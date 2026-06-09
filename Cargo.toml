@@ -1,0 +1,19 @@
+[package]
+name = "tree-viewer"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "tv"
+path = "src/main.rs"
+
+[dependencies]
+ratatui = "0.28"
+crossterm = "0.27"
+ignore = "0.4"
+fuzzy-matcher = "0.3"
+syntect = "5"
+anyhow = "1"
+pulldown-cmark = "0.9"
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"

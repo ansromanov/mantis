@@ -1,0 +1,303 @@
+use pulldown_cmark::{Alignment, Event, HeadingLevel, Options, Parser, Tag};
+use ratatui::style::{Color, Modifier, Style};
+
+pub fn render(src: &str) -> Vec<Vec<(Style, String)>> {
+    let mut lines: Vec<Vec<(Style, String)>> = Vec::new();
+    let mut current: Vec<(Style, String)> = Vec::new();
+    let mut style_stack: Vec<Style> = vec![Style::default()];
+    let mut code_buf: Vec<String> = Vec::new();
+    let mut in_code = false;
+    let mut list_depth: usize = 0;
+    let mut bq_depth: usize = 0;
+
+    // Table accumulation state
+    let mut table_aligns: Vec<Alignment> = Vec::new();
+    let mut table_rows: Vec<(bool, Vec<String>)> = Vec::new(); // (is_header, cells)
+    let mut table_row_cells: Vec<String> = Vec::new();
+    let mut table_cell_buf = String::new();
+    let mut in_table = false;
+    let mut in_table_header = false;
+    let mut in_table_cell = false;
+
+    for event in Parser::new_ext(src, Options::all()) {
+        match event {
+            Event::Start(Tag::Table(aligns)) => {
+                flush(&mut lines, &mut current, bq_depth);
+                table_aligns = aligns;
+                table_rows.clear();
+                in_table = true;
+            }
+            Event::End(Tag::Table(_)) => {
+                in_table = false;
+                lines.extend(render_table(&table_rows, &table_aligns));
+                table_rows.clear();
+                table_aligns.clear();
+            }
+            Event::Start(Tag::TableHead) => {
+                in_table_header = true;
+            }
+            Event::End(Tag::TableHead) => {
+                in_table_header = false;
+            }
+            Event::Start(Tag::TableRow) => {
+                table_row_cells.clear();
+            }
+            Event::End(Tag::TableRow) => {
+                table_rows.push((in_table_header, std::mem::take(&mut table_row_cells)));
+            }
+            Event::Start(Tag::TableCell) => {
+                table_cell_buf.clear();
+                in_table_cell = true;
+            }
+            Event::End(Tag::TableCell) => {
+                in_table_cell = false;
+                table_row_cells.push(std::mem::take(&mut table_cell_buf));
+            }
+
+            Event::Start(Tag::Heading(level, _, _)) => {
+                flush(&mut lines, &mut current, bq_depth);
+                style_stack.push(heading_style(level));
+            }
+            Event::End(Tag::Heading(_, _, _)) => {
+                flush(&mut lines, &mut current, bq_depth);
+                style_stack.pop();
+                lines.push(vec![]);
+            }
+            Event::Start(Tag::Paragraph) => {}
+            Event::End(Tag::Paragraph) => {
+                if !in_table {
+                    flush(&mut lines, &mut current, bq_depth);
+                    lines.push(vec![]);
+                }
+            }
+            Event::Start(Tag::Strong) => {
+                let s = top(&style_stack).add_modifier(Modifier::BOLD);
+                style_stack.push(s);
+            }
+            Event::End(Tag::Strong) => {
+                style_stack.pop();
+            }
+            Event::Start(Tag::Emphasis) => {
+                let s = top(&style_stack).add_modifier(Modifier::ITALIC);
+                style_stack.push(s);
+            }
+            Event::End(Tag::Emphasis) => {
+                style_stack.pop();
+            }
+            Event::Start(Tag::Strikethrough) => {
+                let s = top(&style_stack).add_modifier(Modifier::CROSSED_OUT);
+                style_stack.push(s);
+            }
+            Event::End(Tag::Strikethrough) => {
+                style_stack.pop();
+            }
+            Event::Start(Tag::CodeBlock(_)) => {
+                flush(&mut lines, &mut current, bq_depth);
+                in_code = true;
+                code_buf.clear();
+            }
+            Event::End(Tag::CodeBlock(_)) => {
+                in_code = false;
+                let dim = Style::default().fg(Color::DarkGray);
+                let code = Style::default().fg(Color::LightYellow);
+                if !code_buf.is_empty() {
+                    lines.push(vec![(dim, "  ┌──".to_string())]);
+                    for cl in code_buf.drain(..) {
+                        lines.push(vec![(dim, "  │ ".to_string()), (code, cl)]);
+                    }
+                    lines.push(vec![(dim, "  └──".to_string())]);
+                }
+                lines.push(vec![]);
+            }
+            Event::Start(Tag::List(_)) => {
+                if list_depth == 0 {
+                    flush(&mut lines, &mut current, bq_depth);
+                }
+                list_depth += 1;
+            }
+            Event::End(Tag::List(_)) => {
+                list_depth = list_depth.saturating_sub(1);
+                if list_depth == 0 {
+                    lines.push(vec![]);
+                }
+            }
+            Event::Start(Tag::Item) => {
+                flush(&mut lines, &mut current, bq_depth);
+                let indent = "  ".repeat(list_depth.saturating_sub(1));
+                current.push((Style::default().fg(Color::Cyan), format!("{}• ", indent)));
+            }
+            Event::End(Tag::Item) => {
+                flush(&mut lines, &mut current, bq_depth);
+            }
+            Event::Start(Tag::BlockQuote) => {
+                flush(&mut lines, &mut current, bq_depth);
+                bq_depth += 1;
+                style_stack.push(Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC));
+            }
+            Event::End(Tag::BlockQuote) => {
+                flush(&mut lines, &mut current, bq_depth);
+                bq_depth = bq_depth.saturating_sub(1);
+                style_stack.pop();
+                lines.push(vec![]);
+            }
+            Event::Start(Tag::Link(_, _, _)) | Event::End(Tag::Link(_, _, _)) => {}
+            Event::Start(Tag::Image(_, _, _)) => {
+                if !in_table_cell {
+                    current.push((Style::default().fg(Color::DarkGray), "[img]".to_string()));
+                }
+            }
+            Event::End(Tag::Image(_, _, _)) => {}
+            Event::Text(t) => {
+                if in_code {
+                    for line in t.lines() {
+                        code_buf.push(line.to_owned());
+                    }
+                } else if in_table_cell {
+                    table_cell_buf.push_str(&t);
+                } else {
+                    let s = top(&style_stack);
+                    current.push((s, t.to_string()));
+                }
+            }
+            Event::Code(t) => {
+                if in_table_cell {
+                    table_cell_buf.push('`');
+                    table_cell_buf.push_str(&t);
+                    table_cell_buf.push('`');
+                } else {
+                    current.push((Style::default().fg(Color::LightYellow), format!("`{}`", t)));
+                }
+            }
+            Event::SoftBreak => {
+                if !in_table_cell {
+                    current.push((top(&style_stack), " ".to_string()));
+                }
+            }
+            Event::HardBreak => {
+                if !in_table_cell {
+                    flush(&mut lines, &mut current, bq_depth);
+                }
+            }
+            Event::Rule => {
+                flush(&mut lines, &mut current, bq_depth);
+                lines.push(vec![(Style::default().fg(Color::DarkGray), "─".repeat(60))]);
+                lines.push(vec![]);
+            }
+            Event::TaskListMarker(checked) => {
+                if let Some(last) = current.last_mut() {
+                    let trimmed = last.1.trim_end_matches("• ").to_string();
+                    last.1 = format!("{}{} ", trimmed, if checked { "☑" } else { "☐" });
+                }
+            }
+            _ => {}
+        }
+    }
+    flush(&mut lines, &mut current, bq_depth);
+    lines
+}
+
+fn render_table(
+    rows: &[(bool, Vec<String>)],
+    aligns: &[Alignment],
+) -> Vec<Vec<(Style, String)>> {
+    if rows.is_empty() {
+        return vec![];
+    }
+    let col_count = rows.iter().map(|(_, c)| c.len()).max().unwrap_or(0);
+    if col_count == 0 {
+        return vec![];
+    }
+
+    let mut col_widths: Vec<usize> = vec![1; col_count];
+    for (_, cells) in rows {
+        for (i, cell) in cells.iter().enumerate() {
+            if i < col_count {
+                col_widths[i] = col_widths[i].max(cell.len());
+            }
+        }
+    }
+
+    let dim = Style::default().fg(Color::DarkGray);
+    let header_style = Style::default().fg(Color::LightCyan).add_modifier(Modifier::BOLD);
+    let cell_style = Style::default();
+
+    let mut out: Vec<Vec<(Style, String)>> = Vec::new();
+
+    out.push(vec![(dim, table_border('┌', '─', '┬', '┐', &col_widths))]);
+
+    for (is_header, cells) in rows {
+        let mut spans: Vec<(Style, String)> = Vec::new();
+        spans.push((dim, "│".to_string()));
+        let style = if *is_header { header_style } else { cell_style };
+        for (i, w) in col_widths.iter().enumerate() {
+            let text = cells.get(i).map(|s| s.as_str()).unwrap_or("");
+            let align = aligns.get(i).copied().unwrap_or(Alignment::None);
+            spans.push((style, format!(" {} ", pad(text, *w, align))));
+            spans.push((dim, "│".to_string()));
+        }
+        out.push(spans);
+
+        if *is_header {
+            out.push(vec![(dim, table_border('├', '─', '┼', '┤', &col_widths))]);
+        }
+    }
+
+    out.push(vec![(dim, table_border('└', '─', '┴', '┘', &col_widths))]);
+    out.push(vec![]);
+    out
+}
+
+fn table_border(left: char, fill: char, mid: char, right: char, widths: &[usize]) -> String {
+    let mut s = String::from(left);
+    for (i, w) in widths.iter().enumerate() {
+        for _ in 0..(*w + 2) {
+            s.push(fill);
+        }
+        s.push(if i < widths.len() - 1 { mid } else { right });
+    }
+    s
+}
+
+fn pad(text: &str, width: usize, align: Alignment) -> String {
+    match align {
+        Alignment::Right => format!("{:>width$}", text, width = width),
+        Alignment::Center => {
+            let pad = width.saturating_sub(text.len());
+            format!("{}{}{}", " ".repeat(pad / 2), text, " ".repeat(pad - pad / 2))
+        }
+        _ => format!("{:<width$}", text, width = width),
+    }
+}
+
+fn flush(lines: &mut Vec<Vec<(Style, String)>>, spans: &mut Vec<(Style, String)>, bq_depth: usize) {
+    if spans.is_empty() {
+        return;
+    }
+    let mut line: Vec<(Style, String)> = Vec::new();
+    if bq_depth > 0 {
+        line.push((Style::default().fg(Color::DarkGray), "│ ".repeat(bq_depth)));
+    }
+    line.extend(std::mem::take(spans));
+    lines.push(line);
+}
+
+fn top(stack: &[Style]) -> Style {
+    stack.last().copied().unwrap_or_default()
+}
+
+fn heading_style(level: HeadingLevel) -> Style {
+    match level {
+        HeadingLevel::H1 => Style::default()
+            .fg(Color::LightCyan)
+            .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        HeadingLevel::H2 => Style::default()
+            .fg(Color::LightYellow)
+            .add_modifier(Modifier::BOLD),
+        HeadingLevel::H3 => Style::default()
+            .fg(Color::LightGreen)
+            .add_modifier(Modifier::BOLD),
+        HeadingLevel::H4 | HeadingLevel::H5 | HeadingLevel::H6 => {
+            Style::default().fg(Color::White).add_modifier(Modifier::BOLD)
+        }
+    }
+}
