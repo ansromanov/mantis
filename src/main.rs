@@ -18,11 +18,22 @@ mod tree;
 mod ui;
 
 fn main() -> anyhow::Result<()> {
-    let root = std::env::args()
+    let arg = std::env::args()
         .nth(1)
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("."))
         .canonicalize()?;
+
+    // If a file is given, root the tree at its parent and open the file.
+    let (root, file) = if arg.is_file() {
+        let parent = arg
+            .parent()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("."));
+        (parent, Some(arg))
+    } else {
+        (arg, None)
+    };
 
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -33,6 +44,9 @@ fn main() -> anyhow::Result<()> {
 
     let cfg = config::load(&root);
     let mut app = app::App::new(root, cfg)?;
+    if let Some(file) = file {
+        app.open_and_reveal(&file);
+    }
 
     loop {
         terminal.draw(|f| ui::draw(f, &mut app))?;

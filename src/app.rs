@@ -517,6 +517,14 @@ impl App {
         }
     }
 
+    /// Opens a file and selects it in the tree, expanding parent directories
+    /// as needed. Used when a file path is passed on the command line.
+    pub fn open_and_reveal(&mut self, path: &Path) {
+        self.open_file(path);
+        self.reveal_in_tree(path);
+        self.focus = Focus::Content;
+    }
+
     pub fn open_file(&mut self, path: &Path) {
         self.current_file = Some(path.to_path_buf());
         self.is_diff = false;
@@ -914,6 +922,25 @@ mod tests {
         assert!(app.is_diff);
         assert!(app.content_title.is_some());
         assert!(app.content.iter().any(|l| l.starts_with("+two")));
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn open_and_reveal_selects_file_in_tree() {
+        let root = temp_tree();
+        let mut app = app_for(&root);
+        // Reveal a file nested inside a collapsed subdirectory.
+        let nested = root.join("sub").join("c.txt");
+        app.open_and_reveal(&nested);
+
+        assert_eq!(app.current_file.as_deref(), Some(nested.as_path()));
+        assert!(matches!(app.focus, Focus::Content));
+        // The parent dir is expanded and the file node is selected.
+        assert!(app.expanded.contains(&root.join("sub")));
+        assert_eq!(
+            app.nodes.get(app.tree_selected).map(|n| n.path.clone()),
+            Some(nested)
+        );
         fs::remove_dir_all(&root).ok();
     }
 
