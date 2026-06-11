@@ -118,7 +118,9 @@ impl SearchState {
         }
         let q = self.query.to_lowercase();
         for path in &self.all_files {
-            let Ok(text) = fs::read_to_string(path) else { continue };
+            let Ok(text) = fs::read_to_string(path) else {
+                continue;
+            };
             for (i, line) in text.lines().enumerate() {
                 if line.to_lowercase().contains(&q) {
                     self.content_results.push(ContentMatch {
@@ -235,7 +237,12 @@ impl App {
 
     fn rebuild(&mut self) {
         let prev = self.nodes.get(self.tree_selected).map(|n| n.path.clone());
-        self.nodes = build_visible(&self.root, &self.expanded, self.show_hidden, self.ignore_gitignore);
+        self.nodes = build_visible(
+            &self.root,
+            &self.expanded,
+            self.show_hidden,
+            self.ignore_gitignore,
+        );
         if let Some(p) = prev {
             if let Some(i) = self.nodes.iter().position(|n| n.path == p) {
                 self.tree_selected = i;
@@ -329,8 +336,7 @@ impl App {
             MouseEventKind::ScrollUp => {
                 if rect_contains(self.content_area, ev.column, ev.row) {
                     self.content_scroll = self.content_scroll.saturating_sub(3);
-                } else if rect_contains(self.tree_area, ev.column, ev.row)
-                    && self.tree_selected > 0
+                } else if rect_contains(self.tree_area, ev.column, ev.row) && self.tree_selected > 0
                 {
                     self.tree_selected -= 1;
                     self.try_open_selected();
@@ -424,7 +430,10 @@ impl App {
 
     pub fn handle_key(&mut self, key: KeyEvent) {
         if self.show_help {
-            if matches!(key.code, KeyCode::Char('?') | KeyCode::Esc | KeyCode::Char('q')) {
+            if matches!(
+                key.code,
+                KeyCode::Char('?') | KeyCode::Esc | KeyCode::Char('q')
+            ) {
                 self.show_help = false;
             }
             return;
@@ -484,7 +493,11 @@ impl App {
             self.reload();
         } else if pressed(&k.search_files, &key) {
             let root = self.root.clone();
-            self.search = Some(SearchState::new(&root, self.show_hidden, self.ignore_gitignore));
+            self.search = Some(SearchState::new(
+                &root,
+                self.show_hidden,
+                self.ignore_gitignore,
+            ));
         } else if pressed(&k.reload, &key) {
             self.reload();
         } else if pressed(&k.search_content, &key) {
@@ -807,7 +820,10 @@ mod tests {
         app.handle_mouse(click(1, 0));
         app.handle_mouse(click(1, 0)); // second click, same row, within window
 
-        assert!(app.search.is_none(), "double click should open and close search");
+        assert!(
+            app.search.is_none(),
+            "double click should open and close search"
+        );
         assert_eq!(app.current_file.as_deref(), Some(target.as_path()));
         fs::remove_dir_all(&root).ok();
     }
@@ -821,7 +837,10 @@ mod tests {
         if app.search.as_ref().unwrap().results_len() >= 2 {
             app.handle_mouse(click(1, 0));
             app.handle_mouse(click(1, 1));
-            assert!(app.search.is_some(), "clicks on different rows must not open");
+            assert!(
+                app.search.is_some(),
+                "clicks on different rows must not open"
+            );
             assert_eq!(app.search.as_ref().unwrap().selected, 1);
         }
         fs::remove_dir_all(&root).ok();

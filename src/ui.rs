@@ -83,9 +83,11 @@ fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
         })
         .collect();
 
-    let list = List::new(items)
-        .block(block)
-        .highlight_style(Style::default().bg(Color::DarkGray).add_modifier(Modifier::BOLD));
+    let list = List::new(items).block(block).highlight_style(
+        Style::default()
+            .bg(Color::DarkGray)
+            .add_modifier(Modifier::BOLD),
+    );
 
     let mut state = ListState::default();
     if !app.nodes.is_empty() {
@@ -128,7 +130,14 @@ fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     let lines: Vec<Line> = if app.is_markdown && !app.show_raw_markdown {
         app.markdown_lines
             .iter()
-            .map(|spans| Line::from(spans.iter().map(|(s, t)| Span::styled(t.as_str(), *s)).collect::<Vec<_>>()))
+            .map(|spans| {
+                Line::from(
+                    spans
+                        .iter()
+                        .map(|(s, t)| Span::styled(t.as_str(), *s))
+                        .collect::<Vec<_>>(),
+                )
+            })
             .collect()
     } else {
         let ln_width = app.content.len().to_string().len().max(1);
@@ -152,10 +161,7 @@ fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                 .enumerate()
                 .map(|(i, text)| {
                     Line::from(vec![
-                        Span::styled(
-                            format!("{:>width$} ", i + 1, width = ln_width),
-                            ln_style,
-                        ),
+                        Span::styled(format!("{:>width$} ", i + 1, width = ln_width), ln_style),
                         Span::raw(text.as_str()),
                     ])
                 })
@@ -163,7 +169,11 @@ fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         }
     };
 
-    let hscroll = if app.word_wrap { 0 } else { app.content_hscroll as u16 };
+    let hscroll = if app.word_wrap {
+        0
+    } else {
+        app.content_hscroll as u16
+    };
     let mut para = Paragraph::new(lines)
         .block(block)
         .scroll((app.content_scroll as u16, hscroll));
@@ -184,12 +194,24 @@ fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
 fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
     let hidden_indicator = if app.show_hidden { " [hidden]" } else { "" };
     let md_hint = if app.is_markdown {
-        if app.show_raw_markdown { "  M render" } else { "  M raw" }
+        if app.show_raw_markdown {
+            "  M render"
+        } else {
+            "  M raw"
+        }
     } else {
         ""
     };
-    let wrap_hint = if app.word_wrap { "  z no-wrap" } else { "  z wrap" };
-    let hscroll_hint = if app.word_wrap { "" } else { "  ←/→ h-scroll  0 reset col" };
+    let wrap_hint = if app.word_wrap {
+        "  z no-wrap"
+    } else {
+        "  z wrap"
+    };
+    let hscroll_hint = if app.word_wrap {
+        ""
+    } else {
+        "  ←/→ h-scroll  0 reset col"
+    };
     let content_hint = format!(
         " j/k scroll  PgUp/PgDn{}  g/G top/bot  Tab panel  q quit{}{}",
         hscroll_hint, md_hint, wrap_hint
@@ -249,7 +271,12 @@ fn draw_search(f: &mut Frame, app: &mut App, area: Rect) {
     };
     f.render_widget(
         Paragraph::new(Line::from(vec![
-            Span::styled("> ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "> ",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::raw(search.query.as_str()),
             Span::styled("█", Style::default().fg(Color::Yellow)),
             Span::styled(hint, Style::default().fg(Color::DarkGray)),
@@ -322,12 +349,21 @@ fn draw_help(f: &mut Frame, area: Rect) {
     let inner = block.inner(popup);
     f.render_widget(block, popup);
 
-    let key = |k: &'static str| Span::styled(k, Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
+    let key = |k: &'static str| {
+        Span::styled(
+            k,
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )
+    };
     let desc = |d: &'static str| Span::styled(d, Style::default().fg(Color::White));
     let section = |s: &'static str| {
         Line::from(vec![Span::styled(
             s,
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
         )])
     };
     let gap = Line::from("");
@@ -354,10 +390,16 @@ fn draw_help(f: &mut Frame, area: Rect) {
         Line::from(vec![key("  0          "), desc("reset horizontal scroll")]),
         Line::from(vec![key("  g / G      "), desc("top / bottom")]),
         Line::from(vec![key("  z          "), desc("toggle word wrap")]),
-        Line::from(vec![key("  M          "), desc("toggle markdown render (md files)")]),
+        Line::from(vec![
+            key("  M          "),
+            desc("toggle markdown render (md files)"),
+        ]),
         gap.clone(),
         section("Search popup"),
-        Line::from(vec![key("  Tab        "), desc("switch files ↔ content mode")]),
+        Line::from(vec![
+            key("  Tab        "),
+            desc("switch files ↔ content mode"),
+        ]),
         Line::from(vec![key("  Enter      "), desc("open selected result")]),
         Line::from(vec![key("  ↑↓         "), desc("navigate results")]),
         Line::from(vec![key("  Esc        "), desc("close search")]),

@@ -11,13 +11,25 @@ pub struct TreeNode {
     pub is_dir: bool,
 }
 
-pub fn build_visible(root: &Path, expanded: &HashSet<PathBuf>, show_hidden: bool, ignore_gitignore: bool) -> Vec<TreeNode> {
+pub fn build_visible(
+    root: &Path,
+    expanded: &HashSet<PathBuf>,
+    show_hidden: bool,
+    ignore_gitignore: bool,
+) -> Vec<TreeNode> {
     let mut nodes = Vec::new();
     collect(root, 0, expanded, show_hidden, ignore_gitignore, &mut nodes);
     nodes
 }
 
-fn collect(dir: &Path, depth: usize, expanded: &HashSet<PathBuf>, show_hidden: bool, ignore_gitignore: bool, out: &mut Vec<TreeNode>) {
+fn collect(
+    dir: &Path,
+    depth: usize,
+    expanded: &HashSet<PathBuf>,
+    show_hidden: bool,
+    ignore_gitignore: bool,
+    out: &mut Vec<TreeNode>,
+) {
     let mut entries: Vec<_> = WalkBuilder::new(dir)
         .max_depth(Some(1))
         .hidden(!show_hidden)
@@ -51,7 +63,14 @@ fn collect(dir: &Path, depth: usize, expanded: &HashSet<PathBuf>, show_hidden: b
         });
 
         if is_dir && expanded.contains(&path) {
-            collect(&path, depth + 1, expanded, show_hidden, ignore_gitignore, out);
+            collect(
+                &path,
+                depth + 1,
+                expanded,
+                show_hidden,
+                ignore_gitignore,
+                out,
+            );
         }
     }
 }
