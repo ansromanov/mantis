@@ -134,6 +134,68 @@ impl SearchState {
     }
 }
 
+/// Fuzzy-filterable list of the commits that touched a single file.
+pub struct HistoryState {
+    pub file: PathBuf,
+    pub commits: Vec<crate::git::Commit>,
+    pub query: String,
+    pub filtered: Vec<usize>, // indices into `commits`, in display order
+    pub selected: usize,
+}
+
+impl HistoryState {
+    pub fn new(file: PathBuf, commits: Vec<crate::git::Commit>) -> Self {
+        let filtered = (0..commits.len()).collect();
+        HistoryState {
+            file,
+            commits,
+            query: String::new(),
+            filtered,
+            selected: 0,
+        }
+    }
+
+    pub fn push(&mut self, c: char) {
+        self.query.push(c);
+        self.refilter();
+    }
+
+    pub fn pop(&mut self) {
+        self.query.pop();
+        self.refilter();
+    }
+
+    pub fn results_len(&self) -> usize {
+        self.filtered.len()
+    }
+
+    pub fn selected_commit(&self) -> Option<&crate::git::Commit> {
+        self.filtered
+            .get(self.selected)
+            .and_then(|&i| self.commits.get(i))
+    }
+
+    fn refilter(&mut self) {
+        self.selected = 0;
+        if self.query.is_empty() {
+            self.filtered = (0..self.commits.len()).collect();
+            return;
+        }
+        let matcher = SkimMatcherV2::default();
+        let mut scored: Vec<(usize, i64)> = self
+            .commits
+            .iter()
+            .enumerate()
+            .filter_map(|(i, c)| {
+                let hay = format!("{} {} {}", c.short, c.date, c.subject);
+                matcher.fuzzy_match(&hay, &self.query).map(|sc| (i, sc))
+            })
+            .collect();
+        scored.sort_by_key(|(_, sc)| std::cmp::Reverse(*sc));
+        self.filtered = scored.into_iter().map(|(i, _)| i).collect();
+    }
+}
+
 pub struct App {
     pub root: PathBuf,
     pub nodes: Vec<TreeNode>,
@@ -148,8 +210,11 @@ pub struct App {
     pub content_hscroll: usize,
     pub word_wrap: bool,
     pub current_file: Option<PathBuf>,
+    pub is_diff: bool,
+    pub content_title: Option<String>,
     pub focus: Focus,
     pub search: Option<SearchState>,
+    pub history: Option<HistoryState>,
     pub show_hidden: bool,
     pub ignore_gitignore: bool,
     pub tree_width: u16,
@@ -162,6 +227,8 @@ pub struct App {
     pub content_area: Rect,
     pub search_area: Rect,
     pub search_offset: usize,
+    pub history_area: Rect,
+    pub history_offset: usize,
     // Time and result index of the last search-result click, for double-click.
     last_click: Option<(Instant, usize)>,
     highlighter: Highlighter,
@@ -186,8 +253,11 @@ impl App {
             content_hscroll: 0,
             word_wrap: cfg.word_wrap,
             current_file: None,
+            is_diff: false,
+            content_title: None,
             focus: Focus::Tree,
             search: None,
+            history: None,
             show_hidden: cfg.show_hidden,
             ignore_gitignore: cfg.ignore_gitignore,
             tree_width: cfg.tree_width,
@@ -199,6 +269,8 @@ impl App {
             content_area: Rect::default(),
             search_area: Rect::default(),
             search_offset: 0,
+            history_area: Rect::default(),
+            history_offset: 0,
             last_click: None,
             highlighter: Highlighter::new(),
             last_refresh: Instant::now(),
@@ -216,6 +288,10 @@ impl App {
             s.reload_files(&root, show_hidden, ignore_gitignore);
         }
         self.rebuild();
+        // A diff view is transient; don't clobber it with a file re-open.
+        if self.is_diff {
+            return;
+        }
         if let Some(path) = self.current_file.clone() {
             // Re-opening resets scroll, but a periodic refresh of the file
             // already on screen should keep the reader's position.
@@ -300,8 +376,57 @@ impl App {
         }
     }
 
+    fn handle_history_mouse(&mut self, ev: MouseEvent) {
+        match ev.kind {
+            MouseEventKind::Down(MouseButton::Left) => {
+                if !rect_contains(self.history_area, ev.column, ev.row) {
+                    return;
+                }
+                let index = self.history_offset + (ev.row - self.history_area.y) as usize;
+                let in_range = self
+                    .history
+                    .as_ref()
+                    .is_some_and(|h| index < h.results_len());
+                if !in_range {
+                    return;
+                }
+                if let Some(h) = &mut self.history {
+                    h.selected = index;
+                }
+                let now = Instant::now();
+                let double = matches!(
+                    self.last_click,
+                    Some((t, i)) if i == index && now.duration_since(t) < Duration::from_millis(400)
+                );
+                if double {
+                    self.last_click = None;
+                    self.show_selected_revision();
+                } else {
+                    self.last_click = Some((now, index));
+                }
+            }
+            MouseEventKind::ScrollDown => {
+                if let Some(h) = &mut self.history {
+                    if h.selected + 1 < h.results_len() {
+                        h.selected += 1;
+                    }
+                }
+            }
+            MouseEventKind::ScrollUp => {
+                if let Some(h) = &mut self.history {
+                    h.selected = h.selected.saturating_sub(1);
+                }
+            }
+            _ => {}
+        }
+    }
+
     pub fn handle_mouse(&mut self, ev: MouseEvent) {
         if self.show_help {
+            return;
+        }
+        if self.history.is_some() {
+            self.handle_history_mouse(ev);
             return;
         }
         if self.search.is_some() {
@@ -394,6 +519,8 @@ impl App {
 
     pub fn open_file(&mut self, path: &Path) {
         self.current_file = Some(path.to_path_buf());
+        self.is_diff = false;
+        self.content_title = None;
         self.content_scroll = 0;
         self.content_hscroll = 0;
 
@@ -438,7 +565,9 @@ impl App {
             }
             return;
         }
-        if self.search.is_some() {
+        if self.history.is_some() {
+            self.handle_history_key(key);
+        } else if self.search.is_some() {
             self.handle_search_key(key);
         } else {
             self.handle_normal_key(key);
@@ -482,6 +611,80 @@ impl App {
         }
     }
 
+    /// Opens the git history of the currently displayed file as a picker.
+    /// Does nothing if no file is open or the file has no tracked history.
+    fn open_file_history(&mut self) {
+        let Some(file) = self.current_file.clone() else {
+            return;
+        };
+        let commits = crate::git::file_log(&self.root, &file);
+        if commits.is_empty() {
+            return;
+        }
+        self.history = Some(HistoryState::new(file, commits));
+    }
+
+    fn handle_history_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Esc => self.history = None,
+            KeyCode::Enter => self.show_selected_revision(),
+            KeyCode::Up => {
+                if let Some(h) = &mut self.history {
+                    h.selected = h.selected.saturating_sub(1);
+                }
+            }
+            KeyCode::Down => {
+                if let Some(h) = &mut self.history {
+                    if h.selected + 1 < h.results_len() {
+                        h.selected += 1;
+                    }
+                }
+            }
+            KeyCode::Backspace => {
+                if let Some(h) = &mut self.history {
+                    h.pop();
+                }
+            }
+            KeyCode::Char(c) => {
+                if let Some(h) = &mut self.history {
+                    h.push(c);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Loads the diff of the selected revision into the content panel.
+    fn show_selected_revision(&mut self) {
+        let picked = self.history.as_ref().and_then(|h| {
+            h.selected_commit()
+                .map(|c| (c.hash.clone(), c.short.clone(), h.file.clone()))
+        });
+        self.history = None;
+        if let Some((hash, short, file)) = picked {
+            let diff = crate::git::file_diff(&self.root, &hash, &file);
+            self.show_diff(&file, &short, diff);
+        }
+    }
+
+    fn show_diff(&mut self, file: &Path, short: &str, lines: Vec<String>) {
+        self.current_file = Some(file.to_path_buf());
+        self.is_markdown = false;
+        self.show_raw_markdown = false;
+        self.markdown_lines = Vec::new();
+        self.is_diff = true;
+        self.content_scroll = 0;
+        self.content_hscroll = 0;
+        let rel = file.strip_prefix(&self.root).unwrap_or(file);
+        self.content_title = Some(format!(" diff {} — {} ", short, rel.display()));
+        self.highlighted = lines
+            .iter()
+            .map(|l| vec![(diff_line_style(l), l.clone())])
+            .collect();
+        self.content = lines;
+        self.focus = Focus::Content;
+    }
+
     fn handle_normal_key(&mut self, key: KeyEvent) {
         let k = &self.keys;
         if pressed(&k.quit, &key) {
@@ -505,6 +708,8 @@ impl App {
             let mut s = SearchState::new(&root, self.show_hidden, self.ignore_gitignore);
             s.toggle_mode();
             self.search = Some(s);
+        } else if pressed(&k.file_history, &key) {
+            self.open_file_history();
         } else if pressed(&k.switch_panel, &key) {
             self.focus = match self.focus {
                 Focus::Tree => Focus::Content,
@@ -623,6 +828,26 @@ fn rect_contains(area: Rect, col: u16, row: u16) -> bool {
         && row < area.y.saturating_add(area.height)
 }
 
+/// Colors a unified-diff line by its leading marker.
+fn diff_line_style(line: &str) -> ratatui::style::Style {
+    use ratatui::style::{Color, Modifier, Style};
+    if line.starts_with("@@") {
+        Style::default().fg(Color::Cyan)
+    } else if line.starts_with("+++") || line.starts_with("---") {
+        Style::default()
+            .fg(Color::DarkGray)
+            .add_modifier(Modifier::BOLD)
+    } else if line.starts_with('+') {
+        Style::default().fg(Color::Green)
+    } else if line.starts_with('-') {
+        Style::default().fg(Color::Red)
+    } else if line.starts_with("diff ") || line.starts_with("index ") {
+        Style::default().fg(Color::DarkGray)
+    } else {
+        Style::default()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -646,6 +871,60 @@ mod tests {
 
     fn app_for(root: &Path) -> App {
         App::new(root.to_path_buf(), Config::default()).unwrap()
+    }
+
+    /// A temp git repo with one committed file plus an uncommitted change.
+    fn temp_git_tree() -> PathBuf {
+        use std::process::Command;
+        static COUNTER: AtomicUsize = AtomicUsize::new(0);
+        let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!("tv_app_git_{}_{n}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let git = |args: &[&str]| {
+            Command::new("git")
+                .arg("-C")
+                .arg(&dir)
+                .args(["-c", "user.email=t@e.x", "-c", "user.name=T"])
+                .args(args)
+                .status()
+                .unwrap();
+        };
+        git(&["init", "-q"]);
+        fs::write(dir.join("tracked.txt"), "one\n").unwrap();
+        git(&["add", "tracked.txt"]);
+        git(&["commit", "-q", "-m", "add tracked"]);
+        fs::write(dir.join("tracked.txt"), "one\ntwo\n").unwrap();
+        dir.canonicalize().unwrap()
+    }
+
+    #[test]
+    fn file_history_opens_picker_and_shows_diff() {
+        let root = temp_git_tree();
+        let mut app = app_for(&root);
+        app.open_file(&root.join("tracked.txt"));
+
+        // H opens the history picker.
+        app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::empty()));
+        assert!(app.history.is_some());
+        assert!(!app.history.as_ref().unwrap().commits.is_empty());
+
+        // Enter loads the diff into the content panel.
+        app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+        assert!(app.history.is_none());
+        assert!(app.is_diff);
+        assert!(app.content_title.is_some());
+        assert!(app.content.iter().any(|l| l.starts_with("+two")));
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn file_history_noop_without_git_history() {
+        let root = temp_tree(); // not a git repo
+        let mut app = app_for(&root);
+        app.open_file(&root.join("a.txt"));
+        app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::empty()));
+        assert!(app.history.is_none());
+        fs::remove_dir_all(&root).ok();
     }
 
     fn mouse(kind: MouseEventKind, col: u16, row: u16) -> MouseEvent {

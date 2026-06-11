@@ -14,6 +14,8 @@ fuzzy search, and mouse support. Built with [ratatui](https://ratatui.rs).
 - **Markdown rendering** in the terminal — headings, tables, task lists, code
   blocks, blockquotes, and more (press `M` to toggle the raw source)
 - **Fuzzy search** over file names, or full-text search across file contents
+- **Git file history** — pick a past revision from an fzf-style list and view
+  its diff against your working tree, with red/green coloring
 - **Mouse support** — click to select, fold/unfold directories, switch panes,
   and scroll
 - **Configurable** layout, behavior, and keybindings via a simple TOML file
@@ -56,6 +58,7 @@ Press `?` at any time for in-app help, and `q` to quit.
 | `f`            | Content (full-text) search |
 | `r`            | Reload tree             |
 | `Alt+.`        | Toggle hidden files     |
+| `H`            | Git history of current file |
 
 ### Tree panel
 
@@ -92,8 +95,16 @@ Press `?` at any time for in-app help, and `q` to quit.
 - **Click** a tree row to select it — opens a file, or folds/unfolds a directory.
 - **Click** a pane to focus it.
 - **Scroll wheel** scrolls whichever pane is under the cursor.
-- In the search popup, **single-click** selects a result and **double-click**
-  opens it.
+- In the search and history popups, **single-click** selects an entry and
+  **double-click** activates it.
+
+## Git history
+
+With a file open in the content panel, press `H` to open an fzf-style list of
+the commits that touched it. Type to fuzzy-filter, navigate with `↑`/`↓`, and
+press `Enter` (or double-click) to load the diff of that revision against your
+current working tree into the content panel — additions in green, deletions in
+red. Requires `git` on your `PATH` and the file to be tracked in a repository.
 
 ## Configuration
 
@@ -120,6 +131,7 @@ search_files = ["/"]
 search_content = ["f"]
 reload = ["r"]
 switch_panel = ["Tab"]
+file_history = ["H"]
 
 nav_up = ["Up", "k"]
 nav_down = ["Down", "j"]
