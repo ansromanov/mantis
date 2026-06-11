@@ -107,7 +107,7 @@ impl SearchState {
                     .map(|sc| (p.clone(), sc))
             })
             .collect();
-        scored.sort_by(|a, b| b.1.cmp(&a.1));
+        scored.sort_by_key(|(_, score)| std::cmp::Reverse(*score));
         self.file_results = scored.into_iter().map(|(p, _)| p).collect();
     }
 
@@ -350,7 +350,7 @@ impl App {
                 let in_range = self
                     .search
                     .as_ref()
-                    .map_or(false, |s| index < s.results_len());
+                    .is_some_and(|s| index < s.results_len());
                 if !in_range {
                     return;
                 }

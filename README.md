@@ -1,11 +1,11 @@
-<p align="center">
-  <img src="media/intro.png" alt="tree-viewer" width="800">
-</p>
-
 # tree-viewer (`tv`)
 
 A fast terminal file tree viewer with syntax highlighting, markdown rendering,
 fuzzy search, and mouse support. Built with [ratatui](https://ratatui.rs).
+
+<p align="center">
+  <img src="media/intro.png" alt="tree-viewer" width="800">
+</p>
 
 ## Features
 

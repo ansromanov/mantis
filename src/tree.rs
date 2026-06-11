@@ -32,7 +32,7 @@ fn collect(dir: &Path, depth: usize, expanded: &HashSet<PathBuf>, show_hidden: b
     entries.sort_by(|a, b| {
         let ad = a.file_type().map(|t| t.is_dir()).unwrap_or(false);
         let bd = b.file_type().map(|t| t.is_dir()).unwrap_or(false);
-        bd.cmp(&ad).then_with(|| a.file_name().cmp(&b.file_name()))
+        bd.cmp(&ad).then_with(|| a.file_name().cmp(b.file_name()))
     });
 
     for e in entries {
