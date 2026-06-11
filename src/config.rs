@@ -59,6 +59,7 @@ pub struct Keymap {
     pub search_content: Vec<KeyBinding>,
     pub reload: Vec<KeyBinding>,
     pub switch_panel: Vec<KeyBinding>,
+    pub file_history: Vec<KeyBinding>,
     // Shared navigation (tree + content)
     pub nav_up: Vec<KeyBinding>,
     pub nav_down: Vec<KeyBinding>,
@@ -87,6 +88,7 @@ impl Default for Keymap {
             search_content: bind(&["f"]),
             reload: bind(&["r"]),
             switch_panel: bind(&["Tab"]),
+            file_history: bind(&["H"]),
             nav_up: bind(&["Up", "k"]),
             nav_down: bind(&["Down", "j"]),
             tree_expand: bind(&["Enter", "Right", "l"]),

@@ -33,13 +33,17 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         draw_search(f, app, area);
     }
 
+    if app.history.is_some() {
+        draw_history(f, app, area);
+    }
+
     if app.show_help {
         draw_help(f, area);
     }
 }
 
 fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
-    let focused = matches!(app.focus, Focus::Tree) && app.search.is_none();
+    let focused = matches!(app.focus, Focus::Tree) && app.search.is_none() && app.history.is_none();
     let border_style = if focused {
         Style::default().fg(Color::Cyan)
     } else {
@@ -108,26 +112,43 @@ fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
 }
 
 fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
-    let focused = matches!(app.focus, Focus::Content) && app.search.is_none();
+    let focused =
+        matches!(app.focus, Focus::Content) && app.search.is_none() && app.history.is_none();
     let border_style = if focused {
         Style::default().fg(Color::Cyan)
     } else {
         Style::default().fg(Color::DarkGray)
     };
 
-    let title = app
-        .current_file
-        .as_ref()
-        .and_then(|p| p.strip_prefix(&app.root).ok())
-        .map(|rel| format!(" {} ", rel.display()))
-        .unwrap_or_else(|| " No file ".into());
+    let title = if let Some(t) = &app.content_title {
+        t.clone()
+    } else {
+        app.current_file
+            .as_ref()
+            .and_then(|p| p.strip_prefix(&app.root).ok())
+            .map(|rel| format!(" {} ", rel.display()))
+            .unwrap_or_else(|| " No file ".into())
+    };
 
     let block = Block::default()
         .title(title)
         .borders(Borders::ALL)
         .border_style(border_style);
 
-    let lines: Vec<Line> = if app.is_markdown && !app.show_raw_markdown {
+    let lines: Vec<Line> = if app.is_diff {
+        // Diff view: styled spans, no line-number gutter.
+        app.highlighted
+            .iter()
+            .map(|spans| {
+                Line::from(
+                    spans
+                        .iter()
+                        .map(|(s, t)| Span::styled(t.as_str(), *s))
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .collect()
+    } else if app.is_markdown && !app.show_raw_markdown {
         app.markdown_lines
             .iter()
             .map(|spans| {
@@ -213,14 +234,16 @@ fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
         "  ←/→ h-scroll  0 reset col"
     };
     let content_hint = format!(
-        " j/k scroll  PgUp/PgDn{}  g/G top/bot  Tab panel  q quit{}{}",
+        " j/k scroll  PgUp/PgDn{}  g/G top/bot  H history  Tab panel  q quit{}{}",
         hscroll_hint, md_hint, wrap_hint
     );
     let tree_hint = format!(
         " j/k nav  Enter/l expand  h collapse  / files  f content  Tab panel  q quit  ? help{}",
         hidden_indicator
     );
-    let text: &str = if app.search.is_some() {
+    let text: &str = if app.history.is_some() {
+        " ↑↓ navigate  type to filter  Enter show diff  Esc cancel"
+    } else if app.search.is_some() {
         " ↑↓ navigate  Enter select  Tab toggle mode  Esc cancel"
     } else {
         match app.focus {
@@ -337,6 +360,87 @@ fn draw_search(f: &mut Frame, app: &mut App, area: Rect) {
     app.search_offset = state.offset();
 }
 
+fn draw_history(f: &mut Frame, app: &mut App, area: Rect) {
+    let history = app.history.as_ref().unwrap();
+
+    let popup = centered_rect(72, 75, area);
+    f.render_widget(Clear, popup);
+
+    let name = history
+        .file
+        .strip_prefix(&app.root)
+        .unwrap_or(&history.file);
+    let block = Block::default()
+        .title(format!(" History: {} ", name.display()))
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Yellow));
+
+    let inner = block.inner(popup);
+    f.render_widget(block, popup);
+
+    let parts = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Min(0),
+        ])
+        .split(inner);
+
+    // Query input
+    f.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::styled(
+                "> ",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(history.query.as_str()),
+            Span::styled("█", Style::default().fg(Color::Yellow)),
+        ])),
+        parts[0],
+    );
+
+    // Divider
+    f.render_widget(
+        Paragraph::new("─".repeat(inner.width as usize))
+            .style(Style::default().fg(Color::DarkGray)),
+        parts[1],
+    );
+
+    // Commit list
+    let items: Vec<ListItem> = history
+        .filtered
+        .iter()
+        .filter_map(|&i| history.commits.get(i))
+        .map(|c| {
+            ListItem::new(Line::from(vec![
+                Span::styled(format!("{} ", c.short), Style::default().fg(Color::Yellow)),
+                Span::styled(format!("{} ", c.date), Style::default().fg(Color::Cyan)),
+                Span::raw(c.subject.as_str()),
+            ]))
+        })
+        .collect();
+
+    let list = List::new(items).highlight_style(
+        Style::default()
+            .bg(Color::DarkGray)
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::BOLD),
+    );
+
+    let mut state = ListState::default();
+    if history.results_len() > 0 {
+        state.select(Some(history.selected));
+    }
+
+    f.render_stateful_widget(list, parts[2], &mut state);
+
+    app.history_area = parts[2];
+    app.history_offset = state.offset();
+}
+
 fn draw_help(f: &mut Frame, area: Rect) {
     let popup = centered_rect(52, 80, area);
     f.render_widget(Clear, popup);
@@ -394,15 +498,19 @@ fn draw_help(f: &mut Frame, area: Rect) {
             key("  M          "),
             desc("toggle markdown render (md files)"),
         ]),
+        Line::from(vec![
+            key("  H          "),
+            desc("git history of current file"),
+        ]),
         gap.clone(),
-        section("Search popup"),
+        section("Search / history popup"),
         Line::from(vec![
             key("  Tab        "),
             desc("switch files ↔ content mode"),
         ]),
-        Line::from(vec![key("  Enter      "), desc("open selected result")]),
+        Line::from(vec![key("  Enter      "), desc("open result / show diff")]),
         Line::from(vec![key("  ↑↓         "), desc("navigate results")]),
-        Line::from(vec![key("  Esc        "), desc("close search")]),
+        Line::from(vec![key("  Esc        "), desc("close popup")]),
     ];
 
     f.render_widget(Paragraph::new(rows), inner);

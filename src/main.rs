@@ -11,6 +11,7 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 mod app;
 mod config;
 mod file;
+mod git;
 mod highlight;
 mod markdown;
 mod tree;
