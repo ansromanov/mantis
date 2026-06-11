@@ -5,7 +5,7 @@ edition = "2021"
 description = "A fast terminal file tree viewer with syntax highlighting, markdown rendering, fuzzy search, and mouse support."
 license = "MIT"
 readme = "README.md"
-repository = "https://github.com/ansromanov/tv"
+repository = "https://github.com/ansromanov/tree-viewer"
 
 [[bin]]
 name = "tv"
