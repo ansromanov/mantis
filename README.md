@@ -23,8 +23,8 @@ fuzzy search, and mouse support. Built with [ratatui](https://ratatui.rs).
 ## Install
 
 ```sh
-git clone https://github.com/ansromanov/tv.git
-cd tv
+git clone https://github.com/ansromanov/tree-viewer.git
+cd tree-viewer
 cargo build --release
 # binary is at target/release/tv
 ```
