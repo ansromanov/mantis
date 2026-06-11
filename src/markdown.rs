@@ -132,7 +132,11 @@ pub fn render(src: &str) -> Vec<Vec<(Style, String)>> {
             Event::Start(Tag::BlockQuote) => {
                 flush(&mut lines, &mut current, bq_depth);
                 bq_depth += 1;
-                style_stack.push(Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC));
+                style_stack.push(
+                    Style::default()
+                        .fg(Color::DarkGray)
+                        .add_modifier(Modifier::ITALIC),
+                );
             }
             Event::End(Tag::BlockQuote) => {
                 flush(&mut lines, &mut current, bq_depth);
@@ -196,10 +200,7 @@ pub fn render(src: &str) -> Vec<Vec<(Style, String)>> {
     lines
 }
 
-fn render_table(
-    rows: &[(bool, Vec<String>)],
-    aligns: &[Alignment],
-) -> Vec<Vec<(Style, String)>> {
+fn render_table(rows: &[(bool, Vec<String>)], aligns: &[Alignment]) -> Vec<Vec<(Style, String)>> {
     if rows.is_empty() {
         return vec![];
     }
@@ -218,7 +219,9 @@ fn render_table(
     }
 
     let dim = Style::default().fg(Color::DarkGray);
-    let header_style = Style::default().fg(Color::LightCyan).add_modifier(Modifier::BOLD);
+    let header_style = Style::default()
+        .fg(Color::LightCyan)
+        .add_modifier(Modifier::BOLD);
     let cell_style = Style::default();
 
     let mut out: Vec<Vec<(Style, String)>> = Vec::new();
@@ -263,7 +266,12 @@ fn pad(text: &str, width: usize, align: Alignment) -> String {
         Alignment::Right => format!("{:>width$}", text, width = width),
         Alignment::Center => {
             let pad = width.saturating_sub(text.len());
-            format!("{}{}{}", " ".repeat(pad / 2), text, " ".repeat(pad - pad / 2))
+            format!(
+                "{}{}{}",
+                " ".repeat(pad / 2),
+                text,
+                " ".repeat(pad - pad / 2)
+            )
         }
         _ => format!("{:<width$}", text, width = width),
     }
@@ -296,8 +304,8 @@ fn heading_style(level: HeadingLevel) -> Style {
         HeadingLevel::H3 => Style::default()
             .fg(Color::LightGreen)
             .add_modifier(Modifier::BOLD),
-        HeadingLevel::H4 | HeadingLevel::H5 | HeadingLevel::H6 => {
-            Style::default().fg(Color::White).add_modifier(Modifier::BOLD)
-        }
+        HeadingLevel::H4 | HeadingLevel::H5 | HeadingLevel::H6 => Style::default()
+            .fg(Color::White)
+            .add_modifier(Modifier::BOLD),
     }
 }

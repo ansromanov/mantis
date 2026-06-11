@@ -199,9 +199,7 @@ fn global_config_path() -> Option<PathBuf> {
 fn dirs_next() -> Option<PathBuf> {
     std::env::var_os("XDG_CONFIG_HOME")
         .map(PathBuf::from)
-        .or_else(|| {
-            std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config"))
-        })
+        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
 }
 
 #[cfg(test)]
@@ -296,17 +294,35 @@ mod tests {
     fn pressed_matches_any_in_list() {
         let binds = bind(&["Up", "k"]);
         assert!(pressed(&binds, &ev(KeyCode::Up, KeyModifiers::empty())));
-        assert!(pressed(&binds, &ev(KeyCode::Char('k'), KeyModifiers::empty())));
-        assert!(!pressed(&binds, &ev(KeyCode::Char('j'), KeyModifiers::empty())));
+        assert!(pressed(
+            &binds,
+            &ev(KeyCode::Char('k'), KeyModifiers::empty())
+        ));
+        assert!(!pressed(
+            &binds,
+            &ev(KeyCode::Char('j'), KeyModifiers::empty())
+        ));
     }
 
     #[test]
     fn default_keymap_has_expected_bindings() {
         let km = Keymap::default();
-        assert!(pressed(&km.quit, &ev(KeyCode::Char('q'), KeyModifiers::empty())));
-        assert!(pressed(&km.quit, &ev(KeyCode::Char('c'), KeyModifiers::CONTROL)));
-        assert!(pressed(&km.switch_panel, &ev(KeyCode::Tab, KeyModifiers::empty())));
-        assert!(pressed(&km.toggle_hidden, &ev(KeyCode::Char('.'), KeyModifiers::ALT)));
+        assert!(pressed(
+            &km.quit,
+            &ev(KeyCode::Char('q'), KeyModifiers::empty())
+        ));
+        assert!(pressed(
+            &km.quit,
+            &ev(KeyCode::Char('c'), KeyModifiers::CONTROL)
+        ));
+        assert!(pressed(
+            &km.switch_panel,
+            &ev(KeyCode::Tab, KeyModifiers::empty())
+        ));
+        assert!(pressed(
+            &km.toggle_hidden,
+            &ev(KeyCode::Char('.'), KeyModifiers::ALT)
+        ));
     }
 
     #[test]
@@ -315,7 +331,10 @@ mod tests {
         let cfg: Config = toml::from_str("tree_width = 42").unwrap();
         assert_eq!(cfg.tree_width, 42);
         assert!(!cfg.show_hidden);
-        assert!(pressed(&cfg.keys.quit, &ev(KeyCode::Char('q'), KeyModifiers::empty())));
+        assert!(pressed(
+            &cfg.keys.quit,
+            &ev(KeyCode::Char('q'), KeyModifiers::empty())
+        ));
     }
 
     #[test]
