@@ -8,7 +8,7 @@ use ratatui::{
 
 use crate::app::{App, Focus, SearchMode};
 
-pub fn draw(f: &mut Frame, app: &App) {
+pub fn draw(f: &mut Frame, app: &mut App) {
     let area = f.area();
 
     let vert = Layout::default()
@@ -38,7 +38,7 @@ pub fn draw(f: &mut Frame, app: &App) {
     }
 }
 
-fn draw_tree(f: &mut Frame, app: &App, area: Rect) {
+fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
     let focused = matches!(app.focus, Focus::Tree) && app.search.is_none();
     let border_style = if focused {
         Style::default().fg(Color::Cyan)
@@ -93,9 +93,19 @@ fn draw_tree(f: &mut Frame, app: &App, area: Rect) {
     }
 
     f.render_stateful_widget(list, area, &mut state);
+
+    // Record the geometry of the rendered list (inside the border) and the
+    // scroll offset so mouse clicks can be mapped back to node indices.
+    app.tree_area = Rect {
+        x: area.x + 1,
+        y: area.y + 1,
+        width: area.width.saturating_sub(2),
+        height: area.height.saturating_sub(2),
+    };
+    app.tree_offset = state.offset();
 }
 
-fn draw_content(f: &mut Frame, app: &App, area: Rect) {
+fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     let focused = matches!(app.focus, Focus::Content) && app.search.is_none();
     let border_style = if focused {
         Style::default().fg(Color::Cyan)
@@ -162,6 +172,13 @@ fn draw_content(f: &mut Frame, app: &App, area: Rect) {
     }
 
     f.render_widget(para, area);
+
+    app.content_area = Rect {
+        x: area.x + 1,
+        y: area.y + 1,
+        width: area.width.saturating_sub(2),
+        height: area.height.saturating_sub(2),
+    };
 }
 
 fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
@@ -196,7 +213,7 @@ fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
     );
 }
 
-fn draw_search(f: &mut Frame, app: &App, area: Rect) {
+fn draw_search(f: &mut Frame, app: &mut App, area: Rect) {
     let search = app.search.as_ref().unwrap();
 
     let popup = centered_rect(72, 75, area);
@@ -287,6 +304,10 @@ fn draw_search(f: &mut Frame, app: &App, area: Rect) {
     }
 
     f.render_stateful_widget(list, parts[2], &mut state);
+
+    // Record the results-list geometry and scroll offset for mouse mapping.
+    app.search_area = parts[2];
+    app.search_offset = state.offset();
 }
 
 fn draw_help(f: &mut Frame, area: Rect) {
