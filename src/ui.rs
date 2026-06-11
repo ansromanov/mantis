@@ -2,7 +2,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph},
+    widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap},
     Frame,
 };
 
@@ -16,9 +16,13 @@ pub fn draw(f: &mut Frame, app: &App) {
         .constraints([Constraint::Min(0), Constraint::Length(1)])
         .split(area);
 
+    let tree_width = app.tree_width.clamp(5, 95);
     let horiz = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(28), Constraint::Percentage(72)])
+        .constraints([
+            Constraint::Percentage(tree_width),
+            Constraint::Percentage(100 - tree_width),
+        ])
         .split(vert[0]);
 
     draw_tree(f, app, horiz[0]);
@@ -149,9 +153,13 @@ fn draw_content(f: &mut Frame, app: &App, area: Rect) {
         }
     };
 
-    let para = Paragraph::new(lines)
+    let hscroll = if app.word_wrap { 0 } else { app.content_hscroll as u16 };
+    let mut para = Paragraph::new(lines)
         .block(block)
-        .scroll((app.content_scroll as u16, app.content_hscroll as u16));
+        .scroll((app.content_scroll as u16, hscroll));
+    if app.word_wrap {
+        para = para.wrap(Wrap { trim: false });
+    }
 
     f.render_widget(para, area);
 }
@@ -163,9 +171,11 @@ fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
     } else {
         ""
     };
+    let wrap_hint = if app.word_wrap { "  z no-wrap" } else { "  z wrap" };
+    let hscroll_hint = if app.word_wrap { "" } else { "  ←/→ h-scroll  0 reset col" };
     let content_hint = format!(
-        " j/k scroll  PgUp/PgDn  ←/→ h-scroll  0 reset col  g/G top/bot  Tab panel  q quit{}",
-        md_hint
+        " j/k scroll  PgUp/PgDn{}  g/G top/bot  Tab panel  q quit{}{}",
+        hscroll_hint, md_hint, wrap_hint
     );
     let tree_hint = format!(
         " j/k nav  Enter/l expand  h collapse  / files  f content  Tab panel  q quit  ? help{}",
@@ -322,6 +332,7 @@ fn draw_help(f: &mut Frame, area: Rect) {
         Line::from(vec![key("  ←/→        "), desc("horizontal scroll")]),
         Line::from(vec![key("  0          "), desc("reset horizontal scroll")]),
         Line::from(vec![key("  g / G      "), desc("top / bottom")]),
+        Line::from(vec![key("  z          "), desc("toggle word wrap")]),
         Line::from(vec![key("  M          "), desc("toggle markdown render (md files)")]),
         gap.clone(),
         section("Search popup"),

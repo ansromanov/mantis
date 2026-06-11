@@ -30,7 +30,7 @@ fn main() -> anyhow::Result<()> {
     let mut terminal = Terminal::new(backend)?;
     terminal.hide_cursor()?;
 
-    let cfg = config::load();
+    let cfg = config::load(&root);
     let mut app = app::App::new(root, cfg)?;
 
     loop {

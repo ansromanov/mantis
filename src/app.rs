@@ -3,10 +3,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent};
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 
-use crate::config::Config;
+use crate::config::{pressed, Config, Keymap};
 use crate::file::is_binary;
 use crate::highlight::Highlighter;
 use crate::markdown;
@@ -143,13 +143,16 @@ pub struct App {
     pub show_raw_markdown: bool,
     pub content_scroll: usize,
     pub content_hscroll: usize,
+    pub word_wrap: bool,
     pub current_file: Option<PathBuf>,
     pub focus: Focus,
     pub search: Option<SearchState>,
     pub show_hidden: bool,
     pub ignore_gitignore: bool,
+    pub tree_width: u16,
     pub show_help: bool,
     pub should_quit: bool,
+    keys: Keymap,
     highlighter: Highlighter,
     last_refresh: Instant,
 }
@@ -170,13 +173,16 @@ impl App {
             show_raw_markdown: false,
             content_scroll: 0,
             content_hscroll: 0,
+            word_wrap: cfg.word_wrap,
             current_file: None,
             focus: Focus::Tree,
             search: None,
             show_hidden: cfg.show_hidden,
             ignore_gitignore: cfg.ignore_gitignore,
+            tree_width: cfg.tree_width,
             show_help: false,
             should_quit: false,
+            keys: cfg.keys,
             highlighter: Highlighter::new(),
             last_refresh: Instant::now(),
         };
@@ -331,96 +337,82 @@ impl App {
     }
 
     fn handle_normal_key(&mut self, key: KeyEvent) {
-        match key.code {
-            KeyCode::Char('q') => {
-                self.should_quit = true;
-            }
-            KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.should_quit = true;
-            }
-            KeyCode::Char('?') => {
-                self.show_help = !self.show_help;
-            }
-            KeyCode::Char('.') if key.modifiers.contains(KeyModifiers::ALT) => {
-                self.show_hidden = !self.show_hidden;
-                self.reload();
-            }
-            KeyCode::Char('/') => {
-                let root = self.root.clone();
-                self.search = Some(SearchState::new(&root, self.show_hidden, self.ignore_gitignore));
-            }
-            KeyCode::Char('r') => {
-                self.reload();
-            }
-            KeyCode::Char('f') => {
-                let root = self.root.clone();
-                let mut s = SearchState::new(&root, self.show_hidden, self.ignore_gitignore);
-                s.toggle_mode();
-                self.search = Some(s);
-            }
-            KeyCode::Tab => {
-                self.focus = match self.focus {
-                    Focus::Tree => Focus::Content,
-                    Focus::Content => Focus::Tree,
-                };
-            }
-            _ => match self.focus {
+        let k = &self.keys;
+        if pressed(&k.quit, &key) {
+            self.should_quit = true;
+        } else if pressed(&k.help, &key) {
+            self.show_help = !self.show_help;
+        } else if pressed(&k.toggle_hidden, &key) {
+            self.show_hidden = !self.show_hidden;
+            self.reload();
+        } else if pressed(&k.search_files, &key) {
+            let root = self.root.clone();
+            self.search = Some(SearchState::new(&root, self.show_hidden, self.ignore_gitignore));
+        } else if pressed(&k.reload, &key) {
+            self.reload();
+        } else if pressed(&k.search_content, &key) {
+            let root = self.root.clone();
+            let mut s = SearchState::new(&root, self.show_hidden, self.ignore_gitignore);
+            s.toggle_mode();
+            self.search = Some(s);
+        } else if pressed(&k.switch_panel, &key) {
+            self.focus = match self.focus {
+                Focus::Tree => Focus::Content,
+                Focus::Content => Focus::Tree,
+            };
+        } else {
+            match self.focus {
                 Focus::Tree => self.handle_tree_key(key),
                 Focus::Content => self.handle_content_key(key),
-            },
+            }
         }
     }
 
     fn handle_tree_key(&mut self, key: KeyEvent) {
-        match key.code {
-            KeyCode::Up | KeyCode::Char('k') => {
-                if self.tree_selected > 0 {
-                    self.tree_selected -= 1;
-                    self.try_open_selected();
-                }
+        let k = &self.keys;
+        if pressed(&k.nav_up, &key) {
+            if self.tree_selected > 0 {
+                self.tree_selected -= 1;
+                self.try_open_selected();
             }
-            KeyCode::Down | KeyCode::Char('j') => {
-                if self.tree_selected + 1 < self.nodes.len() {
-                    self.tree_selected += 1;
-                    self.try_open_selected();
-                }
+        } else if pressed(&k.nav_down, &key) {
+            if self.tree_selected + 1 < self.nodes.len() {
+                self.tree_selected += 1;
+                self.try_open_selected();
             }
-            KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
-                if let Some(node) = self.nodes.get(self.tree_selected) {
-                    if node.is_dir {
-                        let p = node.path.clone();
-                        if self.expanded.contains(&p) {
-                            self.expanded.remove(&p);
-                        } else {
-                            self.expanded.insert(p);
-                        }
-                        self.rebuild();
+        } else if pressed(&k.tree_expand, &key) {
+            if let Some(node) = self.nodes.get(self.tree_selected) {
+                if node.is_dir {
+                    let p = node.path.clone();
+                    if self.expanded.contains(&p) {
+                        self.expanded.remove(&p);
                     } else {
-                        let p = node.path.clone();
-                        self.open_file(&p);
+                        self.expanded.insert(p);
                     }
+                    self.rebuild();
+                } else {
+                    let p = node.path.clone();
+                    self.open_file(&p);
                 }
             }
-            KeyCode::Left | KeyCode::Char('h') => {
-                if let Some(node) = self.nodes.get(self.tree_selected) {
-                    let depth = node.depth;
-                    let path = node.path.clone();
-                    let is_dir = node.is_dir;
+        } else if pressed(&k.tree_collapse, &key) {
+            if let Some(node) = self.nodes.get(self.tree_selected) {
+                let depth = node.depth;
+                let path = node.path.clone();
+                let is_dir = node.is_dir;
 
-                    if is_dir && self.expanded.contains(&path) {
-                        self.expanded.remove(&path);
-                        self.rebuild();
-                    } else if depth > 0 {
-                        for i in (0..self.tree_selected).rev() {
-                            if self.nodes[i].depth < depth {
-                                self.tree_selected = i;
-                                break;
-                            }
+                if is_dir && self.expanded.contains(&path) {
+                    self.expanded.remove(&path);
+                    self.rebuild();
+                } else if depth > 0 {
+                    for i in (0..self.tree_selected).rev() {
+                        if self.nodes[i].depth < depth {
+                            self.tree_selected = i;
+                            break;
                         }
                     }
                 }
             }
-            _ => {}
         }
     }
 
@@ -433,44 +425,37 @@ impl App {
     }
 
     fn handle_content_key(&mut self, key: KeyEvent) {
-        match key.code {
-            KeyCode::Char('M') if self.is_markdown => {
-                self.show_raw_markdown = !self.show_raw_markdown;
-                self.content_scroll = 0;
-                self.content_hscroll = 0;
+        let k = &self.keys;
+        if self.is_markdown && pressed(&k.toggle_raw_markdown, &key) {
+            self.show_raw_markdown = !self.show_raw_markdown;
+            self.content_scroll = 0;
+            self.content_hscroll = 0;
+        } else if pressed(&k.toggle_wrap, &key) {
+            self.word_wrap = !self.word_wrap;
+            self.content_scroll = 0;
+            self.content_hscroll = 0;
+        } else if pressed(&k.nav_up, &key) {
+            self.content_scroll = self.content_scroll.saturating_sub(1);
+        } else if pressed(&k.nav_down, &key) {
+            let max = self.content_line_count().saturating_sub(1);
+            if self.content_scroll < max {
+                self.content_scroll += 1;
             }
-            KeyCode::Up | KeyCode::Char('k') => {
-                self.content_scroll = self.content_scroll.saturating_sub(1);
-            }
-            KeyCode::Down | KeyCode::Char('j') => {
-                let max = self.content_line_count().saturating_sub(1);
-                if self.content_scroll < max {
-                    self.content_scroll += 1;
-                }
-            }
-            KeyCode::PageUp => {
-                self.content_scroll = self.content_scroll.saturating_sub(20);
-            }
-            KeyCode::PageDown => {
-                let max = self.content_line_count().saturating_sub(1);
-                self.content_scroll = (self.content_scroll + 20).min(max);
-            }
-            KeyCode::Left => {
-                self.content_hscroll = self.content_hscroll.saturating_sub(4);
-            }
-            KeyCode::Right => {
-                self.content_hscroll += 4;
-            }
-            KeyCode::Char('g') => {
-                self.content_scroll = 0;
-            }
-            KeyCode::Char('G') => {
-                self.content_scroll = self.content.len().saturating_sub(1);
-            }
-            KeyCode::Char('0') => {
-                self.content_hscroll = 0;
-            }
-            _ => {}
+        } else if pressed(&k.content_page_up, &key) {
+            self.content_scroll = self.content_scroll.saturating_sub(20);
+        } else if pressed(&k.content_page_down, &key) {
+            let max = self.content_line_count().saturating_sub(1);
+            self.content_scroll = (self.content_scroll + 20).min(max);
+        } else if !self.word_wrap && pressed(&k.content_left, &key) {
+            self.content_hscroll = self.content_hscroll.saturating_sub(4);
+        } else if !self.word_wrap && pressed(&k.content_right, &key) {
+            self.content_hscroll += 4;
+        } else if pressed(&k.content_top, &key) {
+            self.content_scroll = 0;
+        } else if pressed(&k.content_bottom, &key) {
+            self.content_scroll = self.content.len().saturating_sub(1);
+        } else if !self.word_wrap && pressed(&k.content_reset_col, &key) {
+            self.content_hscroll = 0;
         }
     }
 

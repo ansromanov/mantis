@@ -1,0 +1,37 @@
+show_hidden = true
+ignore_gitignore = true
+tree_width = 20
+word_wrap = true
+
+# Keybindings. Each action takes a list of key specs. A spec is a single
+# character ("q", "?", "0") or a named key (Up, Down, Left, Right, Enter,
+# Tab, Esc, Backspace, PageUp, PageDown, Home, End, Space), optionally
+# prefixed with modifiers: "ctrl+c", "alt+.".
+[keys]
+# Global
+quit = ["q", "ctrl+c"]
+help = ["?"]
+toggle_hidden = ["alt+."]
+search_files = ["/"]
+search_content = ["f"]
+reload = ["r"]
+switch_panel = ["Tab"]
+
+# Navigation (shared by tree and content panels)
+nav_up = ["Up", "k"]
+nav_down = ["Down", "j"]
+
+# Tree panel
+tree_expand = ["Enter", "Right", "l"]
+tree_collapse = ["Left", "h"]
+
+# Content panel
+content_left = ["Left"]
+content_right = ["Right"]
+content_top = ["g"]
+content_bottom = ["G"]
+content_page_up = ["PageUp"]
+content_page_down = ["PageDown"]
+content_reset_col = ["0"]
+toggle_wrap = ["z"]
+toggle_raw_markdown = ["M"]
