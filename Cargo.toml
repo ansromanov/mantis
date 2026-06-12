@@ -11,6 +11,12 @@ repository = "https://github.com/ansromanov/tree-viewer"
 name = "tv"
 path = "src/main.rs"
 
+[profile.release]
+strip = true        # drop symbols/debuginfo from the binary
+lto = true          # cross-crate link-time optimization
+codegen-units = 1   # better optimization at the cost of build time
+panic = "abort"     # no unwinding tables; smaller binary
+
 [dependencies]
 ratatui = "0.28"
 crossterm = "0.27"
