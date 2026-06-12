@@ -3,6 +3,12 @@ ignore_gitignore = true
 tree_width = 20
 word_wrap = true
 
+# Git mode: show only changed files and their working-tree diffs.
+# git_mode = false         # start in git mode (default: false)
+# git_mode_flat = false    # start git mode in flat/plain list view (default: false)
+# git_status = true        # colour tree by git status (default: true)
+# git_show_deleted = false # show ghost nodes for deleted tracked files (default: false)
+
 # Keybindings. Each action takes a list of key specs. A spec is a single
 # character ("q", "?", "0") or a named key (Up, Down, Left, Right, Enter,
 # Tab, Esc, Backspace, PageUp, PageDown, Home, End, Space), optionally
@@ -18,6 +24,8 @@ reload = ["r"]
 switch_panel = ["Tab"]
 file_history = ["H"]
 theme_picker = ["t"]
+git_mode_toggle = ["ctrl+g"]
+git_mode_flat_toggle = ["alt+g"]
 
 # Navigation (shared by tree and content panels)
 nav_up = ["Up", "k"]

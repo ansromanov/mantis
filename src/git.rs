@@ -114,6 +114,45 @@ pub fn repo_status(dir: &Path, include_ignored: bool) -> HashMap<PathBuf, GitSta
     map
 }
 
+/// Returns the working-tree diff for `file` compared to HEAD, as lines.
+/// For new untracked files that aren't staged, falls back to a
+/// `--no-index` diff against `/dev/null`.
+pub fn working_tree_diff(repo_dir: &Path, file: &Path) -> Vec<String> {
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(repo_dir)
+        .args(["diff", "HEAD", "--no-color", "--"])
+        .arg(file)
+        .output();
+
+    if let Ok(o) = out {
+        let text = String::from_utf8_lossy(&o.stdout);
+        if !text.trim().is_empty() {
+            return text.lines().map(|l| l.to_string()).collect();
+        }
+    }
+
+    // Untracked (unstaged) new file — diff against /dev/null.
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(repo_dir)
+        .args(["diff", "--no-color", "--no-index", "--", "/dev/null"])
+        .arg(file)
+        .output();
+
+    match out {
+        Ok(o) => {
+            let text = String::from_utf8_lossy(&o.stdout);
+            if !text.trim().is_empty() {
+                text.lines().map(|l| l.to_string()).collect()
+            } else {
+                vec!["(no diff available)".to_string()]
+            }
+        }
+        Err(e) => vec![format!("[git unavailable] {e}")],
+    }
+}
+
 /// A commit that touched a particular file.
 pub struct Commit {
     pub hash: String,
@@ -251,5 +290,32 @@ mod tests {
         // A path with no repo / untracked yields no history rather than erroring.
         let log = file_log(&dir, Path::new("definitely-not-tracked-xyz.txt"));
         assert!(log.is_empty());
+    }
+
+    #[test]
+    fn working_tree_diff_shows_modifications() {
+        let repo = temp_repo();
+        // file.txt: last commit has "two", working tree adds "three".
+        let diff = working_tree_diff(&repo, &repo.join("file.txt"));
+        let joined = diff.join("\n");
+        assert!(
+            joined.contains("+three"),
+            "expected '+three' in diff, got: {joined}"
+        );
+        fs::remove_dir_all(&repo).ok();
+    }
+
+    #[test]
+    fn working_tree_diff_shows_untracked_file() {
+        let repo = temp_repo();
+        fs::write(repo.join("new.txt"), "brand new\n").unwrap();
+        // Untracked files aren't in HEAD; the function falls back to --no-index.
+        let diff = working_tree_diff(&repo, &repo.join("new.txt"));
+        let joined = diff.join("\n");
+        assert!(
+            joined.contains("+brand new"),
+            "expected '+brand new' in diff, got: {joined}"
+        );
+        fs::remove_dir_all(&repo).ok();
     }
 }

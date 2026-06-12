@@ -66,12 +66,22 @@ fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
         Style::default().fg(theme.dim)
     };
 
+    let git_suffix = if app.git_mode {
+        if app.git_mode_flat {
+            " [git:flat]"
+        } else {
+            " [git]"
+        }
+    } else {
+        ""
+    };
     let title = format!(
-        " {} ",
+        " {}{} ",
         app.root
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_else(|| "/".to_string())
+            .unwrap_or_else(|| "/".to_string()),
+        git_suffix
     );
 
     let block = Block::default()
@@ -282,9 +292,18 @@ fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
         " j/k scroll  PgUp/PgDn{}  g/G top/bot  H history  Tab panel  q quit{}{}",
         hscroll_hint, md_hint, wrap_hint
     );
+    let git_indicator = if app.git_mode {
+        if app.git_mode_flat {
+            " [git:flat]"
+        } else {
+            " [git]"
+        }
+    } else {
+        ""
+    };
     let tree_hint = format!(
-        " j/k nav  Enter/l expand  h collapse  / files  f content  t theme  Tab panel  q quit  ? help{}",
-        hidden_indicator
+        " j/k nav  Enter/l expand  h collapse  / files  f content  t theme  Tab panel  q quit  ? help{}{}",
+        hidden_indicator, git_indicator
     );
     let text: &str = if app.theme_picker.is_some() {
         " ↑↓ navigate  type to filter  Enter apply theme  Esc cancel"
@@ -608,6 +627,14 @@ fn draw_help(f: &mut Frame, app: &App, area: Rect) {
         Line::from(vec![key("  q / Ctrl+C "), desc("quit")]),
         Line::from(vec![key("  Alt+.      "), desc("toggle hidden files")]),
         Line::from(vec![key("  t          "), desc("pick a theme")]),
+        Line::from(vec![
+            key("  Ctrl+G     "),
+            desc("toggle git mode (changed files only + diffs)"),
+        ]),
+        Line::from(vec![
+            key("  Alt+G      "),
+            desc("toggle git flat/tree view (in git mode)"),
+        ]),
         gap.clone(),
         section("Tree panel"),
         Line::from(vec![key("  j/k / ↑↓   "), desc("move up / down")]),
