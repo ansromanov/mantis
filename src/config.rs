@@ -418,6 +418,21 @@ mod tests {
     }
 
     #[test]
+    fn default_config_serializes_and_round_trips() {
+        let cfg = Config::default();
+        let toml = toml::to_string_pretty(&cfg).expect("default config must serialize");
+        assert!(!toml.is_empty());
+        let back: Config = toml::from_str(&toml).expect("serialized config must round-trip");
+        assert_eq!(back.show_hidden, cfg.show_hidden);
+        assert_eq!(back.git_mode, cfg.git_mode);
+        assert_eq!(back.tree_width, cfg.tree_width);
+        assert!(pressed(
+            &back.keys.quit,
+            &ev(KeyCode::Char('q'), KeyModifiers::empty())
+        ));
+    }
+
+    #[test]
     fn config_paths_are_local_first_then_global() {
         let root = Path::new("/a/b/c");
         let paths = config_paths(root);
