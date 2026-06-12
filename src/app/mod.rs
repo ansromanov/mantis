@@ -20,11 +20,16 @@ mod key_handlers;
 mod mouse_handlers;
 mod navigation;
 
+/// Which panel is currently focused.
 pub enum Focus {
+    /// The file tree panel on the left.
     Tree,
+    /// The file content / diff panel on the right.
     Content,
 }
 
+/// Central application state. Holds the file tree, content buffers, overlay
+/// state, geometry captured during rendering, and configuration.
 pub struct App {
     pub root: PathBuf,
     pub nodes: Vec<TreeNode>,
@@ -81,6 +86,8 @@ pub struct App {
 }
 
 impl App {
+    /// Builds the app: walks the root directory, loads git status, resolves
+    /// the theme, and opens the first selected file.
     pub fn new(
         root: PathBuf,
         cfg: Config,
@@ -172,6 +179,8 @@ impl App {
         }
     }
 
+    /// Rebuilds the file tree, re-fetches git status, and reloads the current
+    /// file. Called explicitly by the reload key and automatically every 30 s.
     pub fn reload(&mut self) {
         self.last_refresh = Instant::now();
         if self.git_status_enabled {
@@ -187,6 +196,8 @@ impl App {
         self.reload_content();
     }
 
+    /// Periodic per-frame update: drains file-watch events and triggers a
+    /// periodic full reload every 30 seconds.
     pub fn tick(&mut self) {
         if self.drain_file_watch() {
             self.reload_content();
@@ -209,6 +220,7 @@ fn deleted_set(map: &HashMap<PathBuf, GitStatus>, enabled: bool) -> HashSet<Path
         .collect()
 }
 
+/// Returns `true` when `(col, row)` lies within the given `Rect`.
 fn rect_contains(area: Rect, col: u16, row: u16) -> bool {
     col >= area.x
         && col < area.x.saturating_add(area.width)

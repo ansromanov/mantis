@@ -10,6 +10,9 @@ use crate::search::HistoryState;
 use super::{diff_line_style, App, Focus};
 
 impl App {
+    /// Re-reads the current file from disk and re-renders it into the content
+    /// buffer while preserving scroll position. No-op for commit diffs (which
+    /// are immutable), but refreshes working-tree diffs in git mode.
     pub(super) fn reload_content(&mut self) {
         // Commit diffs are transient; don't clobber them on refresh.
         // Working-tree diffs in git mode should be refreshed (working tree changes).
@@ -31,6 +34,9 @@ impl App {
         }
     }
 
+    /// Sets up a filesystem watcher on the parent directory of `path` so that
+    /// `drain_file_watch` can detect external edits. Clears any previous watch.
+    /// Watches the parent directory (not the file) to catch atomic-save renames.
     fn set_file_watch(&mut self, path: Option<&Path>) {
         self.file_watcher = None;
         self.file_watch_rx = None;
@@ -53,6 +59,8 @@ impl App {
         }
     }
 
+    /// Drains all pending file-watch events and returns `true` if the watched
+    /// file was modified, created, or deleted since the last check.
     pub(super) fn drain_file_watch(&self) -> bool {
         let (Some(rx), Some(watched)) = (&self.file_watch_rx, &self.file_watch_path) else {
             return false;
@@ -74,6 +82,8 @@ impl App {
         changed
     }
 
+    /// Displays the working-tree diff of `path` (relative to HEAD) in the
+    /// content panel, using `diff_line_style` for per-line coloring.
     pub(super) fn show_working_tree_diff(&mut self, path: &Path) {
         let lines = crate::git::working_tree_diff(&self.root, path);
         let rel = path.strip_prefix(&self.root).unwrap_or(path);
@@ -94,6 +104,8 @@ impl App {
         self.set_file_watch(Some(path));
     }
 
+    /// Shows a "[deleted]" placeholder for a file that was removed from the
+    /// working tree but is tracked by git.
     pub(super) fn show_deleted(&mut self, path: &Path) {
         self.current_file = Some(path.to_path_buf());
         self.is_diff = false;
@@ -122,6 +134,9 @@ impl App {
         self.focus = Focus::Content;
     }
 
+    /// Reads a file from disk, detects binary/markdown, runs syntax
+    /// highlighting, and renders markdown if applicable. Errors and empty files
+    /// produce inline messages rather than crashing.
     pub fn open_file(&mut self, path: &Path) {
         self.current_file = Some(path.to_path_buf());
         self.is_diff = false;
@@ -197,6 +212,9 @@ impl App {
         }
     }
 
+    /// Loads a diff (from git history) into the content panel with styled
+    /// per-line markers. Sets `is_diff = true` so the line-number gutter is
+    /// hidden and the diff stays read-only.
     fn show_diff(&mut self, file: &Path, short: &str, lines: Vec<String>) {
         self.current_file = Some(file.to_path_buf());
         self.is_markdown = false;
@@ -311,11 +329,14 @@ impl App {
         result
     }
 
+    /// Clears any active text selection and resets the drag-start position.
     pub(super) fn clear_selection(&mut self) {
         self.selection = None;
         self.drag_start = None;
     }
 
+    /// Expands all ancestor directories of `path` and selects the file in the
+    /// tree so it becomes visible. Used by `open_and_reveal` and search results.
     pub(super) fn reveal_in_tree(&mut self, path: &Path) {
         let mut current = path.parent();
         while let Some(dir) = current {

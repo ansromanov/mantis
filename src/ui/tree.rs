@@ -8,6 +8,9 @@ use ratatui::{
 use crate::app::{App, Focus};
 use crate::git::GitStatus;
 
+/// Renders the file tree panel. Iterates `app.nodes`, drawing indentation,
+/// expand/collapse arrows, and git-status coloring. Records `tree_area` and
+/// `tree_offset` for mouse hit-testing.
 pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
     let theme = &app.theme;
     let focused = matches!(app.focus, Focus::Tree)
@@ -87,6 +90,9 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
     app.tree_offset = state.offset();
 }
 
+/// Returns the foreground color and modifier for a tree node based on its
+/// git status and whether it is a directory. Deleted files get `diff_del`,
+/// new files `diff_add`, modified files `accent_alt`, ignored files gray.
 fn git_status_style(
     node: &crate::tree::TreeNode,
     app: &App,

@@ -6,6 +6,8 @@ use syntect::{
     parsing::SyntaxSet,
 };
 
+/// Wraps a syntect `SyntaxSet` + `ThemeSet` to provide syntax highlighting
+/// for file contents. Compiled once at startup and reused across file opens.
 pub struct Highlighter {
     ss: SyntaxSet,
     ts: ThemeSet,
@@ -29,6 +31,9 @@ impl Highlighter {
         }
     }
 
+    /// Syntax-highlights the given lines by detecting the file type from
+    /// `path` and applying the configured syntect theme. Returns one Vec of
+    /// styled spans per line. Unrecognized files get plain-text style.
     pub fn highlight(&self, path: &Path, lines: &[String]) -> Vec<Vec<(Style, String)>> {
         let syntax = self
             .ss
@@ -53,6 +58,8 @@ impl Highlighter {
     }
 }
 
+/// Converts a syntect style (foreground + font-style flags) into ratatui
+/// Style with corresponding modifiers (bold, italic, underlined).
 fn to_ratatui(s: SynStyle) -> Style {
     let mut style = Style::default().fg(syn_color(s.foreground));
     if s.font_style.contains(FontStyle::BOLD) {
@@ -67,6 +74,8 @@ fn to_ratatui(s: SynStyle) -> Style {
     style
 }
 
+/// Converts a syntect color to ratatui Color. An alpha of 0 (transparent)
+/// maps to `Color::Reset` so the terminal default shows through.
 fn syn_color(c: syntect::highlighting::Color) -> Color {
     if c.a == 0 {
         Color::Reset

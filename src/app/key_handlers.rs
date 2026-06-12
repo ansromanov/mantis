@@ -8,6 +8,8 @@ use crate::theme::{Theme, ThemeConfig};
 use super::{diff_line_style, App, Focus};
 
 impl App {
+    /// Dispatches a key event. Overlays (help, theme, history, search) are
+    /// checked first; otherwise normal tree/content key handling applies.
     pub fn handle_key(&mut self, key: KeyEvent) {
         if self.show_help {
             if matches!(
@@ -29,6 +31,9 @@ impl App {
         }
     }
 
+    /// Handles keyboard input while the search overlay is open: typing
+    /// characters, backspace, up/down navigation, Tab to toggle mode,
+    /// Enter to open, Esc to close.
     fn handle_search_key(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Esc => {
@@ -66,6 +71,7 @@ impl App {
         }
     }
 
+    /// Handles keyboard input while the git-history overlay is open.
     fn handle_history_key(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Esc => self.history = None,
@@ -96,6 +102,7 @@ impl App {
         }
     }
 
+    /// Handles keyboard input while the theme picker overlay is open.
     fn handle_theme_key(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Esc => self.theme_picker = None,
@@ -126,6 +133,8 @@ impl App {
         }
     }
 
+    /// Applies the theme selected in the picker, saves it to config, and
+    /// closes the overlay.
     pub(super) fn apply_selected_theme(&mut self) {
         let name = self.theme_picker.as_ref().and_then(|p| p.selected_name());
         self.theme_picker = None;
@@ -160,6 +169,9 @@ impl App {
         }
     }
 
+    /// Handles all key events when no overlay is active. Dispatches global
+    /// actions (quit, help, search, reload, etc.) and routes to tree/content
+    /// handlers based on `self.focus`.
     fn handle_normal_key(&mut self, key: KeyEvent) {
         if key.code == KeyCode::Esc && self.selection.is_some() {
             self.clear_selection();
@@ -216,6 +228,7 @@ impl App {
         }
     }
 
+    /// Handles navigation and expand/collapse keys when the tree panel is focused.
     fn handle_tree_key(&mut self, key: KeyEvent) {
         let k = &self.keys;
         if pressed(&k.nav_up, &key) {
@@ -251,6 +264,8 @@ impl App {
         }
     }
 
+    /// Handles scrolling, wrapping, and markdown-raw toggle keys when the
+    /// content panel is focused.
     fn handle_content_key(&mut self, key: KeyEvent) {
         let k = &self.keys;
         if self.is_markdown && pressed(&k.toggle_raw_markdown, &key) {

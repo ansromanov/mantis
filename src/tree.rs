@@ -3,6 +3,8 @@ use std::path::{Path, PathBuf};
 
 use ignore::WalkBuilder;
 
+/// A single entry in the flat file tree. `depth` controls indentation;
+/// `deleted` marks a file that no longer exists on disk but is tracked by git.
 #[derive(Debug, Clone)]
 pub struct TreeNode {
     pub path: PathBuf,
@@ -13,6 +15,9 @@ pub struct TreeNode {
     pub deleted: bool,
 }
 
+/// Recursively walks `root` using `ignore::WalkBuilder`, returning a flat
+/// `Vec<TreeNode>` of files and directories. Only directories in `expanded`
+/// are descended into. `deleted_files` are appended as ghost nodes.
 pub fn build_visible(
     root: &Path,
     expanded: &HashSet<PathBuf>,
@@ -33,6 +38,9 @@ pub fn build_visible(
     nodes
 }
 
+/// Recursive helper for `build_visible`. Lists a single directory's entries
+/// (depth 1 via `WalkBuilder`), sorts dirs before files, and recurses into
+/// expanded directories.
 fn collect(
     dir: &Path,
     depth: usize,
@@ -110,6 +118,8 @@ fn collect(
     }
 }
 
+/// Returns a flat list of all files (non-directories) under `root` using
+/// `ignore::WalkBuilder`. Used to populate the search index.
 pub fn collect_all_files(root: &Path, show_hidden: bool, ignore_gitignore: bool) -> Vec<PathBuf> {
     WalkBuilder::new(root)
         .hidden(!show_hidden)
