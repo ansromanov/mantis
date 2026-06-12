@@ -224,8 +224,8 @@ impl Serialize for KeyBinding {
 /// Loads config for the given view root. A project-local `tv.toml` found in
 /// the root or any ancestor takes precedence over the global config; this lets
 /// a repo ship its own defaults. Creates the global config with defaults if it
-/// doesn't exist yet. Returns the loaded config and the global config path for
-/// persisting live changes.
+/// doesn't exist yet. Returns the loaded config and the path it was loaded from
+/// so that live changes are saved back to the same file.
 pub fn load(root: &Path) -> (Config, Option<PathBuf>) {
     let global = global_config_path();
     if let Some(ref path) = global {
@@ -233,12 +233,14 @@ pub fn load(root: &Path) -> (Config, Option<PathBuf>) {
             install_default(path);
         }
     }
-    let config = config_paths(root)
-        .into_iter()
-        .find_map(|p| fs::read_to_string(p).ok())
-        .and_then(|s| toml::from_str(&s).ok())
-        .unwrap_or_default();
-    (config, global)
+    for path in config_paths(root) {
+        if let Ok(s) = fs::read_to_string(&path) {
+            if let Ok(config) = toml::from_str::<Config>(&s) {
+                return (config, Some(path));
+            }
+        }
+    }
+    (Config::default(), global)
 }
 
 /// Writes `config` to `path`, silently ignoring errors.
@@ -430,6 +432,82 @@ mod tests {
             &back.keys.quit,
             &ev(KeyCode::Char('q'), KeyModifiers::empty())
         ));
+    }
+
+    #[test]
+    fn theme_config_with_name_serializes_and_round_trips() {
+        use crate::theme::ThemeConfig;
+        let cfg = Config {
+            theme: ThemeConfig::from_preset("monokai"),
+            ..Config::default()
+        };
+        let toml = toml::to_string_pretty(&cfg).expect("must serialize");
+        assert!(
+            toml.contains("monokai"),
+            "theme name must appear in TOML:\n{toml}"
+        );
+        let back: Config = toml::from_str(&toml).expect("must round-trip");
+        let theme = back.theme.resolve();
+        let expected = crate::theme::Theme::preset("monokai").unwrap();
+        assert_eq!(
+            theme.accent, expected.accent,
+            "theme must be restored from name"
+        );
+    }
+
+    #[test]
+    fn load_returns_path_of_loaded_file() {
+        let dir = std::env::temp_dir().join(format!(
+            "tv_cfg_test_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .subsec_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let cfg_file = dir.join("tv.toml");
+        std::fs::write(&cfg_file, "tree_width = 99\n").unwrap();
+
+        let (cfg, path) = load(&dir);
+        assert_eq!(cfg.tree_width, 99);
+        assert_eq!(path.as_deref(), Some(cfg_file.as_path()));
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn save_and_reload_preserves_theme() {
+        let dir = std::env::temp_dir().join(format!(
+            "tv_theme_test_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .subsec_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        // Write a config without a theme (like a project-local tv.toml).
+        std::fs::write(dir.join("tv.toml"), "tree_width = 30\n").unwrap();
+
+        let (mut cfg, path) = load(&dir);
+        assert_eq!(cfg.tree_width, 30);
+
+        // Simulate picking "synthwave84" from the theme picker.
+        use crate::theme::ThemeConfig;
+        cfg.theme = ThemeConfig::from_preset("synthwave84");
+        save(&cfg, path.as_deref().unwrap());
+
+        // Reload and verify the theme survived.
+        let (reloaded, _) = load(&dir);
+        let theme = reloaded.theme.resolve();
+        let expected = crate::theme::Theme::preset("synthwave84").unwrap();
+        assert_eq!(
+            theme.accent, expected.accent,
+            "theme must survive a save/reload cycle"
+        );
+
+        std::fs::remove_dir_all(&dir).ok();
     }
 
     #[test]
