@@ -1,5 +1,5 @@
 use ratatui::style::Color;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// The active color palette. Field names are semantic roles, not literal
 /// colors, so a theme can remap the whole UI. `Default` reproduces the
@@ -148,7 +148,7 @@ fn hex(s: &str) -> Color {
 /// base; any other field overrides that base. Unset fields keep the base value.
 /// Colors accept names ("cyan", "lightyellow", "reset") or hex ("#aabbcc");
 /// `syntax` is a syntect theme name.
-#[derive(Deserialize, Default)]
+#[derive(Serialize, Deserialize, Clone, Default)]
 #[serde(default)]
 pub struct ThemeConfig {
     name: Option<String>,
@@ -173,6 +173,14 @@ pub struct ThemeConfig {
 }
 
 impl ThemeConfig {
+    /// Creates a `ThemeConfig` that selects a named preset with no overrides.
+    pub fn from_preset(name: &str) -> Self {
+        ThemeConfig {
+            name: Some(name.to_string()),
+            ..Default::default()
+        }
+    }
+
     /// Builds a runtime `Theme`: starts from the named preset (or the default),
     /// then applies any per-role overrides. Unknown/invalid values are ignored.
     pub fn resolve(&self) -> Theme {
