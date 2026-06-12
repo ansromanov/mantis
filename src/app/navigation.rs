@@ -7,6 +7,9 @@ use crate::tree::{build_visible, TreeNode};
 use super::App;
 
 impl App {
+    /// Rebuilds the visible node list from the filesystem. Preserves the
+    /// currently selected item by path. In git mode, filters to changed files
+    /// only. In flat git mode, produces a single-level file list.
     pub(super) fn rebuild(&mut self) {
         let prev = self.nodes.get(self.tree_selected).map(|n| n.path.clone());
         let deleted = super::deleted_set(&self.git_status_map, self.git_show_deleted);
@@ -49,7 +52,8 @@ impl App {
         self.tree_selected = self.tree_selected.min(self.nodes.len().saturating_sub(1));
     }
 
-    /// Flat list of all changed (non-ignored) files for git mode's plain view.
+    /// Produces a flat list of all changed (non-ignored) files with depth 0
+    /// and their full relative path as the name, sorted alphabetically.
     fn build_git_flat_nodes(&self) -> Vec<TreeNode> {
         let mut entries: Vec<(PathBuf, bool)> = self
             .git_status_map
@@ -101,6 +105,9 @@ impl App {
         }
     }
 
+    /// Opens the tree node at `self.tree_selected` if it is a file (skips
+    /// directories). Delegates to `show_deleted`, `show_working_tree_diff`, or
+    /// `open_file` based on state.
     pub(super) fn try_open_selected(&mut self) {
         if let Some(node) = self.nodes.get(self.tree_selected) {
             if node.is_dir {
@@ -119,6 +126,10 @@ impl App {
         }
     }
 
+    /// Toggles git mode on/off. Enabling git mode fetches git status if needed,
+    /// auto-expands changed directories, rebuilds the tree, and shows the
+    /// working-tree diff for the selected file. Disabling restores the full
+    /// tree and re-opens the current file as plain content.
     pub(super) fn toggle_git_mode(&mut self) {
         self.git_mode = !self.git_mode;
         self.config.git_mode = self.git_mode;

@@ -2,6 +2,10 @@ use crate::theme::Theme;
 use pulldown_cmark::{Alignment, Event, HeadingLevel, Options, Parser, Tag};
 use ratatui::style::{Modifier, Style};
 
+/// Renders a markdown string into themed ratatui spans. Supports headings,
+/// code blocks (bordered), tables (box-drawing), lists, block quotes,
+/// horizontal rules, inline formatting (bold, italic, strikethrough, code),
+/// images (placeholder), and task list markers.
 pub fn render(src: &str, theme: &Theme) -> Vec<Vec<(Style, String)>> {
     let mut lines: Vec<Vec<(Style, String)>> = Vec::new();
     let mut current: Vec<(Style, String)> = Vec::new();
@@ -201,6 +205,9 @@ pub fn render(src: &str, theme: &Theme) -> Vec<Vec<(Style, String)>> {
     lines
 }
 
+/// Builds a box-drawing table from parsed markdown table rows. Calculates
+/// column widths, applies alignment (left/center/right), and adds border
+/// lines (─, │, ┌, ┬, ┐, etc.).
 fn render_table(
     rows: &[(bool, Vec<String>)],
     aligns: &[Alignment],
@@ -255,6 +262,8 @@ fn render_table(
     out
 }
 
+/// Builds a table border line with the given corner/fill/junction characters
+/// and column widths (each width + 2 for padding).
 fn table_border(left: char, fill: char, mid: char, right: char, widths: &[usize]) -> String {
     let mut s = String::from(left);
     for (i, w) in widths.iter().enumerate() {
@@ -266,6 +275,8 @@ fn table_border(left: char, fill: char, mid: char, right: char, widths: &[usize]
     s
 }
 
+/// Pads `text` to `width` columns using the given alignment. Used for table
+/// cell content rendering.
 fn pad(text: &str, width: usize, align: Alignment) -> String {
     match align {
         Alignment::Right => format!("{:>width$}", text, width = width),
@@ -282,6 +293,8 @@ fn pad(text: &str, width: usize, align: Alignment) -> String {
     }
 }
 
+/// Flushes the current line's accumulated spans into the output, prefixed
+/// with block-quote markers (`│ `) when inside a block quote.
 fn flush(
     lines: &mut Vec<Vec<(Style, String)>>,
     spans: &mut Vec<(Style, String)>,
@@ -299,10 +312,13 @@ fn flush(
     lines.push(line);
 }
 
+/// Returns the top of the style stack, or default if empty.
 fn top(stack: &[Style]) -> Style {
     stack.last().copied().unwrap_or_default()
 }
 
+/// Returns the style for a markdown heading level. H1 is underlined bold,
+/// H2–H3 are bold with distinct colors, H4+ are bold text only.
 fn heading_style(level: HeadingLevel, theme: &Theme) -> Style {
     match level {
         HeadingLevel::H1 => Style::default()

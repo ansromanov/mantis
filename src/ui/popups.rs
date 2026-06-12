@@ -344,6 +344,8 @@ pub(super) fn draw_help(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(Paragraph::new(rows), inner);
 }
 
+/// Returns a `Rect` centered in `area` using the given percentage widths.
+/// Used by all popup overlays (search, history, theme, help).
 fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
     let margin_y = (100 - percent_y) / 2;
     let margin_x = (100 - percent_x) / 2;

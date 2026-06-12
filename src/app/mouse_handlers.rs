@@ -8,6 +8,10 @@ use crate::selection::TextSelection;
 use super::{rect_contains, App, Focus};
 
 impl App {
+    /// Dispatches a mouse event. Overlays (theme, history, search) intercept
+    /// first; otherwise routes based on the click location (tree vs content
+    /// panel). Handles left-click, drag, scroll, and double-click for
+    /// search/history/theme results.
     pub fn handle_mouse(&mut self, ev: MouseEvent) {
         if self.show_help {
             return;
@@ -102,6 +106,8 @@ impl App {
         }
     }
 
+    /// Handles mouse events on the git-history overlay: click to select,
+    /// double-click to open the diff, scroll to navigate.
     fn handle_history_mouse(&mut self, ev: MouseEvent) {
         match ev.kind {
             MouseEventKind::Down(MouseButton::Left) => {
@@ -147,6 +153,8 @@ impl App {
         }
     }
 
+    /// Handles mouse events on the theme picker overlay: click to select,
+    /// double-click to apply, scroll to navigate.
     fn handle_theme_mouse(&mut self, ev: MouseEvent) {
         match ev.kind {
             MouseEventKind::Down(MouseButton::Left) => {
@@ -192,6 +200,8 @@ impl App {
         }
     }
 
+    /// Handles mouse events on the search overlay: click to select,
+    /// double-click to open the result, scroll to navigate.
     fn handle_search_mouse(&mut self, ev: MouseEvent) {
         match ev.kind {
             MouseEventKind::Down(MouseButton::Left) => {

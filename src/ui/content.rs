@@ -8,6 +8,10 @@ use ratatui::{
 
 use crate::app::{App, Focus};
 
+/// Renders the content/diff panel. Handles three modes:
+/// - Diff view (styled per-line, no gutter, no selection)
+/// - Markdown rendered view (styled spans from `markdown_lines`)
+/// - Plain / syntax-highlighted view (with line numbers and optional selection)
 pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     let focused = matches!(app.focus, Focus::Content)
         && app.search.is_none()
@@ -170,6 +174,9 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     };
 }
 
+/// Splits each (style, text) region into up to three segments —
+/// before selection, selection-highlighted, after selection — by
+/// character-offset boundaries. The selected segment gets `sel_bg`.
 fn apply_selection(
     regions: &[(Style, String)],
     col_start: usize,
