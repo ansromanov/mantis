@@ -1,0 +1,87 @@
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+use tree_viewer::git::{file_diff, file_log, working_tree_diff};
+
+fn git(dir: &Path, args: &[&str]) {
+    let status = Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(["-c", "user.email=test@example.com", "-c", "user.name=Test"])
+        .args(args)
+        .status()
+        .unwrap();
+    assert!(status.success(), "git {args:?} failed");
+}
+
+fn temp_repo() -> PathBuf {
+    static COUNTER: AtomicUsize = AtomicUsize::new(0);
+    let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+    let dir = std::env::temp_dir().join(format!("tv_git_test_{}_{n}", std::process::id()));
+    fs::create_dir_all(&dir).unwrap();
+    git(&dir, &["init", "-q"]);
+    fs::write(dir.join("file.txt"), "one\n").unwrap();
+    git(&dir, &["add", "file.txt"]);
+    git(&dir, &["commit", "-q", "-m", "first"]);
+    fs::write(dir.join("file.txt"), "one\ntwo\n").unwrap();
+    git(&dir, &["add", "file.txt"]);
+    git(&dir, &["commit", "-q", "-m", "second"]);
+    fs::write(dir.join("file.txt"), "one\ntwo\nthree\n").unwrap();
+    dir.canonicalize().unwrap()
+}
+
+#[test]
+fn file_log_returns_commits_newest_first() {
+    let repo = temp_repo();
+    let log = file_log(&repo, &repo.join("file.txt"));
+    assert_eq!(log.len(), 2);
+    assert_eq!(log[0].subject, "second");
+    assert_eq!(log[1].subject, "first");
+    assert!(!log[0].short.is_empty());
+    fs::remove_dir_all(&repo).ok();
+}
+
+#[test]
+fn file_diff_against_working_tree() {
+    let repo = temp_repo();
+    let log = file_log(&repo, &repo.join("file.txt"));
+    let diff = file_diff(&repo, &log[1].hash, &repo.join("file.txt"));
+    let joined = diff.join("\n");
+    assert!(joined.contains("+two"), "diff was: {joined}");
+    assert!(joined.contains("+three"), "diff was: {joined}");
+    fs::remove_dir_all(&repo).ok();
+}
+
+#[test]
+fn file_log_empty_outside_repo() {
+    let dir = std::env::temp_dir();
+    let log = file_log(&dir, Path::new("definitely-not-tracked-xyz.txt"));
+    assert!(log.is_empty());
+}
+
+#[test]
+fn working_tree_diff_shows_modifications() {
+    let repo = temp_repo();
+    let diff = working_tree_diff(&repo, &repo.join("file.txt"));
+    let joined = diff.join("\n");
+    assert!(
+        joined.contains("+three"),
+        "expected '+three' in diff, got: {joined}"
+    );
+    fs::remove_dir_all(&repo).ok();
+}
+
+#[test]
+fn working_tree_diff_shows_untracked_file() {
+    let repo = temp_repo();
+    fs::write(repo.join("new.txt"), "brand new\n").unwrap();
+    let diff = working_tree_diff(&repo, &repo.join("new.txt"));
+    let joined = diff.join("\n");
+    assert!(
+        joined.contains("+brand new"),
+        "expected '+brand new' in diff, got: {joined}"
+    );
+    fs::remove_dir_all(&repo).ok();
+}
