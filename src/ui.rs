@@ -1,6 +1,6 @@
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Modifier, Style},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap},
     Frame,
@@ -164,6 +164,46 @@ fn git_status_style(
     }
 }
 
+fn apply_selection(
+    regions: &[(Style, String)],
+    col_start: usize,
+    col_end: usize,
+    sel_bg: Color,
+) -> Vec<Span<'static>> {
+    let mut result = Vec::new();
+    let mut col = 0;
+    for (style, text) in regions {
+        let chars: Vec<char> = text.chars().collect();
+        let span_len = chars.len();
+        let before_end = col_start.saturating_sub(col).min(span_len);
+        let hl_end = if col_end == usize::MAX {
+            span_len
+        } else {
+            col_end.saturating_sub(col).min(span_len)
+        };
+        if before_end > 0 {
+            result.push(Span::styled(
+                chars[..before_end].iter().collect::<String>(),
+                *style,
+            ));
+        }
+        if before_end < hl_end {
+            result.push(Span::styled(
+                chars[before_end..hl_end].iter().collect::<String>(),
+                style.bg(sel_bg),
+            ));
+        }
+        if hl_end < span_len {
+            result.push(Span::styled(
+                chars[hl_end..].iter().collect::<String>(),
+                *style,
+            ));
+        }
+        col += span_len;
+    }
+    result
+}
+
 fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     let focused = matches!(app.focus, Focus::Content)
         && app.search.is_none()
@@ -190,15 +230,18 @@ fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         .borders(Borders::ALL)
         .border_style(border_style);
 
+    let sel = app.selection.as_ref().map(|s| s.normalized());
+    let sel_bg = app.theme.selection_bg;
+
     let lines: Vec<Line> = if app.is_diff {
-        // Diff view: styled spans, no line-number gutter.
+        // Diff view: styled spans, no line-number gutter, no selection.
         app.highlighted
             .iter()
             .map(|spans| {
                 Line::from(
                     spans
                         .iter()
-                        .map(|(s, t)| Span::styled(t.as_str(), *s))
+                        .map(|(s, t)| Span::styled(t.clone(), *s))
                         .collect::<Vec<_>>(),
                 )
             })
@@ -210,7 +253,7 @@ fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                 Line::from(
                     spans
                         .iter()
-                        .map(|(s, t)| Span::styled(t.as_str(), *s))
+                        .map(|(s, t)| Span::styled(t.clone(), *s))
                         .collect::<Vec<_>>(),
                 )
             })
@@ -227,7 +270,32 @@ fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                         format!("{:>width$} ", i + 1, width = ln_width),
                         ln_style,
                     )];
-                    spans.extend(regions.iter().map(|(s, t)| Span::styled(t.as_str(), *s)));
+                    let regions_owned: Vec<(Style, String)> =
+                        regions.iter().map(|(s, t)| (*s, t.clone())).collect();
+                    if let Some(((sl, sc), (el, ec))) = sel {
+                        if i >= sl && i <= el {
+                            let col_start = if i == sl { sc } else { 0 };
+                            let col_end = if i == el { ec } else { usize::MAX };
+                            spans.extend(apply_selection(
+                                &regions_owned,
+                                col_start,
+                                col_end,
+                                sel_bg,
+                            ));
+                        } else {
+                            spans.extend(
+                                regions_owned
+                                    .iter()
+                                    .map(|(s, t)| Span::styled(t.clone(), *s)),
+                            );
+                        }
+                    } else {
+                        spans.extend(
+                            regions_owned
+                                .iter()
+                                .map(|(s, t)| Span::styled(t.clone(), *s)),
+                        );
+                    }
                     Line::from(spans)
                 })
                 .collect()
@@ -236,10 +304,23 @@ fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                 .iter()
                 .enumerate()
                 .map(|(i, text)| {
-                    Line::from(vec![
-                        Span::styled(format!("{:>width$} ", i + 1, width = ln_width), ln_style),
-                        Span::raw(text.as_str()),
-                    ])
+                    let mut spans = vec![Span::styled(
+                        format!("{:>width$} ", i + 1, width = ln_width),
+                        ln_style,
+                    )];
+                    if let Some(((sl, sc), (el, ec))) = sel {
+                        if i >= sl && i <= el {
+                            let col_start = if i == sl { sc } else { 0 };
+                            let col_end = if i == el { ec } else { usize::MAX };
+                            let region = vec![(Style::default(), text.clone())];
+                            spans.extend(apply_selection(&region, col_start, col_end, sel_bg));
+                        } else {
+                            spans.push(Span::raw(text.clone()));
+                        }
+                    } else {
+                        spans.push(Span::raw(text.clone()));
+                    }
+                    Line::from(spans)
                 })
                 .collect()
         }
