@@ -11,6 +11,7 @@ use crate::config::{pressed, Config, Keymap};
 use crate::file::is_binary;
 use crate::highlight::Highlighter;
 use crate::markdown;
+use crate::theme::Theme;
 use crate::tree::{build_visible, collect_all_files, TreeNode};
 
 pub enum Focus {
@@ -220,6 +221,7 @@ pub struct App {
     pub tree_width: u16,
     pub show_help: bool,
     pub should_quit: bool,
+    pub theme: Theme,
     keys: Keymap,
     // Geometry captured during the last render, used to map mouse events.
     pub tree_area: Rect,
@@ -239,6 +241,8 @@ impl App {
     pub fn new(root: PathBuf, cfg: Config) -> anyhow::Result<Self> {
         let expanded = HashSet::new();
         let nodes = build_visible(&root, &expanded, cfg.show_hidden, cfg.ignore_gitignore);
+        let theme = cfg.theme.resolve();
+        let highlighter = Highlighter::new(&theme.syntax);
         let mut app = App {
             root,
             nodes,
@@ -263,6 +267,7 @@ impl App {
             tree_width: cfg.tree_width,
             show_help: false,
             should_quit: false,
+            theme,
             keys: cfg.keys,
             tree_area: Rect::default(),
             tree_offset: 0,
@@ -272,7 +277,7 @@ impl App {
             history_area: Rect::default(),
             history_offset: 0,
             last_click: None,
-            highlighter: Highlighter::new(),
+            highlighter,
             last_refresh: Instant::now(),
         };
         app.try_open_selected();
@@ -552,7 +557,7 @@ impl App {
                 } else {
                     self.highlighted = self.highlighter.highlight(path, &self.content);
                     if self.is_markdown {
-                        self.markdown_lines = markdown::render(&s);
+                        self.markdown_lines = markdown::render(&s, &self.theme);
                     }
                 }
             }
@@ -687,7 +692,7 @@ impl App {
         self.content_title = Some(format!(" diff {} — {} ", short, rel.display()));
         self.highlighted = lines
             .iter()
-            .map(|l| vec![(diff_line_style(l), l.clone())])
+            .map(|l| vec![(diff_line_style(l, &self.theme), l.clone())])
             .collect();
         self.content = lines;
         self.focus = Focus::Content;
@@ -837,20 +842,18 @@ fn rect_contains(area: Rect, col: u16, row: u16) -> bool {
 }
 
 /// Colors a unified-diff line by its leading marker.
-fn diff_line_style(line: &str) -> ratatui::style::Style {
-    use ratatui::style::{Color, Modifier, Style};
+fn diff_line_style(line: &str, theme: &Theme) -> ratatui::style::Style {
+    use ratatui::style::{Modifier, Style};
     if line.starts_with("@@") {
-        Style::default().fg(Color::Cyan)
+        Style::default().fg(theme.accent)
     } else if line.starts_with("+++") || line.starts_with("---") {
-        Style::default()
-            .fg(Color::DarkGray)
-            .add_modifier(Modifier::BOLD)
+        Style::default().fg(theme.dim).add_modifier(Modifier::BOLD)
     } else if line.starts_with('+') {
-        Style::default().fg(Color::Green)
+        Style::default().fg(theme.diff_add)
     } else if line.starts_with('-') {
-        Style::default().fg(Color::Red)
+        Style::default().fg(theme.diff_del)
     } else if line.starts_with("diff ") || line.starts_with("index ") {
-        Style::default().fg(Color::DarkGray)
+        Style::default().fg(theme.dim)
     } else {
         Style::default()
     }

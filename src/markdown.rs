@@ -1,7 +1,8 @@
+use crate::theme::Theme;
 use pulldown_cmark::{Alignment, Event, HeadingLevel, Options, Parser, Tag};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 
-pub fn render(src: &str) -> Vec<Vec<(Style, String)>> {
+pub fn render(src: &str, theme: &Theme) -> Vec<Vec<(Style, String)>> {
     let mut lines: Vec<Vec<(Style, String)>> = Vec::new();
     let mut current: Vec<(Style, String)> = Vec::new();
     let mut style_stack: Vec<Style> = vec![Style::default()];
@@ -22,14 +23,14 @@ pub fn render(src: &str) -> Vec<Vec<(Style, String)>> {
     for event in Parser::new_ext(src, Options::all()) {
         match event {
             Event::Start(Tag::Table(aligns)) => {
-                flush(&mut lines, &mut current, bq_depth);
+                flush(&mut lines, &mut current, bq_depth, theme);
                 table_aligns = aligns;
                 table_rows.clear();
                 in_table = true;
             }
             Event::End(Tag::Table(_)) => {
                 in_table = false;
-                lines.extend(render_table(&table_rows, &table_aligns));
+                lines.extend(render_table(&table_rows, &table_aligns, theme));
                 table_rows.clear();
                 table_aligns.clear();
             }
@@ -55,18 +56,18 @@ pub fn render(src: &str) -> Vec<Vec<(Style, String)>> {
             }
 
             Event::Start(Tag::Heading(level, _, _)) => {
-                flush(&mut lines, &mut current, bq_depth);
-                style_stack.push(heading_style(level));
+                flush(&mut lines, &mut current, bq_depth, theme);
+                style_stack.push(heading_style(level, theme));
             }
             Event::End(Tag::Heading(_, _, _)) => {
-                flush(&mut lines, &mut current, bq_depth);
+                flush(&mut lines, &mut current, bq_depth, theme);
                 style_stack.pop();
                 lines.push(vec![]);
             }
             Event::Start(Tag::Paragraph) => {}
             Event::End(Tag::Paragraph) => {
                 if !in_table {
-                    flush(&mut lines, &mut current, bq_depth);
+                    flush(&mut lines, &mut current, bq_depth, theme);
                     lines.push(vec![]);
                 }
             }
@@ -92,14 +93,14 @@ pub fn render(src: &str) -> Vec<Vec<(Style, String)>> {
                 style_stack.pop();
             }
             Event::Start(Tag::CodeBlock(_)) => {
-                flush(&mut lines, &mut current, bq_depth);
+                flush(&mut lines, &mut current, bq_depth, theme);
                 in_code = true;
                 code_buf.clear();
             }
             Event::End(Tag::CodeBlock(_)) => {
                 in_code = false;
-                let dim = Style::default().fg(Color::DarkGray);
-                let code = Style::default().fg(Color::LightYellow);
+                let dim = Style::default().fg(theme.dim);
+                let code = Style::default().fg(theme.code);
                 if !code_buf.is_empty() {
                     lines.push(vec![(dim, "  ┌──".to_string())]);
                     for cl in code_buf.drain(..) {
@@ -111,7 +112,7 @@ pub fn render(src: &str) -> Vec<Vec<(Style, String)>> {
             }
             Event::Start(Tag::List(_)) => {
                 if list_depth == 0 {
-                    flush(&mut lines, &mut current, bq_depth);
+                    flush(&mut lines, &mut current, bq_depth, theme);
                 }
                 list_depth += 1;
             }
@@ -122,24 +123,24 @@ pub fn render(src: &str) -> Vec<Vec<(Style, String)>> {
                 }
             }
             Event::Start(Tag::Item) => {
-                flush(&mut lines, &mut current, bq_depth);
+                flush(&mut lines, &mut current, bq_depth, theme);
                 let indent = "  ".repeat(list_depth.saturating_sub(1));
-                current.push((Style::default().fg(Color::Cyan), format!("{}• ", indent)));
+                current.push((Style::default().fg(theme.accent), format!("{}• ", indent)));
             }
             Event::End(Tag::Item) => {
-                flush(&mut lines, &mut current, bq_depth);
+                flush(&mut lines, &mut current, bq_depth, theme);
             }
             Event::Start(Tag::BlockQuote) => {
-                flush(&mut lines, &mut current, bq_depth);
+                flush(&mut lines, &mut current, bq_depth, theme);
                 bq_depth += 1;
                 style_stack.push(
                     Style::default()
-                        .fg(Color::DarkGray)
+                        .fg(theme.dim)
                         .add_modifier(Modifier::ITALIC),
                 );
             }
             Event::End(Tag::BlockQuote) => {
-                flush(&mut lines, &mut current, bq_depth);
+                flush(&mut lines, &mut current, bq_depth, theme);
                 bq_depth = bq_depth.saturating_sub(1);
                 style_stack.pop();
                 lines.push(vec![]);
@@ -147,7 +148,7 @@ pub fn render(src: &str) -> Vec<Vec<(Style, String)>> {
             Event::Start(Tag::Link(_, _, _)) | Event::End(Tag::Link(_, _, _)) => {}
             Event::Start(Tag::Image(_, _, _)) => {
                 if !in_table_cell {
-                    current.push((Style::default().fg(Color::DarkGray), "[img]".to_string()));
+                    current.push((Style::default().fg(theme.dim), "[img]".to_string()));
                 }
             }
             Event::End(Tag::Image(_, _, _)) => {}
@@ -169,7 +170,7 @@ pub fn render(src: &str) -> Vec<Vec<(Style, String)>> {
                     table_cell_buf.push_str(&t);
                     table_cell_buf.push('`');
                 } else {
-                    current.push((Style::default().fg(Color::LightYellow), format!("`{}`", t)));
+                    current.push((Style::default().fg(theme.code), format!("`{}`", t)));
                 }
             }
             Event::SoftBreak => {
@@ -179,12 +180,12 @@ pub fn render(src: &str) -> Vec<Vec<(Style, String)>> {
             }
             Event::HardBreak => {
                 if !in_table_cell {
-                    flush(&mut lines, &mut current, bq_depth);
+                    flush(&mut lines, &mut current, bq_depth, theme);
                 }
             }
             Event::Rule => {
-                flush(&mut lines, &mut current, bq_depth);
-                lines.push(vec![(Style::default().fg(Color::DarkGray), "─".repeat(60))]);
+                flush(&mut lines, &mut current, bq_depth, theme);
+                lines.push(vec![(Style::default().fg(theme.dim), "─".repeat(60))]);
                 lines.push(vec![]);
             }
             Event::TaskListMarker(checked) => {
@@ -196,11 +197,15 @@ pub fn render(src: &str) -> Vec<Vec<(Style, String)>> {
             _ => {}
         }
     }
-    flush(&mut lines, &mut current, bq_depth);
+    flush(&mut lines, &mut current, bq_depth, theme);
     lines
 }
 
-fn render_table(rows: &[(bool, Vec<String>)], aligns: &[Alignment]) -> Vec<Vec<(Style, String)>> {
+fn render_table(
+    rows: &[(bool, Vec<String>)],
+    aligns: &[Alignment],
+    theme: &Theme,
+) -> Vec<Vec<(Style, String)>> {
     if rows.is_empty() {
         return vec![];
     }
@@ -218,9 +223,9 @@ fn render_table(rows: &[(bool, Vec<String>)], aligns: &[Alignment]) -> Vec<Vec<(
         }
     }
 
-    let dim = Style::default().fg(Color::DarkGray);
+    let dim = Style::default().fg(theme.dim);
     let header_style = Style::default()
-        .fg(Color::LightCyan)
+        .fg(theme.heading1)
         .add_modifier(Modifier::BOLD);
     let cell_style = Style::default();
 
@@ -277,13 +282,18 @@ fn pad(text: &str, width: usize, align: Alignment) -> String {
     }
 }
 
-fn flush(lines: &mut Vec<Vec<(Style, String)>>, spans: &mut Vec<(Style, String)>, bq_depth: usize) {
+fn flush(
+    lines: &mut Vec<Vec<(Style, String)>>,
+    spans: &mut Vec<(Style, String)>,
+    bq_depth: usize,
+    theme: &Theme,
+) {
     if spans.is_empty() {
         return;
     }
     let mut line: Vec<(Style, String)> = Vec::new();
     if bq_depth > 0 {
-        line.push((Style::default().fg(Color::DarkGray), "│ ".repeat(bq_depth)));
+        line.push((Style::default().fg(theme.dim), "│ ".repeat(bq_depth)));
     }
     line.extend(std::mem::take(spans));
     lines.push(line);
@@ -293,19 +303,19 @@ fn top(stack: &[Style]) -> Style {
     stack.last().copied().unwrap_or_default()
 }
 
-fn heading_style(level: HeadingLevel) -> Style {
+fn heading_style(level: HeadingLevel, theme: &Theme) -> Style {
     match level {
         HeadingLevel::H1 => Style::default()
-            .fg(Color::LightCyan)
+            .fg(theme.heading1)
             .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
         HeadingLevel::H2 => Style::default()
-            .fg(Color::LightYellow)
+            .fg(theme.heading2)
             .add_modifier(Modifier::BOLD),
         HeadingLevel::H3 => Style::default()
-            .fg(Color::LightGreen)
+            .fg(theme.heading3)
             .add_modifier(Modifier::BOLD),
-        HeadingLevel::H4 | HeadingLevel::H5 | HeadingLevel::H6 => Style::default()
-            .fg(Color::White)
-            .add_modifier(Modifier::BOLD),
+        HeadingLevel::H4 | HeadingLevel::H5 | HeadingLevel::H6 => {
+            Style::default().fg(theme.text).add_modifier(Modifier::BOLD)
+        }
     }
 }

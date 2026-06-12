@@ -14,6 +14,7 @@ mod file;
 mod git;
 mod highlight;
 mod markdown;
+mod theme;
 mod tree;
 mod ui;
 

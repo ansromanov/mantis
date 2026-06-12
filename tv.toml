@@ -36,3 +36,23 @@ content_page_down = ["PageDown"]
 content_reset_col = ["0"]
 toggle_wrap = ["z"]
 toggle_raw_markdown = ["M"]
+
+# Theme. Each role is a color name ("cyan", "lightyellow", "reset") or a hex
+# value ("#aabbcc"); `syntax` is a syntect theme name for file contents. Any
+# role left unset keeps the default shown below.
+# [theme]
+# accent = "cyan"            # focused borders, primary highlights
+# accent_alt = "yellow"      # popup chrome, keys, prompts
+# dim = "darkgray"           # unfocused borders, gutters, hints, rules
+# text = "white"             # emphasized / default text
+# dir = "blue"               # directory entries in the tree
+# file = "reset"             # file entries in the tree
+# selection_bg = "darkgray"  # selected row / status bar background
+# selection_fg = "yellow"    # selected row foreground in popups
+# heading1 = "lightcyan"     # markdown H1 / table headers
+# heading2 = "lightyellow"   # markdown H2
+# heading3 = "lightgreen"    # markdown H3
+# code = "lightyellow"       # inline code / code blocks
+# diff_add = "green"         # added lines in a diff
+# diff_del = "red"           # removed lines in a diff
+# syntax = "base16-ocean.dark"
