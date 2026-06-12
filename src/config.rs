@@ -437,8 +437,10 @@ mod tests {
     #[test]
     fn theme_config_with_name_serializes_and_round_trips() {
         use crate::theme::ThemeConfig;
-        let mut cfg = Config::default();
-        cfg.theme = ThemeConfig::from_preset("monokai");
+        let cfg = Config {
+            theme: ThemeConfig::from_preset("monokai"),
+            ..Config::default()
+        };
         let toml = toml::to_string_pretty(&cfg).expect("must serialize");
         assert!(
             toml.contains("monokai"),
