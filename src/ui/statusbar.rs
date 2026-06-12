@@ -47,19 +47,18 @@ pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
     } else if app.search.is_some() {
         " ↑↓ navigate  Enter select  Tab toggle mode  Esc cancel".into()
     } else {
-        match app.focus {
+        let base = match app.focus {
             Focus::Tree => tree_hint,
-            Focus::Content => {
-                if app.current_file.is_some() {
-                    let scroll_max = app.content_scroll_max();
-                    let pct = (app.content_scroll * 100)
-                        .checked_div(scroll_max)
-                        .map_or(100, |v| v.min(100));
-                    format!("{content_hint}  {pct}%")
-                } else {
-                    content_hint
-                }
-            }
+            Focus::Content => content_hint,
+        };
+        if app.current_file.is_some() {
+            let scroll_max = app.content_scroll_max();
+            let pct = (app.content_scroll * 100)
+                .checked_div(scroll_max)
+                .map_or(100, |v| v.min(100));
+            format!("{base}  {pct}%")
+        } else {
+            base
         }
     };
 
