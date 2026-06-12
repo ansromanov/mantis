@@ -856,7 +856,9 @@ impl App {
                     }
                 } else if rect_contains(self.content_area, ev.column, ev.row) {
                     self.focus = Focus::Content;
-                    let can_select = !(self.is_diff || self.is_markdown && !self.show_raw_markdown);
+                    let can_select = !(self.is_diff
+                        || self.word_wrap
+                        || self.is_markdown && !self.show_raw_markdown);
                     if can_select {
                         let pos = self.content_pos(ev.column, ev.row);
                         self.drag_start = Some(pos);
@@ -866,12 +868,8 @@ impl App {
             }
             MouseEventKind::Drag(MouseButton::Left) => {
                 if let Some(start) = self.drag_start {
-                    let pos = self.content_pos(ev.column, ev.row);
-                    self.selection = Some(TextSelection {
-                        anchor: start,
-                        active: pos,
-                    });
-                    // Auto-scroll: if dragging near the top or bottom edge, scroll content.
+                    // Auto-scroll before computing position so that selection.active
+                    // is calculated with the already-updated scroll offset.
                     let ca = self.content_area;
                     if ev.row < ca.y + 2 {
                         self.content_scroll = self.content_scroll.saturating_sub(1);
@@ -879,6 +877,11 @@ impl App {
                         let max = self.content_line_count().saturating_sub(1);
                         self.content_scroll = (self.content_scroll + 1).min(max);
                     }
+                    let pos = self.content_pos(ev.column, ev.row);
+                    self.selection = Some(TextSelection {
+                        anchor: start,
+                        active: pos,
+                    });
                 }
             }
             MouseEventKind::Up(MouseButton::Left) => {
