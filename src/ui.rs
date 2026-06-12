@@ -7,6 +7,7 @@ use ratatui::{
 };
 
 use crate::app::{App, Focus, SearchMode};
+use crate::git::GitStatus;
 
 pub fn draw(f: &mut Frame, app: &mut App) {
     let area = f.area();
@@ -92,11 +93,7 @@ fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
             } else {
                 "  "
             };
-            let (color, bold) = if node.is_dir {
-                (theme.dir, Modifier::BOLD)
-            } else {
-                (theme.file, Modifier::empty())
-            };
+            let (color, bold) = git_status_style(node, app, theme);
             ListItem::new(format!("{}{}{}", indent, arrow, node.name))
                 .style(Style::default().fg(color).add_modifier(bold))
         })
@@ -124,6 +121,33 @@ fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
         height: area.height.saturating_sub(2),
     };
     app.tree_offset = state.offset();
+}
+
+fn git_status_style(
+    node: &crate::tree::TreeNode,
+    app: &App,
+    theme: &crate::theme::Theme,
+) -> (ratatui::style::Color, Modifier) {
+    use ratatui::style::Color;
+    let dir_bold = if node.is_dir { Modifier::BOLD } else { Modifier::empty() };
+
+    if node.deleted {
+        return (theme.diff_del, Modifier::empty());
+    }
+    if app.git_status_enabled {
+        match app.git_status_map.get(&node.path) {
+            Some(GitStatus::New) => return (theme.diff_add, dir_bold),
+            Some(GitStatus::Modified) => return (theme.accent_alt, dir_bold),
+            Some(GitStatus::Deleted) => return (theme.diff_del, dir_bold),
+            Some(GitStatus::Ignored) => return (Color::DarkGray, dir_bold),
+            None => {}
+        }
+    }
+    if node.is_dir {
+        (theme.dir, Modifier::BOLD)
+    } else {
+        (theme.file, Modifier::empty())
+    }
 }
 
 fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {

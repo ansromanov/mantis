@@ -1,5 +1,118 @@
-use std::path::Path;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::process::Command;
+
+/// Per-file git working-tree status.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum GitStatus {
+    New,
+    Modified,
+    Deleted,
+    Ignored,
+}
+
+fn status_priority(s: GitStatus) -> u8 {
+    match s {
+        GitStatus::Modified => 3,
+        GitStatus::New => 2,
+        GitStatus::Deleted => 1,
+        GitStatus::Ignored => 0,
+    }
+}
+
+fn set_if_higher(map: &mut HashMap<PathBuf, GitStatus>, key: PathBuf, val: GitStatus) {
+    let cur = map.entry(key).or_insert(val);
+    if status_priority(val) > status_priority(*cur) {
+        *cur = val;
+    }
+}
+
+/// Returns the git repository root containing `dir`, canonicalized.
+fn git_toplevel(dir: &Path) -> Option<PathBuf> {
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(["rev-parse", "--show-toplevel"])
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    PathBuf::from(s).canonicalize().ok()
+}
+
+/// Builds an absolute-path → status map for the repository containing `dir`.
+/// Parent directories are included with their highest-priority child status so
+/// collapsed dirs can be colored when they contain changes.
+/// Pass `include_ignored = true` only when the tree is showing gitignored files;
+/// omitting `--ignored` makes the status call significantly faster on large repos.
+pub fn repo_status(dir: &Path, include_ignored: bool) -> HashMap<PathBuf, GitStatus> {
+    let Some(root) = git_toplevel(dir) else {
+        return HashMap::new();
+    };
+
+    let mut cmd = Command::new("git");
+    cmd.arg("-C").arg(&root).arg("status").arg("--porcelain");
+    if include_ignored {
+        cmd.arg("--ignored");
+    }
+    let out = match cmd.output() {
+        Ok(o) if o.status.success() => o,
+        _ => return HashMap::new(),
+    };
+
+    let text = String::from_utf8_lossy(&out.stdout);
+    let mut map: HashMap<PathBuf, GitStatus> = HashMap::new();
+
+    for line in text.lines() {
+        if line.len() < 3 {
+            continue;
+        }
+        let x = line.as_bytes()[0] as char;
+        let y = line.as_bytes()[1] as char;
+        let path_str = line[3..].trim();
+        // Renames: "old -> new" — keep the destination path.
+        let path_str = path_str
+            .find(" -> ")
+            .map_or(path_str, |i| &path_str[i + 4..]);
+        // Ignored directories are listed with a trailing slash.
+        let path_str = path_str.trim_end_matches('/');
+        if path_str.is_empty() {
+            continue;
+        }
+
+        let status = if x == '!' && y == '!' {
+            GitStatus::Ignored
+        } else if x == '?' && y == '?' {
+            GitStatus::New
+        } else if x == 'D' || y == 'D' {
+            GitStatus::Deleted
+        } else if (x == 'A' || x == '?') && y == ' ' {
+            GitStatus::New
+        } else {
+            GitStatus::Modified
+        };
+
+        let abs = root.join(path_str);
+        set_if_higher(&mut map, abs.clone(), status);
+
+        // Propagate up through parent directories, but never for Ignored — doing
+        // so would incorrectly taint the parent with the ignored status.
+        if status != GitStatus::Ignored {
+            let mut cur = abs.parent();
+            while let Some(d) = cur {
+                if d == root.as_path() || !d.starts_with(&root) {
+                    break;
+                }
+                set_if_higher(&mut map, d.to_path_buf(), status);
+                cur = d.parent();
+            }
+        }
+    }
+
+    map
+}
 
 /// A commit that touched a particular file.
 pub struct Commit {

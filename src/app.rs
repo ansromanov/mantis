@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -9,6 +9,7 @@ use ratatui::layout::Rect;
 
 use crate::config::{pressed, Config, Keymap};
 use crate::file::is_binary_bytes;
+use crate::git::GitStatus;
 use crate::highlight::Highlighter;
 use crate::markdown;
 use crate::theme::Theme;
@@ -288,6 +289,9 @@ pub struct App {
     pub show_help: bool,
     pub should_quit: bool,
     pub theme: Theme,
+    pub git_status_enabled: bool,
+    pub git_show_deleted: bool,
+    pub git_status_map: HashMap<PathBuf, GitStatus>,
     keys: Keymap,
     // Geometry captured during the last render, used to map mouse events.
     pub tree_area: Rect,
@@ -308,7 +312,21 @@ pub struct App {
 impl App {
     pub fn new(root: PathBuf, cfg: Config) -> anyhow::Result<Self> {
         let expanded = HashSet::new();
-        let nodes = build_visible(&root, &expanded, cfg.show_hidden, cfg.ignore_gitignore);
+        let git_status_enabled = cfg.git_status;
+        let git_show_deleted = cfg.git_show_deleted;
+        let git_status_map = if git_status_enabled {
+            crate::git::repo_status(&root, cfg.ignore_gitignore)
+        } else {
+            HashMap::new()
+        };
+        let deleted = deleted_set(&git_status_map, git_show_deleted);
+        let nodes = build_visible(
+            &root,
+            &expanded,
+            cfg.show_hidden,
+            cfg.ignore_gitignore,
+            &deleted,
+        );
         let theme = cfg.theme.resolve();
         let highlighter = Highlighter::new(&theme.syntax);
         let mut app = App {
@@ -337,6 +355,9 @@ impl App {
             show_help: false,
             should_quit: false,
             theme,
+            git_status_enabled,
+            git_show_deleted,
+            git_status_map,
             keys: cfg.keys,
             tree_area: Rect::default(),
             tree_offset: 0,
@@ -357,6 +378,10 @@ impl App {
 
     pub fn reload(&mut self) {
         self.last_refresh = Instant::now();
+        if self.git_status_enabled {
+            self.git_status_map =
+                crate::git::repo_status(&self.root, self.ignore_gitignore);
+        }
         let root = self.root.clone();
         let show_hidden = self.show_hidden;
         let ignore_gitignore = self.ignore_gitignore;
@@ -389,11 +414,13 @@ impl App {
 
     fn rebuild(&mut self) {
         let prev = self.nodes.get(self.tree_selected).map(|n| n.path.clone());
+        let deleted = deleted_set(&self.git_status_map, self.git_show_deleted);
         self.nodes = build_visible(
             &self.root,
             &self.expanded,
             self.show_hidden,
             self.ignore_gitignore,
+            &deleted,
         );
         if let Some(p) = prev {
             if let Some(i) = self.nodes.iter().position(|n| n.path == p) {
@@ -406,11 +433,30 @@ impl App {
 
     fn try_open_selected(&mut self) {
         if let Some(node) = self.nodes.get(self.tree_selected) {
-            if !node.is_dir {
+            if node.is_dir {
+                return;
+            }
+            if node.deleted {
+                let path = node.path.clone();
+                self.show_deleted(&path);
+            } else {
                 let path = node.path.clone();
                 self.open_file(&path);
             }
         }
+    }
+
+    fn show_deleted(&mut self, path: &Path) {
+        self.current_file = Some(path.to_path_buf());
+        self.is_diff = false;
+        self.is_markdown = false;
+        self.show_raw_markdown = false;
+        self.content = vec!["[deleted]".into()];
+        self.highlighted = Vec::new();
+        self.markdown_lines = Vec::new();
+        self.content_title = None;
+        self.content_scroll = 0;
+        self.content_hscroll = 0;
     }
 
     /// Acts on the currently selected node: toggles a directory's fold state,
@@ -425,6 +471,9 @@ impl App {
                     self.expanded.insert(p);
                 }
                 self.rebuild();
+            } else if node.deleted {
+                let p = node.path.clone();
+                self.show_deleted(&p);
             } else {
                 let p = node.path.clone();
                 self.open_file(&p);
@@ -1025,6 +1074,18 @@ impl App {
             self.tree_selected = i;
         }
     }
+}
+
+/// Builds the set of absolute paths that should appear as ghost (deleted) nodes
+/// in the tree. Only files that are absent from the working tree are included.
+fn deleted_set(map: &HashMap<PathBuf, GitStatus>, enabled: bool) -> HashSet<PathBuf> {
+    if !enabled {
+        return HashSet::new();
+    }
+    map.iter()
+        .filter(|(path, &status)| status == GitStatus::Deleted && !path.exists())
+        .map(|(path, _)| path.clone())
+        .collect()
 }
 
 fn rect_contains(area: Rect, col: u16, row: u16) -> bool {
