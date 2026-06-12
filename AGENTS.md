@@ -18,6 +18,9 @@ A fast terminal-based file tree viewer with ratatui. Navigate filesystems, previ
 | `cargo clippy --all-targets -- -D warnings` | Lint (must pass) |
 | `cargo fmt --all` | Format (must pass) |
 | `cargo fmt --check` | Check formatting |
+| `pre-commit install` | Install git hooks (run once after clone) |
+| `pre-commit run --all-files` | Run all hooks manually |
+| `pre-commit autoupdate` | Update hook versions |
 
 ## Architecture (single crate, no workspace)
 
@@ -78,9 +81,9 @@ Uses `crossterm::event::poll()` with 16ms timeout — no async runtime. Simple s
 
 ## Before Committing
 
-1. `cargo fmt --all` — formatting clean
-2. `cargo clippy --all-targets -- -D warnings` — no warnings
+1. `cargo fmt --all` — formatting clean (enforced by pre-commit hook)
+2. `cargo clippy --all-targets -- -D warnings` — no warnings (enforced by pre-commit hook)
 3. `cargo test` — all tests pass
-4. `cargo check` — no type errors
+4. `cargo check` — no type errors (enforced by pre-commit hook)
 5. No debug `println!`, `dbg!`, or commented-out code
 6. No hardcoded secrets or credentials
