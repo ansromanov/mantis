@@ -10,7 +10,7 @@ use ratatui::layout::Rect;
 use crate::config::{self, Config, Keymap};
 use crate::git::GitStatus;
 use crate::highlight::Highlighter;
-use crate::search::{HistoryState, SearchState, ThemePicker};
+use crate::search::{HistoryState, InFileSearch, SearchState, ThemePicker};
 use crate::selection::TextSelection;
 use crate::theme::Theme;
 use crate::tree::{build_visible, TreeNode};
@@ -21,6 +21,7 @@ mod mouse_handlers;
 mod navigation;
 
 /// Which panel is currently focused.
+#[derive(PartialEq)]
 pub enum Focus {
     /// The file tree panel on the left.
     Tree,
@@ -48,6 +49,7 @@ pub struct App {
     pub content_title: Option<String>,
     pub focus: Focus,
     pub search: Option<SearchState>,
+    pub in_file_search: Option<InFileSearch>,
     pub history: Option<HistoryState>,
     pub theme_picker: Option<ThemePicker>,
     pub show_hidden: bool,
@@ -137,6 +139,7 @@ impl App {
             content_title: None,
             focus: Focus::Tree,
             search: None,
+            in_file_search: None,
             history: None,
             theme_picker: None,
             show_hidden: cfg.show_hidden,

@@ -40,6 +40,10 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     content::draw_content(f, app, horiz[1]);
     statusbar::draw_statusbar(f, app, vert[1]);
 
+    if app.in_file_search.is_some() {
+        popups::draw_in_file_search(f, app, horiz[1]);
+    }
+
     if app.search.is_some() {
         popups::draw_search(f, app, area);
     }
