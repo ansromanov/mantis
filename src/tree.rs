@@ -9,6 +9,8 @@ pub struct TreeNode {
     pub name: String,
     pub depth: usize,
     pub is_dir: bool,
+    /// Ghost node for a file deleted from the working tree but tracked by git.
+    pub deleted: bool,
 }
 
 pub fn build_visible(
@@ -16,9 +18,18 @@ pub fn build_visible(
     expanded: &HashSet<PathBuf>,
     show_hidden: bool,
     ignore_gitignore: bool,
+    deleted_files: &HashSet<PathBuf>,
 ) -> Vec<TreeNode> {
     let mut nodes = Vec::new();
-    collect(root, 0, expanded, show_hidden, ignore_gitignore, &mut nodes);
+    collect(
+        root,
+        0,
+        expanded,
+        show_hidden,
+        ignore_gitignore,
+        deleted_files,
+        &mut nodes,
+    );
     nodes
 }
 
@@ -28,6 +39,7 @@ fn collect(
     expanded: &HashSet<PathBuf>,
     show_hidden: bool,
     ignore_gitignore: bool,
+    deleted_files: &HashSet<PathBuf>,
     out: &mut Vec<TreeNode>,
 ) {
     let mut entries: Vec<_> = WalkBuilder::new(dir)
@@ -60,6 +72,7 @@ fn collect(
             name,
             depth,
             is_dir,
+            deleted: false,
         });
 
         if is_dir && expanded.contains(&path) {
@@ -69,9 +82,31 @@ fn collect(
                 expanded,
                 show_hidden,
                 ignore_gitignore,
+                deleted_files,
                 out,
             );
         }
+    }
+
+    // Append ghost nodes for files deleted from the working tree. They go after
+    // all real entries in this directory, sorted by name.
+    let mut ghosts: Vec<&PathBuf> = deleted_files
+        .iter()
+        .filter(|p| p.parent() == Some(dir))
+        .collect();
+    ghosts.sort();
+    for p in ghosts {
+        let name = match p.file_name() {
+            Some(n) => n.to_string_lossy().to_string(),
+            None => continue,
+        };
+        out.push(TreeNode {
+            path: p.clone(),
+            name,
+            depth,
+            is_dir: false,
+            deleted: true,
+        });
     }
 }
 

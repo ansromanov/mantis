@@ -11,6 +11,8 @@ pub struct Config {
     pub ignore_gitignore: bool,
     pub tree_width: u16,
     pub word_wrap: bool,
+    pub git_status: bool,
+    pub git_show_deleted: bool,
     pub keys: Keymap,
     pub theme: ThemeConfig,
 }
@@ -22,6 +24,8 @@ impl Default for Config {
             ignore_gitignore: false,
             tree_width: 28,
             word_wrap: false,
+            git_status: true,
+            git_show_deleted: false,
             keys: Keymap::default(),
             theme: ThemeConfig::default(),
         }
