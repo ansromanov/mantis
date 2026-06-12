@@ -192,7 +192,6 @@ impl<'de> Deserialize<'de> for KeyBinding {
 
 impl Serialize for KeyBinding {
     fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-        use serde::ser::Error;
         let key = match self.code {
             KeyCode::Char(' ') => "space".to_string(),
             KeyCode::Char(c) => c.to_string(),
@@ -208,7 +207,9 @@ impl Serialize for KeyBinding {
             KeyCode::PageDown => "PageDown".to_string(),
             KeyCode::Home => "Home".to_string(),
             KeyCode::End => "End".to_string(),
-            _ => return Err(S::Error::custom("unsupported key code")),
+            // Unreachable via parse_binding, but produce a non-failing placeholder
+            // so save() always writes a complete config rather than silently dropping it.
+            ref other => format!("{other:?}"),
         };
         let spec = match (self.ctrl, self.alt) {
             (true, true) => format!("ctrl+alt+{key}"),
