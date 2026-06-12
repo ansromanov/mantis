@@ -13,6 +13,8 @@ pub struct Config {
     pub word_wrap: bool,
     pub git_status: bool,
     pub git_show_deleted: bool,
+    pub git_mode: bool,
+    pub git_mode_flat: bool,
     pub keys: Keymap,
     pub theme: ThemeConfig,
 }
@@ -26,6 +28,8 @@ impl Default for Config {
             word_wrap: false,
             git_status: true,
             git_show_deleted: false,
+            git_mode: false,
+            git_mode_flat: false,
             keys: Keymap::default(),
             theme: ThemeConfig::default(),
         }
@@ -84,6 +88,8 @@ pub struct Keymap {
     pub content_reset_col: Vec<KeyBinding>,
     pub toggle_wrap: Vec<KeyBinding>,
     pub toggle_raw_markdown: Vec<KeyBinding>,
+    pub git_mode_toggle: Vec<KeyBinding>,
+    pub git_mode_flat_toggle: Vec<KeyBinding>,
 }
 
 impl Default for Keymap {
@@ -111,6 +117,8 @@ impl Default for Keymap {
             content_reset_col: bind(&["0"]),
             toggle_wrap: bind(&["z"]),
             toggle_raw_markdown: bind(&["M"]),
+            git_mode_toggle: bind(&["ctrl+g"]),
+            git_mode_flat_toggle: bind(&["alt+g"]),
         }
     }
 }
