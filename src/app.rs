@@ -316,6 +316,7 @@ pub struct App {
     last_refresh: Instant,
     file_watcher: Option<RecommendedWatcher>,
     file_watch_rx: Option<Receiver<notify::Result<notify::Event>>>,
+    file_watch_path: Option<PathBuf>,
 }
 
 impl App {
@@ -392,6 +393,7 @@ impl App {
             last_refresh: Instant::now(),
             file_watcher: None,
             file_watch_rx: None,
+            file_watch_path: None,
         };
         if app.git_mode {
             app.expand_git_dirs();
@@ -446,27 +448,39 @@ impl App {
     fn set_file_watch(&mut self, path: Option<&Path>) {
         self.file_watcher = None;
         self.file_watch_rx = None;
+        self.file_watch_path = None;
         let Some(p) = path else { return };
+        // Watch the parent directory rather than the file itself so that
+        // atomic-save editors (those that write a temp file and rename it over
+        // the original) still trigger events after the inode is replaced.
+        let Some(dir) = p.parent() else { return };
         let (tx, rx) = std::sync::mpsc::channel();
         let Ok(mut watcher) = notify::recommended_watcher(move |res| {
             let _ = tx.send(res);
         }) else {
             return;
         };
-        if watcher.watch(p, RecursiveMode::NonRecursive).is_ok() {
+        if watcher.watch(dir, RecursiveMode::NonRecursive).is_ok() {
             self.file_watcher = Some(watcher);
             self.file_watch_rx = Some(rx);
+            self.file_watch_path = Some(p.to_path_buf());
         }
     }
 
     fn drain_file_watch(&self) -> bool {
-        let Some(rx) = &self.file_watch_rx else {
+        let (Some(rx), Some(watched)) = (&self.file_watch_rx, &self.file_watch_path) else {
             return false;
         };
         let mut changed = false;
         while let Ok(res) = rx.try_recv() {
             if let Ok(evt) = res {
-                if matches!(evt.kind, EventKind::Modify(_) | EventKind::Create(_)) {
+                let affects_watched = evt.paths.iter().any(|p| p == watched);
+                if affects_watched
+                    && matches!(
+                        evt.kind,
+                        EventKind::Modify(_) | EventKind::Create(_) | EventKind::Remove(_)
+                    )
+                {
                     changed = true;
                 }
             }
