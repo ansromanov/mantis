@@ -67,7 +67,11 @@ fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
     };
 
     let git_suffix = if app.git_mode {
-        if app.git_mode_flat { " [git:flat]" } else { " [git]" }
+        if app.git_mode_flat {
+            " [git:flat]"
+        } else {
+            " [git]"
+        }
     } else {
         ""
     };
@@ -289,7 +293,11 @@ fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
         hscroll_hint, md_hint, wrap_hint
     );
     let git_indicator = if app.git_mode {
-        if app.git_mode_flat { " [git:flat]" } else { " [git]" }
+        if app.git_mode_flat {
+            " [git:flat]"
+        } else {
+            " [git]"
+        }
     } else {
         ""
     };
@@ -619,8 +627,14 @@ fn draw_help(f: &mut Frame, app: &App, area: Rect) {
         Line::from(vec![key("  q / Ctrl+C "), desc("quit")]),
         Line::from(vec![key("  Alt+.      "), desc("toggle hidden files")]),
         Line::from(vec![key("  t          "), desc("pick a theme")]),
-        Line::from(vec![key("  Ctrl+G     "), desc("toggle git mode (changed files only + diffs)")]),
-        Line::from(vec![key("  Alt+G      "), desc("toggle git flat/tree view (in git mode)")]),
+        Line::from(vec![
+            key("  Ctrl+G     "),
+            desc("toggle git mode (changed files only + diffs)"),
+        ]),
+        Line::from(vec![
+            key("  Alt+G      "),
+            desc("toggle git flat/tree view (in git mode)"),
+        ]),
         gap.clone(),
         section("Tree panel"),
         Line::from(vec![key("  j/k / ↑↓   "), desc("move up / down")]),

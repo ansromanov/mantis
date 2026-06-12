@@ -442,10 +442,7 @@ impl App {
                 self.nodes = all
                     .into_iter()
                     .filter(|n| {
-                        n.deleted
-                            || map
-                                .get(&n.path)
-                                .map_or(false, |&s| s != GitStatus::Ignored)
+                        n.deleted || map.get(&n.path).map_or(false, |&s| s != GitStatus::Ignored)
                     })
                     .collect();
             }
@@ -474,9 +471,7 @@ impl App {
             .git_status_map
             .iter()
             .filter(|(path, &status)| {
-                status != GitStatus::Ignored
-                    && path.starts_with(&self.root)
-                    && !path.is_dir()
+                status != GitStatus::Ignored && path.starts_with(&self.root) && !path.is_dir()
             })
             .map(|(path, &status)| {
                 let deleted = status == GitStatus::Deleted && !path.exists();
@@ -564,8 +559,7 @@ impl App {
             // Ensure git status is populated even if git_status was disabled.
             if !self.git_status_enabled {
                 self.git_status_enabled = true;
-                self.git_status_map =
-                    crate::git::repo_status(&self.root, self.ignore_gitignore);
+                self.git_status_map = crate::git::repo_status(&self.root, self.ignore_gitignore);
             }
             self.expand_git_dirs();
             self.rebuild();
@@ -1606,8 +1600,7 @@ mod tests {
         use std::process::Command;
         static COUNTER: AtomicUsize = AtomicUsize::new(0);
         let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-        let dir =
-            std::env::temp_dir().join(format!("tv_git_mode_{}_{n}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("tv_git_mode_{}_{n}", std::process::id()));
         fs::create_dir_all(dir.join("sub")).unwrap();
         let git = |args: &[&str]| {
             Command::new("git")
@@ -1676,7 +1669,10 @@ mod tests {
     fn git_mode_auto_expands_dirs_with_changes() {
         let root = temp_git_with_changes();
         let mut app = app_for(&root);
-        assert!(!app.expanded.contains(&root.join("sub")), "sub/ starts collapsed");
+        assert!(
+            !app.expanded.contains(&root.join("sub")),
+            "sub/ starts collapsed"
+        );
 
         app.handle_key(ctrl_g());
 
@@ -1709,7 +1705,10 @@ mod tests {
             app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
         }
 
-        assert!(app.is_diff, "selecting a file in git mode must show working-tree diff");
+        assert!(
+            app.is_diff,
+            "selecting a file in git mode must show working-tree diff"
+        );
         assert!(
             app.content_title
                 .as_deref()
@@ -1734,7 +1733,10 @@ mod tests {
         // Move to the next file node.
         app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
 
-        assert!(app.is_diff, "navigation in git mode must keep showing diffs");
+        assert!(
+            app.is_diff,
+            "navigation in git mode must keep showing diffs"
+        );
         fs::remove_dir_all(&root).ok();
     }
 
