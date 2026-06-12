@@ -9,13 +9,23 @@ use syntect::{
 pub struct Highlighter {
     ss: SyntaxSet,
     ts: ThemeSet,
+    theme: String,
 }
 
 impl Highlighter {
-    pub fn new() -> Self {
+    /// Builds a highlighter using the named syntect theme, falling back to
+    /// `base16-ocean.dark` if the name is unknown.
+    pub fn new(theme: &str) -> Self {
+        let ts = ThemeSet::load_defaults();
+        let theme = if ts.themes.contains_key(theme) {
+            theme.to_string()
+        } else {
+            "base16-ocean.dark".to_string()
+        };
         Highlighter {
             ss: SyntaxSet::load_defaults_nonewlines(),
-            ts: ThemeSet::load_defaults(),
+            ts,
+            theme,
         }
     }
 
@@ -27,7 +37,7 @@ impl Highlighter {
             .flatten()
             .unwrap_or_else(|| self.ss.find_syntax_plain_text());
 
-        let theme = &self.ts.themes["base16-ocean.dark"];
+        let theme = &self.ts.themes[&self.theme];
         let mut h = HighlightLines::new(syntax, theme);
 
         lines

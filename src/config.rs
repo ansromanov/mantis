@@ -1,3 +1,4 @@
+use crate::theme::ThemeConfig;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use serde::{Deserialize, Deserializer};
 use std::fs;
@@ -11,6 +12,7 @@ pub struct Config {
     pub tree_width: u16,
     pub word_wrap: bool,
     pub keys: Keymap,
+    pub theme: ThemeConfig,
 }
 
 impl Default for Config {
@@ -21,6 +23,7 @@ impl Default for Config {
             tree_width: 28,
             word_wrap: false,
             keys: Keymap::default(),
+            theme: ThemeConfig::default(),
         }
     }
 }

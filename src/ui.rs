@@ -1,6 +1,6 @@
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap},
     Frame,
@@ -38,16 +38,17 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     }
 
     if app.show_help {
-        draw_help(f, area);
+        draw_help(f, app, area);
     }
 }
 
 fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
+    let theme = &app.theme;
     let focused = matches!(app.focus, Focus::Tree) && app.search.is_none() && app.history.is_none();
     let border_style = if focused {
-        Style::default().fg(Color::Cyan)
+        Style::default().fg(theme.accent)
     } else {
-        Style::default().fg(Color::DarkGray)
+        Style::default().fg(theme.dim)
     };
 
     let title = format!(
@@ -78,9 +79,9 @@ fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
                 "  "
             };
             let (color, bold) = if node.is_dir {
-                (Color::Blue, Modifier::BOLD)
+                (theme.dir, Modifier::BOLD)
             } else {
-                (Color::Reset, Modifier::empty())
+                (theme.file, Modifier::empty())
             };
             ListItem::new(format!("{}{}{}", indent, arrow, node.name))
                 .style(Style::default().fg(color).add_modifier(bold))
@@ -89,7 +90,7 @@ fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
 
     let list = List::new(items).block(block).highlight_style(
         Style::default()
-            .bg(Color::DarkGray)
+            .bg(theme.selection_bg)
             .add_modifier(Modifier::BOLD),
     );
 
@@ -115,9 +116,9 @@ fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     let focused =
         matches!(app.focus, Focus::Content) && app.search.is_none() && app.history.is_none();
     let border_style = if focused {
-        Style::default().fg(Color::Cyan)
+        Style::default().fg(app.theme.accent)
     } else {
-        Style::default().fg(Color::DarkGray)
+        Style::default().fg(app.theme.dim)
     };
 
     let title = if let Some(t) = &app.content_title {
@@ -162,7 +163,7 @@ fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
             .collect()
     } else {
         let ln_width = app.content.len().to_string().len().max(1);
-        let ln_style = Style::default().fg(Color::DarkGray);
+        let ln_style = Style::default().fg(app.theme.dim);
         if !app.highlighted.is_empty() {
             app.highlighted
                 .iter()
@@ -253,12 +254,17 @@ fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
     };
 
     f.render_widget(
-        Paragraph::new(text).style(Style::default().bg(Color::DarkGray).fg(Color::White)),
+        Paragraph::new(text).style(
+            Style::default()
+                .bg(app.theme.selection_bg)
+                .fg(app.theme.text),
+        ),
         area,
     );
 }
 
 fn draw_search(f: &mut Frame, app: &mut App, area: Rect) {
+    let theme = &app.theme;
     let search = app.search.as_ref().unwrap();
 
     let popup = centered_rect(72, 75, area);
@@ -272,7 +278,7 @@ fn draw_search(f: &mut Frame, app: &mut App, area: Rect) {
     let block = Block::default()
         .title(mode_label)
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Yellow));
+        .border_style(Style::default().fg(theme.accent_alt));
 
     let inner = block.inner(popup);
     f.render_widget(block, popup);
@@ -297,20 +303,19 @@ fn draw_search(f: &mut Frame, app: &mut App, area: Rect) {
             Span::styled(
                 "> ",
                 Style::default()
-                    .fg(Color::Yellow)
+                    .fg(theme.accent_alt)
                     .add_modifier(Modifier::BOLD),
             ),
             Span::raw(search.query.as_str()),
-            Span::styled("█", Style::default().fg(Color::Yellow)),
-            Span::styled(hint, Style::default().fg(Color::DarkGray)),
+            Span::styled("█", Style::default().fg(theme.accent_alt)),
+            Span::styled(hint, Style::default().fg(theme.dim)),
         ])),
         parts[0],
     );
 
     // Divider
     f.render_widget(
-        Paragraph::new("─".repeat(inner.width as usize))
-            .style(Style::default().fg(Color::DarkGray)),
+        Paragraph::new("─".repeat(inner.width as usize)).style(Style::default().fg(theme.dim)),
         parts[1],
     );
 
@@ -333,7 +338,7 @@ fn draw_search(f: &mut Frame, app: &mut App, area: Rect) {
                 ListItem::new(Line::from(vec![
                     Span::styled(
                         format!("{}:{}: ", file.display(), m.line_num),
-                        Style::default().fg(Color::Cyan),
+                        Style::default().fg(theme.accent),
                     ),
                     Span::raw(trimmed),
                 ]))
@@ -343,8 +348,8 @@ fn draw_search(f: &mut Frame, app: &mut App, area: Rect) {
 
     let list = List::new(items).highlight_style(
         Style::default()
-            .bg(Color::DarkGray)
-            .fg(Color::Yellow)
+            .bg(theme.selection_bg)
+            .fg(theme.selection_fg)
             .add_modifier(Modifier::BOLD),
     );
 
@@ -361,6 +366,7 @@ fn draw_search(f: &mut Frame, app: &mut App, area: Rect) {
 }
 
 fn draw_history(f: &mut Frame, app: &mut App, area: Rect) {
+    let theme = &app.theme;
     let history = app.history.as_ref().unwrap();
 
     let popup = centered_rect(72, 75, area);
@@ -373,7 +379,7 @@ fn draw_history(f: &mut Frame, app: &mut App, area: Rect) {
     let block = Block::default()
         .title(format!(" History: {} ", name.display()))
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Yellow));
+        .border_style(Style::default().fg(theme.accent_alt));
 
     let inner = block.inner(popup);
     f.render_widget(block, popup);
@@ -393,19 +399,18 @@ fn draw_history(f: &mut Frame, app: &mut App, area: Rect) {
             Span::styled(
                 "> ",
                 Style::default()
-                    .fg(Color::Yellow)
+                    .fg(theme.accent_alt)
                     .add_modifier(Modifier::BOLD),
             ),
             Span::raw(history.query.as_str()),
-            Span::styled("█", Style::default().fg(Color::Yellow)),
+            Span::styled("█", Style::default().fg(theme.accent_alt)),
         ])),
         parts[0],
     );
 
     // Divider
     f.render_widget(
-        Paragraph::new("─".repeat(inner.width as usize))
-            .style(Style::default().fg(Color::DarkGray)),
+        Paragraph::new("─".repeat(inner.width as usize)).style(Style::default().fg(theme.dim)),
         parts[1],
     );
 
@@ -416,8 +421,11 @@ fn draw_history(f: &mut Frame, app: &mut App, area: Rect) {
         .filter_map(|&i| history.commits.get(i))
         .map(|c| {
             ListItem::new(Line::from(vec![
-                Span::styled(format!("{} ", c.short), Style::default().fg(Color::Yellow)),
-                Span::styled(format!("{} ", c.date), Style::default().fg(Color::Cyan)),
+                Span::styled(
+                    format!("{} ", c.short),
+                    Style::default().fg(theme.accent_alt),
+                ),
+                Span::styled(format!("{} ", c.date), Style::default().fg(theme.accent)),
                 Span::raw(c.subject.as_str()),
             ]))
         })
@@ -425,8 +433,8 @@ fn draw_history(f: &mut Frame, app: &mut App, area: Rect) {
 
     let list = List::new(items).highlight_style(
         Style::default()
-            .bg(Color::DarkGray)
-            .fg(Color::Yellow)
+            .bg(theme.selection_bg)
+            .fg(theme.selection_fg)
             .add_modifier(Modifier::BOLD),
     );
 
@@ -441,14 +449,15 @@ fn draw_history(f: &mut Frame, app: &mut App, area: Rect) {
     app.history_offset = state.offset();
 }
 
-fn draw_help(f: &mut Frame, area: Rect) {
+fn draw_help(f: &mut Frame, app: &App, area: Rect) {
+    let theme = &app.theme;
     let popup = centered_rect(52, 80, area);
     f.render_widget(Clear, popup);
 
     let block = Block::default()
         .title(" Help — ? / Esc to close ")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Yellow));
+        .border_style(Style::default().fg(theme.accent_alt));
 
     let inner = block.inner(popup);
     f.render_widget(block, popup);
@@ -457,16 +466,16 @@ fn draw_help(f: &mut Frame, area: Rect) {
         Span::styled(
             k,
             Style::default()
-                .fg(Color::Yellow)
+                .fg(theme.accent_alt)
                 .add_modifier(Modifier::BOLD),
         )
     };
-    let desc = |d: &'static str| Span::styled(d, Style::default().fg(Color::White));
+    let desc = |d: &'static str| Span::styled(d, Style::default().fg(theme.text));
     let section = |s: &'static str| {
         Line::from(vec![Span::styled(
             s,
             Style::default()
-                .fg(Color::Cyan)
+                .fg(theme.accent)
                 .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
         )])
     };
