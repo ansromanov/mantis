@@ -79,6 +79,17 @@ Uses `crossterm::event::poll()` with 16ms timeout — no async runtime. Simple s
 - **`.clone()` explicitly** on non-Copy types — no hidden clones
 - **Custom errors** with `thiserror` / `anyhow` `.context()`
 
+## Branching
+
+Always branch from `origin/main`, never from an existing feature branch:
+
+```bash
+git fetch origin
+git checkout -b your-branch origin/main
+```
+
+If you find yourself on a branch that isn't based on main, cherry-pick only the new commits onto a clean branch rather than rebasing through merge noise.
+
 ## Before Committing
 
 1. `cargo fmt --all` — formatting clean (enforced by pre-commit hook)
