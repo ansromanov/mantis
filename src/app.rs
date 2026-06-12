@@ -8,7 +8,7 @@ use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use ratatui::layout::Rect;
 
 use crate::config::{pressed, Config, Keymap};
-use crate::file::is_binary;
+use crate::file::is_binary_bytes;
 use crate::highlight::Highlighter;
 use crate::markdown;
 use crate::theme::Theme;
@@ -119,7 +119,14 @@ impl SearchState {
         }
         let q = self.query.to_lowercase();
         for path in &self.all_files {
-            let Ok(text) = fs::read_to_string(path) else {
+            let Ok(bytes) = fs::read(path) else {
+                continue;
+            };
+            // Skip binary blobs rather than scanning them line by line.
+            if is_binary_bytes(&bytes) {
+                continue;
+            }
+            let Ok(text) = String::from_utf8(bytes) else {
                 continue;
             };
             for (i, line) in text.lines().enumerate() {
@@ -655,28 +662,37 @@ impl App {
         self.show_raw_markdown = false;
         self.markdown_lines = Vec::new();
 
-        if is_binary(path) {
+        // Read the file once: classify it as binary and decode it from the
+        // same bytes, rather than reading the whole file twice.
+        let bytes = match fs::read(path) {
+            Ok(b) => b,
+            Err(e) => {
+                self.content = vec![format!("[error: {}]", e)];
+                self.highlighted = Vec::new();
+                return;
+            }
+        };
+        if is_binary_bytes(&bytes) {
             self.content = vec!["[binary file]".into()];
             self.highlighted = Vec::new();
             return;
         }
-
-        match fs::read_to_string(path) {
-            Ok(s) => {
-                self.content = s.lines().map(|l| l.to_owned()).collect();
-                if self.content.is_empty() {
-                    self.content = vec!["[empty file]".into()];
-                    self.highlighted = Vec::new();
-                } else {
-                    self.highlighted = self.highlighter.highlight(path, &self.content);
-                    if self.is_markdown {
-                        self.markdown_lines = markdown::render(&s, &self.theme);
-                    }
-                }
-            }
-            Err(e) => {
-                self.content = vec![format!("[error: {}]", e)];
+        let s = match String::from_utf8(bytes) {
+            Ok(s) => s,
+            Err(_) => {
+                self.content = vec!["[binary file]".into()];
                 self.highlighted = Vec::new();
+                return;
+            }
+        };
+        self.content = s.lines().map(|l| l.to_owned()).collect();
+        if self.content.is_empty() {
+            self.content = vec!["[empty file]".into()];
+            self.highlighted = Vec::new();
+        } else {
+            self.highlighted = self.highlighter.highlight(path, &self.content);
+            if self.is_markdown {
+                self.markdown_lines = markdown::render(&s, &self.theme);
             }
         }
     }
@@ -985,7 +1001,7 @@ impl App {
         } else if pressed(&k.content_top, &key) {
             self.content_scroll = 0;
         } else if pressed(&k.content_bottom, &key) {
-            self.content_scroll = self.content.len().saturating_sub(1);
+            self.content_scroll = self.content_line_count().saturating_sub(1);
         } else if !self.word_wrap && pressed(&k.content_reset_col, &key) {
             self.content_hscroll = 0;
         }
