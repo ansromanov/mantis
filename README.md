@@ -166,11 +166,17 @@ role then overrides it. A role takes a color name (`cyan`, `lightyellow`,
 [syntect](https://github.com/trishume/syntect) theme name for file contents.
 Anything left unset keeps the preset's value.
 
+Presets ship their own `background`; the `default` theme leaves it transparent
+(the terminal's background). Set `background = "reset"` to keep a preset's
+colors but your terminal's background. Custom backgrounds need a true-color
+terminal.
+
 ```toml
 [theme]
 name = "catppuccin"        # built-in preset to start from
 
 # Optional per-role overrides on top of the preset:
+background = "reset"       # panel background; "reset" = terminal default
 accent = "cyan"            # focused borders, primary highlights
 accent_alt = "yellow"      # popup chrome, keys, prompts
 dim = "darkgray"           # unfocused borders, gutters, hints, rules

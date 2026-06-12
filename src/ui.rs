@@ -11,6 +11,13 @@ use crate::app::{App, Focus, SearchMode};
 pub fn draw(f: &mut Frame, app: &mut App) {
     let area = f.area();
 
+    // Paint the themed background; widgets that don't set their own bg inherit
+    // it. With the default theme this is Color::Reset (the terminal default).
+    f.render_widget(
+        Block::default().style(Style::default().bg(app.theme.background)),
+        area,
+    );
+
     let vert = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(0), Constraint::Length(1)])
@@ -289,6 +296,7 @@ fn draw_search(f: &mut Frame, app: &mut App, area: Rect) {
     let block = Block::default()
         .title(mode_label)
         .borders(Borders::ALL)
+        .style(Style::default().bg(theme.background))
         .border_style(Style::default().fg(theme.accent_alt));
 
     let inner = block.inner(popup);
@@ -390,6 +398,7 @@ fn draw_history(f: &mut Frame, app: &mut App, area: Rect) {
     let block = Block::default()
         .title(format!(" History: {} ", name.display()))
         .borders(Borders::ALL)
+        .style(Style::default().bg(theme.background))
         .border_style(Style::default().fg(theme.accent_alt));
 
     let inner = block.inner(popup);
@@ -470,6 +479,7 @@ fn draw_theme(f: &mut Frame, app: &mut App, area: Rect) {
     let block = Block::default()
         .title(" Theme ")
         .borders(Borders::ALL)
+        .style(Style::default().bg(theme.background))
         .border_style(Style::default().fg(theme.accent_alt));
 
     let inner = block.inner(popup);
@@ -538,6 +548,7 @@ fn draw_help(f: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
         .title(" Help — ? / Esc to close ")
         .borders(Borders::ALL)
+        .style(Style::default().bg(theme.background))
         .border_style(Style::default().fg(theme.accent_alt));
 
     let inner = block.inner(popup);
