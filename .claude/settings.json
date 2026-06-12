@@ -1,0 +1,25 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git commit*)",
+            "command": "if command -v pre-commit >/dev/null 2>&1; then if ! pre-commit run --all-files; then echo '{\"continue\": false, \"stopReason\": \"pre-commit checks failed\"}'; exit 1; fi; fi",
+            "statusMessage": "Running pre-commit checks...",
+            "timeout": 120
+          },
+          {
+            "type": "command",
+            "if": "Bash(git push*)",
+            "command": "git fetch origin main 2>/dev/null || true",
+            "statusMessage": "Fetching origin/main...",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
