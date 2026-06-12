@@ -50,7 +50,7 @@ Each `draw_*` function stores its rendered `Rect` and scroll offset back on `App
 `SearchState`, `HistoryState`, `ThemePicker` all share: query string, full list, filtered+scored list, selected index, `push(c)`/`pop()` → `refresh()`. Uses `SkimMatcherV2` with descending score sort.
 
 ### 5. Semantic theming
-`Theme` has 11 named color roles (not literal colors) plus a `syntax` syntect theme name. Presets (default, monokai, solarized, catppuccin, synthwave84) listed in `PRESETS` + user overrides. `apply_theme()` re-opens current file after theme switch.
+`Theme` is a set of named color roles (not literal colors) plus a `syntax` syntect theme name. Presets (default, monokai, solarized, catppuccin, synthwave84) listed in `PRESETS` + user overrides. `apply_theme()` re-opens current file after theme switch.
 
 ### 6. Keybinding abstraction
 All actions bound through `Keymap` struct. `pressed()` checks binding lists. Fully remappable via `tv.toml` `[keys]` table.
