@@ -249,13 +249,31 @@ fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     } else if app.is_markdown && !app.show_raw_markdown {
         app.markdown_lines
             .iter()
-            .map(|spans| {
-                Line::from(
-                    spans
-                        .iter()
-                        .map(|(s, t)| Span::styled(t.clone(), *s))
-                        .collect::<Vec<_>>(),
-                )
+            .enumerate()
+            .map(|(i, spans)| {
+                let regions_owned: Vec<(Style, String)> =
+                    spans.iter().map(|(s, t)| (*s, t.clone())).collect();
+                if let Some(((sl, sc), (el, ec))) = sel {
+                    if i >= sl && i <= el {
+                        let col_start = if i == sl { sc } else { 0 };
+                        let col_end = if i == el { ec } else { usize::MAX };
+                        Line::from(apply_selection(&regions_owned, col_start, col_end, sel_bg))
+                    } else {
+                        Line::from(
+                            regions_owned
+                                .iter()
+                                .map(|(s, t)| Span::styled(t.clone(), *s))
+                                .collect::<Vec<_>>(),
+                        )
+                    }
+                } else {
+                    Line::from(
+                        regions_owned
+                            .iter()
+                            .map(|(s, t)| Span::styled(t.clone(), *s))
+                            .collect::<Vec<_>>(),
+                    )
+                }
             })
             .collect()
     } else {
