@@ -34,7 +34,7 @@ impl Default for Theme {
             text: Color::White,
             dir: Color::Blue,
             file: Color::Reset,
-            selection_bg: Color::DarkGray,
+            selection_bg: Color::Rgb(80, 80, 80),
             selection_fg: Color::Yellow,
             heading1: Color::LightCyan,
             heading2: Color::LightYellow,
