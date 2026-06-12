@@ -51,11 +51,9 @@ pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
             Focus::Tree => tree_hint,
             Focus::Content => content_hint,
         };
-        if app.current_file.is_some() {
-            let scroll_max = app.content_scroll_max();
-            let pct = (app.content_scroll * 100)
-                .checked_div(scroll_max)
-                .map_or(100, |v| v.min(100));
+        let scroll_max = app.content_scroll_max();
+        if app.show_scroll_percentage && app.current_file.is_some() && scroll_max > 0 {
+            let pct = (app.content_scroll * 100 / scroll_max).min(100);
             format!("{base}  {pct}%")
         } else {
             base

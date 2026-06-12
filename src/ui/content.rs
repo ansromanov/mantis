@@ -184,7 +184,8 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
 
     // Transient scrollbar overlay on the right edge of the content area.
     let total = app.content_line_count();
-    if total > inner_h
+    if app.show_scrollbar
+        && total > inner_h
         && inner_h > 0
         && inner_w > 0
         && app.content_scrolled_at.elapsed() < SCROLLBAR_FADE
