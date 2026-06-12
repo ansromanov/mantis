@@ -14,9 +14,9 @@
           {
             "type": "command",
             "if": "Bash(git push*)",
-            "command": "git fetch origin main 2>/dev/null || true",
-            "statusMessage": "Fetching origin/main...",
-            "timeout": 30
+            "command": "git fetch origin main 2>/dev/null || true; if git rebase origin/main --quiet 2>/dev/null; then true; else git rebase --abort 2>/dev/null || true; fi",
+            "statusMessage": "Fetching and rebasing onto origin/main...",
+            "timeout": 60
           }
         ]
       }
