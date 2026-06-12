@@ -197,6 +197,64 @@ impl HistoryState {
     }
 }
 
+/// Fuzzy-filterable list of built-in theme presets.
+pub struct ThemePicker {
+    pub names: Vec<&'static str>,
+    pub query: String,
+    pub filtered: Vec<usize>,
+    pub selected: usize,
+}
+
+impl Default for ThemePicker {
+    fn default() -> Self {
+        let names = crate::theme::PRESETS.to_vec();
+        let filtered = (0..names.len()).collect();
+        ThemePicker {
+            names,
+            query: String::new(),
+            filtered,
+            selected: 0,
+        }
+    }
+}
+
+impl ThemePicker {
+    pub fn push(&mut self, c: char) {
+        self.query.push(c);
+        self.refilter();
+    }
+
+    pub fn pop(&mut self) {
+        self.query.pop();
+        self.refilter();
+    }
+
+    pub fn results_len(&self) -> usize {
+        self.filtered.len()
+    }
+
+    pub fn selected_name(&self) -> Option<&'static str> {
+        self.filtered.get(self.selected).map(|&i| self.names[i])
+    }
+
+    fn refilter(&mut self) {
+        self.selected = 0;
+        if self.query.is_empty() {
+            self.filtered = (0..self.names.len()).collect();
+            return;
+        }
+        let matcher = SkimMatcherV2::default();
+        let mut scored: Vec<(usize, i64)> = self
+            .names
+            .iter()
+            .enumerate()
+            .filter_map(|(i, n)| matcher.fuzzy_match(n, &self.query).map(|s| (i, s)))
+            .collect();
+        scored.sort_by_key(|(_, s)| std::cmp::Reverse(*s));
+        self.filtered = scored.into_iter().map(|(i, _)| i).collect();
+    }
+}
+
 pub struct App {
     pub root: PathBuf,
     pub nodes: Vec<TreeNode>,
@@ -216,6 +274,7 @@ pub struct App {
     pub focus: Focus,
     pub search: Option<SearchState>,
     pub history: Option<HistoryState>,
+    pub theme_picker: Option<ThemePicker>,
     pub show_hidden: bool,
     pub ignore_gitignore: bool,
     pub tree_width: u16,
@@ -231,6 +290,8 @@ pub struct App {
     pub search_offset: usize,
     pub history_area: Rect,
     pub history_offset: usize,
+    pub theme_area: Rect,
+    pub theme_offset: usize,
     // Time and result index of the last search-result click, for double-click.
     last_click: Option<(Instant, usize)>,
     highlighter: Highlighter,
@@ -262,6 +323,7 @@ impl App {
             focus: Focus::Tree,
             search: None,
             history: None,
+            theme_picker: None,
             show_hidden: cfg.show_hidden,
             ignore_gitignore: cfg.ignore_gitignore,
             tree_width: cfg.tree_width,
@@ -276,6 +338,8 @@ impl App {
             search_offset: 0,
             history_area: Rect::default(),
             history_offset: 0,
+            theme_area: Rect::default(),
+            theme_offset: 0,
             last_click: None,
             highlighter,
             last_refresh: Instant::now(),
@@ -426,8 +490,57 @@ impl App {
         }
     }
 
+    fn handle_theme_mouse(&mut self, ev: MouseEvent) {
+        match ev.kind {
+            MouseEventKind::Down(MouseButton::Left) => {
+                if !rect_contains(self.theme_area, ev.column, ev.row) {
+                    return;
+                }
+                let index = self.theme_offset + (ev.row - self.theme_area.y) as usize;
+                let in_range = self
+                    .theme_picker
+                    .as_ref()
+                    .is_some_and(|p| index < p.results_len());
+                if !in_range {
+                    return;
+                }
+                if let Some(p) = &mut self.theme_picker {
+                    p.selected = index;
+                }
+                let now = Instant::now();
+                let double = matches!(
+                    self.last_click,
+                    Some((t, i)) if i == index && now.duration_since(t) < Duration::from_millis(400)
+                );
+                if double {
+                    self.last_click = None;
+                    self.apply_selected_theme();
+                } else {
+                    self.last_click = Some((now, index));
+                }
+            }
+            MouseEventKind::ScrollDown => {
+                if let Some(p) = &mut self.theme_picker {
+                    if p.selected + 1 < p.results_len() {
+                        p.selected += 1;
+                    }
+                }
+            }
+            MouseEventKind::ScrollUp => {
+                if let Some(p) = &mut self.theme_picker {
+                    p.selected = p.selected.saturating_sub(1);
+                }
+            }
+            _ => {}
+        }
+    }
+
     pub fn handle_mouse(&mut self, ev: MouseEvent) {
         if self.show_help {
+            return;
+        }
+        if self.theme_picker.is_some() {
+            self.handle_theme_mouse(ev);
             return;
         }
         if self.history.is_some() {
@@ -578,7 +691,9 @@ impl App {
             }
             return;
         }
-        if self.history.is_some() {
+        if self.theme_picker.is_some() {
+            self.handle_theme_key(key);
+        } else if self.history.is_some() {
             self.handle_history_key(key);
         } else if self.search.is_some() {
             self.handle_search_key(key);
@@ -698,6 +813,66 @@ impl App {
         self.focus = Focus::Content;
     }
 
+    fn handle_theme_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Esc => self.theme_picker = None,
+            KeyCode::Enter => self.apply_selected_theme(),
+            KeyCode::Up => {
+                if let Some(p) = &mut self.theme_picker {
+                    p.selected = p.selected.saturating_sub(1);
+                }
+            }
+            KeyCode::Down => {
+                if let Some(p) = &mut self.theme_picker {
+                    if p.selected + 1 < p.results_len() {
+                        p.selected += 1;
+                    }
+                }
+            }
+            KeyCode::Backspace => {
+                if let Some(p) = &mut self.theme_picker {
+                    p.pop();
+                }
+            }
+            KeyCode::Char(c) => {
+                if let Some(p) = &mut self.theme_picker {
+                    p.push(c);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn apply_selected_theme(&mut self) {
+        let name = self.theme_picker.as_ref().and_then(|p| p.selected_name());
+        self.theme_picker = None;
+        if let Some(theme) = name.and_then(Theme::preset) {
+            self.apply_theme(theme);
+        }
+    }
+
+    /// Switches the active theme and re-renders the current view with it,
+    /// preserving scroll position.
+    fn apply_theme(&mut self, theme: Theme) {
+        self.theme = theme;
+        self.highlighter = Highlighter::new(&self.theme.syntax);
+        if self.is_diff {
+            self.highlighted = self
+                .content
+                .iter()
+                .map(|l| vec![(diff_line_style(l, &self.theme), l.clone())])
+                .collect();
+        } else if let Some(path) = self.current_file.clone() {
+            let scroll = self.content_scroll;
+            let hscroll = self.content_hscroll;
+            let raw = self.show_raw_markdown;
+            self.open_file(&path);
+            self.show_raw_markdown = raw;
+            self.content_scroll = scroll.min(self.content_line_count().saturating_sub(1));
+            self.content_hscroll = hscroll;
+        }
+    }
+
     fn handle_normal_key(&mut self, key: KeyEvent) {
         let k = &self.keys;
         if pressed(&k.quit, &key) {
@@ -723,6 +898,8 @@ impl App {
             self.search = Some(s);
         } else if pressed(&k.file_history, &key) {
             self.open_file_history();
+        } else if pressed(&k.theme_picker, &key) {
+            self.theme_picker = Some(ThemePicker::default());
         } else if pressed(&k.switch_panel, &key) {
             self.focus = match self.focus {
                 Focus::Tree => Focus::Content,
@@ -954,6 +1131,42 @@ mod tests {
         app.open_file(&root.join("a.txt"));
         app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::empty()));
         assert!(app.history.is_none());
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn theme_picker_applies_preset() {
+        let root = temp_tree();
+        let mut app = app_for(&root);
+        assert_eq!(app.theme.accent, crate::theme::Theme::default().accent);
+
+        // `t` opens the picker.
+        app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::empty()));
+        assert!(app.theme_picker.is_some());
+
+        // Filter to "monokai" and apply it.
+        for c in "monokai".chars() {
+            app.handle_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::empty()));
+        }
+        app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+
+        assert!(app.theme_picker.is_none());
+        assert_eq!(
+            app.theme.accent,
+            crate::theme::Theme::preset("monokai").unwrap().accent
+        );
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn theme_picker_esc_cancels() {
+        let root = temp_tree();
+        let mut app = app_for(&root);
+        let before = app.theme.accent;
+        app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::empty()));
+        app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+        assert!(app.theme_picker.is_none());
+        assert_eq!(app.theme.accent, before); // unchanged
         fs::remove_dir_all(&root).ok();
     }
 

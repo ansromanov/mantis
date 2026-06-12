@@ -37,6 +37,10 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         draw_history(f, app, area);
     }
 
+    if app.theme_picker.is_some() {
+        draw_theme(f, app, area);
+    }
+
     if app.show_help {
         draw_help(f, app, area);
     }
@@ -44,7 +48,10 @@ pub fn draw(f: &mut Frame, app: &mut App) {
 
 fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
     let theme = &app.theme;
-    let focused = matches!(app.focus, Focus::Tree) && app.search.is_none() && app.history.is_none();
+    let focused = matches!(app.focus, Focus::Tree)
+        && app.search.is_none()
+        && app.history.is_none()
+        && app.theme_picker.is_none();
     let border_style = if focused {
         Style::default().fg(theme.accent)
     } else {
@@ -113,8 +120,10 @@ fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
 }
 
 fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
-    let focused =
-        matches!(app.focus, Focus::Content) && app.search.is_none() && app.history.is_none();
+    let focused = matches!(app.focus, Focus::Content)
+        && app.search.is_none()
+        && app.history.is_none()
+        && app.theme_picker.is_none();
     let border_style = if focused {
         Style::default().fg(app.theme.accent)
     } else {
@@ -239,10 +248,12 @@ fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
         hscroll_hint, md_hint, wrap_hint
     );
     let tree_hint = format!(
-        " j/k nav  Enter/l expand  h collapse  / files  f content  Tab panel  q quit  ? help{}",
+        " j/k nav  Enter/l expand  h collapse  / files  f content  t theme  Tab panel  q quit  ? help{}",
         hidden_indicator
     );
-    let text: &str = if app.history.is_some() {
+    let text: &str = if app.theme_picker.is_some() {
+        " ↑↓ navigate  type to filter  Enter apply theme  Esc cancel"
+    } else if app.history.is_some() {
         " ↑↓ navigate  type to filter  Enter show diff  Esc cancel"
     } else if app.search.is_some() {
         " ↑↓ navigate  Enter select  Tab toggle mode  Esc cancel"
@@ -449,6 +460,76 @@ fn draw_history(f: &mut Frame, app: &mut App, area: Rect) {
     app.history_offset = state.offset();
 }
 
+fn draw_theme(f: &mut Frame, app: &mut App, area: Rect) {
+    let theme = &app.theme;
+    let picker = app.theme_picker.as_ref().unwrap();
+
+    let popup = centered_rect(44, 55, area);
+    f.render_widget(Clear, popup);
+
+    let block = Block::default()
+        .title(" Theme ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(theme.accent_alt));
+
+    let inner = block.inner(popup);
+    f.render_widget(block, popup);
+
+    let parts = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Min(0),
+        ])
+        .split(inner);
+
+    // Query input
+    f.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::styled(
+                "> ",
+                Style::default()
+                    .fg(theme.accent_alt)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(picker.query.as_str()),
+            Span::styled("█", Style::default().fg(theme.accent_alt)),
+        ])),
+        parts[0],
+    );
+
+    // Divider
+    f.render_widget(
+        Paragraph::new("─".repeat(inner.width as usize)).style(Style::default().fg(theme.dim)),
+        parts[1],
+    );
+
+    // Preset list
+    let items: Vec<ListItem> = picker
+        .filtered
+        .iter()
+        .map(|&i| ListItem::new(picker.names[i]))
+        .collect();
+
+    let list = List::new(items).highlight_style(
+        Style::default()
+            .bg(theme.selection_bg)
+            .fg(theme.selection_fg)
+            .add_modifier(Modifier::BOLD),
+    );
+
+    let mut state = ListState::default();
+    if picker.results_len() > 0 {
+        state.select(Some(picker.selected));
+    }
+
+    f.render_stateful_widget(list, parts[2], &mut state);
+
+    app.theme_area = parts[2];
+    app.theme_offset = state.offset();
+}
+
 fn draw_help(f: &mut Frame, app: &App, area: Rect) {
     let theme = &app.theme;
     let popup = centered_rect(52, 80, area);
@@ -487,6 +568,7 @@ fn draw_help(f: &mut Frame, app: &App, area: Rect) {
         Line::from(vec![key("  Tab        "), desc("switch panel")]),
         Line::from(vec![key("  q / Ctrl+C "), desc("quit")]),
         Line::from(vec![key("  Alt+.      "), desc("toggle hidden files")]),
+        Line::from(vec![key("  t          "), desc("pick a theme")]),
         gap.clone(),
         section("Tree panel"),
         Line::from(vec![key("  j/k / ↑↓   "), desc("move up / down")]),
