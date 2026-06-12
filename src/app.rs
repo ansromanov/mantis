@@ -1594,4 +1594,237 @@ mod tests {
         }
         fs::remove_dir_all(&root).ok();
     }
+
+    // ── git mode ─────────────────────────────────────────────────────────────
+
+    /// Repo with:
+    ///   committed.txt  – committed "original", working-tree modified to "modified"
+    ///   unchanged.txt  – committed "stable", untouched (must stay invisible in git mode)
+    ///   new.txt        – untracked
+    ///   sub/nested.txt – committed "nested", working-tree modified (gives sub/ a status)
+    fn temp_git_with_changes() -> PathBuf {
+        use std::process::Command;
+        static COUNTER: AtomicUsize = AtomicUsize::new(0);
+        let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+        let dir =
+            std::env::temp_dir().join(format!("tv_git_mode_{}_{n}", std::process::id()));
+        fs::create_dir_all(dir.join("sub")).unwrap();
+        let git = |args: &[&str]| {
+            Command::new("git")
+                .arg("-C")
+                .arg(&dir)
+                .args(["-c", "user.email=t@e.x", "-c", "user.name=T"])
+                .args(args)
+                .status()
+                .unwrap();
+        };
+        git(&["init", "-q"]);
+        fs::write(dir.join("committed.txt"), "original\n").unwrap();
+        fs::write(dir.join("unchanged.txt"), "stable\n").unwrap();
+        fs::write(dir.join("sub").join("nested.txt"), "nested\n").unwrap();
+        git(&["add", "."]);
+        git(&["commit", "-q", "-m", "init"]);
+        fs::write(dir.join("committed.txt"), "modified\n").unwrap();
+        fs::write(dir.join("sub").join("nested.txt"), "nested modified\n").unwrap();
+        fs::write(dir.join("new.txt"), "brand new\n").unwrap();
+        dir.canonicalize().unwrap()
+    }
+
+    fn ctrl_g() -> KeyEvent {
+        KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL)
+    }
+
+    fn alt_g() -> KeyEvent {
+        KeyEvent::new(KeyCode::Char('g'), KeyModifiers::ALT)
+    }
+
+    #[test]
+    fn git_mode_filters_tree_to_changed_files() {
+        let root = temp_git_with_changes();
+        let mut app = app_for(&root);
+
+        app.handle_key(ctrl_g());
+
+        assert!(app.git_mode);
+        let names: Vec<&str> = app.nodes.iter().map(|n| n.name.as_str()).collect();
+        // Changed items must appear.
+        assert!(names.contains(&"committed.txt"), "nodes: {names:?}");
+        assert!(names.contains(&"new.txt"), "nodes: {names:?}");
+        // Unchanged file must be absent.
+        assert!(!names.contains(&"unchanged.txt"), "nodes: {names:?}");
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn git_mode_toggle_off_restores_unchanged_files() {
+        let root = temp_git_with_changes();
+        let mut app = app_for(&root);
+
+        app.handle_key(ctrl_g()); // on
+        app.handle_key(ctrl_g()); // off
+
+        assert!(!app.git_mode);
+        assert!(!app.is_diff, "should restore file content view");
+        assert!(
+            app.nodes.iter().any(|n| n.name == "unchanged.txt"),
+            "unchanged file must reappear after exiting git mode"
+        );
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn git_mode_auto_expands_dirs_with_changes() {
+        let root = temp_git_with_changes();
+        let mut app = app_for(&root);
+        assert!(!app.expanded.contains(&root.join("sub")), "sub/ starts collapsed");
+
+        app.handle_key(ctrl_g());
+
+        assert!(
+            app.expanded.contains(&root.join("sub")),
+            "git mode must auto-expand dirs containing changes"
+        );
+        assert!(
+            app.nodes.iter().any(|n| n.path.ends_with("nested.txt")),
+            "nested changed file must be visible in git mode tree"
+        );
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn git_mode_opens_working_tree_diff() {
+        let root = temp_git_with_changes();
+        let mut app = app_for(&root);
+
+        app.handle_key(ctrl_g());
+
+        // Navigate past any leading directory nodes to land on a file.
+        // (tree.rs sorts dirs first, so sub/ may be at index 0.)
+        let file_idx = app
+            .nodes
+            .iter()
+            .position(|n| !n.is_dir)
+            .expect("git mode must have at least one file node");
+        for _ in 0..file_idx {
+            app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
+        }
+
+        assert!(app.is_diff, "selecting a file in git mode must show working-tree diff");
+        assert!(
+            app.content_title
+                .as_deref()
+                .unwrap_or("")
+                .contains("working diff"),
+            "title was {:?}",
+            app.content_title
+        );
+        assert!(
+            app.content.iter().any(|l| l.starts_with('+')),
+            "diff must contain added lines"
+        );
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn git_mode_navigation_shows_diff_for_each_file() {
+        let root = temp_git_with_changes();
+        let mut app = app_for(&root);
+
+        app.handle_key(ctrl_g());
+        // Move to the next file node.
+        app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
+
+        assert!(app.is_diff, "navigation in git mode must keep showing diffs");
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn git_mode_flat_shows_depth_zero_files() {
+        let root = temp_git_with_changes();
+        let mut app = app_for(&root);
+
+        app.handle_key(ctrl_g());
+        app.handle_key(alt_g());
+
+        assert!(app.git_mode_flat);
+        assert!(
+            app.nodes.iter().all(|n| n.depth == 0 && !n.is_dir),
+            "flat mode must only have depth-0 file nodes"
+        );
+        // Root-level file appears as bare name; nested file as relative path.
+        assert!(app.nodes.iter().any(|n| n.name == "committed.txt"));
+        assert!(app.nodes.iter().any(|n| n.name.contains("nested.txt")));
+        // Unchanged file still absent.
+        assert!(!app.nodes.iter().any(|n| n.name.contains("unchanged.txt")));
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn git_mode_flat_toggle_returns_to_tree_view() {
+        let root = temp_git_with_changes();
+        let mut app = app_for(&root);
+
+        app.handle_key(ctrl_g());
+        app.handle_key(alt_g()); // flat
+        app.handle_key(alt_g()); // back to tree
+
+        assert!(app.git_mode);
+        assert!(!app.git_mode_flat);
+        assert!(
+            app.nodes.iter().any(|n| n.is_dir),
+            "tree view should include directory nodes"
+        );
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn git_mode_flat_key_is_noop_outside_git_mode() {
+        let root = temp_git_with_changes();
+        let mut app = app_for(&root);
+        let count = app.nodes.len();
+
+        app.handle_key(alt_g());
+
+        assert!(!app.git_mode_flat);
+        assert!(!app.git_mode);
+        assert_eq!(app.nodes.len(), count, "tree must be unchanged");
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn git_mode_outside_repo_gives_empty_tree() {
+        let root = temp_tree(); // not a git repo
+        let mut app = app_for(&root);
+
+        app.handle_key(ctrl_g());
+
+        assert!(app.git_mode);
+        assert!(
+            app.nodes.is_empty(),
+            "no git changes → empty filtered tree; got {} nodes",
+            app.nodes.len()
+        );
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn git_mode_config_starts_enabled() {
+        let root = temp_git_with_changes();
+        let cfg = Config {
+            git_mode: true,
+            ..Config::default()
+        };
+        let app = App::new(root.to_path_buf(), cfg).unwrap();
+
+        assert!(app.git_mode);
+        assert!(
+            !app.nodes.iter().any(|n| n.name == "unchanged.txt"),
+            "unchanged file must be absent when starting in git mode"
+        );
+        assert!(
+            app.nodes.iter().any(|n| n.name == "committed.txt"),
+            "changed file must be visible when starting in git mode"
+        );
+        fs::remove_dir_all(&root).ok();
+    }
 }

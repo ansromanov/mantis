@@ -291,4 +291,31 @@ mod tests {
         let log = file_log(&dir, Path::new("definitely-not-tracked-xyz.txt"));
         assert!(log.is_empty());
     }
+
+    #[test]
+    fn working_tree_diff_shows_modifications() {
+        let repo = temp_repo();
+        // file.txt: last commit has "two", working tree adds "three".
+        let diff = working_tree_diff(&repo, &repo.join("file.txt"));
+        let joined = diff.join("\n");
+        assert!(
+            joined.contains("+three"),
+            "expected '+three' in diff, got: {joined}"
+        );
+        fs::remove_dir_all(&repo).ok();
+    }
+
+    #[test]
+    fn working_tree_diff_shows_untracked_file() {
+        let repo = temp_repo();
+        fs::write(repo.join("new.txt"), "brand new\n").unwrap();
+        // Untracked files aren't in HEAD; the function falls back to --no-index.
+        let diff = working_tree_diff(&repo, &repo.join("new.txt"));
+        let joined = diff.join("\n");
+        assert!(
+            joined.contains("+brand new"),
+            "expected '+brand new' in diff, got: {joined}"
+        );
+        fs::remove_dir_all(&repo).ok();
+    }
 }
