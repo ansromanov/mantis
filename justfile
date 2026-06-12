@@ -1,6 +1,10 @@
 default:
     @just --list
 
+# install git hooks (run once after cloning)
+setup:
+    pre-commit install
+
 # build debug binary
 build:
     cargo build
