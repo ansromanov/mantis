@@ -12,12 +12,13 @@ use ratatui::layout::Rect;
 use crate::config::{self, pressed, Config, Keymap};
 use crate::git::GitStatus;
 use crate::highlight::Highlighter;
-use crate::search::{HistoryState, SearchMode, SearchState, ThemePicker};
+use crate::search::{HistoryState, SearchState, ThemePicker};
 use crate::selection::TextSelection;
 use crate::theme::{Theme, ThemeConfig};
 use crate::tree::{build_visible, TreeNode};
 
 mod file_ops;
+mod navigation;
 
 pub enum Focus {
     Tree,
@@ -192,187 +193,6 @@ impl App {
         }
         if self.last_refresh.elapsed().as_secs() >= 30 {
             self.reload();
-        }
-    }
-
-    fn rebuild(&mut self) {
-        let prev = self.nodes.get(self.tree_selected).map(|n| n.path.clone());
-        let deleted = deleted_set(&self.git_status_map, self.git_show_deleted);
-
-        if self.git_mode {
-            if self.git_mode_flat {
-                self.nodes = self.build_git_flat_nodes();
-            } else {
-                let all = build_visible(
-                    &self.root,
-                    &self.expanded,
-                    self.show_hidden,
-                    self.ignore_gitignore,
-                    &deleted,
-                );
-                let map = &self.git_status_map;
-                self.nodes = all
-                    .into_iter()
-                    .filter(|n| {
-                        n.deleted || map.get(&n.path).is_some_and(|&s| s != GitStatus::Ignored)
-                    })
-                    .collect();
-            }
-        } else {
-            self.nodes = build_visible(
-                &self.root,
-                &self.expanded,
-                self.show_hidden,
-                self.ignore_gitignore,
-                &deleted,
-            );
-        }
-
-        if let Some(p) = prev {
-            if let Some(i) = self.nodes.iter().position(|n| n.path == p) {
-                self.tree_selected = i;
-                return;
-            }
-        }
-        self.tree_selected = self.tree_selected.min(self.nodes.len().saturating_sub(1));
-    }
-
-    /// Flat list of all changed (non-ignored) files for git mode's plain view.
-    fn build_git_flat_nodes(&self) -> Vec<TreeNode> {
-        let mut entries: Vec<(PathBuf, bool)> = self
-            .git_status_map
-            .iter()
-            .filter(|(path, &status)| {
-                status != GitStatus::Ignored && path.starts_with(&self.root) && !path.is_dir()
-            })
-            .map(|(path, &status)| {
-                let deleted = status == GitStatus::Deleted && !path.exists();
-                (path.clone(), deleted)
-            })
-            .collect();
-        entries.sort_by(|(a, _), (b, _)| a.cmp(b));
-        entries
-            .into_iter()
-            .map(|(path, deleted)| {
-                let name = path
-                    .strip_prefix(&self.root)
-                    .unwrap_or(&path)
-                    .to_string_lossy()
-                    .to_string();
-                TreeNode {
-                    path,
-                    name,
-                    depth: 0,
-                    is_dir: false,
-                    deleted,
-                }
-            })
-            .collect()
-    }
-
-    /// Expands all directories that contain git changes so they are visible in
-    /// git mode's tree view.
-    fn expand_git_dirs(&mut self) {
-        let dirs: Vec<PathBuf> = self
-            .git_status_map
-            .iter()
-            .filter(|(path, &status)| {
-                status != GitStatus::Ignored
-                    && path.is_dir()
-                    && path.starts_with(&self.root)
-                    && **path != self.root
-            })
-            .map(|(p, _)| p.clone())
-            .collect();
-        for dir in dirs {
-            self.expanded.insert(dir);
-        }
-    }
-
-    fn try_open_selected(&mut self) {
-        if let Some(node) = self.nodes.get(self.tree_selected) {
-            if node.is_dir {
-                return;
-            }
-            if node.deleted {
-                let path = node.path.clone();
-                self.show_deleted(&path);
-            } else if self.git_mode {
-                let path = node.path.clone();
-                self.show_working_tree_diff(&path);
-            } else {
-                let path = node.path.clone();
-                self.open_file(&path);
-            }
-        }
-    }
-
-    fn toggle_git_mode(&mut self) {
-        self.git_mode = !self.git_mode;
-        self.config.git_mode = self.git_mode;
-        if self.git_mode {
-            // Ensure git status is populated even if git_status was disabled.
-            if !self.git_status_enabled {
-                self.git_status_enabled = true;
-                self.git_status_map = crate::git::repo_status(&self.root, self.ignore_gitignore);
-            }
-            self.expand_git_dirs();
-            self.rebuild();
-            self.try_open_selected();
-        } else {
-            self.rebuild();
-            // Re-open the current file as normal content instead of a diff.
-            if let Some(path) = self.current_file.clone() {
-                if self.is_diff {
-                    self.open_file(&path);
-                }
-            }
-        }
-        self.save_config();
-    }
-
-    /// Acts on the currently selected node: toggles a directory's fold state,
-    /// or opens a file. Shared by the Enter key and a mouse click.
-    fn activate_selected(&mut self) {
-        if let Some(node) = self.nodes.get(self.tree_selected) {
-            if node.is_dir {
-                let p = node.path.clone();
-                if self.expanded.contains(&p) {
-                    self.expanded.remove(&p);
-                } else {
-                    self.expanded.insert(p);
-                }
-                self.rebuild();
-            } else if node.deleted {
-                let p = node.path.clone();
-                self.show_deleted(&p);
-            } else if self.git_mode {
-                let p = node.path.clone();
-                self.show_working_tree_diff(&p);
-            } else {
-                let p = node.path.clone();
-                self.open_file(&p);
-            }
-        }
-    }
-
-    /// Opens the currently selected search result and closes the overlay.
-    /// Shared by the Enter key and a mouse click in the results list.
-    fn activate_search_selection(&mut self) {
-        let action = self.search.as_ref().and_then(|s| match s.mode {
-            SearchMode::Files => s.file_results.get(s.selected).map(|p| (p.clone(), None)),
-            SearchMode::Content => s
-                .content_results
-                .get(s.selected)
-                .map(|m| (m.path.clone(), Some(m.line_num))),
-        });
-        self.search = None;
-        if let Some((path, line)) = action {
-            self.open_file(&path);
-            if let Some(ln) = line {
-                self.content_scroll = ln.saturating_sub(1);
-            }
-            self.reveal_in_tree(&path.clone());
         }
     }
 
