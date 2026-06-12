@@ -129,7 +129,11 @@ fn git_status_style(
     theme: &crate::theme::Theme,
 ) -> (ratatui::style::Color, Modifier) {
     use ratatui::style::Color;
-    let dir_bold = if node.is_dir { Modifier::BOLD } else { Modifier::empty() };
+    let dir_bold = if node.is_dir {
+        Modifier::BOLD
+    } else {
+        Modifier::empty()
+    };
 
     if node.deleted {
         return (theme.diff_del, Modifier::empty());

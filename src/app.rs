@@ -379,8 +379,7 @@ impl App {
     pub fn reload(&mut self) {
         self.last_refresh = Instant::now();
         if self.git_status_enabled {
-            self.git_status_map =
-                crate::git::repo_status(&self.root, self.ignore_gitignore);
+            self.git_status_map = crate::git::repo_status(&self.root, self.ignore_gitignore);
         }
         let root = self.root.clone();
         let show_hidden = self.show_hidden;
