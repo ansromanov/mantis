@@ -173,6 +173,7 @@ impl App {
         Ok(app)
     }
 
+    /// Persists the current config to disk if a config path was provided.
     fn save_config(&self) {
         if let Some(path) = &self.config_path {
             config::save(&self.config, path);

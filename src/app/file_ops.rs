@@ -14,8 +14,6 @@ impl App {
     /// buffer while preserving scroll position. No-op for commit diffs (which
     /// are immutable), but refreshes working-tree diffs in git mode.
     pub(super) fn reload_content(&mut self) {
-        // Commit diffs are transient; don't clobber them on refresh.
-        // Working-tree diffs in git mode should be refreshed (working tree changes).
         if self.is_diff && !self.git_mode {
             return;
         }
