@@ -88,7 +88,7 @@ pub fn repo_status(dir: &Path, include_ignored: bool) -> HashMap<PathBuf, GitSta
             GitStatus::New
         } else if x == 'D' || y == 'D' {
             GitStatus::Deleted
-        } else if (x == 'A' || x == '?') && y == ' ' {
+        } else if x == 'A' && y == ' ' {
             GitStatus::New
         } else {
             GitStatus::Modified

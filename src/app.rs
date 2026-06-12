@@ -693,7 +693,13 @@ impl App {
     /// Opens a file and selects it in the tree, expanding parent directories
     /// as needed. Used when a file path is passed on the command line.
     pub fn open_and_reveal(&mut self, path: &Path) {
-        self.open_file(path);
+        if !path.exists()
+            && self.git_status_map.get(path) == Some(&GitStatus::Deleted)
+        {
+            self.show_deleted(path);
+        } else {
+            self.open_file(path);
+        }
         self.reveal_in_tree(path);
         self.focus = Focus::Content;
     }
