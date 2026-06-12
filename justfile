@@ -5,9 +5,10 @@ default:
 build:
     cargo build
 
-# build release binary
+# build release binary (re-signs on macOS after strip invalidates the linker signature)
 release:
     cargo build --release
+    @codesign --force -s - target/release/tv 2>/dev/null || true
 
 # run with optional args (e.g. just run /some/path)
 run *args:
