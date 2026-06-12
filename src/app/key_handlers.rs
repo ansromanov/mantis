@@ -268,6 +268,8 @@ impl App {
     /// content panel is focused.
     fn handle_content_key(&mut self, key: KeyEvent) {
         let k = &self.keys;
+        let scroll_before = self.content_scroll;
+        let hscroll_before = self.content_hscroll;
         if self.is_markdown && pressed(&k.toggle_raw_markdown, &key) {
             self.show_raw_markdown = !self.show_raw_markdown;
             self.content_scroll = 0;
@@ -300,6 +302,9 @@ impl App {
             self.content_scroll = self.content_line_count().saturating_sub(1);
         } else if !self.word_wrap && pressed(&k.content_reset_col, &key) {
             self.content_hscroll = 0;
+        }
+        if self.content_scroll != scroll_before || self.content_hscroll != hscroll_before {
+            self.mark_content_scrolled();
         }
     }
 }

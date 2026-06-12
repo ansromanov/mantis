@@ -233,7 +233,7 @@ impl App {
         self.set_file_watch(None);
     }
 
-    pub(super) fn content_line_count(&self) -> usize {
+    pub fn content_line_count(&self) -> usize {
         if self.is_markdown && !self.show_raw_markdown {
             self.markdown_lines.len()
         } else {
