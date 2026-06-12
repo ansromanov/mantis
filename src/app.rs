@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant};
 
+use arboard::Clipboard;
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
@@ -266,6 +267,25 @@ impl ThemePicker {
     }
 }
 
+pub struct TextSelection {
+    pub anchor: (usize, usize),
+    pub active: (usize, usize),
+}
+
+impl TextSelection {
+    pub fn normalized(&self) -> ((usize, usize), (usize, usize)) {
+        if self.anchor <= self.active {
+            (self.anchor, self.active)
+        } else {
+            (self.active, self.anchor)
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.anchor == self.active
+    }
+}
+
 pub struct App {
     pub root: PathBuf,
     pub nodes: Vec<TreeNode>,
@@ -317,6 +337,8 @@ pub struct App {
     file_watcher: Option<RecommendedWatcher>,
     file_watch_rx: Option<Receiver<notify::Result<notify::Event>>>,
     file_watch_path: Option<PathBuf>,
+    pub selection: Option<TextSelection>,
+    drag_start: Option<(usize, usize)>,
 }
 
 impl App {
@@ -394,6 +416,8 @@ impl App {
             file_watcher: None,
             file_watch_rx: None,
             file_watch_path: None,
+            selection: None,
+            drag_start: None,
         };
         if app.git_mode {
             app.expand_git_dirs();
@@ -619,6 +643,7 @@ impl App {
         self.is_diff = true;
         self.content_scroll = 0;
         self.content_hscroll = 0;
+        self.clear_selection();
         self.content_title = Some(format!(" working diff — {} ", rel.display()));
         self.highlighted = lines
             .iter()
@@ -663,6 +688,7 @@ impl App {
         self.content_title = None;
         self.content_scroll = 0;
         self.content_hscroll = 0;
+        self.clear_selection();
         self.set_file_watch(None);
     }
 
@@ -821,6 +847,7 @@ impl App {
             MouseEventKind::Down(MouseButton::Left) => {
                 if rect_contains(self.tree_area, ev.column, ev.row) {
                     self.focus = Focus::Tree;
+                    self.clear_selection();
                     let row = (ev.row - self.tree_area.y) as usize;
                     let index = self.tree_offset + row;
                     if index < self.nodes.len() {
@@ -829,6 +856,44 @@ impl App {
                     }
                 } else if rect_contains(self.content_area, ev.column, ev.row) {
                     self.focus = Focus::Content;
+                    let can_select = !(self.is_diff || self.is_markdown && !self.show_raw_markdown);
+                    if can_select {
+                        let pos = self.content_pos(ev.column, ev.row);
+                        self.drag_start = Some(pos);
+                        self.selection = None;
+                    }
+                }
+            }
+            MouseEventKind::Drag(MouseButton::Left) => {
+                if let Some(start) = self.drag_start {
+                    let pos = self.content_pos(ev.column, ev.row);
+                    self.selection = Some(TextSelection {
+                        anchor: start,
+                        active: pos,
+                    });
+                    // Auto-scroll: if dragging near the top or bottom edge, scroll content.
+                    let ca = self.content_area;
+                    if ev.row < ca.y + 2 {
+                        self.content_scroll = self.content_scroll.saturating_sub(1);
+                    } else if ev.row >= ca.y + ca.height.saturating_sub(2) {
+                        let max = self.content_line_count().saturating_sub(1);
+                        self.content_scroll = (self.content_scroll + 1).min(max);
+                    }
+                }
+            }
+            MouseEventKind::Up(MouseButton::Left) => {
+                if self.drag_start.is_some() {
+                    if let Some(sel) = &self.selection {
+                        if !sel.is_empty() {
+                            let text = self.selection_text();
+                            if !text.is_empty() {
+                                if let Ok(mut cb) = Clipboard::new() {
+                                    let _ = cb.set_text(text);
+                                }
+                            }
+                        }
+                    }
+                    self.drag_start = None;
                 }
             }
             MouseEventKind::ScrollDown => {
@@ -919,6 +984,7 @@ impl App {
         self.content_title = None;
         self.content_scroll = 0;
         self.content_hscroll = 0;
+        self.clear_selection();
 
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
         self.is_markdown = matches!(ext, "md" | "markdown");
@@ -1083,6 +1149,7 @@ impl App {
         self.is_diff = true;
         self.content_scroll = 0;
         self.content_hscroll = 0;
+        self.clear_selection();
         let rel = file.strip_prefix(&self.root).unwrap_or(file);
         self.content_title = Some(format!(" diff {} — {} ", short, rel.display()));
         self.highlighted = lines
@@ -1159,6 +1226,10 @@ impl App {
     }
 
     fn handle_normal_key(&mut self, key: KeyEvent) {
+        if key.code == KeyCode::Esc && self.selection.is_some() {
+            self.clear_selection();
+            return;
+        }
         let k = &self.keys;
         if pressed(&k.quit, &key) {
             self.should_quit = true;
@@ -1251,6 +1322,67 @@ impl App {
         } else {
             self.content.len()
         }
+    }
+
+    /// Width of the line-number gutter (digits + space), or 0 when there is none.
+    pub fn line_prefix_width(&self) -> usize {
+        if self.is_diff || (self.is_markdown && !self.show_raw_markdown) {
+            0
+        } else {
+            self.content.len().to_string().len().max(1) + 1
+        }
+    }
+
+    /// Convert a terminal cell inside `content_area` to a `(buffer_line, buffer_col)` position.
+    pub fn content_pos(&self, col: u16, row: u16) -> (usize, usize) {
+        let ca = self.content_area;
+        let rel_row = (row.saturating_sub(ca.y)) as usize;
+        let rel_col = (col.saturating_sub(ca.x)) as usize;
+        let buf_line = self.content_scroll + rel_row;
+        let prefix = self.line_prefix_width();
+        let buf_col = (rel_col + self.content_hscroll).saturating_sub(prefix);
+        (buf_line, buf_col)
+    }
+
+    /// Extract the currently selected text from `self.content`.
+    pub fn selection_text(&self) -> String {
+        let Some(sel) = &self.selection else {
+            return String::new();
+        };
+        if sel.is_empty() {
+            return String::new();
+        }
+        let ((start_line, start_col), (end_line, end_col)) = sel.normalized();
+        let lines = &self.content;
+        if start_line >= lines.len() {
+            return String::new();
+        }
+        let mut result = String::new();
+        let last = end_line.min(lines.len().saturating_sub(1));
+        for (line_idx, line) in lines
+            .iter()
+            .enumerate()
+            .skip(start_line)
+            .take(last - start_line + 1)
+        {
+            let chars: Vec<char> = line.chars().collect();
+            let col_start = if line_idx == start_line { start_col } else { 0 };
+            let col_end = if line_idx == end_line {
+                end_col.min(chars.len())
+            } else {
+                chars.len()
+            };
+            if !result.is_empty() {
+                result.push('\n');
+            }
+            result.extend(&chars[col_start.min(chars.len())..col_end]);
+        }
+        result
+    }
+
+    fn clear_selection(&mut self) {
+        self.selection = None;
+        self.drag_start = None;
     }
 
     fn handle_content_key(&mut self, key: KeyEvent) {
