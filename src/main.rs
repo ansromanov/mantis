@@ -43,8 +43,8 @@ fn main() -> anyhow::Result<()> {
     let mut terminal = Terminal::new(backend)?;
     terminal.hide_cursor()?;
 
-    let cfg = config::load(&root);
-    let mut app = app::App::new(root, cfg)?;
+    let (cfg, cfg_path) = config::load(&root);
+    let mut app = app::App::new(root, cfg, cfg_path)?;
     if let Some(file) = file {
         app.open_and_reveal(&file);
     }

@@ -1,10 +1,10 @@
 use crate::theme::ThemeConfig;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 #[serde(default)]
 pub struct Config {
     pub show_hidden: bool,
@@ -59,7 +59,7 @@ pub fn pressed(bindings: &[KeyBinding], key: &KeyEvent) -> bool {
     bindings.iter().any(|b| b.matches(key))
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 #[serde(default)]
 pub struct Keymap {
     // Global
@@ -190,15 +190,69 @@ impl<'de> Deserialize<'de> for KeyBinding {
     }
 }
 
+impl Serialize for KeyBinding {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::Error;
+        let key = match self.code {
+            KeyCode::Char(' ') => "space".to_string(),
+            KeyCode::Char(c) => c.to_string(),
+            KeyCode::Up => "Up".to_string(),
+            KeyCode::Down => "Down".to_string(),
+            KeyCode::Left => "Left".to_string(),
+            KeyCode::Right => "Right".to_string(),
+            KeyCode::Enter => "Enter".to_string(),
+            KeyCode::Tab => "Tab".to_string(),
+            KeyCode::Esc => "Esc".to_string(),
+            KeyCode::Backspace => "Backspace".to_string(),
+            KeyCode::PageUp => "PageUp".to_string(),
+            KeyCode::PageDown => "PageDown".to_string(),
+            KeyCode::Home => "Home".to_string(),
+            KeyCode::End => "End".to_string(),
+            _ => return Err(S::Error::custom("unsupported key code")),
+        };
+        let spec = match (self.ctrl, self.alt) {
+            (true, true) => format!("ctrl+alt+{key}"),
+            (true, false) => format!("ctrl+{key}"),
+            (false, true) => format!("alt+{key}"),
+            (false, false) => key,
+        };
+        s.serialize_str(&spec)
+    }
+}
+
 /// Loads config for the given view root. A project-local `tv.toml` found in
 /// the root or any ancestor takes precedence over the global config; this lets
-/// a repo ship its own defaults. Falls back to `Config::default()`.
-pub fn load(root: &Path) -> Config {
-    config_paths(root)
+/// a repo ship its own defaults. Creates the global config with defaults if it
+/// doesn't exist yet. Returns the loaded config and the global config path for
+/// persisting live changes.
+pub fn load(root: &Path) -> (Config, Option<PathBuf>) {
+    let global = global_config_path();
+    if let Some(ref path) = global {
+        if !path.exists() {
+            install_default(path);
+        }
+    }
+    let config = config_paths(root)
         .into_iter()
         .find_map(|p| fs::read_to_string(p).ok())
         .and_then(|s| toml::from_str(&s).ok())
-        .unwrap_or_default()
+        .unwrap_or_default();
+    (config, global)
+}
+
+/// Writes `config` to `path`, silently ignoring errors.
+pub fn save(config: &Config, path: &Path) {
+    if let Ok(content) = toml::to_string_pretty(config) {
+        let _ = fs::write(path, content);
+    }
+}
+
+/// Creates the global config file with defaults if the directory is writable.
+fn install_default(path: &Path) {
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    save(&Config::default(), path);
 }
 
 /// Candidate config paths in precedence order: project-local (`tv.toml` in the

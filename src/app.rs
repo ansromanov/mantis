@@ -7,12 +7,12 @@ use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKin
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use ratatui::layout::Rect;
 
-use crate::config::{pressed, Config, Keymap};
+use crate::config::{self, pressed, Config, Keymap};
 use crate::file::is_binary_bytes;
 use crate::git::GitStatus;
 use crate::highlight::Highlighter;
 use crate::markdown;
-use crate::theme::Theme;
+use crate::theme::{Theme, ThemeConfig};
 use crate::tree::{build_visible, collect_all_files, TreeNode};
 
 pub enum Focus {
@@ -295,6 +295,8 @@ pub struct App {
     pub git_mode: bool,
     pub git_mode_flat: bool,
     keys: Keymap,
+    config: Config,
+    config_path: Option<std::path::PathBuf>,
     // Geometry captured during the last render, used to map mouse events.
     pub tree_area: Rect,
     pub tree_offset: usize,
@@ -312,7 +314,11 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(root: PathBuf, cfg: Config) -> anyhow::Result<Self> {
+    pub fn new(
+        root: PathBuf,
+        cfg: Config,
+        config_path: Option<std::path::PathBuf>,
+    ) -> anyhow::Result<Self> {
         let expanded = HashSet::new();
         // git_mode requires status data even if git_status is disabled in config.
         let git_status_enabled = cfg.git_status || cfg.git_mode;
@@ -331,6 +337,7 @@ impl App {
             &deleted,
         );
         let theme = cfg.theme.resolve();
+        let saved_config = cfg.clone();
         let highlighter = Highlighter::new(&theme.syntax);
         let mut app = App {
             root,
@@ -364,6 +371,8 @@ impl App {
             git_mode: cfg.git_mode,
             git_mode_flat: cfg.git_mode_flat,
             keys: cfg.keys,
+            config: saved_config,
+            config_path,
             tree_area: Rect::default(),
             tree_offset: 0,
             content_area: Rect::default(),
@@ -383,6 +392,12 @@ impl App {
         }
         app.try_open_selected();
         Ok(app)
+    }
+
+    fn save_config(&self) {
+        if let Some(path) = &self.config_path {
+            config::save(&self.config, path);
+        }
     }
 
     pub fn reload(&mut self) {
@@ -555,6 +570,7 @@ impl App {
 
     fn toggle_git_mode(&mut self) {
         self.git_mode = !self.git_mode;
+        self.config.git_mode = self.git_mode;
         if self.git_mode {
             // Ensure git status is populated even if git_status was disabled.
             if !self.git_status_enabled {
@@ -573,6 +589,7 @@ impl App {
                 }
             }
         }
+        self.save_config();
     }
 
     fn show_deleted(&mut self, path: &Path) {
@@ -1047,8 +1064,12 @@ impl App {
     fn apply_selected_theme(&mut self) {
         let name = self.theme_picker.as_ref().and_then(|p| p.selected_name());
         self.theme_picker = None;
-        if let Some(theme) = name.and_then(Theme::preset) {
-            self.apply_theme(theme);
+        if let Some(name) = name {
+            if let Some(theme) = Theme::preset(name) {
+                self.apply_theme(theme);
+                self.config.theme = ThemeConfig::from_preset(name);
+                self.save_config();
+            }
         }
     }
 
@@ -1082,7 +1103,9 @@ impl App {
             self.show_help = !self.show_help;
         } else if pressed(&k.toggle_hidden, &key) {
             self.show_hidden = !self.show_hidden;
+            self.config.show_hidden = self.show_hidden;
             self.reload();
+            self.save_config();
         } else if pressed(&k.search_files, &key) {
             let root = self.root.clone();
             self.search = Some(SearchState::new(
@@ -1111,8 +1134,10 @@ impl App {
         } else if pressed(&k.git_mode_flat_toggle, &key) {
             if self.git_mode {
                 self.git_mode_flat = !self.git_mode_flat;
+                self.config.git_mode_flat = self.git_mode_flat;
                 self.rebuild();
                 self.try_open_selected();
+                self.save_config();
             }
         } else {
             match self.focus {
@@ -1173,8 +1198,10 @@ impl App {
             self.content_hscroll = 0;
         } else if pressed(&k.toggle_wrap, &key) {
             self.word_wrap = !self.word_wrap;
+            self.config.word_wrap = self.word_wrap;
             self.content_scroll = 0;
             self.content_hscroll = 0;
+            self.save_config();
         } else if pressed(&k.nav_up, &key) {
             self.content_scroll = self.content_scroll.saturating_sub(1);
         } else if pressed(&k.nav_down, &key) {
@@ -1279,7 +1306,7 @@ mod tests {
     }
 
     fn app_for(root: &Path) -> App {
-        App::new(root.to_path_buf(), Config::default()).unwrap()
+        App::new(root.to_path_buf(), Config::default(), None).unwrap()
     }
 
     /// A temp git repo with one committed file plus an uncommitted change.
@@ -1816,7 +1843,7 @@ mod tests {
             git_mode: true,
             ..Config::default()
         };
-        let app = App::new(root.to_path_buf(), cfg).unwrap();
+        let app = App::new(root.to_path_buf(), cfg, None).unwrap();
 
         assert!(app.git_mode);
         assert!(
