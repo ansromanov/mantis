@@ -152,7 +152,9 @@ fn hex(s: &str) -> Color {
 #[serde(default)]
 pub struct ThemeConfig {
     name: Option<String>,
-    background: Option<String>,
+    /// When `true`, overrides the preset's background with `Color::Reset` so
+    /// the terminal's own background shows through.
+    transparent_background: Option<bool>,
     accent: Option<String>,
     accent_alt: Option<String>,
     dim: Option<String>,
@@ -181,8 +183,13 @@ impl ThemeConfig {
             .unwrap_or_default();
         let col =
             |o: &Option<String>, def: Color| o.as_deref().and_then(parse_color).unwrap_or(def);
+        let background = if self.transparent_background == Some(true) {
+            Color::Reset
+        } else {
+            d.background
+        };
         Theme {
-            background: col(&self.background, d.background),
+            background,
             accent: col(&self.accent, d.accent),
             accent_alt: col(&self.accent_alt, d.accent_alt),
             dim: col(&self.dim, d.dim),
@@ -285,10 +292,10 @@ mod tests {
             Theme::preset("monokai").unwrap().background,
             Color::Rgb(0x27, 0x28, 0x22)
         );
-        // ...which a config override can turn back off.
+        // ...which transparent_background = true turns back off.
         let cfg = ThemeConfig {
             name: Some("monokai".into()),
-            background: Some("reset".into()),
+            transparent_background: Some(true),
             ..Default::default()
         };
         assert_eq!(cfg.resolve().background, Color::Reset);
