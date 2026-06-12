@@ -16,8 +16,13 @@ fuzzy search, and mouse support. Built with [ratatui](https://ratatui.rs).
 - **Fuzzy search** over file names, or full-text search across file contents
 - **Git file history** — pick a past revision from an fzf-style list and view
   its diff against your working tree, with red/green coloring
+- **Git mode** (`Ctrl+G`) — show only changed files with working-tree diffs in
+  the content panel; `Alt+G` toggles between tree and flat list views
+- **Git status indicators** — tree entries colored by git status (new, modified,
+  deleted, ignored) whenever `git status` data is available
 - **Themes** — built-in presets (monokai, solarized, catppuccin, synthwave84),
-  switchable live from an fzf-style picker or set in config
+  switchable live from an fzf-style picker or set in config, with configurable
+  panel background and terminal transparency
 - **Mouse support** — click to select, fold/unfold directories, switch panes,
   and scroll
 - **Configurable** layout, behavior, and keybindings via a simple TOML file
@@ -62,6 +67,8 @@ Press `?` at any time for in-app help, and `q` to quit.
 | `Alt+.`        | Toggle hidden files     |
 | `H`            | Git history of current file |
 | `t`            | Theme picker            |
+| `Ctrl+G`       | Toggle git mode (changed files + diffs) |
+| `Alt+G`        | Toggle flat / tree view in git mode |
 
 ### Tree panel
 
@@ -109,6 +116,28 @@ press `Enter` (or double-click) to load the diff of that revision against your
 current working tree into the content panel — additions in green, deletions in
 red. Requires `git` on your `PATH` and the file to be tracked in a repository.
 
+## Git mode
+
+Press `Ctrl+G` to switch the tree to show only files with uncommitted changes
+(modified, new, deleted, or renamed). Selecting a file shows its working-tree
+diff in the content panel instead of the file contents. The tree title displays
+a `[git]` badge while active.
+
+Press `Alt+G` inside git mode to toggle between the tree view (directories
+intact) and a flat, depth-0 list of every changed file with relative paths.
+Press `Alt+G` again to return to the tree view (a no-op outside git mode).
+
+All directories containing changes are auto-expanded when entering git mode.
+Diffs refresh on the 30-second auto-reload tick and on manual `r`.
+
+Configure via `tv.toml`:
+```toml
+git_mode = false         # start in git mode (default: false)
+git_mode_flat = false    # start in flat list view (default: false)
+git_status = true        # colour tree entries by git status (default: true)
+git_show_deleted = false # show ghost nodes for deleted tracked files (default: false)
+```
+
 ## Configuration
 
 `tv` reads a `tv.toml` file. It first looks for one in the directory being
@@ -136,6 +165,8 @@ reload = ["r"]
 switch_panel = ["Tab"]
 file_history = ["H"]
 theme_picker = ["t"]
+git_mode_toggle = ["ctrl+g"]
+git_mode_flat_toggle = ["alt+g"]
 
 nav_up = ["Up", "k"]
 nav_down = ["Down", "j"]
@@ -176,6 +207,7 @@ name = "catppuccin"           # built-in preset to start from
 
 # Optional per-role overrides on top of the preset:
 transparent_background = false  # true = use terminal's background instead of the preset's
+background = "reset"         # panel backgrounds (Reset = terminal default)
 accent = "cyan"               # focused borders, primary highlights
 accent_alt = "yellow"      # popup chrome, keys, prompts
 dim = "darkgray"           # unfocused borders, gutters, hints, rules
@@ -192,6 +224,12 @@ diff_add = "green"         # added lines in a diff
 diff_del = "red"           # removed lines in a diff
 syntax = "base16-ocean.dark"
 ```
+
+The `background` role controls panel backgrounds. When set to `reset` (the
+default), the terminal's own background shows through. Each preset ships a
+preferred background color that you can override or disable with
+`transparent_background`. On top of presets, live theme switching instantly
+re-applies the current file with the new syntax highlighting theme.
 
 See [`example.md`](example.md) for a document that exercises the markdown
 renderer.
