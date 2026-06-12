@@ -58,8 +58,8 @@ impl App {
                     if ev.row < ca.y + 2 {
                         self.content_scroll = self.content_scroll.saturating_sub(1);
                     } else if ev.row >= ca.y + ca.height.saturating_sub(2) {
-                        let max = self.content_line_count().saturating_sub(1);
-                        self.content_scroll = (self.content_scroll + 1).min(max);
+                        self.content_scroll =
+                            (self.content_scroll + 1).min(self.content_scroll_max());
                     }
                     let pos = self.content_pos(ev.column, ev.row);
                     self.selection = Some(TextSelection {
@@ -85,8 +85,7 @@ impl App {
             }
             MouseEventKind::ScrollDown => {
                 if rect_contains(self.content_area, ev.column, ev.row) {
-                    let max = self.content_line_count().saturating_sub(1);
-                    self.content_scroll = (self.content_scroll + 3).min(max);
+                    self.content_scroll = (self.content_scroll + 3).min(self.content_scroll_max());
                 } else if rect_contains(self.tree_area, ev.column, ev.row)
                     && self.tree_selected + 1 < self.nodes.len()
                 {

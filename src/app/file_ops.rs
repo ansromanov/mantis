@@ -241,6 +241,14 @@ impl App {
         }
     }
 
+    /// Maximum valid content_scroll so the last line sits at the bottom edge,
+    /// not the top. Falls back to `total - 1` before the first render (height 0).
+    pub fn content_scroll_max(&self) -> usize {
+        let total = self.content_line_count();
+        let vh = (self.content_area.height as usize).max(1);
+        total.saturating_sub(vh)
+    }
+
     /// Width of the line-number gutter (digits + space), or 0 when there is none.
     pub fn line_prefix_width(&self) -> usize {
         if self.is_diff || (self.is_markdown && !self.show_raw_markdown) {
