@@ -7,6 +7,10 @@ license = "MIT"
 readme = "README.md"
 repository = "https://github.com/ansromanov/tree-viewer"
 
+[lib]
+name = "tree_viewer"
+path = "src/lib.rs"
+
 [[bin]]
 name = "tv"
 path = "src/main.rs"
