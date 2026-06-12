@@ -52,12 +52,15 @@ pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
             Focus::Content => {
                 if app.current_file.is_some() {
                     let total = app.content_line_count();
-                    let max_scroll = total.saturating_sub(1);
-                    let pct = (app.content_scroll * 100)
-                        .checked_div(max_scroll)
-                        .unwrap_or(0)
-                        .min(100);
-                    format!("{content_hint}  {pct}%")
+                    let inner_h = app.content_area.height as usize;
+                    if total > inner_h {
+                        let scroll_range = total - inner_h;
+                        let pct =
+                            (app.content_scroll.min(scroll_range) * 100 / scroll_range).min(100);
+                        format!("{content_hint}  {pct}%")
+                    } else {
+                        content_hint
+                    }
                 } else {
                     content_hint
                 }

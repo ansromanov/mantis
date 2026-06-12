@@ -28,6 +28,7 @@ impl App {
             self.handle_search_mouse(ev);
             return;
         }
+        let scroll_before = self.content_scroll;
         match ev.kind {
             MouseEventKind::Down(MouseButton::Left) => {
                 if rect_contains(self.tree_area, ev.column, ev.row) {
@@ -56,11 +57,9 @@ impl App {
                     let ca = self.content_area;
                     if ev.row < ca.y + 2 {
                         self.content_scroll = self.content_scroll.saturating_sub(1);
-                        self.mark_content_scrolled();
                     } else if ev.row >= ca.y + ca.height.saturating_sub(2) {
                         let max = self.content_line_count().saturating_sub(1);
                         self.content_scroll = (self.content_scroll + 1).min(max);
-                        self.mark_content_scrolled();
                     }
                     let pos = self.content_pos(ev.column, ev.row);
                     self.selection = Some(TextSelection {
@@ -88,7 +87,6 @@ impl App {
                 if rect_contains(self.content_area, ev.column, ev.row) {
                     let max = self.content_line_count().saturating_sub(1);
                     self.content_scroll = (self.content_scroll + 3).min(max);
-                    self.mark_content_scrolled();
                 } else if rect_contains(self.tree_area, ev.column, ev.row)
                     && self.tree_selected + 1 < self.nodes.len()
                 {
@@ -99,7 +97,6 @@ impl App {
             MouseEventKind::ScrollUp => {
                 if rect_contains(self.content_area, ev.column, ev.row) {
                     self.content_scroll = self.content_scroll.saturating_sub(3);
-                    self.mark_content_scrolled();
                 } else if rect_contains(self.tree_area, ev.column, ev.row) && self.tree_selected > 0
                 {
                     self.tree_selected -= 1;
@@ -107,6 +104,9 @@ impl App {
                 }
             }
             _ => {}
+        }
+        if self.content_scroll != scroll_before {
+            self.mark_content_scrolled();
         }
     }
 

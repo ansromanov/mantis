@@ -188,9 +188,10 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         let thumb_size = 1.max(inner_h * inner_h / total);
         let scroll_range = total - inner_h;
         let track_range = inner_h - thumb_size;
-        let thumb_start = (app.content_scroll * track_range + scroll_range / 2)
+        let thumb_start = ((app.content_scroll * track_range + scroll_range / 2)
             .checked_div(scroll_range)
-            .unwrap_or(0);
+            .unwrap_or(0))
+        .min(track_range);
 
         let lines: Vec<Line> = (0..inner_h)
             .map(|i| {
