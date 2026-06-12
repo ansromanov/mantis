@@ -442,7 +442,7 @@ impl App {
                 self.nodes = all
                     .into_iter()
                     .filter(|n| {
-                        n.deleted || map.get(&n.path).map_or(false, |&s| s != GitStatus::Ignored)
+                        n.deleted || map.get(&n.path).is_some_and(|&s| s != GitStatus::Ignored)
                     })
                     .collect();
             }
