@@ -6,7 +6,8 @@ use ratatui::{
     Frame,
 };
 
-use crate::app::{App, Focus, SearchMode};
+use crate::app::{App, Focus};
+use crate::search::SearchMode;
 use crate::git::GitStatus;
 
 pub fn draw(f: &mut Frame, app: &mut App) {

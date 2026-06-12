@@ -4,6 +4,8 @@ pub mod file;
 pub mod git;
 pub mod highlight;
 pub mod markdown;
+pub mod search;
+pub mod selection;
 pub mod theme;
 pub mod tree;
 pub mod ui;
