@@ -44,7 +44,8 @@ toggle_raw_markdown = ["M"]
 # ("#aabbcc") and overrides the preset; `syntax` is a syntect theme name.
 # [theme]
 # name = "catppuccin"
-# accent = "cyan"            # focused borders, primary highlights
+# transparent_background = false  # true = use terminal's background instead of the preset's
+# accent = "cyan"                 # focused borders, primary highlights
 # accent_alt = "yellow"      # popup chrome, keys, prompts
 # dim = "darkgray"           # unfocused borders, gutters, hints, rules
 # text = "white"             # emphasized / default text

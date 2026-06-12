@@ -6,6 +6,7 @@ use serde::Deserialize;
 /// original hardcoded look.
 #[derive(Clone)]
 pub struct Theme {
+    pub background: Color,   // panel background (Reset = terminal default)
     pub accent: Color,       // focused borders, primary highlights
     pub accent_alt: Color,   // popup chrome, keys, prompts
     pub dim: Color,          // unfocused borders, gutters, hints, rules
@@ -26,6 +27,7 @@ pub struct Theme {
 impl Default for Theme {
     fn default() -> Self {
         Theme {
+            background: Color::Reset,
             accent: Color::Cyan,
             accent_alt: Color::Yellow,
             dim: Color::DarkGray,
@@ -60,6 +62,7 @@ impl Theme {
         let t = match name.trim().to_ascii_lowercase().as_str() {
             "default" => Theme::default(),
             "monokai" => Theme {
+                background: hex("#272822"),
                 accent: hex("#66d9ef"),
                 accent_alt: hex("#e6db74"),
                 dim: hex("#75715e"),
@@ -77,6 +80,7 @@ impl Theme {
                 syntax: "base16-eighties.dark".to_string(),
             },
             "solarized" => Theme {
+                background: hex("#002b36"),
                 accent: hex("#268bd2"),
                 accent_alt: hex("#b58900"),
                 dim: hex("#586e75"),
@@ -94,6 +98,7 @@ impl Theme {
                 syntax: "Solarized (dark)".to_string(),
             },
             "catppuccin" => Theme {
+                background: hex("#1e1e2e"),
                 accent: hex("#89b4fa"),
                 accent_alt: hex("#f9e2af"),
                 dim: hex("#6c7086"),
@@ -111,6 +116,7 @@ impl Theme {
                 syntax: "base16-mocha.dark".to_string(),
             },
             "synthwave84" | "synthwave" => Theme {
+                background: hex("#262335"),
                 accent: hex("#36f9f6"),
                 accent_alt: hex("#ff7edb"),
                 dim: hex("#848bbd"),
@@ -146,6 +152,9 @@ fn hex(s: &str) -> Color {
 #[serde(default)]
 pub struct ThemeConfig {
     name: Option<String>,
+    /// When `true`, overrides the preset's background with `Color::Reset` so
+    /// the terminal's own background shows through.
+    transparent_background: Option<bool>,
     accent: Option<String>,
     accent_alt: Option<String>,
     dim: Option<String>,
@@ -174,7 +183,13 @@ impl ThemeConfig {
             .unwrap_or_default();
         let col =
             |o: &Option<String>, def: Color| o.as_deref().and_then(parse_color).unwrap_or(def);
+        let background = if self.transparent_background == Some(true) {
+            Color::Reset
+        } else {
+            d.background
+        };
         Theme {
+            background,
             accent: col(&self.accent, d.accent),
             accent_alt: col(&self.accent_alt, d.accent_alt),
             dim: col(&self.dim, d.dim),
@@ -266,6 +281,24 @@ mod tests {
             assert!(Theme::preset(name).is_some(), "missing preset {name}");
         }
         assert!(Theme::preset("bogus").is_none());
+    }
+
+    #[test]
+    fn background_defaults_transparent_but_presets_set_it() {
+        // The default theme leaves the terminal background untouched.
+        assert_eq!(Theme::default().background, Color::Reset);
+        // Presets ship an opaque background.
+        assert_eq!(
+            Theme::preset("monokai").unwrap().background,
+            Color::Rgb(0x27, 0x28, 0x22)
+        );
+        // ...which transparent_background = true turns back off.
+        let cfg = ThemeConfig {
+            name: Some("monokai".into()),
+            transparent_background: Some(true),
+            ..Default::default()
+        };
+        assert_eq!(cfg.resolve().background, Color::Reset);
     }
 
     #[test]
