@@ -856,9 +856,7 @@ impl App {
                     }
                 } else if rect_contains(self.content_area, ev.column, ev.row) {
                     self.focus = Focus::Content;
-                    let can_select = !(self.is_diff
-                        || self.word_wrap
-                        || self.is_markdown && !self.show_raw_markdown);
+                    let can_select = !(self.is_diff || self.word_wrap);
                     if can_select {
                         let pos = self.content_pos(ev.column, ev.row);
                         self.drag_start = Some(pos);
@@ -1356,6 +1354,36 @@ impl App {
             return String::new();
         }
         let ((start_line, start_col), (end_line, end_col)) = sel.normalized();
+
+        if self.is_markdown && !self.show_raw_markdown {
+            let lines = &self.markdown_lines;
+            if start_line >= lines.len() {
+                return String::new();
+            }
+            let mut result = String::new();
+            let last = end_line.min(lines.len().saturating_sub(1));
+            for (line_idx, spans) in lines
+                .iter()
+                .enumerate()
+                .skip(start_line)
+                .take(last - start_line + 1)
+            {
+                let line_text: String = spans.iter().map(|(_, t)| t.as_str()).collect();
+                let chars: Vec<char> = line_text.chars().collect();
+                let col_start = if line_idx == start_line { start_col } else { 0 };
+                let col_end = if line_idx == end_line {
+                    end_col.min(chars.len())
+                } else {
+                    chars.len()
+                };
+                if !result.is_empty() {
+                    result.push('\n');
+                }
+                result.extend(&chars[col_start.min(chars.len())..col_end]);
+            }
+            return result;
+        }
+
         let lines = &self.content;
         if start_line >= lines.len() {
             return String::new();
