@@ -268,6 +268,8 @@ impl App {
     /// content panel is focused.
     fn handle_content_key(&mut self, key: KeyEvent) {
         let k = &self.keys;
+        let scroll_before = self.content_scroll;
+        let hscroll_before = self.content_hscroll;
         if self.is_markdown && pressed(&k.toggle_raw_markdown, &key) {
             self.show_raw_markdown = !self.show_raw_markdown;
             self.content_scroll = 0;
@@ -281,14 +283,14 @@ impl App {
         } else if pressed(&k.nav_up, &key) {
             self.content_scroll = self.content_scroll.saturating_sub(1);
         } else if pressed(&k.nav_down, &key) {
-            let max = self.content_line_count().saturating_sub(1);
+            let max = self.content_scroll_max();
             if self.content_scroll < max {
                 self.content_scroll += 1;
             }
         } else if pressed(&k.content_page_up, &key) {
             self.content_scroll = self.content_scroll.saturating_sub(20);
         } else if pressed(&k.content_page_down, &key) {
-            let max = self.content_line_count().saturating_sub(1);
+            let max = self.content_scroll_max();
             self.content_scroll = (self.content_scroll + 20).min(max);
         } else if !self.word_wrap && pressed(&k.content_left, &key) {
             self.content_hscroll = self.content_hscroll.saturating_sub(4);
@@ -297,9 +299,12 @@ impl App {
         } else if pressed(&k.content_top, &key) {
             self.content_scroll = 0;
         } else if pressed(&k.content_bottom, &key) {
-            self.content_scroll = self.content_line_count().saturating_sub(1);
+            self.content_scroll = self.content_scroll_max();
         } else if !self.word_wrap && pressed(&k.content_reset_col, &key) {
             self.content_hscroll = 0;
+        }
+        if self.content_scroll != scroll_before || self.content_hscroll != hscroll_before {
+            self.mark_content_scrolled();
         }
     }
 }

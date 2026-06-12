@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use ratatui::{
     layout::Rect,
     style::{Color, Style},
@@ -7,6 +9,8 @@ use ratatui::{
 };
 
 use crate::app::{App, Focus};
+
+const SCROLLBAR_FADE: Duration = Duration::from_millis(2000);
 
 /// Renders the content/diff panel. Handles three modes:
 /// - Diff view (styled per-line, no gutter, no selection)
@@ -166,12 +170,54 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
 
     f.render_widget(para, area);
 
+    let inner_x = area.x + 1;
+    let inner_y = area.y + 1;
+    let inner_w = area.width.saturating_sub(2) as usize;
+    let inner_h = area.height.saturating_sub(2) as usize;
+
     app.content_area = Rect {
-        x: area.x + 1,
-        y: area.y + 1,
-        width: area.width.saturating_sub(2),
-        height: area.height.saturating_sub(2),
+        x: inner_x,
+        y: inner_y,
+        width: inner_w as u16,
+        height: inner_h as u16,
     };
+
+    // Transient scrollbar overlay on the right edge of the content area.
+    let total = app.content_line_count();
+    if app.show_scrollbar
+        && total > inner_h
+        && inner_h > 0
+        && inner_w > 0
+        && app.content_scrolled_at.elapsed() < SCROLLBAR_FADE
+    {
+        let thumb_size = 1.max(inner_h * inner_h / total);
+        let scroll_range = total - inner_h;
+        let track_range = inner_h - thumb_size;
+        let thumb_start = ((app.content_scroll * track_range + scroll_range / 2)
+            .checked_div(scroll_range)
+            .unwrap_or(0))
+        .min(track_range);
+
+        let lines: Vec<Line> = (0..inner_h)
+            .map(|i| {
+                if i >= thumb_start && i < thumb_start + thumb_size {
+                    Line::from(Span::styled("█", Style::default().fg(app.theme.dim)))
+                } else {
+                    Line::from(Span::raw(" "))
+                }
+            })
+            .collect();
+
+        f.render_widget(
+            Paragraph::new(lines),
+            Rect {
+                x: inner_x + inner_w as u16 - 1,
+                y: inner_y,
+                width: 1,
+                height: inner_h as u16,
+            },
+        );
+    }
 }
 
 /// Splits each (style, text) region into up to three segments —

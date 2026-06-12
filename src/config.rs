@@ -15,6 +15,8 @@ pub struct Config {
     pub git_show_deleted: bool,
     pub git_mode: bool,
     pub git_mode_flat: bool,
+    pub scrollbar: bool,
+    pub scroll_percentage: bool,
     pub keys: Keymap,
     pub theme: ThemeConfig,
 }
@@ -30,6 +32,8 @@ impl Default for Config {
             git_show_deleted: false,
             git_mode: false,
             git_mode_flat: false,
+            scrollbar: true,
+            scroll_percentage: true,
             keys: Keymap::default(),
             theme: ThemeConfig::default(),
         }

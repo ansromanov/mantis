@@ -61,6 +61,8 @@ pub struct App {
     pub git_status_map: HashMap<PathBuf, GitStatus>,
     pub git_mode: bool,
     pub git_mode_flat: bool,
+    pub show_scrollbar: bool,
+    pub show_scroll_percentage: bool,
     keys: Keymap,
     config: Config,
     config_path: Option<std::path::PathBuf>,
@@ -76,6 +78,10 @@ pub struct App {
     pub theme_offset: usize,
     // Time and result index of the last search-result click, for double-click.
     last_click: Option<(Instant, usize)>,
+    // When the user last scrolled the content panel. The scrollbar overlay is
+    // visible for 2 s after this instant. Initialised 10 s in the past so the
+    // scrollbar is hidden on first render.
+    pub content_scrolled_at: Instant,
     highlighter: Highlighter,
     last_refresh: Instant,
     file_watcher: Option<RecommendedWatcher>,
@@ -144,6 +150,8 @@ impl App {
             git_status_map,
             git_mode: cfg.git_mode,
             git_mode_flat: cfg.git_mode_flat,
+            show_scrollbar: cfg.scrollbar,
+            show_scroll_percentage: cfg.scroll_percentage,
             keys: cfg.keys,
             config: saved_config,
             config_path,
@@ -157,6 +165,7 @@ impl App {
             theme_area: Rect::default(),
             theme_offset: 0,
             last_click: None,
+            content_scrolled_at: Instant::now() - std::time::Duration::from_secs(10),
             highlighter,
             last_refresh: Instant::now(),
             file_watcher: None,
@@ -195,6 +204,12 @@ impl App {
         }
         self.rebuild();
         self.reload_content();
+    }
+
+    /// Records that the user scrolled the content, used to show a transient
+    /// scrollbar.
+    pub fn mark_content_scrolled(&mut self) {
+        self.content_scrolled_at = Instant::now();
     }
 
     /// Periodic per-frame update: drains file-watch events and triggers a

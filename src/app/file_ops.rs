@@ -233,12 +233,20 @@ impl App {
         self.set_file_watch(None);
     }
 
-    pub(super) fn content_line_count(&self) -> usize {
+    pub fn content_line_count(&self) -> usize {
         if self.is_markdown && !self.show_raw_markdown {
             self.markdown_lines.len()
         } else {
             self.content.len()
         }
+    }
+
+    /// Maximum valid content_scroll so the last line sits at the bottom edge,
+    /// not the top. Falls back to `total - 1` before the first render (height 0).
+    pub fn content_scroll_max(&self) -> usize {
+        let total = self.content_line_count();
+        let vh = (self.content_area.height as usize).max(1);
+        total.saturating_sub(vh)
     }
 
     /// Width of the line-number gutter (digits + space), or 0 when there is none.

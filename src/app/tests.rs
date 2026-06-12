@@ -331,6 +331,89 @@ fn search_click_on_different_row_does_not_open() {
     fs::remove_dir_all(&root).ok();
 }
 
+// ── content scroll capping ────────────────────────────────────────────────
+
+fn viewport(height: u16) -> Rect {
+    Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height,
+    }
+}
+
+#[test]
+fn g_key_stops_at_scroll_max_not_last_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt")); // 50 lines
+    app.focus = Focus::Content;
+    app.content_area = viewport(10); // scroll_max = 50 - 10 = 40
+
+    app.handle_key(KeyEvent::new(KeyCode::Char('G'), KeyModifiers::empty()));
+    assert_eq!(
+        app.content_scroll, 40,
+        "G should land at scroll_max, not total-1"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn j_key_stops_at_scroll_max() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt")); // 50 lines
+    app.focus = Focus::Content;
+    app.content_area = viewport(10); // scroll_max = 40
+
+    for _ in 0..60 {
+        app.handle_key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::empty()));
+    }
+    assert_eq!(app.content_scroll, 40, "j must not scroll past scroll_max");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn page_down_stops_at_scroll_max() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt")); // 50 lines
+    app.focus = Focus::Content;
+    app.content_area = viewport(10); // scroll_max = 40
+
+    app.handle_key(KeyEvent::new(KeyCode::PageDown, KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::PageDown, KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::PageDown, KeyModifiers::empty()));
+    assert_eq!(
+        app.content_scroll, 40,
+        "PageDown must not scroll past scroll_max"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn mouse_scroll_down_stops_at_scroll_max() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt")); // 50 lines
+    app.content_area = viewport(10); // scroll_max = 40
+    app.tree_area = Rect {
+        x: 100,
+        y: 0,
+        width: 10,
+        height: 10,
+    };
+
+    for _ in 0..20 {
+        app.handle_mouse(mouse(MouseEventKind::ScrollDown, 1, 1));
+    }
+    assert_eq!(
+        app.content_scroll, 40,
+        "mouse scroll must not exceed scroll_max"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
 // ── git mode ─────────────────────────────────────────────────────────────
 
 /// Repo with:

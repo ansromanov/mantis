@@ -40,16 +40,23 @@ pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
         " j/k nav  Enter/l expand  h collapse  / files  f content  t theme  Tab panel  q quit  ? help{}{}",
         hidden_indicator, git_indicator
     );
-    let text: &str = if app.theme_picker.is_some() {
-        " ↑↓ navigate  type to filter  Enter apply theme  Esc cancel"
+    let text: String = if app.theme_picker.is_some() {
+        " ↑↓ navigate  type to filter  Enter apply theme  Esc cancel".into()
     } else if app.history.is_some() {
-        " ↑↓ navigate  type to filter  Enter show diff  Esc cancel"
+        " ↑↓ navigate  type to filter  Enter show diff  Esc cancel".into()
     } else if app.search.is_some() {
-        " ↑↓ navigate  Enter select  Tab toggle mode  Esc cancel"
+        " ↑↓ navigate  Enter select  Tab toggle mode  Esc cancel".into()
     } else {
-        match app.focus {
-            Focus::Tree => &tree_hint,
-            Focus::Content => &content_hint,
+        let base = match app.focus {
+            Focus::Tree => tree_hint,
+            Focus::Content => content_hint,
+        };
+        let scroll_max = app.content_scroll_max();
+        if app.show_scroll_percentage && app.current_file.is_some() && scroll_max > 0 {
+            let pct = (app.content_scroll * 100 / scroll_max).min(100);
+            format!("{base}  {pct}%")
+        } else {
+            base
         }
     };
 
