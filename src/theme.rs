@@ -123,8 +123,8 @@ pub fn parse_color(s: &str) -> Option<Color> {
 }
 
 fn parse_hex(s: &str) -> Option<Color> {
+    let h = &s[1..];
     if h.len() != 6 || !h.is_ascii() {
-    if h.len() != 6 {
         return None;
     }
     let r = u8::from_str_radix(&h[0..2], 16).ok()?;
