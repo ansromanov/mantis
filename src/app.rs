@@ -8,7 +8,6 @@ use arboard::Clipboard;
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
-use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use ratatui::layout::Rect;
 
 use crate::config::{self, pressed, Config, Keymap};
@@ -16,274 +15,14 @@ use crate::file::is_binary_bytes;
 use crate::git::GitStatus;
 use crate::highlight::Highlighter;
 use crate::markdown;
+use crate::search::{HistoryState, SearchMode, SearchState, ThemePicker};
+use crate::selection::TextSelection;
 use crate::theme::{Theme, ThemeConfig};
-use crate::tree::{build_visible, collect_all_files, TreeNode};
+use crate::tree::{build_visible, TreeNode};
 
 pub enum Focus {
     Tree,
     Content,
-}
-
-#[derive(PartialEq)]
-pub enum SearchMode {
-    Files,
-    Content,
-}
-
-pub struct ContentMatch {
-    pub path: PathBuf,
-    pub line_num: usize,
-    pub line: String,
-}
-
-pub struct SearchState {
-    pub query: String,
-    pub mode: SearchMode,
-    all_files: Vec<PathBuf>,
-    pub file_results: Vec<PathBuf>,
-    pub content_results: Vec<ContentMatch>,
-    pub selected: usize,
-}
-
-impl SearchState {
-    pub fn new(root: &Path, show_hidden: bool, ignore_gitignore: bool) -> Self {
-        let all_files = collect_all_files(root, show_hidden, ignore_gitignore);
-        let file_results = all_files.clone();
-        SearchState {
-            query: String::new(),
-            mode: SearchMode::Files,
-            all_files,
-            file_results,
-            content_results: Vec::new(),
-            selected: 0,
-        }
-    }
-
-    pub fn push(&mut self, c: char) {
-        self.query.push(c);
-        self.refresh();
-    }
-
-    pub fn pop(&mut self) {
-        self.query.pop();
-        self.refresh();
-    }
-
-    pub fn toggle_mode(&mut self) {
-        self.mode = match self.mode {
-            SearchMode::Files => SearchMode::Content,
-            SearchMode::Content => SearchMode::Files,
-        };
-        self.selected = 0;
-        self.refresh();
-    }
-
-    pub fn results_len(&self) -> usize {
-        match self.mode {
-            SearchMode::Files => self.file_results.len(),
-            SearchMode::Content => self.content_results.len(),
-        }
-    }
-
-    fn refresh(&mut self) {
-        self.selected = 0;
-        match self.mode {
-            SearchMode::Files => self.refresh_files(),
-            SearchMode::Content => self.refresh_content(),
-        }
-    }
-
-    pub fn reload_files(&mut self, root: &Path, show_hidden: bool, ignore_gitignore: bool) {
-        self.all_files = collect_all_files(root, show_hidden, ignore_gitignore);
-        self.refresh();
-    }
-
-    fn refresh_files(&mut self) {
-        if self.query.is_empty() {
-            self.file_results = self.all_files.clone();
-            return;
-        }
-        let matcher = SkimMatcherV2::default();
-        let mut scored: Vec<(PathBuf, i64)> = self
-            .all_files
-            .iter()
-            .filter_map(|p| {
-                matcher
-                    .fuzzy_match(&p.to_string_lossy(), &self.query)
-                    .map(|sc| (p.clone(), sc))
-            })
-            .collect();
-        scored.sort_by_key(|(_, score)| std::cmp::Reverse(*score));
-        self.file_results = scored.into_iter().map(|(p, _)| p).collect();
-    }
-
-    fn refresh_content(&mut self) {
-        self.content_results = Vec::new();
-        if self.query.len() < 2 {
-            return;
-        }
-        let q = self.query.to_lowercase();
-        for path in &self.all_files {
-            let Ok(bytes) = fs::read(path) else {
-                continue;
-            };
-            // Skip binary blobs rather than scanning them line by line.
-            if is_binary_bytes(&bytes) {
-                continue;
-            }
-            let Ok(text) = String::from_utf8(bytes) else {
-                continue;
-            };
-            for (i, line) in text.lines().enumerate() {
-                if line.to_lowercase().contains(&q) {
-                    self.content_results.push(ContentMatch {
-                        path: path.clone(),
-                        line_num: i + 1,
-                        line: line.to_owned(),
-                    });
-                }
-            }
-        }
-    }
-}
-
-/// Fuzzy-filterable list of the commits that touched a single file.
-pub struct HistoryState {
-    pub file: PathBuf,
-    pub commits: Vec<crate::git::Commit>,
-    pub query: String,
-    pub filtered: Vec<usize>, // indices into `commits`, in display order
-    pub selected: usize,
-}
-
-impl HistoryState {
-    pub fn new(file: PathBuf, commits: Vec<crate::git::Commit>) -> Self {
-        let filtered = (0..commits.len()).collect();
-        HistoryState {
-            file,
-            commits,
-            query: String::new(),
-            filtered,
-            selected: 0,
-        }
-    }
-
-    pub fn push(&mut self, c: char) {
-        self.query.push(c);
-        self.refilter();
-    }
-
-    pub fn pop(&mut self) {
-        self.query.pop();
-        self.refilter();
-    }
-
-    pub fn results_len(&self) -> usize {
-        self.filtered.len()
-    }
-
-    pub fn selected_commit(&self) -> Option<&crate::git::Commit> {
-        self.filtered
-            .get(self.selected)
-            .and_then(|&i| self.commits.get(i))
-    }
-
-    fn refilter(&mut self) {
-        self.selected = 0;
-        if self.query.is_empty() {
-            self.filtered = (0..self.commits.len()).collect();
-            return;
-        }
-        let matcher = SkimMatcherV2::default();
-        let mut scored: Vec<(usize, i64)> = self
-            .commits
-            .iter()
-            .enumerate()
-            .filter_map(|(i, c)| {
-                let hay = format!("{} {} {}", c.short, c.date, c.subject);
-                matcher.fuzzy_match(&hay, &self.query).map(|sc| (i, sc))
-            })
-            .collect();
-        scored.sort_by_key(|(_, sc)| std::cmp::Reverse(*sc));
-        self.filtered = scored.into_iter().map(|(i, _)| i).collect();
-    }
-}
-
-/// Fuzzy-filterable list of built-in theme presets.
-pub struct ThemePicker {
-    pub names: Vec<&'static str>,
-    pub query: String,
-    pub filtered: Vec<usize>,
-    pub selected: usize,
-}
-
-impl Default for ThemePicker {
-    fn default() -> Self {
-        let names = crate::theme::PRESETS.to_vec();
-        let filtered = (0..names.len()).collect();
-        ThemePicker {
-            names,
-            query: String::new(),
-            filtered,
-            selected: 0,
-        }
-    }
-}
-
-impl ThemePicker {
-    pub fn push(&mut self, c: char) {
-        self.query.push(c);
-        self.refilter();
-    }
-
-    pub fn pop(&mut self) {
-        self.query.pop();
-        self.refilter();
-    }
-
-    pub fn results_len(&self) -> usize {
-        self.filtered.len()
-    }
-
-    pub fn selected_name(&self) -> Option<&'static str> {
-        self.filtered.get(self.selected).map(|&i| self.names[i])
-    }
-
-    fn refilter(&mut self) {
-        self.selected = 0;
-        if self.query.is_empty() {
-            self.filtered = (0..self.names.len()).collect();
-            return;
-        }
-        let matcher = SkimMatcherV2::default();
-        let mut scored: Vec<(usize, i64)> = self
-            .names
-            .iter()
-            .enumerate()
-            .filter_map(|(i, n)| matcher.fuzzy_match(n, &self.query).map(|s| (i, s)))
-            .collect();
-        scored.sort_by_key(|(_, s)| std::cmp::Reverse(*s));
-        self.filtered = scored.into_iter().map(|(i, _)| i).collect();
-    }
-}
-
-pub struct TextSelection {
-    pub anchor: (usize, usize),
-    pub active: (usize, usize),
-}
-
-impl TextSelection {
-    pub fn normalized(&self) -> ((usize, usize), (usize, usize)) {
-        if self.anchor <= self.active {
-            (self.anchor, self.active)
-        } else {
-            (self.active, self.anchor)
-        }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.anchor == self.active
-    }
 }
 
 pub struct App {
@@ -1513,6 +1252,7 @@ fn diff_line_style(line: &str, theme: &Theme) -> ratatui::style::Style {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::Config;
     use crossterm::event::KeyModifiers;
     use std::sync::atomic::{AtomicUsize, Ordering};
 

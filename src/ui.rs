@@ -6,8 +6,9 @@ use ratatui::{
     Frame,
 };
 
-use crate::app::{App, Focus, SearchMode};
+use crate::app::{App, Focus};
 use crate::git::GitStatus;
+use crate::search::SearchMode;
 
 pub fn draw(f: &mut Frame, app: &mut App) {
     let area = f.area();
