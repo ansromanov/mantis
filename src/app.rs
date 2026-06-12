@@ -1,7 +1,10 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant};
+
+use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
@@ -311,6 +314,9 @@ pub struct App {
     last_click: Option<(Instant, usize)>,
     highlighter: Highlighter,
     last_refresh: Instant,
+    file_watcher: Option<RecommendedWatcher>,
+    file_watch_rx: Option<Receiver<notify::Result<notify::Event>>>,
+    file_watch_path: Option<PathBuf>,
 }
 
 impl App {
@@ -385,6 +391,9 @@ impl App {
             last_click: None,
             highlighter,
             last_refresh: Instant::now(),
+            file_watcher: None,
+            file_watch_rx: None,
+            file_watch_path: None,
         };
         if app.git_mode {
             app.expand_git_dirs();
@@ -412,6 +421,10 @@ impl App {
             s.reload_files(&root, show_hidden, ignore_gitignore);
         }
         self.rebuild();
+        self.reload_content();
+    }
+
+    fn reload_content(&mut self) {
         // Commit diffs are transient; don't clobber them on refresh.
         // Working-tree diffs in git mode should be refreshed (working tree changes).
         if self.is_diff && !self.git_mode {
@@ -432,7 +445,53 @@ impl App {
         }
     }
 
+    fn set_file_watch(&mut self, path: Option<&Path>) {
+        self.file_watcher = None;
+        self.file_watch_rx = None;
+        self.file_watch_path = None;
+        let Some(p) = path else { return };
+        // Watch the parent directory rather than the file itself so that
+        // atomic-save editors (those that write a temp file and rename it over
+        // the original) still trigger events after the inode is replaced.
+        let Some(dir) = p.parent() else { return };
+        let (tx, rx) = std::sync::mpsc::channel();
+        let Ok(mut watcher) = notify::recommended_watcher(move |res| {
+            let _ = tx.send(res);
+        }) else {
+            return;
+        };
+        if watcher.watch(dir, RecursiveMode::NonRecursive).is_ok() {
+            self.file_watcher = Some(watcher);
+            self.file_watch_rx = Some(rx);
+            self.file_watch_path = Some(p.to_path_buf());
+        }
+    }
+
+    fn drain_file_watch(&self) -> bool {
+        let (Some(rx), Some(watched)) = (&self.file_watch_rx, &self.file_watch_path) else {
+            return false;
+        };
+        let mut changed = false;
+        while let Ok(res) = rx.try_recv() {
+            if let Ok(evt) = res {
+                let affects_watched = evt.paths.iter().any(|p| p == watched);
+                if affects_watched
+                    && matches!(
+                        evt.kind,
+                        EventKind::Modify(_) | EventKind::Create(_) | EventKind::Remove(_)
+                    )
+                {
+                    changed = true;
+                }
+            }
+        }
+        changed
+    }
+
     pub fn tick(&mut self) {
+        if self.drain_file_watch() {
+            self.reload_content();
+        }
         if self.last_refresh.elapsed().as_secs() >= 30 {
             self.reload();
         }
@@ -566,6 +625,7 @@ impl App {
             .map(|l| vec![(diff_line_style(l, &self.theme), l.clone())])
             .collect();
         self.content = lines;
+        self.set_file_watch(Some(path));
     }
 
     fn toggle_git_mode(&mut self) {
@@ -603,6 +663,7 @@ impl App {
         self.content_title = None;
         self.content_scroll = 0;
         self.content_hscroll = 0;
+        self.set_file_watch(None);
     }
 
     /// Acts on the currently selected node: toggles a directory's fold state,
@@ -897,6 +958,7 @@ impl App {
                 self.markdown_lines = markdown::render(&s, &self.theme);
             }
         }
+        self.set_file_watch(Some(path));
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) {
@@ -1029,6 +1091,7 @@ impl App {
             .collect();
         self.content = lines;
         self.focus = Focus::Content;
+        self.set_file_watch(None);
     }
 
     fn handle_theme_key(&mut self, key: KeyEvent) {
