@@ -83,6 +83,7 @@ impl App {
     /// Displays the working-tree diff of `path` (relative to HEAD) in the
     /// content panel, using `diff_line_style` for per-line coloring.
     pub(super) fn show_working_tree_diff(&mut self, path: &Path) {
+        self.in_file_search = None;
         let lines = crate::git::working_tree_diff(&self.root, path);
         let rel = path.strip_prefix(&self.root).unwrap_or(path);
         self.current_file = Some(path.to_path_buf());
@@ -105,6 +106,7 @@ impl App {
     /// Shows a "[deleted]" placeholder for a file that was removed from the
     /// working tree but is tracked by git.
     pub(super) fn show_deleted(&mut self, path: &Path) {
+        self.in_file_search = None;
         self.current_file = Some(path.to_path_buf());
         self.is_diff = false;
         self.is_markdown = false;
@@ -136,6 +138,7 @@ impl App {
     /// highlighting, and renders markdown if applicable. Errors and empty files
     /// produce inline messages rather than crashing.
     pub fn open_file(&mut self, path: &Path) {
+        self.in_file_search = None;
         self.current_file = Some(path.to_path_buf());
         self.is_diff = false;
         self.content_title = None;
@@ -214,6 +217,7 @@ impl App {
     /// per-line markers. Sets `is_diff = true` so the line-number gutter is
     /// hidden and the diff stays read-only.
     fn show_diff(&mut self, file: &Path, short: &str, lines: Vec<String>) {
+        self.in_file_search = None;
         self.current_file = Some(file.to_path_buf());
         self.is_markdown = false;
         self.show_raw_markdown = false;

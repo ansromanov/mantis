@@ -9,6 +9,8 @@ use ratatui::{
 };
 
 use crate::app::{App, Focus};
+use crate::search::InFileSearch;
+use crate::theme::Theme;
 
 const SCROLLBAR_FADE: Duration = Duration::from_millis(2000);
 
@@ -45,17 +47,24 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     let sel = app.selection.as_ref().map(|s| s.normalized());
     let sel_bg = app.theme.selection_bg;
 
+    let in_file_search = app.in_file_search.as_ref();
+
     let lines: Vec<Line> = if app.is_diff {
         // Diff view: styled spans, no line-number gutter, no selection.
         app.highlighted
             .iter()
-            .map(|spans| {
-                Line::from(
-                    spans
+            .enumerate()
+            .map(|(i, spans)| {
+                let regions_owned: Vec<(Style, String)> =
+                    spans.iter().map(|(s, t)| (*s, t.clone())).collect();
+                Line::from(if let Some(s) = in_file_search {
+                    apply_search_to_regions(&regions_owned, i, s, &app.theme)
+                } else {
+                    regions_owned
                         .iter()
                         .map(|(s, t)| Span::styled(t.clone(), *s))
-                        .collect::<Vec<_>>(),
-                )
+                        .collect()
+                })
             })
             .collect()
     } else if app.is_markdown && !app.show_raw_markdown {
@@ -65,7 +74,9 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
             .map(|(i, spans)| {
                 let regions_owned: Vec<(Style, String)> =
                     spans.iter().map(|(s, t)| (*s, t.clone())).collect();
-                if let Some(((sl, sc), (el, ec))) = sel {
+                if let Some(s) = in_file_search {
+                    Line::from(apply_search_to_regions(&regions_owned, i, s, &app.theme))
+                } else if let Some(((sl, sc), (el, ec))) = sel {
                     if i >= sl && i <= el {
                         let col_start = if i == sl { sc } else { 0 };
                         let col_end = if i == el { ec } else { usize::MAX };
@@ -102,7 +113,9 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                     )];
                     let regions_owned: Vec<(Style, String)> =
                         regions.iter().map(|(s, t)| (*s, t.clone())).collect();
-                    if let Some(((sl, sc), (el, ec))) = sel {
+                    if let Some(s) = in_file_search {
+                        spans.extend(apply_search_to_regions(&regions_owned, i, s, &app.theme));
+                    } else if let Some(((sl, sc), (el, ec))) = sel {
                         if i >= sl && i <= el {
                             let col_start = if i == sl { sc } else { 0 };
                             let col_end = if i == el { ec } else { usize::MAX };
@@ -138,11 +151,13 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                         format!("{:>width$} ", i + 1, width = ln_width),
                         ln_style,
                     )];
-                    if let Some(((sl, sc), (el, ec))) = sel {
+                    let region = vec![(Style::default(), text.clone())];
+                    if let Some(s) = in_file_search {
+                        spans.extend(apply_search_to_regions(&region, i, s, &app.theme));
+                    } else if let Some(((sl, sc), (el, ec))) = sel {
                         if i >= sl && i <= el {
                             let col_start = if i == sl { sc } else { 0 };
                             let col_end = if i == el { ec } else { usize::MAX };
-                            let region = vec![(Style::default(), text.clone())];
                             spans.extend(apply_selection(&region, col_start, col_end, sel_bg));
                         } else {
                             spans.push(Span::raw(text.clone()));
@@ -218,6 +233,83 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
             },
         );
     }
+}
+
+/// Subdivides styled regions at in-file search match boundaries, applying
+/// `selection_bg` for the current match and `dim` for other matches.
+fn apply_search_to_regions(
+    regions: &[(Style, String)],
+    line_idx: usize,
+    search: &InFileSearch,
+    theme: &Theme,
+) -> Vec<Span<'static>> {
+    let line_matches: Vec<(usize, usize, bool)> = search
+        .matches
+        .iter()
+        .enumerate()
+        .filter(|(_, m)| m.line == line_idx)
+        .map(|(gi, m)| (m.col, m.col + m.len, gi == search.current))
+        .collect();
+
+    if line_matches.is_empty() {
+        return regions
+            .iter()
+            .map(|(s, t)| Span::styled(t.clone(), *s))
+            .collect();
+    }
+
+    let mut result = Vec::new();
+    let mut line_char_pos = 0;
+
+    for (style, text) in regions {
+        let chars: Vec<char> = text.chars().collect();
+        let span_len = chars.len();
+        let span_start = line_char_pos;
+        let span_end = line_char_pos + span_len;
+
+        let local_matches: Vec<(usize, usize, bool)> = line_matches
+            .iter()
+            .filter(|(ms, me, _)| *ms < span_end && *me > span_start)
+            .map(|(ms, me, is_cur)| {
+                let local_start = ms.saturating_sub(span_start).min(span_len);
+                let local_end = me.saturating_sub(span_start).min(span_len);
+                (local_start, local_end, *is_cur)
+            })
+            .collect();
+
+        let mut pos = 0;
+        for (local_start, local_end, is_current) in &local_matches {
+            if *local_end <= pos || *local_start >= span_len {
+                continue;
+            }
+            if *local_start > pos {
+                result.push(Span::styled(
+                    chars[pos..*local_start].iter().collect::<String>(),
+                    *style,
+                ));
+            }
+            if *local_end > *local_start {
+                let bg = if *is_current {
+                    theme.selection_bg
+                } else {
+                    theme.dim
+                };
+                result.push(Span::styled(
+                    chars[*local_start..*local_end].iter().collect::<String>(),
+                    style.bg(bg),
+                ));
+            }
+            pos = *local_end;
+        }
+        if pos < span_len {
+            result.push(Span::styled(
+                chars[pos..].iter().collect::<String>(),
+                *style,
+            ));
+        }
+        line_char_pos += span_len;
+    }
+    result
 }
 
 /// Splits each (style, text) region into up to three segments —

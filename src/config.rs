@@ -17,6 +17,7 @@ pub struct Config {
     pub git_mode_flat: bool,
     pub scrollbar: bool,
     pub scroll_percentage: bool,
+    pub in_file_search: bool,
     pub keys: Keymap,
     pub theme: ThemeConfig,
 }
@@ -34,6 +35,7 @@ impl Default for Config {
             git_mode_flat: false,
             scrollbar: true,
             scroll_percentage: true,
+            in_file_search: true,
             keys: Keymap::default(),
             theme: ThemeConfig::default(),
         }

@@ -1,8 +1,8 @@
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::config::pressed;
 use crate::highlight::Highlighter;
-use crate::search::{SearchState, ThemePicker};
+use crate::search::{InFileSearch, SearchState, ThemePicker};
 use crate::theme::{Theme, ThemeConfig};
 
 use super::{diff_line_style, App, Focus};
@@ -26,6 +26,8 @@ impl App {
             self.handle_history_key(key);
         } else if self.search.is_some() {
             self.handle_search_key(key);
+        } else if self.in_file_search.is_some() {
+            self.handle_in_file_search_key(key);
         } else {
             self.handle_normal_key(key);
         }
@@ -69,6 +71,82 @@ impl App {
             }
             _ => {}
         }
+    }
+
+    /// Handles keyboard input while in-file search is active: typing chars,
+    /// backspace, n/N for next/prev, Esc/Enter to close.
+    fn handle_in_file_search_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Esc | KeyCode::Enter => {
+                self.in_file_search = None;
+            }
+            KeyCode::Char('n') => {
+                self.in_file_search_next();
+            }
+            KeyCode::Char('N') | KeyCode::Char('P') => {
+                self.in_file_search_prev();
+            }
+            KeyCode::Tab => {
+                self.in_file_search_next();
+            }
+            KeyCode::BackTab => {
+                self.in_file_search_prev();
+            }
+            KeyCode::Char('p') if key.modifiers.intersects(KeyModifiers::CONTROL) => {
+                self.in_file_search_prev();
+            }
+            KeyCode::Backspace => {
+                if let Some(s) = &mut self.in_file_search {
+                    s.pop(&self.content);
+                }
+                self.scroll_in_file_search_to_current();
+            }
+            KeyCode::Char(c) => {
+                if let Some(s) = &mut self.in_file_search {
+                    s.push(c, &self.content);
+                }
+                self.scroll_in_file_search_to_current();
+            }
+            _ => {}
+        }
+    }
+
+    fn in_file_search_next(&mut self) {
+        if let Some(s) = &mut self.in_file_search {
+            if !s.matches.is_empty() {
+                s.current = (s.current + 1) % s.matches.len();
+            }
+        }
+        self.scroll_in_file_search_to_current();
+    }
+
+    fn in_file_search_prev(&mut self) {
+        if let Some(s) = &mut self.in_file_search {
+            if !s.matches.is_empty() {
+                s.current = if s.current == 0 {
+                    s.matches.len() - 1
+                } else {
+                    s.current - 1
+                };
+            }
+        }
+        self.scroll_in_file_search_to_current();
+    }
+
+    fn scroll_in_file_search_to_current(&mut self) {
+        let view_height = (self.content_area.height as usize).max(1);
+        let Some(s) = &self.in_file_search else {
+            return;
+        };
+        let Some(m) = s.matches.get(s.current) else {
+            return;
+        };
+        if m.line < self.content_scroll {
+            self.content_scroll = m.line;
+        } else if m.line >= self.content_scroll + view_height {
+            self.content_scroll = m.line.saturating_sub(view_height).saturating_add(1);
+        }
+        self.mark_content_scrolled();
     }
 
     /// Handles keyboard input while the git-history overlay is open.
@@ -188,12 +266,19 @@ impl App {
             self.reload();
             self.save_config();
         } else if pressed(&k.search_files, &key) {
-            let root = self.root.clone();
-            self.search = Some(SearchState::new(
-                &root,
-                self.show_hidden,
-                self.ignore_gitignore,
-            ));
+            if self.focus == Focus::Content
+                && self.current_file.is_some()
+                && self.config.in_file_search
+            {
+                self.in_file_search = Some(InFileSearch::new());
+            } else {
+                let root = self.root.clone();
+                self.search = Some(SearchState::new(
+                    &root,
+                    self.show_hidden,
+                    self.ignore_gitignore,
+                ));
+            }
         } else if pressed(&k.reload, &key) {
             self.reload();
         } else if pressed(&k.search_content, &key) {

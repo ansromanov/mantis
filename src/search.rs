@@ -191,6 +191,75 @@ impl HistoryState {
     }
 }
 
+/// A single match occurrence within a file for in-file search.
+#[derive(Clone, Debug)]
+pub struct InFileMatch {
+    pub line: usize,
+    pub col: usize,
+    pub len: usize,
+}
+
+/// State for in-file search (/ while content panel is focused).
+pub struct InFileSearch {
+    pub query: String,
+    pub matches: Vec<InFileMatch>,
+    pub current: usize,
+}
+
+impl Default for InFileSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl InFileSearch {
+    pub fn new() -> Self {
+        InFileSearch {
+            query: String::new(),
+            matches: Vec::new(),
+            current: 0,
+        }
+    }
+
+    pub fn push(&mut self, c: char, lines: &[String]) {
+        self.query.push(c);
+        self.refresh(lines);
+    }
+
+    pub fn pop(&mut self, lines: &[String]) {
+        self.query.pop();
+        self.refresh(lines);
+    }
+
+    fn refresh(&mut self, lines: &[String]) {
+        self.matches.clear();
+        self.current = 0;
+        if self.query.is_empty() {
+            return;
+        }
+        let q_lower: Vec<char> = self.query.to_lowercase().chars().collect();
+        let q_char_len = q_lower.len();
+        if q_char_len == 0 {
+            return;
+        }
+        for (i, line) in lines.iter().enumerate() {
+            let line_lower: Vec<char> = line.to_lowercase().chars().collect();
+            if line_lower.len() < q_char_len {
+                continue;
+            }
+            for start in 0..=line_lower.len() - q_char_len {
+                if line_lower[start..start + q_char_len] == q_lower[..] {
+                    self.matches.push(InFileMatch {
+                        line: i,
+                        col: start,
+                        len: q_char_len,
+                    });
+                }
+            }
+        }
+    }
+}
+
 /// Fuzzy-filterable list of built-in theme presets.
 pub struct ThemePicker {
     pub names: Vec<&'static str>,
