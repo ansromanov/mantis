@@ -45,12 +45,107 @@ impl Default for Theme {
     }
 }
 
-/// `[theme]` overrides from tv.toml. Any field left unset keeps the default.
+/// Names of the built-in presets, in picker display order.
+pub const PRESETS: &[&str] = &[
+    "default",
+    "monokai",
+    "solarized",
+    "catppuccin",
+    "synthwave84",
+];
+
+impl Theme {
+    /// Returns a built-in preset by name, or `None` if unknown.
+    pub fn preset(name: &str) -> Option<Theme> {
+        let t = match name.trim().to_ascii_lowercase().as_str() {
+            "default" => Theme::default(),
+            "monokai" => Theme {
+                accent: hex("#66d9ef"),
+                accent_alt: hex("#e6db74"),
+                dim: hex("#75715e"),
+                text: hex("#f8f8f2"),
+                dir: hex("#66d9ef"),
+                file: hex("#f8f8f2"),
+                selection_bg: hex("#49483e"),
+                selection_fg: hex("#e6db74"),
+                heading1: hex("#66d9ef"),
+                heading2: hex("#e6db74"),
+                heading3: hex("#a6e22e"),
+                code: hex("#e6db74"),
+                diff_add: hex("#a6e22e"),
+                diff_del: hex("#f92672"),
+                syntax: "base16-eighties.dark".to_string(),
+            },
+            "solarized" => Theme {
+                accent: hex("#268bd2"),
+                accent_alt: hex("#b58900"),
+                dim: hex("#586e75"),
+                text: hex("#93a1a1"),
+                dir: hex("#268bd2"),
+                file: hex("#839496"),
+                selection_bg: hex("#073642"),
+                selection_fg: hex("#b58900"),
+                heading1: hex("#2aa198"),
+                heading2: hex("#b58900"),
+                heading3: hex("#859900"),
+                code: hex("#b58900"),
+                diff_add: hex("#859900"),
+                diff_del: hex("#dc322f"),
+                syntax: "Solarized (dark)".to_string(),
+            },
+            "catppuccin" => Theme {
+                accent: hex("#89b4fa"),
+                accent_alt: hex("#f9e2af"),
+                dim: hex("#6c7086"),
+                text: hex("#cdd6f4"),
+                dir: hex("#89b4fa"),
+                file: hex("#cdd6f4"),
+                selection_bg: hex("#313244"),
+                selection_fg: hex("#f9e2af"),
+                heading1: hex("#89dceb"),
+                heading2: hex("#f9e2af"),
+                heading3: hex("#a6e3a1"),
+                code: hex("#f9e2af"),
+                diff_add: hex("#a6e3a1"),
+                diff_del: hex("#f38ba8"),
+                syntax: "base16-mocha.dark".to_string(),
+            },
+            "synthwave84" | "synthwave" => Theme {
+                accent: hex("#36f9f6"),
+                accent_alt: hex("#ff7edb"),
+                dim: hex("#848bbd"),
+                text: hex("#f0eff1"),
+                dir: hex("#36f9f6"),
+                file: hex("#f0eff1"),
+                selection_bg: hex("#463465"),
+                selection_fg: hex("#fede5d"),
+                heading1: hex("#36f9f6"),
+                heading2: hex("#fede5d"),
+                heading3: hex("#72f1b8"),
+                code: hex("#fede5d"),
+                diff_add: hex("#72f1b8"),
+                diff_del: hex("#f92aad"),
+                syntax: "base16-eighties.dark".to_string(),
+            },
+            _ => return None,
+        };
+        Some(t)
+    }
+}
+
+/// Parses a known-good hex literal used in the preset tables above.
+fn hex(s: &str) -> Color {
+    parse_color(s).expect("valid preset color")
+}
+
+/// `[theme]` overrides from tv.toml. `name` selects a built-in preset as the
+/// base; any other field overrides that base. Unset fields keep the base value.
 /// Colors accept names ("cyan", "lightyellow", "reset") or hex ("#aabbcc");
 /// `syntax` is a syntect theme name.
 #[derive(Deserialize, Default)]
 #[serde(default)]
 pub struct ThemeConfig {
+    name: Option<String>,
     accent: Option<String>,
     accent_alt: Option<String>,
     dim: Option<String>,
@@ -69,10 +164,14 @@ pub struct ThemeConfig {
 }
 
 impl ThemeConfig {
-    /// Builds a runtime `Theme`, parsing each override and falling back to the
-    /// default for anything unset or invalid.
+    /// Builds a runtime `Theme`: starts from the named preset (or the default),
+    /// then applies any per-role overrides. Unknown/invalid values are ignored.
     pub fn resolve(&self) -> Theme {
-        let d = Theme::default();
+        let d = self
+            .name
+            .as_deref()
+            .and_then(Theme::preset)
+            .unwrap_or_default();
         let col =
             |o: &Option<String>, def: Color| o.as_deref().and_then(parse_color).unwrap_or(def);
         Theme {
@@ -145,6 +244,28 @@ mod tests {
         assert_eq!(parse_color("#ff8800"), Some(Color::Rgb(255, 136, 0)));
         assert_eq!(parse_color("nonsense"), None);
         assert_eq!(parse_color("#fff"), None); // must be 6 digits
+    }
+
+    #[test]
+    fn named_preset_is_the_base_and_overrides_layer_on_top() {
+        let cfg = ThemeConfig {
+            name: Some("monokai".into()),
+            accent: Some("#000000".into()), // override just accent
+            ..Default::default()
+        };
+        let t = cfg.resolve();
+        let monokai = Theme::preset("monokai").unwrap();
+        assert_eq!(t.accent, Color::Rgb(0, 0, 0)); // overridden
+        assert_eq!(t.diff_del, monokai.diff_del); // from preset
+        assert_eq!(t.syntax, monokai.syntax);
+    }
+
+    #[test]
+    fn all_listed_presets_resolve() {
+        for name in PRESETS {
+            assert!(Theme::preset(name).is_some(), "missing preset {name}");
+        }
+        assert!(Theme::preset("bogus").is_none());
     }
 
     #[test]

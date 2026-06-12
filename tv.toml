@@ -17,6 +17,7 @@ search_content = ["f"]
 reload = ["r"]
 switch_panel = ["Tab"]
 file_history = ["H"]
+theme_picker = ["t"]
 
 # Navigation (shared by tree and content panels)
 nav_up = ["Up", "k"]
@@ -37,10 +38,12 @@ content_reset_col = ["0"]
 toggle_wrap = ["z"]
 toggle_raw_markdown = ["M"]
 
-# Theme. Each role is a color name ("cyan", "lightyellow", "reset") or a hex
-# value ("#aabbcc"); `syntax` is a syntect theme name for file contents. Any
-# role left unset keeps the default shown below.
+# Theme. `name` selects a built-in preset (default, monokai, solarized,
+# catppuccin, synthwave84) — also switchable live with the theme picker (t).
+# Each role is a color name ("cyan", "lightyellow", "reset") or a hex value
+# ("#aabbcc") and overrides the preset; `syntax` is a syntect theme name.
 # [theme]
+# name = "catppuccin"
 # accent = "cyan"            # focused borders, primary highlights
 # accent_alt = "yellow"      # popup chrome, keys, prompts
 # dim = "darkgray"           # unfocused borders, gutters, hints, rules

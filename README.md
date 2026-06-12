@@ -16,6 +16,8 @@ fuzzy search, and mouse support. Built with [ratatui](https://ratatui.rs).
 - **Fuzzy search** over file names, or full-text search across file contents
 - **Git file history** — pick a past revision from an fzf-style list and view
   its diff against your working tree, with red/green coloring
+- **Themes** — built-in presets (monokai, solarized, catppuccin, synthwave84),
+  switchable live from an fzf-style picker or set in config
 - **Mouse support** — click to select, fold/unfold directories, switch panes,
   and scroll
 - **Configurable** layout, behavior, and keybindings via a simple TOML file
@@ -59,6 +61,7 @@ Press `?` at any time for in-app help, and `q` to quit.
 | `r`            | Reload tree             |
 | `Alt+.`        | Toggle hidden files     |
 | `H`            | Git history of current file |
+| `t`            | Theme picker            |
 
 ### Tree panel
 
@@ -132,6 +135,7 @@ search_content = ["f"]
 reload = ["r"]
 switch_panel = ["Tab"]
 file_history = ["H"]
+theme_picker = ["t"]
 
 nav_up = ["Up", "k"]
 nav_down = ["Down", "j"]
@@ -152,13 +156,21 @@ toggle_raw_markdown = ["M"]
 
 ### Theme
 
-Colors are configurable under a `[theme]` table. Each role takes a color name
-(`cyan`, `lightyellow`, `reset`) or a hex value (`#aabbcc`); `syntax` is a
-[syntect](https://github.com/trishume/syntect) theme name used for file
-contents. Anything left unset keeps the default.
+Press `t` for an fzf-style picker to switch themes live, or set one in config.
+Built-in presets: `default`, `monokai`, `solarized`, `catppuccin`,
+`synthwave84`.
+
+Configure under a `[theme]` table. `name` selects a preset as the base; each
+role then overrides it. A role takes a color name (`cyan`, `lightyellow`,
+`reset`) or a hex value (`#aabbcc`); `syntax` is a
+[syntect](https://github.com/trishume/syntect) theme name for file contents.
+Anything left unset keeps the preset's value.
 
 ```toml
 [theme]
+name = "catppuccin"        # built-in preset to start from
+
+# Optional per-role overrides on top of the preset:
 accent = "cyan"            # focused borders, primary highlights
 accent_alt = "yellow"      # popup chrome, keys, prompts
 dim = "darkgray"           # unfocused borders, gutters, hints, rules
