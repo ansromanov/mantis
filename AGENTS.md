@@ -98,6 +98,10 @@ git rebase origin/main
 git push --force-with-lease   # only needed if the branch was already pushed
 ```
 
+## File Size Limit
+
+Keep every source file under **400 lines**. If a file grows beyond that, split it into focused submodules (see `src/app/` and `src/ui/` for examples of the Rust module-directory pattern).
+
 ## Before Committing
 
 1. `cargo fmt --all` — formatting clean (enforced by pre-commit hook)
