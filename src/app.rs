@@ -292,6 +292,8 @@ pub struct App {
     pub git_status_enabled: bool,
     pub git_show_deleted: bool,
     pub git_status_map: HashMap<PathBuf, GitStatus>,
+    pub git_mode: bool,
+    pub git_mode_flat: bool,
     keys: Keymap,
     // Geometry captured during the last render, used to map mouse events.
     pub tree_area: Rect,
@@ -312,7 +314,8 @@ pub struct App {
 impl App {
     pub fn new(root: PathBuf, cfg: Config) -> anyhow::Result<Self> {
         let expanded = HashSet::new();
-        let git_status_enabled = cfg.git_status;
+        // git_mode requires status data even if git_status is disabled in config.
+        let git_status_enabled = cfg.git_status || cfg.git_mode;
         let git_show_deleted = cfg.git_show_deleted;
         let git_status_map = if git_status_enabled {
             crate::git::repo_status(&root, cfg.ignore_gitignore)
@@ -358,6 +361,8 @@ impl App {
             git_status_enabled,
             git_show_deleted,
             git_status_map,
+            git_mode: cfg.git_mode,
+            git_mode_flat: cfg.git_mode_flat,
             keys: cfg.keys,
             tree_area: Rect::default(),
             tree_offset: 0,
@@ -372,6 +377,10 @@ impl App {
             highlighter,
             last_refresh: Instant::now(),
         };
+        if app.git_mode {
+            app.expand_git_dirs();
+            app.rebuild();
+        }
         app.try_open_selected();
         Ok(app)
     }
@@ -388,18 +397,21 @@ impl App {
             s.reload_files(&root, show_hidden, ignore_gitignore);
         }
         self.rebuild();
-        // A diff view is transient; don't clobber it with a file re-open.
-        if self.is_diff {
+        // Commit diffs are transient; don't clobber them on refresh.
+        // Working-tree diffs in git mode should be refreshed (working tree changes).
+        if self.is_diff && !self.git_mode {
             return;
         }
         if let Some(path) = self.current_file.clone() {
-            // Re-opening resets scroll, but a periodic refresh of the file
-            // already on screen should keep the reader's position.
             let scroll = self.content_scroll;
             let hscroll = self.content_hscroll;
-            let raw = self.show_raw_markdown;
-            self.open_file(&path);
-            self.show_raw_markdown = raw;
+            if self.git_mode {
+                self.show_working_tree_diff(&path);
+            } else {
+                let raw = self.show_raw_markdown;
+                self.open_file(&path);
+                self.show_raw_markdown = raw;
+            }
             self.content_scroll = scroll.min(self.content_line_count().saturating_sub(1));
             self.content_hscroll = hscroll;
         }
@@ -414,13 +426,39 @@ impl App {
     fn rebuild(&mut self) {
         let prev = self.nodes.get(self.tree_selected).map(|n| n.path.clone());
         let deleted = deleted_set(&self.git_status_map, self.git_show_deleted);
-        self.nodes = build_visible(
-            &self.root,
-            &self.expanded,
-            self.show_hidden,
-            self.ignore_gitignore,
-            &deleted,
-        );
+
+        if self.git_mode {
+            if self.git_mode_flat {
+                self.nodes = self.build_git_flat_nodes();
+            } else {
+                let all = build_visible(
+                    &self.root,
+                    &self.expanded,
+                    self.show_hidden,
+                    self.ignore_gitignore,
+                    &deleted,
+                );
+                let map = &self.git_status_map;
+                self.nodes = all
+                    .into_iter()
+                    .filter(|n| {
+                        n.deleted
+                            || map
+                                .get(&n.path)
+                                .map_or(false, |&s| s != GitStatus::Ignored)
+                    })
+                    .collect();
+            }
+        } else {
+            self.nodes = build_visible(
+                &self.root,
+                &self.expanded,
+                self.show_hidden,
+                self.ignore_gitignore,
+                &deleted,
+            );
+        }
+
         if let Some(p) = prev {
             if let Some(i) = self.nodes.iter().position(|n| n.path == p) {
                 self.tree_selected = i;
@@ -428,6 +466,60 @@ impl App {
             }
         }
         self.tree_selected = self.tree_selected.min(self.nodes.len().saturating_sub(1));
+    }
+
+    /// Flat list of all changed (non-ignored) files for git mode's plain view.
+    fn build_git_flat_nodes(&self) -> Vec<TreeNode> {
+        let mut entries: Vec<(PathBuf, bool)> = self
+            .git_status_map
+            .iter()
+            .filter(|(path, &status)| {
+                status != GitStatus::Ignored
+                    && path.starts_with(&self.root)
+                    && !path.is_dir()
+            })
+            .map(|(path, &status)| {
+                let deleted = status == GitStatus::Deleted && !path.exists();
+                (path.clone(), deleted)
+            })
+            .collect();
+        entries.sort_by(|(a, _), (b, _)| a.cmp(b));
+        entries
+            .into_iter()
+            .map(|(path, deleted)| {
+                let name = path
+                    .strip_prefix(&self.root)
+                    .unwrap_or(&path)
+                    .to_string_lossy()
+                    .to_string();
+                TreeNode {
+                    path,
+                    name,
+                    depth: 0,
+                    is_dir: false,
+                    deleted,
+                }
+            })
+            .collect()
+    }
+
+    /// Expands all directories that contain git changes so they are visible in
+    /// git mode's tree view.
+    fn expand_git_dirs(&mut self) {
+        let dirs: Vec<PathBuf> = self
+            .git_status_map
+            .iter()
+            .filter(|(path, &status)| {
+                status != GitStatus::Ignored
+                    && path.is_dir()
+                    && path.starts_with(&self.root)
+                    && **path != self.root
+            })
+            .map(|(p, _)| p.clone())
+            .collect();
+        for dir in dirs {
+            self.expanded.insert(dir);
+        }
     }
 
     fn try_open_selected(&mut self) {
@@ -438,9 +530,53 @@ impl App {
             if node.deleted {
                 let path = node.path.clone();
                 self.show_deleted(&path);
+            } else if self.git_mode {
+                let path = node.path.clone();
+                self.show_working_tree_diff(&path);
             } else {
                 let path = node.path.clone();
                 self.open_file(&path);
+            }
+        }
+    }
+
+    fn show_working_tree_diff(&mut self, path: &Path) {
+        let lines = crate::git::working_tree_diff(&self.root, path);
+        let rel = path.strip_prefix(&self.root).unwrap_or(path);
+        self.current_file = Some(path.to_path_buf());
+        self.is_markdown = false;
+        self.show_raw_markdown = false;
+        self.markdown_lines = Vec::new();
+        self.is_diff = true;
+        self.content_scroll = 0;
+        self.content_hscroll = 0;
+        self.content_title = Some(format!(" working diff — {} ", rel.display()));
+        self.highlighted = lines
+            .iter()
+            .map(|l| vec![(diff_line_style(l, &self.theme), l.clone())])
+            .collect();
+        self.content = lines;
+    }
+
+    fn toggle_git_mode(&mut self) {
+        self.git_mode = !self.git_mode;
+        if self.git_mode {
+            // Ensure git status is populated even if git_status was disabled.
+            if !self.git_status_enabled {
+                self.git_status_enabled = true;
+                self.git_status_map =
+                    crate::git::repo_status(&self.root, self.ignore_gitignore);
+            }
+            self.expand_git_dirs();
+            self.rebuild();
+            self.try_open_selected();
+        } else {
+            self.rebuild();
+            // Re-open the current file as normal content instead of a diff.
+            if let Some(path) = self.current_file.clone() {
+                if self.is_diff {
+                    self.open_file(&path);
+                }
             }
         }
     }
@@ -473,6 +609,9 @@ impl App {
             } else if node.deleted {
                 let p = node.path.clone();
                 self.show_deleted(&p);
+            } else if self.git_mode {
+                let p = node.path.clone();
+                self.show_working_tree_diff(&p);
             } else {
                 let p = node.path.clone();
                 self.open_file(&p);
@@ -973,6 +1112,14 @@ impl App {
                 Focus::Tree => Focus::Content,
                 Focus::Content => Focus::Tree,
             };
+        } else if pressed(&k.git_mode_toggle, &key) {
+            self.toggle_git_mode();
+        } else if pressed(&k.git_mode_flat_toggle, &key) {
+            if self.git_mode {
+                self.git_mode_flat = !self.git_mode_flat;
+                self.rebuild();
+                self.try_open_selected();
+            }
         } else {
             match self.focus {
                 Focus::Tree => self.handle_tree_key(key),

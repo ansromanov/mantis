@@ -114,6 +114,45 @@ pub fn repo_status(dir: &Path, include_ignored: bool) -> HashMap<PathBuf, GitSta
     map
 }
 
+/// Returns the working-tree diff for `file` compared to HEAD, as lines.
+/// For new untracked files that aren't staged, falls back to a
+/// `--no-index` diff against `/dev/null`.
+pub fn working_tree_diff(repo_dir: &Path, file: &Path) -> Vec<String> {
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(repo_dir)
+        .args(["diff", "HEAD", "--no-color", "--"])
+        .arg(file)
+        .output();
+
+    if let Ok(o) = out {
+        let text = String::from_utf8_lossy(&o.stdout);
+        if !text.trim().is_empty() {
+            return text.lines().map(|l| l.to_string()).collect();
+        }
+    }
+
+    // Untracked (unstaged) new file — diff against /dev/null.
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(repo_dir)
+        .args(["diff", "--no-color", "--no-index", "--", "/dev/null"])
+        .arg(file)
+        .output();
+
+    match out {
+        Ok(o) => {
+            let text = String::from_utf8_lossy(&o.stdout);
+            if !text.trim().is_empty() {
+                text.lines().map(|l| l.to_string()).collect()
+            } else {
+                vec!["(no diff available)".to_string()]
+            }
+        }
+        Err(e) => vec![format!("[git unavailable] {e}")],
+    }
+}
+
 /// A commit that touched a particular file.
 pub struct Commit {
     pub hash: String,
