@@ -78,7 +78,7 @@ jobs:
           else
             log=$(git log --pretty=format:"- %s" "${prev_tag}..HEAD")
           fi
-          log=$(echo "$log" | grep -v "^- chore: bump version to v")
+          log=$(echo "$log" | grep -v "^- chore: bump version to v" || true)
           {
             echo "log<<EOF"
             echo "$log"
