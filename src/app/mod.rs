@@ -15,6 +15,7 @@ use crate::selection::TextSelection;
 use crate::theme::Theme;
 use crate::tree::{build_visible, TreeNode};
 
+mod content_pos;
 mod file_ops;
 mod key_handlers;
 mod mouse_handlers;
