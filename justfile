@@ -37,3 +37,7 @@ clippy:
 # remove build artifacts
 clean:
     cargo clean
+
+# publish a GitHub release for the current version
+publish:
+    gh workflow run release.yml --ref main
