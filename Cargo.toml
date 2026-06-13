@@ -32,4 +32,5 @@ pulldown-cmark = "0.9"
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
 notify = "6"
+unicode-width = "0.2"
 arboard = "3"

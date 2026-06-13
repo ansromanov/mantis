@@ -1191,6 +1191,297 @@ fn theme_mouse_scroll_down_up() {
     fs::remove_dir_all(&root).ok();
 }
 
+// --- content_pos ----------------------------------------------------------
+
+#[test]
+fn content_pos_no_wrap_plain_text() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt")); // "line1\nline2\n"
+    app.word_wrap = false;
+    app.content_scroll = 0;
+    app.content_hscroll = 0;
+    app.content_area = Rect {
+        x: 2,
+        y: 3,
+        width: 80,
+        height: 20,
+    };
+    // Row 3 = content_area.y, so rel_row = 0 -> buf_line = 0.
+    // Col 2 = content_area.x, rel_col = 0, prefix = 2 (1-digit + space), buf_col = 0.
+    let (line, _col) = app.content_pos(2, 3);
+    assert_eq!(line, 0);
+    // Row 4 -> rel_row = 1 -> buf_line = 1.
+    let (line, _col) = app.content_pos(2, 4);
+    assert_eq!(line, 1);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_pos_word_wrap_first_visual_row_of_first_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    // Markdown mode: prefix = 0.
+    app.is_markdown = true;
+    app.show_raw_markdown = false;
+    app.markdown_lines = vec![
+        // Line 0: 5 chars -> ceil(5/10) = 1 visual row.
+        vec![(ratatui::style::Style::default(), "hello".to_string())],
+        // Line 1: 22 chars -> ceil(22/10) = 3 visual rows.
+        vec![(
+            ratatui::style::Style::default(),
+            "a long line that wraps".to_string(),
+        )],
+    ];
+    app.word_wrap = true;
+    app.content_scroll = 0;
+    app.content_area = Rect {
+        x: 2,
+        y: 2,
+        width: 10,
+        height: 20,
+    };
+    // Mouse at (col=5, row=2) -> rel_row=0, rel_col=3, text_col=3.
+    // Line 0: visual_rows=1, visual_remaining=0 < 1 -> (0, 0*10+3) = (0, 3).
+    let (line, col) = app.content_pos(5, 2);
+    assert_eq!(line, 0);
+    assert_eq!(col, 3);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_pos_word_wrap_first_visual_row_of_second_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.is_markdown = true;
+    app.show_raw_markdown = false;
+    app.markdown_lines = vec![
+        vec![(ratatui::style::Style::default(), "hello".to_string())],
+        vec![(
+            ratatui::style::Style::default(),
+            "a long line that wraps".to_string(),
+        )],
+    ];
+    app.word_wrap = true;
+    app.content_scroll = 0;
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 20,
+    };
+    // rel_row=1: Line 0 uses 1 visual row (visual_remaining->0); Line 1: 0 < 3 -> (1, 0*10+4) = (1, 4).
+    let (line, col) = app.content_pos(4, 1);
+    assert_eq!(line, 1);
+    assert_eq!(col, 4);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_pos_word_wrap_second_visual_row_of_second_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.is_markdown = true;
+    app.show_raw_markdown = false;
+    app.markdown_lines = vec![
+        vec![(ratatui::style::Style::default(), "hello".to_string())],
+        vec![(
+            ratatui::style::Style::default(),
+            "a long line that wraps".to_string(),
+        )],
+    ];
+    app.word_wrap = true;
+    app.content_scroll = 0;
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 20,
+    };
+    // rel_row=2: Line 0 uses 1 row; Line 1: visual_remaining=1 < 3 -> (1, 1*10+4) = (1, 14).
+    let (line, col) = app.content_pos(4, 2);
+    assert_eq!(line, 1);
+    assert_eq!(col, 14);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_pos_word_wrap_third_visual_row_of_second_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.is_markdown = true;
+    app.show_raw_markdown = false;
+    app.markdown_lines = vec![
+        vec![(ratatui::style::Style::default(), "hello".to_string())],
+        vec![(
+            ratatui::style::Style::default(),
+            "a long line that wraps".to_string(),
+        )],
+    ];
+    app.word_wrap = true;
+    app.content_scroll = 0;
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 20,
+    };
+    // rel_row=3: Line 0 uses 1 row; Line 1: visual_remaining=2 < 3 -> (1, 2*10+4) = (1, 24).
+    let (line, col) = app.content_pos(4, 3);
+    assert_eq!(line, 1);
+    assert_eq!(col, 24);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_pos_word_wrap_past_all_content_clamps_to_last_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.is_markdown = true;
+    app.show_raw_markdown = false;
+    app.markdown_lines = vec![
+        vec![(ratatui::style::Style::default(), "hello".to_string())],
+        vec![(
+            ratatui::style::Style::default(),
+            "a long line that wraps".to_string(),
+        )],
+    ];
+    app.word_wrap = true;
+    app.content_scroll = 0;
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 20,
+    };
+    // rel_row=10: past all 4 visual rows -> clamped to last logical line (1).
+    let (line, _col) = app.content_pos(0, 10);
+    assert_eq!(line, 1);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_pos_word_wrap_empty_line_counts_as_one_visual_row() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.is_markdown = true;
+    app.show_raw_markdown = false;
+    app.markdown_lines = vec![
+        vec![(ratatui::style::Style::default(), "".to_string())],
+        vec![(ratatui::style::Style::default(), "next".to_string())],
+    ];
+    app.word_wrap = true;
+    app.content_scroll = 0;
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 20,
+    };
+    // Empty line occupies 1 visual row; rel_row=1 -> second logical line.
+    let (line, _col) = app.content_pos(0, 1);
+    assert_eq!(line, 1);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_pos_word_wrap_respects_content_scroll() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.is_markdown = true;
+    app.show_raw_markdown = false;
+    app.markdown_lines = vec![
+        vec![(ratatui::style::Style::default(), "line0".to_string())],
+        vec![(ratatui::style::Style::default(), "line1".to_string())],
+        vec![(ratatui::style::Style::default(), "line2".to_string())],
+    ];
+    app.word_wrap = true;
+    app.content_scroll = 1; // first visible logical line is index 1
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 20,
+    };
+    // rel_row=0 -> first visible line = logical line 1.
+    let (line, _col) = app.content_pos(0, 0);
+    assert_eq!(line, 1);
+    // rel_row=1 -> logical line 2.
+    let (line, _col) = app.content_pos(0, 1);
+    assert_eq!(line, 2);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_pos_word_wrap_plain_text_multi_span_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    // Plain-text mode with word_wrap.
+    app.is_markdown = false;
+    app.is_diff = false;
+    app.content = vec![
+        "short".to_string(),        // 5 chars -> 1 visual row with width 10
+        "hello world!".to_string(), // 12 chars -> 2 visual rows with width 10
+    ];
+    // Override highlighted so line_prefix_width returns 1+1=2 (1-digit gutter).
+    app.highlighted = vec![];
+    app.word_wrap = true;
+    app.content_scroll = 0;
+    // prefix = line_prefix_width() = len("2") + 1 = 2; wrap_width = 10 - 2 = 8.
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 20,
+    };
+    // "short" (5 chars) -> ceil(5/8) = 1 visual row.
+    // "hello world!" (12 chars) -> ceil(12/8) = 2 visual rows.
+    // rel_row=0 -> line 0.
+    let (line, _col) = app.content_pos(2, 0);
+    assert_eq!(line, 0);
+    // rel_row=1 -> line 1, visual_remaining=0.
+    let (line, col) = app.content_pos(2, 1);
+    assert_eq!(line, 1);
+    assert_eq!(col, 0); // text_col = 2 - prefix(2) = 0; 0*8 + 0 = 0
+                        // rel_row=2 -> line 1, visual_remaining=1 -> col_offset = 1*8 = 8.
+    let (line, col) = app.content_pos(2, 2);
+    assert_eq!(line, 1);
+    assert_eq!(col, 8);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_pos_word_wrap_counts_wide_chars_by_display_width() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    // Markdown mode: prefix = 0, wrap_width = content_area.width = 8.
+    app.is_markdown = true;
+    app.show_raw_markdown = false;
+    app.markdown_lines = vec![
+        // 5 wide CJK glyphs: 5 chars but display width 10 -> ceil(10/8) = 2 rows.
+        // Counting by chars would give ceil(5/8) = 1 row and mis-map the row below.
+        vec![(
+            ratatui::style::Style::default(),
+            "\u{4e16}\u{754c}\u{4f60}\u{597d}\u{554a}".to_string(),
+        )],
+        vec![(ratatui::style::Style::default(), "next".to_string())],
+    ];
+    app.word_wrap = true;
+    app.content_scroll = 0;
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 8,
+        height: 20,
+    };
+    // rel_row=0 and rel_row=1 both fall on the wrapped first line.
+    assert_eq!(app.content_pos(0, 0).0, 0);
+    assert_eq!(app.content_pos(0, 1).0, 0);
+    // rel_row=2 lands on the second logical line.
+    assert_eq!(app.content_pos(0, 2).0, 1);
+    fs::remove_dir_all(&root).ok();
+}
+
 // ── mark_content_scrolled ─────────────────────────────────────────────────
 
 #[test]
