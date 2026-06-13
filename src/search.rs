@@ -273,17 +273,18 @@ impl InFileSearch {
         }
     }
 
-    pub fn push(&mut self, c: char, lines: &[String]) {
+    pub fn push(&mut self, c: char) {
         self.query.push(c);
-        self.refresh(lines);
     }
 
-    pub fn pop(&mut self, lines: &[String]) {
+    pub fn pop(&mut self) {
         self.query.pop();
-        self.refresh(lines);
     }
 
-    fn refresh(&mut self, lines: &[String]) {
+    /// Re-computes matches by calling `get_line(i)` for each 0-based line index
+    /// up to `line_count`. The caller provides the line provider (which may read
+    /// from a virtual file or from an in-memory vec).
+    pub fn refresh(&mut self, line_count: usize, get_line: impl Fn(usize) -> Option<String>) {
         self.matches.clear();
         self.current = 0;
         if self.query.is_empty() {
@@ -294,7 +295,8 @@ impl InFileSearch {
         if q_char_len == 0 {
             return;
         }
-        for (i, line) in lines.iter().enumerate() {
+        for i in 0..line_count {
+            let Some(line) = get_line(i) else { continue };
             let line_lower: Vec<char> = line.to_lowercase().chars().collect();
             if line_lower.len() < q_char_len {
                 continue;
@@ -393,26 +395,30 @@ mod tests {
         assert!(s.matches.is_empty());
         assert_eq!(s.current, 0);
 
-        let lines = vec!["hello world".to_string(), "foo bar".to_string()];
-        s.push('o', &lines);
+        let lines = ["hello world".to_string(), "foo bar".to_string()];
+        s.push('o');
+        s.refresh(lines.len(), |i| lines.get(i).cloned());
         // 'o' matches at positions 4, 7 in "hello world" and 1, 2 in "foo bar"
         assert_eq!(s.matches.len(), 4);
 
-        s.push(' ', &lines);
+        s.push(' ');
+        s.refresh(lines.len(), |i| lines.get(i).cloned());
         // "o " matches at position 4 in "hello world" and position 1 in "foo bar"
         assert_eq!(s.matches.len(), 2);
         assert_eq!(s.matches[0].line, 0);
         assert_eq!(s.matches[0].col, 4);
 
-        s.pop(&lines);
+        s.pop();
+        s.refresh(lines.len(), |i| lines.get(i).cloned());
         assert_eq!(s.matches.len(), 4);
     }
 
     #[test]
     fn in_file_search_case_insensitive() {
         let mut s = InFileSearch::new();
-        let lines = vec!["Hello World".to_string()];
-        s.push('w', &lines);
+        let lines = ["Hello World".to_string()];
+        s.push('w');
+        s.refresh(lines.len(), |i| lines.get(i).cloned());
         assert_eq!(s.matches.len(), 1);
         assert_eq!(s.matches[0].col, 6);
     }
@@ -420,18 +426,21 @@ mod tests {
     #[test]
     fn in_file_search_empty_query_clears_matches() {
         let mut s = InFileSearch::new();
-        let lines = vec!["hello".to_string()];
-        s.push('h', &lines);
+        let lines = ["hello".to_string()];
+        s.push('h');
+        s.refresh(lines.len(), |i| lines.get(i).cloned());
         assert_eq!(s.matches.len(), 1);
-        s.pop(&lines);
+        s.pop();
+        s.refresh(lines.len(), |i| lines.get(i).cloned());
         assert!(s.matches.is_empty());
     }
 
     #[test]
     fn in_file_search_current_navigation() {
         let mut s = InFileSearch::new();
-        let lines = vec!["aa".to_string()];
-        s.push('a', &lines);
+        let lines = ["aa".to_string()];
+        s.push('a');
+        s.refresh(lines.len(), |i| lines.get(i).cloned());
         assert_eq!(s.matches.len(), 2);
         assert_eq!(s.current, 0);
 

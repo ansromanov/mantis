@@ -35,6 +35,21 @@ impl Highlighter {
     /// `path` and applying the configured syntect theme. Returns one Vec of
     /// styled spans per line. Unrecognized files get plain-text style.
     pub fn highlight(&self, path: &Path, lines: &[String]) -> Vec<Vec<(Style, String)>> {
+        self.highlight_impl(path, lines.iter().map(|s| s.as_str()))
+    }
+
+    /// Syntax-highlights a range of lines (as `&str` slices) for virtualization.
+    /// Same as `highlight` but accepts a slice of borrowed strings to avoid
+    /// allocating a `Vec<String>` for the visible window.
+    pub fn highlight_range(&self, path: &Path, lines: &[&str]) -> Vec<Vec<(Style, String)>> {
+        self.highlight_impl(path, lines.iter().copied())
+    }
+
+    fn highlight_impl<'a>(
+        &self,
+        path: &Path,
+        lines: impl Iterator<Item = &'a str>,
+    ) -> Vec<Vec<(Style, String)>> {
         let syntax = self
             .ss
             .find_syntax_for_file(path)
@@ -46,13 +61,12 @@ impl Highlighter {
         let mut h = HighlightLines::new(syntax, theme);
 
         lines
-            .iter()
             .map(|line| match h.highlight_line(line, &self.ss) {
                 Ok(regions) => regions
                     .into_iter()
                     .map(|(s, text)| (to_ratatui(s), text.to_owned()))
                     .collect(),
-                Err(_) => vec![(Style::default(), line.clone())],
+                Err(_) => vec![(Style::default(), line.to_owned())],
             })
             .collect()
     }

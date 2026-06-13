@@ -14,10 +14,11 @@ use crate::theme::Theme;
 
 const SCROLLBAR_FADE: Duration = Duration::from_millis(2000);
 
-/// Renders the content/diff panel. Handles three modes:
+/// Renders the content/diff panel. Handles four modes:
 /// - Diff view (styled per-line, no gutter, no selection)
 /// - Markdown rendered view (styled spans from `markdown_lines`)
-/// - Plain / syntax-highlighted view (with line numbers and optional selection)
+/// - Virtual file view (mmap-backed, syntax-highlighted on the fly for the visible window)
+/// - Inline fallback view (for errors, binaries, small files)
 pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     let focused = matches!(app.focus, Focus::Content)
         && app.search.is_none()
@@ -44,15 +45,19 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         .borders(Borders::ALL)
         .border_style(border_style);
 
+    let inner = block.inner(area);
+    let view_height = inner.height as usize;
+    let total_lines = app.line_count();
+    let scroll = app.content_scroll.min(total_lines.saturating_sub(1));
+    let visible_end = (scroll + view_height).min(total_lines);
+
     let sel = app.selection.as_ref().map(|s| s.normalized());
     let sel_bg = app.theme.selection_bg;
-
     let in_file_search = app.in_file_search.as_ref();
 
-    // ln_width: number of columns for the fixed line-number gutter (0 = no gutter).
-    // ln_lines: one Line per row containing only the line-number span.
-    // content_lines: one Line per row containing only the text/code spans.
+    // ln_width, ln_lines, content_lines
     let (ln_width, ln_lines, content_lines): (usize, Vec<Line>, Vec<Line>) = if app.is_diff {
+        // Diff view: iterate all highlighted lines (diffs are never large).
         let lines = app
             .highlighted
             .iter()
@@ -72,19 +77,35 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
             .collect();
         (0, vec![], lines)
     } else if app.is_markdown && !app.show_raw_markdown {
-        let lines = app
-            .markdown_lines
+        // Markdown: iterate only the visible window of pre-rendered lines.
+        let ln_style = Style::default().fg(app.theme.dim);
+        let lw = total_lines.to_string().len().max(1);
+        let gutters: Vec<Line> = (scroll..visible_end)
+            .map(|i| {
+                Line::from(Span::styled(
+                    format!("{:>width$} ", i + 1, width = lw),
+                    ln_style,
+                ))
+            })
+            .collect();
+        let lines: Vec<Line> = app.markdown_lines[scroll..visible_end]
             .iter()
             .enumerate()
-            .map(|(i, spans)| {
+            .map(|(offset, spans)| {
+                let logical_idx = scroll + offset;
                 let regions_owned: Vec<(Style, String)> =
                     spans.iter().map(|(s, t)| (*s, t.clone())).collect();
                 if let Some(s) = in_file_search {
-                    Line::from(apply_search_to_regions(&regions_owned, i, s, &app.theme))
+                    Line::from(apply_search_to_regions(
+                        &regions_owned,
+                        logical_idx,
+                        s,
+                        &app.theme,
+                    ))
                 } else if let Some(((sl, sc), (el, ec))) = sel {
-                    if i >= sl && i <= el {
-                        let col_start = if i == sl { sc } else { 0 };
-                        let col_end = if i == el { ec } else { usize::MAX };
+                    if logical_idx >= sl && logical_idx <= el {
+                        let col_start = if logical_idx == sl { sc } else { 0 };
+                        let col_end = if logical_idx == el { ec } else { usize::MAX };
                         Line::from(apply_selection(&regions_owned, col_start, col_end, sel_bg))
                     } else {
                         Line::from(
@@ -104,17 +125,32 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                 }
             })
             .collect();
-        (0, vec![], lines)
-    } else {
-        let lw = app.content.len().to_string().len().max(1);
+        (lw + 1, gutters, lines)
+    } else if let Some(vf) = app.virtual_file.as_ref() {
+        // Virtual file view: lazy-loaded from mmap, highlighted on the fly.
+        let lw = total_lines.to_string().len().max(1);
         let ln_style = Style::default().fg(app.theme.dim);
-        // highlighted is populated when syntax coloring is available; fall back to raw content.
-        let num_lines = if !app.highlighted.is_empty() {
-            app.highlighted.len()
-        } else {
-            app.content.len()
+        let highlight = || -> Vec<Vec<(Style, String)>> {
+            let path = match &app.current_file {
+                Some(p) => p.as_path(),
+                None => return Vec::new(),
+            };
+            let lines: Vec<&str> = (scroll..visible_end)
+                .filter_map(|i| vf.line_text(i))
+                .collect();
+            if lines.is_empty() {
+                return Vec::new();
+            }
+            app.highlight_lines(path, &lines)
         };
-        let gutters: Vec<Line> = (0..num_lines)
+        let highlighted = if app.highlighted.is_empty() {
+            highlight()
+        } else {
+            Default::default()
+        };
+        let has_highlight = !highlighted.is_empty();
+
+        let gutters: Vec<Line> = (scroll..visible_end)
             .map(|i| {
                 Line::from(Span::styled(
                     format!("{:>width$} ", i + 1, width = lw),
@@ -122,19 +158,83 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                 ))
             })
             .collect();
-        let content: Vec<Line> = if !app.highlighted.is_empty() {
-            app.highlighted
+        let content: Vec<Line> = (scroll..visible_end)
+            .enumerate()
+            .map(|(offset, logical_idx)| {
+                if has_highlight {
+                    if let Some(regions) = highlighted.get(offset) {
+                        let regions_owned: Vec<(Style, String)> =
+                            regions.iter().map(|(s, t)| (*s, t.clone())).collect();
+                        let spans: Vec<Span> = if let Some(s) = in_file_search {
+                            apply_search_to_regions(&regions_owned, logical_idx, s, &app.theme)
+                        } else if let Some(((sl, sc), (el, ec))) = sel {
+                            if logical_idx >= sl && logical_idx <= el {
+                                let col_start = if logical_idx == sl { sc } else { 0 };
+                                let col_end = if logical_idx == el { ec } else { usize::MAX };
+                                apply_selection(&regions_owned, col_start, col_end, sel_bg)
+                            } else {
+                                regions_owned
+                                    .iter()
+                                    .map(|(s, t)| Span::styled(t.clone(), *s))
+                                    .collect()
+                            }
+                        } else {
+                            regions_owned
+                                .iter()
+                                .map(|(s, t)| Span::styled(t.clone(), *s))
+                                .collect()
+                        };
+                        return Line::from(spans);
+                    }
+                }
+                // Fallback: show raw text if highlighting failed or wasn't applied
+                let text = vf.line_text(logical_idx).unwrap_or("");
+                let region = vec![(Style::default(), text.to_string())];
+                let spans: Vec<Span> = if let Some(s) = in_file_search {
+                    apply_search_to_regions(&region, logical_idx, s, &app.theme)
+                } else if let Some(((sl, sc), (el, ec))) = sel {
+                    if logical_idx >= sl && logical_idx <= el {
+                        let col_start = if logical_idx == sl { sc } else { 0 };
+                        let col_end = if logical_idx == el { ec } else { usize::MAX };
+                        apply_selection(&region, col_start, col_end, sel_bg)
+                    } else {
+                        vec![Span::raw(text.to_string())]
+                    }
+                } else {
+                    vec![Span::raw(text.to_string())]
+                };
+                Line::from(spans)
+            })
+            .collect();
+        (lw + 1, gutters, content)
+    } else {
+        // Inline fallback: `content` vec is the source (errors, binaries, small files).
+        let lw = total_lines.to_string().len().max(1);
+        let ln_style = Style::default().fg(app.theme.dim);
+        let has_highlight = !app.highlighted.is_empty();
+
+        let gutters: Vec<Line> = (scroll..visible_end)
+            .map(|i| {
+                Line::from(Span::styled(
+                    format!("{:>width$} ", i + 1, width = lw),
+                    ln_style,
+                ))
+            })
+            .collect();
+        let content: Vec<Line> = if has_highlight {
+            app.highlighted[scroll..visible_end]
                 .iter()
                 .enumerate()
-                .map(|(i, regions)| {
+                .map(|(offset, regions)| {
+                    let logical_idx = scroll + offset;
                     let regions_owned: Vec<(Style, String)> =
                         regions.iter().map(|(s, t)| (*s, t.clone())).collect();
                     let spans: Vec<Span> = if let Some(s) = in_file_search {
-                        apply_search_to_regions(&regions_owned, i, s, &app.theme)
+                        apply_search_to_regions(&regions_owned, logical_idx, s, &app.theme)
                     } else if let Some(((sl, sc), (el, ec))) = sel {
-                        if i >= sl && i <= el {
-                            let col_start = if i == sl { sc } else { 0 };
-                            let col_end = if i == el { ec } else { usize::MAX };
+                        if logical_idx >= sl && logical_idx <= el {
+                            let col_start = if logical_idx == sl { sc } else { 0 };
+                            let col_end = if logical_idx == el { ec } else { usize::MAX };
                             apply_selection(&regions_owned, col_start, col_end, sel_bg)
                         } else {
                             regions_owned
@@ -152,17 +252,18 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                 })
                 .collect()
         } else {
-            app.content
+            app.content[scroll..visible_end]
                 .iter()
                 .enumerate()
-                .map(|(i, text)| {
+                .map(|(offset, text)| {
+                    let logical_idx = scroll + offset;
                     let region = vec![(Style::default(), text.clone())];
                     let spans: Vec<Span> = if let Some(s) = in_file_search {
-                        apply_search_to_regions(&region, i, s, &app.theme)
+                        apply_search_to_regions(&region, logical_idx, s, &app.theme)
                     } else if let Some(((sl, sc), (el, ec))) = sel {
-                        if i >= sl && i <= el {
-                            let col_start = if i == sl { sc } else { 0 };
-                            let col_end = if i == el { ec } else { usize::MAX };
+                        if logical_idx >= sl && logical_idx <= el {
+                            let col_start = if logical_idx == sl { sc } else { 0 };
+                            let col_end = if logical_idx == el { ec } else { usize::MAX };
                             apply_selection(&region, col_start, col_end, sel_bg)
                         } else {
                             vec![Span::raw(text.clone())]
@@ -174,7 +275,6 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                 })
                 .collect()
         };
-        // +1 for the trailing space after the digits
         (lw + 1, gutters, content)
     };
 
@@ -187,10 +287,11 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         app.content_hscroll as u16
     };
 
-    // Fixed gutter: line numbers scroll vertically but never horizontally.
+    // Fixed gutter: line numbers are pre-clipped to the visible range,
+    // rendered with scroll=(0,0) because they are already at the right offset.
     if ln_width > 0 {
         f.render_widget(
-            Paragraph::new(ln_lines).scroll((app.content_scroll as u16, 0)),
+            Paragraph::new(ln_lines).scroll((0, 0)),
             Rect {
                 x: inner.x,
                 y: inner.y,
@@ -200,10 +301,11 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         );
     }
 
-    // Scrollable content area, offset to the right of the gutter.
+    // Content area: only the visible window of lines is materialised, so
+    // vertical scroll is 0. Horizontal scroll is still applied.
     let cx = inner.x + ln_width as u16;
     let cw = inner.width.saturating_sub(ln_width as u16);
-    let mut para = Paragraph::new(content_lines).scroll((app.content_scroll as u16, hscroll));
+    let mut para = Paragraph::new(content_lines).scroll((0, hscroll));
     if app.word_wrap {
         para = para.wrap(Wrap { trim: false });
     }

@@ -14,6 +14,7 @@ use crate::search::{CommandPalette, HistoryState, InFileSearch, SearchState, The
 use crate::selection::TextSelection;
 use crate::theme::Theme;
 use crate::tree::{build_visible, TreeNode};
+use crate::virtual_file::VirtualFile;
 
 mod content_pos;
 mod file_ops;
@@ -40,6 +41,7 @@ pub struct App {
     pub content: Vec<String>,
     pub highlighted: Vec<Vec<(ratatui::style::Style, String)>>,
     pub markdown_lines: Vec<Vec<(ratatui::style::Style, String)>>,
+    pub virtual_file: Option<VirtualFile>,
     pub is_markdown: bool,
     pub show_raw_markdown: bool,
     pub content_scroll: usize,
@@ -147,6 +149,7 @@ impl App {
             content: Vec::new(),
             highlighted: Vec::new(),
             markdown_lines: Vec::new(),
+            virtual_file: None,
             is_markdown: false,
             show_raw_markdown: false,
             content_scroll: 0,
@@ -258,6 +261,47 @@ impl App {
         if self.last_refresh.elapsed().as_secs() >= 30 {
             self.reload();
         }
+    }
+
+    /// Returns the total number of lines in the current content source
+    /// (virtual file, raw content, or markdown-rendered lines).
+    pub fn line_count(&self) -> usize {
+        if self.is_markdown && !self.show_raw_markdown {
+            self.markdown_lines.len()
+        } else if let Some(vf) = &self.virtual_file {
+            vf.line_count()
+        } else {
+            self.content.len()
+        }
+    }
+
+    /// Returns the text of the 0-indexed line, consulting the virtual file
+    /// first and falling back to the raw content vec.
+    pub fn line_text(&self, index: usize) -> Option<&str> {
+        if let Some(vf) = &self.virtual_file {
+            vf.line_text(index)
+        } else {
+            self.content.get(index).map(|s| s.as_str())
+        }
+    }
+
+    /// Returns the display width of line `index` in terminal columns.
+    pub fn line_width(&self, index: usize) -> Option<usize> {
+        if let Some(vf) = &self.virtual_file {
+            vf.line_width(index)
+        } else {
+            self.line_text(index)
+                .map(unicode_width::UnicodeWidthStr::width)
+        }
+    }
+
+    /// Syntax-highlights a slice of lines for the visible window.
+    pub fn highlight_lines(
+        &self,
+        path: &std::path::Path,
+        lines: &[&str],
+    ) -> Vec<Vec<(ratatui::style::Style, String)>> {
+        self.highlighter.highlight_range(path, lines)
     }
 }
 
