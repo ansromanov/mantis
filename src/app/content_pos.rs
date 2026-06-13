@@ -5,12 +5,10 @@ use unicode_width::UnicodeWidthStr;
 use super::App;
 
 impl App {
+    /// DEPRECATED: use `line_count()` instead. Returns the total number of
+    /// displayable lines in the current content source.
     pub fn content_line_count(&self) -> usize {
-        if self.is_markdown && !self.show_raw_markdown {
-            self.markdown_lines.len()
-        } else {
-            self.content.len()
-        }
+        self.line_count()
     }
 
     /// Maximum valid content_scroll so the last line sits at the bottom edge,
@@ -26,7 +24,7 @@ impl App {
         if self.is_diff || (self.is_markdown && !self.show_raw_markdown) {
             0
         } else {
-            self.content.len().to_string().len().max(1) + 1
+            self.line_count().to_string().len().max(1) + 1
         }
     }
 
@@ -46,20 +44,16 @@ impl App {
             if let Some(wrap_nz) = NonZeroUsize::new(raw_wrap) {
                 let wrap_width = wrap_nz.get();
                 let is_md = self.is_markdown && !self.show_raw_markdown;
-                let total = if is_md {
-                    self.markdown_lines.len()
-                } else {
-                    self.content.len()
-                };
+                let total = self.line_count();
                 let mut visual_remaining = rel_row;
                 for logical_idx in self.content_scroll..total {
                     let display_width: usize = if is_md {
-                        self.markdown_lines[logical_idx]
-                            .iter()
-                            .map(|(_, t)| t.width())
-                            .sum()
+                        self.markdown_lines
+                            .get(logical_idx)
+                            .map(|spans| spans.iter().map(|(_, t)| t.width()).sum())
+                            .unwrap_or(0)
                     } else {
-                        self.content[logical_idx].width()
+                        self.line_width(logical_idx).unwrap_or(0)
                     };
                     let visual_rows = display_width.div_ceil(wrap_width).max(1);
                     if visual_remaining < visual_rows {
@@ -77,7 +71,7 @@ impl App {
         (buf_line, buf_col)
     }
 
-    /// Extract the currently selected text from `self.content`.
+    /// Extract the currently selected text from the content source.
     pub fn selection_text(&self) -> String {
         let Some(sel) = &self.selection else {
             return String::new();
@@ -86,15 +80,16 @@ impl App {
             return String::new();
         }
         let ((start_line, start_col), (end_line, end_col)) = sel.normalized();
+        let total = self.line_count();
 
         if self.is_markdown && !self.show_raw_markdown {
-            let lines = &self.markdown_lines;
-            if start_line >= lines.len() {
+            if start_line >= self.markdown_lines.len() {
                 return String::new();
             }
             let mut result = String::new();
-            let last = end_line.min(lines.len().saturating_sub(1));
-            for (line_idx, spans) in lines
+            let last = end_line.min(self.markdown_lines.len().saturating_sub(1));
+            for (line_idx, spans) in self
+                .markdown_lines
                 .iter()
                 .enumerate()
                 .skip(start_line)
@@ -115,19 +110,44 @@ impl App {
             }
             return result;
         }
-
-        let lines = &self.content;
-        if start_line >= lines.len() {
+        let Some(_) = self.virtual_file else {
+            // Fallback for inline content (diffs, errors, etc.)
+            let lines = &self.content;
+            if start_line >= lines.len() {
+                return String::new();
+            }
+            let mut result = String::new();
+            let last = end_line.min(lines.len().saturating_sub(1));
+            for (line_idx, line) in lines
+                .iter()
+                .enumerate()
+                .skip(start_line)
+                .take(last - start_line + 1)
+            {
+                let chars: Vec<char> = line.chars().collect();
+                let col_start = if line_idx == start_line { start_col } else { 0 };
+                let col_end = if line_idx == end_line {
+                    end_col.min(chars.len())
+                } else {
+                    chars.len()
+                };
+                if !result.is_empty() {
+                    result.push('\n');
+                }
+                result.extend(&chars[col_start.min(chars.len())..col_end]);
+            }
+            return result;
+        };
+        // VirtualFile path
+        if start_line >= total {
             return String::new();
         }
         let mut result = String::new();
-        let last = end_line.min(lines.len().saturating_sub(1));
-        for (line_idx, line) in lines
-            .iter()
-            .enumerate()
-            .skip(start_line)
-            .take(last - start_line + 1)
-        {
+        let last = end_line.min(total.saturating_sub(1));
+        for line_idx in start_line..=last {
+            let Some(line) = self.line_text(line_idx) else {
+                continue;
+            };
             let chars: Vec<char> = line.chars().collect();
             let col_start = if line_idx == start_line { start_col } else { 0 };
             let col_end = if line_idx == end_line {
