@@ -1,6 +1,6 @@
 [package]
 name = "tree-viewer"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2021"
 description = "A fast terminal file tree viewer with syntax highlighting, markdown rendering, fuzzy search, and mouse support."
 license = "MIT"
