@@ -381,7 +381,8 @@ impl App {
         } else if pressed(&k.theme_picker, &key) {
             self.theme_picker = Some(ThemePicker::default());
         } else if pressed(&k.command_palette, &key) {
-            self.command_palette = Some(CommandPalette::default());
+            self.last_click = None;
+            self.command_palette = Some(CommandPalette::new(&self.keys));
         } else if pressed(&k.switch_panel, &key) {
             self.focus = match self.focus {
                 Focus::Tree => Focus::Content,

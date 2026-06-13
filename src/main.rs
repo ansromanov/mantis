@@ -9,6 +9,7 @@ use crossterm::{
 use ratatui::{backend::CrosstermBackend, Terminal};
 
 mod app;
+mod command_palette;
 mod config;
 mod file;
 mod git;

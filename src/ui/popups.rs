@@ -259,16 +259,26 @@ pub(super) fn draw_theme(f: &mut Frame, app: &mut App, area: Rect) {
 }
 
 pub(super) fn draw_command_palette(f: &mut Frame, app: &mut App, area: Rect) {
-    use crate::search::COMMANDS;
+    use crate::command_palette::COMMANDS;
+
+    let Some(picker) = app.command_palette.as_ref() else {
+        return;
+    };
+
+    let palette_key = app
+        .keys()
+        .command_palette
+        .first()
+        .map(|b| b.display())
+        .unwrap_or_else(|| "Ctrl+P".to_string());
+    let title = format!(" Commands - {} ", palette_key);
 
     let theme = &app.theme;
-    let picker = app.command_palette.as_ref().unwrap();
-
     let popup = centered_rect(56, 65, area);
     f.render_widget(Clear, popup);
 
     let block = Block::default()
-        .title(" Commands — Ctrl+P ")
+        .title(title)
         .borders(Borders::ALL)
         .style(Style::default().bg(theme.background))
         .border_style(Style::default().fg(theme.accent_alt));
@@ -294,13 +304,13 @@ pub(super) fn draw_command_palette(f: &mut Frame, app: &mut App, area: Rect) {
                     .add_modifier(Modifier::BOLD),
             ),
             Span::raw(picker.query.as_str()),
-            Span::styled("█", Style::default().fg(theme.accent_alt)),
+            Span::styled("|", Style::default().fg(theme.accent_alt)),
         ])),
         parts[0],
     );
 
     f.render_widget(
-        Paragraph::new("─".repeat(inner.width as usize)).style(Style::default().fg(theme.dim)),
+        Paragraph::new("-".repeat(inner.width as usize)).style(Style::default().fg(theme.dim)),
         parts[1],
     );
 
@@ -312,7 +322,7 @@ pub(super) fn draw_command_palette(f: &mut Frame, app: &mut App, area: Rect) {
             ListItem::new(Line::from(vec![
                 Span::styled(format!(" {} ", cmd.name), Style::default().fg(theme.text)),
                 Span::styled(
-                    format!("[{}]", cmd.keybinding),
+                    format!("[{}]", picker.binding_labels[i]),
                     Style::default().fg(theme.dim),
                 ),
             ]))

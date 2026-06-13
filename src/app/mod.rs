@@ -238,6 +238,10 @@ impl App {
 
     /// Periodic per-frame update: drains file-watch events and triggers a
     /// periodic full reload every 30 seconds.
+    pub fn keys(&self) -> &Keymap {
+        &self.keys
+    }
+
     pub fn tick(&mut self) {
         if self.drain_file_watch() {
             self.reload_content();
