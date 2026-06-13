@@ -44,7 +44,10 @@ pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
         .git_branch
         .as_ref()
         .map(|b| {
-            let dirty = !app.git_status_map.is_empty();
+            let dirty = app
+                .git_status_map
+                .values()
+                .any(|&s| s != crate::git::GitStatus::Ignored);
             if dirty {
                 format!(" [{} +]", b)
             } else {
