@@ -149,7 +149,16 @@ pub fn render(src: &str, theme: &Theme) -> Vec<Vec<(Style, String)>> {
                 style_stack.pop();
                 lines.push(vec![]);
             }
-            Event::Start(Tag::Link(_, _, _)) | Event::End(Tag::Link(_, _, _)) => {}
+            Event::Start(Tag::Link(_, _, _)) => {
+                style_stack.push(
+                    Style::default()
+                        .fg(theme.accent)
+                        .add_modifier(Modifier::UNDERLINED),
+                );
+            }
+            Event::End(Tag::Link(_, _, _)) => {
+                style_stack.pop();
+            }
             Event::Start(Tag::Image(_, _, _)) => {
                 if !in_table_cell {
                     current.push((Style::default().fg(theme.dim), "[img]".to_string()));
@@ -446,6 +455,18 @@ mod tests {
         let result = render("[link text](http://x.com)", &default_theme());
         let text: String = result[0].iter().map(|(_, s)| s.as_str()).collect();
         assert_eq!(text, "link text", "got {text:?}");
+    }
+
+    #[test]
+    fn link_is_accent_underlined() {
+        let t = default_theme();
+        let result = render("[link text](http://x.com)", &t);
+        let span = result[0]
+            .iter()
+            .find(|(_, s)| s == "link text")
+            .expect("link text span");
+        assert_eq!(span.0.fg, Some(t.accent));
+        assert!(span.0.add_modifier.contains(Modifier::UNDERLINED));
     }
 
     #[test]
