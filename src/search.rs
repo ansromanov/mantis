@@ -25,6 +25,7 @@ pub struct SearchState {
     pub file_results: Vec<PathBuf>,
     pub content_results: Vec<ContentMatch>,
     pub selected: usize,
+    matcher: SkimMatcherV2,
 }
 
 impl SearchState {
@@ -38,6 +39,7 @@ impl SearchState {
             file_results,
             content_results: Vec::new(),
             selected: 0,
+            matcher: SkimMatcherV2::default(),
         }
     }
 
@@ -85,12 +87,11 @@ impl SearchState {
             self.file_results = self.all_files.clone();
             return;
         }
-        let matcher = SkimMatcherV2::default();
         let mut scored: Vec<(PathBuf, i64)> = self
             .all_files
             .iter()
             .filter_map(|p| {
-                matcher
+                self.matcher
                     .fuzzy_match(&p.to_string_lossy(), &self.query)
                     .map(|sc| (p.clone(), sc))
             })
@@ -136,6 +137,7 @@ pub struct HistoryState {
     pub query: String,
     pub filtered: Vec<usize>,
     pub selected: usize,
+    matcher: SkimMatcherV2,
 }
 
 impl HistoryState {
@@ -147,6 +149,7 @@ impl HistoryState {
             query: String::new(),
             filtered,
             selected: 0,
+            matcher: SkimMatcherV2::default(),
         }
     }
 
@@ -176,14 +179,15 @@ impl HistoryState {
             self.filtered = (0..self.commits.len()).collect();
             return;
         }
-        let matcher = SkimMatcherV2::default();
         let mut scored: Vec<(usize, i64)> = self
             .commits
             .iter()
             .enumerate()
             .filter_map(|(i, c)| {
                 let hay = format!("{} {} {}", c.short, c.date, c.subject);
-                matcher.fuzzy_match(&hay, &self.query).map(|sc| (i, sc))
+                self.matcher
+                    .fuzzy_match(&hay, &self.query)
+                    .map(|sc| (i, sc))
             })
             .collect();
         scored.sort_by_key(|(_, sc)| std::cmp::Reverse(*sc));
@@ -266,6 +270,7 @@ pub struct ThemePicker {
     pub query: String,
     pub filtered: Vec<usize>,
     pub selected: usize,
+    matcher: SkimMatcherV2,
 }
 
 impl Default for ThemePicker {
@@ -277,6 +282,7 @@ impl Default for ThemePicker {
             query: String::new(),
             filtered,
             selected: 0,
+            matcher: SkimMatcherV2::default(),
         }
     }
 }
@@ -306,12 +312,11 @@ impl ThemePicker {
             self.filtered = (0..self.names.len()).collect();
             return;
         }
-        let matcher = SkimMatcherV2::default();
         let mut scored: Vec<(usize, i64)> = self
             .names
             .iter()
             .enumerate()
-            .filter_map(|(i, n)| matcher.fuzzy_match(n, &self.query).map(|s| (i, s)))
+            .filter_map(|(i, n)| self.matcher.fuzzy_match(n, &self.query).map(|s| (i, s)))
             .collect();
         scored.sort_by_key(|(_, s)| std::cmp::Reverse(*s));
         self.filtered = scored.into_iter().map(|(i, _)| i).collect();
