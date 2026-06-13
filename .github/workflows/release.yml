@@ -90,6 +90,8 @@ jobs:
   publish:
     needs: [bump, build]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v6
         with:
@@ -117,8 +119,9 @@ jobs:
           path: artifacts
           merge-multiple: true
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: v${{ needs.bump.outputs.version }}
           name: v${{ needs.bump.outputs.version }}
           target_commitish: ${{ needs.bump.outputs.sha }}
