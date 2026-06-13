@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Mutex;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Per-file git working-tree status.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -382,5 +384,177 @@ pub fn file_diff(repo_dir: &Path, rev: &str, file: &Path) -> Vec<String> {
             String::from_utf8_lossy(&o.stderr).trim()
         )],
         Err(e) => vec![format!("[git unavailable] {e}")],
+    }
+}
+
+/// Per-line git blame annotation.
+#[derive(Clone, Debug)]
+#[allow(dead_code)]
+pub struct BlameLine {
+    pub commit_hash: String,
+    pub short_hash: String,
+    pub author: String,
+    pub date_relative: String,
+    pub line_no: u32,
+}
+
+#[allow(dead_code)]
+struct CachedBlame {
+    mtime: SystemTime,
+    lines: Vec<BlameLine>,
+}
+
+#[allow(dead_code)]
+static BLAME_CACHE: Mutex<Option<HashMap<PathBuf, CachedBlame>>> = Mutex::new(None);
+
+/// Returns per-line git blame annotations for `file` in the repository at
+/// `repo_dir`. Returns an empty `Vec` if the file is untracked, not in a git
+/// repo, or git is unavailable. Results are cached by (path, mtime) so
+/// repeated renders don't re-invoke git.
+#[allow(dead_code)]
+pub fn file_blame(repo_dir: &Path, file: &Path) -> Vec<BlameLine> {
+    let mtime = match std::fs::metadata(file).and_then(|m| m.modified()) {
+        Ok(t) => t,
+        Err(_) => return Vec::new(),
+    };
+
+    {
+        let guard = BLAME_CACHE.lock().unwrap();
+        if let Some(cache) = guard.as_ref() {
+            if let Some(cached) = cache.get(file) {
+                if cached.mtime == mtime {
+                    return cached.lines.clone();
+                }
+            }
+        }
+    }
+
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(repo_dir)
+        .args(["blame", "--porcelain", "--"])
+        .arg(file)
+        .output();
+
+    let output = match output {
+        Ok(o) if o.status.success() => o,
+        _ => return Vec::new(),
+    };
+
+    let text = String::from_utf8_lossy(&output.stdout);
+    let lines = parse_blame_porcelain(&text);
+
+    {
+        let mut guard = BLAME_CACHE.lock().unwrap();
+        let cache = guard.get_or_insert_with(HashMap::new);
+        cache.insert(
+            file.to_path_buf(),
+            CachedBlame {
+                mtime,
+                lines: lines.clone(),
+            },
+        );
+    }
+
+    lines
+}
+
+#[allow(dead_code)]
+fn parse_blame_porcelain(text: &str) -> Vec<BlameLine> {
+    let mut blames = Vec::new();
+    let mut meta: HashMap<String, (String, String)> = HashMap::new();
+    let mut lines = text.lines();
+
+    while let Some(line) = lines.next() {
+        let parts: Vec<&str> = line.splitn(4, ' ').collect();
+        if parts.len() < 4 {
+            continue;
+        }
+        let hash = parts[0].to_string();
+        let count: usize = parts[3].parse().unwrap_or(1);
+
+        let (author, date_relative) = if let Some(m) = meta.get(&hash) {
+            m.clone()
+        } else {
+            let mut author = String::from("Unknown");
+            let mut author_time: u64 = 0;
+
+            loop {
+                match lines.next() {
+                    Some(meta_line) if meta_line.starts_with("author ") => {
+                        author = meta_line["author ".len()..].to_string();
+                    }
+                    Some(meta_line) if meta_line.starts_with("author-time ") => {
+                        author_time = meta_line["author-time ".len()..].parse().unwrap_or(0);
+                    }
+                    Some(meta_line) if meta_line.starts_with("filename ") => break,
+                    Some(_) => continue,
+                    None => break,
+                }
+            }
+
+            let date_relative = format_relative_time(author_time);
+            meta.insert(hash.clone(), (author.clone(), date_relative.clone()));
+            (author, date_relative)
+        };
+
+        for _ in 0..count {
+            if let Some(content_line) = lines.next() {
+                let _content = content_line.strip_prefix('\t').unwrap_or(content_line);
+                blames.push(BlameLine {
+                    short_hash: if hash.len() >= 7 {
+                        hash[..7].to_string()
+                    } else {
+                        hash.clone()
+                    },
+                    author: author.clone(),
+                    date_relative: date_relative.clone(),
+                    line_no: blames.len() as u32 + 1,
+                    commit_hash: hash.clone(),
+                });
+            }
+        }
+    }
+
+    blames
+}
+
+#[allow(dead_code)]
+fn format_relative_time(unix_ts: u64) -> String {
+    if unix_ts == 0 {
+        return "Not committed yet".to_string();
+    }
+
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+
+    let diff = now.saturating_sub(unix_ts);
+
+    if diff < 60 {
+        let n = diff.max(1);
+        pluralize(n, "second")
+    } else if diff < 3600 {
+        pluralize(diff / 60, "minute")
+    } else if diff < 86400 {
+        pluralize(diff / 3600, "hour")
+    } else if diff < 604800 {
+        pluralize(diff / 86400, "day")
+    } else if diff < 2_592_000 {
+        pluralize(diff / 604800, "week")
+    } else if diff < 31_536_000 {
+        pluralize(diff / 2_592_000, "month")
+    } else {
+        pluralize(diff / 31_536_000, "year")
+    }
+}
+
+#[allow(dead_code)]
+fn pluralize(n: u64, unit: &str) -> String {
+    if n == 1 {
+        format!("1 {unit} ago")
+    } else {
+        format!("{n} {unit}s ago")
     }
 }
