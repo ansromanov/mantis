@@ -100,6 +100,7 @@ if [ -z "$INSTALL_DIR" ]; then
 fi
 
 
+
 # --- download + verify ----------------------------------------------------
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
