@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use notify::{EventKind, RecursiveMode, Watcher};
+use unicode_width::UnicodeWidthStr;
 
 use crate::file::is_binary_bytes;
 use crate::git::GitStatus;
@@ -303,23 +304,26 @@ impl App {
                 };
                 let mut visual_remaining = rel_row;
                 for logical_idx in self.content_scroll..total {
-                    let char_count: usize = if is_md {
+                    // The renderer wraps on terminal cell width, so measure the
+                    // line's display width (not its char count) to match how many
+                    // visual rows it actually occupies for wide/multi-cell glyphs.
+                    let display_width: usize = if is_md {
                         self.markdown_lines[logical_idx]
                             .iter()
-                            .map(|(_, t)| t.chars().count())
+                            .map(|(_, t)| t.width())
                             .sum()
                     } else {
-                        self.content[logical_idx].chars().count()
+                        self.content[logical_idx].width()
                     };
                     // Empty lines still occupy one visual row.
-                    let visual_rows = char_count.div_ceil(wrap_width).max(1);
+                    let visual_rows = display_width.div_ceil(wrap_width).max(1);
                     if visual_remaining < visual_rows {
                         let text_col = rel_col.saturating_sub(prefix);
                         return (logical_idx, visual_remaining * wrap_width + text_col);
                     }
                     visual_remaining -= visual_rows;
                 }
-                // Mouse is below all content — clamp to last line.
+                // Mouse is below all content; clamp to last line.
                 return (total.saturating_sub(1), rel_col.saturating_sub(prefix));
             }
         }
