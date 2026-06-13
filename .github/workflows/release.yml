@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       bump:
+        description: Bump minor version before releasing
         type: boolean
-        description: Bump minor version before build
         default: true
 
 jobs:
@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.bump.outputs.version || steps.current.outputs.version }}
-      sha: ${{ steps.push.outputs.sha || github.sha }}
+      sha: ${{ steps.sha.outputs.sha }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -40,14 +40,16 @@ jobs:
 
       - name: Commit and push
         if: inputs.bump
-        id: push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Cargo.toml Cargo.lock
           git commit -m "chore: bump version to v${{ steps.bump.outputs.version }} [skip ci]"
           git push origin HEAD:main
-          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Set sha
+        id: sha
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   build:
     needs: bump
