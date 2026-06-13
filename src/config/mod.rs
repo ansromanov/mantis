@@ -230,23 +230,33 @@ impl Serialize for KeyBinding {
 /// Loads config for the given view root. A project-local `tv.toml` found in
 /// the root or any ancestor takes precedence over the global config; this lets
 /// a repo ship its own defaults. Creates the global config with defaults if it
-/// doesn't exist yet. Returns the loaded config and the path it was loaded from
-/// so that live changes are saved back to the same file.
-pub fn load(root: &Path) -> (Config, Option<PathBuf>) {
+/// doesn't exist yet. Returns the loaded config, the path it was loaded from
+/// (so that live changes are saved back to the same file), and a warning
+/// describing the first malformed config encountered, if any, so the caller can
+/// tell the user their config was ignored instead of failing silently.
+pub fn load(root: &Path) -> (Config, Option<PathBuf>, Option<String>) {
     let global = global_config_path();
     if let Some(ref path) = global {
         if !path.exists() {
             install_default(path);
         }
     }
+    let mut error = None;
     for path in config_paths(root) {
-        if let Ok(s) = fs::read_to_string(&path) {
-            if let Ok(config) = toml::from_str::<Config>(&s) {
-                return (config, Some(path));
+        let Ok(s) = fs::read_to_string(&path) else {
+            continue; // missing or unreadable: try the next candidate
+        };
+        match toml::from_str::<Config>(&s) {
+            Ok(config) => return (config, Some(path), error),
+            // Record the first malformed config but keep falling back so a valid
+            // lower-precedence file (e.g. the global config) can still load.
+            Err(e) if error.is_none() => {
+                error = Some(format!("{}: {e}", path.display()));
             }
+            Err(_) => {}
         }
     }
-    (Config::default(), global)
+    (Config::default(), global, error)
 }
 
 /// Writes `config` to `path`, silently ignoring errors.
@@ -285,120 +295,4 @@ fn dirs_next() -> Option<PathBuf> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn ev(code: KeyCode, mods: KeyModifiers) -> KeyEvent {
-        KeyEvent::new(code, mods)
-    }
-
-    #[test]
-    fn parses_single_char_preserving_case() {
-        let g = parse_binding("G").unwrap();
-        assert_eq!(g.code, KeyCode::Char('G'));
-        assert!(!g.ctrl && !g.alt);
-
-        let lower = parse_binding("g").unwrap();
-        assert_eq!(lower.code, KeyCode::Char('g'));
-    }
-
-    #[test]
-    fn parses_named_keys_case_insensitively() {
-        assert_eq!(parse_binding("Up").unwrap().code, KeyCode::Up);
-        assert_eq!(parse_binding("up").unwrap().code, KeyCode::Up);
-        assert_eq!(parse_binding("PAGEUP").unwrap().code, KeyCode::PageUp);
-        assert_eq!(parse_binding("enter").unwrap().code, KeyCode::Enter);
-        assert_eq!(parse_binding("return").unwrap().code, KeyCode::Enter);
-        assert_eq!(parse_binding("esc").unwrap().code, KeyCode::Esc);
-        assert_eq!(parse_binding("space").unwrap().code, KeyCode::Char(' '));
-    }
-
-    #[test]
-    fn parses_modifiers() {
-        let c = parse_binding("ctrl+c").unwrap();
-        assert_eq!(c.code, KeyCode::Char('c'));
-        assert!(c.ctrl && !c.alt);
-
-        let dot = parse_binding("alt+.").unwrap();
-        assert_eq!(dot.code, KeyCode::Char('.'));
-        assert!(dot.alt && !dot.ctrl);
-
-        let both = parse_binding("ctrl+alt+x").unwrap();
-        assert!(both.ctrl && both.alt);
-        assert_eq!(both.code, KeyCode::Char('x'));
-    }
-
-    #[test]
-    fn modifier_aliases_accepted() {
-        assert!(parse_binding("control+a").unwrap().ctrl);
-        assert!(parse_binding("meta+a").unwrap().alt);
-        assert!(parse_binding("option+a").unwrap().alt);
-    }
-
-    #[test]
-    fn shift_modifier_is_ignored_in_spec() {
-        // Shift is encoded in char case, so it is parsed but sets no flag.
-        let b = parse_binding("shift+a").unwrap();
-        assert!(!b.ctrl && !b.alt);
-        assert_eq!(b.code, KeyCode::Char('a'));
-    }
-
-    #[test]
-    fn rejects_unknown_modifier_and_key() {
-        assert!(parse_binding("hyper+a").is_err());
-        assert!(parse_binding("nope").is_err());
-    }
-
-    #[test]
-    fn matches_requires_exact_modifiers() {
-        let b = parse_binding("ctrl+c").unwrap();
-        assert!(b.matches(&ev(KeyCode::Char('c'), KeyModifiers::CONTROL)));
-        // Missing the ctrl modifier should not match.
-        assert!(!b.matches(&ev(KeyCode::Char('c'), KeyModifiers::empty())));
-        // A different code should not match.
-        assert!(!b.matches(&ev(KeyCode::Char('x'), KeyModifiers::CONTROL)));
-    }
-
-    #[test]
-    fn matches_ignores_shift_for_unmodified_binding() {
-        // Pressing 'G' arrives as Char('G') + SHIFT; a "G" binding must match.
-        let b = parse_binding("G").unwrap();
-        assert!(b.matches(&ev(KeyCode::Char('G'), KeyModifiers::SHIFT)));
-    }
-
-    #[test]
-    fn unmodified_binding_rejects_ctrl_press() {
-        let b = parse_binding("g").unwrap();
-        assert!(!b.matches(&ev(KeyCode::Char('g'), KeyModifiers::CONTROL)));
-    }
-
-    #[test]
-    fn pressed_matches_any_in_list() {
-        let binds = bind(&["Up", "k"]);
-        assert!(pressed(&binds, &ev(KeyCode::Up, KeyModifiers::empty())));
-        assert!(pressed(
-            &binds,
-            &ev(KeyCode::Char('k'), KeyModifiers::empty())
-        ));
-        assert!(!pressed(
-            &binds,
-            &ev(KeyCode::Char('j'), KeyModifiers::empty())
-        ));
-    }
-
-    #[test]
-    fn config_paths_are_local_first_then_global() {
-        let root = Path::new("/a/b/c");
-        let paths = config_paths(root);
-        // Project-local: root first, then each ancestor.
-        assert_eq!(paths[0], PathBuf::from("/a/b/c/tv.toml"));
-        assert_eq!(paths[1], PathBuf::from("/a/b/tv.toml"));
-        assert_eq!(paths[2], PathBuf::from("/a/tv.toml"));
-        assert_eq!(paths[3], PathBuf::from("/tv.toml"));
-        // Global config (if resolvable) comes after all local candidates.
-        if let Some(global) = global_config_path() {
-            assert_eq!(*paths.last().unwrap(), global);
-            assert!(paths.iter().position(|p| *p == global).unwrap() >= 4);
-        }
-    }
-}
+mod tests;

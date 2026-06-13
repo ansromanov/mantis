@@ -97,9 +97,10 @@ fn load_returns_path_of_loaded_file() {
     let cfg_file = dir.join("tv.toml");
     fs::write(&cfg_file, "tree_width = 99\n").unwrap();
 
-    let (cfg, path) = config::load(&dir);
+    let (cfg, path, err) = config::load(&dir);
     assert_eq!(cfg.tree_width, 99);
     assert_eq!(path.as_deref(), Some(cfg_file.as_path()));
+    assert!(err.is_none());
 
     fs::remove_dir_all(&dir).ok();
 }
@@ -117,13 +118,13 @@ fn save_and_reload_preserves_theme() {
     fs::create_dir_all(&dir).unwrap();
     fs::write(dir.join("tv.toml"), "tree_width = 30\n").unwrap();
 
-    let (mut cfg, path) = config::load(&dir);
+    let (mut cfg, path, _) = config::load(&dir);
     assert_eq!(cfg.tree_width, 30);
 
     cfg.theme = ThemeConfig::from_preset("synthwave84");
     config::save(&cfg, path.as_deref().unwrap());
 
-    let (reloaded, _) = config::load(&dir);
+    let (reloaded, _, _) = config::load(&dir);
     let theme = reloaded.theme.resolve();
     let expected = Theme::preset("synthwave84").unwrap();
     assert_eq!(

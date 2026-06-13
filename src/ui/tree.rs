@@ -151,7 +151,7 @@ mod tests {
             git_status: false, // don't fetch real git status
             ..Config::default()
         };
-        let mut app = App::new(PathBuf::from("."), cfg, None).unwrap();
+        let mut app = App::new(PathBuf::from("."), cfg, None, None).unwrap();
         app.git_status_enabled = git_status_enabled;
         app.git_status_map = status_map;
         app
