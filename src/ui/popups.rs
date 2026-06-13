@@ -429,3 +429,69 @@ fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
         ])
         .split(vert[1])[1]
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn centered_rect_returns_inner_rectangle() {
+        // area = 100x100, centered_rect(50, 50) → 50x50 centered
+        let area = Rect {
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 100,
+        };
+        let result = centered_rect(50, 50, area);
+        assert_eq!(result.width, 50);
+        assert_eq!(result.height, 50);
+        assert_eq!(result.x, 25);
+        assert_eq!(result.y, 25);
+    }
+
+    #[test]
+    fn centered_rect_full_size() {
+        let area = Rect {
+            x: 0,
+            y: 0,
+            width: 80,
+            height: 24,
+        };
+        let result = centered_rect(100, 100, area);
+        assert_eq!(result.width, 80);
+        assert_eq!(result.height, 24);
+        assert_eq!(result.x, 0);
+        assert_eq!(result.y, 0);
+    }
+
+    #[test]
+    fn centered_rect_narrow_and_short() {
+        let area = Rect {
+            x: 0,
+            y: 0,
+            width: 80,
+            height: 24,
+        };
+        let result = centered_rect(20, 20, area);
+        assert_eq!(result.width, 16); // 80 * 0.20 = 16
+        assert_eq!(result.height, 4); // 24 * 0.20 = 4.8 → 4
+        assert_eq!(result.x, 32); // (80-16)/2 = 32
+        assert_eq!(result.y, 10); // (24-4)/2 = 10
+    }
+
+    #[test]
+    fn centered_rect_non_zero_origin() {
+        let area = Rect {
+            x: 10,
+            y: 5,
+            width: 80,
+            height: 40,
+        };
+        let result = centered_rect(50, 50, area);
+        assert_eq!(result.width, 40);
+        assert_eq!(result.height, 20);
+        assert_eq!(result.x, 10 + 20); // x + (80-40)/2
+        assert_eq!(result.y, 5 + 10); // y + (40-20)/2
+    }
+}
