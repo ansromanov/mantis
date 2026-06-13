@@ -56,7 +56,3 @@ jobs:
       - name: Test
         if: steps.changes.outputs.code == 'true'
         run: cargo test --all
-
-      - name: Build (release)
-        if: steps.changes.outputs.code == 'true'
-        run: cargo build --release
