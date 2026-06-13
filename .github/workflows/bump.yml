@@ -3,10 +3,11 @@ name: Bump Version
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   bump:
-    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    if: "github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -14,13 +15,14 @@ jobs:
           fetch-depth: 0
           ssh-key: ${{ secrets.DEPLOY_KEY }}
 
-      - name: Bump minor version
+      - name: Bump patch version
         id: bump
         run: |
           current=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
           major=$(echo "$current" | cut -d. -f1)
           minor=$(echo "$current" | cut -d. -f2)
-          new_version="${major}.$((minor + 1)).0"
+          patch=$(echo "$current" | cut -d. -f3)
+          new_version="${major}.${minor}.$((patch + 1))"
           sed -i "s/^version = \"${current}\"/version = \"${new_version}\"/" Cargo.toml
           sed -i "/^name = \"tree-viewer\"/{n;s/version = \"${current}\"/version = \"${new_version}\"/}" Cargo.lock
           echo "version=${new_version}" >> "$GITHUB_OUTPUT"
