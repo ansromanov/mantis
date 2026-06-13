@@ -108,6 +108,7 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     } else {
         let lw = app.content.len().to_string().len().max(1);
         let ln_style = Style::default().fg(app.theme.dim);
+        // highlighted is populated when syntax coloring is available; fall back to raw content.
         let num_lines = if !app.highlighted.is_empty() {
             app.highlighted.len()
         } else {
