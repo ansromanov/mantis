@@ -5,6 +5,18 @@ default:
 setup:
     pre-commit install
 
+# start a new feature branch from latest origin/main (e.g. just new my-feature)
+new branch:
+    git fetch origin
+    git checkout -b {{branch}} origin/main
+    pre-commit install
+
+# safe push before opening a PR: fetch latest main, rebase, then push
+pr:
+    git fetch origin
+    git rebase origin/main
+    git push -u origin HEAD --force-with-lease
+
 # build debug binary
 build:
     cargo build
