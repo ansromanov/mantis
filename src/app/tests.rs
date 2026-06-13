@@ -22,7 +22,7 @@ fn temp_tree() -> PathBuf {
 }
 
 fn app_for(root: &std::path::Path) -> App {
-    App::new(root.to_path_buf(), Config::default(), None).unwrap()
+    App::new(root.to_path_buf(), Config::default(), None, None).unwrap()
 }
 
 /// A temp git repo with one committed file plus an uncommitted change.
@@ -663,7 +663,7 @@ fn git_mode_config_starts_enabled() {
         git_mode: true,
         ..Config::default()
     };
-    let app = App::new(root.to_path_buf(), cfg, None).unwrap();
+    let app = App::new(root.to_path_buf(), cfg, None, None).unwrap();
 
     assert!(app.git_mode);
     assert!(
