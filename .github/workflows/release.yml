@@ -2,20 +2,32 @@ name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      bump:
+        type: boolean
+        description: Bump minor version before build
+        default: true
 
 jobs:
   bump:
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.bump.outputs.version }}
-      sha: ${{ steps.push.outputs.sha }}
+      version: ${{ steps.bump.outputs.version || steps.current.outputs.version }}
+      sha: ${{ steps.push.outputs.sha || github.sha }}
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ssh-key: ${{ secrets.DEPLOY_KEY }}
 
+      - name: Get current version
+        id: current
+        run: |
+          current=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          echo "version=${current}" >> "$GITHUB_OUTPUT"
+
       - name: Bump minor version
+        if: inputs.bump
         id: bump
         run: |
           current=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
@@ -27,6 +39,7 @@ jobs:
           echo "version=${new_version}" >> "$GITHUB_OUTPUT"
 
       - name: Commit and push
+        if: inputs.bump
         id: push
         run: |
           git config user.name "github-actions[bot]"
