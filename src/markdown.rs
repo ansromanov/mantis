@@ -400,7 +400,11 @@ mod tests {
             "top border: {:?}",
             result[0][0].1
         );
-        assert_eq!(result[1][1].1, "code line");
+        let code_span = result[1]
+            .iter()
+            .find(|(_, s)| s == "code line")
+            .expect("code content span");
+        assert_eq!(code_span.0.fg, Some(t.code));
         assert!(
             result[2][0].1.contains("└──"),
             "bottom border: {:?}",
@@ -519,8 +523,9 @@ mod tests {
     }
 
     #[test]
-    fn pad_odd_center_left_biased() {
-        assert_eq!(pad("hi", 4, Alignment::Center), " hi ");
+    fn pad_center_right_biases_odd_remainder() {
+        // Odd total padding (3): left gets pad/2=1, right gets pad-pad/2=2.
+        assert_eq!(pad("h", 4, Alignment::Center), " h  ");
     }
 
     #[test]

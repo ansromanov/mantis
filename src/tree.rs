@@ -164,6 +164,7 @@ mod tests {
     #[test]
     fn dirs_before_files_alphabetical() {
         let root = dir_tree();
+        // Only root is expanded, so dir_a's children (c.txt) are not shown.
         let expanded = HashSet::from([root.clone()]);
         let nodes = build_visible(&root, &expanded, false, true, &HashSet::new());
         let names: Vec<&str> = nodes.iter().map(|n| n.name.as_str()).collect();
