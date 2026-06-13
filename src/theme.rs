@@ -21,6 +21,8 @@ pub struct Theme {
     pub code: Color,         // inline code / code blocks
     pub diff_add: Color,     // added lines in a diff
     pub diff_del: Color,     // removed lines in a diff
+    pub git_clean: Color,    // clean working-tree indicator
+    pub git_dirty: Color,    // dirty working-tree indicator
     pub syntax: String,      // syntect theme name for file contents
 }
 
@@ -42,6 +44,8 @@ impl Default for Theme {
             code: Color::LightYellow,
             diff_add: Color::Green,
             diff_del: Color::Red,
+            git_clean: Color::Green,
+            git_dirty: Color::Yellow,
             syntax: "base16-ocean.dark".to_string(),
         }
     }
@@ -77,6 +81,8 @@ impl Theme {
                 code: hex("#e6db74"),
                 diff_add: hex("#a6e22e"),
                 diff_del: hex("#f92672"),
+                git_clean: hex("#a6e22e"),
+                git_dirty: hex("#e6db74"),
                 syntax: "base16-eighties.dark".to_string(),
             },
             "solarized" => Theme {
@@ -95,6 +101,8 @@ impl Theme {
                 code: hex("#b58900"),
                 diff_add: hex("#859900"),
                 diff_del: hex("#dc322f"),
+                git_clean: hex("#859900"),
+                git_dirty: hex("#b58900"),
                 syntax: "Solarized (dark)".to_string(),
             },
             "catppuccin" => Theme {
@@ -113,6 +121,8 @@ impl Theme {
                 code: hex("#f9e2af"),
                 diff_add: hex("#a6e3a1"),
                 diff_del: hex("#f38ba8"),
+                git_clean: hex("#a6e3a1"),
+                git_dirty: hex("#f9e2af"),
                 syntax: "base16-mocha.dark".to_string(),
             },
             "synthwave84" | "synthwave" => Theme {
@@ -131,6 +141,8 @@ impl Theme {
                 code: hex("#fede5d"),
                 diff_add: hex("#72f1b8"),
                 diff_del: hex("#f92aad"),
+                git_clean: hex("#72f1b8"),
+                git_dirty: hex("#fede5d"),
                 syntax: "base16-eighties.dark".to_string(),
             },
             _ => return None,
@@ -169,6 +181,8 @@ pub struct ThemeConfig {
     code: Option<String>,
     diff_add: Option<String>,
     diff_del: Option<String>,
+    git_clean: Option<String>,
+    git_dirty: Option<String>,
     syntax: Option<String>,
 }
 
@@ -212,6 +226,8 @@ impl ThemeConfig {
             code: col(&self.code, d.code),
             diff_add: col(&self.diff_add, d.diff_add),
             diff_del: col(&self.diff_del, d.diff_del),
+            git_clean: col(&self.git_clean, d.git_clean),
+            git_dirty: col(&self.git_dirty, d.git_dirty),
             syntax: self.syntax.clone().unwrap_or(d.syntax),
         }
     }

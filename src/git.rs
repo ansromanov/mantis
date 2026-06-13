@@ -42,24 +42,168 @@ fn git_toplevel(dir: &Path) -> Option<PathBuf> {
     PathBuf::from(s).canonicalize().ok()
 }
 
-/// Returns the current git branch name for the repository containing `dir`,
-/// or `None` if not on a branch (detached HEAD) or not in a git repo.
-pub fn current_branch(dir: &Path) -> Option<String> {
+/// The current HEAD state of the repository.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GitHead {
+    Branch(String),
+    Detached,
+    Rebase,
+    Merge,
+}
+
+#[allow(clippy::derivable_impls)]
+impl Default for GitHead {
+    fn default() -> Self {
+        GitHead::Detached
+    }
+}
+
+impl GitHead {
+    pub fn display(&self) -> String {
+        match self {
+            GitHead::Branch(name) => name.clone(),
+            GitHead::Detached => "HEAD (detached)".to_string(),
+            GitHead::Rebase => "REBASE".to_string(),
+            GitHead::Merge => "MERGE".to_string(),
+        }
+    }
+}
+
+/// Rich git repository info: branch/HEAD state, ahead/behind counts, and
+/// dirty file counts.
+#[derive(Debug, Clone)]
+pub struct GitRepoInfo {
+    pub head: GitHead,
+    pub ahead: usize,
+    pub behind: usize,
+    /// Total non-ignored changed files.
+    pub total_changed: usize,
+    /// Files with staged changes.
+    pub staged: usize,
+    /// Untracked files.
+    pub untracked: usize,
+}
+
+impl GitRepoInfo {
+    pub fn is_dirty(&self) -> bool {
+        self.total_changed > 0
+    }
+}
+
+/// Returns rich git repository info for the directory containing `dir`, or
+/// `None` if not in a git repo or git is unavailable. Uses a single
+/// `git status --porcelain -b` call.
+pub fn repo_info(dir: &Path) -> Option<GitRepoInfo> {
+    let root = git_toplevel(dir)?;
+
     let out = Command::new("git")
         .arg("-C")
-        .arg(dir)
-        .args(["branch", "--show-current"])
+        .arg(&root)
+        .args(["status", "--porcelain", "-b"])
         .output()
         .ok()?;
     if !out.status.success() {
         return None;
     }
-    let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
-    if s.is_empty() {
-        None
-    } else {
-        Some(s)
+    let text = String::from_utf8_lossy(&out.stdout);
+    let mut info = parse_repo_info(&text);
+
+    // Refine HEAD state: check for rebase/merge by looking at git state files.
+    if info.head == GitHead::Detached {
+        let git_dir = root.join(".git");
+        if git_dir.join("rebase-merge").exists() || git_dir.join("rebase-apply").exists() {
+            info.head = GitHead::Rebase;
+        } else if git_dir.join("MERGE_HEAD").exists() {
+            info.head = GitHead::Merge;
+        }
     }
+
+    Some(info)
+}
+
+fn parse_branch_line(line: &str) -> (GitHead, usize, usize) {
+    let line = match line.strip_prefix("## ") {
+        Some(l) => l,
+        None => return (GitHead::default(), 0, 0),
+    };
+
+    let head = if line.starts_with("HEAD (no branch)") || line.starts_with("Initial commit on ") {
+        GitHead::Detached
+    } else {
+        let branch = if let Some(pos) = line.find("...") {
+            &line[..pos]
+        } else if let Some(pos) = line.find(" [") {
+            &line[..pos]
+        } else {
+            line
+        };
+        GitHead::Branch(branch.to_string())
+    };
+
+    let (ahead, behind) = if let Some(start) = line.find('[') {
+        let rest = &line[start + 1..];
+        if let Some(end) = rest.find(']') {
+            let inner = &rest[..end];
+            let mut a = 0usize;
+            let mut b = 0usize;
+            for part in inner.split(',') {
+                let p = part.trim();
+                if let Some(n) = p.strip_prefix("ahead ") {
+                    a = n.trim().parse().unwrap_or(0);
+                } else if let Some(n) = p.strip_prefix("behind ") {
+                    b = n.trim().parse().unwrap_or(0);
+                }
+            }
+            (a, b)
+        } else {
+            (0, 0)
+        }
+    } else {
+        (0, 0)
+    };
+
+    (head, ahead, behind)
+}
+
+fn parse_repo_info(text: &str) -> GitRepoInfo {
+    let mut lines = text.lines();
+
+    // First line is the branch header: "## ..."
+    let branch_line = lines.next().unwrap_or("");
+    let (head, ahead, behind) = parse_branch_line(branch_line);
+
+    let mut info = GitRepoInfo {
+        head,
+        ahead,
+        behind,
+        total_changed: 0,
+        staged: 0,
+        untracked: 0,
+    };
+
+    for line in lines {
+        if line.len() < 2 {
+            continue;
+        }
+        let bytes = line.as_bytes();
+        let x = bytes[0] as char;
+        let y = bytes[1] as char;
+
+        // Skip ignored files.
+        if x == '!' && y == '!' {
+            continue;
+        }
+
+        info.total_changed += 1;
+
+        if x == '?' && y == '?' {
+            info.untracked += 1;
+        } else if x != ' ' {
+            info.staged += 1;
+        }
+    }
+
+    info
 }
 
 /// Builds an absolute-path → status map for the repository containing `dir`.
