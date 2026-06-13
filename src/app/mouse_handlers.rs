@@ -46,16 +46,29 @@ impl App {
                     }
                 } else if rect_contains(self.content_area, ev.column, ev.row) {
                     self.focus = Focus::Content;
-                    let can_select = !self.is_diff;
-                    if can_select {
-                        let pos = self.content_pos(ev.column, ev.row);
-                        self.drag_start = Some(pos);
-                        self.selection = None;
+                    let on_scrollbar = self.show_scrollbar
+                        && self.content_line_count() > self.content_area.height as usize
+                        && ev.column
+                            == self.content_area.x + self.content_area.width.saturating_sub(1);
+                    if on_scrollbar {
+                        self.scrollbar_drag = true;
+                        self.set_scroll_from_mouse_y(ev.row);
+                        self.mark_content_scrolled();
+                    } else {
+                        let can_select = !self.is_diff;
+                        if can_select {
+                            let pos = self.content_pos(ev.column, ev.row);
+                            self.drag_start = Some(pos);
+                            self.selection = None;
+                        }
                     }
                 }
             }
             MouseEventKind::Drag(MouseButton::Left) => {
-                if let Some(start) = self.drag_start {
+                if self.scrollbar_drag {
+                    self.set_scroll_from_mouse_y(ev.row);
+                    self.mark_content_scrolled();
+                } else if let Some(start) = self.drag_start {
                     // Auto-scroll before computing position so that selection.active
                     // is calculated with the already-updated scroll offset.
                     let ca = self.content_area;
@@ -73,6 +86,7 @@ impl App {
                 }
             }
             MouseEventKind::Up(MouseButton::Left) => {
+                self.scrollbar_drag = false;
                 if self.drag_start.is_some() {
                     if let Some(sel) = &self.selection {
                         if !sel.is_empty() {
@@ -301,5 +315,23 @@ impl App {
             }
             _ => {}
         }
+    }
+
+    /// Maps a mouse row to a content scroll position, used for scrollbar dragging.
+    fn set_scroll_from_mouse_y(&mut self, row: u16) {
+        let total = self.content_line_count();
+        let inner_h = self.content_area.height as usize;
+        if total <= inner_h || inner_h == 0 {
+            return;
+        }
+        let thumb_size = (inner_h * inner_h / total).max(1);
+        let scroll_range = total - inner_h;
+        let track_range = inner_h.saturating_sub(thumb_size);
+        if track_range == 0 {
+            return;
+        }
+        let y = (row as usize).saturating_sub(self.content_area.y as usize);
+        let y = y.min(track_range);
+        self.content_scroll = (y * scroll_range / track_range).min(scroll_range);
     }
 }

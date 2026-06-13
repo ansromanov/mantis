@@ -99,6 +99,8 @@ if [ -z "$INSTALL_DIR" ]; then
   warn "installing to ${INSTALL_DIR} (not on PATH; set TV_INSTALL_DIR to override)"
 fi
 
+
+
 # --- download + verify ----------------------------------------------------
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
