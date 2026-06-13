@@ -49,9 +49,12 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
 
     let in_file_search = app.in_file_search.as_ref();
 
-    let lines: Vec<Line> = if app.is_diff {
-        // Diff view: styled spans, no line-number gutter, no selection.
-        app.highlighted
+    // ln_width: number of columns for the fixed line-number gutter (0 = no gutter).
+    // ln_lines: one Line per row containing only the line-number span.
+    // content_lines: one Line per row containing only the text/code spans.
+    let (ln_width, ln_lines, content_lines): (usize, Vec<Line>, Vec<Line>) = if app.is_diff {
+        let lines = app
+            .highlighted
             .iter()
             .enumerate()
             .map(|(i, spans)| {
@@ -66,9 +69,11 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                         .collect()
                 })
             })
-            .collect()
+            .collect();
+        (0, vec![], lines)
     } else if app.is_markdown && !app.show_raw_markdown {
-        app.markdown_lines
+        let lines = app
+            .markdown_lines
             .iter()
             .enumerate()
             .map(|(i, spans)| {
@@ -98,47 +103,50 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                     )
                 }
             })
-            .collect()
+            .collect();
+        (0, vec![], lines)
     } else {
-        let ln_width = app.content.len().to_string().len().max(1);
+        let lw = app.content.len().to_string().len().max(1);
         let ln_style = Style::default().fg(app.theme.dim);
-        if !app.highlighted.is_empty() {
+        let num_lines = if !app.highlighted.is_empty() {
+            app.highlighted.len()
+        } else {
+            app.content.len()
+        };
+        let gutters: Vec<Line> = (0..num_lines)
+            .map(|i| {
+                Line::from(Span::styled(
+                    format!("{:>width$} ", i + 1, width = lw),
+                    ln_style,
+                ))
+            })
+            .collect();
+        let content: Vec<Line> = if !app.highlighted.is_empty() {
             app.highlighted
                 .iter()
                 .enumerate()
                 .map(|(i, regions)| {
-                    let mut spans = vec![Span::styled(
-                        format!("{:>width$} ", i + 1, width = ln_width),
-                        ln_style,
-                    )];
                     let regions_owned: Vec<(Style, String)> =
                         regions.iter().map(|(s, t)| (*s, t.clone())).collect();
-                    if let Some(s) = in_file_search {
-                        spans.extend(apply_search_to_regions(&regions_owned, i, s, &app.theme));
+                    let spans: Vec<Span> = if let Some(s) = in_file_search {
+                        apply_search_to_regions(&regions_owned, i, s, &app.theme)
                     } else if let Some(((sl, sc), (el, ec))) = sel {
                         if i >= sl && i <= el {
                             let col_start = if i == sl { sc } else { 0 };
                             let col_end = if i == el { ec } else { usize::MAX };
-                            spans.extend(apply_selection(
-                                &regions_owned,
-                                col_start,
-                                col_end,
-                                sel_bg,
-                            ));
+                            apply_selection(&regions_owned, col_start, col_end, sel_bg)
                         } else {
-                            spans.extend(
-                                regions_owned
-                                    .iter()
-                                    .map(|(s, t)| Span::styled(t.clone(), *s)),
-                            );
-                        }
-                    } else {
-                        spans.extend(
                             regions_owned
                                 .iter()
-                                .map(|(s, t)| Span::styled(t.clone(), *s)),
-                        );
-                    }
+                                .map(|(s, t)| Span::styled(t.clone(), *s))
+                                .collect()
+                        }
+                    } else {
+                        regions_owned
+                            .iter()
+                            .map(|(s, t)| Span::styled(t.clone(), *s))
+                            .collect()
+                    };
                     Line::from(spans)
                 })
                 .collect()
@@ -147,43 +155,66 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                 .iter()
                 .enumerate()
                 .map(|(i, text)| {
-                    let mut spans = vec![Span::styled(
-                        format!("{:>width$} ", i + 1, width = ln_width),
-                        ln_style,
-                    )];
                     let region = vec![(Style::default(), text.clone())];
-                    if let Some(s) = in_file_search {
-                        spans.extend(apply_search_to_regions(&region, i, s, &app.theme));
+                    let spans: Vec<Span> = if let Some(s) = in_file_search {
+                        apply_search_to_regions(&region, i, s, &app.theme)
                     } else if let Some(((sl, sc), (el, ec))) = sel {
                         if i >= sl && i <= el {
                             let col_start = if i == sl { sc } else { 0 };
                             let col_end = if i == el { ec } else { usize::MAX };
-                            spans.extend(apply_selection(&region, col_start, col_end, sel_bg));
+                            apply_selection(&region, col_start, col_end, sel_bg)
                         } else {
-                            spans.push(Span::raw(text.clone()));
+                            vec![Span::raw(text.clone())]
                         }
                     } else {
-                        spans.push(Span::raw(text.clone()));
-                    }
+                        vec![Span::raw(text.clone())]
+                    };
                     Line::from(spans)
                 })
                 .collect()
-        }
+        };
+        // +1 for the trailing space after the digits
+        (lw + 1, gutters, content)
     };
+
+    let inner = block.inner(area);
+    f.render_widget(block, area);
 
     let hscroll = if app.word_wrap {
         0
     } else {
         app.content_hscroll as u16
     };
-    let mut para = Paragraph::new(lines)
-        .block(block)
-        .scroll((app.content_scroll as u16, hscroll));
+
+    // Fixed gutter: line numbers scroll vertically but never horizontally.
+    if ln_width > 0 {
+        f.render_widget(
+            Paragraph::new(ln_lines).scroll((app.content_scroll as u16, 0)),
+            Rect {
+                x: inner.x,
+                y: inner.y,
+                width: ln_width as u16,
+                height: inner.height,
+            },
+        );
+    }
+
+    // Scrollable content area, offset to the right of the gutter.
+    let cx = inner.x + ln_width as u16;
+    let cw = inner.width.saturating_sub(ln_width as u16);
+    let mut para = Paragraph::new(content_lines).scroll((app.content_scroll as u16, hscroll));
     if app.word_wrap {
         para = para.wrap(Wrap { trim: false });
     }
-
-    f.render_widget(para, area);
+    f.render_widget(
+        para,
+        Rect {
+            x: cx,
+            y: inner.y,
+            width: cw,
+            height: inner.height,
+        },
+    );
 
     let inner_x = area.x + 1;
     let inner_y = area.y + 1;
