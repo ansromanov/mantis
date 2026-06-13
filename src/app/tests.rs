@@ -88,6 +88,27 @@ fn open_and_reveal_selects_file_in_tree() {
 }
 
 #[test]
+fn failed_open_clears_stale_current_file() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+
+    // Open a real file so current_file and the watcher are populated.
+    let good = root.join("a.txt");
+    app.open_file(&good);
+    assert_eq!(app.current_file.as_deref(), Some(good.as_path()));
+    assert!(app.file_watch_path.is_some());
+
+    // Opening a missing file fails the read: current_file and the watcher must
+    // be cleared rather than left pointing at the previously opened file.
+    let missing = root.join("does-not-exist.txt");
+    app.open_file(&missing);
+    assert_eq!(app.current_file, None);
+    assert!(app.file_watch_path.is_none());
+    assert!(app.content.iter().any(|l| l.starts_with("[error:")));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn file_history_noop_without_git_history() {
     let root = temp_tree(); // not a git repo
     let mut app = app_for(&root);
