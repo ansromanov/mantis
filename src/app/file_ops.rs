@@ -165,11 +165,20 @@ impl App {
         let bytes = match std::fs::read(path) {
             Ok(b) => b,
             Err(e) => {
+                // The read failed, so no file is open: clear any previously
+                // opened file and its watcher rather than leaving stale state
+                // (the title would otherwise show the old file over this error).
+                self.current_file = None;
+                self.set_file_watch(None);
                 self.content = vec![format!("[error: {}]", e)];
                 self.highlighted = Vec::new();
                 return;
             }
         };
+        // The read succeeded, so this path is now the open file. Set it (and the
+        // watcher) before classifying the bytes so every success path agrees.
+        self.current_file = Some(path.to_path_buf());
+        self.set_file_watch(Some(path));
         if is_binary_bytes(&bytes) {
             self.content = vec!["[binary file]".into()];
             self.highlighted = Vec::new();
@@ -184,7 +193,6 @@ impl App {
             }
         };
         self.content = s.lines().map(|l| l.to_owned()).collect();
-        self.current_file = Some(path.to_path_buf());
         if self.content.is_empty() {
             self.content = vec!["[empty file]".into()];
             self.highlighted = Vec::new();
@@ -194,7 +202,6 @@ impl App {
                 self.markdown_lines = markdown::render(&s, &self.theme);
             }
         }
-        self.set_file_watch(Some(path));
     }
 
     /// Opens the git history of the currently displayed file as a picker.
