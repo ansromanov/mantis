@@ -42,6 +42,26 @@ fn git_toplevel(dir: &Path) -> Option<PathBuf> {
     PathBuf::from(s).canonicalize().ok()
 }
 
+/// Returns the current git branch name for the repository containing `dir`,
+/// or `None` if not on a branch (detached HEAD) or not in a git repo.
+pub fn current_branch(dir: &Path) -> Option<String> {
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(["branch", "--show-current"])
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    if s.is_empty() {
+        None
+    } else {
+        Some(s)
+    }
+}
+
 /// Builds an absolute-path → status map for the repository containing `dir`.
 /// Parent directories are included with their highest-priority child status so
 /// collapsed dirs can be colored when they contain changes.
