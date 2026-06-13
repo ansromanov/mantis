@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::git::GitStatus;
 use crate::search::SearchMode;
@@ -181,6 +181,27 @@ impl App {
                 let p = node.path.clone();
                 self.open_file(&p);
             }
+        }
+    }
+
+    /// Expands all ancestor directories of `path` and selects the file in the
+    /// tree so it becomes visible. Used by `open_and_reveal` and search results.
+    pub(super) fn reveal_in_tree(&mut self, path: &Path) {
+        let mut current = path.parent();
+        while let Some(dir) = current {
+            if dir == self.root {
+                break;
+            }
+            if dir.starts_with(&self.root) {
+                self.expanded.insert(dir.to_path_buf());
+            } else {
+                break;
+            }
+            current = dir.parent();
+        }
+        self.rebuild();
+        if let Some(i) = self.nodes.iter().position(|n| n.path == path) {
+            self.tree_selected = i;
         }
     }
 
