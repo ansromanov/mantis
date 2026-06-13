@@ -1,5 +1,7 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 
@@ -26,6 +28,9 @@ pub struct SearchState {
     pub content_results: Vec<ContentMatch>,
     pub selected: usize,
     matcher: SkimMatcherV2,
+    content_cache: HashMap<PathBuf, String>,
+    content_cache_dirty: bool,
+    pending_refresh: Option<Instant>,
 }
 
 impl SearchState {
@@ -40,17 +45,30 @@ impl SearchState {
             content_results: Vec::new(),
             selected: 0,
             matcher: SkimMatcherV2::default(),
+            content_cache: HashMap::new(),
+            content_cache_dirty: true,
+            pending_refresh: None,
         }
     }
 
     pub fn push(&mut self, c: char) {
         self.query.push(c);
-        self.refresh();
+        match self.mode {
+            SearchMode::Files => self.refresh(),
+            SearchMode::Content => {
+                self.pending_refresh = Some(Instant::now());
+            }
+        }
     }
 
     pub fn pop(&mut self) {
         self.query.pop();
-        self.refresh();
+        match self.mode {
+            SearchMode::Files => self.refresh(),
+            SearchMode::Content => {
+                self.pending_refresh = Some(Instant::now());
+            }
+        }
     }
 
     pub fn toggle_mode(&mut self) {
@@ -59,6 +77,7 @@ impl SearchState {
             SearchMode::Content => SearchMode::Files,
         };
         self.selected = 0;
+        self.pending_refresh = None;
         self.refresh();
     }
 
@@ -79,6 +98,27 @@ impl SearchState {
 
     pub fn reload_files(&mut self, root: &Path, show_hidden: bool, ignore_gitignore: bool) {
         self.all_files = collect_all_files(root, show_hidden, ignore_gitignore);
+        self.content_cache.clear();
+        self.content_cache_dirty = true;
+        self.pending_refresh = None;
+        self.refresh();
+    }
+
+    /// If a debounced content refresh is pending and 100ms have elapsed since
+    /// the last keystroke, run it now. Called from every frame tick.
+    pub fn maybe_refresh(&mut self) {
+        if let Some(t) = self.pending_refresh {
+            if t.elapsed() >= std::time::Duration::from_millis(100) {
+                self.pending_refresh = None;
+                self.refresh();
+            }
+        }
+    }
+
+    /// Force an immediate refresh, bypassing any debounce.
+    #[cfg(test)]
+    pub fn refresh_now(&mut self) {
+        self.pending_refresh = None;
         self.refresh();
     }
 
@@ -105,16 +145,24 @@ impl SearchState {
         if self.query.len() < 2 {
             return;
         }
+        // Build cache from disk if dirty (first call or after tree reload).
+        if self.content_cache_dirty {
+            self.content_cache.clear();
+            for path in &self.all_files {
+                let Ok(bytes) = fs::read(path) else { continue };
+                if is_binary_bytes(&bytes) {
+                    continue;
+                }
+                let Ok(text) = String::from_utf8(bytes) else {
+                    continue;
+                };
+                self.content_cache.insert(path.clone(), text);
+            }
+            self.content_cache_dirty = false;
+        }
         let q = self.query.to_lowercase();
         for path in &self.all_files {
-            let Ok(bytes) = fs::read(path) else {
-                continue;
-            };
-            // Skip binary blobs rather than scanning them line by line.
-            if is_binary_bytes(&bytes) {
-                continue;
-            }
-            let Ok(text) = String::from_utf8(bytes) else {
+            let Some(text) = self.content_cache.get(path) else {
                 continue;
             };
             for (i, line) in text.lines().enumerate() {
@@ -595,6 +643,7 @@ mod tests {
         s.push('h');
         assert_eq!(s.results_len(), 0);
         s.push('e');
+        s.refresh_now(); // bypass debounce in test
         assert_eq!(s.results_len(), 1);
         fs::remove_dir_all(&root).ok();
     }

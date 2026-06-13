@@ -231,6 +231,9 @@ impl App {
         if self.drain_file_watch() {
             self.reload_content();
         }
+        if let Some(ref mut s) = self.search {
+            s.maybe_refresh();
+        }
         if self.last_refresh.elapsed().as_secs() >= 30 {
             self.reload();
         }
