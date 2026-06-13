@@ -3,6 +3,12 @@ name: Bump Version
 on:
   push:
     branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'tv.toml'
   workflow_dispatch:
 
 jobs:

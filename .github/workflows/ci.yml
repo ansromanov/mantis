@@ -15,23 +15,48 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect code changes
+        id: changes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            changed=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files \
+              --paginate --jq '.[].filename')
+          else
+            changed=$(git diff --name-only HEAD~1 HEAD)
+          fi
+          if echo "$changed" | grep -qE '^(src/|tests/|Cargo\.(toml|lock)|tv\.toml)'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Install Rust toolchain
+        if: steps.changes.outputs.code == 'true'
         uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
 
       - name: Cache cargo
+        if: steps.changes.outputs.code == 'true'
         uses: Swatinem/rust-cache@v2
 
       - name: Format
+        if: steps.changes.outputs.code == 'true'
         run: cargo fmt --all -- --check
 
       - name: Clippy
+        if: steps.changes.outputs.code == 'true'
         run: cargo clippy --all-targets -- -D warnings
 
       - name: Test
+        if: steps.changes.outputs.code == 'true'
         run: cargo test --all
 
       - name: Build (release)
+        if: steps.changes.outputs.code == 'true'
         run: cargo build --release
