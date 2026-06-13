@@ -72,7 +72,7 @@ jobs:
       - name: Generate changelog
         id: changelog
         run: |
-          prev_tag=$(git tag --sort=-version:refname | grep '^v' | head -1)
+          prev_tag=$(git tag --sort=-version:refname | grep '^v' | head -1 || true)
           if [ -z "$prev_tag" ]; then
             log=$(git log --pretty=format:"- %s")
           else
