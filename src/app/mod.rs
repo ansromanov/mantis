@@ -66,6 +66,7 @@ pub struct App {
     pub git_mode_flat: bool,
     pub show_scrollbar: bool,
     pub show_scroll_percentage: bool,
+    pub walk_errors: usize,
     keys: Keymap,
     config: Config,
     config_path: Option<std::path::PathBuf>,
@@ -117,7 +118,7 @@ impl App {
             None
         };
         let deleted = deleted_set(&git_status_map, git_show_deleted);
-        let nodes = build_visible(
+        let (nodes, walk_errors) = build_visible(
             &root,
             &expanded,
             cfg.show_hidden,
@@ -162,6 +163,7 @@ impl App {
             git_mode_flat: cfg.git_mode_flat,
             show_scrollbar: cfg.scrollbar,
             show_scroll_percentage: cfg.scroll_percentage,
+            walk_errors,
             keys: cfg.keys,
             config: saved_config,
             config_path,

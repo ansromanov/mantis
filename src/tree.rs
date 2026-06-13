@@ -18,14 +18,16 @@ pub struct TreeNode {
 /// Recursively walks `root` using `ignore::WalkBuilder`, returning a flat
 /// `Vec<TreeNode>` of files and directories. Only directories in `expanded`
 /// are descended into. `deleted_files` are appended as ghost nodes.
+/// The second element counts walk errors (permission-denied, broken symlinks, etc.).
 pub fn build_visible(
     root: &Path,
     expanded: &HashSet<PathBuf>,
     show_hidden: bool,
     ignore_gitignore: bool,
     deleted_files: &HashSet<PathBuf>,
-) -> Vec<TreeNode> {
+) -> (Vec<TreeNode>, usize) {
     let mut nodes = Vec::new();
+    let mut error_count = 0usize;
     collect(
         root,
         0,
@@ -34,13 +36,15 @@ pub fn build_visible(
         ignore_gitignore,
         deleted_files,
         &mut nodes,
+        &mut error_count,
     );
-    nodes
+    (nodes, error_count)
 }
 
 /// Recursive helper for `build_visible`. Lists a single directory's entries
 /// (depth 1 via `WalkBuilder`), sorts dirs before files, and recurses into
 /// expanded directories.
+#[allow(clippy::too_many_arguments)]
 fn collect(
     dir: &Path,
     depth: usize,
@@ -49,17 +53,23 @@ fn collect(
     ignore_gitignore: bool,
     deleted_files: &HashSet<PathBuf>,
     out: &mut Vec<TreeNode>,
+    error_count: &mut usize,
 ) {
-    let mut entries: Vec<_> = WalkBuilder::new(dir)
+    let mut entries = Vec::new();
+    for result in WalkBuilder::new(dir)
         .max_depth(Some(1))
         .hidden(!show_hidden)
         .git_ignore(!ignore_gitignore)
         .git_global(!ignore_gitignore)
         .git_exclude(!ignore_gitignore)
         .build()
-        .filter_map(|e| e.ok())
-        .filter(|e| e.depth() == 1)
-        .collect();
+    {
+        match result {
+            Ok(e) if e.depth() == 1 => entries.push(e),
+            Ok(_) => {}
+            Err(_) => *error_count += 1,
+        }
+    }
 
     entries.sort_by(|a, b| {
         let ad = a.file_type().map(|t| t.is_dir()).unwrap_or(false);
@@ -92,6 +102,7 @@ fn collect(
                 ignore_gitignore,
                 deleted_files,
                 out,
+                error_count,
             );
         }
     }
@@ -166,7 +177,7 @@ mod tests {
         let root = dir_tree();
         // Only root is expanded, so dir_a's children (c.txt) are not shown.
         let expanded = HashSet::from([root.clone()]);
-        let nodes = build_visible(&root, &expanded, false, true, &HashSet::new());
+        let (nodes, _) = build_visible(&root, &expanded, false, true, &HashSet::new());
         let names: Vec<&str> = nodes.iter().map(|n| n.name.as_str()).collect();
         assert_eq!(names, vec!["dir_a", "dir_b", "a.txt", "b.txt"]);
         fs::remove_dir_all(&root).ok();
@@ -176,7 +187,7 @@ mod tests {
     fn collapsed_dir_hides_children() {
         let root = dir_tree();
         let expanded = HashSet::new();
-        let nodes = build_visible(&root, &expanded, false, true, &HashSet::new());
+        let (nodes, _) = build_visible(&root, &expanded, false, true, &HashSet::new());
         // Root-level entries (dirs + files) all appear at depth 0;
         // nothing is recursed into because expanded is empty.
         assert!(nodes.iter().all(|n| n.depth == 0));
@@ -188,7 +199,7 @@ mod tests {
     fn expanded_dir_shows_children_at_depth_1() {
         let root = dir_tree();
         let expanded = HashSet::from([root.clone(), root.join("dir_a")]);
-        let nodes = build_visible(&root, &expanded, false, true, &HashSet::new());
+        let (nodes, _) = build_visible(&root, &expanded, false, true, &HashSet::new());
         let c = nodes.iter().find(|n| n.name == "c.txt").unwrap();
         assert_eq!(c.depth, 1);
         fs::remove_dir_all(&root).ok();
@@ -198,7 +209,7 @@ mod tests {
     fn show_hidden_reveals_dotfiles() {
         let root = dir_tree();
         let expanded = HashSet::from([root.clone()]);
-        let nodes = build_visible(&root, &expanded, true, true, &HashSet::new());
+        let (nodes, _) = build_visible(&root, &expanded, true, true, &HashSet::new());
         let names: Vec<&str> = nodes.iter().map(|n| n.name.as_str()).collect();
         assert!(names.contains(&".hidden_file"));
         assert!(names.contains(&".hidden_dir"));
@@ -209,7 +220,7 @@ mod tests {
     fn hide_hidden_omits_dotfiles() {
         let root = dir_tree();
         let expanded = HashSet::from([root.clone()]);
-        let nodes = build_visible(&root, &expanded, false, true, &HashSet::new());
+        let (nodes, _) = build_visible(&root, &expanded, false, true, &HashSet::new());
         let names: Vec<&str> = nodes.iter().map(|n| n.name.as_str()).collect();
         assert!(!names.contains(&".hidden_file"));
         assert!(!names.contains(&".hidden_dir"));
@@ -221,7 +232,7 @@ mod tests {
         let root = dir_tree();
         let expanded = HashSet::from([root.clone(), root.join("dir_a")]);
         let deleted = HashSet::from([root.join("gone.txt"), root.join("dir_a").join("missing.rs")]);
-        let nodes = build_visible(&root, &expanded, false, true, &deleted);
+        let (nodes, _) = build_visible(&root, &expanded, false, true, &deleted);
 
         let gone = nodes.iter().find(|n| n.name == "gone.txt").unwrap();
         assert!(gone.deleted);
@@ -266,7 +277,7 @@ mod tests {
     #[test]
     fn empty_directory_yields_no_nodes() {
         let root = temp_dir("empty");
-        let nodes = build_visible(&root, &HashSet::new(), false, true, &HashSet::new());
+        let (nodes, _) = build_visible(&root, &HashSet::new(), false, true, &HashSet::new());
         assert!(nodes.is_empty());
         let files = collect_all_files(&root, false, true);
         assert!(files.is_empty());
@@ -293,12 +304,12 @@ mod tests {
         let expanded = HashSet::from([root.clone()]);
 
         // ignore_gitignore = false → use gitignore → ignored.log hidden.
-        let nodes = build_visible(&root, &expanded, false, false, &HashSet::new());
+        let (nodes, _) = build_visible(&root, &expanded, false, false, &HashSet::new());
         let names: Vec<&str> = nodes.iter().map(|n| n.name.as_str()).collect();
         assert!(!names.contains(&"ignored.log"));
 
         // ignore_gitignore = true → ignore gitignore → ignored.log visible.
-        let nodes = build_visible(&root, &expanded, false, true, &HashSet::new());
+        let (nodes, _) = build_visible(&root, &expanded, false, true, &HashSet::new());
         let names: Vec<&str> = nodes.iter().map(|n| n.name.as_str()).collect();
         assert!(names.contains(&"ignored.log"));
         fs::remove_dir_all(&root).ok();
