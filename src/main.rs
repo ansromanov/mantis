@@ -50,8 +50,8 @@ fn main() -> anyhow::Result<()> {
     let mut terminal = Terminal::new(backend)?;
     terminal.hide_cursor()?;
 
-    let (cfg, cfg_path) = config::load(&root);
-    let mut app = app::App::new(root, cfg, cfg_path)?;
+    let (cfg, cfg_path, cfg_error) = config::load(&root);
+    let mut app = app::App::new(root, cfg, cfg_path, cfg_error)?;
     if let Some(file) = file {
         app.open_and_reveal(&file);
     }
@@ -81,6 +81,12 @@ fn main() -> anyhow::Result<()> {
         DisableMouseCapture
     )?;
     terminal.show_cursor()?;
+
+    // Surface a malformed config now that the alternate screen is gone, so the
+    // warning lands on the user's normal terminal instead of being painted over.
+    if let Some(err) = &app.config_error {
+        eprintln!("tv: ignoring invalid config: {err}");
+    }
 
     Ok(())
 }

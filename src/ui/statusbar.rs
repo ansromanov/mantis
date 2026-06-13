@@ -62,6 +62,12 @@ pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
         String::new()
     };
 
+    let config_err_indicator = if app.config_error.is_some() {
+        " [config error]"
+    } else {
+        ""
+    };
+
     let text: String = if app.theme_picker.is_some() {
         " ↑↓ navigate  type to filter  Enter apply theme  Esc cancel".into()
     } else if app.history.is_some() {
@@ -76,9 +82,9 @@ pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
         let scroll_max = app.content_scroll_max();
         if app.show_scroll_percentage && app.current_file.is_some() && scroll_max > 0 {
             let pct = (app.content_scroll * 100 / scroll_max).min(100);
-            format!("{base}  {pct}%{git_info}{walk_err_indicator}")
+            format!("{base}  {pct}%{git_info}{walk_err_indicator}{config_err_indicator}")
         } else {
-            format!("{base}{git_info}{walk_err_indicator}")
+            format!("{base}{git_info}{walk_err_indicator}{config_err_indicator}")
         }
     };
 

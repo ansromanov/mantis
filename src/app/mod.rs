@@ -67,6 +67,8 @@ pub struct App {
     pub show_scrollbar: bool,
     pub show_scroll_percentage: bool,
     pub walk_errors: usize,
+    /// Warning describing a malformed config that was ignored at startup, if any.
+    pub config_error: Option<String>,
     keys: Keymap,
     config: Config,
     config_path: Option<std::path::PathBuf>,
@@ -102,6 +104,7 @@ impl App {
         root: PathBuf,
         cfg: Config,
         config_path: Option<std::path::PathBuf>,
+        config_error: Option<String>,
     ) -> anyhow::Result<Self> {
         let expanded = HashSet::new();
         // git_mode requires status data even if git_status is disabled in config.
@@ -164,6 +167,7 @@ impl App {
             show_scrollbar: cfg.scrollbar,
             show_scroll_percentage: cfg.scroll_percentage,
             walk_errors,
+            config_error,
             keys: cfg.keys,
             config: saved_config,
             config_path,

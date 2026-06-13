@@ -230,23 +230,33 @@ impl Serialize for KeyBinding {
 /// Loads config for the given view root. A project-local `tv.toml` found in
 /// the root or any ancestor takes precedence over the global config; this lets
 /// a repo ship its own defaults. Creates the global config with defaults if it
-/// doesn't exist yet. Returns the loaded config and the path it was loaded from
-/// so that live changes are saved back to the same file.
-pub fn load(root: &Path) -> (Config, Option<PathBuf>) {
+/// doesn't exist yet. Returns the loaded config, the path it was loaded from
+/// (so that live changes are saved back to the same file), and a warning
+/// describing the first malformed config encountered, if any, so the caller can
+/// tell the user their config was ignored instead of failing silently.
+pub fn load(root: &Path) -> (Config, Option<PathBuf>, Option<String>) {
     let global = global_config_path();
     if let Some(ref path) = global {
         if !path.exists() {
             install_default(path);
         }
     }
+    let mut error = None;
     for path in config_paths(root) {
-        if let Ok(s) = fs::read_to_string(&path) {
-            if let Ok(config) = toml::from_str::<Config>(&s) {
-                return (config, Some(path));
+        let Ok(s) = fs::read_to_string(&path) else {
+            continue; // missing or unreadable: try the next candidate
+        };
+        match toml::from_str::<Config>(&s) {
+            Ok(config) => return (config, Some(path), error),
+            // Record the first malformed config but keep falling back so a valid
+            // lower-precedence file (e.g. the global config) can still load.
+            Err(e) if error.is_none() => {
+                error = Some(format!("{}: {e}", path.display()));
             }
+            Err(_) => {}
         }
     }
-    (Config::default(), global)
+    (Config::default(), global, error)
 }
 
 /// Writes `config` to `path`, silently ignoring errors.
@@ -384,6 +394,29 @@ mod tests {
             &binds,
             &ev(KeyCode::Char('j'), KeyModifiers::empty())
         ));
+    }
+
+    #[test]
+    fn malformed_local_config_reports_warning_and_falls_back() {
+        let dir = std::env::temp_dir().join(format!(
+            "tv_cfg_bad_{}_{:?}",
+            std::process::id(),
+            std::time::SystemTime::now()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        // `tree_width` expects an integer; a string makes parsing fail.
+        fs::write(dir.join("tv.toml"), "tree_width = \"oops\"\n").unwrap();
+
+        let (_config, _path, error) = load(&dir);
+        // The malformed file is ignored (the loader falls back to a valid
+        // lower-precedence config or defaults) but the warning is still surfaced.
+        let msg = error.expect("malformed config should produce a warning");
+        assert!(
+            msg.contains("tv.toml"),
+            "warning should name the file: {msg}"
+        );
+
+        fs::remove_dir_all(&dir).ok();
     }
 
     #[test]
