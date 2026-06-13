@@ -20,27 +20,32 @@ impl App {
         }
         if let Some(path) = self.current_file.clone() {
             if self.git_mode {
-                let scroll = self.content_scroll;
-                let hscroll = self.content_hscroll;
-                self.show_working_tree_diff(&path);
-                self.content_scroll = scroll.min(self.content_line_count().saturating_sub(1));
-                self.content_hscroll = hscroll;
+                self.preserving_scroll(|s| s.show_working_tree_diff(&path));
             } else {
                 self.reopen_file(&path);
             }
         }
     }
 
+    /// Runs `f` (which replaces the content buffer) while preserving the
+    /// vertical and horizontal scroll position, clamping the vertical scroll to
+    /// the new line count so it never points past the end of the buffer.
+    fn preserving_scroll(&mut self, f: impl FnOnce(&mut Self)) {
+        let scroll = self.content_scroll;
+        let hscroll = self.content_hscroll;
+        f(self);
+        self.content_scroll = scroll.min(self.content_line_count().saturating_sub(1));
+        self.content_hscroll = hscroll;
+    }
+
     /// Re-opens `path` via `open_file` while preserving scroll position,
     /// horizontal scroll, and raw-markdown toggle.
     pub(super) fn reopen_file(&mut self, path: &std::path::Path) {
-        let scroll = self.content_scroll;
-        let hscroll = self.content_hscroll;
         let raw = self.show_raw_markdown;
-        self.open_file(path);
-        self.show_raw_markdown = raw;
-        self.content_scroll = scroll.min(self.content_line_count().saturating_sub(1));
-        self.content_hscroll = hscroll;
+        self.preserving_scroll(|s| {
+            s.open_file(path);
+            s.show_raw_markdown = raw;
+        });
     }
 
     /// Sets up a filesystem watcher on the parent directory of `path` so that
