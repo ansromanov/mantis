@@ -280,12 +280,51 @@ impl App {
     }
 
     /// Convert a terminal cell inside `content_area` to a `(buffer_line, buffer_col)` position.
+    ///
+    /// When word wrap is enabled a single logical line can span multiple visual
+    /// rows, so `rel_row` must be translated through the per-line row counts
+    /// rather than added directly to `content_scroll`.
     pub fn content_pos(&self, col: u16, row: u16) -> (usize, usize) {
         let ca = self.content_area;
         let rel_row = (row.saturating_sub(ca.y)) as usize;
         let rel_col = (col.saturating_sub(ca.x)) as usize;
-        let buf_line = self.content_scroll + rel_row;
         let prefix = self.line_prefix_width();
+
+        if self.word_wrap {
+            let raw_wrap = (ca.width as usize).saturating_sub(prefix);
+            // NonZeroUsize ensures div_ceil is safe without a manual `> 0` guard.
+            if let Some(wrap_nz) = std::num::NonZeroUsize::new(raw_wrap) {
+                let wrap_width = wrap_nz.get();
+                let is_md = self.is_markdown && !self.show_raw_markdown;
+                let total = if is_md {
+                    self.markdown_lines.len()
+                } else {
+                    self.content.len()
+                };
+                let mut visual_remaining = rel_row;
+                for logical_idx in self.content_scroll..total {
+                    let char_count: usize = if is_md {
+                        self.markdown_lines[logical_idx]
+                            .iter()
+                            .map(|(_, t)| t.chars().count())
+                            .sum()
+                    } else {
+                        self.content[logical_idx].chars().count()
+                    };
+                    // Empty lines still occupy one visual row.
+                    let visual_rows = char_count.div_ceil(wrap_width).max(1);
+                    if visual_remaining < visual_rows {
+                        let text_col = rel_col.saturating_sub(prefix);
+                        return (logical_idx, visual_remaining * wrap_width + text_col);
+                    }
+                    visual_remaining -= visual_rows;
+                }
+                // Mouse is below all content — clamp to last line.
+                return (total.saturating_sub(1), rel_col.saturating_sub(prefix));
+            }
+        }
+
+        let buf_line = self.content_scroll + rel_row;
         let buf_col = (rel_col + self.content_hscroll).saturating_sub(prefix);
         (buf_line, buf_col)
     }
