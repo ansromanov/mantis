@@ -1,5 +1,21 @@
 # Installation
 
+## Via cargo install
+
+If you have the Rust toolchain installed, the simplest way to install `tv` is:
+
+```sh
+cargo install tree-viewer
+```
+
+This compiles and places the `tv` binary in `~/.cargo/bin` (which should already be on your `PATH` after a standard `rustup` install).
+
+To install directly from the git repository without a crates.io release:
+
+```sh
+cargo install --git https://github.com/ansromanov/tree-viewer
+```
+
 ## From source (Rust toolchain required)
 
 ```sh

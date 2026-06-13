@@ -52,13 +52,13 @@ Press `?` at any time for in-app help, and `q` to quit.
 | --------- | ------------------------------- |
 | *(type)*  | Filter results                  |
 | `Up`/`Down` | Navigate results              |
-| `Tab`     | Switch files ↔ content mode     |
+| `Tab`     | Switch files / content mode     |
 | `Enter`   | Open selected result            |
 | `Esc`     | Close search                    |
 
 ## Mouse
 
-- **Click** a tree row to select it — opens a file, or folds/unfolds a
+- **Click** a tree row to select it - opens a file, or folds/unfolds a
   directory.
 - **Click** a pane to focus it.
 - **Scroll wheel** scrolls whichever pane is under the cursor.
