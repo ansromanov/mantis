@@ -1,4 +1,5 @@
 pub mod app;
+pub mod command_palette;
 pub mod config;
 pub mod file;
 pub mod git;

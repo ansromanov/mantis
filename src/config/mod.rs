@@ -42,12 +42,13 @@ impl Default for Config {
     }
 }
 
-/// A single key combination, e.g. `q`, `ctrl+c`, `alt+.`, `PageUp`.
+/// A single key combination, e.g. `q`, `ctrl+c`, `alt+.`, `cmd+p`, `PageUp`.
 #[derive(Clone, Copy)]
 pub struct KeyBinding {
     code: KeyCode,
     ctrl: bool,
     alt: bool,
+    super_key: bool,
 }
 
 impl KeyBinding {
@@ -57,12 +58,64 @@ impl KeyBinding {
         key.code == self.code
             && key.modifiers.contains(KeyModifiers::CONTROL) == self.ctrl
             && key.modifiers.contains(KeyModifiers::ALT) == self.alt
+            && key.modifiers.contains(KeyModifiers::SUPER) == self.super_key
+    }
+
+    /// Returns a human-readable label for this binding, e.g. `"Ctrl+P"`, `"Alt+."`.
+    pub fn display(&self) -> String {
+        let key = match self.code {
+            KeyCode::Char(' ') => "Space".to_string(),
+            KeyCode::Char(c) => c.to_string(),
+            KeyCode::Up => "Up".to_string(),
+            KeyCode::Down => "Down".to_string(),
+            KeyCode::Left => "Left".to_string(),
+            KeyCode::Right => "Right".to_string(),
+            KeyCode::Enter => "Enter".to_string(),
+            KeyCode::Tab => "Tab".to_string(),
+            KeyCode::Esc => "Esc".to_string(),
+            KeyCode::Backspace => "Backspace".to_string(),
+            KeyCode::PageUp => "PageUp".to_string(),
+            KeyCode::PageDown => "PageDown".to_string(),
+            KeyCode::Home => "Home".to_string(),
+            KeyCode::End => "End".to_string(),
+            ref other => format!("{other:?}"),
+        };
+        match (self.ctrl, self.alt, self.super_key) {
+            (true, true, false) => format!("Ctrl+Alt+{key}"),
+            (true, false, false) => format!("Ctrl+{key}"),
+            (false, true, false) => format!("Alt+{key}"),
+            (false, false, true) => format!("Cmd+{key}"),
+            (true, false, true) => format!("Ctrl+Cmd+{key}"),
+            _ => key,
+        }
     }
 }
 
 /// Returns true if any binding in the list matches the key event.
 pub fn pressed(bindings: &[KeyBinding], key: &KeyEvent) -> bool {
     bindings.iter().any(|b| b.matches(key))
+}
+
+impl Keymap {
+    /// Returns a display label for the first binding mapped to `action_id`,
+    /// e.g. `"Ctrl+G"` for `toggle_git_mode`.
+    pub fn label_for_action(&self, action_id: &str) -> String {
+        let bindings: &[KeyBinding] = match action_id {
+            "toggle_help" => &self.help,
+            "toggle_hidden" => &self.toggle_hidden,
+            "open_file_search" => &self.search_files,
+            "open_content_search" => &self.search_content,
+            "reload" => &self.reload,
+            "open_file_history" => &self.file_history,
+            "open_theme_picker" => &self.theme_picker,
+            "toggle_git_mode" => &self.git_mode_toggle,
+            "toggle_git_flat" => &self.git_mode_flat_toggle,
+            "toggle_word_wrap" => &self.toggle_wrap,
+            "toggle_raw_markdown" => &self.toggle_raw_markdown,
+            _ => return String::new(),
+        };
+        bindings.first().map(|b| b.display()).unwrap_or_default()
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -96,6 +149,7 @@ pub struct Keymap {
     pub toggle_raw_markdown: Vec<KeyBinding>,
     pub git_mode_toggle: Vec<KeyBinding>,
     pub git_mode_flat_toggle: Vec<KeyBinding>,
+    pub command_palette: Vec<KeyBinding>,
 }
 
 impl Default for Keymap {
@@ -125,6 +179,7 @@ impl Default for Keymap {
             toggle_raw_markdown: bind(&["M"]),
             git_mode_toggle: bind(&["ctrl+g"]),
             git_mode_flat_toggle: bind(&["alt+g"]),
+            command_palette: bind(&["ctrl+p"]),
         }
     }
 }
@@ -144,10 +199,13 @@ fn parse_binding(s: &str) -> Result<KeyBinding, String> {
 
     let mut ctrl = false;
     let mut alt = false;
+    let mut super_key = false;
     for m in mods {
         match m.to_ascii_lowercase().as_str() {
             "ctrl" | "control" => ctrl = true,
-            "alt" | "meta" | "option" => alt = true,
+            "alt" | "option" => alt = true,
+            "meta" => alt = true,
+            "cmd" | "super" | "command" => super_key = true,
             "shift" => {} // encoded in the char case
             other => return Err(format!("unknown modifier '{other}' in '{s}'")),
         }
@@ -157,6 +215,7 @@ fn parse_binding(s: &str) -> Result<KeyBinding, String> {
         code: parse_keycode(key[0], s)?,
         ctrl,
         alt,
+        super_key,
     })
 }
 
@@ -217,11 +276,13 @@ impl Serialize for KeyBinding {
             // so save() always writes a complete config rather than silently dropping it.
             ref other => format!("{other:?}"),
         };
-        let spec = match (self.ctrl, self.alt) {
-            (true, true) => format!("ctrl+alt+{key}"),
-            (true, false) => format!("ctrl+{key}"),
-            (false, true) => format!("alt+{key}"),
-            (false, false) => key,
+        let spec = match (self.ctrl, self.alt, self.super_key) {
+            (true, true, false) => format!("ctrl+alt+{key}"),
+            (true, false, false) => format!("ctrl+{key}"),
+            (false, true, false) => format!("alt+{key}"),
+            (false, false, true) => format!("cmd+{key}"),
+            (true, false, true) => format!("ctrl+cmd+{key}"),
+            _ => key,
         };
         s.serialize_str(&spec)
     }

@@ -353,7 +353,7 @@ fn search_click_on_different_row_does_not_open() {
     fs::remove_dir_all(&root).ok();
 }
 
-// ── content scroll capping ────────────────────────────────────────────────
+// -- content scroll capping ------------------------------------------------
 
 fn viewport(height: u16) -> Rect {
     Rect {
@@ -436,7 +436,7 @@ fn mouse_scroll_down_stops_at_scroll_max() {
     fs::remove_dir_all(&root).ok();
 }
 
-// ── git mode ─────────────────────────────────────────────────────────────
+// -- git mode -------------------------------------------------------------
 
 /// Repo with:
 ///   committed.txt  – committed "original", working-tree modified to "modified"
@@ -677,7 +677,7 @@ fn git_mode_config_starts_enabled() {
     fs::remove_dir_all(&root).ok();
 }
 
-// ── diff_line_style ──────────────────────────────────────────────────────
+// -- diff_line_style ------------------------------------------------------
 
 #[test]
 fn diff_line_style_hunk_header_uses_accent() {
@@ -735,7 +735,7 @@ fn diff_line_style_plain_text_uses_default() {
     fs::remove_dir_all(&root).ok();
 }
 
-// ── deleted_set ───────────────────────────────────────────────────────────
+// -- deleted_set -----------------------------------------------------------
 
 #[test]
 fn deleted_set_returns_empty_when_disabled() {
@@ -765,7 +765,7 @@ fn deleted_set_includes_absent_deleted_files() {
     fs::remove_dir_all(&root).ok();
 }
 
-// ── open_file ─────────────────────────────────────────────────────────────
+// -- open_file -------------------------------------------------------------
 
 #[test]
 fn open_file_nonexistent_shows_error() {
@@ -802,7 +802,7 @@ fn open_file_empty_shows_empty_placeholder() {
     fs::remove_dir_all(&root).ok();
 }
 
-// ── show_deleted ──────────────────────────────────────────────────────────
+// -- show_deleted ----------------------------------------------------------
 
 #[test]
 fn show_deleted_sets_placeholder() {
@@ -818,7 +818,7 @@ fn show_deleted_sets_placeholder() {
     fs::remove_dir_all(&root).ok();
 }
 
-// ── reopen_file ───────────────────────────────────────────────────────────
+// -- reopen_file -----------------------------------------------------------
 
 #[test]
 fn reopen_file_preserves_scroll_and_raw_markdown() {
@@ -841,7 +841,7 @@ fn reopen_file_preserves_scroll_and_raw_markdown() {
     fs::remove_dir_all(&root).ok();
 }
 
-// ── content_line_count ────────────────────────────────────────────────────
+// -- content_line_count ----------------------------------------------------
 
 #[test]
 fn content_line_count_markdown_rendered() {
@@ -856,7 +856,7 @@ fn content_line_count_markdown_rendered() {
     fs::remove_dir_all(&root).ok();
 }
 
-// ── content_scroll_max ────────────────────────────────────────────────────
+// -- content_scroll_max ----------------------------------------------------
 
 #[test]
 fn content_scroll_max_with_multiple_lines() {
@@ -873,7 +873,7 @@ fn content_scroll_max_with_multiple_lines() {
     fs::remove_dir_all(&root).ok();
 }
 
-// ── line_prefix_width ─────────────────────────────────────────────────────
+// -- line_prefix_width -----------------------------------------------------
 
 #[test]
 fn line_prefix_width_zero_for_diff_and_markdown() {
@@ -888,7 +888,7 @@ fn line_prefix_width_zero_for_diff_and_markdown() {
     fs::remove_dir_all(&root).ok();
 }
 
-// ── selection_text ────────────────────────────────────────────────────────
+// -- selection_text --------------------------------------------------------
 
 #[test]
 fn selection_text_empty_when_no_selection() {
@@ -898,7 +898,7 @@ fn selection_text_empty_when_no_selection() {
     fs::remove_dir_all(&root).ok();
 }
 
-// ── clear_selection ───────────────────────────────────────────────────────
+// -- clear_selection -------------------------------------------------------
 
 #[test]
 fn clear_selection_resets_selection_and_drag() {
@@ -916,7 +916,7 @@ fn clear_selection_resets_selection_and_drag() {
     fs::remove_dir_all(&root).ok();
 }
 
-// ── handle_normal_key ─────────────────────────────────────────────────────
+// -- handle_normal_key -----------------------------------------------------
 
 #[test]
 fn normal_key_quit_sets_should_quit() {
@@ -975,7 +975,7 @@ fn normal_key_esc_clears_selection() {
     fs::remove_dir_all(&root).ok();
 }
 
-// ── handle_search_key ─────────────────────────────────────────────────────
+// -- handle_search_key -----------------------------------------------------
 
 #[test]
 fn search_key_esc_closes() {
@@ -1000,7 +1000,7 @@ fn search_key_tab_toggles_mode() {
     fs::remove_dir_all(&root).ok();
 }
 
-// ── handle_in_file_search_key ─────────────────────────────────────────────
+// -- handle_in_file_search_key ---------------------------------------------
 
 #[test]
 fn in_file_search_esc_closes() {
@@ -1028,7 +1028,7 @@ fn in_file_search_enter_closes() {
     fs::remove_dir_all(&root).ok();
 }
 
-// ── handle_content_key ────────────────────────────────────────────────────
+// -- handle_content_key ----------------------------------------------------
 
 #[test]
 fn content_key_toggle_wrap_resets_scroll() {
@@ -1072,7 +1072,7 @@ fn content_key_zero_resets_hscroll() {
     fs::remove_dir_all(&root).ok();
 }
 
-// ── mouse drag in content area ────────────────────────────────────────────
+// -- mouse drag in content area --------------------------------------------
 
 #[test]
 fn mouse_drag_selects_text_in_content() {
@@ -1120,7 +1120,7 @@ fn mouse_click_in_diff_does_not_start_drag() {
     fs::remove_dir_all(&root).ok();
 }
 
-// ── search mouse ──────────────────────────────────────────────────────────
+// -- search mouse ----------------------------------------------------------
 
 #[test]
 fn search_mouse_scroll_down_up() {
@@ -1144,7 +1144,7 @@ fn search_mouse_scroll_down_up() {
     fs::remove_dir_all(&root).ok();
 }
 
-// ── history mouse ─────────────────────────────────────────────────────────
+// -- history mouse ---------------------------------------------------------
 
 #[test]
 fn history_mouse_scroll_down_up() {
@@ -1169,7 +1169,7 @@ fn history_mouse_scroll_down_up() {
     fs::remove_dir_all(&root).ok();
 }
 
-// ── history mouse ─────────────────────────────────────────────────────────
+// -- history mouse ---------------------------------------------------------
 
 #[test]
 fn theme_mouse_scroll_down_up() {
@@ -1188,6 +1188,91 @@ fn theme_mouse_scroll_down_up() {
     assert_eq!(app.theme_picker.as_ref().unwrap().selected, 1);
     app.handle_mouse(mouse(MouseEventKind::ScrollUp, 1, 1));
     assert_eq!(app.theme_picker.as_ref().unwrap().selected, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- command_palette -------------------------------------------------------
+
+#[test]
+fn command_palette_ctrl_p_opens() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    assert!(app.command_palette.is_none());
+    app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL));
+    assert!(app.command_palette.is_some());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn command_palette_esc_closes() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL));
+    assert!(app.command_palette.is_some());
+    app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+    assert!(app.command_palette.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn command_palette_enter_executes_and_closes() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let help_before = app.show_help;
+    app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL));
+    // Filter for "help" so "Toggle help" is selected
+    for c in "help".chars() {
+        app.handle_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::empty()));
+    }
+    app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert!(app.command_palette.is_none());
+    assert_ne!(app.show_help, help_before);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn command_palette_navigation() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL));
+    assert_eq!(app.command_palette.as_ref().unwrap().selected, 0);
+    app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
+    assert_eq!(app.command_palette.as_ref().unwrap().selected, 1);
+    app.handle_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()));
+    assert_eq!(app.command_palette.as_ref().unwrap().selected, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn command_palette_type_filters() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL));
+    let total = app.command_palette.as_ref().unwrap().results_len();
+    app.handle_key(KeyEvent::new(KeyCode::Char('w'), KeyModifiers::empty()));
+    assert!(app.command_palette.as_ref().unwrap().results_len() < total);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- command_palette mouse -------------------------------------------------
+
+#[test]
+fn command_palette_mouse_scroll_down_up() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL));
+    app.command_palette_area = Rect {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 20,
+    };
+    app.command_palette_offset = 0;
+
+    app.handle_mouse(mouse(MouseEventKind::ScrollDown, 1, 1));
+    assert_eq!(app.command_palette.as_ref().unwrap().selected, 1);
+    app.handle_mouse(mouse(MouseEventKind::ScrollUp, 1, 1));
+    assert_eq!(app.command_palette.as_ref().unwrap().selected, 0);
     fs::remove_dir_all(&root).ok();
 }
 
@@ -1482,7 +1567,7 @@ fn content_pos_word_wrap_counts_wide_chars_by_display_width() {
     fs::remove_dir_all(&root).ok();
 }
 
-// ── mark_content_scrolled ─────────────────────────────────────────────────
+// -- mark_content_scrolled -------------------------------------------------
 
 #[test]
 fn mark_content_scrolled_sets_timestamp() {

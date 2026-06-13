@@ -371,6 +371,8 @@ impl ThemePicker {
     }
 }
 
+pub use crate::command_palette::CommandPalette;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -383,7 +385,7 @@ mod tests {
         std::env::temp_dir().join(format!("tv_search_{}_{}_{}", label, std::process::id(), n))
     }
 
-    // ── InFileSearch ──────────────────────────────────────────────────────────
+    // -- InFileSearch ----------------------------------------------------------
 
     #[test]
     fn in_file_search_finds_matches() {
@@ -445,7 +447,7 @@ mod tests {
         assert_eq!(s.current, 0);
     }
 
-    // ── ThemePicker ───────────────────────────────────────────────────────────
+    // -- ThemePicker -----------------------------------------------------------
 
     #[test]
     fn theme_picker_starts_with_all_presets() {
@@ -499,7 +501,7 @@ mod tests {
         assert_eq!(p.results_len(), crate::theme::PRESETS.len());
     }
 
-    // ── HistoryState ──────────────────────────────────────────────────────────
+    // -- HistoryState ----------------------------------------------------------
 
     fn sample_commits() -> Vec<crate::git::Commit> {
         vec![
@@ -581,7 +583,7 @@ mod tests {
         assert!(h.selected_commit().is_none());
     }
 
-    // ── SearchState ───────────────────────────────────────────────────────────
+    // -- SearchState -----------------------------------------------------------
 
     #[test]
     fn search_state_new_creates_file_results() {
