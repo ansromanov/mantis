@@ -112,6 +112,7 @@ impl Keymap {
             "toggle_git_flat" => &self.git_mode_flat_toggle,
             "toggle_word_wrap" => &self.toggle_wrap,
             "toggle_raw_markdown" => &self.toggle_raw_markdown,
+            "open_in_editor" => &self.open_in_editor,
             _ => return String::new(),
         };
         bindings.first().map(|b| b.display()).unwrap_or_default()
@@ -150,6 +151,7 @@ pub struct Keymap {
     pub git_mode_toggle: Vec<KeyBinding>,
     pub git_mode_flat_toggle: Vec<KeyBinding>,
     pub command_palette: Vec<KeyBinding>,
+    pub open_in_editor: Vec<KeyBinding>,
 }
 
 impl Default for Keymap {
@@ -180,6 +182,7 @@ impl Default for Keymap {
             git_mode_toggle: bind(&["ctrl+g"]),
             git_mode_flat_toggle: bind(&["alt+g"]),
             command_palette: bind(&["ctrl+p"]),
+            open_in_editor: bind(&["e"]),
         }
     }
 }

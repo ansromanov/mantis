@@ -58,6 +58,10 @@ fn main() -> anyhow::Result<()> {
     }
 
     loop {
+        if app.needs_clear {
+            terminal.clear()?;
+            app.needs_clear = false;
+        }
         terminal.draw(|f| ui::draw(f, &mut app))?;
 
         if event::poll(std::time::Duration::from_millis(16))? {

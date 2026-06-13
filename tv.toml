@@ -45,6 +45,7 @@ content_page_down = ["PageDown"]
 content_reset_col = ["0"]
 toggle_wrap = ["z"]
 toggle_raw_markdown = ["M"]
+open_in_editor = ["e"]
 
 # Theme. `name` selects a built-in preset (default, monokai, solarized,
 # catppuccin, synthwave84) — also switchable live with the theme picker (t).

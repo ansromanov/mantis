@@ -391,6 +391,7 @@ pub(super) fn draw_help(f: &mut Frame, app: &App, area: Rect) {
             key("  Ctrl+G     "),
             desc("toggle git mode (changed files only + diffs)"),
         ]),
+        Line::from(vec![key("  e          "), desc("open file in $EDITOR")]),
         Line::from(vec![
             key("  Alt+G      "),
             desc("toggle git flat/tree view (in git mode)"),

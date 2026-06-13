@@ -100,6 +100,9 @@ pub struct App {
     pub selection: Option<TextSelection>,
     drag_start: Option<(usize, usize)>,
     scrollbar_drag: bool,
+    /// Set to `true` after suspending the TUI (e.g. for editor), signals
+    /// `main.rs` to call `terminal.clear()` before the next `draw()`.
+    pub needs_clear: bool,
 }
 
 impl App {
@@ -198,6 +201,7 @@ impl App {
             selection: None,
             drag_start: None,
             scrollbar_drag: false,
+            needs_clear: false,
         };
         if app.git_mode {
             app.expand_git_dirs();

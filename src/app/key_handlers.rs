@@ -1,4 +1,8 @@
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{DisableMouseCapture, EnableMouseCapture, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::execute;
+use crossterm::terminal::{
+    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
+};
 
 use crate::config::pressed;
 use crate::highlight::Highlighter;
@@ -303,6 +307,7 @@ impl App {
                 self.content_scroll = 0;
                 self.content_hscroll = 0;
             }
+            Some("open_in_editor") => self.open_in_editor(),
             _ => {}
         }
     }
@@ -398,6 +403,8 @@ impl App {
                 self.try_open_selected();
                 self.save_config();
             }
+        } else if pressed(&k.open_in_editor, &key) {
+            self.open_in_editor();
         } else {
             match self.focus {
                 Focus::Tree => self.handle_tree_key(key),
@@ -451,6 +458,37 @@ impl App {
                 }
             }
         }
+    }
+
+    /// Opens the currently selected file in the user's `$EDITOR` (falling back
+    /// to `$VISUAL`). Suspends the TUI, spawns the editor, waits for it to
+    /// exit, then restores the TUI and reloads the file content.
+    fn open_in_editor(&mut self) {
+        let Some(path) = self.current_file.clone() else {
+            return;
+        };
+
+        let editor = std::env::var("VISUAL")
+            .or_else(|_| std::env::var("EDITOR"))
+            .unwrap_or_else(|_| "vim".to_string());
+
+        // Suspend TUI
+        let _ = disable_raw_mode();
+        let _ = execute!(std::io::stdout(), LeaveAlternateScreen, DisableMouseCapture,);
+
+        // Spawn editor and wait for it to finish
+        let _ = std::process::Command::new(&editor).arg(&path).status();
+
+        // Restore TUI
+        let _ = execute!(std::io::stdout(), EnterAlternateScreen, EnableMouseCapture,);
+        let _ = enable_raw_mode();
+
+        // Flag that the terminal was suspended so main.rs clears ratatui's
+        // internal buffer (which is stale after re-entering the alt screen).
+        self.needs_clear = true;
+
+        // File may have been modified; reload its content
+        self.reload_content();
     }
 
     /// Handles scrolling, wrapping, and markdown-raw toggle keys when the
