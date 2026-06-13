@@ -2,6 +2,7 @@ use std::fs;
 
 use super::*;
 use crate::config::Config;
+use crate::search::SearchMode;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -673,5 +674,532 @@ fn git_mode_config_starts_enabled() {
         app.nodes.iter().any(|n| n.name == "committed.txt"),
         "changed file must be visible when starting in git mode"
     );
+    fs::remove_dir_all(&root).ok();
+}
+
+// ── diff_line_style ──────────────────────────────────────────────────────
+
+#[test]
+fn diff_line_style_hunk_header_uses_accent() {
+    let root = temp_tree();
+    let app = app_for(&root);
+    let style = diff_line_style("@@ -1,3 +1,4 @@", &app.theme);
+    assert_eq!(style.fg, Some(app.theme.accent));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn diff_line_style_file_header_uses_dim_bold() {
+    let root = temp_tree();
+    let app = app_for(&root);
+    let style = diff_line_style("+++ b/file.rs", &app.theme);
+    assert_eq!(style.fg, Some(app.theme.dim));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn diff_line_style_addition_uses_diff_add() {
+    let root = temp_tree();
+    let app = app_for(&root);
+    let style = diff_line_style("+new line", &app.theme);
+    assert_eq!(style.fg, Some(app.theme.diff_add));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn diff_line_style_removal_uses_diff_del() {
+    let root = temp_tree();
+    let app = app_for(&root);
+    let style = diff_line_style("-old line", &app.theme);
+    assert_eq!(style.fg, Some(app.theme.diff_del));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn diff_line_style_diff_meta_uses_dim() {
+    let root = temp_tree();
+    let app = app_for(&root);
+    let style = diff_line_style("diff --git a/file b/file", &app.theme);
+    assert_eq!(style.fg, Some(app.theme.dim));
+    let style2 = diff_line_style("index abc..def", &app.theme);
+    assert_eq!(style2.fg, Some(app.theme.dim));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn diff_line_style_plain_text_uses_default() {
+    let root = temp_tree();
+    let app = app_for(&root);
+    let style = diff_line_style(" context line", &app.theme);
+    assert_eq!(style.fg, None);
+    fs::remove_dir_all(&root).ok();
+}
+
+// ── deleted_set ───────────────────────────────────────────────────────────
+
+#[test]
+fn deleted_set_returns_empty_when_disabled() {
+    let map = std::collections::HashMap::new();
+    let result = deleted_set(&map, false);
+    assert!(result.is_empty());
+}
+
+#[test]
+fn deleted_set_filters_existing_files() {
+    let root = temp_tree();
+    let mut map = std::collections::HashMap::new();
+    map.insert(root.join("a.txt"), crate::git::GitStatus::Deleted);
+    let result = deleted_set(&map, true);
+    assert!(result.is_empty(), "existing files are not in deleted set");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn deleted_set_includes_absent_deleted_files() {
+    let root = temp_tree();
+    let gone = root.join("gone.txt");
+    let mut map = std::collections::HashMap::new();
+    map.insert(gone.clone(), crate::git::GitStatus::Deleted);
+    let result = deleted_set(&map, true);
+    assert!(result.contains(&gone));
+    fs::remove_dir_all(&root).ok();
+}
+
+// ── open_file ─────────────────────────────────────────────────────────────
+
+#[test]
+fn open_file_nonexistent_shows_error() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("nonexistent.txt"));
+    assert!(app.content[0].starts_with("[error:"));
+    assert!(app.highlighted.is_empty());
+    assert!(!app.is_diff);
+    assert_eq!(app.content_scroll, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn open_file_binary_shows_binary_placeholder() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let bin_path = root.join("data.bin");
+    fs::write(&bin_path, [0u8, 1, 2, 3]).unwrap();
+    app.open_file(&bin_path);
+    assert_eq!(app.content, vec!["[binary file]"]);
+    assert!(app.highlighted.is_empty());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn open_file_empty_shows_empty_placeholder() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let empty_path = root.join("empty.txt");
+    fs::write(&empty_path, "").unwrap();
+    app.open_file(&empty_path);
+    assert_eq!(app.content, vec!["[empty file]"]);
+    fs::remove_dir_all(&root).ok();
+}
+
+// ── show_deleted ──────────────────────────────────────────────────────────
+
+#[test]
+fn show_deleted_sets_placeholder() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let path = root.join("gone.rs");
+    app.show_deleted(&path);
+    assert_eq!(app.current_file.as_deref(), Some(path.as_path()));
+    assert_eq!(app.content, vec!["[deleted]"]);
+    assert!(!app.is_diff);
+    assert!(app.highlighted.is_empty());
+    assert!(app.in_file_search.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+// ── reopen_file ───────────────────────────────────────────────────────────
+
+#[test]
+fn reopen_file_preserves_scroll_and_raw_markdown() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let md_path = root.join("doc.md");
+    fs::write(&md_path, "# A\n\nline1\nline2\nline3\nline4\n").unwrap();
+    app.open_file(&md_path);
+    app.content_scroll = 3;
+    app.content_hscroll = 5;
+    app.show_raw_markdown = true;
+
+    app.reopen_file(&md_path);
+    assert!(app.show_raw_markdown);
+    assert_eq!(
+        app.content_scroll,
+        3.min(app.content_line_count().saturating_sub(1))
+    );
+    assert_eq!(app.content_hscroll, 5);
+    fs::remove_dir_all(&root).ok();
+}
+
+// ── content_line_count ────────────────────────────────────────────────────
+
+#[test]
+fn content_line_count_markdown_rendered() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let md_path = root.join("readme.md");
+    fs::write(&md_path, "# H1\n\npara\n").unwrap();
+    app.open_file(&md_path);
+    assert!(app.is_markdown);
+    assert!(!app.show_raw_markdown);
+    assert_eq!(app.content_line_count(), app.markdown_lines.len());
+    fs::remove_dir_all(&root).ok();
+}
+
+// ── content_scroll_max ────────────────────────────────────────────────────
+
+#[test]
+fn content_scroll_max_with_multiple_lines() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 10,
+    };
+    assert_eq!(app.content_scroll_max(), 40);
+    fs::remove_dir_all(&root).ok();
+}
+
+// ── line_prefix_width ─────────────────────────────────────────────────────
+
+#[test]
+fn line_prefix_width_zero_for_diff_and_markdown() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.is_diff = true;
+    assert_eq!(app.line_prefix_width(), 0);
+    app.is_diff = false;
+    app.is_markdown = true;
+    app.show_raw_markdown = false;
+    assert_eq!(app.line_prefix_width(), 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+// ── selection_text ────────────────────────────────────────────────────────
+
+#[test]
+fn selection_text_empty_when_no_selection() {
+    let root = temp_tree();
+    let app = app_for(&root);
+    assert_eq!(app.selection_text(), "");
+    fs::remove_dir_all(&root).ok();
+}
+
+// ── clear_selection ───────────────────────────────────────────────────────
+
+#[test]
+fn clear_selection_resets_selection_and_drag() {
+    use crate::selection::TextSelection;
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.selection = Some(TextSelection {
+        anchor: (0, 0),
+        active: (0, 5),
+    });
+    app.drag_start = Some((0, 0));
+    app.clear_selection();
+    assert!(app.selection.is_none());
+    assert!(app.drag_start.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+// ── handle_normal_key ─────────────────────────────────────────────────────
+
+#[test]
+fn normal_key_quit_sets_should_quit() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('q'), KeyModifiers::empty()));
+    assert!(app.should_quit);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn normal_key_help_toggles() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    assert!(!app.show_help);
+    app.handle_key(KeyEvent::new(KeyCode::Char('?'), KeyModifiers::empty()));
+    assert!(app.show_help);
+    app.handle_key(KeyEvent::new(KeyCode::Char('?'), KeyModifiers::empty()));
+    assert!(!app.show_help);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn normal_key_toggle_hidden_reloads() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let before = app.show_hidden;
+    app.handle_key(KeyEvent::new(KeyCode::Char('.'), KeyModifiers::ALT));
+    assert_ne!(app.show_hidden, before);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn normal_key_switch_panel() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    assert_eq!(app.focus, Focus::Tree);
+    app.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::empty()));
+    assert_eq!(app.focus, Focus::Content);
+    app.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::empty()));
+    assert_eq!(app.focus, Focus::Tree);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn normal_key_esc_clears_selection() {
+    use crate::selection::TextSelection;
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.selection = Some(TextSelection {
+        anchor: (0, 0),
+        active: (0, 1),
+    });
+    app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+    assert!(app.selection.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+// ── handle_search_key ─────────────────────────────────────────────────────
+
+#[test]
+fn search_key_esc_closes() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
+    assert!(app.search.is_some());
+    app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+    assert!(app.search.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn search_key_tab_toggles_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::empty()));
+    assert_eq!(app.search.as_ref().unwrap().mode, SearchMode::Content);
+    app.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::empty()));
+    assert_eq!(app.search.as_ref().unwrap().mode, SearchMode::Files);
+    fs::remove_dir_all(&root).ok();
+}
+
+// ── handle_in_file_search_key ─────────────────────────────────────────────
+
+#[test]
+fn in_file_search_esc_closes() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt"));
+    app.focus = Focus::Content;
+    app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
+    assert!(app.in_file_search.is_some());
+    app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+    assert!(app.in_file_search.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn in_file_search_enter_closes() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt"));
+    app.focus = Focus::Content;
+    app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
+    assert!(app.in_file_search.is_some());
+    app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert!(app.in_file_search.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+// ── handle_content_key ────────────────────────────────────────────────────
+
+#[test]
+fn content_key_toggle_wrap_resets_scroll() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.content_scroll = 10;
+    app.content_hscroll = 5;
+    app.handle_key(KeyEvent::new(KeyCode::Char('z'), KeyModifiers::empty()));
+    assert!(app.word_wrap);
+    assert_eq!(app.content_scroll, 0);
+    assert_eq!(app.content_hscroll, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_key_g_top_and_g_bottom() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.content_area = viewport(10);
+    app.content_scroll = 20;
+    app.handle_key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::empty()));
+    assert_eq!(app.content_scroll, 0);
+    app.handle_key(KeyEvent::new(KeyCode::Char('G'), KeyModifiers::empty()));
+    assert_eq!(app.content_scroll, app.content_scroll_max());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_key_zero_resets_hscroll() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.content_hscroll = 20;
+    app.handle_key(KeyEvent::new(KeyCode::Char('0'), KeyModifiers::empty()));
+    assert_eq!(app.content_hscroll, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+// ── mouse drag in content area ────────────────────────────────────────────
+
+#[test]
+fn mouse_drag_selects_text_in_content() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt"));
+    app.content_area = Rect {
+        x: 5,
+        y: 5,
+        width: 50,
+        height: 20,
+    };
+
+    let down = mouse(MouseEventKind::Down(MouseButton::Left), 6, 6);
+    app.handle_mouse(down);
+    assert_eq!(app.focus, Focus::Content);
+    assert!(app.drag_start.is_some());
+
+    let drag = mouse(MouseEventKind::Drag(MouseButton::Left), 10, 6);
+    app.handle_mouse(drag);
+    assert!(app.selection.is_some());
+
+    let up = mouse(MouseEventKind::Up(MouseButton::Left), 10, 6);
+    app.handle_mouse(up);
+    assert!(app.drag_start.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn mouse_click_in_diff_does_not_start_drag() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt"));
+    app.is_diff = true;
+    app.content_area = Rect {
+        x: 5,
+        y: 5,
+        width: 50,
+        height: 20,
+    };
+
+    let down = mouse(MouseEventKind::Down(MouseButton::Left), 6, 6);
+    app.handle_mouse(down);
+    assert!(app.drag_start.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+// ── search mouse ──────────────────────────────────────────────────────────
+
+#[test]
+fn search_mouse_scroll_down_up() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
+    app.search_area = Rect {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 20,
+    };
+    app.search_offset = 0;
+
+    if app.search.as_ref().unwrap().results_len() >= 2 {
+        app.handle_mouse(mouse(MouseEventKind::ScrollDown, 1, 1));
+        assert_eq!(app.search.as_ref().unwrap().selected, 1);
+        app.handle_mouse(mouse(MouseEventKind::ScrollUp, 1, 1));
+        assert_eq!(app.search.as_ref().unwrap().selected, 0);
+    }
+    fs::remove_dir_all(&root).ok();
+}
+
+// ── history mouse ─────────────────────────────────────────────────────────
+
+#[test]
+fn history_mouse_scroll_down_up() {
+    let root = temp_git_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("tracked.txt"));
+    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::empty()));
+    app.history_area = Rect {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 20,
+    };
+    app.history_offset = 0;
+
+    if app.history.as_ref().unwrap().results_len() >= 2 {
+        app.handle_mouse(mouse(MouseEventKind::ScrollDown, 1, 1));
+        assert_eq!(app.history.as_ref().unwrap().selected, 1);
+        app.handle_mouse(mouse(MouseEventKind::ScrollUp, 1, 1));
+        assert_eq!(app.history.as_ref().unwrap().selected, 0);
+    }
+    fs::remove_dir_all(&root).ok();
+}
+
+// ── history mouse ─────────────────────────────────────────────────────────
+
+#[test]
+fn theme_mouse_scroll_down_up() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::empty()));
+    app.theme_area = Rect {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 20,
+    };
+    app.theme_offset = 0;
+
+    app.handle_mouse(mouse(MouseEventKind::ScrollDown, 1, 1));
+    assert_eq!(app.theme_picker.as_ref().unwrap().selected, 1);
+    app.handle_mouse(mouse(MouseEventKind::ScrollUp, 1, 1));
+    assert_eq!(app.theme_picker.as_ref().unwrap().selected, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+// ── mark_content_scrolled ─────────────────────────────────────────────────
+
+#[test]
+fn mark_content_scrolled_sets_timestamp() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let before = app.content_scrolled_at;
+    std::thread::sleep(std::time::Duration::from_millis(1));
+    app.mark_content_scrolled();
+    assert!(app.content_scrolled_at > before);
     fs::remove_dir_all(&root).ok();
 }

@@ -386,3 +386,249 @@ fn apply_selection(
     }
     result
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::search::InFileSearch;
+    use crate::theme::Theme;
+
+    fn default_theme() -> Theme {
+        Theme::default()
+    }
+
+    fn single_region(text: &str) -> Vec<(Style, String)> {
+        vec![(Style::default(), text.to_string())]
+    }
+
+    fn multi_region(parts: &[&str]) -> Vec<(Style, String)> {
+        parts
+            .iter()
+            .map(|t| (Style::default(), t.to_string()))
+            .collect()
+    }
+
+    // ── apply_selection ───────────────────────────────────────────────────────
+
+    #[test]
+    fn selection_empty_cols_returns_unmodified() {
+        let regions = single_region("hello world");
+        let result = apply_selection(&regions, 0, 0, Color::Red);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].content, "hello world");
+    }
+
+    #[test]
+    fn selection_highlights_middle_range() {
+        let regions = single_region("hello world");
+        let result = apply_selection(&regions, 6, 11, Color::Red);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].content, "hello ");
+        assert_eq!(result[1].content, "world");
+        assert_eq!(result[1].style.bg, Some(Color::Red));
+    }
+
+    #[test]
+    fn selection_highlights_start_of_region() {
+        let regions = single_region("hello");
+        let result = apply_selection(&regions, 0, 3, Color::Blue);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].content, "hel");
+        assert_eq!(result[0].style.bg, Some(Color::Blue));
+        assert_eq!(result[1].content, "lo");
+    }
+
+    #[test]
+    fn selection_col_end_usize_max_goes_to_end() {
+        let regions = single_region("test");
+        let result = apply_selection(&regions, 2, usize::MAX, Color::Green);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].content, "te");
+        assert_eq!(result[1].content, "st");
+        assert_eq!(result[1].style.bg, Some(Color::Green));
+    }
+
+    #[test]
+    fn selection_spans_multiple_regions() {
+        let regions = multi_region(&["abc", "def", "ghi"]);
+        let result = apply_selection(&regions, 2, 7, Color::Yellow);
+        // abc|def|ghi, select indices 2..7 → "cdefg"
+        let total: String = result.iter().map(|s| s.content.as_ref()).collect();
+        assert_eq!(total, "abcdefghi");
+        // The selected portions should be in the middle spans
+        let selected: Vec<&Span> = result
+            .iter()
+            .filter(|s| s.style.bg == Some(Color::Yellow))
+            .collect();
+        let selected_text: String = selected.iter().map(|s| s.content.as_ref()).collect();
+        assert_eq!(selected_text, "cdefg");
+    }
+
+    #[test]
+    fn selection_covers_entire_text() {
+        let regions = single_region("full");
+        let result = apply_selection(&regions, 0, 4, Color::Magenta);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].content, "full");
+        assert_eq!(result[0].style.bg, Some(Color::Magenta));
+    }
+
+    #[test]
+    fn selection_col_start_past_end() {
+        let regions = single_region("hi");
+        let result = apply_selection(&regions, 10, 20, Color::Red);
+        // col_start is past the end → before_end = min(10, 2) = 2 → all unselected
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].content, "hi");
+        assert_eq!(result[0].style.bg, None);
+    }
+
+    // ── apply_search_to_regions ───────────────────────────────────────────────
+
+    fn make_search(matches: Vec<crate::search::InFileMatch>, current: usize) -> InFileSearch {
+        InFileSearch {
+            query: "test".to_string(),
+            matches,
+            current,
+        }
+    }
+
+    #[test]
+    fn search_no_matches_returns_unmodified() {
+        let regions = single_region("hello world");
+        let search = InFileSearch::new();
+        let result = apply_search_to_regions(&regions, 0, &search, &default_theme());
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].content, "hello world");
+    }
+
+    #[test]
+    fn search_highlights_current_match() {
+        let regions = single_region("abcde");
+        let search = make_search(
+            vec![crate::search::InFileMatch {
+                line: 0,
+                col: 1,
+                len: 3,
+            }],
+            0,
+        );
+        let result = apply_search_to_regions(&regions, 0, &search, &default_theme());
+        // Should produce 3 spans: "a", "bcd" (bg = selection_bg), "e"
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0].content, "a");
+        assert_eq!(result[1].content, "bcd");
+        assert_eq!(result[1].style.bg, Some(default_theme().selection_bg));
+        assert_eq!(result[2].content, "e");
+    }
+
+    #[test]
+    fn search_non_current_match_uses_dim_bg() {
+        let regions = single_region("abcde");
+        let search = make_search(
+            vec![crate::search::InFileMatch {
+                line: 0,
+                col: 1,
+                len: 3,
+            }],
+            1, // not current (current points to a different index)
+        );
+        let result = apply_search_to_regions(&regions, 0, &search, &default_theme());
+        assert_eq!(result[1].style.bg, Some(default_theme().dim));
+    }
+
+    #[test]
+    fn search_multiple_matches_on_line() {
+        let regions = single_region("aa bb aa");
+        let search = make_search(
+            vec![
+                crate::search::InFileMatch {
+                    line: 0,
+                    col: 0,
+                    len: 2,
+                },
+                crate::search::InFileMatch {
+                    line: 0,
+                    col: 6,
+                    len: 2,
+                },
+            ],
+            0,
+        );
+        let result = apply_search_to_regions(&regions, 0, &search, &default_theme());
+        let highlighted: String = result
+            .iter()
+            .filter(|s| s.style.bg == Some(default_theme().selection_bg))
+            .map(|s| s.content.as_ref())
+            .collect();
+        assert_eq!(highlighted, "aa");
+    }
+
+    #[test]
+    fn search_skips_other_lines() {
+        let regions = single_region("hello");
+        let search = make_search(
+            vec![crate::search::InFileMatch {
+                line: 1,
+                col: 0,
+                len: 3,
+            }],
+            0,
+        );
+        let result = apply_search_to_regions(&regions, 0, &search, &default_theme());
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].content, "hello");
+    }
+
+    #[test]
+    fn search_match_at_start_of_region() {
+        let regions = single_region("hello");
+        let search = make_search(
+            vec![crate::search::InFileMatch {
+                line: 0,
+                col: 0,
+                len: 2,
+            }],
+            0,
+        );
+        let result = apply_search_to_regions(&regions, 0, &search, &default_theme());
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].content, "he");
+        assert_eq!(result[0].style.bg, Some(default_theme().selection_bg));
+        assert_eq!(result[1].content, "llo");
+    }
+
+    #[test]
+    fn search_match_at_end_of_region() {
+        let regions = single_region("hello");
+        let search = make_search(
+            vec![crate::search::InFileMatch {
+                line: 0,
+                col: 3,
+                len: 2,
+            }],
+            0,
+        );
+        let result = apply_search_to_regions(&regions, 0, &search, &default_theme());
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].content, "hel");
+        assert_eq!(result[1].content, "lo");
+        assert_eq!(result[1].style.bg, Some(default_theme().selection_bg));
+    }
+
+    #[test]
+    fn search_multi_byte_chars() {
+        let regions = single_region("héllo wörld");
+        let search = make_search(
+            vec![crate::search::InFileMatch {
+                line: 0,
+                col: 4,
+                len: 2,
+            }],
+            0,
+        );
+        let result = apply_search_to_regions(&regions, 0, &search, &default_theme());
+        let total: String = result.iter().map(|s| s.content.as_ref()).collect();
+        assert_eq!(total, "héllo wörld");
+    }
+}

@@ -21,7 +21,7 @@ mod mouse_handlers;
 mod navigation;
 
 /// Which panel is currently focused.
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum Focus {
     /// The file tree panel on the left.
     Tree,

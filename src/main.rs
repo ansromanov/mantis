@@ -1,5 +1,5 @@
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event},
@@ -20,6 +20,19 @@ mod theme;
 mod tree;
 mod ui;
 
+/// Parses a canonicalized path argument into (root_dir, optional_file_to_open).
+fn resolve_root_and_file(arg: &Path) -> (PathBuf, Option<PathBuf>) {
+    if arg.is_file() {
+        let parent = arg
+            .parent()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("."));
+        (parent, Some(arg.to_path_buf()))
+    } else {
+        (arg.to_path_buf(), None)
+    }
+}
+
 fn main() -> anyhow::Result<()> {
     let arg = std::env::args()
         .nth(1)
@@ -28,15 +41,7 @@ fn main() -> anyhow::Result<()> {
         .canonicalize()?;
 
     // If a file is given, root the tree at its parent and open the file.
-    let (root, file) = if arg.is_file() {
-        let parent = arg
-            .parent()
-            .map(PathBuf::from)
-            .unwrap_or_else(|| PathBuf::from("."));
-        (parent, Some(arg))
-    } else {
-        (arg, None)
-    };
+    let (root, file) = resolve_root_and_file(&arg);
 
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -78,4 +83,40 @@ fn main() -> anyhow::Result<()> {
     terminal.show_cursor()?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    fn temp_dir() -> PathBuf {
+        static COUNTER: AtomicUsize = AtomicUsize::new(0);
+        let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!("tv_main_{}_{n}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        dir.canonicalize().unwrap()
+    }
+
+    #[test]
+    fn resolve_root_and_file_with_directory() {
+        let dir = temp_dir();
+        let (root, file) = resolve_root_and_file(&dir);
+        assert_eq!(root, dir);
+        assert!(file.is_none());
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn resolve_root_and_file_with_file() {
+        let dir = temp_dir();
+        let file_path = dir.join("test.txt");
+        fs::write(&file_path, "content").unwrap();
+        let canonical = file_path.canonicalize().unwrap();
+        let (root, file) = resolve_root_and_file(&canonical);
+        assert_eq!(root, dir);
+        assert_eq!(file, Some(canonical));
+        fs::remove_dir_all(&dir).ok();
+    }
 }
