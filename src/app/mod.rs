@@ -10,7 +10,7 @@ use ratatui::layout::Rect;
 use crate::config::{self, Config, Keymap};
 use crate::git::GitStatus;
 use crate::highlight::Highlighter;
-use crate::search::{HistoryState, InFileSearch, SearchState, ThemePicker};
+use crate::search::{CommandPalette, HistoryState, InFileSearch, SearchState, ThemePicker};
 use crate::selection::TextSelection;
 use crate::theme::Theme;
 use crate::tree::{build_visible, TreeNode};
@@ -51,6 +51,7 @@ pub struct App {
     pub focus: Focus,
     pub search: Option<SearchState>,
     pub in_file_search: Option<InFileSearch>,
+    pub command_palette: Option<CommandPalette>,
     pub history: Option<HistoryState>,
     pub theme_picker: Option<ThemePicker>,
     pub show_hidden: bool,
@@ -79,6 +80,8 @@ pub struct App {
     pub content_area: Rect,
     pub search_area: Rect,
     pub search_offset: usize,
+    pub command_palette_area: Rect,
+    pub command_palette_offset: usize,
     pub history_area: Rect,
     pub history_offset: usize,
     pub theme_area: Rect,
@@ -151,6 +154,7 @@ impl App {
             focus: Focus::Tree,
             search: None,
             in_file_search: None,
+            command_palette: None,
             history: None,
             theme_picker: None,
             show_hidden: cfg.show_hidden,
@@ -177,6 +181,8 @@ impl App {
             content_area: Rect::default(),
             search_area: Rect::default(),
             search_offset: 0,
+            command_palette_area: Rect::default(),
+            command_palette_offset: 0,
             history_area: Rect::default(),
             history_offset: 0,
             theme_area: Rect::default(),

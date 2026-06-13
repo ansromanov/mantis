@@ -48,6 +48,10 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         popups::draw_search(f, app, area);
     }
 
+    if app.command_palette.is_some() {
+        popups::draw_command_palette(f, app, area);
+    }
+
     if app.history.is_some() {
         popups::draw_history(f, app, area);
     }

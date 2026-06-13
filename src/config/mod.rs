@@ -96,6 +96,7 @@ pub struct Keymap {
     pub toggle_raw_markdown: Vec<KeyBinding>,
     pub git_mode_toggle: Vec<KeyBinding>,
     pub git_mode_flat_toggle: Vec<KeyBinding>,
+    pub command_palette: Vec<KeyBinding>,
 }
 
 impl Default for Keymap {
@@ -125,6 +126,7 @@ impl Default for Keymap {
             toggle_raw_markdown: bind(&["M"]),
             git_mode_toggle: bind(&["ctrl+g"]),
             git_mode_flat_toggle: bind(&["alt+g"]),
+            command_palette: bind(&["ctrl+p"]),
         }
     }
 }

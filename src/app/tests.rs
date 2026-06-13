@@ -1191,6 +1191,91 @@ fn theme_mouse_scroll_down_up() {
     fs::remove_dir_all(&root).ok();
 }
 
+// ── command_palette ───────────────────────────────────────────────────────
+
+#[test]
+fn command_palette_ctrl_p_opens() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    assert!(app.command_palette.is_none());
+    app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL));
+    assert!(app.command_palette.is_some());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn command_palette_esc_closes() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL));
+    assert!(app.command_palette.is_some());
+    app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+    assert!(app.command_palette.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn command_palette_enter_executes_and_closes() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let help_before = app.show_help;
+    app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL));
+    // Filter for "help" so "Toggle help" is selected
+    for c in "help".chars() {
+        app.handle_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::empty()));
+    }
+    app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert!(app.command_palette.is_none());
+    assert_ne!(app.show_help, help_before);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn command_palette_navigation() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL));
+    assert_eq!(app.command_palette.as_ref().unwrap().selected, 0);
+    app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
+    assert_eq!(app.command_palette.as_ref().unwrap().selected, 1);
+    app.handle_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()));
+    assert_eq!(app.command_palette.as_ref().unwrap().selected, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn command_palette_type_filters() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL));
+    let total = app.command_palette.as_ref().unwrap().results_len();
+    app.handle_key(KeyEvent::new(KeyCode::Char('w'), KeyModifiers::empty()));
+    assert!(app.command_palette.as_ref().unwrap().results_len() < total);
+    fs::remove_dir_all(&root).ok();
+}
+
+// ── command_palette mouse ─────────────────────────────────────────────────
+
+#[test]
+fn command_palette_mouse_scroll_down_up() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL));
+    app.command_palette_area = Rect {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 20,
+    };
+    app.command_palette_offset = 0;
+
+    app.handle_mouse(mouse(MouseEventKind::ScrollDown, 1, 1));
+    assert_eq!(app.command_palette.as_ref().unwrap().selected, 1);
+    app.handle_mouse(mouse(MouseEventKind::ScrollUp, 1, 1));
+    assert_eq!(app.command_palette.as_ref().unwrap().selected, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
 // --- content_pos ----------------------------------------------------------
 
 #[test]

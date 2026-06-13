@@ -2,7 +2,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::config::pressed;
 use crate::highlight::Highlighter;
-use crate::search::{InFileSearch, SearchState, ThemePicker};
+use crate::search::{CommandPalette, InFileSearch, SearchState, ThemePicker};
 use crate::theme::{Theme, ThemeConfig};
 
 use super::{diff_line_style, App, Focus};
@@ -22,6 +22,8 @@ impl App {
         }
         if self.theme_picker.is_some() {
             self.handle_theme_key(key);
+        } else if self.command_palette.is_some() {
+            self.handle_command_key(key);
         } else if self.history.is_some() {
             self.handle_history_key(key);
         } else if self.search.is_some() {
@@ -211,6 +213,100 @@ impl App {
         }
     }
 
+    /// Handles keyboard input while the command palette is open: typing
+    /// characters, backspace, up/down navigation, Enter to execute, Esc to close.
+    fn handle_command_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Esc => {
+                self.command_palette = None;
+            }
+            KeyCode::Enter => self.dispatch_command(),
+            KeyCode::Up => {
+                if let Some(p) = &mut self.command_palette {
+                    p.selected = p.selected.saturating_sub(1);
+                }
+            }
+            KeyCode::Down => {
+                if let Some(p) = &mut self.command_palette {
+                    if p.selected + 1 < p.results_len() {
+                        p.selected += 1;
+                    }
+                }
+            }
+            KeyCode::Backspace => {
+                if let Some(p) = &mut self.command_palette {
+                    p.pop();
+                }
+            }
+            KeyCode::Char(c) => {
+                if let Some(p) = &mut self.command_palette {
+                    p.push(c);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Executes the selected command from the palette and closes it.
+    pub(super) fn dispatch_command(&mut self) {
+        let action_id = self
+            .command_palette
+            .as_ref()
+            .and_then(|p| p.selected_command().map(|c| c.action_id));
+        self.command_palette = None;
+        match action_id {
+            Some("toggle_help") => self.show_help = !self.show_help,
+            Some("toggle_hidden") => {
+                self.show_hidden = !self.show_hidden;
+                self.config.show_hidden = self.show_hidden;
+                self.reload();
+                self.save_config();
+            }
+            Some("open_file_search") => {
+                let root = self.root.clone();
+                self.search = Some(SearchState::new(
+                    &root,
+                    self.show_hidden,
+                    self.ignore_gitignore,
+                ));
+            }
+            Some("open_content_search") => {
+                let root = self.root.clone();
+                let mut s = SearchState::new(&root, self.show_hidden, self.ignore_gitignore);
+                s.toggle_mode();
+                self.search = Some(s);
+            }
+            Some("reload") => self.reload(),
+            Some("open_file_history") => self.open_file_history(),
+            Some("open_theme_picker") => {
+                self.theme_picker = Some(ThemePicker::default());
+            }
+            Some("toggle_git_mode") => self.toggle_git_mode(),
+            Some("toggle_git_flat") => {
+                if self.git_mode {
+                    self.git_mode_flat = !self.git_mode_flat;
+                    self.config.git_mode_flat = self.git_mode_flat;
+                    self.rebuild();
+                    self.try_open_selected();
+                    self.save_config();
+                }
+            }
+            Some("toggle_word_wrap") => {
+                self.word_wrap = !self.word_wrap;
+                self.config.word_wrap = self.word_wrap;
+                self.content_scroll = 0;
+                self.content_hscroll = 0;
+                self.save_config();
+            }
+            Some("toggle_raw_markdown") if self.is_markdown => {
+                self.show_raw_markdown = !self.show_raw_markdown;
+                self.content_scroll = 0;
+                self.content_hscroll = 0;
+            }
+            _ => {}
+        }
+    }
+
     /// Applies the theme selected in the picker, saves it to config, and
     /// closes the overlay.
     pub(super) fn apply_selected_theme(&mut self) {
@@ -284,6 +380,8 @@ impl App {
             self.open_file_history();
         } else if pressed(&k.theme_picker, &key) {
             self.theme_picker = Some(ThemePicker::default());
+        } else if pressed(&k.command_palette, &key) {
+            self.command_palette = Some(CommandPalette::default());
         } else if pressed(&k.switch_panel, &key) {
             self.focus = match self.focus {
                 Focus::Tree => Focus::Content,

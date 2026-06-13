@@ -258,6 +258,85 @@ pub(super) fn draw_theme(f: &mut Frame, app: &mut App, area: Rect) {
     app.theme_offset = state.offset();
 }
 
+pub(super) fn draw_command_palette(f: &mut Frame, app: &mut App, area: Rect) {
+    use crate::search::COMMANDS;
+
+    let theme = &app.theme;
+    let picker = app.command_palette.as_ref().unwrap();
+
+    let popup = centered_rect(56, 65, area);
+    f.render_widget(Clear, popup);
+
+    let block = Block::default()
+        .title(" Commands — Ctrl+P ")
+        .borders(Borders::ALL)
+        .style(Style::default().bg(theme.background))
+        .border_style(Style::default().fg(theme.accent_alt));
+
+    let inner = block.inner(popup);
+    f.render_widget(block, popup);
+
+    let parts = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Min(0),
+        ])
+        .split(inner);
+
+    f.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::styled(
+                "> ",
+                Style::default()
+                    .fg(theme.accent_alt)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(picker.query.as_str()),
+            Span::styled("█", Style::default().fg(theme.accent_alt)),
+        ])),
+        parts[0],
+    );
+
+    f.render_widget(
+        Paragraph::new("─".repeat(inner.width as usize)).style(Style::default().fg(theme.dim)),
+        parts[1],
+    );
+
+    let items: Vec<ListItem> = picker
+        .filtered
+        .iter()
+        .map(|&i| {
+            let cmd = &COMMANDS[i];
+            ListItem::new(Line::from(vec![
+                Span::styled(format!(" {} ", cmd.name), Style::default().fg(theme.text)),
+                Span::styled(
+                    format!("[{}]", cmd.keybinding),
+                    Style::default().fg(theme.dim),
+                ),
+            ]))
+        })
+        .collect();
+
+    let list = List::new(items).highlight_style(
+        Style::default()
+            .bg(theme.selection_bg)
+            .fg(theme.selection_fg)
+            .add_modifier(Modifier::BOLD),
+    );
+
+    let mut state = ListState::default();
+    if picker.results_len() > 0 {
+        state.select(Some(picker.selected));
+    }
+
+    f.render_stateful_widget(list, parts[2], &mut state);
+
+    app.command_palette_area = parts[2];
+    app.command_palette_offset = state.offset();
+}
+
 pub(super) fn draw_help(f: &mut Frame, app: &App, area: Rect) {
     let theme = &app.theme;
     let popup = centered_rect(52, 80, area);

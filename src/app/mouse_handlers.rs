@@ -20,6 +20,10 @@ impl App {
             self.handle_theme_mouse(ev);
             return;
         }
+        if self.command_palette.is_some() {
+            self.handle_command_palette_mouse(ev);
+            return;
+        }
         if self.history.is_some() {
             self.handle_history_mouse(ev);
             return;
@@ -196,6 +200,54 @@ impl App {
             }
             MouseEventKind::ScrollUp => {
                 if let Some(p) = &mut self.theme_picker {
+                    p.selected = p.selected.saturating_sub(1);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Handles mouse events on the command palette overlay: click to select,
+    /// double-click to execute, scroll to navigate.
+    fn handle_command_palette_mouse(&mut self, ev: MouseEvent) {
+        match ev.kind {
+            MouseEventKind::Down(MouseButton::Left) => {
+                if !rect_contains(self.command_palette_area, ev.column, ev.row) {
+                    return;
+                }
+                let index =
+                    self.command_palette_offset + (ev.row - self.command_palette_area.y) as usize;
+                let in_range = self
+                    .command_palette
+                    .as_ref()
+                    .is_some_and(|p| index < p.results_len());
+                if !in_range {
+                    return;
+                }
+                if let Some(p) = &mut self.command_palette {
+                    p.selected = index;
+                }
+                let now = Instant::now();
+                let double = matches!(
+                    self.last_click,
+                    Some((t, i)) if i == index && now.duration_since(t) < Duration::from_millis(400)
+                );
+                if double {
+                    self.last_click = None;
+                    self.dispatch_command();
+                } else {
+                    self.last_click = Some((now, index));
+                }
+            }
+            MouseEventKind::ScrollDown => {
+                if let Some(p) = &mut self.command_palette {
+                    if p.selected + 1 < p.results_len() {
+                        p.selected += 1;
+                    }
+                }
+            }
+            MouseEventKind::ScrollUp => {
+                if let Some(p) = &mut self.command_palette {
                     p.selected = p.selected.saturating_sub(1);
                 }
             }
