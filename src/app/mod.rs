@@ -99,6 +99,7 @@ pub struct App {
     file_watch_path: Option<PathBuf>,
     pub selection: Option<TextSelection>,
     drag_start: Option<(usize, usize)>,
+    scrollbar_drag: bool,
 }
 
 impl App {
@@ -196,6 +197,7 @@ impl App {
             file_watch_path: None,
             selection: None,
             drag_start: None,
+            scrollbar_drag: false,
         };
         if app.git_mode {
             app.expand_git_dirs();

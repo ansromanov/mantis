@@ -421,6 +421,17 @@ impl App {
             }
         } else if pressed(&k.tree_expand, &key) {
             self.activate_selected();
+        } else if pressed(&k.content_top, &key) {
+            if self.tree_selected != 0 {
+                self.tree_selected = 0;
+                self.try_open_selected();
+            }
+        } else if pressed(&k.content_bottom, &key) {
+            let last = self.nodes.len().saturating_sub(1);
+            if self.tree_selected != last {
+                self.tree_selected = last;
+                self.try_open_selected();
+            }
         } else if pressed(&k.tree_collapse, &key) {
             if let Some(node) = self.nodes.get(self.tree_selected) {
                 let depth = node.depth;
