@@ -149,7 +149,6 @@ impl App {
     /// produce inline messages rather than crashing.
     pub fn open_file(&mut self, path: &Path) {
         self.in_file_search = None;
-        self.current_file = Some(path.to_path_buf());
         self.is_diff = false;
         self.content_title = None;
         self.content_scroll = 0;
@@ -185,6 +184,7 @@ impl App {
             }
         };
         self.content = s.lines().map(|l| l.to_owned()).collect();
+        self.current_file = Some(path.to_path_buf());
         if self.content.is_empty() {
             self.content = vec!["[empty file]".into()];
             self.highlighted = Vec::new();
