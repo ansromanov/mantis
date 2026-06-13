@@ -3,6 +3,7 @@
 #
 # Downloads the prebuilt `tv` binary for your OS/arch from GitHub Releases,
 # verifies its SHA-256 checksum, and installs it onto your PATH.
+# Supports Linux, macOS, and Windows (Git Bash / MSYS2 / Cygwin).
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/ansromanov/tree-viewer/main/install.sh | sh
@@ -38,9 +39,10 @@ os="$(uname -s)"
 arch="$(uname -m)"
 
 case "$os" in
-  Linux)  os_part="linux" ;;
-  Darwin) os_part="macos" ;;
-  *) error "unsupported OS: $os (use the Windows binary or 'cargo install tree-viewer')" ;;
+  Linux)                         os_part="linux";   exe="" ;;
+  Darwin)                        os_part="macos";   exe="" ;;
+  CYGWIN* | MINGW* | MSYS*)     os_part="windows"; exe=".exe" ;;
+  *) error "unsupported OS: $os (use 'cargo install tree-viewer')" ;;
 esac
 
 case "$arch" in
@@ -49,7 +51,7 @@ case "$arch" in
   *) error "unsupported architecture: $arch" ;;
 esac
 
-asset="${BIN}-${os_part}-${arch_part}"
+asset="${BIN}-${os_part}-${arch_part}${exe}"
 
 # --- resolve download tool + URLs -----------------------------------------
 if command -v curl >/dev/null 2>&1; then
@@ -68,11 +70,33 @@ fi
 
 # --- choose install dir ---------------------------------------------------
 if [ -z "$INSTALL_DIR" ]; then
-  if [ -w "/usr/local/bin" ]; then
-    INSTALL_DIR="/usr/local/bin"
-  else
-    INSTALL_DIR="${HOME}/.local/bin"
+  : "${HOME:?HOME is unset; set TV_INSTALL_DIR to specify install location}"
+  # Pick a writable directory that is on PATH
+  for _dir in "/usr/local/bin" "${HOME}/.local/bin"; do
+    case ":${PATH}:" in
+      *":${_dir}:"*)
+        if [ -w "$_dir" ] || [ ! -e "$_dir" ]; then
+          INSTALL_DIR="$_dir"
+          break
+        fi
+        ;;
+    esac
+  done
+  # Fallback: any writable PATH entry
+  if [ -z "$INSTALL_DIR" ]; then
+    IFS=:
+    for _dir in $PATH; do
+      [ -w "$_dir" ] && { INSTALL_DIR="$_dir"; break; }
+    done
+    unset IFS
   fi
+fi
+
+# Last resort: write to ~/.local/bin (may not be on PATH)
+if [ -z "$INSTALL_DIR" ]; then
+  INSTALL_DIR="${HOME}/.local/bin"
+  mkdir -p "$INSTALL_DIR" 2>/dev/null || true
+  warn "installing to ${INSTALL_DIR} (not on PATH; set TV_INSTALL_DIR to override)"
 fi
 
 # --- download + verify ----------------------------------------------------
@@ -102,19 +126,26 @@ expected="$(awk -v a="$asset" '$2 == a || $2 == "*"a {print $1}' "${tmp}/SHA256S
   actual:   ${actual}"
 
 # --- install --------------------------------------------------------------
-mkdir -p "$INSTALL_DIR" || error "could not create ${INSTALL_DIR}"
+if ! mkdir -p "$INSTALL_DIR" 2>/dev/null; then
+  if command -v sudo >/dev/null 2>&1; then
+    warn "could not create ${INSTALL_DIR}; using sudo"
+    sudo mkdir -p "$INSTALL_DIR"
+  else
+    error "could not create ${INSTALL_DIR} and sudo is unavailable; set TV_INSTALL_DIR to a writable directory"
+  fi
+fi
 chmod +x "${tmp}/${asset}"
 
 if [ -w "$INSTALL_DIR" ]; then
-  mv "${tmp}/${asset}" "${INSTALL_DIR}/${BIN}"
+  mv "${tmp}/${asset}" "${INSTALL_DIR}/${BIN}${exe}"
 elif command -v sudo >/dev/null 2>&1; then
   warn "${INSTALL_DIR} is not writable; using sudo"
-  sudo mv "${tmp}/${asset}" "${INSTALL_DIR}/${BIN}"
+  sudo mv "${tmp}/${asset}" "${INSTALL_DIR}/${BIN}${exe}"
 else
   error "${INSTALL_DIR} is not writable and sudo is unavailable; set TV_INSTALL_DIR to a writable directory"
 fi
 
-info "${GREEN}Installed${RESET} ${BIN} to ${BOLD}${INSTALL_DIR}/${BIN}${RESET}"
+info "${GREEN}Installed${RESET} ${BIN} to ${BOLD}${INSTALL_DIR}/${BIN}${exe}${RESET}"
 
 # --- PATH hint ------------------------------------------------------------
 case ":${PATH}:" in
