@@ -30,9 +30,10 @@ release:
 run *args:
     cargo run -- {{args}}
 
-# build release and copy tv to ~/.cargo/bin
+# build release and copy tv to ~/.cargo/bin (re-signs at destination on macOS)
 install: release
     cp target/release/tv ~/.cargo/bin/tv
+    {{ if os() == "macos" { "codesign --force -s - ~/.cargo/bin/tv" } else { "" } }}
 
 # run tests
 test *args:

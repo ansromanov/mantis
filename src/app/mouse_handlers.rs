@@ -42,7 +42,7 @@ impl App {
                     }
                 } else if rect_contains(self.content_area, ev.column, ev.row) {
                     self.focus = Focus::Content;
-                    let can_select = !(self.is_diff || self.word_wrap);
+                    let can_select = !self.is_diff;
                     if can_select {
                         let pos = self.content_pos(ev.column, ev.row);
                         self.drag_start = Some(pos);
