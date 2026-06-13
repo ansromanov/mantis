@@ -16,15 +16,17 @@ impl App {
 
         if self.git_mode {
             if self.git_mode_flat {
+                self.walk_errors = 0;
                 self.nodes = self.build_git_flat_nodes();
             } else {
-                let all = build_visible(
+                let (all, errs) = build_visible(
                     &self.root,
                     &self.expanded,
                     self.show_hidden,
                     self.ignore_gitignore,
                     &deleted,
                 );
+                self.walk_errors = errs;
                 let map = &self.git_status_map;
                 self.nodes = all
                     .into_iter()
@@ -34,13 +36,15 @@ impl App {
                     .collect();
             }
         } else {
-            self.nodes = build_visible(
+            let (nodes, errs) = build_visible(
                 &self.root,
                 &self.expanded,
                 self.show_hidden,
                 self.ignore_gitignore,
                 &deleted,
             );
+            self.walk_errors = errs;
+            self.nodes = nodes;
         }
 
         if let Some(p) = prev {

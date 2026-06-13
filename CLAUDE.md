@@ -4,7 +4,14 @@ Always pass `isolation: "worktree"` when spawning subagents via the Agent tool. 
 
 # Agent workflow
 
-When starting work on a new feature or fix, create a branch with:
+When starting work on a new feature or fix, first ensure you are on an up-to-date main branch:
+
+```bash
+git checkout main
+git pull
+```
+
+Then create a feature branch with:
 
 ```bash
 just new your-branch-name
