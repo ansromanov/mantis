@@ -16,22 +16,43 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Detect code changes
+        id: changes
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base=${{ github.event.pull_request.base.sha }}
+          else
+            base=${{ github.event.before }}
+          fi
+          changed=$(git diff --name-only "$base" HEAD 2>/dev/null || git diff --name-only HEAD~1 HEAD)
+          if echo "$changed" | grep -qE '^(src/|tests/|Cargo\.(toml|lock)|tv\.toml)'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Install Rust toolchain
+        if: steps.changes.outputs.code == 'true'
         uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
 
       - name: Cache cargo
+        if: steps.changes.outputs.code == 'true'
         uses: Swatinem/rust-cache@v2
 
       - name: Format
+        if: steps.changes.outputs.code == 'true'
         run: cargo fmt --all -- --check
 
       - name: Clippy
+        if: steps.changes.outputs.code == 'true'
         run: cargo clippy --all-targets -- -D warnings
 
       - name: Test
+        if: steps.changes.outputs.code == 'true'
         run: cargo test --all
 
       - name: Build (release)
+        if: steps.changes.outputs.code == 'true'
         run: cargo build --release
