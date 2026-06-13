@@ -237,13 +237,7 @@ impl App {
                 .map(|l| vec![(diff_line_style(l, &self.theme), l.clone())])
                 .collect();
         } else if let Some(path) = self.current_file.clone() {
-            let scroll = self.content_scroll;
-            let hscroll = self.content_hscroll;
-            let raw = self.show_raw_markdown;
-            self.open_file(&path);
-            self.show_raw_markdown = raw;
-            self.content_scroll = scroll.min(self.content_line_count().saturating_sub(1));
-            self.content_hscroll = hscroll;
+            self.reopen_file(&path);
         }
     }
 
