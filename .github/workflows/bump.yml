@@ -1,0 +1,36 @@
+name: Bump Version
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    if: "!startsWith(github.event.head_commit.message, 'chore: release v')"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Bump minor version
+        id: bump
+        run: |
+          current=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          major=$(echo "$current" | cut -d. -f1)
+          minor=$(echo "$current" | cut -d. -f2)
+          new_version="${major}.$((minor + 1)).0"
+          sed -i "s/^version = \"${current}\"/version = \"${new_version}\"/" Cargo.toml
+          sed -i "/^name = \"tree-viewer\"/{n;s/version = \"${current}\"/version = \"${new_version}\"/}" Cargo.lock
+          echo "version=${new_version}" >> "$GITHUB_OUTPUT"
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Cargo.toml Cargo.lock
+          git commit -m "chore: release v${{ steps.bump.outputs.version }}"
+          git push origin HEAD:main
