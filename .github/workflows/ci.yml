@@ -15,16 +15,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: Detect code changes
         id: changes
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            base=${{ github.event.pull_request.base.sha }}
+            changed=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files \
+              --paginate --jq '.[].filename')
           else
-            base=${{ github.event.before }}
+            changed=$(git diff --name-only HEAD~1 HEAD)
           fi
-          changed=$(git diff --name-only "$base" HEAD 2>/dev/null || git diff --name-only HEAD~1 HEAD)
           if echo "$changed" | grep -qE '^(src/|tests/|Cargo\.(toml|lock)|tv\.toml)'; then
             echo "code=true" >> "$GITHUB_OUTPUT"
           else
