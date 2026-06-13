@@ -29,6 +29,21 @@ fuzzy search, and mouse support. Built with [ratatui](https://ratatui.rs).
 
 ## Install
 
+**One-liner** (Linux/macOS, no Rust toolchain required) — downloads the prebuilt
+binary for your OS/arch, verifies its checksum, and installs it onto your `PATH`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/ansromanov/tree-viewer/main/install.sh | sh
+```
+
+With the Rust toolchain:
+
+```sh
+cargo install tree-viewer
+```
+
+Or build from source:
+
 ```sh
 git clone https://github.com/ansromanov/tree-viewer.git
 cd tree-viewer
@@ -41,6 +56,9 @@ Or, if you have [`just`](https://github.com/casey/just):
 ```sh
 just install   # builds --release and copies tv to ~/.cargo/bin
 ```
+
+See the [installation docs](https://ansromanov.github.io/tree-viewer/installation.html)
+for prebuilt binaries, Windows, and checksum verification.
 
 ## Usage
 

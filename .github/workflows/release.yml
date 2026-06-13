@@ -2,20 +2,32 @@ name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      bump:
+        type: boolean
+        description: Bump minor version before build
+        default: true
 
 jobs:
   bump:
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.bump.outputs.version }}
-      sha: ${{ steps.push.outputs.sha }}
+      version: ${{ steps.bump.outputs.version || steps.current.outputs.version }}
+      sha: ${{ steps.push.outputs.sha || github.sha }}
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ssh-key: ${{ secrets.DEPLOY_KEY }}
 
+      - name: Get current version
+        id: current
+        run: |
+          current=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          echo "version=${current}" >> "$GITHUB_OUTPUT"
+
       - name: Bump minor version
+        if: inputs.bump
         id: bump
         run: |
           current=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
@@ -27,6 +39,7 @@ jobs:
           echo "version=${new_version}" >> "$GITHUB_OUTPUT"
 
       - name: Commit and push
+        if: inputs.bump
         id: push
         run: |
           git config user.name "github-actions[bot]"
@@ -45,6 +58,9 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-musl
             artifact: tv-linux-x86_64
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-musl
+            artifact: tv-linux-aarch64
           - os: macos-latest
             target: aarch64-apple-darwin
             artifact: tv-macos-aarch64
@@ -65,7 +81,7 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Install musl tools
-        if: matrix.target == 'x86_64-unknown-linux-musl'
+        if: runner.os == 'Linux'
         run: sudo apt-get install -y musl-tools
 
       - uses: Swatinem/rust-cache@v2
@@ -118,6 +134,12 @@ jobs:
         with:
           path: artifacts
           merge-multiple: true
+
+      - name: Generate checksums
+        run: |
+          cd artifacts
+          sha256sum * > SHA256SUMS
+          cat SHA256SUMS
 
       - uses: softprops/action-gh-release@v3
         with:
