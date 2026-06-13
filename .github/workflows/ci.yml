@@ -13,6 +13,10 @@ jobs:
   ci:
     name: build, test, clippy
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -39,11 +43,17 @@ jobs:
         if: steps.changes.outputs.code == 'true'
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy, rustfmt
+          components: clippy, rustfmt, llvm-tools-preview
 
       - name: Cache cargo
         if: steps.changes.outputs.code == 'true'
         uses: Swatinem/rust-cache@v2
+
+      - name: Install nextest and cargo-llvm-cov
+        if: steps.changes.outputs.code == 'true'
+        uses: taiki-e/install-action@v2
+        with:
+          tool: nextest,cargo-llvm-cov
 
       - name: Format
         if: steps.changes.outputs.code == 'true'
@@ -53,6 +63,77 @@ jobs:
         if: steps.changes.outputs.code == 'true'
         run: cargo clippy --all-targets -- -D warnings
 
-      - name: Test
+      - name: Test with coverage
         if: steps.changes.outputs.code == 'true'
-        run: cargo test --all
+        id: test
+        continue-on-error: true
+        run: cargo llvm-cov nextest --profile ci --all --no-report
+
+      - name: Generate coverage reports
+        if: steps.changes.outputs.code == 'true'
+        continue-on-error: true
+        run: |
+          cargo llvm-cov report --lcov --output-path lcov.info
+          cargo llvm-cov report 2>&1 | tee coverage_summary.txt
+
+      - name: Build PR comment
+        if: steps.changes.outputs.code == 'true' && github.event_name == 'pull_request'
+        run: |
+          if [ "${{ steps.test.outcome }}" = "success" ]; then
+            STATUS="✅ passed"
+          else
+            STATUS="❌ failed"
+          fi
+
+          TOTAL=$(grep '^TOTAL' coverage_summary.txt 2>/dev/null || echo "")
+          if [ -n "$TOTAL" ]; then
+            LINE_COV=$(echo "$TOTAL"  | awk '{print $10}')
+            FUNC_COV=$(echo "$TOTAL"  | awk '{print $7}')
+            REGION_COV=$(echo "$TOTAL" | awk '{print $4}')
+          else
+            LINE_COV="n/a"; FUNC_COV="n/a"; REGION_COV="n/a"
+          fi
+
+          {
+            echo "## 🧪 Test Results — $STATUS"
+            echo ""
+            echo "### 📊 Coverage"
+            echo ""
+            echo "| Metric    | Coverage |"
+            echo "|-----------|:--------:|"
+            echo "| Lines     | \`$LINE_COV\`   |"
+            echo "| Functions | \`$FUNC_COV\`   |"
+            echo "| Regions   | \`$REGION_COV\` |"
+            if [ -f coverage_summary.txt ]; then
+              echo ""
+              echo "<details>"
+              echo "<summary>Full coverage report</summary>"
+              echo ""
+              echo '```'
+              cat coverage_summary.txt
+              echo '```'
+              echo ""
+              echo "</details>"
+            fi
+          } > pr_comment.md
+
+      - name: Post / update PR comment
+        if: steps.changes.outputs.code == 'true' && github.event_name == 'pull_request' && always()
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: test-results
+          path: pr_comment.md
+
+      - name: Job summary
+        if: steps.changes.outputs.code == 'true' && always()
+        uses: mikepenz/action-junit-report@v4
+        with:
+          report_paths: target/nextest/ci/junit.xml
+          detailed_summary: true
+          include_passed: true
+          check_name: Test Results
+          comment: false
+
+      - name: Fail if tests failed
+        if: steps.test.outcome == 'failure'
+        run: exit 1
