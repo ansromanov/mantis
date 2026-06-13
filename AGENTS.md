@@ -81,22 +81,23 @@ Uses `crossterm::event::poll()` with 16ms timeout — no async runtime. Simple s
 
 ## Branching
 
-Always branch from `origin/main`, never from an existing feature branch:
+Always branch from `origin/main`, never from an existing feature branch. Use the just command:
 
 ```bash
-git fetch origin
-git checkout -b your-branch origin/main
+just new your-branch-name
 ```
+
+This fetches latest main, creates the branch from `origin/main`, and installs pre-commit hooks.
 
 If you find yourself on a branch that isn't based on main, cherry-pick only the new commits onto a clean branch rather than rebasing through merge noise.
 
-Before pushing (especially before opening a PR), rebase onto the latest main to avoid the "out of date" warning:
+Before pushing and opening a PR, use:
 
 ```bash
-git fetch origin
-git rebase origin/main
-git push --force-with-lease   # only needed if the branch was already pushed
+just pr
 ```
+
+This fetches latest `origin/main`, rebases onto it (fails loudly on conflicts so you can resolve them), then pushes with `--force-with-lease`. Run `gh pr create` after to open the PR.
 
 ## File Size Limit
 
