@@ -476,12 +476,21 @@ impl App {
         let _ = disable_raw_mode();
         let _ = execute!(std::io::stdout(), LeaveAlternateScreen, DisableMouseCapture,);
 
-        // Spawn editor and wait for it to finish
-        let _ = std::process::Command::new(&editor).arg(&path).status();
+        // Spawn editor and wait for it to finish.
+        // Split on whitespace so $EDITOR="code --wait" works correctly.
+        let parts: Vec<&str> = editor.split_whitespace().collect();
+        if let Some((cmd, args)) = parts.split_first() {
+            let _ = std::process::Command::new(cmd)
+                .args(args)
+                .arg(&path)
+                .status();
+        }
 
         // Restore TUI
         let _ = execute!(std::io::stdout(), EnterAlternateScreen, EnableMouseCapture,);
-        let _ = enable_raw_mode();
+        if let Err(e) = enable_raw_mode() {
+            eprintln!("tv: failed to restore raw mode after editor: {e}");
+        }
 
         // Flag that the terminal was suspended so main.rs clears ratatui's
         // internal buffer (which is stale after re-entering the alt screen).
