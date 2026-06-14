@@ -202,6 +202,10 @@ impl App {
         self.rebuild();
         if let Some(i) = self.nodes.iter().position(|n| n.path == path) {
             self.tree_selected = i;
+            // Keep the viewport on the revealed node in independent-scroll mode;
+            // otherwise the selection can land outside the stale viewport and
+            // render unhighlighted. No-op when independent scroll is off.
+            self.scroll_tree_into_view();
         }
     }
 

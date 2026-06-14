@@ -2267,6 +2267,37 @@ fn tree_independent_scroll_up_down_still_move_cursor_and_follow() {
 }
 
 #[test]
+fn tree_independent_scroll_reveal_keeps_selection_in_viewport() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Tree;
+    app.tree_independent_scroll = true;
+    app.tree_area = Rect {
+        x: 0,
+        y: 0,
+        width: 20,
+        height: 2,
+    };
+    // Park the viewport away from the top so a reveal must scroll it back.
+    app.tree_scroll = app.nodes.len().saturating_sub(2);
+
+    let nested = root.join("sub").join("c.txt");
+    app.reveal_in_tree(&nested);
+
+    let idx = app.nodes.iter().position(|n| n.path == nested).unwrap();
+    assert_eq!(app.tree_selected, idx);
+    assert!(
+        app.tree_selected >= app.tree_scroll
+            && app.tree_selected < app.tree_scroll + app.tree_area.height as usize,
+        "revealed node {} should be inside viewport [{}, {})",
+        app.tree_selected,
+        app.tree_scroll,
+        app.tree_scroll + app.tree_area.height as usize
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn tree_key_other_key_noop_when_focus_tree() {
     let root = temp_tree();
     let mut app = app_for(&root);

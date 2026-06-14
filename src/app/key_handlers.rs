@@ -602,7 +602,7 @@ impl App {
     /// When independent tree scrolling is enabled, nudges `tree_scroll` so the
     /// current selection stays within the viewport after a cursor move. A no-op
     /// otherwise, since the list widget auto-scrolls to the selection.
-    fn scroll_tree_into_view(&mut self) {
+    pub(super) fn scroll_tree_into_view(&mut self) {
         if !self.tree_independent_scroll {
             return;
         }
