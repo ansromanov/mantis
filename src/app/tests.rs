@@ -2950,3 +2950,116 @@ fn set_scroll_from_mouse_y_calculates_position() {
     assert_eq!(app.content_scroll, 40);
     fs::remove_dir_all(&root).ok();
 }
+
+/// A temp git repo whose tracked file has two well-separated edits, producing a
+/// working-tree diff with two distinct `@@` hunks.
+fn temp_git_two_hunks() -> PathBuf {
+    use std::process::Command;
+    static COUNTER: AtomicUsize = AtomicUsize::new(0);
+    let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+    let dir = std::env::temp_dir().join(format!("tv_git_hunks_{}_{n}", std::process::id()));
+    fs::create_dir_all(&dir).unwrap();
+    let git = |args: &[&str]| {
+        Command::new("git")
+            .arg("-C")
+            .arg(&dir)
+            .args(["-c", "user.email=t@e.x", "-c", "user.name=T"])
+            .args(args)
+            .status()
+            .unwrap();
+    };
+    git(&["init", "-q"]);
+    let base: String = (1..=30).map(|i| format!("line {i}\n")).collect();
+    fs::write(dir.join("f.txt"), &base).unwrap();
+    git(&["add", "."]);
+    git(&["commit", "-q", "-m", "init"]);
+    // Edit line 2 and line 28 — far enough apart for two separate hunks.
+    let edited: String = (1..=30)
+        .map(|i| match i {
+            2 => "line 2 CHANGED\n".to_string(),
+            28 => "line 28 CHANGED\n".to_string(),
+            _ => format!("line {i}\n"),
+        })
+        .collect();
+    fs::write(dir.join("f.txt"), &edited).unwrap();
+    dir.canonicalize().unwrap()
+}
+
+#[test]
+fn diff_side_by_side_toggle_flips_flag_and_builds_rows() {
+    let root = temp_git_tree();
+    let mut app = app_for(&root);
+    app.show_working_tree_diff(&root.join("tracked.txt"));
+    app.focus = Focus::Content;
+
+    assert!(app.is_diff);
+    assert!(!app.diff_rows.is_empty(), "diff rows must be parsed");
+    assert!(!app.diff_side_by_side);
+
+    // D toggles side-by-side on, then off.
+    app.handle_key(KeyEvent::new(KeyCode::Char('D'), KeyModifiers::empty()));
+    assert!(app.diff_side_by_side);
+    app.handle_key(KeyEvent::new(KeyCode::Char('D'), KeyModifiers::empty()));
+    assert!(!app.diff_side_by_side);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn diff_side_by_side_key_is_noop_outside_diff() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt"));
+    app.focus = Focus::Content;
+
+    app.handle_key(KeyEvent::new(KeyCode::Char('D'), KeyModifiers::empty()));
+    assert!(
+        !app.diff_side_by_side,
+        "D must do nothing for a normal file"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn diff_sbs_active_requires_min_width() {
+    let root = temp_git_tree();
+    let mut app = app_for(&root);
+    app.show_working_tree_diff(&root.join("tracked.txt"));
+    app.diff_side_by_side = true;
+
+    app.content_area.width = crate::diff::MIN_SIDE_BY_SIDE_WIDTH - 1;
+    assert!(!app.diff_sbs_active(), "too narrow → falls back to unified");
+    app.content_area.width = crate::diff::MIN_SIDE_BY_SIDE_WIDTH;
+    assert!(app.diff_sbs_active(), "wide enough → side-by-side active");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn diff_hunk_navigation_jumps_between_headers() {
+    let root = temp_git_two_hunks();
+    let mut app = app_for(&root);
+    app.show_working_tree_diff(&root.join("f.txt"));
+    app.focus = Focus::Content;
+    app.content_area.height = 5;
+
+    // Header rows in the unified content.
+    let headers: Vec<usize> = app
+        .content
+        .iter()
+        .enumerate()
+        .filter(|(_, l)| l.starts_with("@@"))
+        .map(|(i, _)| i)
+        .collect();
+    assert_eq!(headers.len(), 2, "expected two hunks");
+
+    app.content_scroll = 0;
+    // n jumps to the first hunk header below the top.
+    app.handle_key(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::empty()));
+    assert_eq!(app.content_scroll, headers[0]);
+    // n again advances to the second hunk.
+    app.handle_key(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::empty()));
+    assert_eq!(app.content_scroll, headers[1]);
+    // N goes back to the first.
+    app.handle_key(KeyEvent::new(KeyCode::Char('N'), KeyModifiers::empty()));
+    assert_eq!(app.content_scroll, headers[0]);
+    fs::remove_dir_all(&root).ok();
+}

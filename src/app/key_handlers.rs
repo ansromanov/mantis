@@ -359,6 +359,11 @@ impl App {
                 self.content_scroll = 0;
                 self.content_hscroll = 0;
             }
+            Some("toggle_diff_side_by_side") if self.is_diff => {
+                self.diff_side_by_side = !self.diff_side_by_side;
+                self.content_scroll = 0;
+                self.content_hscroll = 0;
+            }
             Some("open_in_editor") => self.open_in_editor(),
             Some("open_config_in_editor") => self.open_config_in_editor(),
             Some("show_about") => self.show_about = !self.show_about,
@@ -689,6 +694,14 @@ impl App {
             self.content_hscroll = 0;
         } else if !self.is_diff && pressed(&k.toggle_blame, &key) {
             self.show_blame = !self.show_blame;
+        } else if self.is_diff && pressed(&k.toggle_diff_side_by_side, &key) {
+            self.diff_side_by_side = !self.diff_side_by_side;
+            self.content_scroll = 0;
+            self.content_hscroll = 0;
+        } else if self.is_diff && pressed(&k.diff_hunk_next, &key) {
+            self.diff_next_hunk();
+        } else if self.is_diff && pressed(&k.diff_hunk_prev, &key) {
+            self.diff_prev_hunk();
         } else if !self.yaml_fold_regions.is_empty() && pressed(&k.yaml_fold_toggle, &key) {
             // Toggle the fold region whose header is at the current scroll position.
             let phys = self.display_to_physical(self.content_scroll);

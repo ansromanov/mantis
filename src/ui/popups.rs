@@ -530,6 +530,14 @@ pub(super) fn draw_help(f: &mut Frame, app: &App, area: Rect) {
             desc("git history of current file"),
         ]),
         Line::from(vec![
+            key("  D          "),
+            desc("toggle side-by-side diff (in a diff)"),
+        ]),
+        Line::from(vec![
+            key("  n / N      "),
+            desc("next / previous hunk (in a diff)"),
+        ]),
+        Line::from(vec![
             key("  /          "),
             desc("find in file (in-file search)"),
         ]),

@@ -54,6 +54,10 @@ pub struct App {
     pub word_wrap: bool,
     pub current_file: Option<PathBuf>,
     pub is_diff: bool,
+    /// When `true`, diffs render in a split old|new layout instead of unified.
+    pub diff_side_by_side: bool,
+    /// Side-by-side rows parsed from the current diff; empty for non-diffs.
+    pub diff_rows: Vec<crate::diff::DiffRow>,
     pub content_title: Option<String>,
     pub focus: Focus,
     pub search: Option<SearchState>,
@@ -177,6 +181,8 @@ impl App {
             word_wrap: cfg.word_wrap,
             current_file: None,
             is_diff: false,
+            diff_side_by_side: false,
+            diff_rows: Vec::new(),
             content_title: None,
             focus: Focus::Tree,
             search: None,
@@ -300,10 +306,21 @@ impl App {
         }
     }
 
+    /// Whether the diff should currently render in the side-by-side layout: the
+    /// toggle is on, a diff is loaded, and the content pane is wide enough.
+    pub fn diff_sbs_active(&self) -> bool {
+        self.is_diff
+            && self.diff_side_by_side
+            && !self.diff_rows.is_empty()
+            && self.content_area.width >= crate::diff::MIN_SIDE_BY_SIDE_WIDTH
+    }
+
     /// Returns the number of **display** lines after folding. Equals
     /// `line_count()` when no folds are active.
     pub fn display_line_count(&self) -> usize {
-        if self.fold_display_map.is_empty() {
+        if self.diff_sbs_active() {
+            self.diff_rows.len()
+        } else if self.fold_display_map.is_empty() {
             self.line_count()
         } else {
             self.fold_display_map.len()
@@ -335,6 +352,44 @@ impl App {
             .iter()
             .position(|&p| p >= physical)
             .unwrap_or(self.fold_display_map.len().saturating_sub(1))
+    }
+
+    /// Returns the display-row indices of hunk headers (`@@`) in the current
+    /// diff, in the coordinate space matching the active layout.
+    fn diff_hunk_rows(&self) -> Vec<usize> {
+        if self.diff_sbs_active() {
+            self.diff_rows
+                .iter()
+                .enumerate()
+                .filter(|(_, r)| matches!(r, crate::diff::DiffRow::Header(_)))
+                .map(|(i, _)| i)
+                .collect()
+        } else {
+            self.content
+                .iter()
+                .enumerate()
+                .filter(|(_, l)| l.starts_with("@@"))
+                .map(|(i, _)| i)
+                .collect()
+        }
+    }
+
+    /// Scrolls to the next hunk header below the current scroll position.
+    pub(crate) fn diff_next_hunk(&mut self) {
+        let cur = self.content_scroll;
+        if let Some(&next) = self.diff_hunk_rows().iter().find(|&&i| i > cur) {
+            self.content_scroll = next.min(self.content_scroll_max());
+            self.mark_content_scrolled();
+        }
+    }
+
+    /// Scrolls to the previous hunk header above the current scroll position.
+    pub(crate) fn diff_prev_hunk(&mut self) {
+        let cur = self.content_scroll;
+        if let Some(&prev) = self.diff_hunk_rows().iter().rev().find(|&&i| i < cur) {
+            self.content_scroll = prev;
+            self.mark_content_scrolled();
+        }
     }
 
     /// Returns the fold region index whose `start` matches `physical_line`, if any.

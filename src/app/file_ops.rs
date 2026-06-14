@@ -124,6 +124,7 @@ impl App {
             .iter()
             .map(|l| vec![(diff_line_style(l, &self.theme), l.clone())])
             .collect();
+        self.diff_rows = crate::diff::parse_side_by_side(&lines);
         self.content = lines;
         self.set_file_watch(Some(path));
     }
@@ -134,6 +135,7 @@ impl App {
         self.in_file_search = None;
         self.current_file = Some(path.to_path_buf());
         self.is_diff = false;
+        self.diff_rows = Vec::new();
         self.is_markdown = false;
         self.show_raw_markdown = false;
         self.is_json = false;
@@ -170,6 +172,7 @@ impl App {
     pub fn open_file(&mut self, path: &Path) {
         self.in_file_search = None;
         self.is_diff = false;
+        self.diff_rows = Vec::new();
         self.content_title = None;
         self.content_scroll = 0;
         self.content_hscroll = 0;
@@ -308,6 +311,7 @@ impl App {
             .iter()
             .map(|l| vec![(diff_line_style(l, &self.theme), l.clone())])
             .collect();
+        self.diff_rows = crate::diff::parse_side_by_side(&lines);
         self.content = lines;
         self.focus = Focus::Content;
         self.set_file_watch(None);
