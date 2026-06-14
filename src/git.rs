@@ -295,11 +295,16 @@ pub fn working_tree_diff(repo_dir: &Path, file: &Path) -> Vec<String> {
         }
     }
 
-    // Untracked (unstaged) new file — diff against /dev/null.
+    // Untracked (unstaged) new file — diff against the null device.
+    // Git for Windows doesn't translate /dev/null in --no-index mode.
+    #[cfg(windows)]
+    let null_dev = "NUL";
+    #[cfg(not(windows))]
+    let null_dev = "/dev/null";
     let out = Command::new("git")
         .arg("-C")
         .arg(repo_dir)
-        .args(["diff", "--no-color", "--no-index", "--", "/dev/null"])
+        .args(["diff", "--no-color", "--no-index", "--", null_dev])
         .arg(file)
         .output();
 
