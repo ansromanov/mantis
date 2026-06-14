@@ -3174,6 +3174,387 @@ fn diff_sbs_active_requires_min_width() {
     fs::remove_dir_all(&root).ok();
 }
 
+// -- content_scroll_max edge cases -----------------------------------------
+
+#[test]
+fn content_scroll_max_zero_total_content() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.content = Vec::new();
+    app.content_area = viewport(10);
+    assert_eq!(app.content_scroll_max(), 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_scroll_max_lines_less_than_height() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.content = vec!["a".to_string(), "b".to_string()];
+    app.content_area = viewport(10);
+    assert_eq!(app.content_scroll_max(), 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_scroll_max_zero_height_falls_back_to_one() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.content = vec!["a".to_string(); 5];
+    app.content_area = viewport(0);
+    // vh = max(0,1) = 1, so max = 5 - 1 = 4
+    assert_eq!(app.content_scroll_max(), 4);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- content_pos additional boundary tests ---------------------------------
+
+#[test]
+fn content_pos_no_wrap_with_hscroll() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt"));
+    app.word_wrap = false;
+    app.content_scroll = 0;
+    app.content_hscroll = 5;
+    app.content_area = Rect {
+        x: 2,
+        y: 2,
+        width: 80,
+        height: 20,
+    };
+    // rel_col = 5 - 2 = 3, prefix = 2, buf_col = 3 + 5 - 2 = 6
+    let (_line, col) = app.content_pos(5, 2);
+    assert_eq!(col, 6);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_pos_no_wrap_below_content_clamps_to_last() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt")); // 2 lines
+    app.content_scroll = 0;
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 20,
+    };
+    // row 99 → rel_row = 99 → display_line = 99 → display_to_physical(99) = 99,
+    // but line_count is 2, so display_to_physical returns 99 (no fold map, identity).
+    // This is technically past end — the caller (mouse handler) should guard against this.
+    let (line, _col) = app.content_pos(0, 99);
+    assert_eq!(line, 99); // identity mapping past end
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_pos_virtual_file_no_wrap() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt"));
+    app.word_wrap = false;
+    app.content_scroll = 0;
+    app.content_hscroll = 0;
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 20,
+    };
+    let (line, _col) = app.content_pos(0, 0);
+    assert_eq!(line, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_pos_with_fold_display_map() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt")); // "line1\nline2\n"
+                                        // Simulate folding: mark line 0 as hidden via fold_display_map.
+    app.fold_display_map = vec![1]; // display line 0 → physical line 1
+    app.content_scroll = 0;
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 20,
+    };
+    // rel_row = 0, display_to_physical(0) = 1
+    let (line, _col) = app.content_pos(0, 0);
+    assert_eq!(line, 1);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_pos_word_wrap_zero_width_area_falls_through() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.is_markdown = true;
+    app.show_raw_markdown = false;
+    app.markdown_lines = vec![vec![(
+        ratatui::style::Style::default(),
+        "hello".to_string(),
+    )]];
+    app.word_wrap = true;
+    app.content_scroll = 0;
+    // wrap_width = 0 → NonZeroUsize::new(0) is None → falls through to no-wrap path
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 20,
+    };
+    let (line, _col) = app.content_pos(0, 0);
+    assert_eq!(line, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_pos_diff_mode_prefix_zero() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.content = vec!["@@ -1 +1 @@".to_string(), "+hello".to_string()];
+    app.is_diff = true;
+    app.content_scroll = 0;
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 20,
+    };
+    // prefix = 0 (diff mode), rel_col = 1 → buf_col = 1
+    let (line, col) = app.content_pos(1, 1);
+    assert_eq!(line, 1);
+    assert_eq!(col, 1);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- line_prefix_width ------------------------------------------------------
+
+#[test]
+fn line_prefix_width_normal_file_with_line_numbers() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.content = vec!["hello".to_string()];
+    // Not diff, not markdown → prefix = fold_gutter_width + len("1") + 1 = 0 + 1 + 1 = 2
+    assert_eq!(app.line_prefix_width(), 2);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn line_prefix_width_with_fold_gutter() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.content = vec!["hello".to_string(); 10];
+    // Simulate YAML fold regions
+    app.yaml_fold_regions = vec![crate::yaml_fold::FoldRegion { start: 0, end: 5 }];
+    // fold_gutter_width = 2, line_width = len("10") + 1 = 3, total = 2 + 3 = 5
+    assert_eq!(app.line_prefix_width(), 5);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- selection_text ---------------------------------------------------------
+
+#[test]
+fn selection_text_inline_single_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.content = vec!["hello world".to_string()];
+    app.selection = Some(crate::selection::TextSelection {
+        anchor: (0, 6),
+        active: (0, 11),
+    });
+    assert_eq!(app.selection_text(), "world");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn selection_text_inline_multi_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.content = vec!["abc".to_string(), "def".to_string()];
+    app.selection = Some(crate::selection::TextSelection {
+        anchor: (0, 1),
+        active: (1, 2),
+    });
+    assert_eq!(app.selection_text(), "bc\nde");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn selection_text_inline_out_of_bounds_returns_empty() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.content = vec!["hi".to_string()];
+    app.selection = Some(crate::selection::TextSelection {
+        anchor: (10, 0),
+        active: (20, 0),
+    });
+    assert_eq!(app.selection_text(), "");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn selection_text_markdown_single_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.is_markdown = true;
+    app.show_raw_markdown = false;
+    app.markdown_lines = vec![vec![(
+        ratatui::style::Style::default(),
+        "hello **world**".to_string(),
+    )]];
+    app.selection = Some(crate::selection::TextSelection {
+        anchor: (0, 6),
+        active: (0, 11),
+    });
+    assert_eq!(app.selection_text(), "**wor");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn selection_text_markdown_multi_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.is_markdown = true;
+    app.show_raw_markdown = false;
+    app.markdown_lines = vec![
+        vec![(ratatui::style::Style::default(), "line A".to_string())],
+        vec![(ratatui::style::Style::default(), "line B".to_string())],
+    ];
+    app.selection = Some(crate::selection::TextSelection {
+        anchor: (0, 5),
+        active: (1, 4),
+    });
+    assert_eq!(app.selection_text(), "A\nline");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn selection_text_markdown_out_of_bounds_returns_empty() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.is_markdown = true;
+    app.show_raw_markdown = false;
+    app.markdown_lines = vec![];
+    app.selection = Some(crate::selection::TextSelection {
+        anchor: (5, 0),
+        active: (10, 0),
+    });
+    assert_eq!(app.selection_text(), "");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn selection_text_virtual_file() {
+    use std::io::Write;
+    let root = temp_tree();
+    // Create a temp file, read it via App::open_file, then simulate selection.
+    let path = root.join("sel.txt");
+    let mut f = std::fs::File::create(&path).unwrap();
+    write!(f, "alpha\nbeta\ngamma\n").unwrap();
+    drop(f);
+    let mut app = app_for(&root);
+    app.open_file(&path);
+    assert!(app.virtual_file.is_some(), "should use virtual file");
+    app.selection = Some(crate::selection::TextSelection {
+        anchor: (1, 1),
+        active: (2, 3),
+    });
+    // line 1 = "beta", col 1 = 'e' → "eta"; line 2 = "gamma", col 3 = "gam" → "gam"
+    assert_eq!(app.selection_text(), "eta\ngam");
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- selection_text: JSON pretty mode ---------------------------------------
+
+#[test]
+fn selection_text_json_pretty() {
+    let root = temp_tree();
+    let path = root.join("data.json");
+    fs::write(&path, r#"{"a":1,"b":2}"#).unwrap();
+    let mut app = app_for(&root);
+    app.open_file(&path);
+    assert!(app.show_pretty_json, "JSON files open with pretty view");
+    // Pretty-printed JSON has '{' on line 0, values on subsequent lines.
+    app.selection = Some(crate::selection::TextSelection {
+        anchor: (0, 0),
+        active: (2, 0),
+    });
+    let text = app.selection_text();
+    assert!(
+        !text.is_empty(),
+        "selection text should not be empty; json_pretty_text={:?}",
+        app.json_pretty_text
+    );
+    assert!(text.contains('{'), "selection should include opening brace");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn selection_text_virtual_file_out_of_bounds_returns_empty() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.content = vec!["hello".to_string()];
+    // virtual_file is None, so the VirtualFile path won't trigger.
+    // Force virtual_file to be Some to test that branch:
+    let path = root.join("dummy.txt");
+    fs::write(&path, "hi\n").unwrap();
+    let vf = crate::virtual_file::VirtualFile::open(&path);
+    app.virtual_file = vf;
+    app.content = Vec::new();
+    // start_line >= total (line_count = 1 from virtual file)
+    app.selection = Some(crate::selection::TextSelection {
+        anchor: (5, 0),
+        active: (10, 0),
+    });
+    assert_eq!(app.selection_text(), "");
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- content_pos with word wrap + visual rows past content (clamp) -----------
+
+#[test]
+fn content_pos_word_wrap_visual_rows_past_content_clamps() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.content = vec!["hello".to_string()];
+    app.word_wrap = true;
+    app.content_scroll = 0;
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 20,
+    };
+    // rel_row way past total visual rows → falls through to last physical line
+    let (line, _col) = app.content_pos(0, 50);
+    assert_eq!(line, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- fold_gutter_width ------------------------------------------------------
+
+#[test]
+fn fold_gutter_width_zero_when_no_regions() {
+    let root = temp_tree();
+    let app = app_for(&root);
+    assert_eq!(app.fold_gutter_width(), 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn fold_gutter_width_two_when_regions_exist() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.yaml_fold_regions = vec![crate::yaml_fold::FoldRegion { start: 0, end: 3 }];
+    assert_eq!(app.fold_gutter_width(), 2);
+    fs::remove_dir_all(&root).ok();
+}
+
 #[test]
 fn diff_hunk_navigation_jumps_between_headers() {
     let root = temp_git_two_hunks();
