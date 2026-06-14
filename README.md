@@ -1,25 +1,69 @@
 # tree-viewer (`tv`)
 
-A fast terminal file tree viewer with syntax highlighting, markdown rendering,
-fuzzy search, and mouse support. Built with [ratatui](https://ratatui.rs).
+**Browse, read, and review code in your terminal — instantly.** `tv` is a fast,
+lightweight file tree viewer with syntax highlighting, markdown rendering, fuzzy
+search, and first-class git tooling (diff, blame, history). One small binary, no
+config required, no plugins to wire up. Built with [ratatui](https://ratatui.rs).
 
 <p align="center">
   <img src="media/intro.png" alt="tree-viewer" width="800">
 </p>
 
+```sh
+tv          # open the current directory and start browsing
+```
+
+That's it — no setup step. Press `?` for help, `q` to quit.
+
+## Why tree-viewer?
+
+`tv` is built for one job and does it well: **moving through a codebase and
+reading it** — with git context one keystroke away. It is not a full editor, and
+that's the point.
+
+| | **tree-viewer** | **Vim / Neovim** | **VS Code** |
+| --- | --- | --- | --- |
+| Footprint | Single ~MB binary | Light core, heavy once configured | Electron, hundreds of MB + RAM |
+| Setup to be useful | **Zero** — just run `tv` | Hours of config & plugins | Install, extensions, indexing |
+| Learning curve | Arrow keys & a mouse | Steep (modes, motions, ecosystem) | Gentle but mouse-heavy |
+| Git diff/blame/history | **Built in** | Needs fugitive/gitsigns/etc. | Needs extensions |
+| Fuzzy + full-text search | **Built in** | Needs telescope/fzf/ripgrep glue | Built in |
+| Starts in | Milliseconds | Fast (slower with a big config) | Seconds |
+
+- **vs. a tuned Neovim / LazyVim:** great editors, but getting tree view, fuzzy
+  finder, git signs, blame, and diffs means assembling and maintaining a stack of
+  plugins — and configs like LazyVim are powerful but heavy. `tv` ships all of
+  that, working, out of the box. No `init.lua`, no plugin manager.
+- **vs. VS Code:** VS Code is an excellent IDE, but it's an Electron app — slow to
+  start and memory-hungry just to glance at a file or a diff over SSH. `tv` opens
+  instantly in any terminal and runs happily on a remote box.
+
+Reach for `tv` when you want to **explore a repo, read a file, or check a diff**
+without spinning up a heavyweight editor. Hit `e` to jump into your `$EDITOR`
+the moment you actually need to change something.
+
 ## Features
 
+- **Lightweight & instant** — a single small binary, no runtime dependencies,
+  no config needed to start
 - **Tree navigation** with keyboard or mouse, respecting `.gitignore`
+- **Fuzzy search** (`/`) over file names, or full-text search (`f`) across file
+  contents — fzf-style, as-you-type
+- **Git mode** (`Ctrl+G`) — show only changed files with working-tree diffs in
+  the content panel; `Alt+G` toggles between tree and flat list views
+- **Git blame** (`b`) — inline per-line author, short hash, and date alongside
+  the file
+- **Git file history** (`H`) — pick a past revision from an fzf-style list and
+  view its diff against your working tree, with red/green coloring
+- **Git status indicators** — tree entries colored by git status (new, modified,
+  deleted, ignored) whenever `git status` data is available
 - **Syntax highlighting** for source files (via [syntect](https://github.com/trishume/syntect))
 - **Markdown rendering** in the terminal — headings, tables, task lists, code
   blocks, blockquotes, and more (press `M` to toggle the raw source)
-- **Fuzzy search** over file names, or full-text search across file contents
-- **Git file history** — pick a past revision from an fzf-style list and view
-  its diff against your working tree, with red/green coloring
-- **Git mode** (`Ctrl+G`) — show only changed files with working-tree diffs in
-  the content panel; `Alt+G` toggles between tree and flat list views
-- **Git status indicators** — tree entries colored by git status (new, modified,
-  deleted, ignored) whenever `git status` data is available
+- **JSON pretty-printing** (`J`) — reformat minified JSON for readable browsing
+- **Command palette** (`Ctrl+P`) — fuzzy-find every action and see its keybinding
+- **Open in your editor** (`e`) — jump to the current file in `$VISUAL`/`$EDITOR`,
+  then drop back into `tv` when you're done
 - **Themes** — built-in presets (monokai, solarized, catppuccin, synthwave84),
   switchable live from an fzf-style picker or set in config, with configurable
   panel background and terminal transparency
@@ -78,12 +122,15 @@ Press `?` at any time for in-app help, and `q` to quit.
 | -------------- | ----------------------- |
 | `q`, `Ctrl+c`  | Quit                    |
 | `?`            | Toggle help             |
+| `Ctrl+P`       | Command palette (fuzzy-find any action) |
 | `Tab`          | Switch panel            |
 | `/`            | Fuzzy file search       |
 | `f`            | Content (full-text) search |
 | `r`            | Reload tree             |
+| `e`            | Open current file in `$EDITOR` |
 | `Alt+.`        | Toggle hidden files     |
 | `H`            | Git history of current file |
+| `b`            | Toggle git blame        |
 | `t`            | Theme picker            |
 | `Ctrl+G`       | Toggle git mode (changed files + diffs) |
 | `Alt+G`        | Toggle flat / tree view in git mode |
@@ -107,6 +154,7 @@ Press `?` at any time for in-app help, and `q` to quit.
 | `0`            | Reset horizontal scroll      |
 | `z`            | Toggle word wrap             |
 | `M`            | Toggle raw / rendered markdown |
+| `J`            | Toggle JSON pretty-print     |
 
 ### Search popup
 
@@ -133,6 +181,13 @@ the commits that touched it. Type to fuzzy-filter, navigate with `↑`/`↓`, an
 press `Enter` (or double-click) to load the diff of that revision against your
 current working tree into the content panel — additions in green, deletions in
 red. Requires `git` on your `PATH` and the file to be tracked in a repository.
+
+## Git blame
+
+Press `b` with a file open to toggle inline git blame. A gutter appears to the
+left of the content showing, for each line, the short commit hash, author, and
+date that last touched it. Press `b` again to hide it. Blame is unavailable
+while viewing a diff. Requires `git` and a tracked file.
 
 ## Git mode
 
@@ -183,6 +238,9 @@ reload = ["r"]
 switch_panel = ["Tab"]
 file_history = ["H"]
 theme_picker = ["t"]
+command_palette = ["ctrl+p"]
+open_in_editor = ["e"]
+toggle_blame = ["b"]
 git_mode_toggle = ["ctrl+g"]
 git_mode_flat_toggle = ["alt+g"]
 
@@ -194,13 +252,14 @@ tree_collapse = ["Left", "h"]
 
 content_left = ["Left"]
 content_right = ["Right"]
-content_top = ["g"]
-content_bottom = ["G"]
+content_top = ["g", "Home"]
+content_bottom = ["G", "End"]
 content_page_up = ["PageUp"]
 content_page_down = ["PageDown"]
 content_reset_col = ["0"]
 toggle_wrap = ["z"]
 toggle_raw_markdown = ["M"]
+toggle_pretty_json = ["J"]
 ```
 
 ### Theme

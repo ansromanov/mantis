@@ -1,41 +1,49 @@
-# tree-viewer (`tv`)
+# Welcome to tree-viewer
 
-**A fast terminal file tree viewer** with syntax highlighting, markdown
-rendering, fuzzy search, and mouse support. Built with
-[ratatui](https://ratatui.rs).
+**tree-viewer** (`tv`) lets you **browse, read, and review a codebase right in
+your terminal** — instantly. Point it at a folder and start moving through your
+files with the arrow keys (or your mouse), with syntax highlighting, rendered
+markdown, fuzzy search, and git diff/blame/history always one keystroke away.
 
 ![tree-viewer screenshot](../media/intro.png)
 
-## Features
+> 💡 **New here?** You only need two things to get started: the
+> [Installation](installation.md) page, then the [Quick Start](quickstart.md).
+> Everything else is optional.
 
-- **Tree navigation** with keyboard or mouse, respecting `.gitignore`
-- **Syntax highlighting** for source files (via
-  [syntect](https://github.com/trishume/syntect))
-- **Markdown rendering** in the terminal — headings, tables, task lists, code
-  blocks, blockquotes, and more (press `M` to toggle the raw source)
-- **Fuzzy search** over file names, or full-text search across file contents
-- **Git file history** — pick a past revision from an fzf-style list and view
-  its diff against your working tree, with red/green coloring
-- **Git mode** (`Ctrl+G`) — show only changed files with working-tree diffs in
-  the content panel; `Alt+G` toggles between tree and flat list views
-- **Git status indicators** — tree entries colored by git status (new, modified,
-  deleted, ignored) whenever `git status` data is available
-- **Themes** — built-in presets (monokai, solarized, catppuccin, synthwave84),
-  switchable live from an fzf-style picker or set in config, with configurable
-  panel background and terminal transparency
-- **Mouse support** — click to select, fold/unfold directories, switch panes,
-  and scroll
-- **Configurable** layout, behavior, and keybindings via a simple TOML file
+## What makes it nice
 
-## Quick start
+- ⚡ **Lightweight & instant.** One small binary, no runtime dependencies, and
+  nothing to configure before your first run. It opens in milliseconds, even
+  over SSH.
+- 🌳 **A real tree view.** Navigate folders with the keyboard or mouse,
+  respecting your `.gitignore`.
+- 🔍 **Fuzzy & full-text search.** Jump to any file by name (`/`), or search
+  across the contents of every file (`f`) — fzf-style, as you type.
+- 🎨 **Readable files.** Syntax highlighting for source code, rendered markdown,
+  and JSON pretty-printing.
+- 🔧 **Git built in.** Per-line blame, working-tree diffs, file history, and
+  status-colored tree entries — no plugins required.
+- ⌨️ **Discoverable.** Press `?` for help or `Ctrl+P` for a searchable command
+  palette. You don't have to memorize anything.
+
+## Try it in five seconds
 
 ```sh
-tv              # view the current directory
-tv path/to/dir  # view a specific directory
-tv file.md      # open a file directly
+tv              # open the current directory
+tv path/to/dir  # open a specific directory
+tv file.md      # open a single file directly
 ```
 
-Press `?` at any time for in-app help, and `q` to quit.
+Press `?` any time for in-app help, and `q` to quit.
 
-See the [Installation](installation.md) page for platform-specific install
-instructions.
+## Where to go next
+
+| If you want to… | Read |
+| --- | --- |
+| Understand when to reach for `tv` | [Why tree-viewer?](why.md) |
+| Get it installed | [Installation](installation.md) |
+| Learn the basics in 5 minutes | [Quick Start](quickstart.md) |
+| See every key and what it does | [Usage & Keybindings](usage.md) |
+| Use blame, diffs, and history | [Git Features](git.md) |
+| Tweak themes and keybindings | [Configuration](configuration.md) |
