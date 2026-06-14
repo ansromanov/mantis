@@ -1,20 +1,33 @@
 # Configuration
 
+> 💡 **Configuration is optional.** `tv` works great with no config at all. Come
+> here when you want to change colors, remap a key, or set a default behavior.
+
 `tv` reads a `tv.toml` file. It first looks for one in the directory being
 viewed (and its ancestors), then falls back to the global config at
 `$XDG_CONFIG_HOME/tv.toml` (or `~/.config/tv.toml`). A project-local file
 overrides the global one, so a repository can ship its own defaults.
+
+## General options
+
+These top-level keys control default behavior:
 
 ```toml
 show_hidden = false       # show dotfiles
 ignore_gitignore = false  # show files excluded by .gitignore
 tree_width = 28           # tree panel width, as a percent of the terminal
 word_wrap = false         # wrap long lines in the content panel
+```
 
-# Every keybinding is remappable. Each action takes a list of key specs.
-# A spec is a single character ("q", "?", "0") or a named key (Up, Down,
-# Left, Right, Enter, Tab, Esc, Backspace, PageUp, PageDown, Home, End,
-# Space), optionally prefixed with modifiers: "ctrl+c", "alt+.".
+## Keybindings
+
+Every keybinding is remappable. Each action takes a **list** of key specs, so an
+action can have several shortcuts. A spec is a single character (`"q"`, `"?"`,
+`"0"`) or a named key (`Up`, `Down`, `Left`, `Right`, `Enter`, `Tab`, `Esc`,
+`Backspace`, `PageUp`, `PageDown`, `Home`, `End`, `Space`), optionally prefixed
+with modifiers: `"ctrl+c"`, `"alt+."`.
+
+```toml
 [keys]
 quit = ["q", "ctrl+c"]
 help = ["?"]
@@ -25,6 +38,9 @@ reload = ["r"]
 switch_panel = ["Tab"]
 file_history = ["H"]
 theme_picker = ["t"]
+command_palette = ["ctrl+p"]
+open_in_editor = ["e"]
+toggle_blame = ["b"]
 git_mode_toggle = ["ctrl+g"]
 git_mode_flat_toggle = ["alt+g"]
 
@@ -36,13 +52,14 @@ tree_collapse = ["Left", "h"]
 
 content_left = ["Left"]
 content_right = ["Right"]
-content_top = ["g"]
-content_bottom = ["G"]
+content_top = ["g", "Home"]
+content_bottom = ["G", "End"]
 content_page_up = ["PageUp"]
 content_page_down = ["PageDown"]
 content_reset_col = ["0"]
 toggle_wrap = ["z"]
 toggle_raw_markdown = ["M"]
+toggle_pretty_json = ["J"]
 ```
 
 ## Theme

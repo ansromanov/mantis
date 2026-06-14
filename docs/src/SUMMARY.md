@@ -1,7 +1,19 @@
-[tree-viewer](introduction.md)
+# Summary
 
+[Welcome to tree-viewer](introduction.md)
+
+# Getting Started
+
+- [Why tree-viewer?](why.md)
 - [Installation](installation.md)
+- [Quick Start](quickstart.md)
+
+# User Guide
+
 - [Usage & Keybindings](usage.md)
-- [Configuration](configuration.md)
 - [Git Features](git.md)
+- [Configuration](configuration.md)
+
+# Reference
+
 - [Development](development.md)

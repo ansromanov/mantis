@@ -38,14 +38,31 @@ Or use the justfile shortcuts:
 
 ```
 src/
-├── main.rs        # Entry: terminal setup, event loop, dispatch
-├── app.rs         # App state, input handling, overlays
-├── ui.rs          # ratatui rendering (tree, content, statusbar, popups)
-├── tree.rs        # Flat Vec<TreeNode> from ignore::WalkBuilder
-├── file.rs        # Binary file detection (null-byte check)
-├── config.rs      # tv.toml deserialization, keybinding parsing
-├── theme.rs       # Theme struct + 5 presets, color parsing
-├── git.rs         # Shells out to `git` for log/diff
-├── highlight.rs   # syntect syntax highlighting → ratatui styles
-└── markdown.rs    # pulldown-cmark → styled ratatui spans
+├── main.rs             # Entry: terminal setup, event loop, dispatch
+├── lib.rs              # Crate root, re-exports the modules below
+├── app/                # App state and input handling
+│   ├── mod.rs          #   core App state + overlays
+│   ├── key_handlers.rs #   keyboard dispatch (incl. open-in-editor)
+│   ├── mouse_handlers.rs #  click/scroll handling
+│   ├── navigation.rs   #   tree movement & expand/collapse
+│   ├── content_pos.rs  #   scroll / wrap position math
+│   └── file_ops.rs     #   load files, JSON pretty-print, reloads
+├── ui/                 # ratatui rendering
+│   ├── mod.rs          #   layout & frame composition
+│   ├── tree.rs         #   tree panel
+│   ├── content.rs      #   content panel (incl. blame gutter, diffs)
+│   ├── popups.rs       #   search / history / palette / help popups
+│   └── statusbar.rs    #   status bar
+├── config/             # tv.toml deserialization, keybinding parsing
+├── command_palette.rs  # Ctrl+P action list + fuzzy matching
+├── search.rs           # fuzzy file + full-text content search
+├── selection.rs        # text selection model
+├── tree.rs             # Flat Vec<TreeNode> from ignore::WalkBuilder
+├── file.rs             # Binary file detection (null-byte check)
+├── virtual_file.rs     # memory-mapped, lazily indexed large files
+├── theme.rs            # Theme struct + presets, color parsing
+├── git.rs              # Shells out to `git` for log/diff/blame
+├── highlight.rs        # syntect syntax highlighting → ratatui styles
+├── markdown.rs         # pulldown-cmark → styled ratatui spans
+└── release_info.rs     # bundled "what's new" release metadata
 ```
