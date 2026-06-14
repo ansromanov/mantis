@@ -4,7 +4,7 @@ use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
 
-use crate::config::pressed;
+use crate::config::{self, pressed};
 use crate::highlight::Highlighter;
 use crate::search::{CommandPalette, InFileSearch, SearchState, ThemePicker};
 use crate::theme::{Theme, ThemeConfig};
@@ -618,6 +618,40 @@ impl App {
         }
 
         self.needs_clear = true;
+        self.reload_config();
+    }
+
+    /// Re-reads the config file and applies all changed fields to App state,
+    /// then rebuilds the tree and reloads the current file. Silently ignores
+    /// read or parse errors so a mid-edit save doesn't crash the app.
+    fn reload_config(&mut self) {
+        let Some(path) = self.config_path.clone() else {
+            return;
+        };
+        let Ok(s) = std::fs::read_to_string(&path) else {
+            return;
+        };
+        let Ok(cfg) = toml::from_str::<config::Config>(&s) else {
+            return;
+        };
+
+        self.show_hidden = cfg.show_hidden;
+        self.ignore_gitignore = cfg.ignore_gitignore;
+        self.tree_width = cfg.tree_width;
+        self.word_wrap = cfg.word_wrap;
+        self.git_status_enabled = cfg.git_status || cfg.git_mode;
+        self.git_show_deleted = cfg.git_show_deleted;
+        self.git_mode = cfg.git_mode;
+        self.git_mode_flat = cfg.git_mode_flat;
+        self.show_scrollbar = cfg.scrollbar;
+        self.show_scroll_percentage = cfg.scroll_percentage;
+        self.keys = cfg.keys.clone();
+
+        let theme = cfg.theme.resolve();
+        self.apply_theme(theme);
+
+        self.config = cfg;
+        self.reload();
     }
 
     /// Handles scrolling, wrapping, and markdown-raw toggle keys when the
