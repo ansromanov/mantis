@@ -190,6 +190,21 @@ fn user_themes_dir() -> Option<PathBuf> {
     Some(base.join("tree-viewer").join("themes"))
 }
 
+/// Copies every bundled theme to the user themes directory if it doesn't
+/// already exist there, so users have local files to reference or edit.
+pub fn install_embedded_themes() {
+    let Some(dir) = user_themes_dir() else {
+        return;
+    };
+    let _ = fs::create_dir_all(&dir);
+    for (name, toml) in EMBEDDED_MANIFEST {
+        let path = dir.join(format!("{name}.toml"));
+        if !path.exists() {
+            let _ = fs::write(&path, toml);
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // ThemeConfig – user overrides from tv.toml
 // ---------------------------------------------------------------------------
