@@ -34,7 +34,7 @@ impl App {
         let scroll = self.content_scroll;
         let hscroll = self.content_hscroll;
         f(self);
-        self.content_scroll = scroll.min(self.content_line_count().saturating_sub(1));
+        self.content_scroll = scroll.min(self.line_count().saturating_sub(1));
         self.content_hscroll = hscroll;
     }
 
@@ -169,24 +169,17 @@ impl App {
         self.markdown_lines = Vec::new();
 
         // Try memory-mapped virtual file first (lazy, no full content in memory).
-        if let Some(vf) = VirtualFile::open(path) {
-            self.current_file = Some(path.to_path_buf());
-            self.set_file_watch(Some(path));
-            self.virtual_file = Some(vf);
-            self.content = Vec::new();
-            self.highlighted = Vec::new();
-            // Markdown files are still rendered eagerly (they are rarely large,
-            // and the renderer needs the full text for correct output).
-            if self.is_markdown {
-                let bytes = match std::fs::read(path) {
-                    Ok(b) => b,
-                    Err(_) => return, // virtual_file already set, show empty
-                };
-                if let Ok(s) = String::from_utf8(bytes) {
-                    self.markdown_lines = markdown::render(&s, &self.theme);
-                }
+        // Markdown is excluded: the renderer needs the full text, and holding
+        // both an mmap and a full Vec<u8> for rendering would double memory usage.
+        if !self.is_markdown {
+            if let Some(vf) = VirtualFile::open(path) {
+                self.current_file = Some(path.to_path_buf());
+                self.set_file_watch(Some(path));
+                self.virtual_file = Some(vf);
+                self.content = Vec::new();
+                self.highlighted = Vec::new();
+                return;
             }
-            return;
         }
 
         // Fallback: read the file into memory (small files, binary check, etc.)

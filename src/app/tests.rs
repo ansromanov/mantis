@@ -835,7 +835,7 @@ fn reopen_file_preserves_scroll_and_raw_markdown() {
     assert!(app.show_raw_markdown);
     assert_eq!(
         app.content_scroll,
-        3.min(app.content_line_count().saturating_sub(1))
+        3.min(app.line_count().saturating_sub(1))
     );
     assert_eq!(app.content_hscroll, 5);
     fs::remove_dir_all(&root).ok();
@@ -852,7 +852,7 @@ fn content_line_count_markdown_rendered() {
     app.open_file(&md_path);
     assert!(app.is_markdown);
     assert!(!app.show_raw_markdown);
-    assert_eq!(app.content_line_count(), app.markdown_lines.len());
+    assert_eq!(app.line_count(), app.markdown_lines.len());
     fs::remove_dir_all(&root).ok();
 }
 

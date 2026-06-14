@@ -5,16 +5,10 @@ use unicode_width::UnicodeWidthStr;
 use super::App;
 
 impl App {
-    /// DEPRECATED: use `line_count()` instead. Returns the total number of
-    /// displayable lines in the current content source.
-    pub fn content_line_count(&self) -> usize {
-        self.line_count()
-    }
-
     /// Maximum valid content_scroll so the last line sits at the bottom edge,
     /// not the top. Falls back to `total - 1` before the first render (height 0).
     pub fn content_scroll_max(&self) -> usize {
-        let total = self.content_line_count();
+        let total = self.line_count();
         let vh = (self.content_area.height as usize).max(1);
         total.saturating_sub(vh)
     }
@@ -110,7 +104,7 @@ impl App {
             }
             return result;
         }
-        let Some(_) = self.virtual_file else {
+        if self.virtual_file.is_none() {
             // Fallback for inline content (diffs, errors, etc.)
             let lines = &self.content;
             if start_line >= lines.len() {
@@ -137,7 +131,7 @@ impl App {
                 result.extend(&chars[col_start.min(chars.len())..col_end]);
             }
             return result;
-        };
+        }
         // VirtualFile path
         if start_line >= total {
             return String::new();
