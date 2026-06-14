@@ -359,6 +359,7 @@ impl App {
                 self.content_hscroll = 0;
             }
             Some("open_in_editor") => self.open_in_editor(),
+            Some("open_config_in_editor") => self.open_config_in_editor(),
             Some("show_about") => self.show_about = !self.show_about,
             _ => {}
         }
@@ -587,6 +588,36 @@ impl App {
 
         // File may have been modified; reload its content
         self.reload_content();
+    }
+
+    /// Opens the global config file (`~/.config/tree-viewer/tv.toml`) in the
+    /// user's `$EDITOR`, using the same suspend/resume pattern as `open_in_editor`.
+    fn open_config_in_editor(&mut self) {
+        let Some(path) = self.config_path.clone() else {
+            return;
+        };
+
+        let editor = std::env::var("VISUAL")
+            .or_else(|_| std::env::var("EDITOR"))
+            .unwrap_or_else(|_| "vim".to_string());
+
+        let _ = disable_raw_mode();
+        let _ = execute!(std::io::stdout(), LeaveAlternateScreen, DisableMouseCapture,);
+
+        let parts: Vec<&str> = editor.split_whitespace().collect();
+        if let Some((cmd, args)) = parts.split_first() {
+            let _ = std::process::Command::new(cmd)
+                .args(args)
+                .arg(&path)
+                .status();
+        }
+
+        let _ = execute!(std::io::stdout(), EnterAlternateScreen, EnableMouseCapture,);
+        if let Err(e) = enable_raw_mode() {
+            eprintln!("tv: failed to restore raw mode after editor: {e}");
+        }
+
+        self.needs_clear = true;
     }
 
     /// Handles scrolling, wrapping, and markdown-raw toggle keys when the

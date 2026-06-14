@@ -61,6 +61,10 @@ pub static COMMANDS: &[CommandEntry] = &[
         action_id: "open_in_editor",
     },
     CommandEntry {
+        name: "Open config in editor",
+        action_id: "open_config_in_editor",
+    },
+    CommandEntry {
         name: "About tree-viewer",
         action_id: "show_about",
     },
