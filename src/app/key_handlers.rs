@@ -625,7 +625,11 @@ impl App {
         let editor = std::env::var("VISUAL")
             .or_else(|_| std::env::var("EDITOR"))
             .unwrap_or_else(|_| {
-                if cfg!(windows) { "notepad".to_string() } else { "vim".to_string() }
+                if cfg!(windows) {
+                    "notepad".to_string()
+                } else {
+                    "vim".to_string()
+                }
             });
 
         // Suspend TUI
@@ -666,7 +670,11 @@ impl App {
         let editor = std::env::var("VISUAL")
             .or_else(|_| std::env::var("EDITOR"))
             .unwrap_or_else(|_| {
-                if cfg!(windows) { "notepad".to_string() } else { "vim".to_string() }
+                if cfg!(windows) {
+                    "notepad".to_string()
+                } else {
+                    "vim".to_string()
+                }
             });
 
         let _ = disable_raw_mode();
