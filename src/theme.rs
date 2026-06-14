@@ -163,6 +163,16 @@ const EMBEDDED_MANIFEST: &[(&str, &str)] = &[
     ("solarized", include_str!("../themes/solarized.toml")),
     ("catppuccin", include_str!("../themes/catppuccin.toml")),
     ("synthwave84", include_str!("../themes/synthwave84.toml")),
+    ("vscode-light", include_str!("../themes/vscode-light.toml")),
+    (
+        "catppuccin-latte",
+        include_str!("../themes/catppuccin-latte.toml"),
+    ),
+    (
+        "solarized-light",
+        include_str!("../themes/solarized-light.toml"),
+    ),
+    ("pink", include_str!("../themes/pink.toml")),
 ];
 
 fn all_embedded() -> &'static HashMap<&'static str, Theme> {
@@ -373,7 +383,7 @@ mod tests {
     #[test]
     fn all_embedded_themes_are_valid() {
         let themes = Theme::discover_all();
-        assert!(themes.len() >= 5, "should have at least 5 built-in themes");
+        assert!(themes.len() >= 9, "should have at least 9 built-in themes");
         for (name, _) in &themes {
             assert!(!name.is_empty(), "each theme must have a non-empty name");
         }
