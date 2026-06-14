@@ -134,7 +134,7 @@ impl App {
         }
     }
 
-    fn in_file_search_next(&mut self) {
+    pub(super) fn in_file_search_next(&mut self) {
         if let Some(s) = &mut self.in_file_search {
             if !s.matches.is_empty() {
                 s.current = (s.current + 1) % s.matches.len();
@@ -143,7 +143,7 @@ impl App {
         self.scroll_in_file_search_to_current();
     }
 
-    fn in_file_search_prev(&mut self) {
+    pub(super) fn in_file_search_prev(&mut self) {
         if let Some(s) = &mut self.in_file_search {
             if !s.matches.is_empty() {
                 s.current = if s.current == 0 {
@@ -156,7 +156,7 @@ impl App {
         self.scroll_in_file_search_to_current();
     }
 
-    fn scroll_in_file_search_to_current(&mut self) {
+    pub(super) fn scroll_in_file_search_to_current(&mut self) {
         let view_height = (self.content_area.height as usize).max(1);
         let Some(s) = &self.in_file_search else {
             return;
@@ -173,7 +173,7 @@ impl App {
     }
 
     /// Re-runs in-file search against the current content source.
-    fn refresh_in_file_search(&mut self) {
+    pub(super) fn refresh_in_file_search(&mut self) {
         let total = self.line_count();
         // Collect before mutably borrowing in_file_search: line_text() takes
         // &self which conflicts with the &mut borrow needed by s.refresh().

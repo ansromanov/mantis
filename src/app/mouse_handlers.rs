@@ -318,7 +318,7 @@ impl App {
     }
 
     /// Maps a mouse row to a content scroll position, used for scrollbar dragging.
-    fn set_scroll_from_mouse_y(&mut self, row: u16) {
+    pub(super) fn set_scroll_from_mouse_y(&mut self, row: u16) {
         let total = self.line_count();
         let inner_h = self.content_area.height as usize;
         if total <= inner_h || inner_h == 0 {
