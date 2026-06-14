@@ -281,6 +281,7 @@ impl ThemeConfig {
     /// won't do: its fields are all `None`, which TOML omits. The explicit
     /// struct literal means adding a field forces updating this, so the
     /// validation schema can't silently drift out of sync.
+    #[allow(dead_code)]
     pub(crate) fn schema() -> Self {
         ThemeConfig {
             name: Some(String::new()),
@@ -301,6 +302,8 @@ impl ThemeConfig {
             diff_del: Some(String::new()),
             git_clean: Some(String::new()),
             git_dirty: Some(String::new()),
+            git_conflict: Some(String::new()),
+            git_progress: Some(String::new()),
             syntax: Some(String::new()),
         }
     }
