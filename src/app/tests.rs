@@ -3763,6 +3763,32 @@ fn content_key_toggle_pretty_json_toggles() {
     fs::remove_dir_all(&root).ok();
 }
 
+// -- visual-line mode -----------------------------------------------------
+
+#[test]
+fn visual_line_enters_and_extends_selection() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt")); // 50 lines
+    app.focus = Focus::Content;
+    app.content_area = viewport(10);
+
+    // V enters visual-line mode anchored at the top.
+    app.handle_key(KeyEvent::new(KeyCode::Char('V'), KeyModifiers::empty()));
+    let v = app.visual_line.expect("visual-line mode should be active");
+    assert_eq!(v.range(), (0, 0));
+
+    // j extends the selection downward.
+    app.handle_key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::empty()));
+    assert_eq!(app.visual_line.unwrap().range(), (0, 2));
+
+    // G extends to the last line.
+    app.handle_key(KeyEvent::new(KeyCode::Char('G'), KeyModifiers::empty()));
+    assert_eq!(app.visual_line.unwrap().range(), (0, 49));
+    fs::remove_dir_all(&root).ok();
+}
+
 #[test]
 fn content_key_yaml_fold_toggle_toggles() {
     let root = temp_tree();
@@ -3775,6 +3801,22 @@ fn content_key_yaml_fold_toggle_toggles() {
     // Space is the yaml_fold_toggle binding
     app.handle_key(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::empty()));
     assert!(app.yaml_folded.contains(&0));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn visual_line_esc_exits_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.content_area = viewport(10);
+
+    app.handle_key(KeyEvent::new(KeyCode::Char('V'), KeyModifiers::empty()));
+    assert!(app.visual_line.is_some());
+    app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+    assert!(app.visual_line.is_none());
+    assert!(!app.blame_panel);
     fs::remove_dir_all(&root).ok();
 }
 
@@ -3860,6 +3902,41 @@ fn mouse_scroll_up_tree_at_zero_is_noop() {
     let before = app.tree_selected;
     app.handle_mouse(mouse(MouseEventKind::ScrollUp, 1, 1));
     assert_eq!(app.tree_selected, before);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn visual_line_blame_key_toggles_panel() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.content_area = viewport(10);
+
+    app.handle_key(KeyEvent::new(KeyCode::Char('V'), KeyModifiers::empty()));
+    // b opens the scoped blame panel.
+    app.handle_key(KeyEvent::new(KeyCode::Char('b'), KeyModifiers::empty()));
+    assert!(app.blame_panel);
+    // b again hides it, leaving visual-line mode active.
+    app.handle_key(KeyEvent::new(KeyCode::Char('b'), KeyModifiers::empty()));
+    assert!(!app.blame_panel);
+    assert!(app.visual_line.is_some());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn visual_line_does_not_toggle_blame_gutter() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.content_area = viewport(10);
+
+    // Entering visual-line mode and pressing b must not flip the always-on
+    // blame gutter (`show_blame`); it controls the scoped panel instead.
+    app.handle_key(KeyEvent::new(KeyCode::Char('V'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('b'), KeyModifiers::empty()));
+    assert!(!app.show_blame);
     fs::remove_dir_all(&root).ok();
 }
 
@@ -4093,5 +4170,38 @@ fn set_scroll_from_mouse_y_track_range_zero() {
     let before = app.content_scroll;
     app.set_scroll_from_mouse_y(5);
     assert_eq!(app.content_scroll, before);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn visual_line_not_entered_for_diff() {
+    let root = temp_git_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("tracked.txt"));
+    app.focus = Focus::Content;
+    // Switch to the working-tree diff view, which sets is_diff.
+    app.show_working_tree_diff(&root.join("tracked.txt"));
+    assert!(app.is_diff);
+
+    app.handle_key(KeyEvent::new(KeyCode::Char('V'), KeyModifiers::empty()));
+    assert!(app.visual_line.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn opening_different_file_exits_visual_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.content_area = viewport(10);
+
+    app.handle_key(KeyEvent::new(KeyCode::Char('V'), KeyModifiers::empty()));
+    app.blame_panel = true;
+    assert!(app.visual_line.is_some());
+
+    app.open_file(&root.join("a.txt"));
+    assert!(app.visual_line.is_none());
+    assert!(!app.blame_panel);
     fs::remove_dir_all(&root).ok();
 }

@@ -23,6 +23,20 @@ and the date it was last changed. Press `b` again to hide it.
 Blame is disabled while you're viewing a diff (it only annotates real file
 content).
 
+### Visual-line blame
+
+For inspecting a specific range rather than the whole file, press `V` with a file
+open to enter **visual-line mode**. The first visible line is selected; extend the
+selection a line at a time with `j`/`k` (or `↑`/`↓`), jump to the top/bottom of
+the file with `g`/`G`, and page with `PageUp`/`PageDown`. The selected lines are
+highlighted with a distinct background.
+
+Press `b` while in visual-line mode to open a **blame panel** scoped to the
+selection: each line in the range is listed with its short commit hash, author,
+relative date, and content. Press `b` again to dismiss the panel, and `Esc` to
+leave visual-line mode entirely. Like the inline gutter, this is unavailable
+while viewing a diff.
+
 ## Git file history
 
 With a file open in the content panel, press `H` to open an fzf-style list of the

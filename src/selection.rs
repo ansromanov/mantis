@@ -22,6 +22,35 @@ impl TextSelection {
     }
 }
 
+/// A vim-style visual-line selection in the content panel. Both `anchor` and
+/// `cursor` are **display-line** indices (the same coordinate space as
+/// `content_scroll`); `cursor` is the line that moves as the user navigates.
+#[derive(Clone, Copy)]
+pub struct VisualLine {
+    pub anchor: usize,
+    pub cursor: usize,
+}
+
+impl VisualLine {
+    /// Starts a selection anchored at `line`, with the cursor on the same line.
+    pub fn new(line: usize) -> Self {
+        VisualLine {
+            anchor: line,
+            cursor: line,
+        }
+    }
+
+    /// Returns the selected line range as an inclusive `(start, end)` pair
+    /// ordered so `start <= end`.
+    pub fn range(&self) -> (usize, usize) {
+        if self.anchor <= self.cursor {
+            (self.anchor, self.cursor)
+        } else {
+            (self.cursor, self.anchor)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -75,5 +104,29 @@ mod tests {
             active: (1, 2),
         };
         assert!(!sel.is_empty());
+    }
+
+    #[test]
+    fn visual_line_new_collapses_to_single_line() {
+        let v = VisualLine::new(7);
+        assert_eq!(v.range(), (7, 7));
+    }
+
+    #[test]
+    fn visual_line_range_orders_downward_selection() {
+        let v = VisualLine {
+            anchor: 10,
+            cursor: 4,
+        };
+        assert_eq!(v.range(), (4, 10));
+    }
+
+    #[test]
+    fn visual_line_range_orders_upward_selection() {
+        let v = VisualLine {
+            anchor: 4,
+            cursor: 10,
+        };
+        assert_eq!(v.range(), (4, 10));
     }
 }

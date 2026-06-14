@@ -104,7 +104,7 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     let blame_style = Style::default().fg(app.theme.dim);
 
     // ln_width, ln_lines, content_lines, fold_gutter_rows
-    let (ln_width, ln_lines, content_lines, new_fold_gutter_rows) = if app.is_diff {
+    let (ln_width, ln_lines, mut content_lines, new_fold_gutter_rows) = if app.is_diff {
         // Diff view: iterate all highlighted lines (diffs are never large).
         let lines = app
             .highlighted
@@ -533,6 +533,21 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
             inline_fold_gutter_rows,
         )
     };
+
+    // Visual-line mode: paint the whole-line background across the selected
+    // range. The j-th rendered line maps to display index `scroll + j` in every
+    // non-diff branch above, and visual-line mode is never active over a diff.
+    if let Some(v) = app.visual_line.as_ref() {
+        let (vstart, vend) = v.range();
+        for (j, line) in content_lines.iter_mut().enumerate() {
+            let disp = scroll + j;
+            if disp >= vstart && disp <= vend {
+                for span in &mut line.spans {
+                    span.style = span.style.bg(sel_bg);
+                }
+            }
+        }
+    }
 
     let inner = block.inner(area);
     f.render_widget(block, area);

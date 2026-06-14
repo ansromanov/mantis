@@ -31,6 +31,7 @@ These work no matter which panel is focused.
 | `Alt+.`        | Toggle hidden files     |
 | `H`            | Git history of current file |
 | `b`            | Toggle git blame        |
+| `V`            | Visual-line mode (select lines; `b` blames the range) |
 | `t`            | Theme picker            |
 | `Ctrl+G`       | Toggle git mode (changed files + diffs) |
 | `Alt+G`        | Toggle flat / tree view in git mode |
@@ -56,6 +57,7 @@ These work no matter which panel is focused.
 | `z`            | Toggle word wrap             |
 | `M`            | Toggle raw / rendered markdown |
 | `J`            | Toggle JSON pretty-print     |
+| `V`            | Visual-line mode: select lines, `b` blames the range, `Esc` exits |
 | `D`            | Toggle side-by-side diff (in a diff) |
 | `n`/`N`        | Next / previous hunk (in a diff) |
 

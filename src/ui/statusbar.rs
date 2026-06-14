@@ -28,6 +28,16 @@ pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
             " \u{2191}\u{2193} navigate  Enter select  Tab toggle mode  Esc cancel",
             base,
         )]
+    } else if app.visual_line.is_some() {
+        let blame = if app.blame_panel {
+            "  b hide blame"
+        } else {
+            "  b blame"
+        };
+        vec![Span::styled(
+            format!(" VISUAL LINE  j/k extend  g/G top/bot{blame}  Esc exit"),
+            base,
+        )]
     } else {
         let mut spans = vec![];
 
@@ -264,6 +274,27 @@ mod tests {
         app.git_mode_flat = true;
         let text = render_bar_width(&app, 120);
         assert!(text.contains("[git:flat]"));
+    }
+
+    #[test]
+    fn visual_line_hint_shown() {
+        let mut app = make_app();
+        app.focus = Focus::Content;
+        app.visual_line = Some(crate::selection::VisualLine::new(0));
+        let text = render_bar_width(&app, 120);
+        assert!(text.contains("VISUAL LINE"));
+        assert!(text.contains("b blame"));
+        assert!(text.contains("Esc exit"));
+    }
+
+    #[test]
+    fn visual_line_hint_shows_hide_blame_when_panel_open() {
+        let mut app = make_app();
+        app.focus = Focus::Content;
+        app.visual_line = Some(crate::selection::VisualLine::new(0));
+        app.blame_panel = true;
+        let text = render_bar_width(&app, 120);
+        assert!(text.contains("b hide blame"));
     }
 
     #[test]
