@@ -52,6 +52,10 @@ pub static COMMANDS: &[CommandEntry] = &[
         name: "Toggle markdown render",
         action_id: "toggle_raw_markdown",
     },
+    CommandEntry {
+        name: "Open in editor",
+        action_id: "open_in_editor",
+    },
 ];
 
 pub struct CommandPalette {
