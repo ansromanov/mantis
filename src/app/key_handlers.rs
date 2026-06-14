@@ -335,6 +335,11 @@ impl App {
                 self.content_scroll = 0;
                 self.content_hscroll = 0;
             }
+            Some("toggle_pretty_json") if self.is_json && !self.json_pretty_lines.is_empty() => {
+                self.show_pretty_json = !self.show_pretty_json;
+                self.content_scroll = 0;
+                self.content_hscroll = 0;
+            }
             Some("open_in_editor") => self.open_in_editor(),
             Some("show_about") => self.show_about = !self.show_about,
             _ => {}
@@ -559,6 +564,13 @@ impl App {
         let hscroll_before = self.content_hscroll;
         if self.is_markdown && pressed(&k.toggle_raw_markdown, &key) {
             self.show_raw_markdown = !self.show_raw_markdown;
+            self.content_scroll = 0;
+            self.content_hscroll = 0;
+        } else if self.is_json
+            && !self.json_pretty_lines.is_empty()
+            && pressed(&k.toggle_pretty_json, &key)
+        {
+            self.show_pretty_json = !self.show_pretty_json;
             self.content_scroll = 0;
             self.content_hscroll = 0;
         } else if !self.is_diff && pressed(&k.toggle_blame, &key) {

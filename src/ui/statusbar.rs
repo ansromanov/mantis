@@ -55,6 +55,12 @@ pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
                     } else {
                         "  M raw"
                     }
+                } else if app.is_json && !app.json_pretty_lines.is_empty() {
+                    if app.show_pretty_json {
+                        "  J raw"
+                    } else {
+                        "  J pretty"
+                    }
                 } else {
                     ""
                 };

@@ -39,12 +39,16 @@ impl App {
     }
 
     /// Re-opens `path` via `open_file` while preserving scroll position,
-    /// horizontal scroll, and raw-markdown toggle.
+    /// horizontal scroll, and view-mode toggles.
     pub(super) fn reopen_file(&mut self, path: &std::path::Path) {
         let raw = self.show_raw_markdown;
+        let pretty = self.show_pretty_json;
         self.preserving_scroll(|s| {
             s.open_file(path);
             s.show_raw_markdown = raw;
+            if s.is_json {
+                s.show_pretty_json = pretty;
+            }
         });
     }
 
@@ -107,6 +111,10 @@ impl App {
         self.is_markdown = false;
         self.show_raw_markdown = false;
         self.markdown_lines = Vec::new();
+        self.is_json = false;
+        self.show_pretty_json = false;
+        self.json_pretty_text = Vec::new();
+        self.json_pretty_lines = Vec::new();
         self.is_diff = true;
         self.content_scroll = 0;
         self.content_hscroll = 0;
@@ -128,6 +136,10 @@ impl App {
         self.is_diff = false;
         self.is_markdown = false;
         self.show_raw_markdown = false;
+        self.is_json = false;
+        self.show_pretty_json = false;
+        self.json_pretty_text = Vec::new();
+        self.json_pretty_lines = Vec::new();
         self.virtual_file = None;
         self.content = vec!["[deleted]".into()];
         self.highlighted = Vec::new();
@@ -167,11 +179,14 @@ impl App {
         self.is_markdown = matches!(ext, "md" | "markdown");
         self.show_raw_markdown = false;
         self.markdown_lines = Vec::new();
+        self.is_json = ext == "json";
+        self.show_pretty_json = false;
+        self.json_pretty_text = Vec::new();
+        self.json_pretty_lines = Vec::new();
 
         // Try memory-mapped virtual file first (lazy, no full content in memory).
-        // Markdown is excluded: the renderer needs the full text, and holding
-        // both an mmap and a full Vec<u8> for rendering would double memory usage.
-        if !self.is_markdown {
+        // Markdown and JSON are excluded: both need full content for rendering.
+        if !self.is_markdown && !self.is_json {
             if let Some(vf) = VirtualFile::open(path) {
                 self.current_file = Some(path.to_path_buf());
                 self.set_file_watch(Some(path));
@@ -218,6 +233,17 @@ impl App {
             if self.is_markdown {
                 self.markdown_lines = markdown::render(&s, &self.theme);
             }
+            if self.is_json {
+                if let Ok(value) = serde_json::from_str::<serde_json::Value>(&s) {
+                    if let Ok(pretty) = serde_json::to_string_pretty(&value) {
+                        let pretty_lines: Vec<String> =
+                            pretty.lines().map(|l| l.to_owned()).collect();
+                        self.json_pretty_lines = self.highlighter.highlight(path, &pretty_lines);
+                        self.json_pretty_text = pretty_lines;
+                        self.show_pretty_json = true;
+                    }
+                }
+            }
         }
     }
 
@@ -257,6 +283,10 @@ impl App {
         self.is_markdown = false;
         self.show_raw_markdown = false;
         self.markdown_lines = Vec::new();
+        self.is_json = false;
+        self.show_pretty_json = false;
+        self.json_pretty_text = Vec::new();
+        self.json_pretty_lines = Vec::new();
         self.is_diff = true;
         self.content_scroll = 0;
         self.content_hscroll = 0;

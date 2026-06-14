@@ -111,6 +111,56 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
             })
             .collect();
         (0, vec![], lines)
+    } else if app.is_json && app.show_pretty_json && !app.json_pretty_lines.is_empty() {
+        // JSON pretty view: iterate only the visible window of pre-highlighted lines.
+        let ln_style = Style::default().fg(app.theme.dim);
+        let lw = total_lines.to_string().len().max(1);
+        let gutters: Vec<Line> = (scroll..visible_end)
+            .map(|i| {
+                Line::from(Span::styled(
+                    format!("{:>width$} ", i + 1, width = lw),
+                    ln_style,
+                ))
+            })
+            .collect();
+        let lines: Vec<Line> = app.json_pretty_lines[scroll..visible_end]
+            .iter()
+            .enumerate()
+            .map(|(offset, spans)| {
+                let logical_idx = scroll + offset;
+                let regions_owned: Vec<(Style, String)> =
+                    spans.iter().map(|(s, t)| (*s, t.clone())).collect();
+                if let Some(s) = in_file_search {
+                    Line::from(apply_search_to_regions(
+                        &regions_owned,
+                        logical_idx,
+                        s,
+                        &app.theme,
+                    ))
+                } else if let Some(((sl, sc), (el, ec))) = sel {
+                    if logical_idx >= sl && logical_idx <= el {
+                        let col_start = if logical_idx == sl { sc } else { 0 };
+                        let col_end = if logical_idx == el { ec } else { usize::MAX };
+                        Line::from(apply_selection(&regions_owned, col_start, col_end, sel_bg))
+                    } else {
+                        Line::from(
+                            regions_owned
+                                .iter()
+                                .map(|(s, t)| Span::styled(t.clone(), *s))
+                                .collect::<Vec<_>>(),
+                        )
+                    }
+                } else {
+                    Line::from(
+                        regions_owned
+                            .iter()
+                            .map(|(s, t)| Span::styled(t.clone(), *s))
+                            .collect::<Vec<_>>(),
+                    )
+                }
+            })
+            .collect();
+        (lw + 1, gutters, lines)
     } else if app.is_markdown && !app.show_raw_markdown {
         // Markdown: iterate only the visible window of pre-rendered lines.
         let ln_style = Style::default().fg(app.theme.dim);
