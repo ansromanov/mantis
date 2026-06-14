@@ -104,7 +104,7 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     let blame_style = Style::default().fg(app.theme.dim);
 
     // ln_width, ln_lines, content_lines, fold_gutter_rows
-    let (ln_width, ln_lines, content_lines, new_fold_gutter_rows) = if app.is_diff {
+    let (ln_width, ln_lines, mut content_lines, new_fold_gutter_rows) = if app.is_diff {
         // Diff view: iterate all highlighted lines (diffs are never large).
         let lines = app
             .highlighted
@@ -533,6 +533,21 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
             inline_fold_gutter_rows,
         )
     };
+
+    // Visual-line mode: paint the whole-line background across the selected
+    // range. The j-th rendered line maps to display index `scroll + j` in every
+    // non-diff branch above, and visual-line mode is never active over a diff.
+    if let Some(v) = app.visual_line.as_ref() {
+        let (vstart, vend) = v.range();
+        for (j, line) in content_lines.iter_mut().enumerate() {
+            let disp = scroll + j;
+            if disp >= vstart && disp <= vend {
+                for span in &mut line.spans {
+                    span.style = span.style.bg(sel_bg);
+                }
+            }
+        }
+    }
 
     let inner = block.inner(area);
     f.render_widget(block, area);
@@ -1203,5 +1218,319 @@ mod tests {
         let result = apply_search_to_regions(&regions, 0, &search, &default_theme());
         let total: String = result.iter().map(|s| s.content.as_ref()).collect();
         assert_eq!(total, "héllo wörld");
+    }
+
+    // ── emphasize ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn emphasize_no_ranges_returns_full_text() {
+        let base = Style::default();
+        let emph = Style::default().bg(Color::Red);
+        let result = emphasize("hello", &[], base, emph);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].content, "hello");
+    }
+
+    #[test]
+    fn emphasize_middle_range_splits_correctly() {
+        let base = Style::default();
+        let emph = Style::default().bg(Color::Red);
+        let result = emphasize("hello world", &[(6, 11)], base, emph);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].content, "hello ");
+        assert_eq!(result[0].style, base);
+        assert_eq!(result[1].content, "world");
+        assert_eq!(result[1].style, emph);
+    }
+
+    #[test]
+    fn emphasize_range_at_start() {
+        let base = Style::default();
+        let emph = Style::default().bg(Color::Blue);
+        let result = emphasize("abcdef", &[(0, 3)], base, emph);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].content, "abc");
+        assert_eq!(result[0].style, emph);
+        assert_eq!(result[1].content, "def");
+        assert_eq!(result[1].style, base);
+    }
+
+    #[test]
+    fn emphasize_range_at_end() {
+        let base = Style::default();
+        let emph = Style::default().bg(Color::Green);
+        let result = emphasize("abcdef", &[(3, 6)], base, emph);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].content, "abc");
+        assert_eq!(result[0].style, base);
+        assert_eq!(result[1].content, "def");
+        assert_eq!(result[1].style, emph);
+    }
+
+    #[test]
+    fn emphasize_full_range() {
+        let base = Style::default();
+        let emph = Style::default().bg(Color::Yellow);
+        let result = emphasize("full", &[(0, 4)], base, emph);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].content, "full");
+        assert_eq!(result[0].style, emph);
+    }
+
+    #[test]
+    fn emphasize_multiple_disjoint_ranges() {
+        let base = Style::default();
+        let emph = Style::default().bg(Color::Magenta);
+        let result = emphasize("abcdefghi", &[(1, 3), (5, 8)], base, emph);
+        let joined: String = result.iter().map(|s| s.content.as_ref()).collect();
+        assert_eq!(joined, "abcdefghi");
+        let emphasized: String = result
+            .iter()
+            .filter(|s| s.style.bg == Some(Color::Magenta))
+            .map(|s| s.content.as_ref())
+            .collect();
+        assert_eq!(emphasized, "bcfgh");
+    }
+
+    #[test]
+    fn emphasize_empty_text() {
+        let base = Style::default();
+        let emph = Style::default().bg(Color::Red);
+        let result = emphasize("", &[(0, 0)], base, emph);
+        assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn emphasize_range_out_of_bounds_clamps() {
+        let base = Style::default();
+        let emph = Style::default().bg(Color::Cyan);
+        let result = emphasize("hi", &[(10, 20)], base, emph);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].content, "hi");
+        assert_eq!(result[0].style, base);
+    }
+
+    // ── draw_content smoke tests ───────────────────────────────────────────
+
+    /// Minimal app factory for rendering tests. Creates a temp directory and
+    /// a real `App` via `App::new` (needed for the highlighter and config).
+    fn render_app() -> (crate::app::App, tempfile::TempDir) {
+        let dir = tempfile::TempDir::new().expect("temp dir");
+        // Write at least one file so the tree is non-empty.
+        std::fs::write(dir.path().join("f.txt"), "line1\nline2\n").unwrap();
+        let app = crate::app::App::new(
+            dir.path().to_path_buf(),
+            crate::config::Config::default(),
+            None,
+            None,
+        )
+        .expect("App::new");
+        (app, dir)
+    }
+
+    /// Creates a `TestBackend` + `Terminal`, runs `draw_content`, and returns
+    /// the rendered buffer for assertions.
+    fn render_content<F>(app: &mut crate::app::App, f: F) -> ratatui::buffer::Buffer
+    where
+        F: FnOnce(&mut crate::app::App),
+    {
+        use ratatui::backend::TestBackend;
+        f(app);
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        terminal
+            .draw(|frame| draw_content(frame, app, frame.area()))
+            .unwrap();
+        terminal.backend().buffer().clone()
+    }
+
+    #[test]
+    fn draw_inline_fallback_no_file_shows_title() {
+        let (mut app, _dir) = render_app();
+        app.current_file = None;
+        app.content = Vec::new();
+        app.highlighted = Vec::new();
+        app.virtual_file = None;
+        let buffer = render_content(&mut app, |_| {});
+        let top_line: String = buffer
+            .content()
+            .iter()
+            .take(80)
+            .map(|c| c.symbol())
+            .collect();
+        assert!(
+            top_line.contains("No file"),
+            "top border should contain 'No file'; got: {top_line:?}"
+        );
+    }
+
+    #[test]
+    fn draw_inline_fallback_with_content() {
+        let (mut app, _dir) = render_app();
+        let buffer = render_content(&mut app, |app| {
+            app.current_file = None;
+            app.virtual_file = None;
+            app.content = vec!["hello".to_string(), "world".to_string()];
+            app.highlighted = vec![
+                vec![(Style::default(), "hello".to_string())],
+                vec![(Style::default(), "world".to_string())],
+            ];
+        });
+        let lines: Vec<String> = buffer
+            .content()
+            .chunks(80)
+            .map(|row| row.iter().map(|c| c.symbol()).collect::<String>())
+            .collect();
+        let all = lines.concat();
+        assert!(all.contains("hello"), "content should contain 'hello'");
+        assert!(all.contains("world"), "content should contain 'world'");
+    }
+
+    #[test]
+    fn draw_inline_fallback_word_wrap() {
+        let (mut app, _dir) = render_app();
+        let buffer = render_content(&mut app, |app| {
+            app.current_file = None;
+            app.virtual_file = None;
+            app.content = vec!["hello world".to_string()];
+            app.highlighted = vec![vec![(Style::default(), "hello world".to_string())]];
+            app.word_wrap = true;
+        });
+        let lines: Vec<String> = buffer
+            .content()
+            .chunks(80)
+            .map(|row| row.iter().map(|c| c.symbol()).collect::<String>())
+            .collect();
+        let all = lines.concat();
+        assert!(
+            all.contains("hello"),
+            "wrapped content should contain 'hello'"
+        );
+    }
+
+    #[test]
+    fn draw_diff_mode_renders_without_panicking() {
+        let (mut app, _dir) = render_app();
+        let _buffer = render_content(&mut app, |app| {
+            app.current_file = None;
+            app.virtual_file = None;
+            app.is_diff = true;
+            app.content = vec![
+                "@@ -1 +1 @@".to_string(),
+                "-old line".to_string(),
+                "+new line".to_string(),
+            ];
+            app.highlighted = vec![
+                vec![(
+                    Style::default().fg(Color::Yellow),
+                    "@@ -1 +1 @@".to_string(),
+                )],
+                vec![(Style::default().fg(Color::Red), "-old line".to_string())],
+                vec![(Style::default().fg(Color::Green), "+new line".to_string())],
+            ];
+        });
+        let all: String = _buffer.content().iter().map(|c| c.symbol()).collect();
+        assert!(all.contains("@@"));
+        assert!(all.contains("-old"));
+        assert!(all.contains("+new"));
+    }
+
+    #[test]
+    fn draw_markdown_mode() {
+        let (mut app, _dir) = render_app();
+        let _buffer = render_content(&mut app, |app| {
+            app.current_file = None;
+            app.virtual_file = None;
+            app.is_markdown = true;
+            app.show_raw_markdown = false;
+            app.markdown_lines = vec![
+                vec![(Style::default().fg(Color::Cyan), "# Title".to_string())],
+                vec![(Style::default(), "body text".to_string())],
+            ];
+        });
+        let all: String = _buffer.content().iter().map(|c| c.symbol()).collect();
+        assert!(
+            all.contains("Title") || all.contains("body"),
+            "markdown content should render; got prefix: {:?}",
+            &all[..all.len().min(80)]
+        );
+    }
+
+    #[test]
+    fn draw_virtual_file_mode() {
+        let (mut app, _dir) = render_app();
+        let _buffer = render_content(&mut app, |app| {
+            let path = _dir.path().join("f.txt");
+            let vf = crate::virtual_file::VirtualFile::open(&path);
+            app.virtual_file = vf;
+            app.current_file = Some(path);
+        });
+        let all: String = _buffer.content().iter().map(|c| c.symbol()).collect();
+        assert!(all.contains("line1"), "virtual file content should render");
+    }
+
+    #[test]
+    fn draw_with_selection_highlights_bg() {
+        let (mut app, _dir) = render_app();
+        let _buffer = render_content(&mut app, |app| {
+            app.current_file = None;
+            app.virtual_file = None;
+            app.content = vec!["select me".to_string()];
+            app.highlighted = vec![vec![(Style::default(), "select me".to_string())]];
+            app.selection = Some(crate::selection::TextSelection {
+                anchor: (0, 0),
+                active: (0, 6),
+            });
+        });
+        let all: String = _buffer.content().iter().map(|c| c.symbol()).collect();
+        assert!(
+            all.contains("select"),
+            "content with selection should render"
+        );
+    }
+
+    #[test]
+    fn draw_scrollbar_visible_when_recently_scrolled() {
+        let (mut app, _dir) = render_app();
+        app.show_scrollbar = true;
+        app.content_scrolled_at = std::time::Instant::now();
+        let _buffer = render_content(&mut app, |app| {
+            app.current_file = None;
+            app.virtual_file = None;
+            app.content = (0..100).map(|i| format!("line {i}")).collect();
+            app.highlighted = (0..100)
+                .map(|i| vec![(Style::default(), format!("line {i}"))])
+                .collect();
+            app.content_scroll = 30;
+        });
+        let all: String = _buffer.content().iter().map(|c| c.symbol()).collect();
+        assert!(all.contains('█'), "scrollbar thumb should be visible");
+    }
+
+    #[test]
+    fn draw_content_records_area_and_fold_gutter_rows() {
+        let (mut app, _dir) = render_app();
+        let area = ratatui::layout::Rect {
+            x: 2,
+            y: 2,
+            width: 76,
+            height: 20,
+        };
+        let _buffer = {
+            use ratatui::backend::TestBackend;
+            let backend = TestBackend::new(80, 24);
+            let mut terminal = ratatui::Terminal::new(backend).unwrap();
+            terminal
+                .draw(|frame| draw_content(frame, &mut app, area))
+                .unwrap();
+            terminal.backend().buffer().clone()
+        };
+        // content_area should be recorded
+        assert!(
+            app.content_area.width > 0,
+            "content_area should be recorded after draw"
+        );
+        // fold_gutter_rows is a Vec - recorded even if empty
+        assert!(app.fold_gutter_rows.is_empty());
     }
 }

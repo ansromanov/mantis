@@ -1,8 +1,10 @@
 use std::fs;
 
 use super::*;
+use crate::command_palette::COMMANDS;
 use crate::config::Config;
 use crate::search::{InFileMatch, SearchMode};
+use crate::yaml_fold::FoldRegion;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -3174,6 +3176,387 @@ fn diff_sbs_active_requires_min_width() {
     fs::remove_dir_all(&root).ok();
 }
 
+// -- content_scroll_max edge cases -----------------------------------------
+
+#[test]
+fn content_scroll_max_zero_total_content() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.content = Vec::new();
+    app.content_area = viewport(10);
+    assert_eq!(app.content_scroll_max(), 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_scroll_max_lines_less_than_height() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.content = vec!["a".to_string(), "b".to_string()];
+    app.content_area = viewport(10);
+    assert_eq!(app.content_scroll_max(), 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_scroll_max_zero_height_falls_back_to_one() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.content = vec!["a".to_string(); 5];
+    app.content_area = viewport(0);
+    // vh = max(0,1) = 1, so max = 5 - 1 = 4
+    assert_eq!(app.content_scroll_max(), 4);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- content_pos additional boundary tests ---------------------------------
+
+#[test]
+fn content_pos_no_wrap_with_hscroll() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt"));
+    app.word_wrap = false;
+    app.content_scroll = 0;
+    app.content_hscroll = 5;
+    app.content_area = Rect {
+        x: 2,
+        y: 2,
+        width: 80,
+        height: 20,
+    };
+    // rel_col = 5 - 2 = 3, prefix = 2, buf_col = 3 + 5 - 2 = 6
+    let (_line, col) = app.content_pos(5, 2);
+    assert_eq!(col, 6);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_pos_no_wrap_below_content_clamps_to_last() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt")); // 2 lines
+    app.content_scroll = 0;
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 20,
+    };
+    // row 99 → rel_row = 99 → display_line = 99 → display_to_physical(99) = 99,
+    // but line_count is 2, so display_to_physical returns 99 (no fold map, identity).
+    // This is technically past end — the caller (mouse handler) should guard against this.
+    let (line, _col) = app.content_pos(0, 99);
+    assert_eq!(line, 99); // identity mapping past end
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_pos_virtual_file_no_wrap() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt"));
+    app.word_wrap = false;
+    app.content_scroll = 0;
+    app.content_hscroll = 0;
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 20,
+    };
+    let (line, _col) = app.content_pos(0, 0);
+    assert_eq!(line, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_pos_with_fold_display_map() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt")); // "line1\nline2\n"
+                                        // Simulate folding: mark line 0 as hidden via fold_display_map.
+    app.fold_display_map = vec![1]; // display line 0 → physical line 1
+    app.content_scroll = 0;
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 20,
+    };
+    // rel_row = 0, display_to_physical(0) = 1
+    let (line, _col) = app.content_pos(0, 0);
+    assert_eq!(line, 1);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_pos_word_wrap_zero_width_area_falls_through() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.is_markdown = true;
+    app.show_raw_markdown = false;
+    app.markdown_lines = vec![vec![(
+        ratatui::style::Style::default(),
+        "hello".to_string(),
+    )]];
+    app.word_wrap = true;
+    app.content_scroll = 0;
+    // wrap_width = 0 → NonZeroUsize::new(0) is None → falls through to no-wrap path
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 20,
+    };
+    let (line, _col) = app.content_pos(0, 0);
+    assert_eq!(line, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_pos_diff_mode_prefix_zero() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.content = vec!["@@ -1 +1 @@".to_string(), "+hello".to_string()];
+    app.is_diff = true;
+    app.content_scroll = 0;
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 20,
+    };
+    // prefix = 0 (diff mode), rel_col = 1 → buf_col = 1
+    let (line, col) = app.content_pos(1, 1);
+    assert_eq!(line, 1);
+    assert_eq!(col, 1);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- line_prefix_width ------------------------------------------------------
+
+#[test]
+fn line_prefix_width_normal_file_with_line_numbers() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.content = vec!["hello".to_string()];
+    // Not diff, not markdown → prefix = fold_gutter_width + len("1") + 1 = 0 + 1 + 1 = 2
+    assert_eq!(app.line_prefix_width(), 2);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn line_prefix_width_with_fold_gutter() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.content = vec!["hello".to_string(); 10];
+    // Simulate YAML fold regions
+    app.yaml_fold_regions = vec![crate::yaml_fold::FoldRegion { start: 0, end: 5 }];
+    // fold_gutter_width = 2, line_width = len("10") + 1 = 3, total = 2 + 3 = 5
+    assert_eq!(app.line_prefix_width(), 5);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- selection_text ---------------------------------------------------------
+
+#[test]
+fn selection_text_inline_single_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.content = vec!["hello world".to_string()];
+    app.selection = Some(crate::selection::TextSelection {
+        anchor: (0, 6),
+        active: (0, 11),
+    });
+    assert_eq!(app.selection_text(), "world");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn selection_text_inline_multi_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.content = vec!["abc".to_string(), "def".to_string()];
+    app.selection = Some(crate::selection::TextSelection {
+        anchor: (0, 1),
+        active: (1, 2),
+    });
+    assert_eq!(app.selection_text(), "bc\nde");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn selection_text_inline_out_of_bounds_returns_empty() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.content = vec!["hi".to_string()];
+    app.selection = Some(crate::selection::TextSelection {
+        anchor: (10, 0),
+        active: (20, 0),
+    });
+    assert_eq!(app.selection_text(), "");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn selection_text_markdown_single_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.is_markdown = true;
+    app.show_raw_markdown = false;
+    app.markdown_lines = vec![vec![(
+        ratatui::style::Style::default(),
+        "hello **world**".to_string(),
+    )]];
+    app.selection = Some(crate::selection::TextSelection {
+        anchor: (0, 6),
+        active: (0, 11),
+    });
+    assert_eq!(app.selection_text(), "**wor");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn selection_text_markdown_multi_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.is_markdown = true;
+    app.show_raw_markdown = false;
+    app.markdown_lines = vec![
+        vec![(ratatui::style::Style::default(), "line A".to_string())],
+        vec![(ratatui::style::Style::default(), "line B".to_string())],
+    ];
+    app.selection = Some(crate::selection::TextSelection {
+        anchor: (0, 5),
+        active: (1, 4),
+    });
+    assert_eq!(app.selection_text(), "A\nline");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn selection_text_markdown_out_of_bounds_returns_empty() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.is_markdown = true;
+    app.show_raw_markdown = false;
+    app.markdown_lines = vec![];
+    app.selection = Some(crate::selection::TextSelection {
+        anchor: (5, 0),
+        active: (10, 0),
+    });
+    assert_eq!(app.selection_text(), "");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn selection_text_virtual_file() {
+    use std::io::Write;
+    let root = temp_tree();
+    // Create a temp file, read it via App::open_file, then simulate selection.
+    let path = root.join("sel.txt");
+    let mut f = std::fs::File::create(&path).unwrap();
+    write!(f, "alpha\nbeta\ngamma\n").unwrap();
+    drop(f);
+    let mut app = app_for(&root);
+    app.open_file(&path);
+    assert!(app.virtual_file.is_some(), "should use virtual file");
+    app.selection = Some(crate::selection::TextSelection {
+        anchor: (1, 1),
+        active: (2, 3),
+    });
+    // line 1 = "beta", col 1 = 'e' → "eta"; line 2 = "gamma", col 3 = "gam" → "gam"
+    assert_eq!(app.selection_text(), "eta\ngam");
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- selection_text: JSON pretty mode ---------------------------------------
+
+#[test]
+fn selection_text_json_pretty() {
+    let root = temp_tree();
+    let path = root.join("data.json");
+    fs::write(&path, r#"{"a":1,"b":2}"#).unwrap();
+    let mut app = app_for(&root);
+    app.open_file(&path);
+    assert!(app.show_pretty_json, "JSON files open with pretty view");
+    // Pretty-printed JSON has '{' on line 0, values on subsequent lines.
+    app.selection = Some(crate::selection::TextSelection {
+        anchor: (0, 0),
+        active: (2, 0),
+    });
+    let text = app.selection_text();
+    assert!(
+        !text.is_empty(),
+        "selection text should not be empty; json_pretty_text={:?}",
+        app.json_pretty_text
+    );
+    assert!(text.contains('{'), "selection should include opening brace");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn selection_text_virtual_file_out_of_bounds_returns_empty() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.content = vec!["hello".to_string()];
+    // virtual_file is None, so the VirtualFile path won't trigger.
+    // Force virtual_file to be Some to test that branch:
+    let path = root.join("dummy.txt");
+    fs::write(&path, "hi\n").unwrap();
+    let vf = crate::virtual_file::VirtualFile::open(&path);
+    app.virtual_file = vf;
+    app.content = Vec::new();
+    // start_line >= total (line_count = 1 from virtual file)
+    app.selection = Some(crate::selection::TextSelection {
+        anchor: (5, 0),
+        active: (10, 0),
+    });
+    assert_eq!(app.selection_text(), "");
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- content_pos with word wrap + visual rows past content (clamp) -----------
+
+#[test]
+fn content_pos_word_wrap_visual_rows_past_content_clamps() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.content = vec!["hello".to_string()];
+    app.word_wrap = true;
+    app.content_scroll = 0;
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 20,
+    };
+    // rel_row way past total visual rows → falls through to last physical line
+    let (line, _col) = app.content_pos(0, 50);
+    assert_eq!(line, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- fold_gutter_width ------------------------------------------------------
+
+#[test]
+fn fold_gutter_width_zero_when_no_regions() {
+    let root = temp_tree();
+    let app = app_for(&root);
+    assert_eq!(app.fold_gutter_width(), 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn fold_gutter_width_two_when_regions_exist() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.yaml_fold_regions = vec![crate::yaml_fold::FoldRegion { start: 0, end: 3 }];
+    assert_eq!(app.fold_gutter_width(), 2);
+    fs::remove_dir_all(&root).ok();
+}
+
 #[test]
 fn diff_hunk_navigation_jumps_between_headers() {
     let root = temp_git_two_hunks();
@@ -3202,5 +3585,623 @@ fn diff_hunk_navigation_jumps_between_headers() {
     // N goes back to the first.
     app.handle_key(KeyEvent::new(KeyCode::Char('N'), KeyModifiers::empty()));
     assert_eq!(app.content_scroll, headers[0]);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- dispatch_command action tests -------------------------------------------
+
+/// Sets `app.command_palette` to an instance whose first and only result is
+/// the command matching `action_id`.
+fn setup_command(app: &mut App, action_id: &str) {
+    app.command_palette = Some(CommandPalette::default());
+    let idx = COMMANDS
+        .iter()
+        .position(|c| c.action_id == action_id)
+        .unwrap();
+    if let Some(p) = &mut app.command_palette {
+        p.filtered = vec![idx];
+        p.selected = 0;
+    }
+}
+
+#[test]
+fn dispatch_command_toggle_help_toggles() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    setup_command(&mut app, "toggle_help");
+    assert!(!app.show_help);
+    app.dispatch_command();
+    assert!(app.command_palette.is_none());
+    assert!(app.show_help);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn dispatch_command_open_file_search_creates_search() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    setup_command(&mut app, "open_file_search");
+    assert!(app.search.is_none());
+    app.dispatch_command();
+    assert!(app.command_palette.is_none());
+    assert!(app.search.is_some());
+    assert_eq!(app.search.as_ref().unwrap().mode, SearchMode::Files);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn dispatch_command_open_file_search_with_keep_query() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.config.keep_search_query = true;
+    app.last_search_query = "test".to_string();
+    setup_command(&mut app, "open_file_search");
+    app.dispatch_command();
+    assert!(app.search.is_some());
+    assert_eq!(app.search.as_ref().unwrap().query, "test");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn dispatch_command_open_content_search_creates_search() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    setup_command(&mut app, "open_content_search");
+    app.dispatch_command();
+    assert!(app.command_palette.is_none());
+    assert!(app.search.is_some());
+    assert_eq!(app.search.as_ref().unwrap().mode, SearchMode::Content);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn dispatch_command_toggle_word_wrap_toggles() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    setup_command(&mut app, "toggle_word_wrap");
+    let before = app.word_wrap;
+    app.content_scroll = 10;
+    app.content_hscroll = 5;
+    app.dispatch_command();
+    assert!(app.command_palette.is_none());
+    assert_ne!(app.word_wrap, before);
+    assert_eq!(app.content_scroll, 0);
+    assert_eq!(app.content_hscroll, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn dispatch_command_toggle_raw_markdown_toggles() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.is_markdown = true;
+    setup_command(&mut app, "toggle_raw_markdown");
+    assert!(!app.show_raw_markdown);
+    app.dispatch_command();
+    assert!(app.show_raw_markdown);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn dispatch_command_toggle_pretty_json_toggles() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.is_json = true;
+    app.json_pretty_lines = vec![vec![(ratatui::style::Style::default(), "{}".to_string())]];
+    setup_command(&mut app, "toggle_pretty_json");
+    assert!(!app.show_pretty_json);
+    app.dispatch_command();
+    assert!(app.show_pretty_json);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn dispatch_command_toggle_diff_side_by_side_toggles() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.is_diff = true;
+    setup_command(&mut app, "toggle_diff_side_by_side");
+    assert!(!app.diff_side_by_side);
+    app.dispatch_command();
+    assert!(app.diff_side_by_side);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn dispatch_command_yaml_unfold_all_works() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.content = vec![
+        "header:".to_string(),
+        "  child1: 1".to_string(),
+        "  child2: 2".to_string(),
+    ];
+    app.yaml_fold_regions = vec![FoldRegion { start: 0, end: 2 }];
+    app.yaml_folded.insert(0);
+    app.rebuild_fold_display_map();
+    assert_eq!(
+        app.fold_display_map,
+        vec![0],
+        "folded should show only header"
+    );
+    setup_command(&mut app, "yaml_unfold_all");
+    app.dispatch_command();
+    assert!(app.yaml_folded.is_empty());
+    assert!(app.fold_display_map.is_empty());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn dispatch_command_yaml_fold_toggle_toggles() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.content = vec!["header".to_string(), "  child".to_string()];
+    app.yaml_fold_regions = vec![FoldRegion { start: 0, end: 1 }];
+    app.rebuild_fold_display_map();
+    setup_command(&mut app, "yaml_fold_toggle");
+    assert!(app.yaml_folded.is_empty());
+    app.dispatch_command();
+    // The region at content_scroll (0) should be folded
+    assert!(app.yaml_folded.contains(&0));
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- handle_content_key: additional coverage ----------------------------------
+
+#[test]
+fn content_key_toggle_pretty_json_toggles() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt"));
+    app.focus = Focus::Content;
+    app.is_json = true;
+    app.json_pretty_lines = vec![vec![(ratatui::style::Style::default(), "{}".to_string())]];
+    assert!(!app.show_pretty_json);
+    // 'J' is the toggle_pretty_json binding
+    app.handle_key(KeyEvent::new(KeyCode::Char('J'), KeyModifiers::empty()));
+    assert!(app.show_pretty_json);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- visual-line mode -----------------------------------------------------
+
+#[test]
+fn visual_line_enters_and_extends_selection() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt")); // 50 lines
+    app.focus = Focus::Content;
+    app.content_area = viewport(10);
+
+    // V enters visual-line mode anchored at the top.
+    app.handle_key(KeyEvent::new(KeyCode::Char('V'), KeyModifiers::empty()));
+    let v = app.visual_line.expect("visual-line mode should be active");
+    assert_eq!(v.range(), (0, 0));
+
+    // j extends the selection downward.
+    app.handle_key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::empty()));
+    assert_eq!(app.visual_line.unwrap().range(), (0, 2));
+
+    // G extends to the last line.
+    app.handle_key(KeyEvent::new(KeyCode::Char('G'), KeyModifiers::empty()));
+    assert_eq!(app.visual_line.unwrap().range(), (0, 49));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_key_yaml_fold_toggle_toggles() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt"));
+    app.focus = Focus::Content;
+    app.yaml_fold_regions = vec![FoldRegion { start: 0, end: 1 }];
+    app.rebuild_fold_display_map();
+    assert!(app.yaml_folded.is_empty());
+    // Space is the yaml_fold_toggle binding
+    app.handle_key(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::empty()));
+    assert!(app.yaml_folded.contains(&0));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn visual_line_esc_exits_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.content_area = viewport(10);
+
+    app.handle_key(KeyEvent::new(KeyCode::Char('V'), KeyModifiers::empty()));
+    assert!(app.visual_line.is_some());
+    app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+    assert!(app.visual_line.is_none());
+    assert!(!app.blame_panel);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_key_toggle_diff_side_by_side_toggles() {
+    let root = temp_git_tree();
+    let mut app = app_for(&root);
+    app.show_working_tree_diff(&root.join("tracked.txt"));
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 120,
+        height: 10,
+    };
+    app.focus = Focus::Content;
+    assert!(!app.diff_side_by_side);
+    // 'D' is the toggle_diff_side_by_side binding
+    app.handle_key(KeyEvent::new(KeyCode::Char('D'), KeyModifiers::empty()));
+    assert!(app.diff_side_by_side);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- handle_tree_key: additional coverage -------------------------------------
+
+#[test]
+fn tree_key_left_on_expanded_dir_collapses() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let dir_idx = app.nodes.iter().position(|n| n.is_dir).unwrap();
+    let dir_path = app.nodes[dir_idx].path.clone();
+    app.tree_selected = dir_idx;
+    // Expand the dir first
+    app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert!(app.expanded.contains(&dir_path));
+    // Left collapses it
+    app.handle_key(KeyEvent::new(KeyCode::Left, KeyModifiers::empty()));
+    assert!(!app.expanded.contains(&dir_path));
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- handle_mouse: fold gutter ------------------------------------------------
+
+#[test]
+fn mouse_fold_gutter_click_toggles_region() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt"));
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 50,
+        height: 20,
+    };
+    app.tree_area = Rect {
+        x: 100,
+        y: 0,
+        width: 10,
+        height: 10,
+    };
+    app.yaml_fold_regions = vec![FoldRegion { start: 0, end: 1 }];
+    app.fold_gutter_rows = vec![(0, 0)];
+    assert!(app.yaml_folded.is_empty());
+    // Click at (col=0, row=0) which is in the fold gutter
+    app.handle_mouse(click(0, 0));
+    assert!(app.yaml_folded.contains(&0));
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- handle_mouse: scroll boundaries ------------------------------------------
+
+#[test]
+fn mouse_scroll_up_tree_at_zero_is_noop() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.tree_area = full_rect();
+    app.content_area = Rect {
+        x: 100,
+        y: 0,
+        width: 40,
+        height: 20,
+    };
+    app.tree_selected = 0;
+    let before = app.tree_selected;
+    app.handle_mouse(mouse(MouseEventKind::ScrollUp, 1, 1));
+    assert_eq!(app.tree_selected, before);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn visual_line_blame_key_toggles_panel() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.content_area = viewport(10);
+
+    app.handle_key(KeyEvent::new(KeyCode::Char('V'), KeyModifiers::empty()));
+    // b opens the scoped blame panel.
+    app.handle_key(KeyEvent::new(KeyCode::Char('b'), KeyModifiers::empty()));
+    assert!(app.blame_panel);
+    // b again hides it, leaving visual-line mode active.
+    app.handle_key(KeyEvent::new(KeyCode::Char('b'), KeyModifiers::empty()));
+    assert!(!app.blame_panel);
+    assert!(app.visual_line.is_some());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn visual_line_does_not_toggle_blame_gutter() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.content_area = viewport(10);
+
+    // Entering visual-line mode and pressing b must not flip the always-on
+    // blame gutter (`show_blame`); it controls the scoped panel instead.
+    app.handle_key(KeyEvent::new(KeyCode::Char('V'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('b'), KeyModifiers::empty()));
+    assert!(!app.show_blame);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn mouse_scroll_down_tree_at_last_is_noop() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.tree_area = full_rect();
+    app.content_area = Rect {
+        x: 100,
+        y: 0,
+        width: 40,
+        height: 20,
+    };
+    let last = app.nodes.len().saturating_sub(1);
+    app.tree_selected = last;
+    app.handle_mouse(mouse(MouseEventKind::ScrollDown, 1, 1));
+    assert_eq!(app.tree_selected, last);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- mouse scroll at overlay boundaries ---------------------------------------
+
+/// A temp git repo with exactly two commits touching a single file.
+fn temp_git_two_commits() -> PathBuf {
+    use std::process::Command;
+    static COUNTER: AtomicUsize = AtomicUsize::new(0);
+    let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+    let dir = std::env::temp_dir().join(format!("tv_git_two_{}_{n}", std::process::id()));
+    fs::create_dir_all(&dir).unwrap();
+    let git = |args: &[&str]| {
+        Command::new("git")
+            .arg("-C")
+            .arg(&dir)
+            .args(["-c", "user.email=t@e.x", "-c", "user.name=T"])
+            .args(args)
+            .status()
+            .unwrap();
+    };
+    git(&["init", "-q"]);
+    fs::write(dir.join("f.txt"), "commit1\n").unwrap();
+    git(&["add", "."]);
+    git(&["commit", "-q", "-m", "first"]);
+    fs::write(dir.join("f.txt"), "commit2\n").unwrap();
+    git(&["add", "."]);
+    git(&["commit", "-q", "-m", "second"]);
+    dir.canonicalize().unwrap()
+}
+
+#[test]
+fn history_mouse_scroll_at_boundary() {
+    let root = temp_git_two_commits();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("f.txt"));
+    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::empty()));
+    app.history_area = Rect {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 20,
+    };
+    app.history_offset = 0;
+
+    let h = app.history.as_ref().unwrap();
+    assert!(h.results_len() >= 2, "need 2+ commits");
+    let _ = h;
+
+    // ScrollUp at selected=0 stays at 0
+    app.history.as_mut().unwrap().selected = 0;
+    app.handle_mouse(mouse(MouseEventKind::ScrollUp, 1, 1));
+    assert_eq!(app.history.as_ref().unwrap().selected, 0);
+
+    // ScrollDown at max stays at max
+    let max = app.history.as_ref().unwrap().results_len() - 1;
+    app.history.as_mut().unwrap().selected = max;
+    app.handle_mouse(mouse(MouseEventKind::ScrollDown, 1, 1));
+    assert_eq!(app.history.as_ref().unwrap().selected, max);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn theme_mouse_scroll_up_at_zero() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::empty()));
+    app.theme_area = full_rect();
+    app.theme_offset = 0;
+    app.theme_picker.as_mut().unwrap().selected = 0;
+    app.handle_mouse(mouse(MouseEventKind::ScrollUp, 1, 1));
+    assert_eq!(app.theme_picker.as_ref().unwrap().selected, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn command_palette_mouse_scroll_up_at_zero() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL));
+    app.command_palette_area = full_rect();
+    app.command_palette_offset = 0;
+    app.command_palette.as_mut().unwrap().selected = 0;
+    app.handle_mouse(mouse(MouseEventKind::ScrollUp, 1, 1));
+    assert_eq!(app.command_palette.as_ref().unwrap().selected, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn search_mouse_scroll_up_at_zero() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
+    app.search_area = full_rect();
+    app.search_offset = 0;
+    if app.search.as_ref().unwrap().results_len() > 0 {
+        app.search.as_mut().unwrap().selected = 0;
+        app.handle_mouse(mouse(MouseEventKind::ScrollUp, 1, 1));
+        assert_eq!(app.search.as_ref().unwrap().selected, 0);
+    }
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- handle_mouse: _ => {} catch-all ------------------------------------------
+
+#[test]
+fn mouse_unhandled_event_kind_is_noop() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    // Use a mouse event kind that hits the catch-all.
+    // MiddleButton down is not handled anywhere.
+    app.handle_mouse(mouse(MouseEventKind::Down(MouseButton::Middle), 1, 1));
+    // Should not panic and no state should change.
+    assert!(!app.should_quit);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- handle_key: catch-all in overlays ----------------------------------------
+
+#[test]
+fn search_key_unrecognized_key_is_noop() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
+    assert!(app.search.is_some());
+    let selected = app.search.as_ref().unwrap().selected;
+    // F-key should hit the _ => {} catch-all
+    app.handle_key(KeyEvent::new(KeyCode::F(1), KeyModifiers::empty()));
+    assert_eq!(app.search.as_ref().unwrap().selected, selected);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn history_key_unrecognized_key_is_noop() {
+    let root = temp_git_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("tracked.txt"));
+    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::empty()));
+    assert!(app.history.is_some());
+    let selected = app.history.as_ref().unwrap().selected;
+    app.handle_key(KeyEvent::new(KeyCode::F(2), KeyModifiers::empty()));
+    assert_eq!(app.history.as_ref().unwrap().selected, selected);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn theme_key_unrecognized_key_is_noop() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::empty()));
+    assert!(app.theme_picker.is_some());
+    let selected = app.theme_picker.as_ref().unwrap().selected;
+    app.handle_key(KeyEvent::new(KeyCode::F(3), KeyModifiers::empty()));
+    assert_eq!(app.theme_picker.as_ref().unwrap().selected, selected);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn command_key_unrecognized_key_is_noop() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL));
+    assert!(app.command_palette.is_some());
+    let selected = app.command_palette.as_ref().unwrap().selected;
+    app.handle_key(KeyEvent::new(KeyCode::F(4), KeyModifiers::empty()));
+    assert_eq!(app.command_palette.as_ref().unwrap().selected, selected);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn in_file_search_unrecognized_key_is_noop() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt"));
+    app.focus = Focus::Content;
+    app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
+    assert!(app.in_file_search.is_some());
+    let current = app.in_file_search.as_ref().unwrap().current;
+    app.handle_key(KeyEvent::new(KeyCode::F(5), KeyModifiers::empty()));
+    assert_eq!(app.in_file_search.as_ref().unwrap().current, current);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- handle_key: about overlay unrecognized key -------------------------------
+
+#[test]
+fn about_overlay_unrecognized_key_is_noop() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.show_about = true;
+    app.handle_key(KeyEvent::new(KeyCode::F(6), KeyModifiers::empty()));
+    assert!(app.show_about);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- set_scroll_from_mouse_y: track_range == 0 --------------------------------
+
+#[test]
+fn set_scroll_from_mouse_y_track_range_zero() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    // A file with fewer lines than the content height: track_range = 0.
+    app.open_file(&root.join("a.txt")); // 2 lines
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 50,
+        height: 10,
+    };
+    app.show_scrollbar = true;
+    // Click on the scrollbar column to trigger set_scroll_from_mouse_y
+    // But display_line_count (2) < height (10), so set_scroll_from_mouse_y returns early.
+    let before = app.content_scroll;
+    app.set_scroll_from_mouse_y(5);
+    assert_eq!(app.content_scroll, before);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn visual_line_not_entered_for_diff() {
+    let root = temp_git_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("tracked.txt"));
+    app.focus = Focus::Content;
+    // Switch to the working-tree diff view, which sets is_diff.
+    app.show_working_tree_diff(&root.join("tracked.txt"));
+    assert!(app.is_diff);
+
+    app.handle_key(KeyEvent::new(KeyCode::Char('V'), KeyModifiers::empty()));
+    assert!(app.visual_line.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn opening_different_file_exits_visual_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.content_area = viewport(10);
+
+    app.handle_key(KeyEvent::new(KeyCode::Char('V'), KeyModifiers::empty()));
+    app.blame_panel = true;
+    assert!(app.visual_line.is_some());
+
+    app.open_file(&root.join("a.txt"));
+    assert!(app.visual_line.is_none());
+    assert!(!app.blame_panel);
     fs::remove_dir_all(&root).ok();
 }

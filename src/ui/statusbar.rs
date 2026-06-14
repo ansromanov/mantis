@@ -1,6 +1,6 @@
 use ratatui::{
     layout::Rect,
-    style::Style,
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::Paragraph,
     Frame,
@@ -28,25 +28,30 @@ pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
             " \u{2191}\u{2193} navigate  Enter select  Tab toggle mode  Esc cancel",
             base,
         )]
+    } else if app.visual_line.is_some() {
+        let blame = if app.blame_panel {
+            "  b hide blame"
+        } else {
+            "  b blame"
+        };
+        vec![Span::styled(
+            format!(" VISUAL LINE  j/k extend  g/G top/bot{blame}  Esc exit"),
+            base,
+        )]
     } else {
         let mut spans = vec![];
 
+        // Accent style for active-mode badges; bold to stand apart from the
+        // dimmed hint text.
+        let badge = base.fg(theme.accent).add_modifier(Modifier::BOLD);
+        // Red+bold style for error indicators.
+        let error = base.fg(theme.diff_del).add_modifier(Modifier::BOLD);
+        // Hint text recedes behind the state indicators.
+        let hint_style = base.fg(theme.dim);
+
         let hint = match app.focus {
             Focus::Tree => {
-                let hidden = if app.show_hidden { " [hidden]" } else { "" };
-                let git = if app.git_mode {
-                    if app.git_mode_flat {
-                        " [git:flat]"
-                    } else {
-                        " [git]"
-                    }
-                } else {
-                    ""
-                };
-                format!(
-                    " j/k nav  Enter/l expand  h collapse  / files  f content  t theme  Tab panel  q quit  ? help{}{}",
-                    hidden, git
-                )
+                " j/k nav  Enter/l expand  h collapse  / files  f content  t theme  Tab panel  q quit  ? help".to_string()
             }
             Focus::Content => {
                 let md = if app.is_markdown {
@@ -80,7 +85,22 @@ pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
                 )
             }
         };
-        spans.push(Span::styled(hint, base));
+        spans.push(Span::styled(hint, hint_style));
+
+        // Active-mode badges (only meaningful in the tree panel).
+        if matches!(app.focus, Focus::Tree) {
+            if app.show_hidden {
+                spans.push(Span::styled(" [hidden]", badge));
+            }
+            if app.git_mode {
+                let label = if app.git_mode_flat {
+                    " [git:flat]"
+                } else {
+                    " [git]"
+                };
+                spans.push(Span::styled(label, badge));
+            }
+        }
 
         if app.show_scroll_percentage && app.current_file.is_some() {
             let max = app.content_scroll_max();
@@ -94,37 +114,29 @@ pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
         }
 
         if let Some(ref info) = app.git_info {
-            let dirty = info.is_dirty()
-                || matches!(
-                    info.head,
-                    GitHead::Detached | GitHead::Rebase | GitHead::Merge
-                );
-            let fg = if dirty {
-                theme.git_dirty
-            } else {
-                theme.git_clean
+            // Semantic git color: green clean, yellow dirty, red for a detached
+            // HEAD, orange while a rebase/merge is in progress.
+            let fg = match info.head {
+                GitHead::Detached => theme.git_conflict,
+                GitHead::Rebase | GitHead::Merge => theme.git_progress,
+                GitHead::Branch(_) if info.is_dirty() => theme.git_dirty,
+                GitHead::Branch(_) => theme.git_clean,
             };
             spans.push(Span::styled(git_info_str(info), base.fg(fg)));
         }
 
         if app.walk_errors > 0 {
-            spans.push(Span::styled(
-                format!(" [!{}]", app.walk_errors),
-                base.fg(theme.diff_del),
-            ));
+            spans.push(Span::styled(format!(" [!{}]", app.walk_errors), error));
         }
 
         if app.config_error.is_some() {
-            spans.push(Span::styled(" [config error]", base.fg(theme.diff_del)));
+            spans.push(Span::styled(" [config error]", error));
         }
 
         // YAML validation error indicator
         if let Some(ref err) = app.yaml_error {
             let label = err.lines().next().unwrap_or(err);
-            spans.push(Span::styled(
-                format!(" [YAML: {label}]"),
-                base.fg(theme.diff_del),
-            ));
+            spans.push(Span::styled(format!(" [YAML: {label}]"), error));
         }
 
         // YAML anchor/alias/fold stats (only when a YAML file is open)
@@ -262,6 +274,27 @@ mod tests {
         app.git_mode_flat = true;
         let text = render_bar_width(&app, 120);
         assert!(text.contains("[git:flat]"));
+    }
+
+    #[test]
+    fn visual_line_hint_shown() {
+        let mut app = make_app();
+        app.focus = Focus::Content;
+        app.visual_line = Some(crate::selection::VisualLine::new(0));
+        let text = render_bar_width(&app, 120);
+        assert!(text.contains("VISUAL LINE"));
+        assert!(text.contains("b blame"));
+        assert!(text.contains("Esc exit"));
+    }
+
+    #[test]
+    fn visual_line_hint_shows_hide_blame_when_panel_open() {
+        let mut app = make_app();
+        app.focus = Focus::Content;
+        app.visual_line = Some(crate::selection::VisualLine::new(0));
+        app.blame_panel = true;
+        let text = render_bar_width(&app, 120);
+        assert!(text.contains("b hide blame"));
     }
 
     #[test]

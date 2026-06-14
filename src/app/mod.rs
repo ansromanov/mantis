@@ -11,7 +11,7 @@ use crate::config::{self, Config, Keymap};
 use crate::git::GitStatus;
 use crate::highlight::Highlighter;
 use crate::search::{CommandPalette, HistoryState, InFileSearch, SearchState, ThemePicker};
-use crate::selection::TextSelection;
+use crate::selection::{TextSelection, VisualLine};
 use crate::theme::Theme;
 use crate::tree::{build_visible, TreeNode};
 use crate::virtual_file::VirtualFile;
@@ -119,6 +119,12 @@ pub struct App {
     file_watch_rx: Option<Receiver<notify::Result<notify::Event>>>,
     file_watch_path: Option<PathBuf>,
     pub selection: Option<TextSelection>,
+    /// Active visual-line selection in the content panel, if any. Whole lines
+    /// are selected and a scoped git-blame panel can be opened for the range.
+    pub visual_line: Option<VisualLine>,
+    /// Whether the selection-scoped git-blame panel is open. Only meaningful
+    /// while `visual_line` is `Some`.
+    pub blame_panel: bool,
     drag_start: Option<(usize, usize)>,
     scrollbar_drag: bool,
     /// Set to `true` after suspending the TUI (e.g. for editor), signals
@@ -246,6 +252,8 @@ impl App {
             file_watch_rx: None,
             file_watch_path: None,
             selection: None,
+            visual_line: None,
+            blame_panel: false,
             drag_start: None,
             scrollbar_drag: false,
             needs_clear: false,

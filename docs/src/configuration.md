@@ -41,6 +41,8 @@ theme_picker = ["t"]
 command_palette = ["ctrl+p"]
 open_in_editor = ["e"]
 toggle_blame = ["b"]
+visual_line_toggle = ["V"]
+visual_line_blame = ["b"]
 git_mode_toggle = ["ctrl+g"]
 git_mode_flat_toggle = ["alt+g"]
 
@@ -99,6 +101,10 @@ heading3 = "lightgreen"    # markdown H3
 code = "lightyellow"       # inline code / code blocks
 diff_add = "green"         # added lines in a diff
 diff_del = "red"           # removed lines in a diff
+git_clean = "green"        # statusbar git indicator: clean working tree
+git_dirty = "yellow"       # statusbar git indicator: uncommitted changes
+git_conflict = "red"       # statusbar git indicator: conflict / detached HEAD
+git_progress = "#ff8700"   # statusbar git indicator: rebase / merge in progress
 syntax = "base16-ocean.dark"
 ```
 
