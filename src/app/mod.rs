@@ -125,6 +125,12 @@ pub struct App {
     /// (screen_y, region_idx) pairs recorded during the last render, used for
     /// fold-gutter mouse click detection.
     pub fold_gutter_rows: Vec<(u16, usize)>,
+    /// YAML parse error message, if any (set when opening a `.yaml`/`.yml` file).
+    pub yaml_error: Option<String>,
+    /// Number of YAML anchors (`&name`) found in the current file.
+    pub yaml_anchor_count: usize,
+    /// Number of YAML aliases (`*name`) found in the current file.
+    pub yaml_alias_count: usize,
 }
 
 impl App {
@@ -238,6 +244,9 @@ impl App {
             yaml_folded: HashSet::new(),
             fold_display_map: Vec::new(),
             fold_gutter_rows: Vec::new(),
+            yaml_error: None,
+            yaml_anchor_count: 0,
+            yaml_alias_count: 0,
         };
         if app.git_mode {
             app.expand_git_dirs();
@@ -432,12 +441,15 @@ impl App {
         self.fold_display_map.clear();
     }
 
-    /// Resets all YAML fold state. Called whenever a new file is opened.
-    pub(crate) fn clear_fold_state(&mut self) {
+    /// Resets all YAML state. Called whenever a new file is opened.
+    pub(crate) fn clear_yaml_state(&mut self) {
         self.yaml_fold_regions.clear();
         self.yaml_folded.clear();
         self.fold_display_map.clear();
         self.fold_gutter_rows.clear();
+        self.yaml_error = None;
+        self.yaml_anchor_count = 0;
+        self.yaml_alias_count = 0;
     }
 
     /// Returns the total number of lines in the current content source
@@ -483,6 +495,47 @@ impl App {
         lines: &[&str],
     ) -> Vec<Vec<(ratatui::style::Style, String)>> {
         self.highlighter.highlight_range(path, lines)
+    }
+
+    /// Validates YAML content, storing an error message if parsing fails.
+    pub(super) fn validate_yaml(&mut self, content: &str) {
+        match serde_yaml::from_str::<serde_yaml::Value>(content) {
+            Ok(_) => self.yaml_error = None,
+            Err(e) => self.yaml_error = Some(e.to_string()),
+        }
+    }
+
+    /// Counts YAML anchors (`&name`) and aliases (`*name`) in the given lines.
+    pub(super) fn count_yaml_anchors_aliases(&mut self, lines: &[String]) {
+        let mut anchors = 0;
+        let mut aliases = 0;
+        for line in lines {
+            let trimmed = line.trim();
+            // Skip comments
+            if trimmed.starts_with('#') {
+                continue;
+            }
+            // Count anchors: & followed by alphanumeric/underscore
+            let mut chars = trimmed.chars().peekable();
+            while let Some(ch) = chars.next() {
+                if ch == '&'
+                    && chars
+                        .peek()
+                        .is_some_and(|c| c.is_alphanumeric() || *c == '_')
+                {
+                    anchors += 1;
+                }
+                if ch == '*'
+                    && chars
+                        .peek()
+                        .is_some_and(|c| c.is_alphanumeric() || *c == '_')
+                {
+                    aliases += 1;
+                }
+            }
+        }
+        self.yaml_anchor_count = anchors;
+        self.yaml_alias_count = aliases;
     }
 }
 
