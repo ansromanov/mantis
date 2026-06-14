@@ -113,6 +113,7 @@ impl App {
         self.markdown_lines = Vec::new();
         self.is_json = false;
         self.show_pretty_json = false;
+        self.json_pretty_text = Vec::new();
         self.json_pretty_lines = Vec::new();
         self.is_diff = true;
         self.content_scroll = 0;
@@ -137,6 +138,7 @@ impl App {
         self.show_raw_markdown = false;
         self.is_json = false;
         self.show_pretty_json = false;
+        self.json_pretty_text = Vec::new();
         self.json_pretty_lines = Vec::new();
         self.virtual_file = None;
         self.content = vec!["[deleted]".into()];
@@ -179,6 +181,7 @@ impl App {
         self.markdown_lines = Vec::new();
         self.is_json = ext == "json";
         self.show_pretty_json = false;
+        self.json_pretty_text = Vec::new();
         self.json_pretty_lines = Vec::new();
 
         // Try memory-mapped virtual file first (lazy, no full content in memory).
@@ -236,6 +239,7 @@ impl App {
                         let pretty_lines: Vec<String> =
                             pretty.lines().map(|l| l.to_owned()).collect();
                         self.json_pretty_lines = self.highlighter.highlight(path, &pretty_lines);
+                        self.json_pretty_text = pretty_lines;
                         self.show_pretty_json = true;
                     }
                 }
@@ -281,6 +285,7 @@ impl App {
         self.markdown_lines = Vec::new();
         self.is_json = false;
         self.show_pretty_json = false;
+        self.json_pretty_text = Vec::new();
         self.json_pretty_lines = Vec::new();
         self.is_diff = true;
         self.content_scroll = 0;

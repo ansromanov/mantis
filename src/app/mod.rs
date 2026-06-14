@@ -46,6 +46,7 @@ pub struct App {
     pub show_raw_markdown: bool,
     pub is_json: bool,
     pub show_pretty_json: bool,
+    pub json_pretty_text: Vec<String>,
     pub json_pretty_lines: Vec<Vec<(ratatui::style::Style, String)>>,
     pub content_scroll: usize,
     pub content_hscroll: usize,
@@ -158,6 +159,7 @@ impl App {
             show_raw_markdown: false,
             is_json: false,
             show_pretty_json: false,
+            json_pretty_text: Vec::new(),
             json_pretty_lines: Vec::new(),
             content_scroll: 0,
             content_hscroll: 0,
@@ -285,10 +287,12 @@ impl App {
         }
     }
 
-    /// Returns the text of the 0-indexed line, consulting the virtual file
-    /// first and falling back to the raw content vec.
+    /// Returns the text of the 0-indexed line, consulting the active content
+    /// source: pretty JSON, virtual file, or raw content vec.
     pub fn line_text(&self, index: usize) -> Option<&str> {
-        if let Some(vf) = &self.virtual_file {
+        if self.is_json && self.show_pretty_json && !self.json_pretty_text.is_empty() {
+            self.json_pretty_text.get(index).map(|s| s.as_str())
+        } else if let Some(vf) = &self.virtual_file {
             vf.line_text(index)
         } else {
             self.content.get(index).map(|s| s.as_str())
