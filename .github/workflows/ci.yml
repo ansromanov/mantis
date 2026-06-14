@@ -169,7 +169,8 @@ jobs:
         if: steps.changes.outputs.code == 'true'
       - uses: Swatinem/rust-cache@v2
         if: steps.changes.outputs.code == 'true'
-      - name: Bench smoke test (compiles + runs one group at --quick)
+      - name: Bench smoke test (compiles + runs one group)
         if: steps.changes.outputs.code == 'true'
-        # Run a single small group in quick mode to verify benches don't crash.
-        run: cargo bench -- "scroll_redraw/highlight_range/top/25" --sample-size 10
+        # Target the Criterion binary explicitly so libtest in src/lib.rs is not invoked.
+        # --test runs each benchmark once without statistics — sufficient to catch crashes.
+        run: cargo bench --bench performance -- "scroll_redraw/highlight_range/top/25" --test
