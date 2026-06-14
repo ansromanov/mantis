@@ -172,4 +172,4 @@ jobs:
       - name: Bench smoke test (compiles + runs one group at --quick)
         if: steps.changes.outputs.code == 'true'
         # Run a single small group in quick mode to verify benches don't crash.
-        run: cargo bench -- "scroll_redraw/highlight_range/top/25" -- --quick
+        run: cargo bench -- "scroll_redraw/highlight_range/top/25" --sample-size 10
