@@ -164,10 +164,11 @@ impl App {
         let Some(m) = s.matches.get(s.current) else {
             return;
         };
-        if m.line < self.content_scroll {
-            self.content_scroll = m.line;
-        } else if m.line >= self.content_scroll + view_height {
-            self.content_scroll = m.line.saturating_sub(view_height).saturating_add(1);
+        let display_line = self.physical_to_display(m.line);
+        if display_line < self.content_scroll {
+            self.content_scroll = display_line;
+        } else if display_line >= self.content_scroll + view_height {
+            self.content_scroll = display_line.saturating_sub(view_height).saturating_add(1);
         }
         self.mark_content_scrolled();
     }

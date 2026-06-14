@@ -322,6 +322,21 @@ impl App {
         }
     }
 
+    /// Converts a physical line index to a display line index.
+    /// When folding is inactive this is identity; when active it finds the
+    /// position of `physical` in the display map (first visible line ≥ physical
+    /// when the line itself is hidden inside a fold).
+    pub fn physical_to_display(&self, physical: usize) -> usize {
+        if self.fold_display_map.is_empty() {
+            return physical;
+        }
+        // Find the first display line whose physical index is >= physical.
+        self.fold_display_map
+            .iter()
+            .position(|&p| p >= physical)
+            .unwrap_or(self.fold_display_map.len().saturating_sub(1))
+    }
+
     /// Returns the fold region index whose `start` matches `physical_line`, if any.
     pub fn region_idx_at(&self, physical_line: usize) -> Option<usize> {
         self.yaml_fold_regions
