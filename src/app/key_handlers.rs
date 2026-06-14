@@ -300,11 +300,17 @@ impl App {
                     &root,
                     self.show_hidden,
                     self.ignore_gitignore,
+                    self.config.search_context_lines,
                 ));
             }
             Some("open_content_search") => {
                 let root = self.root.clone();
-                let mut s = SearchState::new(&root, self.show_hidden, self.ignore_gitignore);
+                let mut s = SearchState::new(
+                    &root,
+                    self.show_hidden,
+                    self.ignore_gitignore,
+                    self.config.search_context_lines,
+                );
                 s.toggle_mode();
                 self.search = Some(s);
             }
@@ -428,13 +434,19 @@ impl App {
                     &root,
                     self.show_hidden,
                     self.ignore_gitignore,
+                    self.config.search_context_lines,
                 ));
             }
         } else if pressed(&k.reload, &key) {
             self.reload();
         } else if pressed(&k.search_content, &key) {
             let root = self.root.clone();
-            let mut s = SearchState::new(&root, self.show_hidden, self.ignore_gitignore);
+            let mut s = SearchState::new(
+                &root,
+                self.show_hidden,
+                self.ignore_gitignore,
+                self.config.search_context_lines,
+            );
             s.toggle_mode();
             self.search = Some(s);
         } else if pressed(&k.file_history, &key) {

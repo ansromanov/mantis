@@ -79,13 +79,20 @@ pub(super) fn draw_search(f: &mut Frame, app: &mut App, area: Rect) {
             .map(|m| {
                 let file = m.path.strip_prefix(&app.root).unwrap_or(&m.path);
                 let trimmed = m.line.trim();
-                ListItem::new(Line::from(vec![
+                let mut lines = vec![Line::from(vec![
                     Span::styled(
                         format!("{}:{}: ", file.display(), m.line_num),
                         Style::default().fg(theme.accent),
                     ),
                     Span::raw(trimmed),
-                ]))
+                ])];
+                for ctx_line in &m.context {
+                    lines.push(Line::from(vec![
+                        Span::styled("  ", Style::default().fg(theme.dim)),
+                        Span::styled(ctx_line.trim().to_string(), Style::default().fg(theme.dim)),
+                    ]));
+                }
+                ListItem::new(lines)
             })
             .collect(),
     };

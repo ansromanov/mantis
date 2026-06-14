@@ -18,6 +18,7 @@ pub struct ContentMatch {
     pub path: PathBuf,
     pub line_num: usize,
     pub line: String,
+    pub context: Vec<String>,
 }
 
 pub struct SearchState {
@@ -31,10 +32,16 @@ pub struct SearchState {
     content_cache: HashMap<PathBuf, String>,
     content_cache_dirty: bool,
     pending_refresh: Option<Instant>,
+    context_lines: usize,
 }
 
 impl SearchState {
-    pub fn new(root: &Path, show_hidden: bool, ignore_gitignore: bool) -> Self {
+    pub fn new(
+        root: &Path,
+        show_hidden: bool,
+        ignore_gitignore: bool,
+        context_lines: usize,
+    ) -> Self {
         let all_files = collect_all_files(root, show_hidden, ignore_gitignore);
         let file_results = all_files.clone();
         SearchState {
@@ -48,6 +55,7 @@ impl SearchState {
             content_cache: HashMap::new(),
             content_cache_dirty: true,
             pending_refresh: None,
+            context_lines,
         }
     }
 
@@ -161,16 +169,28 @@ impl SearchState {
             self.content_cache_dirty = false;
         }
         let q = self.query.to_lowercase();
+        let ctx = self.context_lines;
         for path in &self.all_files {
             let Some(text) = self.content_cache.get(path) else {
                 continue;
             };
-            for (i, line) in text.lines().enumerate() {
+            let all_lines: Vec<&str> = text.lines().collect();
+            for (i, line) in all_lines.iter().enumerate() {
                 if line.to_lowercase().contains(&q) {
+                    let context = if ctx > 0 {
+                        let end = (i + 1 + ctx).min(all_lines.len());
+                        all_lines[i + 1..end]
+                            .iter()
+                            .map(|l| l.to_string())
+                            .collect()
+                    } else {
+                        Vec::new()
+                    };
                     self.content_results.push(ContentMatch {
                         path: path.clone(),
                         line_num: i + 1,
-                        line: line.to_owned(),
+                        line: line.to_string(),
+                        context,
                     });
                 }
             }
@@ -607,7 +627,7 @@ mod tests {
         fs::write(root.join("a.txt"), "hello\n").unwrap();
         fs::write(root.join("b.txt"), "world\n").unwrap();
 
-        let s = SearchState::new(&root, false, true);
+        let s = SearchState::new(&root, false, true, 0);
         assert_eq!(s.file_results.len(), 2);
         assert_eq!(s.mode, SearchMode::Files);
         assert!(s.query.is_empty());
@@ -622,7 +642,7 @@ mod tests {
         fs::write(root.join("a.txt"), "hello\n").unwrap();
         fs::write(root.join("b.txt"), "world\n").unwrap();
 
-        let mut s = SearchState::new(&root, false, true);
+        let mut s = SearchState::new(&root, false, true, 0);
         assert_eq!(s.file_results.len(), 2);
         s.push('A');
         assert_eq!(s.query, "A");
@@ -638,7 +658,7 @@ mod tests {
         fs::create_dir_all(&root).unwrap();
         fs::write(root.join("a.txt"), "hello\n").unwrap();
 
-        let mut s = SearchState::new(&root, false, true);
+        let mut s = SearchState::new(&root, false, true, 0);
         assert_eq!(s.mode, SearchMode::Files);
         s.toggle_mode();
         assert_eq!(s.mode, SearchMode::Content);
@@ -653,7 +673,7 @@ mod tests {
         fs::create_dir_all(&root).unwrap();
         fs::write(root.join("a.txt"), "hello\n").unwrap();
 
-        let mut s = SearchState::new(&root, false, true);
+        let mut s = SearchState::new(&root, false, true, 0);
         assert_eq!(s.results_len(), 1);
         s.toggle_mode();
         // Content mode needs 2+ chars
@@ -666,12 +686,52 @@ mod tests {
     }
 
     #[test]
+    fn search_state_content_context_lines() {
+        let root = search_temp_dir("context");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(
+            root.join("a.yaml"),
+            "database:\n  host: db.internal\n  port: 5432\n",
+        )
+        .unwrap();
+
+        let mut s = SearchState::new(&root, false, true, 2);
+        s.toggle_mode();
+        s.push('d');
+        s.push('a');
+        s.push('t');
+        s.refresh_now();
+        assert_eq!(s.content_results.len(), 1);
+        assert_eq!(s.content_results[0].context.len(), 2);
+        assert!(s.content_results[0].context[0].contains("host"));
+        assert!(s.content_results[0].context[1].contains("port"));
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn search_state_content_context_capped_at_eof() {
+        let root = search_temp_dir("context_eof");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("a.txt"), "match\nnext\n").unwrap();
+
+        let mut s = SearchState::new(&root, false, true, 5);
+        s.toggle_mode();
+        for c in "mat".chars() {
+            s.push(c);
+        }
+        s.refresh_now();
+        assert_eq!(s.content_results.len(), 1);
+        assert_eq!(s.content_results[0].context.len(), 1);
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
     fn search_state_reload_files() {
         let root = search_temp_dir("reload");
         fs::create_dir_all(&root).unwrap();
         fs::write(root.join("a.txt"), "hello\n").unwrap();
 
-        let mut s = SearchState::new(&root, false, true);
+        let mut s = SearchState::new(&root, false, true, 0);
         assert_eq!(s.file_results.len(), 1);
 
         // Add a file and reload

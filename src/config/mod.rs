@@ -18,6 +18,7 @@ pub struct Config {
     pub scrollbar: bool,
     pub scroll_percentage: bool,
     pub in_file_search: bool,
+    pub search_context_lines: usize,
     pub keys: Keymap,
     pub theme: ThemeConfig,
 }
@@ -36,6 +37,7 @@ impl Default for Config {
             scrollbar: true,
             scroll_percentage: true,
             in_file_search: true,
+            search_context_lines: 0,
             keys: Keymap::default(),
             theme: ThemeConfig::default(),
         }

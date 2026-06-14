@@ -3,6 +3,8 @@ ignore_gitignore = true
 tree_width = 20
 word_wrap = true
 
+# search_context_lines = 0  # lines of trailing context shown after each content match (default: 0)
+
 # Git mode: show only changed files and their working-tree diffs.
 # git_mode = false         # start in git mode (default: false)
 # git_mode_flat = false    # start git mode in flat/plain list view (default: false)
