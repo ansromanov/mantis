@@ -22,6 +22,9 @@ static COUNTER: AtomicUsize = AtomicUsize::new(0);
 fn fixture_dir(label: &str) -> PathBuf {
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
     let dir = std::env::temp_dir().join(format!("tv_bench_{}_{}", label, n));
+    if dir.exists() {
+        fs::remove_dir_all(&dir).unwrap();
+    }
     fs::create_dir_all(&dir).unwrap();
     dir
 }
@@ -69,28 +72,36 @@ fn generate_deep_tree(dir: &Path, depth: usize) {
 }
 
 /// A large markdown file with headings, tables, code blocks, lists, etc.
+/// Produces a file with exactly `line_count` lines (counted by `\n`).
 fn generate_large_markdown(path: &Path, line_count: usize) {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).unwrap();
     }
     let mut content = String::with_capacity(line_count * 60);
     content.push_str("# Large Benchmark Document\n\n");
-    for i in 0..line_count.saturating_sub(5) {
-        match i % 10 {
-            0 => content.push_str(&format!("## Section {i}\n\n")),
-            1 => content.push_str("Paragraph with **bold** and *italic* text and `code`.\n\n"),
-            2 => content.push_str("- list item 1\n- list item 2\n- list item 3\n\n"),
-            3 => content.push_str("> Block quote with some text in it.\n\n"),
-            4 => content.push_str("```rust\nfn hello() { println!(\"world\"); }\n```\n\n"),
-            5 => content.push_str(&format!(
+    let mut lines_written = 2usize;
+    let mut i = 0usize;
+    while lines_written < line_count {
+        let chunk = match i % 10 {
+            0 => format!("## Section {i}\n\n"),
+            1 => "Paragraph with **bold** and *italic* text and `code`.\n\n".to_string(),
+            2 => "- list item 1\n- list item 2\n- list item 3\n\n".to_string(),
+            3 => "> Block quote with some text in it.\n\n".to_string(),
+            4 => "```rust\nfn hello() { println!(\"world\"); }\n```\n\n".to_string(),
+            5 => format!(
                 "| Col A | Col B | Col C |\n|-------|-------|-------|\n| {i}A    | \
                      {i}B    | {i}C    |\n\n"
-            )),
-            6 => content.push_str("---\n\n"),
-            _ => content.push_str(&format!(
-                "Regular paragraph with some content at line {i}.\n\n"
-            )),
+            ),
+            6 => "---\n\n".to_string(),
+            _ => format!("Regular paragraph with some content at line {i}.\n\n"),
+        };
+        let chunk_lines = chunk.chars().filter(|&c| c == '\n').count();
+        if lines_written + chunk_lines > line_count {
+            break;
         }
+        content.push_str(&chunk);
+        lines_written += chunk_lines;
+        i += 1;
     }
     fs::write(path, content).unwrap();
 }
@@ -156,7 +167,8 @@ fn bench_tree_walk(c: &mut Criterion) {
             BenchmarkId::new("build_visible/flat", count),
             &(&root, &expanded),
             |b, (root, expanded)| {
-                b.iter(|| black_box(build_visible(root, expanded, false, true, &HashSet::new())))
+                let deleted: HashSet<PathBuf> = HashSet::new();
+                b.iter(|| black_box(build_visible(root, expanded, false, true, &deleted)))
             },
         );
 
@@ -179,8 +191,15 @@ fn bench_tree_walk(c: &mut Criterion) {
             BenchmarkId::new("build_visible/deep", depth),
             &(&root, &expanded),
             |b, (root, expanded)| {
-                b.iter(|| black_box(build_visible(root, expanded, false, true, &HashSet::new())))
+                let deleted: HashSet<PathBuf> = HashSet::new();
+                b.iter(|| black_box(build_visible(root, expanded, false, true, &deleted)))
             },
+        );
+
+        group.bench_with_input(
+            BenchmarkId::new("collect_all_files/deep", depth),
+            &root,
+            |b, root| b.iter(|| black_box(collect_all_files(root, false, true))),
         );
 
         fs::remove_dir_all(&dir).ok();
