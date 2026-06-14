@@ -104,6 +104,33 @@ impl App {
             }
             return result;
         }
+        if self.is_json && self.show_pretty_json && !self.json_pretty_text.is_empty() {
+            let lines = &self.json_pretty_text;
+            if start_line >= lines.len() {
+                return String::new();
+            }
+            let mut result = String::new();
+            let last = end_line.min(lines.len().saturating_sub(1));
+            for (line_idx, line) in lines
+                .iter()
+                .enumerate()
+                .skip(start_line)
+                .take(last - start_line + 1)
+            {
+                let chars: Vec<char> = line.chars().collect();
+                let col_start = if line_idx == start_line { start_col } else { 0 };
+                let col_end = if line_idx == end_line {
+                    end_col.min(chars.len())
+                } else {
+                    chars.len()
+                };
+                if !result.is_empty() {
+                    result.push('\n');
+                }
+                result.extend(&chars[col_start.min(chars.len())..col_end]);
+            }
+            return result;
+        }
         if self.virtual_file.is_none() {
             // Fallback for inline content (diffs, errors, etc.)
             let lines = &self.content;

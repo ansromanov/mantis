@@ -1678,6 +1678,7 @@ dependencies = [
  "pulldown-cmark",
  "ratatui",
  "serde",
+ "serde_json",
  "syntect",
  "tempfile",
  "toml",
