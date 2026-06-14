@@ -421,7 +421,7 @@ pub(super) fn draw_about(f: &mut Frame, app: &App, area: Rect) {
 
     rows.push(Line::from(vec![
         Span::styled("  License:   ", dim),
-        Span::styled("MIT", text_style),
+        Span::styled("GPL-3.0-or-later", text_style),
     ]));
 
     if !whats_new.is_empty() {
