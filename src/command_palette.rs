@@ -56,6 +56,10 @@ pub static COMMANDS: &[CommandEntry] = &[
         name: "Open in editor",
         action_id: "open_in_editor",
     },
+    CommandEntry {
+        name: "About tree-viewer",
+        action_id: "show_about",
+    },
 ];
 
 pub struct CommandPalette {

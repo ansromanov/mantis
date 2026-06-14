@@ -71,6 +71,7 @@ pub struct App {
     pub show_scrollbar: bool,
     pub show_scroll_percentage: bool,
     pub show_blame: bool,
+    pub show_about: bool,
     pub walk_errors: usize,
     /// Warning describing a malformed config that was ignored at startup, if any.
     pub config_error: Option<String>,
@@ -180,6 +181,7 @@ impl App {
             show_scrollbar: cfg.scrollbar,
             show_scroll_percentage: cfg.scroll_percentage,
             show_blame: false,
+            show_about: false,
             walk_errors,
             config_error,
             keys: cfg.keys,

@@ -38,12 +38,22 @@ jobs:
           sed -i "/^name = \"tree-viewer\"/{n;s/version = \"${current}\"/version = \"${new_version}\"/}" Cargo.lock
           echo "version=${new_version}" >> "$GITHUB_OUTPUT"
 
+      - name: Write release info
+        if: inputs.bump
+        run: |
+          cat > release-info.toml << EOF
+          version = "${{ steps.bump.outputs.version }}"
+          date = "$(date +%Y-%m-%d)"
+          whats_new = ""
+          release_url = "https://github.com/ansromanov/tree-viewer/releases/tag/v${{ steps.bump.outputs.version }}"
+          EOF
+
       - name: Commit and push
         if: inputs.bump
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Cargo.toml Cargo.lock
+          git add Cargo.toml Cargo.lock release-info.toml
           git commit -m "chore: bump version to v${{ steps.bump.outputs.version }} [skip ci]"
           git push origin HEAD:main
 
@@ -131,6 +141,20 @@ jobs:
             echo "$log"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
+
+      - name: Update release info with changelog
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          cat > release-info.toml << 'TOMLEOF'
+          version = "${{ needs.bump.outputs.version }}"
+          date = "$(date +%Y-%m-%d)"
+          whats_new = """${{ steps.changelog.outputs.log }}"""
+          release_url = "https://github.com/ansromanov/tree-viewer/releases/tag/v${{ needs.bump.outputs.version }}"
+          TOMLEOF
+          git add release-info.toml
+          git commit -m "chore: add changelog to release info [skip ci]"
+          git push origin HEAD:main
 
       - uses: actions/download-artifact@v8
         with:

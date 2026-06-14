@@ -60,6 +60,10 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         popups::draw_theme(f, app, area);
     }
 
+    if app.show_about {
+        popups::draw_about(f, app, area);
+    }
+
     if app.show_help {
         popups::draw_help(f, app, area);
     }
