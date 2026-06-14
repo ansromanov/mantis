@@ -125,6 +125,7 @@ jobs:
         with:
           ref: ${{ needs.bump.outputs.sha }}
           fetch-depth: 0
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
 
       - name: Generate changelog
         id: changelog
@@ -148,10 +149,11 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           cat > release-info.toml << 'TOMLEOF'
           version = "${{ needs.bump.outputs.version }}"
-          date = "$(date +%Y-%m-%d)"
+          date = "__RELEASE_DATE__"
           whats_new = """${{ steps.changelog.outputs.log }}"""
           release_url = "https://github.com/ansromanov/tree-viewer/releases/tag/v${{ needs.bump.outputs.version }}"
           TOMLEOF
+          sed -i "s/__RELEASE_DATE__/$(date +%Y-%m-%d)/" release-info.toml
           git add release-info.toml
           git commit -m "chore: add changelog to release info [skip ci]"
           git push origin HEAD:main
