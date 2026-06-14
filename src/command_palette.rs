@@ -57,6 +57,10 @@ pub static COMMANDS: &[CommandEntry] = &[
         action_id: "toggle_pretty_json",
     },
     CommandEntry {
+        name: "Toggle side-by-side diff",
+        action_id: "toggle_diff_side_by_side",
+    },
+    CommandEntry {
         name: "Open in editor",
         action_id: "open_in_editor",
     },

@@ -13,6 +13,7 @@ use crate::app::App;
 mod app;
 mod command_palette;
 mod config;
+mod diff;
 mod file;
 mod git;
 mod highlight;
@@ -221,6 +222,47 @@ mod tests {
         let backend = TestBackend::new(80, 30);
         let mut terminal = ratatui::Terminal::new(backend).unwrap();
         terminal.draw(|f| ui::draw(f, &mut app)).unwrap();
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn app_draw_side_by_side_diff_does_not_panic() {
+        use std::process::Command;
+        let dir = temp_dir();
+        let git = |args: &[&str]| {
+            Command::new("git")
+                .arg("-C")
+                .arg(&dir)
+                .args(["-c", "user.email=t@e.x", "-c", "user.name=T"])
+                .args(args)
+                .status()
+                .unwrap();
+        };
+        git(&["init", "-q"]);
+        fs::write(dir.join("f.txt"), "alpha\nbeta\ngamma\n").unwrap();
+        git(&["add", "."]);
+        git(&["commit", "-q", "-m", "init"]);
+        fs::write(dir.join("f.txt"), "alpha\nBETA changed\ngamma\n").unwrap();
+        git(&["commit", "-q", "-am", "change beta"]);
+
+        let mut app = app_for(&dir);
+        app.open_file(&dir.join("f.txt"));
+        // Load a diff via the history picker: H opens it, Enter shows the diff.
+        app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::empty()));
+        app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+        assert!(app.is_diff, "history Enter should load a diff");
+        // Toggle the split layout on.
+        app.handle_key(KeyEvent::new(KeyCode::Char('D'), KeyModifiers::empty()));
+        assert!(app.diff_side_by_side);
+
+        let backend = TestBackend::new(100, 20);
+        let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        terminal.draw(|f| ui::draw(f, &mut app)).unwrap();
+
+        // The split layout draws a vertical divider between the two columns.
+        let buffer = terminal.backend().buffer().clone();
+        let has_divider = buffer.content().iter().any(|c| c.symbol() == "│");
+        assert!(has_divider, "side-by-side diff should render a divider");
         fs::remove_dir_all(&dir).ok();
     }
 

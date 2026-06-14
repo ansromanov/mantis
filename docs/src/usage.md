@@ -56,6 +56,8 @@ These work no matter which panel is focused.
 | `z`            | Toggle word wrap             |
 | `M`            | Toggle raw / rendered markdown |
 | `J`            | Toggle JSON pretty-print     |
+| `D`            | Toggle side-by-side diff (in a diff) |
+| `n`/`N`        | Next / previous hunk (in a diff) |
 
 ## Search popup
 
