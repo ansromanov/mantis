@@ -389,8 +389,8 @@ pub fn file_diff(repo_dir: &Path, rev: &str, file: &Path) -> Vec<String> {
 
 /// Per-line git blame annotation.
 #[derive(Clone, Debug)]
-#[allow(dead_code)]
 pub struct BlameLine {
+    #[allow(dead_code)]
     pub commit_hash: String,
     pub short_hash: String,
     pub author: String,
@@ -398,7 +398,6 @@ pub struct BlameLine {
     pub line_no: u32,
 }
 
-#[allow(dead_code)]
 struct CachedBlame {
     mtime: SystemTime,
     lines: Vec<BlameLine>,
@@ -414,7 +413,6 @@ fn blame_cache() -> &'static Mutex<HashMap<PathBuf, CachedBlame>> {
 /// `repo_dir`. Returns an empty `Vec` if the file is untracked, not in a git
 /// repo, or git is unavailable. Results are cached by (path, mtime) so
 /// repeated renders don't re-invoke git.
-#[allow(dead_code)]
 pub fn file_blame(repo_dir: &Path, file: &Path) -> Vec<BlameLine> {
     let mtime = match std::fs::metadata(file).and_then(|m| m.modified()) {
         Ok(t) => t,

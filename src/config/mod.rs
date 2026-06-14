@@ -112,6 +112,7 @@ impl Keymap {
             "toggle_git_flat" => &self.git_mode_flat_toggle,
             "toggle_word_wrap" => &self.toggle_wrap,
             "toggle_raw_markdown" => &self.toggle_raw_markdown,
+            "toggle_blame" => &self.toggle_blame,
             "open_in_editor" => &self.open_in_editor,
             _ => return String::new(),
         };
@@ -148,6 +149,7 @@ pub struct Keymap {
     pub content_reset_col: Vec<KeyBinding>,
     pub toggle_wrap: Vec<KeyBinding>,
     pub toggle_raw_markdown: Vec<KeyBinding>,
+    pub toggle_blame: Vec<KeyBinding>,
     pub git_mode_toggle: Vec<KeyBinding>,
     pub git_mode_flat_toggle: Vec<KeyBinding>,
     pub command_palette: Vec<KeyBinding>,
@@ -179,6 +181,7 @@ impl Default for Keymap {
             content_reset_col: bind(&["0"]),
             toggle_wrap: bind(&["z"]),
             toggle_raw_markdown: bind(&["M"]),
+            toggle_blame: bind(&["b"]),
             git_mode_toggle: bind(&["ctrl+g"]),
             git_mode_flat_toggle: bind(&["alt+g"]),
             command_palette: bind(&["ctrl+p"]),
