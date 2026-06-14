@@ -32,10 +32,9 @@ run *args:
 
 # build release, copy tv to ~/.cargo/bin, and install default themes
 install: release
-    cp target/release/tv ~/.cargo/bin/tv
-    {{ if os() == "macos" { "codesign --force -s - ~/.cargo/bin/tv" } else { "" } }}
-    mkdir -p ~/.config/tree-viewer/themes
-    cp themes/*.toml ~/.config/tree-viewer/themes/
+    cp target/release/tv{{if os() == "windows" { ".exe" } else { "" }}} {{env_var_or_default("CARGO_HOME", home_directory() + "/.cargo")}}/bin/tv{{if os() == "windows" { ".exe" } else { "" }}}
+    {{ if os() == "macos" { "codesign --force -s - " + env_var_or_default("CARGO_HOME", home_directory() + "/.cargo") + "/bin/tv" } else { "" } }}
+    {{ if os() == "windows" { "mkdir -p \"$APPDATA/tree-viewer/themes\" && cp themes/*.toml \"$APPDATA/tree-viewer/themes/\"" } else { "mkdir -p ~/.config/tree-viewer/themes && cp themes/*.toml ~/.config/tree-viewer/themes/" } }}
 
 # run tests
 test *args:

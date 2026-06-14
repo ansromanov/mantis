@@ -393,9 +393,12 @@ fn global_config_path() -> Option<PathBuf> {
 }
 
 fn dirs_next() -> Option<PathBuf> {
-    std::env::var_os("XDG_CONFIG_HOME")
+    #[cfg(windows)]
+    return std::env::var_os("APPDATA").map(|p| PathBuf::from(p).join("tree-viewer"));
+    #[cfg(not(windows))]
+    return std::env::var_os("XDG_CONFIG_HOME")
         .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
+        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")));
 }
 
 #[cfg(test)]

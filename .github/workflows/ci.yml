@@ -138,6 +138,47 @@ jobs:
         if: steps.test.outcome == 'failure'
         run: exit 1
 
+  windows:
+    name: build + test (Windows)
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Detect code changes
+        id: changes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            changed=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files \
+              --paginate --jq '.[].filename')
+          else
+            changed=$(git diff --name-only HEAD~1 HEAD)
+          fi
+          if echo "$changed" | grep -qE '^(src/|tests/|benches/|Cargo\.(toml|lock)|tv\.toml)'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.changes.outputs.code == 'true'
+      - uses: Swatinem/rust-cache@v2
+        if: steps.changes.outputs.code == 'true'
+
+      - name: Build
+        if: steps.changes.outputs.code == 'true'
+        run: cargo build --all-targets
+
+      - name: Test
+        if: steps.changes.outputs.code == 'true'
+        run: cargo test --all
+
   bench-smoke:
     name: bench (compile check)
     runs-on: ubuntu-latest
