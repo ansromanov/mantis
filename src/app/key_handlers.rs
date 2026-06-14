@@ -530,6 +530,8 @@ impl App {
             self.show_raw_markdown = !self.show_raw_markdown;
             self.content_scroll = 0;
             self.content_hscroll = 0;
+        } else if !self.is_diff && pressed(&k.toggle_blame, &key) {
+            self.show_blame = !self.show_blame;
         } else if pressed(&k.toggle_wrap, &key) {
             self.word_wrap = !self.word_wrap;
             self.config.word_wrap = self.word_wrap;

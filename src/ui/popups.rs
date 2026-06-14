@@ -412,6 +412,7 @@ pub(super) fn draw_help(f: &mut Frame, app: &App, area: Rect) {
         Line::from(vec![key("  0          "), desc("reset horizontal scroll")]),
         Line::from(vec![key("  g / G      "), desc("top / bottom")]),
         Line::from(vec![key("  z          "), desc("toggle word wrap")]),
+        Line::from(vec![key("  b          "), desc("toggle git blame gutter")]),
         Line::from(vec![
             key("  M          "),
             desc("toggle markdown render (md files)"),

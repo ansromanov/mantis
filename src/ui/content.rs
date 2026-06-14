@@ -9,6 +9,7 @@ use ratatui::{
 };
 
 use crate::app::{App, Focus};
+use crate::git;
 use crate::search::InFileSearch;
 use crate::theme::Theme;
 
@@ -55,6 +56,40 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     let sel_bg = app.theme.selection_bg;
     let in_file_search = app.in_file_search.as_ref();
 
+    // Blame annotations: one formatted string per 0-based line index.
+    // BLAME_COL_WIDTH = 7 (hash) + 1 + 10 (author) + 1 + 6 (date) + 1 = 26 chars.
+    const BLAME_COL_WIDTH: usize = 26;
+    let blame_annotations: Vec<String> = if app.show_blame && !app.is_diff {
+        if let Some(path) = &app.current_file {
+            let lines = git::file_blame(&app.root, path);
+            if lines.is_empty() {
+                Vec::new()
+            } else {
+                let max_line = lines.iter().map(|l| l.line_no as usize).max().unwrap_or(0);
+                let mut annotations = vec![String::new(); max_line + 1];
+                for bl in &lines {
+                    let idx = (bl.line_no as usize).saturating_sub(1);
+                    if idx < annotations.len() {
+                        let author: String = bl.author.chars().take(10).collect();
+                        let date: String = bl.date_relative.chars().take(6).collect();
+                        annotations[idx] = format!("{} {:<10} {:<6} ", bl.short_hash, author, date);
+                    }
+                }
+                annotations
+            }
+        } else {
+            Vec::new()
+        }
+    } else {
+        Vec::new()
+    };
+    let blame_width = if blame_annotations.is_empty() {
+        0
+    } else {
+        BLAME_COL_WIDTH
+    };
+    let blame_style = Style::default().fg(app.theme.dim);
+
     // ln_width, ln_lines, content_lines
     let (ln_width, ln_lines, content_lines): (usize, Vec<Line>, Vec<Line>) = if app.is_diff {
         // Diff view: iterate all highlighted lines (diffs are never large).
@@ -82,10 +117,16 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         let lw = total_lines.to_string().len().max(1);
         let gutters: Vec<Line> = (scroll..visible_end)
             .map(|i| {
-                Line::from(Span::styled(
-                    format!("{:>width$} ", i + 1, width = lw),
-                    ln_style,
-                ))
+                let ln_span = Span::styled(format!("{:>width$} ", i + 1, width = lw), ln_style);
+                if blame_width > 0 {
+                    let annotation = blame_annotations
+                        .get(i)
+                        .cloned()
+                        .unwrap_or_else(|| " ".repeat(BLAME_COL_WIDTH));
+                    Line::from(vec![Span::styled(annotation, blame_style), ln_span])
+                } else {
+                    Line::from(ln_span)
+                }
             })
             .collect();
         let lines: Vec<Line> = app.markdown_lines[scroll..visible_end]
@@ -125,7 +166,7 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                 }
             })
             .collect();
-        (lw + 1, gutters, lines)
+        (blame_width + lw + 1, gutters, lines)
     } else if let Some(vf) = app.virtual_file.as_ref() {
         // Virtual file view: lazy-loaded from mmap, highlighted on the fly.
         let lw = total_lines.to_string().len().max(1);
@@ -148,10 +189,16 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
 
         let gutters: Vec<Line> = (scroll..visible_end)
             .map(|i| {
-                Line::from(Span::styled(
-                    format!("{:>width$} ", i + 1, width = lw),
-                    ln_style,
-                ))
+                let ln_span = Span::styled(format!("{:>width$} ", i + 1, width = lw), ln_style);
+                if blame_width > 0 {
+                    let annotation = blame_annotations
+                        .get(i)
+                        .cloned()
+                        .unwrap_or_else(|| " ".repeat(BLAME_COL_WIDTH));
+                    Line::from(vec![Span::styled(annotation, blame_style), ln_span])
+                } else {
+                    Line::from(ln_span)
+                }
             })
             .collect();
         let content: Vec<Line> = (scroll..visible_end)
@@ -202,7 +249,7 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                 Line::from(spans)
             })
             .collect();
-        (lw + 1, gutters, content)
+        (blame_width + lw + 1, gutters, content)
     } else {
         // Inline fallback: `content` vec is the source (errors, binaries, small files).
         let lw = total_lines.to_string().len().max(1);
@@ -211,10 +258,16 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
 
         let gutters: Vec<Line> = (scroll..visible_end)
             .map(|i| {
-                Line::from(Span::styled(
-                    format!("{:>width$} ", i + 1, width = lw),
-                    ln_style,
-                ))
+                let ln_span = Span::styled(format!("{:>width$} ", i + 1, width = lw), ln_style);
+                if blame_width > 0 {
+                    let annotation = blame_annotations
+                        .get(i)
+                        .cloned()
+                        .unwrap_or_else(|| " ".repeat(BLAME_COL_WIDTH));
+                    Line::from(vec![Span::styled(annotation, blame_style), ln_span])
+                } else {
+                    Line::from(ln_span)
+                }
             })
             .collect();
         let content: Vec<Line> = if has_highlight {
@@ -271,7 +324,7 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                 })
                 .collect()
         };
-        (lw + 1, gutters, content)
+        (blame_width + lw + 1, gutters, content)
     };
 
     let inner = block.inner(area);

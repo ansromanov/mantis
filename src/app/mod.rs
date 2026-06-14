@@ -70,6 +70,7 @@ pub struct App {
     pub git_mode_flat: bool,
     pub show_scrollbar: bool,
     pub show_scroll_percentage: bool,
+    pub show_blame: bool,
     pub walk_errors: usize,
     /// Warning describing a malformed config that was ignored at startup, if any.
     pub config_error: Option<String>,
@@ -178,6 +179,7 @@ impl App {
             git_mode_flat: cfg.git_mode_flat,
             show_scrollbar: cfg.scrollbar,
             show_scroll_percentage: cfg.scroll_percentage,
+            show_blame: false,
             walk_errors,
             config_error,
             keys: cfg.keys,
