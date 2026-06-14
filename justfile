@@ -30,10 +30,12 @@ release:
 run *args:
     cargo run -- {{args}}
 
-# build release and copy tv to ~/.cargo/bin (re-signs at destination on macOS)
+# build release, copy tv to ~/.cargo/bin, and install default themes
 install: release
     cp target/release/tv ~/.cargo/bin/tv
     {{ if os() == "macos" { "codesign --force -s - ~/.cargo/bin/tv" } else { "" } }}
+    mkdir -p ~/.config/tree-viewer/themes
+    cp themes/*.toml ~/.config/tree-viewer/themes/
 
 # run tests
 test *args:

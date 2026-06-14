@@ -237,7 +237,7 @@ pub(super) fn draw_theme(f: &mut Frame, app: &mut App, area: Rect) {
     let items: Vec<ListItem> = picker
         .filtered
         .iter()
-        .map(|&i| ListItem::new(picker.names[i]))
+        .map(|&i| ListItem::new(picker.names[i].as_str()))
         .collect();
 
     let list = List::new(items).highlight_style(

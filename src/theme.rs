@@ -1,3 +1,8 @@
+use std::collections::HashMap;
+use std::fs;
+use std::path::PathBuf;
+use std::sync::OnceLock;
+
 use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
 
@@ -28,166 +33,200 @@ pub struct Theme {
 
 impl Default for Theme {
     fn default() -> Self {
-        Theme {
-            background: Color::Reset,
-            accent: Color::Cyan,
-            accent_alt: Color::Yellow,
-            dim: Color::DarkGray,
-            text: Color::White,
-            dir: Color::Blue,
-            file: Color::Reset,
-            selection_bg: Color::Rgb(80, 80, 80),
-            selection_fg: Color::Yellow,
-            heading1: Color::LightCyan,
-            heading2: Color::LightYellow,
-            heading3: Color::LightGreen,
-            code: Color::LightYellow,
-            diff_add: Color::Green,
-            diff_del: Color::Red,
-            git_clean: Color::Green,
-            git_dirty: Color::Yellow,
-            syntax: "base16-ocean.dark".to_string(),
-        }
+        Theme::load("default").expect("default theme should always load")
     }
 }
 
-/// Names of the built-in presets, in picker display order.
-pub const PRESETS: &[&str] = &[
-    "default",
-    "monokai",
-    "solarized",
-    "catppuccin",
-    "synthwave84",
-];
+/// Intermediate struct for deserializing theme TOML files.
+#[derive(Deserialize)]
+struct ThemeToml {
+    background: String,
+    accent: String,
+    accent_alt: String,
+    dim: String,
+    text: String,
+    dir: String,
+    file: String,
+    selection_bg: String,
+    selection_fg: String,
+    heading1: String,
+    heading2: String,
+    heading3: String,
+    code: String,
+    diff_add: String,
+    diff_del: String,
+    git_clean: String,
+    git_dirty: String,
+    syntax: String,
+}
 
 impl Theme {
-    /// Returns a built-in preset by name, or `None` if unknown.
-    pub fn preset(name: &str) -> Option<Theme> {
-        let t = match name.trim().to_ascii_lowercase().as_str() {
-            "default" => Theme::default(),
-            "monokai" => Theme {
-                background: hex("#272822"),
-                accent: hex("#66d9ef"),
-                accent_alt: hex("#e6db74"),
-                dim: hex("#75715e"),
-                text: hex("#f8f8f2"),
-                dir: hex("#66d9ef"),
-                file: hex("#f8f8f2"),
-                selection_bg: hex("#49483e"),
-                selection_fg: hex("#e6db74"),
-                heading1: hex("#66d9ef"),
-                heading2: hex("#e6db74"),
-                heading3: hex("#a6e22e"),
-                code: hex("#e6db74"),
-                diff_add: hex("#a6e22e"),
-                diff_del: hex("#f92672"),
-                git_clean: hex("#a6e22e"),
-                git_dirty: hex("#e6db74"),
-                syntax: "base16-eighties.dark".to_string(),
-            },
-            "solarized" => Theme {
-                background: hex("#002b36"),
-                accent: hex("#268bd2"),
-                accent_alt: hex("#b58900"),
-                dim: hex("#586e75"),
-                text: hex("#93a1a1"),
-                dir: hex("#268bd2"),
-                file: hex("#839496"),
-                selection_bg: hex("#073642"),
-                selection_fg: hex("#b58900"),
-                heading1: hex("#2aa198"),
-                heading2: hex("#b58900"),
-                heading3: hex("#859900"),
-                code: hex("#b58900"),
-                diff_add: hex("#859900"),
-                diff_del: hex("#dc322f"),
-                git_clean: hex("#859900"),
-                git_dirty: hex("#b58900"),
-                syntax: "Solarized (dark)".to_string(),
-            },
-            "catppuccin" => Theme {
-                background: hex("#1e1e2e"),
-                accent: hex("#89b4fa"),
-                accent_alt: hex("#f9e2af"),
-                dim: hex("#6c7086"),
-                text: hex("#cdd6f4"),
-                dir: hex("#89b4fa"),
-                file: hex("#cdd6f4"),
-                selection_bg: hex("#313244"),
-                selection_fg: hex("#f9e2af"),
-                heading1: hex("#89dceb"),
-                heading2: hex("#f9e2af"),
-                heading3: hex("#a6e3a1"),
-                code: hex("#f9e2af"),
-                diff_add: hex("#a6e3a1"),
-                diff_del: hex("#f38ba8"),
-                git_clean: hex("#a6e3a1"),
-                git_dirty: hex("#f9e2af"),
-                syntax: "base16-mocha.dark".to_string(),
-            },
-            "synthwave84" | "synthwave" => Theme {
-                background: hex("#262335"),
-                accent: hex("#36f9f6"),
-                accent_alt: hex("#ff7edb"),
-                dim: hex("#848bbd"),
-                text: hex("#f0eff1"),
-                dir: hex("#36f9f6"),
-                file: hex("#f0eff1"),
-                selection_bg: hex("#463465"),
-                selection_fg: hex("#fede5d"),
-                heading1: hex("#36f9f6"),
-                heading2: hex("#fede5d"),
-                heading3: hex("#72f1b8"),
-                code: hex("#fede5d"),
-                diff_add: hex("#72f1b8"),
-                diff_del: hex("#f92aad"),
-                git_clean: hex("#72f1b8"),
-                git_dirty: hex("#fede5d"),
-                syntax: "base16-eighties.dark".to_string(),
-            },
-            _ => return None,
-        };
-        Some(t)
+    /// Build a `Theme` from a TOML string. Returns `None` if any field is
+    /// invalid.
+    fn from_toml(toml_str: &str) -> Option<Theme> {
+        let tf: ThemeToml = toml::from_str(toml_str).ok()?;
+        Some(Theme {
+            background: parse_color(&tf.background)?,
+            accent: parse_color(&tf.accent)?,
+            accent_alt: parse_color(&tf.accent_alt)?,
+            dim: parse_color(&tf.dim)?,
+            text: parse_color(&tf.text)?,
+            dir: parse_color(&tf.dir)?,
+            file: parse_color(&tf.file)?,
+            selection_bg: parse_color(&tf.selection_bg)?,
+            selection_fg: parse_color(&tf.selection_fg)?,
+            heading1: parse_color(&tf.heading1)?,
+            heading2: parse_color(&tf.heading2)?,
+            heading3: parse_color(&tf.heading3)?,
+            code: parse_color(&tf.code)?,
+            diff_add: parse_color(&tf.diff_add)?,
+            diff_del: parse_color(&tf.diff_del)?,
+            git_clean: parse_color(&tf.git_clean)?,
+            git_dirty: parse_color(&tf.git_dirty)?,
+            syntax: tf.syntax,
+        })
+    }
+
+    /// Load a theme by name. Tries the user themes directory first, then
+    /// falls back to the bundled embedded themes.
+    pub fn load(name: &str) -> Option<Theme> {
+        // Try user themes directory first.
+        if let Some(dir) = user_themes_dir() {
+            let path = dir.join(format!("{name}.toml"));
+            if let Ok(s) = fs::read_to_string(&path) {
+                if let Some(theme) = Theme::from_toml(&s) {
+                    return Some(theme);
+                }
+            }
+        }
+        // Fall back to embedded themes.
+        all_embedded().get(name).cloned()
+    }
+
+    /// Discover all available themes. Returns a list of (name, theme) pairs
+    /// preserving the built-in order, with user themes overriding or extending.
+    pub fn discover_all() -> Vec<(String, Theme)> {
+        let mut themes: Vec<(String, Theme)> = EMBEDDED_MANIFEST
+            .iter()
+            .filter_map(|(name, _toml)| {
+                all_embedded()
+                    .get(name)
+                    .map(|t| (name.to_string(), t.clone()))
+            })
+            .collect();
+
+        if let Some(dir) = user_themes_dir() {
+            if dir.is_dir() {
+                let mut entries: Vec<_> = fs::read_dir(dir)
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|e| e.ok())
+                    .filter(|e| e.path().extension().is_some_and(|ext| ext == "toml"))
+                    .collect();
+                entries.sort_by_key(|e| e.file_name());
+
+                for entry in entries {
+                    let path = entry.path();
+                    let name = path
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .map(|s| s.to_string());
+                    let Some(name) = name else { continue };
+                    let Ok(s) = fs::read_to_string(&path) else {
+                        continue;
+                    };
+                    let Some(theme) = Theme::from_toml(&s) else {
+                        continue;
+                    };
+
+                    if let Some(pos) = themes.iter().position(|(n, _)| n == &name) {
+                        themes[pos] = (name, theme);
+                    } else {
+                        themes.push((name, theme));
+                    }
+                }
+            }
+        }
+
+        themes
     }
 }
 
-/// Parses a known-good hex literal used in the preset tables above.
-fn hex(s: &str) -> Color {
-    parse_color(s).expect("valid preset color")
+// ---------------------------------------------------------------------------
+// Embedded default themes
+// ---------------------------------------------------------------------------
+
+/// List of (name, toml_content) for each shipped theme.
+const EMBEDDED_MANIFEST: &[(&str, &str)] = &[
+    ("default", include_str!("../themes/default.toml")),
+    ("monokai", include_str!("../themes/monokai.toml")),
+    ("solarized", include_str!("../themes/solarized.toml")),
+    ("catppuccin", include_str!("../themes/catppuccin.toml")),
+    ("synthwave84", include_str!("../themes/synthwave84.toml")),
+];
+
+fn all_embedded() -> &'static HashMap<&'static str, Theme> {
+    static ALL_EMBEDDED: OnceLock<HashMap<&'static str, Theme>> = OnceLock::new();
+    ALL_EMBEDDED.get_or_init(|| {
+        let mut m = HashMap::new();
+        for (name, toml) in EMBEDDED_MANIFEST {
+            if let Some(theme) = Theme::from_toml(toml) {
+                m.insert(*name, theme);
+            }
+        }
+        m
+    })
 }
 
-/// `[theme]` overrides from tv.toml. `name` selects a built-in preset as the
-/// base; any other field overrides that base. Unset fields keep the base value.
+// ---------------------------------------------------------------------------
+// User themes directory
+// ---------------------------------------------------------------------------
+
+/// Returns the path to `~/.config/tree-viewer/themes/`.
+fn user_themes_dir() -> Option<PathBuf> {
+    let base = std::env::var_os("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))?;
+    Some(base.join("tree-viewer").join("themes"))
+}
+
+// ---------------------------------------------------------------------------
+// ThemeConfig – user overrides from tv.toml
+// ---------------------------------------------------------------------------
+
+/// `[theme]` overrides from tv.toml. `name` selects a theme from the
+/// discovered set (bundled or user-installed); any other field overrides
+/// that base. Unset fields keep the base value.
 /// Colors accept names ("cyan", "lightyellow", "reset") or hex ("#aabbcc");
 /// `syntax` is a syntect theme name.
 #[derive(Serialize, Deserialize, Clone, Default)]
 #[serde(default)]
 pub struct ThemeConfig {
-    name: Option<String>,
+    pub name: Option<String>,
     /// When `true`, overrides the preset's background with `Color::Reset` so
     /// the terminal's own background shows through.
-    transparent_background: Option<bool>,
-    accent: Option<String>,
-    accent_alt: Option<String>,
-    dim: Option<String>,
-    text: Option<String>,
-    dir: Option<String>,
-    file: Option<String>,
-    selection_bg: Option<String>,
-    selection_fg: Option<String>,
-    heading1: Option<String>,
-    heading2: Option<String>,
-    heading3: Option<String>,
-    code: Option<String>,
-    diff_add: Option<String>,
-    diff_del: Option<String>,
-    git_clean: Option<String>,
-    git_dirty: Option<String>,
-    syntax: Option<String>,
+    pub transparent_background: Option<bool>,
+    pub accent: Option<String>,
+    pub accent_alt: Option<String>,
+    pub dim: Option<String>,
+    pub text: Option<String>,
+    pub dir: Option<String>,
+    pub file: Option<String>,
+    pub selection_bg: Option<String>,
+    pub selection_fg: Option<String>,
+    pub heading1: Option<String>,
+    pub heading2: Option<String>,
+    pub heading3: Option<String>,
+    pub code: Option<String>,
+    pub diff_add: Option<String>,
+    pub diff_del: Option<String>,
+    pub git_clean: Option<String>,
+    pub git_dirty: Option<String>,
+    pub syntax: Option<String>,
 }
 
 impl ThemeConfig {
-    /// Creates a `ThemeConfig` that selects a named preset with no overrides.
+    /// Creates a `ThemeConfig` that selects a named theme with no overrides.
     pub fn from_preset(name: &str) -> Self {
         ThemeConfig {
             name: Some(name.to_string()),
@@ -195,13 +234,13 @@ impl ThemeConfig {
         }
     }
 
-    /// Builds a runtime `Theme`: starts from the named preset (or the default),
+    /// Builds a runtime `Theme`: starts from the named theme (or the default),
     /// then applies any per-role overrides. Unknown/invalid values are ignored.
     pub fn resolve(&self) -> Theme {
         let d = self
             .name
             .as_deref()
-            .and_then(Theme::preset)
+            .and_then(Theme::load)
             .unwrap_or_default();
         let col =
             |o: &Option<String>, def: Color| o.as_deref().and_then(parse_color).unwrap_or(def);
@@ -276,29 +315,47 @@ mod tests {
     use super::*;
 
     #[test]
+    fn default_theme_loads_from_embedded() {
+        let t = Theme::load("default").expect("default theme must load");
+        assert_eq!(t.background, Color::Reset);
+        assert_eq!(t.accent, Color::Cyan);
+    }
+
+    #[test]
+    fn unknown_name_returns_none() {
+        assert!(Theme::load("nonexistent-theme").is_none());
+    }
+
+    #[test]
+    fn all_embedded_themes_are_valid() {
+        let themes = Theme::discover_all();
+        assert!(themes.len() >= 5, "should have at least 5 built-in themes");
+        for (name, _) in &themes {
+            assert!(!name.is_empty(), "each theme must have a non-empty name");
+        }
+    }
+
+    #[test]
     fn named_preset_is_the_base_and_overrides_layer_on_top() {
         let cfg = ThemeConfig {
             name: Some("monokai".into()),
-            accent: Some("#000000".into()), // override just accent
+            accent: Some("#000000".into()),
             ..Default::default()
         };
         let t = cfg.resolve();
-        let monokai = Theme::preset("monokai").unwrap();
-        assert_eq!(t.accent, Color::Rgb(0, 0, 0)); // overridden
-        assert_eq!(t.diff_del, monokai.diff_del); // from preset
+        let monokai = Theme::load("monokai").unwrap();
+        assert_eq!(t.accent, Color::Rgb(0, 0, 0));
+        assert_eq!(t.diff_del, monokai.diff_del);
         assert_eq!(t.syntax, monokai.syntax);
     }
 
     #[test]
     fn background_defaults_transparent_but_presets_set_it() {
-        // The default theme leaves the terminal background untouched.
-        assert_eq!(Theme::default().background, Color::Reset);
-        // Presets ship an opaque background.
+        assert_eq!(Theme::load("default").unwrap().background, Color::Reset);
         assert_eq!(
-            Theme::preset("monokai").unwrap().background,
+            Theme::load("monokai").unwrap().background,
             Color::Rgb(0x27, 0x28, 0x22)
         );
-        // ...which transparent_background = true turns back off.
         let cfg = ThemeConfig {
             name: Some("monokai".into()),
             transparent_background: Some(true),
@@ -316,8 +373,16 @@ mod tests {
         };
         let t = cfg.resolve();
         assert_eq!(t.accent, Color::Rgb(1, 2, 3));
-        assert_eq!(t.dim, Theme::default().dim); // invalid -> default
-        assert_eq!(t.diff_add, Theme::default().diff_add); // unset -> default
-        assert_eq!(t.syntax, "base16-ocean.dark");
+        assert_eq!(t.dim, Theme::default().dim);
+        assert_eq!(t.diff_add, Theme::default().diff_add);
+    }
+
+    #[test]
+    fn discover_all_includes_synthwave84() {
+        let themes = Theme::discover_all();
+        assert!(
+            themes.iter().any(|(n, _)| n == "synthwave84"),
+            "synthwave84 must be in discovered themes"
+        );
     }
 }
