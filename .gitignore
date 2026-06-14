@@ -1,3 +1,4 @@
 /target
 /.claude/worktrees
 /docs/book
+/bench-results/

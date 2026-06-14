@@ -49,6 +49,14 @@ check:
 clippy:
     cargo clippy
 
+# run performance benchmarks
+bench *args:
+    cargo bench {{args}}
+
+# run benchmarks and save a dated report with system details + git commit
+bench-report *args:
+    ./scripts/bench-report.sh {{args}}
+
 # remove build artifacts
 clean:
     cargo clean

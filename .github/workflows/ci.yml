@@ -33,7 +33,7 @@ jobs:
           else
             changed=$(git diff --name-only HEAD~1 HEAD)
           fi
-          if echo "$changed" | grep -qE '^(src/|tests/|Cargo\.(toml|lock)|tv\.toml)'; then
+          if echo "$changed" | grep -qE '^(src/|tests/|benches/|Cargo\.(toml|lock)|tv\.toml)'; then
             echo "code=true" >> "$GITHUB_OUTPUT"
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
@@ -137,3 +137,40 @@ jobs:
       - name: Fail if tests failed
         if: steps.test.outcome == 'failure'
         run: exit 1
+
+  bench-smoke:
+    name: bench (compile check)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Detect code changes
+        id: changes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            changed=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files \
+              --paginate --jq '.[].filename')
+          else
+            changed=$(git diff --name-only HEAD~1 HEAD)
+          fi
+          if echo "$changed" | grep -qE '^(src/|benches/|Cargo\.(toml|lock))'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.changes.outputs.code == 'true'
+      - uses: Swatinem/rust-cache@v2
+        if: steps.changes.outputs.code == 'true'
+      - name: Bench smoke test (compiles + runs one group)
+        if: steps.changes.outputs.code == 'true'
+        # Target the Criterion binary explicitly so libtest in src/lib.rs is not invoked.
+        # --test runs each benchmark once without statistics — sufficient to catch crashes.
+        run: cargo bench --bench performance -- "scroll_redraw/highlight_range/top/25" --test
