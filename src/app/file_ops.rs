@@ -116,6 +116,7 @@ impl App {
         self.json_pretty_text = Vec::new();
         self.json_pretty_lines = Vec::new();
         self.is_diff = true;
+        self.clear_yaml_state();
         self.content_scroll = 0;
         self.content_hscroll = 0;
         self.clear_selection();
@@ -142,6 +143,7 @@ impl App {
         self.show_pretty_json = false;
         self.json_pretty_text = Vec::new();
         self.json_pretty_lines = Vec::new();
+        self.clear_yaml_state();
         self.virtual_file = None;
         self.content = vec!["[deleted]".into()];
         self.highlighted = Vec::new();
@@ -187,20 +189,14 @@ impl App {
         self.json_pretty_text = Vec::new();
         self.json_pretty_lines = Vec::new();
         let is_yaml = matches!(ext, "yaml" | "yml");
-        self.clear_fold_state();
+        self.clear_yaml_state();
 
         // Try memory-mapped virtual file first (lazy, no full content in memory).
-        // Markdown and JSON are excluded: both need full content for rendering.
-        if !self.is_markdown && !self.is_json {
+        // Markdown, JSON, and YAML are excluded: they need full content for rendering/validation.
+        if !self.is_markdown && !self.is_json && !is_yaml {
             if let Some(vf) = VirtualFile::open(path) {
                 self.current_file = Some(path.to_path_buf());
                 self.set_file_watch(Some(path));
-                if is_yaml {
-                    let lines: Vec<&str> = (0..vf.line_count())
-                        .filter_map(|i| vf.line_text(i))
-                        .collect();
-                    self.yaml_fold_regions = crate::yaml_fold::detect_fold_regions(&lines);
-                }
                 self.virtual_file = Some(vf);
                 self.content = Vec::new();
                 self.highlighted = Vec::new();
@@ -242,6 +238,9 @@ impl App {
         } else {
             if is_yaml {
                 self.yaml_fold_regions = crate::yaml_fold::detect_fold_regions(&self.content);
+                self.validate_yaml(&s);
+                let lines = self.content.clone();
+                self.count_yaml_anchors_aliases(&lines);
             }
             self.highlighted = self.highlighter.highlight(path, &self.content);
             if self.is_markdown {
@@ -302,6 +301,7 @@ impl App {
         self.json_pretty_text = Vec::new();
         self.json_pretty_lines = Vec::new();
         self.is_diff = true;
+        self.clear_yaml_state();
         self.content_scroll = 0;
         self.content_hscroll = 0;
         self.clear_selection();

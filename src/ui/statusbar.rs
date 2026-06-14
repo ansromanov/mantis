@@ -118,6 +118,30 @@ pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
             spans.push(Span::styled(" [config error]", base.fg(theme.diff_del)));
         }
 
+        // YAML validation error indicator
+        if let Some(ref err) = app.yaml_error {
+            let label = err.lines().next().unwrap_or(err);
+            spans.push(Span::styled(
+                format!(" [YAML: {label}]"),
+                base.fg(theme.diff_del),
+            ));
+        }
+
+        // YAML anchor/alias/fold stats (only when a YAML file is open)
+        if !app.yaml_fold_regions.is_empty() {
+            let folded_count = app.yaml_folded.len();
+            let total_regions = app.yaml_fold_regions.len();
+            let anchor_info = if app.yaml_anchor_count > 0 || app.yaml_alias_count > 0 {
+                format!(" &{} *{}", app.yaml_anchor_count, app.yaml_alias_count)
+            } else {
+                String::new()
+            };
+            spans.push(Span::styled(
+                format!(" [Y{anchor_info} {folded_count}/{total_regions}]"),
+                base.fg(theme.accent),
+            ));
+        }
+
         spans.push(Span::styled(
             format!(" v{}", env!("CARGO_PKG_VERSION")),
             base.fg(theme.dim),
