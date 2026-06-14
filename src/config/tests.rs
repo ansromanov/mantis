@@ -159,3 +159,77 @@ fn config_paths_are_local_first_then_global() {
         assert!(paths.iter().position(|p| *p == global).unwrap() >= 4);
     }
 }
+
+use super::validate::validate_keys;
+
+#[test]
+fn validate_keys_accepts_full_default_template() {
+    // The shipped template must validate cleanly against the schema.
+    assert!(validate_keys(DEFAULT_CONFIG_TEMPLATE).is_empty());
+}
+
+#[test]
+fn validate_keys_flags_unknown_top_level_key_with_suggestion() {
+    let warnings = validate_keys("tre_width = 30\n");
+    assert_eq!(warnings.len(), 1);
+    assert!(
+        warnings[0].contains("unknown key 'tre_width'")
+            && warnings[0].contains("did you mean 'tree_width'?"),
+        "expected nearest-match hint: {}",
+        warnings[0]
+    );
+}
+
+#[test]
+fn validate_keys_reports_nested_unknown_keys_by_path() {
+    let warnings = validate_keys("[keys]\nqiut = [\"q\"]\n\n[theme]\nacent = \"red\"\n");
+    assert!(
+        warnings
+            .iter()
+            .any(|w| w.contains("unknown key 'keys.qiut'") && w.contains("did you mean 'quit'?")),
+        "missing keys.qiut warning: {warnings:?}"
+    );
+    assert!(
+        warnings.iter().any(
+            |w| w.contains("unknown key 'theme.acent'") && w.contains("did you mean 'accent'?")
+        ),
+        "missing theme.acent warning: {warnings:?}"
+    );
+}
+
+#[test]
+fn validate_keys_omits_hint_when_nothing_close() {
+    let warnings = validate_keys("completely_unrelated_setting = true\n");
+    assert_eq!(warnings.len(), 1);
+    assert!(warnings[0].contains("unknown key 'completely_unrelated_setting'"));
+    assert!(
+        !warnings[0].contains("did you mean"),
+        "should not guess for a distant key: {}",
+        warnings[0]
+    );
+}
+
+#[test]
+fn unknown_key_surfaces_as_warning_but_config_still_loads() {
+    let dir = std::env::temp_dir().join(format!(
+        "tv_cfg_unknown_{}_{:?}",
+        std::process::id(),
+        std::time::SystemTime::now()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    // Valid TOML, valid value, but a typo'd key name.
+    fs::write(dir.join("tv.toml"), "tree_widht = 40\n").unwrap();
+
+    let (config, path, error) = load(&dir);
+    // The config still loads (the typo'd key is simply ignored)...
+    assert!(path.is_some());
+    assert_eq!(config.tree_width, Config::default().tree_width);
+    // ...but the typo is surfaced with a suggestion.
+    let msg = error.expect("unknown key should produce a warning");
+    assert!(
+        msg.contains("tree_widht") && msg.contains("tree_width"),
+        "warning should name the bad key and suggestion: {msg}"
+    );
+
+    fs::remove_dir_all(&dir).ok();
+}
