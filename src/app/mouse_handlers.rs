@@ -47,7 +47,7 @@ impl App {
                 } else if rect_contains(self.content_area, ev.column, ev.row) {
                     self.focus = Focus::Content;
                     let on_scrollbar = self.show_scrollbar
-                        && self.content_line_count() > self.content_area.height as usize
+                        && self.line_count() > self.content_area.height as usize
                         && ev.column
                             == self.content_area.x + self.content_area.width.saturating_sub(1);
                     if on_scrollbar {
@@ -319,7 +319,7 @@ impl App {
 
     /// Maps a mouse row to a content scroll position, used for scrollbar dragging.
     fn set_scroll_from_mouse_y(&mut self, row: u16) {
-        let total = self.content_line_count();
+        let total = self.line_count();
         let inner_h = self.content_area.height as usize;
         if total <= inner_h || inner_h == 0 {
             return;

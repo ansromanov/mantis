@@ -6,6 +6,7 @@ use crate::file::is_binary_bytes;
 use crate::git::GitStatus;
 use crate::markdown;
 use crate::search::HistoryState;
+use crate::virtual_file::VirtualFile;
 
 use super::{diff_line_style, App, Focus};
 
@@ -33,7 +34,7 @@ impl App {
         let scroll = self.content_scroll;
         let hscroll = self.content_hscroll;
         f(self);
-        self.content_scroll = scroll.min(self.content_line_count().saturating_sub(1));
+        self.content_scroll = scroll.min(self.line_count().saturating_sub(1));
         self.content_hscroll = hscroll;
     }
 
@@ -99,6 +100,7 @@ impl App {
     /// content panel, using `diff_line_style` for per-line coloring.
     pub(super) fn show_working_tree_diff(&mut self, path: &Path) {
         self.in_file_search = None;
+        self.virtual_file = None;
         let lines = crate::git::working_tree_diff(&self.root, path);
         let rel = path.strip_prefix(&self.root).unwrap_or(path);
         self.current_file = Some(path.to_path_buf());
@@ -126,6 +128,7 @@ impl App {
         self.is_diff = false;
         self.is_markdown = false;
         self.show_raw_markdown = false;
+        self.virtual_file = None;
         self.content = vec!["[deleted]".into()];
         self.highlighted = Vec::new();
         self.markdown_lines = Vec::new();
@@ -165,14 +168,25 @@ impl App {
         self.show_raw_markdown = false;
         self.markdown_lines = Vec::new();
 
-        // Read the file once: classify it as binary and decode it from the
-        // same bytes, rather than reading the whole file twice.
+        // Try memory-mapped virtual file first (lazy, no full content in memory).
+        // Markdown is excluded: the renderer needs the full text, and holding
+        // both an mmap and a full Vec<u8> for rendering would double memory usage.
+        if !self.is_markdown {
+            if let Some(vf) = VirtualFile::open(path) {
+                self.current_file = Some(path.to_path_buf());
+                self.set_file_watch(Some(path));
+                self.virtual_file = Some(vf);
+                self.content = Vec::new();
+                self.highlighted = Vec::new();
+                return;
+            }
+        }
+
+        // Fallback: read the file into memory (small files, binary check, etc.)
+        self.virtual_file = None;
         let bytes = match std::fs::read(path) {
             Ok(b) => b,
             Err(e) => {
-                // The read failed, so no file is open: clear any previously
-                // opened file and its watcher rather than leaving stale state
-                // (the title would otherwise show the old file over this error).
                 self.current_file = None;
                 self.set_file_watch(None);
                 self.content = vec![format!("[error: {}]", e)];
@@ -180,8 +194,6 @@ impl App {
                 return;
             }
         };
-        // The read succeeded, so this path is now the open file. Set it (and the
-        // watcher) before classifying the bytes so every success path agrees.
         self.current_file = Some(path.to_path_buf());
         self.set_file_watch(Some(path));
         if is_binary_bytes(&bytes) {
@@ -240,6 +252,7 @@ impl App {
     /// hidden and the diff stays read-only.
     fn show_diff(&mut self, file: &Path, short: &str, lines: Vec<String>) {
         self.in_file_search = None;
+        self.virtual_file = None;
         self.current_file = Some(file.to_path_buf());
         self.is_markdown = false;
         self.show_raw_markdown = false;

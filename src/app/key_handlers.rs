@@ -102,15 +102,17 @@ impl App {
                 self.in_file_search_prev();
             }
             KeyCode::Backspace => {
-                if let Some(s) = &mut self.in_file_search {
-                    s.pop(&self.content);
+                if let Some(ref mut s) = self.in_file_search {
+                    s.pop();
                 }
+                self.refresh_in_file_search();
                 self.scroll_in_file_search_to_current();
             }
             KeyCode::Char(c) => {
-                if let Some(s) = &mut self.in_file_search {
-                    s.push(c, &self.content);
+                if let Some(ref mut s) = self.in_file_search {
+                    s.push(c);
                 }
+                self.refresh_in_file_search();
                 self.scroll_in_file_search_to_current();
             }
             _ => {}
@@ -153,6 +155,20 @@ impl App {
             self.content_scroll = m.line.saturating_sub(view_height).saturating_add(1);
         }
         self.mark_content_scrolled();
+    }
+
+    /// Re-runs in-file search against the current content source.
+    fn refresh_in_file_search(&mut self) {
+        let total = self.line_count();
+        // Collect before mutably borrowing in_file_search: line_text() takes
+        // &self which conflicts with the &mut borrow needed by s.refresh().
+        let lines: Vec<String> = (0..total)
+            .filter_map(|i| self.line_text(i).map(String::from))
+            .collect();
+        let Some(s) = &mut self.in_file_search else {
+            return;
+        };
+        s.refresh(total, |i| lines.get(i).cloned());
     }
 
     /// Handles keyboard input while the git-history overlay is open.
