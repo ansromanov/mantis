@@ -1,6 +1,6 @@
 use ratatui::style::Color;
 
-use tree_viewer::theme::{parse_color, Theme, PRESETS};
+use tree_viewer::theme::{parse_color, Theme};
 
 #[test]
 fn parses_names_and_hex() {
@@ -13,9 +13,9 @@ fn parses_names_and_hex() {
 }
 
 #[test]
-fn all_listed_presets_resolve() {
-    for name in PRESETS {
-        assert!(Theme::preset(name).is_some(), "missing preset {name}");
+fn all_embedded_themes_resolve() {
+    for (name, _) in Theme::discover_all() {
+        assert!(Theme::load(&name).is_some(), "missing theme {name}");
     }
-    assert!(Theme::preset("bogus").is_none());
+    assert!(Theme::load("bogus").is_none());
 }

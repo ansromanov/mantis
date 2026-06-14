@@ -314,9 +314,9 @@ impl InFileSearch {
     }
 }
 
-/// Fuzzy-filterable list of built-in theme presets.
+/// Fuzzy-filterable list of discovered themes.
 pub struct ThemePicker {
-    pub names: Vec<&'static str>,
+    pub names: Vec<String>,
     pub query: String,
     pub filtered: Vec<usize>,
     pub selected: usize,
@@ -325,7 +325,10 @@ pub struct ThemePicker {
 
 impl Default for ThemePicker {
     fn default() -> Self {
-        let names = crate::theme::PRESETS.to_vec();
+        let names: Vec<String> = crate::theme::Theme::discover_all()
+            .into_iter()
+            .map(|(n, _)| n)
+            .collect();
         let filtered = (0..names.len()).collect();
         ThemePicker {
             names,
@@ -352,8 +355,10 @@ impl ThemePicker {
         self.filtered.len()
     }
 
-    pub fn selected_name(&self) -> Option<&'static str> {
-        self.filtered.get(self.selected).map(|&i| self.names[i])
+    pub fn selected_name(&self) -> Option<&str> {
+        self.filtered
+            .get(self.selected)
+            .map(|&i| self.names[i].as_str())
     }
 
     fn refilter(&mut self) {
@@ -461,8 +466,9 @@ mod tests {
     #[test]
     fn theme_picker_starts_with_all_presets() {
         let p = ThemePicker::default();
-        assert_eq!(p.names.len(), crate::theme::PRESETS.len());
-        assert_eq!(p.filtered.len(), crate::theme::PRESETS.len());
+        let count = crate::theme::Theme::discover_all().len();
+        assert_eq!(p.names.len(), count);
+        assert_eq!(p.filtered.len(), count);
         assert_eq!(p.selected, 0);
     }
 
@@ -507,7 +513,7 @@ mod tests {
     #[test]
     fn theme_picker_results_len() {
         let p = ThemePicker::default();
-        assert_eq!(p.results_len(), crate::theme::PRESETS.len());
+        assert_eq!(p.results_len(), crate::theme::Theme::discover_all().len());
     }
 
     // -- HistoryState ----------------------------------------------------------
