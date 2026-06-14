@@ -101,9 +101,12 @@ fn pressed_matches_any_in_list() {
 #[test]
 fn malformed_local_config_reports_warning_and_falls_back() {
     let dir = std::env::temp_dir().join(format!(
-        "tv_cfg_bad_{}_{:?}",
+        "tv_cfg_bad_{}_{}",
         std::process::id(),
         std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0)
     ));
     fs::create_dir_all(&dir).unwrap();
     // `tree_width` expects an integer; a string makes parsing fail.
@@ -124,9 +127,12 @@ fn malformed_local_config_reports_warning_and_falls_back() {
 #[test]
 fn install_default_writes_template_and_is_parseable() {
     let dir = std::env::temp_dir().join(format!(
-        "tv_cfg_install_{}_{:?}",
+        "tv_cfg_install_{}_{}",
         std::process::id(),
         std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0)
     ));
     fs::create_dir_all(&dir).unwrap();
     let path = dir.join("tv.toml");
@@ -212,9 +218,12 @@ fn validate_keys_omits_hint_when_nothing_close() {
 #[test]
 fn unknown_key_surfaces_as_warning_but_config_still_loads() {
     let dir = std::env::temp_dir().join(format!(
-        "tv_cfg_unknown_{}_{:?}",
+        "tv_cfg_unknown_{}_{}",
         std::process::id(),
         std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0)
     ));
     fs::create_dir_all(&dir).unwrap();
     // Valid TOML, valid value, but a typo'd key name.

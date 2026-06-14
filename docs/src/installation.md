@@ -2,9 +2,11 @@
 
 ## One-liner install (recommended)
 
-On Linux and macOS, the fastest way to get `tv` — no Rust toolchain required —
-is the install script. It detects your OS/arch, downloads the matching prebuilt
-binary, verifies its SHA-256 checksum, and installs it onto your `PATH`:
+### Linux / macOS
+
+The fastest way to get `tv` — no Rust toolchain required — is the install
+script. It detects your OS/arch, downloads the matching prebuilt binary,
+verifies its SHA-256 checksum, and installs it onto your `PATH`:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/ansromanov/tree-viewer/main/install.sh | sh
@@ -24,9 +26,32 @@ TV_INSTALL_DIR="$HOME/bin" curl -fsSL https://raw.githubusercontent.com/ansroman
 > [`install.sh`](https://raw.githubusercontent.com/ansromanov/tree-viewer/main/install.sh),
 > inspect it, then run `sh install.sh`.
 
-On **Windows**, download `tv-windows-x86_64.exe` from the
-[latest release](https://github.com/ansromanov/tree-viewer/releases/latest) and
-place it on your `PATH` (or use `cargo install tree-viewer`).
+### Windows (PowerShell)
+
+Run this in a PowerShell window — `curl` is not needed, `Invoke-WebRequest`
+(`irm`) is built into PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/ansromanov/tree-viewer/main/install.ps1 | iex
+```
+
+From **cmd.exe**:
+
+```cmd
+powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/ansromanov/tree-viewer/main/install.ps1 | iex"
+```
+
+The script downloads `tv.exe`, verifies its SHA-256 checksum, installs it to
+`%CARGO_HOME%\bin` (if Rust is present) or `%LOCALAPPDATA%\Programs\tree-viewer`,
+and adds the directory to your user `PATH`.
+
+You can override the install location:
+
+```powershell
+$env:TV_VERSION    = 'v0.2.0'          # install a specific version
+$env:TV_INSTALL_DIR = "$HOME\bin"       # install to a custom directory
+irm https://raw.githubusercontent.com/ansromanov/tree-viewer/main/install.ps1 | iex
+```
 
 ## Via cargo install
 

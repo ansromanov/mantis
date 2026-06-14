@@ -215,12 +215,18 @@ fn all_embedded() -> &'static HashMap<&'static str, Theme> {
 // User themes directory
 // ---------------------------------------------------------------------------
 
-/// Returns the path to `~/.config/tree-viewer/themes/`.
 fn user_themes_dir() -> Option<PathBuf> {
-    let base = std::env::var_os("XDG_CONFIG_HOME")
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))?;
-    Some(base.join("tree-viewer").join("themes"))
+    #[cfg(windows)]
+    {
+        std::env::var_os("APPDATA").map(|p| PathBuf::from(p).join("tree-viewer").join("themes"))
+    }
+    #[cfg(not(windows))]
+    {
+        let base = std::env::var_os("XDG_CONFIG_HOME")
+            .map(PathBuf::from)
+            .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))?;
+        Some(base.join("tree-viewer").join("themes"))
+    }
 }
 
 /// Copies every bundled theme to the user themes directory if it doesn't

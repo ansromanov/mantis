@@ -2,8 +2,14 @@
 
 **Browse, read, and review code in your terminal — instantly.**
 
+**Linux / macOS:**
 ```sh
 curl -fsSL https://raw.githubusercontent.com/ansromanov/tree-viewer/main/install.sh | sh
+```
+
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/ansromanov/tree-viewer/main/install.ps1 | iex
 ```
 
 `tv` is a fast, lightweight file tree viewer with syntax highlighting, markdown
@@ -70,9 +76,9 @@ the moment you actually need to change something.
 
 ## Install
 
-The one-liner above (Linux/macOS, no Rust toolchain required) downloads the
-prebuilt binary for your OS/arch, verifies its checksum, and installs it onto
-your `PATH`. With the Rust toolchain: `cargo install tree-viewer`. Or from source:
+The one-liners above (no Rust toolchain required) download the prebuilt binary
+for your platform, verify its checksum, and install it onto your `PATH`.
+With the Rust toolchain: `cargo install tree-viewer`. Or from source:
 
 ```sh
 git clone https://github.com/ansromanov/tree-viewer.git
@@ -152,9 +158,10 @@ git_show_deleted = false # show ghost nodes for deleted tracked files (default: 
 ## Configuration
 
 `tv` reads a `tv.toml` file. It first looks for one in the directory being
-viewed (and its ancestors), then falls back to the global config at
-`$XDG_CONFIG_HOME/tv.toml` (or `~/.config/tv.toml`). A project-local file
-overrides the global one, so a repository can ship its own defaults.
+viewed (and its ancestors), then falls back to the global config:
+`$XDG_CONFIG_HOME/tv.toml` (or `~/.config/tv.toml`) on Linux/macOS,
+`%APPDATA%\tree-viewer\tv.toml` on Windows. A project-local file overrides
+the global one, so a repository can ship its own defaults.
 
 ```toml
 show_hidden = false       # show dotfiles
