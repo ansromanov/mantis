@@ -41,6 +41,8 @@ theme_picker = ["t"]
 command_palette = ["ctrl+p"]
 open_in_editor = ["e"]
 toggle_blame = ["b"]
+visual_line_toggle = ["V"]
+visual_line_blame = ["b"]
 git_mode_toggle = ["ctrl+g"]
 git_mode_flat_toggle = ["alt+g"]
 

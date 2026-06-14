@@ -49,6 +49,8 @@ the moment you actually need to change something.
 - **Git mode** (`Ctrl+G`) — show only changed files with working-tree diffs;
   `Alt+G` toggles between tree and flat list views
 - **Git blame** (`b`) — inline per-line author, short hash, and date
+- **Visual-line mode** (`V`) — vim-style whole-line selection; press `b` to open
+  a blame panel scoped to the selected range
 - **Git file history** (`H`) — pick a past revision from an fzf-style list and
   view its diff against your working tree, with red/green coloring
 - **Git status indicators** — tree entries colored by git status (new, modified,
@@ -105,6 +107,7 @@ binding. The essentials:
 | `r` · `e` | Reload tree · open current file in `$EDITOR` |
 | `Alt+.` | Toggle hidden files |
 | `H` · `b` | Git history · toggle git blame |
+| `V` | Visual-line mode (select lines; `b` blames the range) |
 | `Ctrl+G` · `Alt+G` | Toggle git mode · flat/tree view in git mode |
 | `t` | Theme picker |
 
@@ -128,6 +131,9 @@ selects and double-click activates.
   working tree (additions green, deletions red).
 - **Blame** (`b`) — toggle an inline gutter with short hash, author, and date per
   line. Unavailable while viewing a diff.
+- **Visual-line blame** (`V`) — enter visual-line mode, extend the selection with
+  `j`/`k` (or `g`/`G`), then press `b` to open a panel showing the short hash,
+  author, relative date, and content for every line in the range. `Esc` exits.
 - **Git mode** (`Ctrl+G`) — show only files with uncommitted changes; selecting
   one shows its working-tree diff. `Alt+G` toggles between tree and a flat list
   of changed files. Directories with changes auto-expand; diffs refresh on the

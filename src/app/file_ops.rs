@@ -120,6 +120,7 @@ impl App {
         self.content_scroll = 0;
         self.content_hscroll = 0;
         self.clear_selection();
+        self.exit_visual_line();
         self.content_title = Some(format!(" working diff — {} ", rel.display()));
         self.highlighted = lines
             .iter()
@@ -152,6 +153,7 @@ impl App {
         self.content_scroll = 0;
         self.content_hscroll = 0;
         self.clear_selection();
+        self.exit_visual_line();
         self.set_file_watch(None);
     }
 
@@ -179,6 +181,11 @@ impl App {
         self.content_scroll = 0;
         self.content_hscroll = 0;
         self.clear_selection();
+        // Drop visual-line mode only when navigating to a different file; a same
+        // -file reopen (reload / external edit) keeps the selection in place.
+        if self.current_file.as_deref() != Some(path) {
+            self.exit_visual_line();
+        }
 
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
         self.is_markdown = matches!(ext, "md" | "markdown");
@@ -305,6 +312,7 @@ impl App {
         self.content_scroll = 0;
         self.content_hscroll = 0;
         self.clear_selection();
+        self.exit_visual_line();
         let rel = file.strip_prefix(&self.root).unwrap_or(file);
         self.content_title = Some(format!(" diff {} — {} ", short, rel.display()));
         self.highlighted = lines
