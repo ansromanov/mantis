@@ -116,6 +116,7 @@ impl App {
         self.json_pretty_text = Vec::new();
         self.json_pretty_lines = Vec::new();
         self.is_diff = true;
+        self.clear_yaml_state();
         self.content_scroll = 0;
         self.content_hscroll = 0;
         self.clear_selection();
@@ -142,6 +143,7 @@ impl App {
         self.show_pretty_json = false;
         self.json_pretty_text = Vec::new();
         self.json_pretty_lines = Vec::new();
+        self.clear_yaml_state();
         self.virtual_file = None;
         self.content = vec!["[deleted]".into()];
         self.highlighted = Vec::new();
@@ -299,6 +301,7 @@ impl App {
         self.json_pretty_text = Vec::new();
         self.json_pretty_lines = Vec::new();
         self.is_diff = true;
+        self.clear_yaml_state();
         self.content_scroll = 0;
         self.content_hscroll = 0;
         self.clear_selection();
