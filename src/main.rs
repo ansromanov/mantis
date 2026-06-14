@@ -2,11 +2,13 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event},
+    event::{DisableMouseCapture, EnableMouseCapture, Event},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
+
+use crate::app::App;
 
 mod app;
 mod command_palette;
@@ -36,9 +38,23 @@ fn resolve_root_and_file(arg: &Path) -> (PathBuf, Option<PathBuf>) {
     }
 }
 
+/// Returns the first CLI argument as a `PathBuf`, if any.
+fn parse_args() -> Option<PathBuf> {
+    parse_args_from(std::env::args())
+}
+
+/// Parses the first argument from an iterator of strings. Extracted for
+/// testability: tests can inject an arbitrary argument list.
+fn parse_args_from<I>(args: I) -> Option<PathBuf>
+where
+    I: IntoIterator<Item = String>,
+{
+    args.into_iter().nth(1).map(PathBuf::from)
+}
+
 fn main() -> anyhow::Result<()> {
-    let args: Vec<String> = std::env::args().collect();
-    let flag = args.get(1).map(String::as_str);
+    let arg = parse_args();
+    let flag = arg.as_deref().and_then(|p| p.to_str());
     match flag {
         Some("--help") | Some("-h") | Some("/?") => {
             println!("Usage: tv [<path>]");
@@ -56,14 +72,11 @@ fn main() -> anyhow::Result<()> {
         _ => {}
     }
 
-    let arg = args
-        .get(1)
-        .filter(|a| !a.starts_with('-'))
-        .map(PathBuf::from)
+    let arg = arg
+        .filter(|a| !a.to_string_lossy().starts_with('-'))
         .unwrap_or_else(|| PathBuf::from("."))
         .canonicalize()?;
 
-    // If a file is given, root the tree at its parent and open the file.
     let (root, file) = resolve_root_and_file(&arg);
 
     enable_raw_mode()?;
@@ -79,16 +92,39 @@ fn main() -> anyhow::Result<()> {
         app.open_and_reveal(&file);
     }
 
+    run_event_loop(&mut terminal, &mut app)?;
+
+    disable_raw_mode()?;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
+    terminal.show_cursor()?;
+
+    if let Some(err) = &app.config_error {
+        eprintln!("tv: ignoring invalid config: {err}");
+    }
+
+    Ok(())
+}
+
+/// Drives the event loop: renders the UI, polls for events, dispatches them
+/// to the app, and calls `tick()` every frame.
+fn run_event_loop(
+    terminal: &mut Terminal<impl ratatui::backend::Backend>,
+    app: &mut App,
+) -> anyhow::Result<()> {
     loop {
         if app.needs_clear {
             terminal.clear()?;
             terminal.hide_cursor()?;
             app.needs_clear = false;
         }
-        terminal.draw(|f| ui::draw(f, &mut app))?;
+        terminal.draw(|f| ui::draw(f, app))?;
 
-        if event::poll(std::time::Duration::from_millis(16))? {
-            match event::read()? {
+        if crossterm::event::poll(std::time::Duration::from_millis(16))? {
+            match crossterm::event::read()? {
                 Event::Key(key) => app.handle_key(key),
                 Event::Mouse(m) => app.handle_mouse(m),
                 _ => {}
@@ -101,21 +137,6 @@ fn main() -> anyhow::Result<()> {
 
         app.tick();
     }
-
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
-
-    // Surface a malformed config now that the alternate screen is gone, so the
-    // warning lands on the user's normal terminal instead of being painted over.
-    if let Some(err) = &app.config_error {
-        eprintln!("tv: ignoring invalid config: {err}");
-    }
-
     Ok(())
 }
 
@@ -125,12 +146,23 @@ mod tests {
     use std::fs;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    use ratatui::backend::TestBackend;
+
+    use crate::app::App;
+    use crate::config::Config;
+    use crate::ui;
+
     fn temp_dir() -> PathBuf {
         static COUNTER: AtomicUsize = AtomicUsize::new(0);
         let n = COUNTER.fetch_add(1, Ordering::Relaxed);
         let dir = std::env::temp_dir().join(format!("tv_main_{}_{n}", std::process::id()));
         fs::create_dir_all(&dir).unwrap();
         dir.canonicalize().unwrap()
+    }
+
+    fn app_for(root: &Path) -> App {
+        App::new(root.to_path_buf(), Config::default(), None, None).unwrap()
     }
 
     #[test]
@@ -151,6 +183,218 @@ mod tests {
         let (root, file) = resolve_root_and_file(&canonical);
         assert_eq!(root, dir);
         assert_eq!(file, Some(canonical));
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn parse_args_returns_none_with_no_args() {
+        let result = parse_args_from(std::iter::empty::<String>());
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn parse_args_returns_first_arg() {
+        let result = parse_args_from(["program", "some/path"].into_iter().map(String::from));
+        assert_eq!(result, Some(PathBuf::from("some/path")));
+    }
+
+    #[test]
+    fn app_draw_tree_focus_does_not_panic() {
+        let dir = temp_dir();
+        fs::write(dir.join("a.txt"), "hello\nworld\n").unwrap();
+        let mut app = app_for(&dir);
+        let backend = TestBackend::new(80, 30);
+        let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        terminal.draw(|f| ui::draw(f, &mut app)).unwrap();
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn app_draw_content_focus_does_not_panic() {
+        let dir = temp_dir();
+        let file_path = dir.join("a.txt");
+        fs::write(&file_path, "hello\nworld\nline3\n").unwrap();
+        let mut app = app_for(&dir);
+        app.open_file(&file_path);
+        app.focus = crate::app::Focus::Content;
+        let backend = TestBackend::new(80, 30);
+        let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        terminal.draw(|f| ui::draw(f, &mut app)).unwrap();
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn app_draw_with_search_open() {
+        let dir = temp_dir();
+        fs::write(dir.join("a.txt"), "hello\nworld\n").unwrap();
+        let mut app = app_for(&dir);
+        app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
+        assert!(app.search.is_some());
+        let backend = TestBackend::new(80, 30);
+        let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        terminal.draw(|f| ui::draw(f, &mut app)).unwrap();
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn app_draw_with_theme_picker() {
+        let dir = temp_dir();
+        fs::write(dir.join("a.txt"), "hello\nworld\n").unwrap();
+        let mut app = app_for(&dir);
+        app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::empty()));
+        assert!(app.theme_picker.is_some());
+        let backend = TestBackend::new(80, 30);
+        let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        terminal.draw(|f| ui::draw(f, &mut app)).unwrap();
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn app_draw_with_command_palette() {
+        let dir = temp_dir();
+        fs::write(dir.join("a.txt"), "hello\nworld\n").unwrap();
+        let mut app = app_for(&dir);
+        app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL));
+        assert!(app.command_palette.is_some());
+        let backend = TestBackend::new(80, 30);
+        let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        terminal.draw(|f| ui::draw(f, &mut app)).unwrap();
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn app_draw_with_help_open() {
+        let dir = temp_dir();
+        fs::write(dir.join("a.txt"), "hello\nworld\n").unwrap();
+        let mut app = app_for(&dir);
+        app.show_help = true;
+        let backend = TestBackend::new(80, 30);
+        let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        terminal.draw(|f| ui::draw(f, &mut app)).unwrap();
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn app_draw_with_history_and_git_info() {
+        let dir = temp_dir();
+        fs::write(dir.join("a.txt"), "hello\nworld\n").unwrap();
+        let mut app = app_for(&dir);
+        app.git_info = Some(crate::git::GitRepoInfo {
+            head: crate::git::GitHead::Branch("main".into()),
+            ahead: 2,
+            behind: 1,
+            total_changed: 3,
+            staged: 1,
+            untracked: 2,
+        });
+        app.show_scroll_percentage = true;
+        app.current_file = Some(dir.join("a.txt"));
+        let backend = TestBackend::new(80, 30);
+        let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        terminal.draw(|f| ui::draw(f, &mut app)).unwrap();
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn app_draw_with_in_file_search() {
+        let dir = temp_dir();
+        let file_path = dir.join("a.txt");
+        fs::write(&file_path, "hello\nworld\n").unwrap();
+        let mut app = app_for(&dir);
+        app.open_file(&file_path);
+        app.focus = crate::app::Focus::Content;
+        // / in content focus opens in-file search
+        app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
+        assert!(app.in_file_search.is_some());
+        let backend = TestBackend::new(80, 30);
+        let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        terminal.draw(|f| ui::draw(f, &mut app)).unwrap();
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn app_draw_with_walk_errors_and_config_error() {
+        let dir = temp_dir();
+        fs::write(dir.join("a.txt"), "hello\n").unwrap();
+        let mut app = app_for(&dir);
+        app.walk_errors = 3;
+        app.config_error = Some("bad field: unknown_key".into());
+        let backend = TestBackend::new(80, 30);
+        let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        terminal.draw(|f| ui::draw(f, &mut app)).unwrap();
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn event_loop_key_quit_sets_should_quit() {
+        let dir = temp_dir();
+        fs::write(dir.join("a.txt"), "hello\n").unwrap();
+        let mut app = app_for(&dir);
+        assert!(!app.should_quit);
+        app.handle_key(KeyEvent::new(KeyCode::Char('q'), KeyModifiers::empty()));
+        assert!(app.should_quit);
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn event_loop_key_search_toggles_search() {
+        let dir = temp_dir();
+        fs::write(dir.join("a.txt"), "hello\n").unwrap();
+        let mut app = app_for(&dir);
+        assert!(app.search.is_none());
+        app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
+        assert!(app.search.is_some());
+        app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+        assert!(app.search.is_none());
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn event_loop_key_theme_toggles_picker() {
+        let dir = temp_dir();
+        fs::write(dir.join("a.txt"), "hello\n").unwrap();
+        let mut app = app_for(&dir);
+        assert!(app.theme_picker.is_none());
+        app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::empty()));
+        assert!(app.theme_picker.is_some());
+        app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+        assert!(app.theme_picker.is_none());
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn event_loop_key_help_toggles() {
+        let dir = temp_dir();
+        fs::write(dir.join("a.txt"), "hello\n").unwrap();
+        let mut app = app_for(&dir);
+        assert!(!app.show_help);
+        app.handle_key(KeyEvent::new(KeyCode::Char('?'), KeyModifiers::empty()));
+        assert!(app.show_help);
+        app.handle_key(KeyEvent::new(KeyCode::Char('?'), KeyModifiers::empty()));
+        assert!(!app.show_help);
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn event_loop_key_command_palette_toggles() {
+        let dir = temp_dir();
+        fs::write(dir.join("a.txt"), "hello\n").unwrap();
+        let mut app = app_for(&dir);
+        assert!(app.command_palette.is_none());
+        app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL));
+        assert!(app.command_palette.is_some());
+        app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+        assert!(app.command_palette.is_none());
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn config_error_surfaces_from_invalid_toml() {
+        let dir = temp_dir();
+        fs::write(dir.join("tv.toml"), "garbage [[[ = 1").unwrap();
+        let (_cfg, _path, err) = crate::config::load(&dir);
+        assert!(err.is_some());
+        assert!(err.unwrap().contains("tv.toml"));
         fs::remove_dir_all(&dir).ok();
     }
 }

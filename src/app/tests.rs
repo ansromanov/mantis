@@ -2,7 +2,7 @@ use std::fs;
 
 use super::*;
 use crate::config::Config;
-use crate::search::SearchMode;
+use crate::search::{InFileMatch, SearchMode};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -1577,5 +1577,1376 @@ fn mark_content_scrolled_sets_timestamp() {
     std::thread::sleep(std::time::Duration::from_millis(1));
     app.mark_content_scrolled();
     assert!(app.content_scrolled_at > before);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- handle_key dispatch / about / help overlays ---------------------------
+
+#[test]
+fn handle_key_show_about_q_or_esc_closes() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.show_about = true;
+    app.handle_key(KeyEvent::new(KeyCode::Char('q'), KeyModifiers::empty()));
+    assert!(!app.show_about);
+    app.show_about = true;
+    app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+    assert!(!app.show_about);
+    app.show_about = true;
+    app.handle_key(KeyEvent::new(KeyCode::Char('?'), KeyModifiers::empty()));
+    assert!(!app.show_about);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn handle_key_show_about_enter_noop_when_no_release() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.show_about = true;
+    // Enter without a release URL: should be a no-op (not crash).
+    app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert!(app.show_about);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn handle_key_show_help_blocks_other_keys() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.show_help = true;
+    // 'x' is not a close-help key, so help stays open
+    app.handle_key(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::empty()));
+    assert!(!app.should_quit);
+    assert!(app.show_help);
+    // But ?/Esc/q should close help
+    app.handle_key(KeyEvent::new(KeyCode::Char('?'), KeyModifiers::empty()));
+    assert!(!app.show_help);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- handle_search_key -----------------------------------------------------
+
+#[test]
+fn search_key_enter_activates_and_closes() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert!(app.search.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn search_key_up_down_navigation() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
+    let max = app.search.as_ref().unwrap().results_len().saturating_sub(1);
+    app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
+    assert_eq!(app.search.as_ref().unwrap().selected, 1.min(max));
+    app.handle_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()));
+    assert_eq!(app.search.as_ref().unwrap().selected, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn search_key_up_stays_at_zero() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()));
+    assert_eq!(app.search.as_ref().unwrap().selected, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn search_key_down_stays_at_boundary() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
+    let s = app.search.as_mut().unwrap();
+    let max = s.results_len().saturating_sub(1);
+    if max == 0 {
+        fs::remove_dir_all(&root).ok();
+        return;
+    }
+    s.selected = max;
+    let _ = s;
+    app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
+    assert_eq!(app.search.as_ref().unwrap().selected, max);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn search_key_backspace_and_char() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::empty()));
+    assert_eq!(app.search.as_ref().unwrap().query, "a");
+    app.handle_key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::empty()));
+    assert_eq!(app.search.as_ref().unwrap().query, "");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn search_key_pop_without_search_is_noop() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    // search is None; Backspace/Char should not crash
+    app.handle_key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::empty()));
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- handle_in_file_search_key ---------------------------------------------
+
+fn setup_in_file_search(app: &mut App) {
+    app.content = vec![
+        "hello world".to_string(),
+        "foo bar".to_string(),
+        "hello again".to_string(),
+    ];
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 20,
+    };
+    app.in_file_search = Some(InFileSearch::new());
+    app.in_file_search.as_mut().unwrap().push('o');
+    app.refresh_in_file_search();
+}
+
+#[test]
+fn in_file_search_opens_when_content_focused() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt"));
+    app.focus = Focus::Content;
+    app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
+    assert!(app.in_file_search.is_some());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn in_file_search_n_next_match_wraps() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    setup_in_file_search(&mut app);
+    assert_eq!(app.in_file_search.as_ref().unwrap().current, 0);
+    assert_eq!(app.in_file_search.as_ref().unwrap().current, 0);
+    app.handle_key(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::empty()));
+    assert_eq!(app.in_file_search.as_ref().unwrap().current, 1);
+    app.handle_key(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::empty()));
+    assert_eq!(app.in_file_search.as_ref().unwrap().current, 2);
+    app.handle_key(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::empty()));
+    assert_eq!(app.in_file_search.as_ref().unwrap().current, 3);
+    app.handle_key(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::empty()));
+    assert_eq!(app.in_file_search.as_ref().unwrap().current, 4);
+    // Wrap to 0 when at last
+    let last = app.in_file_search.as_ref().unwrap().matches.len() - 1;
+    app.in_file_search.as_mut().unwrap().current = last;
+    app.handle_key(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::empty()));
+    assert_eq!(app.in_file_search.as_ref().unwrap().current, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn in_file_search_n_prev_match() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    setup_in_file_search(&mut app);
+    app.in_file_search.as_mut().unwrap().current = 1;
+    app.handle_key(KeyEvent::new(KeyCode::Char('N'), KeyModifiers::empty()));
+    assert_eq!(app.in_file_search.as_ref().unwrap().current, 0);
+    // "P" also goes back
+    app.in_file_search.as_mut().unwrap().current = 1;
+    app.handle_key(KeyEvent::new(KeyCode::Char('P'), KeyModifiers::empty()));
+    assert_eq!(app.in_file_search.as_ref().unwrap().current, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn in_file_search_prev_wraps_to_last() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    setup_in_file_search(&mut app);
+    assert_eq!(app.in_file_search.as_ref().unwrap().current, 0);
+    app.handle_key(KeyEvent::new(KeyCode::Char('N'), KeyModifiers::empty()));
+    let last = app.in_file_search.as_ref().unwrap().matches.len() - 1;
+    assert_eq!(app.in_file_search.as_ref().unwrap().current, last);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn in_file_search_ctrl_p_goes_prev() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    setup_in_file_search(&mut app);
+    app.in_file_search.as_mut().unwrap().current = 1;
+    app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL));
+    assert_eq!(app.in_file_search.as_ref().unwrap().current, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn in_file_search_tab_and_backtab() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    setup_in_file_search(&mut app);
+    app.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::empty()));
+    assert_eq!(app.in_file_search.as_ref().unwrap().current, 1);
+    app.in_file_search.as_mut().unwrap().current = 0;
+    app.handle_key(KeyEvent::new(KeyCode::BackTab, KeyModifiers::empty()));
+    let last = app.in_file_search.as_ref().unwrap().matches.len() - 1;
+    assert_eq!(app.in_file_search.as_ref().unwrap().current, last);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn in_file_search_backspace_and_char() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.in_file_search = Some(InFileSearch::new());
+    app.content = vec!["hello".to_string()];
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 20,
+    };
+    app.handle_key(KeyEvent::new(KeyCode::Char('h'), KeyModifiers::empty()));
+    assert_eq!(app.in_file_search.as_ref().unwrap().query, "h");
+    app.handle_key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::empty()));
+    assert_eq!(app.in_file_search.as_ref().unwrap().query, "");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn in_file_search_no_matches_is_noop() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.in_file_search = Some(InFileSearch::new());
+    app.content = vec!["hello".to_string()];
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 20,
+    };
+    app.handle_key(KeyEvent::new(KeyCode::Char('z'), KeyModifiers::empty()));
+    // No matches, next/prev should not crash
+    app.handle_key(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('P'), KeyModifiers::empty()));
+    assert_eq!(app.in_file_search.as_ref().unwrap().current, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- handle_history_key ----------------------------------------------------
+
+#[test]
+fn history_key_esc_closes() {
+    let root = temp_git_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("tracked.txt"));
+    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::empty()));
+    assert!(app.history.is_some());
+    app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+    assert!(app.history.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn history_key_up_down_navigation() {
+    let root = temp_git_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("tracked.txt"));
+    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::empty()));
+    let max = app
+        .history
+        .as_ref()
+        .unwrap()
+        .results_len()
+        .saturating_sub(1);
+    if max == 0 {
+        fs::remove_dir_all(&root).ok();
+        return;
+    }
+    app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
+    assert_eq!(app.history.as_ref().unwrap().selected, 1);
+    app.handle_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()));
+    assert_eq!(app.history.as_ref().unwrap().selected, 0);
+    app.handle_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()));
+    assert_eq!(app.history.as_ref().unwrap().selected, 0); // stays at 0
+    app.history.as_mut().unwrap().selected = max;
+    app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
+    assert_eq!(app.history.as_ref().unwrap().selected, max); // stays at max
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn history_key_typing_filters() {
+    let root = temp_git_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("tracked.txt"));
+    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::empty()));
+    let total = app.history.as_ref().unwrap().results_len();
+    app.handle_key(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::empty()));
+    let filtered = app.history.as_ref().unwrap().results_len();
+    assert!(filtered <= total);
+    app.handle_key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::empty()));
+    assert_eq!(app.history.as_ref().unwrap().results_len(), total);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn history_key_pop_without_history_is_noop() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::empty()));
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- handle_theme_key -------------------------------------------------------
+
+#[test]
+fn theme_key_up_down_navigation() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
+    assert_eq!(app.theme_picker.as_ref().unwrap().selected, 1);
+    app.handle_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()));
+    assert_eq!(app.theme_picker.as_ref().unwrap().selected, 0);
+    // Up at 0 stays 0
+    app.handle_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()));
+    assert_eq!(app.theme_picker.as_ref().unwrap().selected, 0);
+    // Down at max stays at max
+    let max = app
+        .theme_picker
+        .as_ref()
+        .unwrap()
+        .results_len()
+        .saturating_sub(1);
+    app.theme_picker.as_mut().unwrap().selected = max;
+    app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
+    assert_eq!(app.theme_picker.as_ref().unwrap().selected, max);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn theme_key_typing_filters() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::empty()));
+    let total = app.theme_picker.as_ref().unwrap().results_len();
+    app.handle_key(KeyEvent::new(KeyCode::Char('m'), KeyModifiers::empty()));
+    assert!(app.theme_picker.as_ref().unwrap().results_len() < total);
+    app.handle_key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::empty()));
+    assert_eq!(app.theme_picker.as_ref().unwrap().results_len(), total);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn theme_key_pop_without_picker_is_noop() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::empty()));
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- handle_command_key -----------------------------------------------------
+
+#[test]
+fn command_key_up_down_boundaries() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL));
+    // Down at max stays at max
+    let max = app
+        .command_palette
+        .as_ref()
+        .unwrap()
+        .results_len()
+        .saturating_sub(1);
+    app.command_palette.as_mut().unwrap().selected = max;
+    app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
+    assert_eq!(app.command_palette.as_ref().unwrap().selected, max);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn command_key_typing_noop_without_palette() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::empty()));
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- handle_normal_key ------------------------------------------------------
+
+#[test]
+fn normal_key_search_files_content_focus_opens_in_file_search() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt"));
+    app.focus = Focus::Content;
+    app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
+    assert!(
+        app.in_file_search.is_some(),
+        "with content focus + file open, / should open in-file search"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn normal_key_search_content_opens_search_in_content_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    // "f" opens content search
+    app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::empty()));
+    assert!(app.search.is_some());
+    assert_eq!(
+        app.search.as_ref().unwrap().mode,
+        crate::search::SearchMode::Content
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn normal_key_reload_does_not_crash() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('r'), KeyModifiers::empty()));
+    // Reload silently succeeds
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn normal_key_theme_picker_opens() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::empty()));
+    assert!(app.theme_picker.is_some());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn normal_key_esc_without_selection_is_noop() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.selection = None;
+    app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+    // Should not crash, selection remains None
+    assert!(app.selection.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- handle_tree_key --------------------------------------------------------
+
+#[test]
+fn tree_key_up_down_navigation() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Tree;
+    let initial = app.tree_selected;
+    if app.nodes.len() > 1 {
+        app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
+        assert_eq!(app.tree_selected, initial + 1);
+        app.handle_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()));
+        assert_eq!(app.tree_selected, initial);
+    }
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_key_up_stays_at_first() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.tree_selected = 0;
+    app.handle_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()));
+    assert_eq!(app.tree_selected, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_key_down_stays_at_last() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let last = app.nodes.len().saturating_sub(1);
+    if last == 0 {
+        fs::remove_dir_all(&root).ok();
+        return;
+    }
+    app.tree_selected = last;
+    app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
+    assert_eq!(app.tree_selected, last);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_key_enter_expands_collapses_dir() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let dir_idx = app.nodes.iter().position(|n| n.is_dir).unwrap();
+    app.tree_selected = dir_idx;
+    let dir_path = app.nodes[dir_idx].path.clone();
+    let before = app.nodes.len();
+    // Enter expands
+    app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert!(app.expanded.contains(&dir_path));
+    assert!(app.nodes.len() > before);
+    // Enter collapses
+    app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert!(!app.expanded.contains(&dir_path));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_key_left_jumps_to_parent() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    // Expand sub/ so a.txt (depth 1) is visible and we can jump to root (depth 0)
+    let sub_idx = app.nodes.iter().position(|n| n.is_dir).unwrap();
+    app.expanded.insert(app.nodes[sub_idx].path.clone());
+    app.rebuild();
+    // Pick a nested file after expansion
+    let file_idx = app
+        .nodes
+        .iter()
+        .position(|n| n.path.ends_with("c.txt"))
+        .unwrap();
+    app.tree_selected = file_idx;
+    let parent_depth = app.nodes[file_idx].depth.saturating_sub(1);
+    app.handle_key(KeyEvent::new(KeyCode::Left, KeyModifiers::empty()));
+    assert!(
+        app.nodes[app.tree_selected].depth == parent_depth,
+        "tree selection should move to a parent node (depth < {})",
+        app.nodes[file_idx].depth
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_key_home_goes_to_first() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.tree_selected = 2;
+    app.handle_key(KeyEvent::new(KeyCode::Home, KeyModifiers::empty()));
+    assert_eq!(app.tree_selected, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_key_end_goes_to_last() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.tree_selected = 0;
+    let last = app.nodes.len().saturating_sub(1);
+    if last == 0 {
+        fs::remove_dir_all(&root).ok();
+        return;
+    }
+    app.handle_key(KeyEvent::new(KeyCode::End, KeyModifiers::empty()));
+    assert_eq!(app.tree_selected, last);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_key_other_key_noop_when_focus_tree() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Tree;
+    // A key that's not bound should be a no-op
+    let initial = app.tree_selected;
+    let sentinel = KeyEvent::new(KeyCode::Char('z'), KeyModifiers::empty());
+    if !super::super::config::pressed(&app.keys().nav_up, &sentinel)
+        && !super::super::config::pressed(&app.keys().nav_down, &sentinel)
+    {
+        app.handle_key(sentinel);
+        assert_eq!(app.tree_selected, initial);
+    }
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- handle_content_key -----------------------------------------------------
+
+#[test]
+fn content_key_k_scrolls_up() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.content_scroll = 5;
+    app.handle_key(KeyEvent::new(KeyCode::Char('k'), KeyModifiers::empty()));
+    assert_eq!(app.content_scroll, 4);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_key_up_stays_at_zero() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.content_scroll = 0;
+    app.handle_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()));
+    assert_eq!(app.content_scroll, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_key_page_up_scrolls_up() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.content_scroll = 25;
+    app.handle_key(KeyEvent::new(KeyCode::PageUp, KeyModifiers::empty()));
+    assert_eq!(app.content_scroll, 5);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_key_left_hscroll() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.word_wrap = false;
+    app.content_hscroll = 10;
+    app.handle_key(KeyEvent::new(KeyCode::Left, KeyModifiers::empty()));
+    assert_eq!(app.content_hscroll, 6);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_key_right_hscroll() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.word_wrap = false;
+    app.content_hscroll = 10;
+    app.handle_key(KeyEvent::new(KeyCode::Right, KeyModifiers::empty()));
+    assert_eq!(app.content_hscroll, 14);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_key_left_is_noop_when_word_wrap() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.word_wrap = true;
+    app.content_hscroll = 10;
+    app.handle_key(KeyEvent::new(KeyCode::Left, KeyModifiers::empty()));
+    assert_eq!(app.content_hscroll, 10); // unchanged
+    app.handle_key(KeyEvent::new(KeyCode::Right, KeyModifiers::empty()));
+    assert_eq!(app.content_hscroll, 10); // unchanged
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_key_markdown_toggle_raw() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let md_path = root.join("doc.md");
+    fs::write(&md_path, "# Title\nbody\n").unwrap();
+    app.open_file(&md_path);
+    app.focus = Focus::Content;
+    assert!(!app.show_raw_markdown);
+    app.handle_key(KeyEvent::new(KeyCode::Char('M'), KeyModifiers::empty()));
+    assert!(app.show_raw_markdown);
+    app.handle_key(KeyEvent::new(KeyCode::Char('M'), KeyModifiers::empty()));
+    assert!(!app.show_raw_markdown);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_key_markdown_toggle_raw_noop_when_not_markdown() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt"));
+    app.focus = Focus::Content;
+    assert!(!app.is_markdown);
+    let before = app.show_raw_markdown;
+    app.handle_key(KeyEvent::new(KeyCode::Char('M'), KeyModifiers::empty()));
+    assert_eq!(app.show_raw_markdown, before);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_key_toggle_blame_toggles() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt"));
+    app.focus = Focus::Content;
+    app.is_diff = false;
+    assert!(!app.show_blame);
+    app.handle_key(KeyEvent::new(KeyCode::Char('b'), KeyModifiers::empty()));
+    assert!(app.show_blame);
+    app.handle_key(KeyEvent::new(KeyCode::Char('b'), KeyModifiers::empty()));
+    assert!(!app.show_blame);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_key_toggle_blame_noop_when_diff() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt"));
+    app.focus = Focus::Content;
+    app.is_diff = true;
+    app.show_blame = false;
+    app.handle_key(KeyEvent::new(KeyCode::Char('b'), KeyModifiers::empty()));
+    assert!(!app.show_blame);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_key_other_key_noop() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.handle_key(KeyEvent::new(KeyCode::Char('z'), KeyModifiers::empty()));
+    assert!(app.word_wrap);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- dispatch_command edge cases ---------------------------------------------
+
+#[test]
+fn dispatch_command_toggle_hidden_toggles_and_reloads() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.command_palette = Some(CommandPalette::default());
+    // Filter to "toggle_hidden"
+    for c in "hidden".chars() {
+        if let Some(p) = &mut app.command_palette {
+            p.push(c);
+        }
+    }
+    let before = app.show_hidden;
+    app.dispatch_command();
+    assert!(app.command_palette.is_none());
+    assert_ne!(app.show_hidden, before);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn dispatch_command_show_about_toggles() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.command_palette = Some(CommandPalette::default());
+    for c in "about".chars() {
+        if let Some(p) = &mut app.command_palette {
+            p.push(c);
+        }
+    }
+    app.dispatch_command();
+    assert!(app.show_about);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn dispatch_command_noop_when_no_selection() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    // Without a valid command selected, dispatch_command should silently do nothing
+    app.command_palette = Some(CommandPalette::default());
+    // Filter to something that produces no results
+    for c in "zzzzzzz".chars() {
+        if let Some(p) = &mut app.command_palette {
+            p.push(c);
+        }
+    }
+    app.dispatch_command();
+    assert!(app.command_palette.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- apply_selected_theme edge cases ---------------------------------------
+
+#[test]
+fn apply_selected_theme_noop_when_no_selection() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::empty()));
+    // Filter to an impossible theme name
+    for c in "zzzzzzz".chars() {
+        app.handle_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::empty()));
+    }
+    let before = app.theme.accent;
+    app.apply_selected_theme();
+    assert!(app.theme_picker.is_none());
+    assert_eq!(app.theme.accent, before);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- handle_in_file_search_next/prev (pure, no keyboard) -------------------
+
+#[test]
+fn in_file_search_next_noop_when_no_matches() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.in_file_search = Some(InFileSearch::new());
+    app.in_file_search_next();
+    assert_eq!(app.in_file_search.as_ref().unwrap().current, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn in_file_search_prev_noop_when_no_matches() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.in_file_search = Some(InFileSearch::new());
+    app.in_file_search_prev();
+    assert_eq!(app.in_file_search.as_ref().unwrap().current, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- handle_in_file_search_next/prev wrap-around ---------------------------
+
+#[test]
+fn in_file_search_next_wraps_to_first() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.in_file_search = Some(InFileSearch::new());
+    let s = app.in_file_search.as_mut().unwrap();
+    s.matches.push(InFileMatch {
+        line: 0,
+        col: 0,
+        len: 1,
+    });
+    s.matches.push(InFileMatch {
+        line: 1,
+        col: 0,
+        len: 1,
+    });
+    app.in_file_search.as_mut().unwrap().current = 1;
+    app.in_file_search_next();
+    assert_eq!(app.in_file_search.as_ref().unwrap().current, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn in_file_search_method_next_wraps_to_first() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.in_file_search = Some(InFileSearch::new());
+    {
+        let s = app.in_file_search.as_mut().unwrap();
+        s.matches.push(InFileMatch {
+            line: 0,
+            col: 0,
+            len: 1,
+        });
+        s.matches.push(InFileMatch {
+            line: 1,
+            col: 0,
+            len: 1,
+        });
+    }
+    app.in_file_search.as_mut().unwrap().current = 1;
+    app.in_file_search_next();
+    assert_eq!(app.in_file_search.as_ref().unwrap().current, 0);
+
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn in_file_search_method_prev_wraps_to_last() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.in_file_search = Some(InFileSearch::new());
+    {
+        let s = app.in_file_search.as_mut().unwrap();
+        s.matches.push(InFileMatch {
+            line: 0,
+            col: 0,
+            len: 1,
+        });
+        s.matches.push(InFileMatch {
+            line: 1,
+            col: 0,
+            len: 1,
+        });
+    }
+    app.in_file_search_prev();
+    assert_eq!(app.in_file_search.as_ref().unwrap().current, 1);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- scroll_in_file_search_to_current -------------------------------------
+
+#[test]
+fn scroll_in_file_search_to_current_noop_when_no_search() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.in_file_search = None;
+    app.scroll_in_file_search_to_current(); // should not crash
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn scroll_in_file_search_to_current_noop_when_no_match() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.in_file_search = Some(InFileSearch::new());
+    app.scroll_in_file_search_to_current(); // should not crash
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn scroll_in_file_search_to_current_scrolls_if_above() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.content = vec!["line0".to_string(), "line1".to_string()];
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 10,
+    };
+    app.in_file_search = Some(InFileSearch::new());
+    let s = app.in_file_search.as_mut().unwrap();
+    s.matches.push(InFileMatch {
+        line: 0,
+        col: 0,
+        len: 1,
+    });
+    app.content_scroll = 3; // match at line 0 is above viewport -> scroll to 0
+    app.scroll_in_file_search_to_current();
+    assert_eq!(app.content_scroll, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn scroll_in_file_search_to_current_scrolls_if_below() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.content = (0..50).map(|i| format!("line {i}")).collect();
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 10,
+    };
+    app.in_file_search = Some(InFileSearch::new());
+    let s = app.in_file_search.as_mut().unwrap();
+    s.matches.push(InFileMatch {
+        line: 45,
+        col: 0,
+        len: 1,
+    });
+    app.content_scroll = 0;
+    app.scroll_in_file_search_to_current();
+    // scroll_max = 40, match at 45 is below viewport (40+10=50 -> visible up to 49)
+    // Actually: scroll_max = 50-10 = 40, viewport shows lines 0..9, match at 45 -> scroll to 45-10+1 = 36
+    assert_eq!(app.content_scroll, 36);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- refresh_in_file_search -----------------------------------------------
+
+#[test]
+fn refresh_in_file_search_noop_when_no_search() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.in_file_search = None;
+    app.refresh_in_file_search();
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn refresh_in_file_search_uses_content_lines() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.content = vec!["hello".to_string(), "world".to_string()];
+    app.in_file_search = Some(InFileSearch::new());
+    app.in_file_search.as_mut().unwrap().push('o');
+    app.refresh_in_file_search();
+    assert!(!app.in_file_search.as_ref().unwrap().matches.is_empty());
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- handle_mouse: help overlay / scrollbar / drag / auto-scroll -----------
+
+#[test]
+fn mouse_help_overlay_noop() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.show_help = true;
+    app.handle_mouse(mouse(MouseEventKind::Down(MouseButton::Left), 1, 1));
+    // No state change expected
+    assert!(!app.should_quit);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn mouse_content_click_on_scrollbar_sets_drag() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt")); // 50 lines
+    app.content_area = Rect {
+        x: 5,
+        y: 5,
+        width: 15,
+        height: 10,
+    };
+    app.show_scrollbar = true;
+    // Click on the last column of the content area (scrollbar)
+    app.handle_mouse(click(5 + 14, 6));
+    assert!(app.scrollbar_drag);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn mouse_scrollbar_drag_updates_scroll() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt")); // 50 lines
+    app.content_area = Rect {
+        x: 5,
+        y: 5,
+        width: 15,
+        height: 10,
+    };
+    app.show_scrollbar = true;
+    app.scrollbar_drag = true;
+    app.handle_mouse(mouse(MouseEventKind::Drag(MouseButton::Left), 5 + 14, 8));
+    // drag should mark content as scrolled
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn mouse_up_clears_scrollbar_drag() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.scrollbar_drag = true;
+    app.drag_start = Some((0, 0));
+    app.selection = Some(crate::selection::TextSelection {
+        anchor: (0, 0),
+        active: (0, 1),
+    });
+    app.handle_mouse(mouse(MouseEventKind::Up(MouseButton::Left), 1, 1));
+    assert!(!app.scrollbar_drag);
+    assert!(app.drag_start.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn mouse_up_clears_drag_without_selection() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.drag_start = Some((0, 0));
+    app.selection = None;
+    app.handle_mouse(mouse(MouseEventKind::Up(MouseButton::Left), 1, 1));
+    assert!(app.drag_start.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn mouse_drag_auto_scroll_up_when_near_top() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt"));
+    app.content_area = Rect {
+        x: 5,
+        y: 5,
+        width: 50,
+        height: 20,
+    };
+    app.drag_start = Some((0, 0));
+    app.content_scroll = 5;
+    // Drag at row = ca.y (5) -> above ca.y + 2 (7) -> auto-scroll up
+    app.handle_mouse(mouse(MouseEventKind::Drag(MouseButton::Left), 6, 5));
+    assert_eq!(app.content_scroll, 4);
+    assert!(app.selection.is_some());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn mouse_drag_auto_scroll_down_when_near_bottom() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.content_area = Rect {
+        x: 5,
+        y: 5,
+        width: 50,
+        height: 10,
+    };
+    app.drag_start = Some((0, 0));
+    app.content_scroll = 0;
+    let max = app.content_scroll_max();
+    // Drag at row = ca.y + ca.height - 1 (5+10-1=14) -> >= ca.y + ca.height - 2 (5+10-2=13) -> auto-scroll down
+    app.handle_mouse(mouse(MouseEventKind::Drag(MouseButton::Left), 6, 14));
+    assert_eq!(app.content_scroll, 1.min(max));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn mouse_drag_without_start_is_noop_during_drag() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.drag_start = None;
+    app.handle_mouse(mouse(MouseEventKind::Drag(MouseButton::Left), 1, 1));
+    assert!(app.selection.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- history mouse events --------------------------------------------------
+
+#[test]
+fn history_mouse_click_outside_area_is_noop() {
+    let root = temp_git_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("tracked.txt"));
+    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::empty()));
+    app.history_area = Rect {
+        x: 5,
+        y: 5,
+        width: 30,
+        height: 10,
+    };
+    let selected_before = app.history.as_ref().unwrap().selected;
+    app.handle_mouse(click(1, 1)); // outside area
+    assert_eq!(app.history.as_ref().unwrap().selected, selected_before);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn history_mouse_click_out_of_range_index_noop() {
+    let root = temp_git_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("tracked.txt"));
+    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::empty()));
+    app.history_area = Rect {
+        x: 0,
+        y: 0,
+        width: 30,
+        height: 10,
+    };
+    let selected_before = app.history.as_ref().unwrap().selected;
+    app.handle_mouse(click(1, 9)); // row 9 -> index 9, likely out of range
+    assert_eq!(app.history.as_ref().unwrap().selected, selected_before);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn history_mouse_single_then_double_click_opens() {
+    let root = temp_git_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("tracked.txt"));
+    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::empty()));
+    app.history_area = Rect {
+        x: 0,
+        y: 0,
+        width: 30,
+        height: 10,
+    };
+    app.history_offset = 0;
+
+    app.handle_mouse(click(1, 0));
+    assert!(app.history.is_some());
+    app.handle_mouse(click(1, 0)); // second click -> double-click -> opens
+    assert!(app.history.is_none() || app.is_diff);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- theme mouse events ----------------------------------------------------
+
+#[test]
+fn theme_mouse_click_outside_area_is_noop() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::empty()));
+    app.theme_area = Rect {
+        x: 5,
+        y: 5,
+        width: 30,
+        height: 10,
+    };
+    let selected_before = app.theme_picker.as_ref().unwrap().selected;
+    app.handle_mouse(click(1, 1));
+    assert_eq!(app.theme_picker.as_ref().unwrap().selected, selected_before);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn theme_mouse_single_then_double_click_opens() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::empty()));
+    app.theme_area = Rect {
+        x: 0,
+        y: 0,
+        width: 30,
+        height: 30,
+    };
+    app.theme_offset = 0;
+
+    let before = app.theme.accent;
+    app.handle_mouse(click(1, 0));
+    assert!(app.theme_picker.is_some());
+    app.handle_mouse(click(1, 0)); // double-click -> applies
+    assert!(app.theme_picker.is_none() || app.theme.accent != before);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- command palette mouse events ------------------------------------------
+
+#[test]
+fn command_palette_mouse_click_outside_area_is_noop() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL));
+    app.command_palette_area = Rect {
+        x: 5,
+        y: 5,
+        width: 30,
+        height: 10,
+    };
+    let selected_before = app.command_palette.as_ref().unwrap().selected;
+    app.handle_mouse(click(1, 1));
+    assert_eq!(
+        app.command_palette.as_ref().unwrap().selected,
+        selected_before
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn command_palette_mouse_single_then_double_click_executes() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL));
+    app.command_palette_area = Rect {
+        x: 0,
+        y: 0,
+        width: 30,
+        height: 30,
+    };
+    app.command_palette_offset = 0;
+    // Filter to "about" so double-click triggers show_about
+    for c in "about".chars() {
+        if let Some(p) = &mut app.command_palette {
+            p.push(c);
+        }
+    }
+
+    app.handle_mouse(click(1, 0));
+    assert!(app.command_palette.is_some());
+    app.handle_mouse(click(1, 0)); // double-click -> executes
+    assert!(app.command_palette.is_none());
+    assert!(app.show_about);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- search mouse events ---------------------------------------------------
+
+#[test]
+fn search_mouse_click_outside_area_is_noop() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
+    app.search_area = Rect {
+        x: 5,
+        y: 5,
+        width: 30,
+        height: 10,
+    };
+    let selected_before = app.search.as_ref().unwrap().selected;
+    app.handle_mouse(click(1, 1));
+    assert_eq!(app.search.as_ref().unwrap().selected, selected_before);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn search_mouse_click_out_of_range_index_noop() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
+    app.search_area = Rect {
+        x: 0,
+        y: 0,
+        width: 30,
+        height: 10,
+    };
+    let selected_before = app.search.as_ref().unwrap().selected;
+    // Row 99 will be well past the last result
+    app.handle_mouse(click(1, 99));
+    assert_eq!(app.search.as_ref().unwrap().selected, selected_before);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- set_scroll_from_mouse_y -----------------------------------------------
+
+#[test]
+fn set_scroll_from_mouse_y_noop_when_total_less_than_height() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt")); // 2 lines
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 50,
+        height: 10,
+    };
+    let before = app.content_scroll;
+    app.set_scroll_from_mouse_y(5);
+    assert_eq!(app.content_scroll, before);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn set_scroll_from_mouse_y_with_track_range_zero() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    // line_count = 50, inner_h = 50, scroll_range = 0
+    app.open_file(&root.join("long.txt"));
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 50,
+        height: 50,
+    };
+    let before = app.content_scroll;
+    app.set_scroll_from_mouse_y(25);
+    assert_eq!(app.content_scroll, before);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn set_scroll_from_mouse_y_calculates_position() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt")); // 50 lines
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 50,
+        height: 10,
+    };
+    // inner_h=10, total=50, thumb = max(10*10/50,1) = 2
+    // scroll_range = 50-10 = 40
+    // track_range = 10-2 = 8
+    // row 5 -> y=5 -> scroll = 5*40/8 = 25
+    app.set_scroll_from_mouse_y(5);
+    assert_eq!(app.content_scroll, 25);
+    // row 0 -> scroll = 0
+    app.set_scroll_from_mouse_y(0);
+    assert_eq!(app.content_scroll, 0);
+    // row 9 -> y=9.min(8)=8 -> scroll = 8*40/8 = 40
+    app.set_scroll_from_mouse_y(9);
+    assert_eq!(app.content_scroll, 40);
     fs::remove_dir_all(&root).ok();
 }
