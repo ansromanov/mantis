@@ -195,8 +195,7 @@ fn all_embedded() -> &'static HashMap<&'static str, Theme> {
 fn user_themes_dir() -> Option<PathBuf> {
     #[cfg(windows)]
     {
-        std::env::var_os("APPDATA")
-            .map(|p| PathBuf::from(p).join("tree-viewer").join("themes"))
+        std::env::var_os("APPDATA").map(|p| PathBuf::from(p).join("tree-viewer").join("themes"))
     }
     #[cfg(not(windows))]
     {
