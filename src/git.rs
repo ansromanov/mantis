@@ -43,19 +43,13 @@ fn git_toplevel(dir: &Path) -> Option<PathBuf> {
 }
 
 /// The current HEAD state of the repository.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum GitHead {
     Branch(String),
+    #[default]
     Detached,
     Rebase,
     Merge,
-}
-
-#[allow(clippy::derivable_impls)]
-impl Default for GitHead {
-    fn default() -> Self {
-        GitHead::Detached
-    }
 }
 
 impl GitHead {
@@ -108,14 +102,14 @@ pub fn repo_info(dir: &Path) -> Option<GitRepoInfo> {
     let text = String::from_utf8_lossy(&out.stdout);
     let mut info = parse_repo_info(&text);
 
-    // Refine HEAD state: check for rebase/merge by looking at git state files.
-    if info.head == GitHead::Detached {
-        let git_dir = root.join(".git");
-        if git_dir.join("rebase-merge").exists() || git_dir.join("rebase-apply").exists() {
-            info.head = GitHead::Rebase;
-        } else if git_dir.join("MERGE_HEAD").exists() {
-            info.head = GitHead::Merge;
-        }
+    // Refine HEAD state: check for rebase/merge by inspecting git state files.
+    // These checks are unconditional — a merge in progress keeps the branch
+    // name in the porcelain header, so we cannot gate on GitHead::Detached.
+    let git_dir = root.join(".git");
+    if git_dir.join("rebase-merge").exists() || git_dir.join("rebase-apply").exists() {
+        info.head = GitHead::Rebase;
+    } else if git_dir.join("MERGE_HEAD").exists() {
+        info.head = GitHead::Merge;
     }
 
     Some(info)
@@ -127,7 +121,10 @@ fn parse_branch_line(line: &str) -> (GitHead, usize, usize) {
         None => return (GitHead::default(), 0, 0),
     };
 
-    let head = if line.starts_with("HEAD (no branch)") || line.starts_with("Initial commit on ") {
+    let head = if line.starts_with("HEAD (no branch)")
+        || line.starts_with("Initial commit on ")
+        || line.starts_with("No commits yet on ")
+    {
         GitHead::Detached
     } else {
         let branch = if let Some(pos) = line.find("...") {
