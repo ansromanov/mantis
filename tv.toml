@@ -4,6 +4,7 @@ tree_width = 20
 word_wrap = true
 
 # search_context_lines = 0  # lines of trailing context shown after each content match (default: 0)
+# keep_search_query = false  # restore last search query when reopening search (default: false)
 
 # Git mode: show only changed files and their working-tree diffs.
 # git_mode = false         # start in git mode (default: false)

@@ -19,6 +19,7 @@ pub struct Config {
     pub scroll_percentage: bool,
     pub in_file_search: bool,
     pub search_context_lines: usize,
+    pub keep_search_query: bool,
     pub keys: Keymap,
     pub theme: ThemeConfig,
 }
@@ -38,6 +39,7 @@ impl Default for Config {
             scroll_percentage: true,
             in_file_search: true,
             search_context_lines: 0,
+            keep_search_query: false,
             keys: Keymap::default(),
             theme: ThemeConfig::default(),
         }
