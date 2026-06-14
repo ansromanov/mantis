@@ -340,13 +340,17 @@ pub fn save(config: &Config, path: &Path) {
     }
 }
 
-/// Creates the global config file with defaults if the directory is writable.
+/// Creates the global config file with defaults if the directory is writable,
+/// and seeds bundled theme files to the themes directory.
 fn install_default(path: &Path) {
     if let Some(parent) = path.parent() {
         let _ = fs::create_dir_all(parent);
     }
-    save(&Config::default(), path);
+    let _ = fs::write(path, DEFAULT_CONFIG_TEMPLATE);
+    crate::theme::install_embedded_themes();
 }
+
+const DEFAULT_CONFIG_TEMPLATE: &str = include_str!("../../tv.toml");
 
 /// Candidate config paths in precedence order: project-local (`tv.toml` in the
 /// root and each ancestor), then the global config.

@@ -122,6 +122,29 @@ fn malformed_local_config_reports_warning_and_falls_back() {
 }
 
 #[test]
+fn install_default_writes_template_and_is_parseable() {
+    let dir = std::env::temp_dir().join(format!(
+        "tv_cfg_install_{}_{:?}",
+        std::process::id(),
+        std::time::SystemTime::now()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("tv.toml");
+    install_default(&path);
+    let content = fs::read_to_string(&path).unwrap();
+    // Template must include the config hint comment.
+    assert!(
+        content.contains("Open config in editor"),
+        "template missing palette hint"
+    );
+    // Template must be valid TOML that parses as Config with defaults.
+    let cfg: Config = toml::from_str(&content).expect("default template should parse");
+    assert!(!cfg.show_hidden);
+    assert_eq!(cfg.tree_width, 28);
+    fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
 fn config_paths_are_local_first_then_global() {
     let root = Path::new("/a/b/c");
     let paths = config_paths(root);

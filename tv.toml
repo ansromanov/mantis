@@ -1,23 +1,27 @@
-show_hidden = true
-ignore_gitignore = true
-tree_width = 20
-word_wrap = true
+# tree-viewer configuration
+# To open this file for editing from within tv: Ctrl+P → "Open config in editor"
 
+show_hidden = false
+ignore_gitignore = false
+tree_width = 28
+word_wrap = false
+git_status = true
+git_show_deleted = false
+scrollbar = true
+scroll_percentage = true
+in_file_search = true
 # search_context_lines = 0  # lines of trailing context shown after each content match (default: 0)
 # keep_search_query = false  # restore last search query when reopening search (default: false)
 
 # Git mode: show only changed files and their working-tree diffs.
-# git_mode = false         # start in git mode (default: false)
-# git_mode_flat = false    # start git mode in flat/plain list view (default: false)
-# git_status = true        # colour tree by git status (default: true)
-# git_show_deleted = false # show ghost nodes for deleted tracked files (default: false)
+# git_mode = false       # start in git mode (default: false)
+# git_mode_flat = false  # start git mode in flat/plain list view (default: false)
 
 # Keybindings. Each action takes a list of key specs. A spec is a single
 # character ("q", "?", "0") or a named key (Up, Down, Left, Right, Enter,
 # Tab, Esc, Backspace, PageUp, PageDown, Home, End, Space), optionally
 # prefixed with modifiers: "ctrl+c", "alt+.".
 [keys]
-# Global
 quit = ["q", "ctrl+c"]
 help = ["?"]
 toggle_hidden = ["alt+."]
@@ -29,6 +33,8 @@ file_history = ["H"]
 theme_picker = ["t"]
 git_mode_toggle = ["ctrl+g"]
 git_mode_flat_toggle = ["alt+g"]
+command_palette = ["ctrl+p"]
+open_in_editor = ["e"]
 
 # Navigation (shared by tree and content panels)
 nav_up = ["Up", "k"]
@@ -41,33 +47,36 @@ tree_collapse = ["Left", "h"]
 # Content panel
 content_left = ["Left"]
 content_right = ["Right"]
-content_top = ["g"]
-content_bottom = ["G"]
+content_top = ["g", "Home"]
+content_bottom = ["G", "End"]
 content_page_up = ["PageUp"]
 content_page_down = ["PageDown"]
 content_reset_col = ["0"]
 toggle_wrap = ["z"]
 toggle_raw_markdown = ["M"]
-open_in_editor = ["e"]
+toggle_pretty_json = ["J"]
+toggle_blame = ["b"]
 
-# Theme overrides. Each role overrides the active theme (selected via
-# the theme picker — press `t`). Colors accept named values ("cyan",
-# "lightyellow", "reset") or hex ("#aabbcc"); `syntax` is a syntect
-# theme name. Unset fields keep the base theme's value.
+# Theme. Select a preset via the theme picker (press `t` or Ctrl+P).
+# Built-in presets: default, monokai, solarized, catppuccin, synthwave84.
+# Full theme files are in ~/.config/tree-viewer/themes/ — copy and edit one
+# to create a custom theme. Each color accepts a name ("cyan", "reset") or
+# hex ("#aabbcc").
 # [theme]
-# transparent_background = false  # true = use terminal background instead of theme's
-# accent = "cyan"                 # focused borders, primary highlights
-# accent_alt = "yellow"           # popup chrome, keys, prompts
-# dim = "darkgray"                # unfocused borders, gutters, hints, rules
-# text = "white"                  # emphasized / default text
-# dir = "blue"                    # directory entries in the tree
-# file = "reset"                  # file entries in the tree
-# selection_bg = "darkgray"       # selected row / status bar background
-# selection_fg = "yellow"         # selected row foreground in popups
-# heading1 = "lightcyan"          # markdown H1 / table headers
-# heading2 = "lightyellow"        # markdown H2
-# heading3 = "lightgreen"         # markdown H3
-# code = "lightyellow"            # inline code / code blocks
-# diff_add = "green"              # added lines in a diff
-# diff_del = "red"                # removed lines in a diff
-# syntax = "base16-ocean.dark"    # syntect theme for syntax highlighting
+# name = "default"
+# transparent_background = false  # true = use terminal background color
+# accent = "cyan"
+# accent_alt = "yellow"
+# dim = "darkgray"
+# text = "white"
+# dir = "blue"
+# file = "reset"
+# selection_bg = "#505050"
+# selection_fg = "yellow"
+# heading1 = "lightcyan"
+# heading2 = "lightyellow"
+# heading3 = "lightgreen"
+# code = "lightyellow"
+# diff_add = "green"
+# diff_del = "red"
+# syntax = "base16-ocean.dark"

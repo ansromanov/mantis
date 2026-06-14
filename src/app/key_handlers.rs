@@ -4,7 +4,7 @@ use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
 
-use crate::config::pressed;
+use crate::config::{self, pressed};
 use crate::highlight::Highlighter;
 use crate::search::{CommandPalette, InFileSearch, SearchState, ThemePicker};
 use crate::theme::{Theme, ThemeConfig};
@@ -359,6 +359,7 @@ impl App {
                 self.content_hscroll = 0;
             }
             Some("open_in_editor") => self.open_in_editor(),
+            Some("open_config_in_editor") => self.open_config_in_editor(),
             Some("show_about") => self.show_about = !self.show_about,
             _ => {}
         }
@@ -587,6 +588,70 @@ impl App {
 
         // File may have been modified; reload its content
         self.reload_content();
+    }
+
+    /// Opens the global config file (`~/.config/tree-viewer/tv.toml`) in the
+    /// user's `$EDITOR`, using the same suspend/resume pattern as `open_in_editor`.
+    fn open_config_in_editor(&mut self) {
+        let Some(path) = self.config_path.clone() else {
+            return;
+        };
+
+        let editor = std::env::var("VISUAL")
+            .or_else(|_| std::env::var("EDITOR"))
+            .unwrap_or_else(|_| "vim".to_string());
+
+        let _ = disable_raw_mode();
+        let _ = execute!(std::io::stdout(), LeaveAlternateScreen, DisableMouseCapture,);
+
+        let parts: Vec<&str> = editor.split_whitespace().collect();
+        if let Some((cmd, args)) = parts.split_first() {
+            let _ = std::process::Command::new(cmd)
+                .args(args)
+                .arg(&path)
+                .status();
+        }
+
+        let _ = execute!(std::io::stdout(), EnterAlternateScreen, EnableMouseCapture,);
+        if let Err(e) = enable_raw_mode() {
+            eprintln!("tv: failed to restore raw mode after editor: {e}");
+        }
+
+        self.needs_clear = true;
+        self.reload_config();
+    }
+
+    /// Re-reads the config file and applies all changed fields to App state,
+    /// then rebuilds the tree and reloads the current file. Silently ignores
+    /// read or parse errors so a mid-edit save doesn't crash the app.
+    fn reload_config(&mut self) {
+        let Some(path) = self.config_path.clone() else {
+            return;
+        };
+        let Ok(s) = std::fs::read_to_string(&path) else {
+            return;
+        };
+        let Ok(cfg) = toml::from_str::<config::Config>(&s) else {
+            return;
+        };
+
+        self.show_hidden = cfg.show_hidden;
+        self.ignore_gitignore = cfg.ignore_gitignore;
+        self.tree_width = cfg.tree_width;
+        self.word_wrap = cfg.word_wrap;
+        self.git_status_enabled = cfg.git_status || cfg.git_mode;
+        self.git_show_deleted = cfg.git_show_deleted;
+        self.git_mode = cfg.git_mode;
+        self.git_mode_flat = cfg.git_mode_flat;
+        self.show_scrollbar = cfg.scrollbar;
+        self.show_scroll_percentage = cfg.scroll_percentage;
+        self.keys = cfg.keys.clone();
+
+        let theme = cfg.theme.resolve();
+        self.apply_theme(theme);
+
+        self.config = cfg;
+        self.reload();
     }
 
     /// Handles scrolling, wrapping, and markdown-raw toggle keys when the
