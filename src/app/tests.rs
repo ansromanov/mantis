@@ -138,7 +138,7 @@ fn theme_picker_applies_preset() {
     assert!(app.theme_picker.is_none());
     assert_eq!(
         app.theme.accent,
-        crate::theme::Theme::preset("monokai").unwrap().accent
+        crate::theme::Theme::load("monokai").unwrap().accent
     );
     fs::remove_dir_all(&root).ok();
 }

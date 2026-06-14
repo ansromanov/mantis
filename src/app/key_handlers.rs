@@ -331,10 +331,14 @@ impl App {
     /// Applies the theme selected in the picker, saves it to config, and
     /// closes the overlay.
     pub(super) fn apply_selected_theme(&mut self) {
-        let name = self.theme_picker.as_ref().and_then(|p| p.selected_name());
+        let name = self
+            .theme_picker
+            .as_ref()
+            .and_then(|p| p.selected_name())
+            .map(String::from);
         self.theme_picker = None;
-        if let Some(name) = name {
-            if let Some(theme) = Theme::preset(name) {
+        if let Some(ref name) = name {
+            if let Some(theme) = Theme::load(name) {
                 self.apply_theme(theme);
                 self.config.theme = ThemeConfig::from_preset(name);
                 self.save_config();

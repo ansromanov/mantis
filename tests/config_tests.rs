@@ -76,7 +76,7 @@ fn theme_config_with_name_serializes_and_round_trips() {
     );
     let back: Config = toml::from_str(&toml_str).expect("must round-trip");
     let theme = back.theme.resolve();
-    let expected = Theme::preset("monokai").unwrap();
+    let expected = Theme::load("monokai").unwrap();
     assert_eq!(
         theme.accent, expected.accent,
         "theme must be restored from name"
@@ -126,7 +126,7 @@ fn save_and_reload_preserves_theme() {
 
     let (reloaded, _, _) = config::load(&dir);
     let theme = reloaded.theme.resolve();
-    let expected = Theme::preset("synthwave84").unwrap();
+    let expected = Theme::load("synthwave84").unwrap();
     assert_eq!(
         theme.accent, expected.accent,
         "theme must survive a save/reload cycle"
