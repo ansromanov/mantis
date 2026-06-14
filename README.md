@@ -1,9 +1,15 @@
 # tree-viewer (`tv`)
 
-**Browse, read, and review code in your terminal — instantly.** `tv` is a fast,
-lightweight file tree viewer with syntax highlighting, markdown rendering, fuzzy
-search, and first-class git tooling (diff, blame, history). One small binary, no
-config required, no plugins to wire up. Built with [ratatui](https://ratatui.rs).
+**Browse, read, and review code in your terminal — instantly.**
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/ansromanov/tree-viewer/main/install.sh | sh
+```
+
+`tv` is a fast, lightweight file tree viewer with syntax highlighting, markdown
+rendering, fuzzy search, and first-class git tooling (diff, blame, history). One
+small binary, no config required, no plugins to wire up. Built with
+[ratatui](https://ratatui.rs).
 
 <p align="center">
   <img src="media/intro.png" alt="tree-viewer" width="800">
@@ -25,18 +31,9 @@ that's the point.
 | --- | --- | --- | --- |
 | Footprint | Single ~MB binary | Light core, heavy once configured | Electron, hundreds of MB + RAM |
 | Setup to be useful | **Zero** — just run `tv` | Hours of config & plugins | Install, extensions, indexing |
-| Learning curve | Arrow keys & a mouse | Steep (modes, motions, ecosystem) | Gentle but mouse-heavy |
 | Git diff/blame/history | **Built in** | Needs fugitive/gitsigns/etc. | Needs extensions |
 | Fuzzy + full-text search | **Built in** | Needs telescope/fzf/ripgrep glue | Built in |
 | Starts in | Milliseconds | Fast (slower with a big config) | Seconds |
-
-- **vs. a tuned Neovim / LazyVim:** great editors, but getting tree view, fuzzy
-  finder, git signs, blame, and diffs means assembling and maintaining a stack of
-  plugins — and configs like LazyVim are powerful but heavy. `tv` ships all of
-  that, working, out of the box. No `init.lua`, no plugin manager.
-- **vs. VS Code:** VS Code is an excellent IDE, but it's an Electron app — slow to
-  start and memory-hungry just to glance at a file or a diff over SSH. `tv` opens
-  instantly in any terminal and runs happily on a remote box.
 
 Reach for `tv` when you want to **explore a repo, read a file, or check a diff**
 without spinning up a heavyweight editor. Hit `e` to jump into your `$EDITOR`
@@ -44,61 +41,40 @@ the moment you actually need to change something.
 
 ## Features
 
-- **Lightweight & instant** — a single small binary, no runtime dependencies,
-  no config needed to start
+- **Lightweight & instant** — a single small binary, no runtime dependencies or
+  config needed to start
 - **Tree navigation** with keyboard or mouse, respecting `.gitignore`
 - **Fuzzy search** (`/`) over file names, or full-text search (`f`) across file
   contents — fzf-style, as-you-type
-- **Git mode** (`Ctrl+G`) — show only changed files with working-tree diffs in
-  the content panel; `Alt+G` toggles between tree and flat list views
-- **Git blame** (`b`) — inline per-line author, short hash, and date alongside
-  the file
+- **Git mode** (`Ctrl+G`) — show only changed files with working-tree diffs;
+  `Alt+G` toggles between tree and flat list views
+- **Git blame** (`b`) — inline per-line author, short hash, and date
 - **Git file history** (`H`) — pick a past revision from an fzf-style list and
   view its diff against your working tree, with red/green coloring
 - **Git status indicators** — tree entries colored by git status (new, modified,
-  deleted, ignored) whenever `git status` data is available
-- **Syntax highlighting** for source files (via [syntect](https://github.com/trishume/syntect))
-- **Markdown rendering** in the terminal — headings, tables, task lists, code
-  blocks, blockquotes, and more (press `M` to toggle the raw source)
+  deleted, ignored)
+- **Syntax highlighting** via [syntect](https://github.com/trishume/syntect)
+- **Markdown rendering** — headings, tables, task lists, code blocks,
+  blockquotes, and more (press `M` to toggle the raw source)
 - **JSON pretty-printing** (`J`) — reformat minified JSON for readable browsing
 - **Command palette** (`Ctrl+P`) — fuzzy-find every action and see its keybinding
 - **Open in your editor** (`e`) — jump to the current file in `$VISUAL`/`$EDITOR`,
   then drop back into `tv` when you're done
 - **Themes** — built-in presets (monokai, solarized, catppuccin, synthwave84),
-  switchable live from an fzf-style picker or set in config, with configurable
-  panel background and terminal transparency
+  switchable live, with configurable panel background and terminal transparency
 - **Mouse support** — click to select, fold/unfold directories, switch panes,
   and scroll
 - **Configurable** layout, behavior, and keybindings via a simple TOML file
 
 ## Install
 
-**One-liner** (Linux/macOS, no Rust toolchain required) — downloads the prebuilt
-binary for your OS/arch, verifies its checksum, and installs it onto your `PATH`:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/ansromanov/tree-viewer/main/install.sh | sh
-```
-
-With the Rust toolchain:
-
-```sh
-cargo install tree-viewer
-```
-
-Or build from source:
+The one-liner above (Linux/macOS, no Rust toolchain required) downloads the
+prebuilt binary for your OS/arch, verifies its checksum, and installs it onto
+your `PATH`. With the Rust toolchain: `cargo install tree-viewer`. Or from source:
 
 ```sh
 git clone https://github.com/ansromanov/tree-viewer.git
-cd tree-viewer
-cargo build --release
-# binary is at target/release/tv
-```
-
-Or, if you have [`just`](https://github.com/casey/just):
-
-```sh
-just install   # builds --release and copies tv to ~/.cargo/bin
+cd tree-viewer && cargo build --release   # binary at target/release/tv
 ```
 
 See the [installation docs](https://ansromanov.github.io/tree-viewer/installation.html)
@@ -116,94 +92,50 @@ Press `?` at any time for in-app help, and `q` to quit.
 
 ## Keybindings
 
-### Global
+Press `?` in-app for the full list, or `Ctrl+P` to fuzzy-find any action with its
+binding. The essentials:
 
-| Key            | Action                  |
-| -------------- | ----------------------- |
-| `q`, `Ctrl+c`  | Quit                    |
-| `?`            | Toggle help             |
-| `Ctrl+P`       | Command palette (fuzzy-find any action) |
-| `Tab`          | Switch panel            |
-| `/`            | Fuzzy file search       |
-| `f`            | Content (full-text) search |
-| `r`            | Reload tree             |
-| `e`            | Open current file in `$EDITOR` |
-| `Alt+.`        | Toggle hidden files     |
-| `H`            | Git history of current file |
-| `b`            | Toggle git blame        |
-| `t`            | Theme picker            |
-| `Ctrl+G`       | Toggle git mode (changed files + diffs) |
-| `Alt+G`        | Toggle flat / tree view in git mode |
+| Key | Action |
+| --- | --- |
+| `q`, `Ctrl+c` | Quit |
+| `?` | Toggle help |
+| `Ctrl+P` | Command palette |
+| `Tab` | Switch panel |
+| `/` · `f` | Fuzzy file search · full-text content search |
+| `r` · `e` | Reload tree · open current file in `$EDITOR` |
+| `Alt+.` | Toggle hidden files |
+| `H` · `b` | Git history · toggle git blame |
+| `Ctrl+G` · `Alt+G` | Toggle git mode · flat/tree view in git mode |
+| `t` | Theme picker |
 
-### Tree panel
+**Navigation** — `Up`/`k`, `Down`/`j` move or scroll; `Enter`/`Right`/`l` expand
+a directory or open a file; `Left`/`h` collapse or go up. In the content panel,
+`PageUp`/`PageDown` page, `g`/`G` jump to top/bottom, `0` resets horizontal
+scroll, `z` toggles word wrap, `M` toggles raw/rendered markdown, `J` toggles
+JSON pretty-print.
 
-| Key                  | Action                       |
-| -------------------- | ---------------------------- |
-| `Up`/`k`, `Down`/`j` | Move selection               |
-| `Enter`/`Right`/`l`  | Expand directory / open file |
-| `Left`/`h`           | Collapse directory / go up   |
+**Search popup** — type to filter, `Up`/`Down` to navigate, `Tab` to switch
+files ↔ content mode, `Enter` to open, `Esc` to close.
 
-### Content panel
+**Mouse** — click a tree row to select (opens a file or folds a directory), click
+a pane to focus it, scroll the pane under the cursor. In popups, single-click
+selects and double-click activates.
 
-| Key            | Action                       |
-| -------------- | ---------------------------- |
-| `Up`/`k`, `Down`/`j` | Scroll                 |
-| `PageUp`/`PageDown`  | Page up / down         |
-| `g` / `G`      | Jump to top / bottom         |
-| `Left`/`Right` | Horizontal scroll (when wrap off) |
-| `0`            | Reset horizontal scroll      |
-| `z`            | Toggle word wrap             |
-| `M`            | Toggle raw / rendered markdown |
-| `J`            | Toggle JSON pretty-print     |
+## Git features
 
-### Search popup
+- **History** (`H`) — fzf-style list of commits that touched the open file. Type
+  to filter, `Enter`/double-click to load that revision's diff against your
+  working tree (additions green, deletions red).
+- **Blame** (`b`) — toggle an inline gutter with short hash, author, and date per
+  line. Unavailable while viewing a diff.
+- **Git mode** (`Ctrl+G`) — show only files with uncommitted changes; selecting
+  one shows its working-tree diff. `Alt+G` toggles between tree and a flat list
+  of changed files. Directories with changes auto-expand; diffs refresh on the
+  30-second auto-reload tick and on manual `r`.
 
-| Key       | Action                          |
-| --------- | ------------------------------- |
-| *(type)*  | Filter results                  |
-| `Up`/`Down` | Navigate results              |
-| `Tab`     | Switch files ↔ content mode     |
-| `Enter`   | Open selected result            |
-| `Esc`     | Close search                    |
+All require `git` on your `PATH` and a tracked file/repository. Configure via
+`tv.toml`:
 
-## Mouse
-
-- **Click** a tree row to select it — opens a file, or folds/unfolds a directory.
-- **Click** a pane to focus it.
-- **Scroll wheel** scrolls whichever pane is under the cursor.
-- In the search and history popups, **single-click** selects an entry and
-  **double-click** activates it.
-
-## Git history
-
-With a file open in the content panel, press `H` to open an fzf-style list of
-the commits that touched it. Type to fuzzy-filter, navigate with `↑`/`↓`, and
-press `Enter` (or double-click) to load the diff of that revision against your
-current working tree into the content panel — additions in green, deletions in
-red. Requires `git` on your `PATH` and the file to be tracked in a repository.
-
-## Git blame
-
-Press `b` with a file open to toggle inline git blame. A gutter appears to the
-left of the content showing, for each line, the short commit hash, author, and
-date that last touched it. Press `b` again to hide it. Blame is unavailable
-while viewing a diff. Requires `git` and a tracked file.
-
-## Git mode
-
-Press `Ctrl+G` to switch the tree to show only files with uncommitted changes
-(modified, new, deleted, or renamed). Selecting a file shows its working-tree
-diff in the content panel instead of the file contents. The tree title displays
-a `[git]` badge while active.
-
-Press `Alt+G` inside git mode to toggle between the tree view (directories
-intact) and a flat, depth-0 list of every changed file with relative paths.
-Press `Alt+G` again to return to the tree view (a no-op outside git mode).
-
-All directories containing changes are auto-expanded when entering git mode.
-Diffs refresh on the 30-second auto-reload tick and on manual `r`.
-
-Configure via `tv.toml`:
 ```toml
 git_mode = false         # start in git mode (default: false)
 git_mode_flat = false    # start in flat list view (default: false)
@@ -224,92 +156,53 @@ ignore_gitignore = false  # show files excluded by .gitignore
 tree_width = 28           # tree panel width, as a percent of the terminal
 word_wrap = false         # wrap long lines in the content panel
 
-# Every keybinding is remappable. Each action takes a list of key specs.
-# A spec is a single character ("q", "?", "0") or a named key (Up, Down,
-# Left, Right, Enter, Tab, Esc, Backspace, PageUp, PageDown, Home, End,
-# Space), optionally prefixed with modifiers: "ctrl+c", "alt+.".
+# Every keybinding is remappable under [keys]. Each action takes a list of
+# key specs — a single character ("q", "?", "0") or a named key (Up, Enter,
+# Tab, Esc, PageUp, ...), optionally prefixed with "ctrl+" / "alt+".
 [keys]
 quit = ["q", "ctrl+c"]
-help = ["?"]
-toggle_hidden = ["alt+."]
 search_files = ["/"]
-search_content = ["f"]
-reload = ["r"]
-switch_panel = ["Tab"]
-file_history = ["H"]
-theme_picker = ["t"]
-command_palette = ["ctrl+p"]
-open_in_editor = ["e"]
-toggle_blame = ["b"]
-git_mode_toggle = ["ctrl+g"]
-git_mode_flat_toggle = ["alt+g"]
-
 nav_up = ["Up", "k"]
-nav_down = ["Down", "j"]
-
 tree_expand = ["Enter", "Right", "l"]
-tree_collapse = ["Left", "h"]
-
-content_left = ["Left"]
-content_right = ["Right"]
-content_top = ["g", "Home"]
-content_bottom = ["G", "End"]
-content_page_up = ["PageUp"]
-content_page_down = ["PageDown"]
-content_reset_col = ["0"]
-toggle_wrap = ["z"]
-toggle_raw_markdown = ["M"]
-toggle_pretty_json = ["J"]
+# ... see `?` in-app or the command palette for every action name.
 ```
 
 ### Theme
 
 Press `t` for an fzf-style picker to switch themes live, or set one in config.
-Built-in presets: `default`, `monokai`, `solarized`, `catppuccin`,
-`synthwave84`.
+Built-in presets: `default`, `monokai`, `solarized`, `catppuccin`, `synthwave84`.
 
-Configure under a `[theme]` table. `name` selects a preset as the base; each
-role then overrides it. A role takes a color name (`cyan`, `lightyellow`,
-`reset`) or a hex value (`#aabbcc`); `syntax` is a
+Configure under a `[theme]` table. `name` selects a preset as the base; each role
+then overrides it. A role takes a color name (`cyan`, `lightyellow`, `reset`) or
+a hex value (`#aabbcc`); `syntax` is a
 [syntect](https://github.com/trishume/syntect) theme name for file contents.
-Anything left unset keeps the preset's value.
-
-Presets ship their own background color; the `default` theme leaves it
-transparent (the terminal's background). Set `transparent_background = true`
-to keep a preset's colors but use your terminal's background instead.
+Anything left unset keeps the preset's value. Presets ship their own background;
+the `default` theme leaves it transparent. Set `transparent_background = true` to
+keep a preset's colors but use your terminal's background.
 
 ```toml
 [theme]
-name = "catppuccin"           # built-in preset to start from
-
-# Optional per-role overrides on top of the preset:
-transparent_background = false  # true = use terminal's background instead of the preset's
-background = "reset"         # panel backgrounds (Reset = terminal default)
-accent = "cyan"               # focused borders, primary highlights
-accent_alt = "yellow"      # popup chrome, keys, prompts
-dim = "darkgray"           # unfocused borders, gutters, hints, rules
-text = "white"             # emphasized / default text
-dir = "blue"               # directory entries in the tree
-file = "reset"             # file entries in the tree
-selection_bg = "darkgray"  # selected row / status bar background
-selection_fg = "yellow"    # selected row foreground in popups
-heading1 = "lightcyan"     # markdown H1 / table headers
-heading2 = "lightyellow"   # markdown H2
-heading3 = "lightgreen"    # markdown H3
-code = "lightyellow"       # inline code / code blocks
-diff_add = "green"         # added lines in a diff
-diff_del = "red"           # removed lines in a diff
+name = "catppuccin"             # built-in preset to start from
+transparent_background = false  # true = use terminal's background instead
+background = "reset"            # panel backgrounds (reset = terminal default)
+accent = "cyan"                # focused borders, primary highlights
+accent_alt = "yellow"          # popup chrome, keys, prompts
+dim = "darkgray"               # unfocused borders, gutters, hints, rules
+text = "white"                 # emphasized / default text
+dir = "blue"                   # directory entries in the tree
+file = "reset"                 # file entries in the tree
+selection_bg = "darkgray"      # selected row / status bar background
+selection_fg = "yellow"        # selected row foreground in popups
+heading1 = "lightcyan"         # markdown H1 / table headers
+heading2 = "lightyellow"       # markdown H2
+heading3 = "lightgreen"        # markdown H3
+code = "lightyellow"           # inline code / code blocks
+diff_add = "green"             # added lines in a diff
+diff_del = "red"               # removed lines in a diff
 syntax = "base16-ocean.dark"
 ```
 
-The `background` role controls panel backgrounds. When set to `reset` (the
-default), the terminal's own background shows through. Each preset ships a
-preferred background color that you can override or disable with
-`transparent_background`. On top of presets, live theme switching instantly
-re-applies the current file with the new syntax highlighting theme.
-
-See [`example.md`](example.md) for a document that exercises the markdown
-renderer.
+See [`example.md`](example.md) for a document that exercises the markdown renderer.
 
 ## Development
 
