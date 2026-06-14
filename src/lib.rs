@@ -12,3 +12,4 @@ pub mod theme;
 pub mod tree;
 pub mod ui;
 pub mod virtual_file;
+pub mod yaml_fold;

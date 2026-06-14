@@ -47,7 +47,7 @@ impl App {
                 } else if rect_contains(self.content_area, ev.column, ev.row) {
                     self.focus = Focus::Content;
                     let on_scrollbar = self.show_scrollbar
-                        && self.line_count() > self.content_area.height as usize
+                        && self.display_line_count() > self.content_area.height as usize
                         && ev.column
                             == self.content_area.x + self.content_area.width.saturating_sub(1);
                     if on_scrollbar {
@@ -55,6 +55,22 @@ impl App {
                         self.set_scroll_from_mouse_y(ev.row);
                         self.mark_content_scrolled();
                     } else {
+                        // Check if click is on the fold gutter (leftmost fold_gutter_width columns).
+                        let fold_gw = self.fold_gutter_width();
+                        let rel_col = (ev.column.saturating_sub(self.content_area.x)) as usize;
+                        if fold_gw > 0 && rel_col < fold_gw {
+                            // Find the fold region for this screen row.
+                            let hit = self
+                                .fold_gutter_rows
+                                .iter()
+                                .find(|&&(y, _)| y == ev.row)
+                                .map(|&(_, ri)| ri);
+                            if let Some(ri) = hit {
+                                self.toggle_fold_region(ri);
+                                self.mark_content_scrolled();
+                                return;
+                            }
+                        }
                         let can_select = !self.is_diff;
                         if can_select {
                             let pos = self.content_pos(ev.column, ev.row);
@@ -319,7 +335,7 @@ impl App {
 
     /// Maps a mouse row to a content scroll position, used for scrollbar dragging.
     pub(super) fn set_scroll_from_mouse_y(&mut self, row: u16) {
-        let total = self.line_count();
+        let total = self.display_line_count();
         let inner_h = self.content_area.height as usize;
         if total <= inner_h || inner_h == 0 {
             return;

@@ -328,10 +328,14 @@ pub(super) fn draw_command_palette(f: &mut Frame, app: &mut App, area: Rect) {
             let cmd = &COMMANDS[i];
             ListItem::new(Line::from(vec![
                 Span::styled(format!(" {} ", cmd.name), Style::default().fg(theme.text)),
-                Span::styled(
-                    format!("[{}]", picker.binding_labels[i]),
-                    Style::default().fg(theme.dim),
-                ),
+                if picker.binding_labels[i].is_empty() {
+                    Span::raw("")
+                } else {
+                    Span::styled(
+                        format!("[{}]", picker.binding_labels[i]),
+                        Style::default().fg(theme.dim),
+                    )
+                },
             ]))
         })
         .collect();

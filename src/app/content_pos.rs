@@ -8,17 +8,17 @@ impl App {
     /// Maximum valid content_scroll so the last line sits at the bottom edge,
     /// not the top. Falls back to `total - 1` before the first render (height 0).
     pub fn content_scroll_max(&self) -> usize {
-        let total = self.line_count();
+        let total = self.display_line_count();
         let vh = (self.content_area.height as usize).max(1);
         total.saturating_sub(vh)
     }
 
-    /// Width of the line-number gutter (digits + space), or 0 when there is none.
+    /// Width of the line-number gutter (fold marker + digits + space), or 0.
     pub fn line_prefix_width(&self) -> usize {
         if self.is_diff || (self.is_markdown && !self.show_raw_markdown) {
             0
         } else {
-            self.line_count().to_string().len().max(1) + 1
+            self.fold_gutter_width() + self.line_count().to_string().len().max(1) + 1
         }
     }
 
@@ -38,29 +38,32 @@ impl App {
             if let Some(wrap_nz) = NonZeroUsize::new(raw_wrap) {
                 let wrap_width = wrap_nz.get();
                 let is_md = self.is_markdown && !self.show_raw_markdown;
-                let total = self.line_count();
+                let display_total = self.display_line_count();
                 let mut visual_remaining = rel_row;
-                for logical_idx in self.content_scroll..total {
+                for display_idx in self.content_scroll..display_total {
+                    let physical_idx = self.display_to_physical(display_idx);
                     let display_width: usize = if is_md {
                         self.markdown_lines
-                            .get(logical_idx)
+                            .get(physical_idx)
                             .map(|spans| spans.iter().map(|(_, t)| t.width()).sum())
                             .unwrap_or(0)
                     } else {
-                        self.line_width(logical_idx).unwrap_or(0)
+                        self.line_width(physical_idx).unwrap_or(0)
                     };
                     let visual_rows = display_width.div_ceil(wrap_width).max(1);
                     if visual_remaining < visual_rows {
                         let text_col = rel_col.saturating_sub(prefix);
-                        return (logical_idx, visual_remaining * wrap_width + text_col);
+                        return (physical_idx, visual_remaining * wrap_width + text_col);
                     }
                     visual_remaining -= visual_rows;
                 }
-                return (total.saturating_sub(1), rel_col.saturating_sub(prefix));
+                let last_phys = self.display_to_physical(display_total.saturating_sub(1));
+                return (last_phys, rel_col.saturating_sub(prefix));
             }
         }
 
-        let buf_line = self.content_scroll + rel_row;
+        let display_line = self.content_scroll + rel_row;
+        let buf_line = self.display_to_physical(display_line);
         let buf_col = (rel_col + self.content_hscroll).saturating_sub(prefix);
         (buf_line, buf_col)
     }

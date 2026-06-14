@@ -1,0 +1,169 @@
+use std::collections::HashSet;
+
+/// A contiguous foldable block in a YAML file.
+///
+/// `start` is the "header" line (always visible). `end` is the last line that
+/// belongs to the block (inclusive). Folding hides lines `start+1..=end`.
+#[derive(Clone, Debug)]
+pub struct FoldRegion {
+    pub start: usize,
+    pub end: usize,
+}
+
+/// Detects foldable regions in YAML content by indentation nesting.
+///
+/// A foldable region begins at any non-blank line that is immediately followed
+/// (ignoring blank lines) by a line with strictly greater indentation. The
+/// region ends just before the next line that returns to the same or lesser
+/// indentation level.
+pub fn detect_fold_regions(lines: &[impl AsRef<str>]) -> Vec<FoldRegion> {
+    let n = lines.len();
+    if n == 0 {
+        return Vec::new();
+    }
+
+    let indent: Vec<Option<usize>> = lines
+        .iter()
+        .map(|l| {
+            let s = l.as_ref();
+            if s.trim().is_empty() {
+                None
+            } else {
+                Some(s.len() - s.trim_start().len())
+            }
+        })
+        .collect();
+
+    let mut regions = Vec::new();
+
+    for i in 0..n {
+        let Some(curr_indent) = indent[i] else {
+            continue;
+        };
+
+        // Find the next non-blank line
+        let next = (i + 1..n).find_map(|j| indent[j].map(|ind| (j, ind)));
+
+        let Some((_, next_ind)) = next else {
+            continue;
+        };
+
+        if next_ind <= curr_indent {
+            continue;
+        }
+
+        // This line has children. Find the last child line.
+        let mut end = i;
+        for (j, ind_opt) in indent.iter().enumerate().skip(i + 1) {
+            if let Some(ind) = *ind_opt {
+                if ind <= curr_indent {
+                    break;
+                }
+            }
+            end = j;
+        }
+
+        if end > i {
+            regions.push(FoldRegion { start: i, end });
+        }
+    }
+
+    regions
+}
+
+/// Builds a display→physical line mapping given the set of folded region indices.
+///
+/// The returned `Vec<usize>` has one entry per display line; each entry is the
+/// corresponding physical (file) line index. When the returned vec is empty
+/// (no regions are folded), callers should treat physical == display.
+pub fn build_display_map(
+    regions: &[FoldRegion],
+    folded: &HashSet<usize>,
+    total: usize,
+) -> Vec<usize> {
+    if folded.is_empty() || regions.is_empty() || total == 0 {
+        return Vec::new();
+    }
+
+    // Mark every line that is hidden (inside a folded region, not the header).
+    let mut hidden = vec![false; total];
+    for (ri, region) in regions.iter().enumerate() {
+        if folded.contains(&ri) {
+            let hide_start = (region.start + 1).min(total);
+            let hide_end = region.end.min(total - 1);
+            for h in hidden.iter_mut().take(hide_end + 1).skip(hide_start) {
+                *h = true;
+            }
+        }
+    }
+
+    (0..total).filter(|&i| !hidden[i]).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn lines(s: &str) -> Vec<&str> {
+        s.lines().collect()
+    }
+
+    #[test]
+    fn empty_input_returns_no_regions() {
+        let empty: &[&str] = &[];
+        assert!(detect_fold_regions(empty).is_empty());
+    }
+
+    #[test]
+    fn flat_yaml_returns_no_regions() {
+        let ls = lines("a: 1\nb: 2\nc: 3");
+        assert!(detect_fold_regions(&ls).is_empty());
+    }
+
+    #[test]
+    fn simple_nested_key() {
+        let ls = lines("outer:\n  inner: 1\n  other: 2\nflat: 3");
+        let r = detect_fold_regions(&ls);
+        assert_eq!(r.len(), 1);
+        assert_eq!(r[0].start, 0);
+        assert_eq!(r[0].end, 2);
+    }
+
+    #[test]
+    fn nested_regions() {
+        let ls = lines("a:\n  b:\n    c: 1\n  d: 2\ne: 3");
+        let r = detect_fold_regions(&ls);
+        assert_eq!(r.len(), 2);
+        assert_eq!(r[0].start, 0);
+        assert_eq!(r[0].end, 3);
+        assert_eq!(r[1].start, 1);
+        assert_eq!(r[1].end, 2);
+    }
+
+    #[test]
+    fn build_display_map_no_folds_returns_empty() {
+        let regions = detect_fold_regions(&lines("a:\n  b: 1\n  c: 2"));
+        let map = build_display_map(&regions, &HashSet::new(), 3);
+        assert!(map.is_empty());
+    }
+
+    #[test]
+    fn build_display_map_folded_hides_children() {
+        let ls = lines("a:\n  b: 1\n  c: 2\nd: 3");
+        let regions = detect_fold_regions(&ls);
+        let mut folded = HashSet::new();
+        folded.insert(0);
+        let map = build_display_map(&regions, &folded, 4);
+        assert_eq!(map, vec![0, 3]);
+    }
+
+    #[test]
+    fn build_display_map_nested_inner_only() {
+        let ls = lines("a:\n  b:\n    c: 1\n  d: 2\ne: 3");
+        let regions = detect_fold_regions(&ls);
+        let mut folded = HashSet::new();
+        folded.insert(1); // fold region starting at line 1
+        let map = build_display_map(&regions, &folded, 5);
+        assert_eq!(map, vec![0, 1, 3, 4]);
+    }
+}
