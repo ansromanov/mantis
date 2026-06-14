@@ -72,8 +72,23 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
             .add_modifier(Modifier::BOLD),
     );
 
+    let view_height = area.height.saturating_sub(2).max(1) as usize;
     let mut state = ListState::default();
-    if !app.nodes.is_empty() {
+    if app.tree_independent_scroll {
+        // The viewport is driven by `tree_scroll`, decoupled from the cursor.
+        // Clamp it so we never scroll past the end, then only highlight the
+        // selection when it falls inside the visible window — otherwise the
+        // list widget would scroll the viewport back to reveal it.
+        let max_scroll = app.nodes.len().saturating_sub(view_height);
+        app.tree_scroll = app.tree_scroll.min(max_scroll);
+        *state.offset_mut() = app.tree_scroll;
+        if !app.nodes.is_empty()
+            && app.tree_selected >= app.tree_scroll
+            && app.tree_selected < app.tree_scroll + view_height
+        {
+            state.select(Some(app.tree_selected));
+        }
+    } else if !app.nodes.is_empty() {
         state.select(Some(app.tree_selected));
     }
 
@@ -88,6 +103,9 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
         height: area.height.saturating_sub(2),
     };
     app.tree_offset = state.offset();
+    // Keep `tree_scroll` aligned with what was actually rendered so cursor
+    // moves and mouse hit-testing share the same offset.
+    app.tree_scroll = state.offset();
 }
 
 /// Returns the foreground color and modifier for a tree node based on its

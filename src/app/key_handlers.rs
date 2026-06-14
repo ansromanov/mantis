@@ -530,25 +530,40 @@ impl App {
         if pressed(&k.nav_up, &key) {
             if self.tree_selected > 0 {
                 self.tree_selected -= 1;
+                self.scroll_tree_into_view();
                 self.try_open_selected();
             }
         } else if pressed(&k.nav_down, &key) {
             if self.tree_selected + 1 < self.nodes.len() {
                 self.tree_selected += 1;
+                self.scroll_tree_into_view();
                 self.try_open_selected();
             }
         } else if pressed(&k.tree_expand, &key) {
             self.activate_selected();
+        } else if self.tree_independent_scroll && pressed(&k.content_page_up, &key) {
+            let page = self.tree_page_size();
+            self.tree_scroll = self.tree_scroll.saturating_sub(page);
+        } else if self.tree_independent_scroll && pressed(&k.content_page_down, &key) {
+            let page = self.tree_page_size();
+            self.tree_scroll = (self.tree_scroll + page).min(self.tree_scroll_max());
         } else if pressed(&k.content_top, &key) {
-            if self.tree_selected != 0 {
+            if self.tree_independent_scroll {
+                // Move only the viewport; leave the selection where it is.
+                self.tree_scroll = 0;
+            } else if self.tree_selected != 0 {
                 self.tree_selected = 0;
                 self.try_open_selected();
             }
         } else if pressed(&k.content_bottom, &key) {
-            let last = self.nodes.len().saturating_sub(1);
-            if self.tree_selected != last {
-                self.tree_selected = last;
-                self.try_open_selected();
+            if self.tree_independent_scroll {
+                self.tree_scroll = self.tree_scroll_max();
+            } else {
+                let last = self.nodes.len().saturating_sub(1);
+                if self.tree_selected != last {
+                    self.tree_selected = last;
+                    self.try_open_selected();
+                }
             }
         } else if pressed(&k.tree_collapse, &key) {
             if let Some(node) = self.nodes.get(self.tree_selected) {
@@ -567,7 +582,35 @@ impl App {
                         }
                     }
                 }
+                self.scroll_tree_into_view();
             }
+        }
+    }
+
+    /// Number of tree rows that fit in the visible viewport, from the geometry
+    /// captured during the last render. Falls back to 1 before the first draw.
+    fn tree_page_size(&self) -> usize {
+        (self.tree_area.height as usize).max(1)
+    }
+
+    /// Largest valid `tree_scroll` value so the last row can sit at the bottom
+    /// of the viewport without scrolling past the end of the tree.
+    fn tree_scroll_max(&self) -> usize {
+        self.nodes.len().saturating_sub(self.tree_page_size())
+    }
+
+    /// When independent tree scrolling is enabled, nudges `tree_scroll` so the
+    /// current selection stays within the viewport after a cursor move. A no-op
+    /// otherwise, since the list widget auto-scrolls to the selection.
+    fn scroll_tree_into_view(&mut self) {
+        if !self.tree_independent_scroll {
+            return;
+        }
+        let height = self.tree_page_size();
+        if self.tree_selected < self.tree_scroll {
+            self.tree_scroll = self.tree_selected;
+        } else if self.tree_selected >= self.tree_scroll + height {
+            self.tree_scroll = self.tree_selected + 1 - height;
         }
     }
 
@@ -659,6 +702,7 @@ impl App {
         self.show_hidden = cfg.show_hidden;
         self.ignore_gitignore = cfg.ignore_gitignore;
         self.tree_width = cfg.tree_width;
+        self.tree_independent_scroll = cfg.tree_independent_scroll;
         self.word_wrap = cfg.word_wrap;
         self.git_status_enabled = cfg.git_status || cfg.git_mode;
         self.git_show_deleted = cfg.git_show_deleted;

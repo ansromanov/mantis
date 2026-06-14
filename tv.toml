@@ -5,6 +5,9 @@ show_hidden = false
 ignore_gitignore = false
 tree_width = 28
 word_wrap = false
+# tree_independent_scroll = false  # PageUp/PageDown and Home/End scroll the tree
+                                   # viewport without moving the selection;
+                                   # Up/Down still move the cursor (default: false)
 git_status = true
 git_show_deleted = false
 scrollbar = true

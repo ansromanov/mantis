@@ -154,6 +154,8 @@ overrides the global one, so a repository can ship its own defaults.
 show_hidden = false       # show dotfiles
 ignore_gitignore = false  # show files excluded by .gitignore
 tree_width = 28           # tree panel width, as a percent of the terminal
+tree_independent_scroll = false  # PageUp/PageDown & Home/End scroll the tree
+                                 # viewport without moving the selection
 word_wrap = false         # wrap long lines in the content panel
 
 # Every keybinding is remappable under [keys]. Each action takes a list of

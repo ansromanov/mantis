@@ -2157,6 +2157,116 @@ fn tree_key_end_goes_to_last() {
 }
 
 #[test]
+fn tree_independent_scroll_page_keys_move_viewport_not_cursor() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Tree;
+    app.tree_independent_scroll = true;
+    // Small viewport so the 4 top-level nodes overflow it.
+    app.tree_area = Rect {
+        x: 0,
+        y: 0,
+        width: 20,
+        height: 2,
+    };
+    app.tree_selected = 0;
+    app.tree_scroll = 0;
+
+    app.handle_key(KeyEvent::new(KeyCode::PageDown, KeyModifiers::empty()));
+    // Viewport moved down by a page, selection untouched.
+    assert_eq!(app.tree_scroll, 2);
+    assert_eq!(app.tree_selected, 0);
+
+    app.handle_key(KeyEvent::new(KeyCode::PageUp, KeyModifiers::empty()));
+    assert_eq!(app.tree_scroll, 0);
+    assert_eq!(app.tree_selected, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_independent_scroll_home_end_move_viewport_only() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Tree;
+    app.tree_independent_scroll = true;
+    app.tree_area = Rect {
+        x: 0,
+        y: 0,
+        width: 20,
+        height: 2,
+    };
+    app.tree_selected = 1;
+    app.tree_scroll = 0;
+
+    let max_scroll = app.nodes.len().saturating_sub(2);
+    app.handle_key(KeyEvent::new(KeyCode::End, KeyModifiers::empty()));
+    assert_eq!(app.tree_scroll, max_scroll);
+    assert_eq!(app.tree_selected, 1, "selection must not move");
+
+    app.handle_key(KeyEvent::new(KeyCode::Home, KeyModifiers::empty()));
+    assert_eq!(app.tree_scroll, 0);
+    assert_eq!(app.tree_selected, 1);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_independent_scroll_disabled_ignores_page_keys() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Tree;
+    assert!(!app.tree_independent_scroll); // default
+    app.tree_area = Rect {
+        x: 0,
+        y: 0,
+        width: 20,
+        height: 2,
+    };
+    app.tree_scroll = 0;
+    app.tree_selected = 0;
+
+    app.handle_key(KeyEvent::new(KeyCode::PageDown, KeyModifiers::empty()));
+    assert_eq!(app.tree_scroll, 0, "page keys are inert without the toggle");
+    assert_eq!(app.tree_selected, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_independent_scroll_up_down_still_move_cursor_and_follow() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Tree;
+    app.tree_independent_scroll = true;
+    app.tree_area = Rect {
+        x: 0,
+        y: 0,
+        width: 20,
+        height: 2,
+    };
+    app.tree_selected = 0;
+    app.tree_scroll = 0;
+
+    let last = app.nodes.len().saturating_sub(1);
+    if last == 0 {
+        fs::remove_dir_all(&root).ok();
+        return;
+    }
+    // Walk the cursor to the bottom; the viewport should follow it.
+    for _ in 0..last {
+        app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
+    }
+    assert_eq!(app.tree_selected, last);
+    assert!(
+        app.tree_selected >= app.tree_scroll
+            && app.tree_selected < app.tree_scroll + app.tree_area.height as usize,
+        "selection {} should stay within viewport [{}, {})",
+        app.tree_selected,
+        app.tree_scroll,
+        app.tree_scroll + app.tree_area.height as usize
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn tree_key_other_key_noop_when_focus_tree() {
     let root = temp_tree();
     let mut app = app_for(&root);
