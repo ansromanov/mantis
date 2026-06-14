@@ -32,9 +32,20 @@ run *args:
 
 # build release, copy tv to ~/.cargo/bin, and install default themes
 install: release
-    cp target/release/tv{{if os() == "windows" { ".exe" } else { "" }}} {{env_var_or_default("CARGO_HOME", home_directory() + "/.cargo")}}/bin/tv{{if os() == "windows" { ".exe" } else { "" }}}
-    {{ if os() == "macos" { "codesign --force -s - " + env_var_or_default("CARGO_HOME", home_directory() + "/.cargo") + "/bin/tv" } else { "" } }}
-    {{ if os() == "windows" { "mkdir -p \"$APPDATA/tree-viewer/themes\" && cp themes/*.toml \"$APPDATA/tree-viewer/themes/\"" } else { "mkdir -p ~/.config/tree-viewer/themes && cp themes/*.toml ~/.config/tree-viewer/themes/" } }}
+    #!/usr/bin/env sh
+    set -e
+    ext=""
+    themes_dir="${XDG_CONFIG_HOME:-$HOME/.config}/tree-viewer/themes"
+    case "$(uname -s 2>/dev/null)" in
+        CYGWIN*|MINGW*|MSYS*)
+            ext=".exe"
+            themes_dir="${APPDATA}/tree-viewer/themes"
+            ;;
+    esac
+    cp "target/release/tv${ext}" "${CARGO_HOME:-$HOME/.cargo}/bin/tv${ext}"
+    [ "$(uname -s 2>/dev/null)" = "Darwin" ] && codesign --force -s - "${CARGO_HOME:-$HOME/.cargo}/bin/tv"
+    mkdir -p "${themes_dir}"
+    cp themes/*.toml "${themes_dir}/"
 
 # run tests
 test *args:

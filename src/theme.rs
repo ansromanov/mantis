@@ -192,13 +192,12 @@ fn all_embedded() -> &'static HashMap<&'static str, Theme> {
 // User themes directory
 // ---------------------------------------------------------------------------
 
-/// Returns the path to the user themes directory.
-/// - Unix: `$XDG_CONFIG_HOME/tree-viewer/themes` or `~/.config/tree-viewer/themes`
-/// - Windows: `%APPDATA%\tree-viewer\themes`
 fn user_themes_dir() -> Option<PathBuf> {
     #[cfg(windows)]
-    return std::env::var_os("APPDATA")
-        .map(|p| PathBuf::from(p).join("tree-viewer").join("themes"));
+    {
+        std::env::var_os("APPDATA")
+            .map(|p| PathBuf::from(p).join("tree-viewer").join("themes"))
+    }
     #[cfg(not(windows))]
     {
         let base = std::env::var_os("XDG_CONFIG_HOME")

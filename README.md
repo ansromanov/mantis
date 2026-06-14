@@ -152,9 +152,10 @@ git_show_deleted = false # show ghost nodes for deleted tracked files (default: 
 ## Configuration
 
 `tv` reads a `tv.toml` file. It first looks for one in the directory being
-viewed (and its ancestors), then falls back to the global config at
-`$XDG_CONFIG_HOME/tv.toml` (or `~/.config/tv.toml`). A project-local file
-overrides the global one, so a repository can ship its own defaults.
+viewed (and its ancestors), then falls back to the global config:
+`$XDG_CONFIG_HOME/tv.toml` (or `~/.config/tv.toml`) on Linux/macOS,
+`%APPDATA%\tree-viewer\tv.toml` on Windows. A project-local file overrides
+the global one, so a repository can ship its own defaults.
 
 ```toml
 show_hidden = false       # show dotfiles
