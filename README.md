@@ -322,4 +322,4 @@ just clippy    # lint
 
 ## License
 
-[MIT](LICENSE) © Andrei Romanov
+[GPL-3.0-or-later](LICENSE) © Andrei Romanov
