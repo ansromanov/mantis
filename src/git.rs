@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Per-file git working-tree status.
@@ -404,8 +404,11 @@ struct CachedBlame {
     lines: Vec<BlameLine>,
 }
 
-#[allow(dead_code)]
-static BLAME_CACHE: Mutex<Option<HashMap<PathBuf, CachedBlame>>> = Mutex::new(None);
+static BLAME_CACHE: OnceLock<Mutex<HashMap<PathBuf, CachedBlame>>> = OnceLock::new();
+
+fn blame_cache() -> &'static Mutex<HashMap<PathBuf, CachedBlame>> {
+    BLAME_CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
 
 /// Returns per-line git blame annotations for `file` in the repository at
 /// `repo_dir`. Returns an empty `Vec` if the file is untracked, not in a git
@@ -419,12 +422,10 @@ pub fn file_blame(repo_dir: &Path, file: &Path) -> Vec<BlameLine> {
     };
 
     {
-        let guard = BLAME_CACHE.lock().unwrap();
-        if let Some(cache) = guard.as_ref() {
-            if let Some(cached) = cache.get(file) {
-                if cached.mtime == mtime {
-                    return cached.lines.clone();
-                }
+        let guard = blame_cache().lock().unwrap_or_else(|p| p.into_inner());
+        if let Some(cached) = guard.get(file) {
+            if cached.mtime == mtime {
+                return cached.lines.clone();
             }
         }
     }
@@ -445,9 +446,8 @@ pub fn file_blame(repo_dir: &Path, file: &Path) -> Vec<BlameLine> {
     let lines = parse_blame_porcelain(&text);
 
     {
-        let mut guard = BLAME_CACHE.lock().unwrap();
-        let cache = guard.get_or_insert_with(HashMap::new);
-        cache.insert(
+        let mut guard = blame_cache().lock().unwrap_or_else(|p| p.into_inner());
+        guard.insert(
             file.to_path_buf(),
             CachedBlame {
                 mtime,
@@ -459,19 +459,21 @@ pub fn file_blame(repo_dir: &Path, file: &Path) -> Vec<BlameLine> {
     lines
 }
 
-#[allow(dead_code)]
 fn parse_blame_porcelain(text: &str) -> Vec<BlameLine> {
     let mut blames = Vec::new();
     let mut meta: HashMap<String, (String, String)> = HashMap::new();
     let mut lines = text.lines();
 
     while let Some(line) = lines.next() {
+        // Header: "<hash> <orig_lineno> <final_lineno> [<group_count>]"
+        // <group_count> is present only on the first line of a new commit group.
+        // Subsequent lines from the same commit have 3 fields and no metadata block.
         let parts: Vec<&str> = line.splitn(4, ' ').collect();
-        if parts.len() < 4 {
+        if parts.len() < 3 {
             continue;
         }
         let hash = parts[0].to_string();
-        let count: usize = parts[3].parse().unwrap_or(1);
+        let line_no: u32 = parts[2].parse().unwrap_or(0);
 
         let (author, date_relative) = if let Some(m) = meta.get(&hash) {
             m.clone()
@@ -498,21 +500,19 @@ fn parse_blame_porcelain(text: &str) -> Vec<BlameLine> {
             (author, date_relative)
         };
 
-        for _ in 0..count {
-            if let Some(content_line) = lines.next() {
-                let _content = content_line.strip_prefix('\t').unwrap_or(content_line);
-                blames.push(BlameLine {
-                    short_hash: if hash.len() >= 7 {
-                        hash[..7].to_string()
-                    } else {
-                        hash.clone()
-                    },
-                    author: author.clone(),
-                    date_relative: date_relative.clone(),
-                    line_no: blames.len() as u32 + 1,
-                    commit_hash: hash.clone(),
-                });
-            }
+        // Every header (first or repeat) is followed by exactly one tab-prefixed content line.
+        if lines.next().is_some() {
+            blames.push(BlameLine {
+                short_hash: if hash.len() >= 7 {
+                    hash[..7].to_string()
+                } else {
+                    hash.clone()
+                },
+                commit_hash: hash,
+                author,
+                date_relative,
+                line_no,
+            });
         }
     }
 
@@ -556,5 +556,87 @@ fn pluralize(n: u64, unit: &str) -> String {
         format!("1 {unit} ago")
     } else {
         format!("{n} {unit}s ago")
+    }
+}
+
+#[cfg(test)]
+mod blame_tests {
+    use super::parse_blame_porcelain;
+
+    #[test]
+    fn single_line_single_commit() {
+        let input = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 1 1 1\n\
+             author Alice\n\
+             author-mail <alice@example.com>\n\
+             author-time 1000000\n\
+             author-tz +0000\n\
+             committer Alice\n\
+             committer-mail <alice@example.com>\n\
+             committer-time 1000000\n\
+             committer-tz +0000\n\
+             summary init\n\
+             filename src/foo.rs\n\
+             \tfn main() {}\n";
+        let result = parse_blame_porcelain(input);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].line_no, 1);
+        assert_eq!(result[0].author, "Alice");
+        assert_eq!(result[0].short_hash, "aaaaaaa");
+        assert_eq!(
+            result[0].commit_hash,
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        );
+    }
+
+    #[test]
+    fn multi_line_same_commit() {
+        // Three consecutive lines from the same commit: first header has group count,
+        // subsequent headers have only 3 fields and no metadata block.
+        let input = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 1 1 3\n\
+             author Alice\n\
+             author-time 1000000\n\
+             filename src/foo.rs\n\
+             \tline one\n\
+             aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 2 2\n\
+             \tline two\n\
+             aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 3 3\n\
+             \tline three\n";
+        let result = parse_blame_porcelain(input);
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0].line_no, 1);
+        assert_eq!(result[1].line_no, 2);
+        assert_eq!(result[2].line_no, 3);
+        for b in &result {
+            assert_eq!(b.author, "Alice");
+        }
+    }
+
+    #[test]
+    fn multiple_commits_interleaved() {
+        let input = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 1 1 1\n\
+             author Alice\n\
+             author-time 1000000\n\
+             filename src/foo.rs\n\
+             \tline one\n\
+             bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb 2 2 1\n\
+             author Bob\n\
+             author-time 2000000\n\
+             filename src/foo.rs\n\
+             \tline two\n\
+             aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 3 3\n\
+             \tline three\n";
+        let result = parse_blame_porcelain(input);
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0].author, "Alice");
+        assert_eq!(result[0].line_no, 1);
+        assert_eq!(result[1].author, "Bob");
+        assert_eq!(result[1].line_no, 2);
+        assert_eq!(result[2].author, "Alice");
+        assert_eq!(result[2].line_no, 3);
+    }
+
+    #[test]
+    fn empty_input() {
+        assert!(parse_blame_porcelain("").is_empty());
     }
 }
