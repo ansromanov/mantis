@@ -1,4 +1,16 @@
 version = "0.5.0"
 date = "2026-06-14"
-whats_new = ""
+whats_new = """- feat: add first-class Windows support (#139)
+- fix: guard visual-line key handling behind focus == Content (#138)
+- test: add coverage for keyboard and mouse handlers (#115) (#137)
+- test: add coverage for content panel rendering and position math (#114) (#136)
+- feat(statusbar): colorful per-segment color semantics (#135)
+- feat(config): validate config schema with unknown-key suggestions (#132)
+- feat(tree): add independent tree scroll config option (#131)
+- test: add coverage for overlay UI modules (popups, statusbar, mod) (#113) (#134)
+- feat: add light theme presets (vscode-light, catppuccin-latte, solarized-light, pink) (#133)
+- feat: YAML validation, anchor/alias counting, and statusbar indicators (#65) (#130)
+- feat(diff): add side-by-side diff view with word-level highlighting (#129)
+- docs: trim README to ~1.5x smaller, surface install one-liner (#128)
+- chore: add changelog to release info [skip ci]"""
 release_url = "https://github.com/ansromanov/tree-viewer/releases/tag/v0.5.0"
