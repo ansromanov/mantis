@@ -44,6 +44,9 @@ pub struct App {
     pub virtual_file: Option<VirtualFile>,
     pub is_markdown: bool,
     pub show_raw_markdown: bool,
+    pub is_json: bool,
+    pub show_pretty_json: bool,
+    pub json_pretty_lines: Vec<Vec<(ratatui::style::Style, String)>>,
     pub content_scroll: usize,
     pub content_hscroll: usize,
     pub word_wrap: bool,
@@ -153,6 +156,9 @@ impl App {
             virtual_file: None,
             is_markdown: false,
             show_raw_markdown: false,
+            is_json: false,
+            show_pretty_json: false,
+            json_pretty_lines: Vec::new(),
             content_scroll: 0,
             content_hscroll: 0,
             word_wrap: cfg.word_wrap,
@@ -270,6 +276,8 @@ impl App {
     pub fn line_count(&self) -> usize {
         if self.is_markdown && !self.show_raw_markdown {
             self.markdown_lines.len()
+        } else if self.is_json && self.show_pretty_json && !self.json_pretty_lines.is_empty() {
+            self.json_pretty_lines.len()
         } else if let Some(vf) = &self.virtual_file {
             vf.line_count()
         } else {
