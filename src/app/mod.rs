@@ -62,7 +62,7 @@ pub struct App {
     pub theme: Theme,
     pub git_status_enabled: bool,
     pub git_show_deleted: bool,
-    pub git_branch: Option<String>,
+    pub git_info: Option<crate::git::GitRepoInfo>,
     pub git_status_map: HashMap<PathBuf, GitStatus>,
     pub git_mode: bool,
     pub git_mode_flat: bool,
@@ -123,8 +123,8 @@ impl App {
         } else {
             HashMap::new()
         };
-        let git_branch = if git_status_enabled {
-            crate::git::current_branch(&root)
+        let git_info = if git_status_enabled {
+            crate::git::repo_info(&root)
         } else {
             None
         };
@@ -169,7 +169,7 @@ impl App {
             theme,
             git_status_enabled,
             git_show_deleted,
-            git_branch,
+            git_info,
             git_status_map,
             git_mode: cfg.git_mode,
             git_mode_flat: cfg.git_mode_flat,
@@ -224,7 +224,7 @@ impl App {
         self.last_refresh = Instant::now();
         if self.git_status_enabled {
             self.git_status_map = crate::git::repo_status(&self.root, self.ignore_gitignore);
-            self.git_branch = crate::git::current_branch(&self.root);
+            self.git_info = crate::git::repo_info(&self.root);
         }
         let root = self.root.clone();
         let show_hidden = self.show_hidden;

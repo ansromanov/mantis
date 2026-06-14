@@ -142,7 +142,7 @@ impl App {
             if !self.git_status_enabled {
                 self.git_status_enabled = true;
                 self.git_status_map = crate::git::repo_status(&self.root, self.ignore_gitignore);
-                self.git_branch = crate::git::current_branch(&self.root);
+                self.git_info = crate::git::repo_info(&self.root);
             }
             self.expand_git_dirs();
             self.rebuild();
