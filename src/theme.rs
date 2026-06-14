@@ -276,6 +276,35 @@ pub struct ThemeConfig {
 }
 
 impl ThemeConfig {
+    /// A `ThemeConfig` with every field populated, used by config validation to
+    /// learn the full set of recognized `[theme]` keys. Serializing the default
+    /// won't do: its fields are all `None`, which TOML omits. The explicit
+    /// struct literal means adding a field forces updating this, so the
+    /// validation schema can't silently drift out of sync.
+    pub(crate) fn schema() -> Self {
+        ThemeConfig {
+            name: Some(String::new()),
+            transparent_background: Some(false),
+            accent: Some(String::new()),
+            accent_alt: Some(String::new()),
+            dim: Some(String::new()),
+            text: Some(String::new()),
+            dir: Some(String::new()),
+            file: Some(String::new()),
+            selection_bg: Some(String::new()),
+            selection_fg: Some(String::new()),
+            heading1: Some(String::new()),
+            heading2: Some(String::new()),
+            heading3: Some(String::new()),
+            code: Some(String::new()),
+            diff_add: Some(String::new()),
+            diff_del: Some(String::new()),
+            git_clean: Some(String::new()),
+            git_dirty: Some(String::new()),
+            syntax: Some(String::new()),
+        }
+    }
+
     /// Creates a `ThemeConfig` that selects a named theme with no overrides.
     pub fn from_preset(name: &str) -> Self {
         ThemeConfig {

@@ -1,3 +1,5 @@
+mod validate;
+
 use crate::theme::ThemeConfig;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use serde::{Deserialize, Deserializer, Serialize};
@@ -10,6 +12,7 @@ pub struct Config {
     pub show_hidden: bool,
     pub ignore_gitignore: bool,
     pub tree_width: u16,
+    pub tree_independent_scroll: bool,
     pub word_wrap: bool,
     pub git_status: bool,
     pub git_show_deleted: bool,
@@ -30,6 +33,7 @@ impl Default for Config {
             show_hidden: false,
             ignore_gitignore: false,
             tree_width: 28,
+            tree_independent_scroll: false,
             word_wrap: false,
             git_status: true,
             git_show_deleted: false,
@@ -331,7 +335,19 @@ pub fn load(root: &Path) -> (Config, Option<PathBuf>, Option<String>) {
             continue; // missing or unreadable: try the next candidate
         };
         match toml::from_str::<Config>(&s) {
-            Ok(config) => return (config, Some(path), error),
+            Ok(config) => {
+                // The config parsed, but `#[serde(default)]` silently ignores
+                // unknown keys. Flag them (with nearest-match hints) so typos
+                // don't get dropped without a word. A higher-precedence parse
+                // failure already recorded above takes priority.
+                if error.is_none() {
+                    let unknown = validate::validate_keys(&s);
+                    if !unknown.is_empty() {
+                        error = Some(format!("{}: {}", path.display(), unknown.join("; ")));
+                    }
+                }
+                return (config, Some(path), error);
+            }
             // Record the first malformed config but keep falling back so a valid
             // lower-precedence file (e.g. the global config) can still load.
             Err(e) if error.is_none() => {

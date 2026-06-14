@@ -39,6 +39,13 @@ pub struct App {
     pub nodes: Vec<TreeNode>,
     pub expanded: HashSet<PathBuf>,
     pub tree_selected: usize,
+    /// Viewport top offset for the tree panel. Only used when
+    /// `tree_independent_scroll` is enabled; otherwise the tree auto-scrolls to
+    /// keep `tree_selected` visible and this stays in sync with that.
+    pub tree_scroll: usize,
+    /// When `true`, PageUp/PageDown and Home/End scroll the tree viewport
+    /// without moving the selection (cursor). Up/Down still move the cursor.
+    pub tree_independent_scroll: bool,
     pub content: Vec<String>,
     pub highlighted: Vec<Vec<(ratatui::style::Style, String)>>,
     pub markdown_lines: Vec<Vec<(ratatui::style::Style, String)>>,
@@ -172,6 +179,8 @@ impl App {
             nodes,
             expanded,
             tree_selected: 0,
+            tree_scroll: 0,
+            tree_independent_scroll: cfg.tree_independent_scroll,
             content: Vec::new(),
             highlighted: Vec::new(),
             markdown_lines: Vec::new(),
