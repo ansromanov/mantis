@@ -160,6 +160,8 @@ fn config_paths_are_local_first_then_global() {
     }
 }
 
+use super::validate::validate_keys;
+
 #[test]
 fn validate_keys_accepts_full_default_template() {
     // The shipped template must validate cleanly against the schema.
