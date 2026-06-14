@@ -66,12 +66,8 @@ impl VirtualFile {
         };
         let slice = &self.mmap[start..end];
         let s = std::str::from_utf8(slice).ok()?;
-        Some(
-            s.strip_suffix('\n')
-                .unwrap_or(s)
-                .strip_suffix('\r')
-                .unwrap_or(s),
-        )
+        let no_lf = s.strip_suffix('\n').unwrap_or(s);
+        Some(no_lf.strip_suffix('\r').unwrap_or(no_lf))
     }
 
     /// Returns the display width (in terminal columns) of line `index`.
@@ -96,4 +92,59 @@ fn build_line_offsets(mmap: &[u8]) -> Vec<usize> {
         offsets.pop();
     }
     offsets
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Write;
+
+    use super::*;
+
+    fn make_vf(content: &[u8]) -> VirtualFile {
+        let mut f = tempfile::NamedTempFile::new().unwrap();
+        f.write_all(content).unwrap();
+        VirtualFile::open(f.path()).expect("VirtualFile::open failed")
+    }
+
+    #[test]
+    fn lf_line_endings_stripped() {
+        let vf = make_vf(b"hello\nworld\n");
+        assert_eq!(vf.line_count(), 2);
+        assert_eq!(vf.line_text(0), Some("hello"));
+        assert_eq!(vf.line_text(1), Some("world"));
+    }
+
+    #[test]
+    fn crlf_line_endings_stripped() {
+        let vf = make_vf(b"hello\r\nworld\r\n");
+        assert_eq!(vf.line_count(), 2);
+        assert_eq!(vf.line_text(0), Some("hello"));
+        assert_eq!(vf.line_text(1), Some("world"));
+    }
+
+    #[test]
+    fn no_trailing_empty_line_for_newline_terminated_file() {
+        let vf = make_vf(b"a\nb\n");
+        assert_eq!(vf.line_count(), 2);
+    }
+
+    #[test]
+    fn file_without_trailing_newline() {
+        let vf = make_vf(b"a\nb");
+        assert_eq!(vf.line_count(), 2);
+        assert_eq!(vf.line_text(1), Some("b"));
+    }
+
+    #[test]
+    fn out_of_bounds_returns_none() {
+        let vf = make_vf(b"only\n");
+        assert_eq!(vf.line_text(1), None);
+    }
+
+    #[test]
+    fn binary_file_rejected() {
+        let mut f = tempfile::NamedTempFile::new().unwrap();
+        f.write_all(b"hello\0world").unwrap();
+        assert!(VirtualFile::open(f.path()).is_none());
+    }
 }

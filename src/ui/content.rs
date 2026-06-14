@@ -143,11 +143,7 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
             }
             app.highlight_lines(path, &lines)
         };
-        let highlighted = if app.highlighted.is_empty() {
-            highlight()
-        } else {
-            Default::default()
-        };
+        let highlighted = highlight();
         let has_highlight = !highlighted.is_empty();
 
         let gutters: Vec<Line> = (scroll..visible_end)
@@ -332,7 +328,7 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     };
 
     // Transient scrollbar overlay on the right edge of the content area.
-    let total = app.content_line_count();
+    let total = app.line_count();
     if app.show_scrollbar
         && total > inner_h
         && inner_h > 0

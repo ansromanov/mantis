@@ -160,13 +160,11 @@ impl App {
     /// Re-runs in-file search against the current content source.
     fn refresh_in_file_search(&mut self) {
         let total = self.line_count();
-        let lines: Vec<String> = if self.virtual_file.is_some() {
-            (0..total)
-                .filter_map(|i| self.line_text(i).map(String::from))
-                .collect()
-        } else {
-            self.content.clone()
-        };
+        // Collect before mutably borrowing in_file_search: line_text() takes
+        // &self which conflicts with the &mut borrow needed by s.refresh().
+        let lines: Vec<String> = (0..total)
+            .filter_map(|i| self.line_text(i).map(String::from))
+            .collect();
         let Some(s) = &mut self.in_file_search else {
             return;
         };
