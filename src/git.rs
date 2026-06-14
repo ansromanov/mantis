@@ -295,30 +295,40 @@ pub fn working_tree_diff(repo_dir: &Path, file: &Path) -> Vec<String> {
         }
     }
 
-    // Untracked (unstaged) new file — diff against the null device.
-    // Git for Windows doesn't translate /dev/null in --no-index mode.
-    #[cfg(windows)]
-    let null_dev = "NUL";
-    #[cfg(not(windows))]
-    let null_dev = "/dev/null";
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(repo_dir)
-        .args(["diff", "--no-color", "--no-index", "--", null_dev])
-        .arg(file)
-        .output();
-
-    match out {
-        Ok(o) => {
-            let text = String::from_utf8_lossy(&o.stdout);
-            if !text.trim().is_empty() {
-                text.lines().map(|l| l.to_string()).collect()
-            } else {
-                vec!["(no diff available)".to_string()]
-            }
-        }
-        Err(e) => vec![format!("[git unavailable] {e}")],
+    // Untracked (unstaged) new file: build the diff manually.
+    // git diff --no-index against /dev/null is unreliable on Windows
+    // (git does not translate the path in --no-index mode).
+    let bytes = match std::fs::read(file) {
+        Ok(b) => b,
+        Err(_) => return vec!["(no diff available)".to_string()],
+    };
+    // Show a placeholder for binary files, matching git's behaviour.
+    if bytes.contains(&0u8) {
+        let rel = file
+            .strip_prefix(repo_dir)
+            .unwrap_or(file)
+            .to_string_lossy()
+            .replace('\\', "/");
+        return vec![format!("Binary file {rel} added")];
     }
+    let text = String::from_utf8_lossy(&bytes);
+    let rel = file
+        .strip_prefix(repo_dir)
+        .unwrap_or(file)
+        .to_string_lossy()
+        .replace('\\', "/");
+    let line_count = text.lines().count();
+    let mut lines = vec![
+        format!("diff --git a/{rel} b/{rel}"),
+        "new file mode 100644".to_string(),
+        "--- /dev/null".to_string(),
+        format!("+++ b/{rel}"),
+        format!("@@ -0,0 +1,{line_count} @@"),
+    ];
+    for line in text.lines() {
+        lines.push(format!("+{line}"));
+    }
+    lines
 }
 
 /// A commit that touched a particular file.
