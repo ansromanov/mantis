@@ -28,6 +28,8 @@ pub struct Theme {
     pub diff_del: Color,     // removed lines in a diff
     pub git_clean: Color,    // clean working-tree indicator
     pub git_dirty: Color,    // dirty working-tree indicator
+    pub git_conflict: Color, // conflict / detached HEAD indicator
+    pub git_progress: Color, // rebase/merge in-progress indicator
     pub syntax: String,      // syntect theme name for file contents
 }
 
@@ -57,6 +59,10 @@ struct ThemeToml {
     diff_del: String,
     git_clean: String,
     git_dirty: String,
+    #[serde(default)]
+    git_conflict: Option<String>,
+    #[serde(default)]
+    git_progress: Option<String>,
     syntax: String,
 }
 
@@ -65,6 +71,21 @@ impl Theme {
     /// invalid.
     fn from_toml(toml_str: &str) -> Option<Theme> {
         let tf: ThemeToml = toml::from_str(toml_str).ok()?;
+        let diff_del = parse_color(&tf.diff_del)?;
+        let git_dirty = parse_color(&tf.git_dirty)?;
+        // New fields fall back to sensible existing roles so older theme files
+        // (missing them) still parse: conflict reuses the theme's red, and an
+        // in-progress rebase/merge reuses the dirty color.
+        let git_conflict = tf
+            .git_conflict
+            .as_deref()
+            .and_then(parse_color)
+            .unwrap_or(diff_del);
+        let git_progress = tf
+            .git_progress
+            .as_deref()
+            .and_then(parse_color)
+            .unwrap_or(git_dirty);
         Some(Theme {
             background: parse_color(&tf.background)?,
             accent: parse_color(&tf.accent)?,
@@ -80,9 +101,11 @@ impl Theme {
             heading3: parse_color(&tf.heading3)?,
             code: parse_color(&tf.code)?,
             diff_add: parse_color(&tf.diff_add)?,
-            diff_del: parse_color(&tf.diff_del)?,
+            diff_del,
             git_clean: parse_color(&tf.git_clean)?,
-            git_dirty: parse_color(&tf.git_dirty)?,
+            git_dirty,
+            git_conflict,
+            git_progress,
             syntax: tf.syntax,
         })
     }
@@ -247,6 +270,8 @@ pub struct ThemeConfig {
     pub diff_del: Option<String>,
     pub git_clean: Option<String>,
     pub git_dirty: Option<String>,
+    pub git_conflict: Option<String>,
+    pub git_progress: Option<String>,
     pub syntax: Option<String>,
 }
 
@@ -256,6 +281,7 @@ impl ThemeConfig {
     /// won't do: its fields are all `None`, which TOML omits. The explicit
     /// struct literal means adding a field forces updating this, so the
     /// validation schema can't silently drift out of sync.
+    #[allow(dead_code)]
     pub(crate) fn schema() -> Self {
         ThemeConfig {
             name: Some(String::new()),
@@ -276,6 +302,8 @@ impl ThemeConfig {
             diff_del: Some(String::new()),
             git_clean: Some(String::new()),
             git_dirty: Some(String::new()),
+            git_conflict: Some(String::new()),
+            git_progress: Some(String::new()),
             syntax: Some(String::new()),
         }
     }
@@ -321,6 +349,8 @@ impl ThemeConfig {
             diff_del: col(&self.diff_del, d.diff_del),
             git_clean: col(&self.git_clean, d.git_clean),
             git_dirty: col(&self.git_dirty, d.git_dirty),
+            git_conflict: col(&self.git_conflict, d.git_conflict),
+            git_progress: col(&self.git_progress, d.git_progress),
             syntax: self.syntax.clone().unwrap_or(d.syntax),
         }
     }
@@ -373,6 +403,47 @@ mod tests {
         let t = Theme::load("default").expect("default theme must load");
         assert_eq!(t.background, Color::Reset);
         assert_eq!(t.accent, Color::Cyan);
+    }
+
+    #[test]
+    fn bundled_default_has_distinct_git_state_colors() {
+        // Parse the embedded TOML directly so a stale user-installed copy in
+        // ~/.config can't shadow the bundled values.
+        let toml = include_str!("../themes/default.toml");
+        let t = Theme::from_toml(toml).expect("bundled default must parse");
+        assert_eq!(t.git_clean, Color::Green);
+        assert_eq!(t.git_dirty, Color::Yellow);
+        assert_eq!(t.git_conflict, Color::Red);
+        assert_eq!(t.git_progress, Color::Rgb(0xff, 0x87, 0x00));
+    }
+
+    #[test]
+    fn missing_git_state_fields_fall_back_to_existing_roles() {
+        // A theme TOML without the new fields should still parse, with conflict
+        // reusing the red (diff_del) and progress reusing the dirty color.
+        let toml = r##"
+            background = "reset"
+            accent = "cyan"
+            accent_alt = "yellow"
+            dim = "darkgray"
+            text = "white"
+            dir = "blue"
+            file = "reset"
+            selection_bg = "#505050"
+            selection_fg = "yellow"
+            heading1 = "lightcyan"
+            heading2 = "lightyellow"
+            heading3 = "lightgreen"
+            code = "lightyellow"
+            diff_add = "green"
+            diff_del = "red"
+            git_clean = "green"
+            git_dirty = "yellow"
+            syntax = "base16-ocean.dark"
+        "##;
+        let t = Theme::from_toml(toml).expect("legacy theme must still parse");
+        assert_eq!(t.git_conflict, t.diff_del);
+        assert_eq!(t.git_progress, t.git_dirty);
     }
 
     #[test]
