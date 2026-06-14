@@ -57,6 +57,9 @@ impl App {
     fn handle_search_key(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Esc => {
+                if let Some(s) = &self.search {
+                    self.last_search_query = s.query.clone();
+                }
                 self.search = None;
             }
             KeyCode::Tab => {
@@ -296,12 +299,17 @@ impl App {
             }
             Some("open_file_search") => {
                 let root = self.root.clone();
-                self.search = Some(SearchState::new(
+                let mut s = SearchState::new(
                     &root,
                     self.show_hidden,
                     self.ignore_gitignore,
                     self.config.search_context_lines,
-                ));
+                );
+                if self.config.keep_search_query && !self.last_search_query.is_empty() {
+                    s.query = self.last_search_query.clone();
+                    s.refresh_now();
+                }
+                self.search = Some(s);
             }
             Some("open_content_search") => {
                 let root = self.root.clone();
@@ -312,6 +320,10 @@ impl App {
                     self.config.search_context_lines,
                 );
                 s.toggle_mode();
+                if self.config.keep_search_query && !self.last_search_query.is_empty() {
+                    s.query = self.last_search_query.clone();
+                    s.refresh_now();
+                }
                 self.search = Some(s);
             }
             Some("reload") => self.reload(),
@@ -430,12 +442,17 @@ impl App {
                 self.in_file_search = Some(InFileSearch::new());
             } else {
                 let root = self.root.clone();
-                self.search = Some(SearchState::new(
+                let mut s = SearchState::new(
                     &root,
                     self.show_hidden,
                     self.ignore_gitignore,
                     self.config.search_context_lines,
-                ));
+                );
+                if self.config.keep_search_query && !self.last_search_query.is_empty() {
+                    s.query = self.last_search_query.clone();
+                    s.refresh_now();
+                }
+                self.search = Some(s);
             }
         } else if pressed(&k.reload, &key) {
             self.reload();
@@ -448,6 +465,10 @@ impl App {
                 self.config.search_context_lines,
             );
             s.toggle_mode();
+            if self.config.keep_search_query && !self.last_search_query.is_empty() {
+                s.query = self.last_search_query.clone();
+                s.refresh_now();
+            }
             self.search = Some(s);
         } else if pressed(&k.file_history, &key) {
             self.open_file_history();

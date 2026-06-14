@@ -124,7 +124,6 @@ impl SearchState {
     }
 
     /// Force an immediate refresh, bypassing any debounce.
-    #[allow(dead_code)]
     pub fn refresh_now(&mut self) {
         self.pending_refresh = None;
         self.refresh();
