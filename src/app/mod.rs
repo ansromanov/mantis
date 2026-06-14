@@ -15,6 +15,7 @@ use crate::selection::TextSelection;
 use crate::theme::Theme;
 use crate::tree::{build_visible, TreeNode};
 use crate::virtual_file::VirtualFile;
+use crate::yaml_fold::FoldRegion;
 
 mod content_pos;
 mod file_ops;
@@ -112,6 +113,14 @@ pub struct App {
     /// Set to `true` after suspending the TUI (e.g. for editor), signals
     /// `main.rs` to call `terminal.clear()` before the next `draw()`.
     pub needs_clear: bool,
+    // YAML folding state
+    pub yaml_fold_regions: Vec<FoldRegion>,
+    pub yaml_folded: HashSet<usize>,
+    /// display_line → physical_line mapping; empty when no folds are active.
+    pub fold_display_map: Vec<usize>,
+    /// (screen_y, region_idx) pairs recorded during the last render, used for
+    /// fold-gutter mouse click detection.
+    pub fold_gutter_rows: Vec<(u16, usize)>,
 }
 
 impl App {
@@ -219,6 +228,10 @@ impl App {
             drag_start: None,
             scrollbar_drag: false,
             needs_clear: false,
+            yaml_fold_regions: Vec::new(),
+            yaml_folded: HashSet::new(),
+            fold_display_map: Vec::new(),
+            fold_gutter_rows: Vec::new(),
         };
         if app.git_mode {
             app.expand_git_dirs();
@@ -275,6 +288,101 @@ impl App {
         if self.last_refresh.elapsed().as_secs() >= 30 {
             self.reload();
         }
+    }
+
+    /// Width of the fold gutter (2 chars: marker + space) when YAML regions
+    /// are detected, 0 otherwise.
+    pub fn fold_gutter_width(&self) -> usize {
+        if self.yaml_fold_regions.is_empty() {
+            0
+        } else {
+            2
+        }
+    }
+
+    /// Returns the number of **display** lines after folding. Equals
+    /// `line_count()` when no folds are active.
+    pub fn display_line_count(&self) -> usize {
+        if self.fold_display_map.is_empty() {
+            self.line_count()
+        } else {
+            self.fold_display_map.len()
+        }
+    }
+
+    /// Maps a display-space line index to a physical file line index.
+    pub fn display_to_physical(&self, display: usize) -> usize {
+        if self.fold_display_map.is_empty() {
+            display
+        } else {
+            self.fold_display_map
+                .get(display)
+                .copied()
+                .unwrap_or(display)
+        }
+    }
+
+    /// Converts a physical line index to a display line index.
+    /// When folding is inactive this is identity; when active it finds the
+    /// position of `physical` in the display map (first visible line ≥ physical
+    /// when the line itself is hidden inside a fold).
+    pub fn physical_to_display(&self, physical: usize) -> usize {
+        if self.fold_display_map.is_empty() {
+            return physical;
+        }
+        // Find the first display line whose physical index is >= physical.
+        self.fold_display_map
+            .iter()
+            .position(|&p| p >= physical)
+            .unwrap_or(self.fold_display_map.len().saturating_sub(1))
+    }
+
+    /// Returns the fold region index whose `start` matches `physical_line`, if any.
+    pub fn region_idx_at(&self, physical_line: usize) -> Option<usize> {
+        self.yaml_fold_regions
+            .iter()
+            .position(|r| r.start == physical_line)
+    }
+
+    /// Rebuilds `fold_display_map` from the current `yaml_folded` set.
+    pub fn rebuild_fold_display_map(&mut self) {
+        self.fold_display_map = crate::yaml_fold::build_display_map(
+            &self.yaml_fold_regions,
+            &self.yaml_folded,
+            self.line_count(),
+        );
+    }
+
+    /// Toggles the fold state of `region_idx` and clamps the scroll position.
+    pub fn toggle_fold_region(&mut self, region_idx: usize) {
+        if self.yaml_folded.contains(&region_idx) {
+            self.yaml_folded.remove(&region_idx);
+        } else {
+            self.yaml_folded.insert(region_idx);
+        }
+        self.rebuild_fold_display_map();
+        self.content_scroll = self.content_scroll.min(self.content_scroll_max());
+    }
+
+    /// Folds every detected YAML region and scrolls to the top.
+    pub fn fold_all(&mut self) {
+        self.yaml_folded = (0..self.yaml_fold_regions.len()).collect();
+        self.rebuild_fold_display_map();
+        self.content_scroll = 0;
+    }
+
+    /// Expands every YAML region.
+    pub fn unfold_all(&mut self) {
+        self.yaml_folded.clear();
+        self.fold_display_map.clear();
+    }
+
+    /// Resets all YAML fold state. Called whenever a new file is opened.
+    pub(crate) fn clear_fold_state(&mut self) {
+        self.yaml_fold_regions.clear();
+        self.yaml_folded.clear();
+        self.fold_display_map.clear();
+        self.fold_gutter_rows.clear();
     }
 
     /// Returns the total number of lines in the current content source

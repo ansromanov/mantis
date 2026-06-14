@@ -48,7 +48,7 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
 
     let inner = block.inner(area);
     let view_height = inner.height as usize;
-    let total_lines = app.line_count();
+    let total_lines = app.display_line_count();
     let scroll = app.content_scroll.min(total_lines.saturating_sub(1));
     let visible_end = (scroll + view_height).min(total_lines);
 
@@ -90,8 +90,8 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     };
     let blame_style = Style::default().fg(app.theme.dim);
 
-    // ln_width, ln_lines, content_lines
-    let (ln_width, ln_lines, content_lines): (usize, Vec<Line>, Vec<Line>) = if app.is_diff {
+    // ln_width, ln_lines, content_lines, fold_gutter_rows
+    let (ln_width, ln_lines, content_lines, new_fold_gutter_rows) = if app.is_diff {
         // Diff view: iterate all highlighted lines (diffs are never large).
         let lines = app
             .highlighted
@@ -110,11 +110,11 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                 })
             })
             .collect();
-        (0, vec![], lines)
+        (0, vec![], lines, vec![])
     } else if app.is_json && app.show_pretty_json && !app.json_pretty_lines.is_empty() {
         // JSON pretty view: iterate only the visible window of pre-highlighted lines.
         let ln_style = Style::default().fg(app.theme.dim);
-        let lw = total_lines.to_string().len().max(1);
+        let lw = app.line_count().to_string().len().max(1);
         let gutters: Vec<Line> = (scroll..visible_end)
             .map(|i| {
                 Line::from(Span::styled(
@@ -160,11 +160,11 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                 }
             })
             .collect();
-        (lw + 1, gutters, lines)
+        (lw + 1, gutters, lines, vec![])
     } else if app.is_markdown && !app.show_raw_markdown {
         // Markdown: iterate only the visible window of pre-rendered lines.
         let ln_style = Style::default().fg(app.theme.dim);
-        let lw = total_lines.to_string().len().max(1);
+        let lw = app.line_count().to_string().len().max(1);
         let gutters: Vec<Line> = (scroll..visible_end)
             .map(|i| {
                 let ln_span = Span::styled(format!("{:>width$} ", i + 1, width = lw), ln_style);
@@ -216,18 +216,29 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                 }
             })
             .collect();
-        (blame_width + lw + 1, gutters, lines)
+        (blame_width + lw + 1, gutters, lines, vec![])
     } else if let Some(vf) = app.virtual_file.as_ref() {
         // Virtual file view: lazy-loaded from mmap, highlighted on the fly.
-        let lw = total_lines.to_string().len().max(1);
+        let phys_total = app.line_count();
+        let lw = phys_total.to_string().len().max(1);
+        let fold_gw = app.fold_gutter_width();
         let ln_style = Style::default().fg(app.theme.dim);
+        let fold_marker_style = Style::default().fg(app.theme.dim);
+        let ellipsis_style = Style::default().fg(app.theme.dim);
+
+        // Map display indices to physical indices for the visible window.
+        let display_phys: Vec<usize> = (scroll..visible_end)
+            .map(|d| app.display_to_physical(d))
+            .collect();
+
         let highlight = || -> Vec<Vec<(Style, String)>> {
             let path = match &app.current_file {
                 Some(p) => p.as_path(),
                 None => return Vec::new(),
             };
-            let lines: Vec<&str> = (scroll..visible_end)
-                .filter_map(|i| vf.line_text(i))
+            let lines: Vec<&str> = display_phys
+                .iter()
+                .filter_map(|&i| vf.line_text(i))
                 .collect();
             if lines.is_empty() {
                 return Vec::new();
@@ -237,33 +248,97 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         let highlighted = highlight();
         let has_highlight = !highlighted.is_empty();
 
-        let gutters: Vec<Line> = (scroll..visible_end)
-            .map(|i| {
-                let ln_span = Span::styled(format!("{:>width$} ", i + 1, width = lw), ln_style);
+        // Record fold gutter rows for mouse click detection.
+        let mut new_fold_gutter_rows: Vec<(u16, usize)> = Vec::new();
+
+        let gutters: Vec<Line> = display_phys
+            .iter()
+            .enumerate()
+            .map(|(offset, &phys)| {
+                // Determine fold marker for this line.
+                let fold_marker = if fold_gw > 0 {
+                    if let Some(ri) = app.region_idx_at(phys) {
+                        let screen_y = inner.y + offset as u16;
+                        new_fold_gutter_rows.push((screen_y, ri));
+                        if app.yaml_folded.contains(&ri) {
+                            "▶ "
+                        } else {
+                            "▼ "
+                        }
+                    } else {
+                        "  "
+                    }
+                } else {
+                    ""
+                };
+                let ln_str = format!("{fold_marker}{:>lw$} ", phys + 1, lw = lw);
+                let ln_span = Span::styled(ln_str, ln_style);
                 if blame_width > 0 {
                     let annotation = blame_annotations
-                        .get(i)
+                        .get(phys)
                         .cloned()
                         .unwrap_or_else(|| " ".repeat(BLAME_COL_WIDTH));
-                    Line::from(vec![Span::styled(annotation, blame_style), ln_span])
+                    Line::from(vec![
+                        Span::styled(annotation, blame_style),
+                        Span::styled(
+                            if fold_gw > 0 {
+                                fold_marker.to_string()
+                            } else {
+                                String::new()
+                            },
+                            fold_marker_style,
+                        ),
+                        ln_span,
+                    ])
                 } else {
                     Line::from(ln_span)
                 }
             })
             .collect();
-        let content: Vec<Line> = (scroll..visible_end)
+
+        let content: Vec<Line> = display_phys
+            .iter()
             .enumerate()
-            .map(|(offset, logical_idx)| {
+            .map(|(offset, &physical_idx)| {
+                // If this line is a collapsed fold header, show a dimmed ellipsis.
+                if fold_gw > 0 {
+                    if let Some(ri) = app.region_idx_at(physical_idx) {
+                        if app.yaml_folded.contains(&ri) {
+                            let header_spans: Vec<Span> = if has_highlight {
+                                if let Some(regions) = highlighted.get(offset) {
+                                    let regions_owned: Vec<(Style, String)> =
+                                        regions.iter().map(|(s, t)| (*s, t.clone())).collect();
+                                    regions_owned
+                                        .iter()
+                                        .map(|(s, t)| Span::styled(t.clone(), *s))
+                                        .collect()
+                                } else {
+                                    vec![Span::raw(
+                                        vf.line_text(physical_idx).unwrap_or("").to_string(),
+                                    )]
+                                }
+                            } else {
+                                vec![Span::raw(
+                                    vf.line_text(physical_idx).unwrap_or("").to_string(),
+                                )]
+                            };
+                            let mut line_spans = header_spans;
+                            line_spans.push(Span::styled("  …", ellipsis_style));
+                            return Line::from(line_spans);
+                        }
+                    }
+                }
+
                 if has_highlight {
                     if let Some(regions) = highlighted.get(offset) {
                         let regions_owned: Vec<(Style, String)> =
                             regions.iter().map(|(s, t)| (*s, t.clone())).collect();
                         let spans: Vec<Span> = if let Some(s) = in_file_search {
-                            apply_search_to_regions(&regions_owned, logical_idx, s, &app.theme)
+                            apply_search_to_regions(&regions_owned, physical_idx, s, &app.theme)
                         } else if let Some(((sl, sc), (el, ec))) = sel {
-                            if logical_idx >= sl && logical_idx <= el {
-                                let col_start = if logical_idx == sl { sc } else { 0 };
-                                let col_end = if logical_idx == el { ec } else { usize::MAX };
+                            if physical_idx >= sl && physical_idx <= el {
+                                let col_start = if physical_idx == sl { sc } else { 0 };
+                                let col_end = if physical_idx == el { ec } else { usize::MAX };
                                 apply_selection(&regions_owned, col_start, col_end, sel_bg)
                             } else {
                                 regions_owned
@@ -280,15 +355,15 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                         return Line::from(spans);
                     }
                 }
-                // Fallback: show raw text if highlighting failed or wasn't applied
-                let text = vf.line_text(logical_idx).unwrap_or("");
+                // Fallback: show raw text
+                let text = vf.line_text(physical_idx).unwrap_or("");
                 let region = vec![(Style::default(), text.to_string())];
                 let spans: Vec<Span> = if let Some(s) = in_file_search {
-                    apply_search_to_regions(&region, logical_idx, s, &app.theme)
+                    apply_search_to_regions(&region, physical_idx, s, &app.theme)
                 } else if let Some(((sl, sc), (el, ec))) = sel {
-                    if logical_idx >= sl && logical_idx <= el {
-                        let col_start = if logical_idx == sl { sc } else { 0 };
-                        let col_end = if logical_idx == el { ec } else { usize::MAX };
+                    if physical_idx >= sl && physical_idx <= el {
+                        let col_start = if physical_idx == sl { sc } else { 0 };
+                        let col_end = if physical_idx == el { ec } else { usize::MAX };
                         apply_selection(&region, col_start, col_end, sel_bg)
                     } else {
                         vec![Span::raw(text.to_string())]
@@ -299,19 +374,51 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                 Line::from(spans)
             })
             .collect();
-        (blame_width + lw + 1, gutters, content)
+        (
+            blame_width + fold_gw + lw + 1,
+            gutters,
+            content,
+            new_fold_gutter_rows,
+        )
     } else {
         // Inline fallback: `content` vec is the source (errors, binaries, small files).
-        let lw = total_lines.to_string().len().max(1);
+        let phys_total = app.line_count();
+        let fold_gw = app.fold_gutter_width();
+        let lw = phys_total.to_string().len().max(1);
         let ln_style = Style::default().fg(app.theme.dim);
         let has_highlight = !app.highlighted.is_empty();
 
-        let gutters: Vec<Line> = (scroll..visible_end)
-            .map(|i| {
-                let ln_span = Span::styled(format!("{:>width$} ", i + 1, width = lw), ln_style);
+        let display_phys: Vec<usize> = (scroll..visible_end)
+            .map(|d| app.display_to_physical(d))
+            .collect();
+
+        // Track fold gutter rows for mouse hit detection.
+        let mut inline_fold_gutter_rows: Vec<(u16, usize)> = Vec::new();
+
+        let gutters: Vec<Line> = display_phys
+            .iter()
+            .enumerate()
+            .map(|(offset, &phys)| {
+                let fold_marker = if fold_gw > 0 {
+                    if let Some(ri) = app.region_idx_at(phys) {
+                        let screen_y = inner.y + offset as u16;
+                        inline_fold_gutter_rows.push((screen_y, ri));
+                        if app.yaml_folded.contains(&ri) {
+                            "▶ "
+                        } else {
+                            "▼ "
+                        }
+                    } else {
+                        "  "
+                    }
+                } else {
+                    ""
+                };
+                let ln_str = format!("{fold_marker}{:>lw$} ", phys + 1, lw = lw);
+                let ln_span = Span::styled(ln_str, ln_style);
                 if blame_width > 0 {
                     let annotation = blame_annotations
-                        .get(i)
+                        .get(phys)
                         .cloned()
                         .unwrap_or_else(|| " ".repeat(BLAME_COL_WIDTH));
                     Line::from(vec![Span::styled(annotation, blame_style), ln_span])
@@ -320,61 +427,98 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                 }
             })
             .collect();
-        let content: Vec<Line> = if has_highlight {
-            app.highlighted[scroll..visible_end]
-                .iter()
-                .enumerate()
-                .map(|(offset, regions)| {
-                    let logical_idx = scroll + offset;
-                    let regions_owned: Vec<(Style, String)> =
-                        regions.iter().map(|(s, t)| (*s, t.clone())).collect();
-                    let spans: Vec<Span> = if let Some(s) = in_file_search {
-                        apply_search_to_regions(&regions_owned, logical_idx, s, &app.theme)
-                    } else if let Some(((sl, sc), (el, ec))) = sel {
-                        if logical_idx >= sl && logical_idx <= el {
-                            let col_start = if logical_idx == sl { sc } else { 0 };
-                            let col_end = if logical_idx == el { ec } else { usize::MAX };
-                            apply_selection(&regions_owned, col_start, col_end, sel_bg)
+
+        let content: Vec<Line> = display_phys
+            .iter()
+            .map(|&physical_idx| {
+                // Collapsed fold header: show header + ellipsis.
+                if fold_gw > 0 {
+                    if let Some(ri) = app.region_idx_at(physical_idx) {
+                        if app.yaml_folded.contains(&ri) {
+                            let ellipsis_style = Style::default().fg(app.theme.dim);
+                            let header_spans: Vec<Span> = if has_highlight {
+                                app.highlighted
+                                    .get(physical_idx)
+                                    .map(|regions| {
+                                        regions
+                                            .iter()
+                                            .map(|(s, t)| Span::styled(t.clone(), *s))
+                                            .collect()
+                                    })
+                                    .unwrap_or_else(|| {
+                                        vec![Span::raw(
+                                            app.content
+                                                .get(physical_idx)
+                                                .cloned()
+                                                .unwrap_or_default(),
+                                        )]
+                                    })
+                            } else {
+                                vec![Span::raw(
+                                    app.content.get(physical_idx).cloned().unwrap_or_default(),
+                                )]
+                            };
+                            let mut line_spans = header_spans;
+                            line_spans.push(Span::styled("  …", ellipsis_style));
+                            return Line::from(line_spans);
+                        }
+                    }
+                }
+
+                if has_highlight {
+                    if let Some(regions) = app.highlighted.get(physical_idx) {
+                        let regions_owned: Vec<(Style, String)> =
+                            regions.iter().map(|(s, t)| (*s, t.clone())).collect();
+                        let spans: Vec<Span> = if let Some(s) = in_file_search {
+                            apply_search_to_regions(&regions_owned, physical_idx, s, &app.theme)
+                        } else if let Some(((sl, sc), (el, ec))) = sel {
+                            if physical_idx >= sl && physical_idx <= el {
+                                let col_start = if physical_idx == sl { sc } else { 0 };
+                                let col_end = if physical_idx == el { ec } else { usize::MAX };
+                                apply_selection(&regions_owned, col_start, col_end, sel_bg)
+                            } else {
+                                regions_owned
+                                    .iter()
+                                    .map(|(s, t)| Span::styled(t.clone(), *s))
+                                    .collect()
+                            }
                         } else {
                             regions_owned
                                 .iter()
                                 .map(|(s, t)| Span::styled(t.clone(), *s))
                                 .collect()
-                        }
+                        };
+                        return Line::from(spans);
+                    }
+                }
+                let text = app
+                    .content
+                    .get(physical_idx)
+                    .map(|s| s.as_str())
+                    .unwrap_or("");
+                let region = vec![(Style::default(), text.to_string())];
+                let spans: Vec<Span> = if let Some(s) = in_file_search {
+                    apply_search_to_regions(&region, physical_idx, s, &app.theme)
+                } else if let Some(((sl, sc), (el, ec))) = sel {
+                    if physical_idx >= sl && physical_idx <= el {
+                        let col_start = if physical_idx == sl { sc } else { 0 };
+                        let col_end = if physical_idx == el { ec } else { usize::MAX };
+                        apply_selection(&region, col_start, col_end, sel_bg)
                     } else {
-                        regions_owned
-                            .iter()
-                            .map(|(s, t)| Span::styled(t.clone(), *s))
-                            .collect()
-                    };
-                    Line::from(spans)
-                })
-                .collect()
-        } else {
-            app.content[scroll..visible_end]
-                .iter()
-                .enumerate()
-                .map(|(offset, text)| {
-                    let logical_idx = scroll + offset;
-                    let region = vec![(Style::default(), text.clone())];
-                    let spans: Vec<Span> = if let Some(s) = in_file_search {
-                        apply_search_to_regions(&region, logical_idx, s, &app.theme)
-                    } else if let Some(((sl, sc), (el, ec))) = sel {
-                        if logical_idx >= sl && logical_idx <= el {
-                            let col_start = if logical_idx == sl { sc } else { 0 };
-                            let col_end = if logical_idx == el { ec } else { usize::MAX };
-                            apply_selection(&region, col_start, col_end, sel_bg)
-                        } else {
-                            vec![Span::raw(text.clone())]
-                        }
-                    } else {
-                        vec![Span::raw(text.clone())]
-                    };
-                    Line::from(spans)
-                })
-                .collect()
-        };
-        (blame_width + lw + 1, gutters, content)
+                        vec![Span::raw(text.to_string())]
+                    }
+                } else {
+                    vec![Span::raw(text.to_string())]
+                };
+                Line::from(spans)
+            })
+            .collect();
+        (
+            blame_width + fold_gw + lw + 1,
+            gutters,
+            content,
+            inline_fold_gutter_rows,
+        )
     };
 
     let inner = block.inner(area);
@@ -429,9 +573,10 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         width: inner_w as u16,
         height: inner_h as u16,
     };
+    app.fold_gutter_rows = new_fold_gutter_rows;
 
     // Transient scrollbar overlay on the right edge of the content area.
-    let total = app.line_count();
+    let total = app.display_line_count();
     if app.show_scrollbar
         && total > inner_h
         && inner_h > 0

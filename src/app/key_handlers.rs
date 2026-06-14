@@ -164,10 +164,11 @@ impl App {
         let Some(m) = s.matches.get(s.current) else {
             return;
         };
-        if m.line < self.content_scroll {
-            self.content_scroll = m.line;
-        } else if m.line >= self.content_scroll + view_height {
-            self.content_scroll = m.line.saturating_sub(view_height).saturating_add(1);
+        let display_line = self.physical_to_display(m.line);
+        if display_line < self.content_scroll {
+            self.content_scroll = display_line;
+        } else if display_line >= self.content_scroll + view_height {
+            self.content_scroll = display_line.saturating_sub(view_height).saturating_add(1);
         }
         self.mark_content_scrolled();
     }
@@ -361,6 +362,21 @@ impl App {
             Some("open_in_editor") => self.open_in_editor(),
             Some("open_config_in_editor") => self.open_config_in_editor(),
             Some("show_about") => self.show_about = !self.show_about,
+            Some("yaml_fold_all") if !self.yaml_fold_regions.is_empty() => {
+                self.fold_all();
+                self.mark_content_scrolled();
+            }
+            Some("yaml_unfold_all") if !self.yaml_fold_regions.is_empty() => {
+                self.unfold_all();
+                self.mark_content_scrolled();
+            }
+            Some("yaml_fold_toggle") if !self.yaml_fold_regions.is_empty() => {
+                let phys = self.display_to_physical(self.content_scroll);
+                if let Some(ri) = self.region_idx_at(phys) {
+                    self.toggle_fold_region(ri);
+                    self.mark_content_scrolled();
+                }
+            }
             _ => {}
         }
     }
@@ -673,6 +689,13 @@ impl App {
             self.content_hscroll = 0;
         } else if !self.is_diff && pressed(&k.toggle_blame, &key) {
             self.show_blame = !self.show_blame;
+        } else if !self.yaml_fold_regions.is_empty() && pressed(&k.yaml_fold_toggle, &key) {
+            // Toggle the fold region whose header is at the current scroll position.
+            let phys = self.display_to_physical(self.content_scroll);
+            if let Some(ri) = self.region_idx_at(phys) {
+                self.toggle_fold_region(ri);
+                self.mark_content_scrolled();
+            }
         } else if pressed(&k.toggle_wrap, &key) {
             self.word_wrap = !self.word_wrap;
             self.config.word_wrap = self.word_wrap;

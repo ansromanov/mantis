@@ -68,6 +68,18 @@ pub static COMMANDS: &[CommandEntry] = &[
         name: "About tree-viewer",
         action_id: "show_about",
     },
+    CommandEntry {
+        name: "Fold all (YAML)",
+        action_id: "yaml_fold_all",
+    },
+    CommandEntry {
+        name: "Unfold all (YAML)",
+        action_id: "yaml_unfold_all",
+    },
+    CommandEntry {
+        name: "Toggle fold at cursor (YAML)",
+        action_id: "yaml_fold_toggle",
+    },
 ];
 
 pub struct CommandPalette {

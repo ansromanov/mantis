@@ -24,6 +24,7 @@ mod theme;
 mod tree;
 mod ui;
 mod virtual_file;
+mod yaml_fold;
 
 /// Parses a canonicalized path argument into (root_dir, optional_file_to_open).
 fn resolve_root_and_file(arg: &Path) -> (PathBuf, Option<PathBuf>) {
