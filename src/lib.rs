@@ -5,6 +5,7 @@ pub mod file;
 pub mod git;
 pub mod highlight;
 pub mod markdown;
+pub mod release_info;
 pub mod search;
 pub mod selection;
 pub mod theme;

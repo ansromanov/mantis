@@ -15,6 +15,7 @@ mod file;
 mod git;
 mod highlight;
 mod markdown;
+mod release_info;
 mod search;
 mod selection;
 mod theme;
@@ -36,8 +37,28 @@ fn resolve_root_and_file(arg: &Path) -> (PathBuf, Option<PathBuf>) {
 }
 
 fn main() -> anyhow::Result<()> {
-    let arg = std::env::args()
-        .nth(1)
+    let args: Vec<String> = std::env::args().collect();
+    let flag = args.get(1).map(String::as_str);
+    match flag {
+        Some("--help") | Some("-h") | Some("/?") => {
+            println!("Usage: tv [<path>]");
+            println!("  <path>  File or directory to open (default: current dir)");
+            println!();
+            println!("Options:");
+            println!("  -h, --help, /?    Print this help");
+            println!("  -V, --version     Print version");
+            std::process::exit(0);
+        }
+        Some("--version") | Some("-V") => {
+            println!("v{}", env!("CARGO_PKG_VERSION"));
+            std::process::exit(0);
+        }
+        _ => {}
+    }
+
+    let arg = args
+        .get(1)
+        .filter(|a| !a.starts_with('-'))
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("."))
         .canonicalize()?;

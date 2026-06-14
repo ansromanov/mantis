@@ -15,6 +15,18 @@ impl App {
     /// Dispatches a key event. Overlays (help, theme, history, search) are
     /// checked first; otherwise normal tree/content key handling applies.
     pub fn handle_key(&mut self, key: KeyEvent) {
+        if self.show_about {
+            match key.code {
+                KeyCode::Char('?') | KeyCode::Esc | KeyCode::Char('q') => {
+                    self.show_about = false;
+                }
+                KeyCode::Enter => {
+                    self.open_release_url();
+                }
+                _ => {}
+            }
+            return;
+        }
         if self.show_help {
             if matches!(
                 key.code,
@@ -329,8 +341,27 @@ impl App {
                 self.content_hscroll = 0;
             }
             Some("open_in_editor") => self.open_in_editor(),
+            Some("show_about") => self.show_about = !self.show_about,
             _ => {}
         }
+    }
+
+    fn open_release_url(&self) {
+        let Some(release) = crate::release_info::RELEASE.as_ref() else {
+            return;
+        };
+        let url = release.release_url.clone();
+        if url.is_empty() {
+            return;
+        }
+        #[cfg(target_os = "macos")]
+        let _ = std::process::Command::new("open").arg(&url).spawn();
+        #[cfg(target_os = "windows")]
+        let _ = std::process::Command::new("cmd")
+            .args(["/c", "start", "", &url])
+            .spawn();
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        let _ = std::process::Command::new("xdg-open").arg(&url).spawn();
     }
 
     /// Applies the theme selected in the picker, saves it to config, and

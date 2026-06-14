@@ -118,6 +118,11 @@ pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
             spans.push(Span::styled(" [config error]", base.fg(theme.diff_del)));
         }
 
+        spans.push(Span::styled(
+            format!(" v{}", env!("CARGO_PKG_VERSION")),
+            base.fg(theme.dim),
+        ));
+
         spans
     };
 
