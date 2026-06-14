@@ -40,7 +40,16 @@ fn resolve_root_and_file(arg: &Path) -> (PathBuf, Option<PathBuf>) {
 
 /// Returns the first CLI argument as a `PathBuf`, if any.
 fn parse_args() -> Option<PathBuf> {
-    std::env::args().nth(1).map(PathBuf::from)
+    parse_args_from(std::env::args())
+}
+
+/// Parses the first argument from an iterator of strings. Extracted for
+/// testability: tests can inject an arbitrary argument list.
+fn parse_args_from<I>(args: I) -> Option<PathBuf>
+where
+    I: IntoIterator<Item = String>,
+{
+    args.into_iter().nth(1).map(PathBuf::from)
 }
 
 fn main() -> anyhow::Result<()> {
@@ -178,9 +187,15 @@ mod tests {
     }
 
     #[test]
-    fn parse_args_returns_option() {
-        let result = parse_args();
-        assert!(result.is_some() || result.is_none());
+    fn parse_args_returns_none_with_no_args() {
+        let result = parse_args_from(std::iter::empty::<String>());
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn parse_args_returns_first_arg() {
+        let result = parse_args_from(["program", "some/path"].into_iter().map(String::from));
+        assert_eq!(result, Some(PathBuf::from("some/path")));
     }
 
     #[test]
@@ -374,8 +389,12 @@ mod tests {
     }
 
     #[test]
-    fn terminal_setup_config_error_surfaces_warning() {
-        let result = parse_args();
-        assert!(result.is_some() || result.is_none());
+    fn config_error_surfaces_from_invalid_toml() {
+        let dir = temp_dir();
+        fs::write(dir.join("tv.toml"), "garbage [[[ = 1").unwrap();
+        let (_cfg, _path, err) = crate::config::load(&dir);
+        assert!(err.is_some());
+        assert!(err.unwrap().contains("tv.toml"));
+        fs::remove_dir_all(&dir).ok();
     }
 }
