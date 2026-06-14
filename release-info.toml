@@ -1,13 +1,4 @@
-version = "0.4.0"
+version = "0.5.0"
 date = "2026-06-14"
-whats_new = """- fix(ci): use deploy key for publish job push to main (#127)
-- feat: YAML code folding with gutter markers and commands (#125)
-- test: add coverage for main.rs entry point (#117) (#123)
-- feat: seed default config and themes on first run, add palette action to open config in editor (#124)
-- docs: refresh README and docs site; relicense to GPL-3.0 (#126)
-- feat: add keep_search_query config option to persist last search (#121)
-- feat: add search_context_lines config for showing N lines after a content match (#120)
-- feat: CLI --help/--version, status bar version, and About popup (#119)
-- feat: JSON syntax highlighting and pretty-print toggle (#106)
-- feat: inline git blame annotations in content pane (#110)"""
-release_url = "https://github.com/ansromanov/tree-viewer/releases/tag/v0.4.0"
+whats_new = ""
+release_url = "https://github.com/ansromanov/tree-viewer/releases/tag/v0.5.0"
