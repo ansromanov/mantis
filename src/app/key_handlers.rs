@@ -612,7 +612,7 @@ impl App {
 
     /// Largest valid `tree_scroll` value so the last row can sit at the bottom
     /// of the viewport without scrolling past the end of the tree.
-    fn tree_scroll_max(&self) -> usize {
+    pub(super) fn tree_scroll_max(&self) -> usize {
         self.nodes.len().saturating_sub(self.tree_page_size())
     }
 
