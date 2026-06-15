@@ -1,3 +1,13 @@
+//! The About popup.
+//!
+//! `draw_about` renders a centered, bordered overlay showing the application
+//! name and version, a short description, and the current release's "what's new"
+//! notes pulled from `release_info::RELEASE`. When release metadata is present
+//! it also hints that Enter opens the release page in a browser. It is a
+//! read-only view of `App` state (theme and release info) and draws nothing when
+//! invoked outside the overlay's active state; visibility is decided by the
+//! caller in the UI orchestrator based on `App::show_about`.
+
 use ratatui::{
     layout::Rect,
     style::{Modifier, Style},

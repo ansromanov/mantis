@@ -1,3 +1,14 @@
+//! YAML fold-region detection (pure, UI-agnostic).
+//!
+//! Computes which line ranges of a YAML document can be collapsed, based purely
+//! on indentation nesting: a `FoldRegion` starts at a line immediately followed
+//! by a more-indented line and ends just before indentation returns to the same
+//! or a shallower level. `detect_fold_regions` produces these regions and
+//! `build_display_map` turns a set of collapsed regions into a display-line to
+//! physical-line table. This module knows nothing about `App` or rendering;
+//! `app::yaml_fold` adapts it to live editor state and the UI consumes the
+//! resulting map for scrolling and the fold gutter.
+
 use std::collections::HashSet;
 
 /// A contiguous foldable block in a YAML file.

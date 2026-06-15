@@ -1,3 +1,14 @@
+//! In-file search match highlighting for the content pane.
+//!
+//! `apply_search_to_regions` takes a line's already-styled `(Style, String)`
+//! regions and the active `InFileSearch` state and subdivides those regions at
+//! match boundaries, so each match on the line is recolored: the current match
+//! gets the selection background and the others get a dimmer highlight. It
+//! returns ratatui `Span`s ready to render. The work is per-line and purely
+//! presentational - match positions are computed by the search engine; this
+//! module only overlays their styling onto the existing syntax/markdown spans
+//! without disturbing the underlying colors elsewhere on the line.
+
 use ratatui::style::Style;
 use ratatui::text::Span;
 

@@ -1,3 +1,15 @@
+//! Central application state: the `App` struct that ties the whole TUI together.
+//!
+//! `App` holds the file tree, content/diff buffers, every overlay's state
+//! (search, history, theme picker, command palette, help, about, blame), the
+//! resolved theme and keymap, and the geometry captured during the last render
+//! so mouse handlers can hit-test clicks. Construction (`App::new`) walks the
+//! root, loads git status, and opens the first file; `reload`/`tick` keep the
+//! view in sync with the filesystem via a debounced watcher with a periodic
+//! fallback. Behaviour is split across sibling submodules (key/mouse handlers,
+//! navigation, file_ops, loader, refresh, content/diff/yaml helpers); this file
+//! owns the struct, its fields, and a few shared free functions.
+
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::mpsc::Receiver;

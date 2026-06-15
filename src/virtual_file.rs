@@ -1,3 +1,14 @@
+//! Memory-mapped, lazily-indexed file backing for large files.
+//!
+//! `VirtualFile` opens a file with `memmap2` and builds only a per-line
+//! byte-offset table instead of reading the whole thing into a `Vec<String>`.
+//! Lines are sliced out of the mapping on demand, so opening a huge file is
+//! cheap and the content pane highlights only the visible window. It exposes the
+//! line count and per-line text accessors the content-query layer expects, and
+//! uses `is_binary_bytes` to refuse binary data. This is the default content
+//! source for ordinary files; small or special cases (errors, binaries, diffs,
+//! rendered markdown) use other in-memory representations instead.
+
 use std::fs::File;
 use std::path::Path;
 

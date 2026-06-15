@@ -1,3 +1,13 @@
+//! Per-frame update tick for `App`.
+//!
+//! `tick` runs once per render-loop iteration and drives all time- and
+//! event-based updates: draining completed background loads, reloading an open
+//! file when its watcher fires, advancing the debounced content search, and
+//! refreshing the tree/git state. Tree refreshes are event-driven when the root
+//! filesystem watcher is installed (reloading only after events go quiet for
+//! `TREE_RELOAD_DEBOUNCE`, to coalesce bursts), with a periodic timer fallback
+//! when no watcher could be installed so the view never goes permanently stale.
+
 use std::time::{Duration, Instant};
 
 use super::loader::{LoadRequest, LoadResponse};

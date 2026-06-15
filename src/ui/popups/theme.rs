@@ -1,3 +1,13 @@
+//! The theme-picker popup.
+//!
+//! `draw_theme` renders the theme selector as a centered overlay: a query input
+//! and a fuzzy-filtered list of available theme names with the selection
+//! highlighted. It reads the live `ThemePicker` state from `App` and mirrors the
+//! other list-style pickers. Theme names come from the built-in presets plus any
+//! user overrides. Applying a highlighted theme (which reopens the current file
+//! so syntax highlighting refreshes) is handled in the key/command layers; this
+//! module only draws the chooser. A no-op when the picker is closed.
+
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},

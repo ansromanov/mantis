@@ -1,3 +1,14 @@
+//! Read-only queries over the active content source for `App`.
+//!
+//! The content pane can be backed by several sources depending on what is open:
+//! a memory-mapped [`VirtualFile`](crate::virtual_file::VirtualFile), an
+//! in-memory `Vec<String>`, pretty-printed JSON, or rendered markdown spans.
+//! These helpers (`line_count`, `line_text`, and friends) hide that branching
+//! behind a single interface so the rest of the app can ask "how many lines?" or
+//! "what is line N?" without knowing which source is active. They never mutate
+//! state; callers that need scrolling or navigation build on top of these read
+//! accessors.
+
 use super::App;
 
 impl App {

@@ -1,3 +1,13 @@
+//! The help popup.
+//!
+//! `draw_help` renders a centered, bordered overlay listing the application's
+//! keybindings and actions grouped by area (navigation, content, search, git,
+//! and so on). It is a static cheat sheet drawn from the current theme and is
+//! toggled by the help key; the caller decides visibility from `App::show_help`.
+//! The content is presentational only - it does not read the live `Keymap`, so
+//! when keybindings or features change this listing must be updated by hand to
+//! stay accurate. It serves as the primary in-app reference alongside the README.
+
 use ratatui::{
     layout::Rect,
     style::{Modifier, Style},

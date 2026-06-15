@@ -1,3 +1,14 @@
+//! Text-selection state for the content pane.
+//!
+//! `TextSelection` models a character-range selection as an `anchor` and an
+//! `active` `(line, column)` endpoint that may extend in either direction;
+//! `normalized()` returns them in start-to-end order for rendering and copying.
+//! `VisualLine` is the whole-line counterpart used by visual-line mode, tracking
+//! the anchored and current line so a range of full lines can be selected and,
+//! for example, fed to the scoped git-blame panel. Both are plain state holders:
+//! the hit-testing, extension, and clipboard copying live in the app's
+//! mouse/key handlers and the UI rendering layer.
+
 /// A text selection spanning from `anchor` to `active`, each being a
 /// `(line, column)` pair. The selection may extend in any direction; use
 /// `normalized()` to obtain a canonical start-end ordering.

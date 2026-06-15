@@ -1,8 +1,14 @@
-//! Schema validation for the loaded config. Deserialization with
-//! `#[serde(default)]` silently drops unrecognized keys, so a typo would take
-//! effect as nothing with no feedback. These helpers re-parse the raw TOML and
-//! flag every unknown key (with a nearest-match suggestion) so the loader can
-//! surface it.
+//! Schema validation for the loaded config.
+//!
+//! Deserialization with `#[serde(default)]` silently drops unrecognized keys, so
+//! a typo like `qiut` under `[keys]` would take effect as nothing, with no
+//! feedback to the user. To catch that, `validate_keys` re-parses the raw TOML
+//! and walks it against a schema table derived from a fully-populated `Config`,
+//! flagging every unknown key by its full dotted path (e.g. `keys.qiut`,
+//! `theme.acent`) and attaching a nearest-match suggestion when one is close
+//! enough. The loader calls this after a successful parse and surfaces the
+//! warnings without failing the launch. Validation is best-effort: unparseable
+//! input is left to the caller's error path.
 
 use super::Config;
 use crate::theme::ThemeConfig;

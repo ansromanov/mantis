@@ -1,3 +1,14 @@
+//! Main content-pane renderer.
+//!
+//! `draw_content` renders the right-hand panel across its four modes: a styled
+//! unified/side-by-side diff (no gutter, no selection), a rendered-markdown view
+//! from precomputed spans, a memory-mapped virtual-file view that highlights
+//! only the visible window on the fly, and an inline fallback for errors,
+//! binaries, and small buffers. It draws the line-number and fold gutters,
+//! applies word wrap, and layers in-file search and text-selection highlighting
+//! plus the transient scrollbar by calling the sibling helpers. It also records
+//! the content `Rect` and scroll offsets back onto `App` for mouse hit-testing.
+
 use ratatui::{
     layout::Rect,
     style::Style,

@@ -1,3 +1,14 @@
+//! Keyboard dispatch entry point for `App`.
+//!
+//! `handle_key` is the single funnel for every key event. It first filters out
+//! key-release events (Windows reports both press and release) so each action
+//! fires once, then routes by precedence: modal overlays (about, help, theme
+//! picker, history, command palette, search) consume input first, and only when
+//! none is active does control fall through to the normal tree/content handler.
+//! The actual handling lives in the sibling submodules wired up here: `normal`
+//! (no overlay), `overlay` (search/picker editing), `visual` (visual-line mode),
+//! and `editor` (command dispatch and external-editor suspend/resume).
+
 mod editor;
 mod normal;
 mod overlay;

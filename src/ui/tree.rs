@@ -1,3 +1,14 @@
+//! File-tree panel rendering.
+//!
+//! `draw_tree` renders the left-hand file tree from `App::nodes`: it draws each
+//! visible `TreeNode` with depth-based indentation, expand/collapse arrows for
+//! directories, and git-status coloring (new, modified, deleted, ignored) when
+//! status is enabled, marking deleted ghost nodes distinctly. The selected row
+//! is highlighted, and focus state controls the border style. It records
+//! `tree_area` and `tree_offset` back onto `App` so mouse handlers can map a
+//! click row to a node index. Rendering only - selection and expansion are
+//! driven by the navigation handlers.
+
 use ratatui::{
     layout::Rect,
     style::{Modifier, Style},

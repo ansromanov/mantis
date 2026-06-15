@@ -1,3 +1,14 @@
+//! Markdown rendering: `pulldown-cmark` events to themed ratatui spans.
+//!
+//! `render` parses a markdown string and produces a `Vec` of styled lines ready
+//! for the content pane. It handles headings, bordered code blocks, box-drawing
+//! tables, ordered/unordered and task lists, block quotes, horizontal rules, and
+//! inline formatting (bold, italic, strikethrough, inline code), with images
+//! shown as a placeholder. All colors come from the active `Theme`, so rendered
+//! markdown matches the rest of the UI. The output uses the same
+//! `(Style, String)` span shape as the syntax highlighter, so the content
+//! renderer can treat both uniformly.
+
 use crate::theme::Theme;
 use pulldown_cmark::{Alignment, Event, HeadingLevel, Options, Parser, Tag};
 use ratatui::style::{Modifier, Style};

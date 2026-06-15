@@ -1,3 +1,13 @@
+//! Status-bar rendering: the bottom line of the UI.
+//!
+//! `draw_statusbar` renders the single row at the bottom of the screen. Its
+//! contents are context-sensitive: when an overlay is active it shows that
+//! overlay's key hints, and otherwise it summarizes the current state - focused
+//! panel, file path, git branch/HEAD info (`GitRepoInfo`/`GitHead`), position
+//! and scroll percentage, and active mode flags. Colors come from the active
+//! theme. It is a read-only projection of `App`; it never mutates state and is
+//! drawn last so it always reflects the final per-frame state.
+
 use ratatui::{
     layout::Rect,
     style::{Modifier, Style},
