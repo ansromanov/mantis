@@ -328,7 +328,6 @@ impl Serialize for KeyBinding {
 /// describing the first malformed config encountered, if any, so the caller can
 /// tell the user their config was ignored instead of failing silently.
 pub fn load(root: &Path) -> (Config, Option<PathBuf>, Option<String>) {
-    migrate_legacy_config();
     let global = global_config_path();
     if let Some(ref path) = global {
         if !path.exists() {
@@ -411,35 +410,6 @@ fn dirs_next() -> Option<PathBuf> {
             .map(|base| base.join("tree-viewer"))
     }
 }
-
-/// Moves `~/.config/tv.toml` → `~/.config/tree-viewer/tv.toml` for users who
-/// had the old (buggy) path. No-op on Windows or when the new path already
-/// exists.
-#[cfg(not(windows))]
-fn migrate_legacy_config() {
-    let Some(new_path) = global_config_path() else {
-        return;
-    };
-    if new_path.exists() {
-        return;
-    }
-    let old_base = std::env::var_os("XDG_CONFIG_HOME")
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")));
-    let Some(old_path) = old_base.map(|b| b.join("tv.toml")) else {
-        return;
-    };
-    if !old_path.exists() {
-        return;
-    }
-    if let Some(parent) = new_path.parent() {
-        let _ = fs::create_dir_all(parent);
-    }
-    let _ = fs::rename(&old_path, &new_path);
-}
-
-#[cfg(windows)]
-fn migrate_legacy_config() {}
 
 #[cfg(test)]
 mod tests;
