@@ -2,12 +2,10 @@ use std::path::Path;
 
 use notify::{EventKind, RecursiveMode, Watcher};
 
-use crate::file::is_binary_bytes;
 use crate::git::GitStatus;
-use crate::markdown;
 use crate::search::HistoryState;
-use crate::virtual_file::VirtualFile;
 
+use super::loader::{compute_diff_load, compute_file_load, DiffLoad, FileLoad};
 use super::{diff_line_style, App, Focus};
 
 impl App {
@@ -141,12 +139,19 @@ impl App {
     }
 
     /// Displays the working-tree diff of `path` (relative to HEAD) in the
-    /// content panel, using `diff_line_style` for per-line coloring.
+    /// content panel synchronously. The async navigation path uses
+    /// `request_working_tree_diff`; both share `apply_diff_load`.
     pub(super) fn show_working_tree_diff(&mut self, path: &Path) {
+        self.invalidate_pending_load();
+        let load = compute_diff_load(&self.root, path, &self.theme);
+        self.apply_diff_load(path, load);
+    }
+
+    /// Applies a computed working-tree diff to the content panel. Shared by the
+    /// synchronous and worker-thread code paths.
+    pub(super) fn apply_diff_load(&mut self, path: &Path, load: DiffLoad) {
         self.in_file_search = None;
         self.virtual_file = None;
-        let lines = crate::git::working_tree_diff(&self.root, path);
-        let rel = path.strip_prefix(&self.root).unwrap_or(path);
         self.current_file = Some(path.to_path_buf());
         self.is_markdown = false;
         self.show_raw_markdown = false;
@@ -161,19 +166,17 @@ impl App {
         self.content_hscroll = 0;
         self.clear_selection();
         self.exit_visual_line();
-        self.content_title = Some(format!(" working diff — {} ", rel.display()));
-        self.highlighted = lines
-            .iter()
-            .map(|l| vec![(diff_line_style(l, &self.theme), l.clone())])
-            .collect();
-        self.diff_rows = crate::diff::parse_side_by_side(&lines);
-        self.content = lines;
+        self.content_title = Some(load.content_title);
+        self.highlighted = load.highlighted;
+        self.diff_rows = load.diff_rows;
+        self.content = load.content;
         self.set_file_watch(Some(path));
     }
 
     /// Shows a "[deleted]" placeholder for a file that was removed from the
     /// working tree but is tracked by git.
     pub(super) fn show_deleted(&mut self, path: &Path) {
+        self.invalidate_pending_load();
         self.in_file_search = None;
         self.current_file = Some(path.to_path_buf());
         self.is_diff = false;
@@ -211,9 +214,20 @@ impl App {
     }
 
     /// Reads a file from disk, detects binary/markdown, runs syntax
-    /// highlighting, and renders markdown if applicable. Errors and empty files
-    /// produce inline messages rather than crashing.
+    /// highlighting, and renders markdown if applicable, synchronously. The
+    /// async navigation path uses `request_open_file`; both share
+    /// `apply_file_load`. Errors and empty files produce inline messages rather
+    /// than crashing.
     pub fn open_file(&mut self, path: &Path) {
+        self.invalidate_pending_load();
+        let load = compute_file_load(path, &self.theme, &self.highlighter);
+        self.apply_file_load(path, load);
+    }
+
+    /// Applies a computed file load to the content panel: resets scroll and
+    /// selection, then installs the rendered content/highlighting/markdown/JSON/
+    /// YAML state. Shared by the synchronous and worker-thread code paths.
+    pub(super) fn apply_file_load(&mut self, path: &Path, load: FileLoad) {
         self.in_file_search = None;
         self.is_diff = false;
         self.diff_rows = Vec::new();
@@ -227,83 +241,30 @@ impl App {
             self.exit_visual_line();
         }
 
-        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-        self.is_markdown = matches!(ext, "md" | "markdown");
+        self.is_markdown = load.is_markdown;
         self.show_raw_markdown = false;
-        self.markdown_lines = Vec::new();
-        self.is_json = ext == "json";
-        self.show_pretty_json = false;
-        self.json_pretty_text = Vec::new();
-        self.json_pretty_lines = Vec::new();
-        let is_yaml = matches!(ext, "yaml" | "yml");
+        self.is_json = load.is_json;
+        self.show_pretty_json = load.show_pretty_json;
+        self.markdown_lines = load.markdown_lines;
+        self.json_pretty_text = load.json_pretty_text;
+        self.json_pretty_lines = load.json_pretty_lines;
         self.clear_yaml_state();
-
-        // Try memory-mapped virtual file first (lazy, no full content in memory).
-        // Markdown, JSON, and YAML are excluded: they need full content for rendering/validation.
-        if !self.is_markdown && !self.is_json && !is_yaml {
-            if let Some(vf) = VirtualFile::open(path) {
-                self.current_file = Some(path.to_path_buf());
-                self.set_file_watch(Some(path));
-                self.virtual_file = Some(vf);
-                self.content = Vec::new();
-                self.highlighted = Vec::new();
-                return;
-            }
+        self.virtual_file = load.virtual_file;
+        self.content = load.content;
+        self.highlighted = load.highlighted;
+        if let Some(y) = load.yaml {
+            self.yaml_fold_regions = y.fold_regions;
+            self.yaml_error = y.error;
+            self.yaml_anchor_count = y.anchor_count;
+            self.yaml_alias_count = y.alias_count;
         }
 
-        // Fallback: read the file into memory (small files, binary check, etc.)
-        self.virtual_file = None;
-        let bytes = match std::fs::read(path) {
-            Ok(b) => b,
-            Err(e) => {
-                self.current_file = None;
-                self.set_file_watch(None);
-                self.content = vec![format!("[error: {}]", e)];
-                self.highlighted = Vec::new();
-                return;
-            }
-        };
-        self.current_file = Some(path.to_path_buf());
-        self.set_file_watch(Some(path));
-        if is_binary_bytes(&bytes) {
-            self.content = vec!["[binary file]".into()];
-            self.highlighted = Vec::new();
-            return;
-        }
-        let s = match String::from_utf8(bytes) {
-            Ok(s) => s,
-            Err(_) => {
-                self.content = vec!["[binary file]".into()];
-                self.highlighted = Vec::new();
-                return;
-            }
-        };
-        self.content = s.lines().map(|l| l.to_owned()).collect();
-        if self.content.is_empty() {
-            self.content = vec!["[empty file]".into()];
-            self.highlighted = Vec::new();
+        if load.ok {
+            self.current_file = Some(path.to_path_buf());
+            self.set_file_watch(Some(path));
         } else {
-            if is_yaml {
-                self.yaml_fold_regions = crate::yaml_fold::detect_fold_regions(&self.content);
-                self.validate_yaml(&s);
-                let lines = self.content.clone();
-                self.count_yaml_anchors_aliases(&lines);
-            }
-            self.highlighted = self.highlighter.highlight(path, &self.content);
-            if self.is_markdown {
-                self.markdown_lines = markdown::render(&s, &self.theme);
-            }
-            if self.is_json {
-                if let Ok(value) = serde_json::from_str::<serde_json::Value>(&s) {
-                    if let Ok(pretty) = serde_json::to_string_pretty(&value) {
-                        let pretty_lines: Vec<String> =
-                            pretty.lines().map(|l| l.to_owned()).collect();
-                        self.json_pretty_lines = self.highlighter.highlight(path, &pretty_lines);
-                        self.json_pretty_text = pretty_lines;
-                        self.show_pretty_json = true;
-                    }
-                }
-            }
+            self.current_file = None;
+            self.set_file_watch(None);
         }
     }
 
@@ -337,6 +298,7 @@ impl App {
     /// per-line markers. Sets `is_diff = true` so the line-number gutter is
     /// hidden and the diff stays read-only.
     fn show_diff(&mut self, file: &Path, short: &str, lines: Vec<String>) {
+        self.invalidate_pending_load();
         self.in_file_search = None;
         self.virtual_file = None;
         self.current_file = Some(file.to_path_buf());

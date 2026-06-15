@@ -4271,3 +4271,78 @@ fn opening_different_file_exits_visual_line() {
     assert!(!app.blame_panel);
     fs::remove_dir_all(&root).ok();
 }
+
+// ── background loader (async navigation) ────────────────────────────────────
+
+#[test]
+fn drain_loads_applies_newest_and_discards_stale() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let a = root.join("a.txt");
+    let long = root.join("long.txt");
+
+    // Dispatch a stale request, then a newer one. The worker answers both but
+    // only the newest seq should be applied.
+    let stale = app.invalidate_pending_load();
+    app.loader.request(super::loader::LoadRequest::File {
+        seq: stale,
+        path: a.clone(),
+    });
+    let newest = app.invalidate_pending_load();
+    app.loader.request(super::loader::LoadRequest::File {
+        seq: newest,
+        path: long.clone(),
+    });
+    app.loading = true;
+
+    let mut applied = false;
+    for _ in 0..200 {
+        if app.drain_loads() {
+            applied = true;
+        }
+        if app.current_file.as_deref() == Some(long.as_path()) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    assert!(applied, "newest load should be applied");
+    assert_eq!(app.current_file.as_deref(), Some(long.as_path()));
+    assert!(
+        !app.loading,
+        "loading flag cleared once newest result lands"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn invalidate_pending_load_bumps_seq_and_clears_flag() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.loading = true;
+    let before = app.load_seq;
+    let after = app.invalidate_pending_load();
+    assert_eq!(after, before.wrapping_add(1));
+    assert!(!app.loading);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn stale_diff_response_is_ignored() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    // Make load_seq advance past the response we inject.
+    app.invalidate_pending_load();
+    let current = app.load_seq;
+    // Inject a diff response with an old seq directly via the worker.
+    app.loader.request(super::loader::LoadRequest::Diff {
+        seq: current.wrapping_sub(1),
+        root: root.clone(),
+        path: root.join("a.txt"),
+    });
+    // Give the worker a moment, then drain. Nothing should be applied.
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    let applied = app.drain_loads();
+    assert!(!applied, "stale diff response must be discarded");
+    assert!(!app.is_diff);
+    fs::remove_dir_all(&root).ok();
+}

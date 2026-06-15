@@ -100,6 +100,33 @@ pub fn build_display_map(
     (0..total).filter(|&i| !hidden[i]).collect()
 }
 
+/// Counts YAML anchors (`&name`) and aliases (`*name`) across `lines`,
+/// skipping comment lines. A marker counts only when immediately followed by an
+/// alphanumeric or underscore so bare `&`/`*` (e.g. in flow text) is ignored.
+pub fn count_anchors_aliases(lines: &[String]) -> (usize, usize) {
+    let mut anchors = 0;
+    let mut aliases = 0;
+    for line in lines {
+        let trimmed = line.trim();
+        if trimmed.starts_with('#') {
+            continue;
+        }
+        let mut chars = trimmed.chars().peekable();
+        while let Some(ch) = chars.next() {
+            let starts_name = chars
+                .peek()
+                .is_some_and(|c| c.is_alphanumeric() || *c == '_');
+            if ch == '&' && starts_name {
+                anchors += 1;
+            }
+            if ch == '*' && starts_name {
+                aliases += 1;
+            }
+        }
+    }
+    (anchors, aliases)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
