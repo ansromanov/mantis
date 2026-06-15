@@ -1,3 +1,14 @@
+//! The file tree: a flat `Vec<TreeNode>` built from the filesystem.
+//!
+//! Instead of a nested tree, the view is modeled as a flat vector where each
+//! `TreeNode` carries an explicit `depth` for indentation - far simpler for
+//! rendering and mouse hit-testing. `build_visible` walks the root with
+//! `ignore::WalkBuilder` (honoring `.gitignore` and hidden-file settings),
+//! descending only into directories listed in the `expanded` set and appending
+//! git-tracked-but-deleted paths as ghost nodes. `collect_all_files` enumerates
+//! every file for the search index. The walk also reports an error count so the
+//! UI can surface unreadable directories without aborting the build.
+
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 

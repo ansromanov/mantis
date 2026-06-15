@@ -1,3 +1,14 @@
+//! Command-palette dispatch and external-editor integration for `App`.
+//!
+//! `dispatch_command` maps a selected command-palette entry's `action_id` to the
+//! matching `App` method, so the palette and direct keybindings share one set of
+//! actions. This module also owns suspending the TUI to launch the user's
+//! `$EDITOR` on the current file: it tears down raw mode and the alternate
+//! screen, runs the editor, then restores the terminal and flags `needs_clear`
+//! so the next frame repaints cleanly. Theme switching and the highlighter
+//! rebuild triggered from the palette live here too, alongside the related
+//! terminal-state bookkeeping.
+
 use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
 use crossterm::execute;
 use crossterm::terminal::{

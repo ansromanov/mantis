@@ -1,3 +1,15 @@
+//! Git integration via the `git` CLI.
+//!
+//! Rather than linking a Rust git library, this module shells out to `git` for
+//! everything it needs: per-file working-tree status (`repo_status`), repository
+//! metadata such as branch/HEAD (`repo_info`/`GitRepoInfo`), commit history, and
+//! unified diffs (working-tree and per-commit). Results are cached behind a mutex
+//! keyed on a coarse timestamp so rapid redraws don't spawn a process per frame.
+//! Every call degrades gracefully - a missing repo, a `git` that isn't
+//! installed, or a failed command yields empty/`None` results instead of an
+//! error, so the viewer works fine outside a repository. `GitStatus` and its
+//! priority ordering drive the tree's status coloring.
+
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;

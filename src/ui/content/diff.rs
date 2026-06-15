@@ -1,3 +1,15 @@
+//! Side-by-side diff renderer.
+//!
+//! `draw_side_by_side_diff` lays out a diff as two columns - old on the left,
+//! new on the right - each with its own line-number gutter and separated by a
+//! vertical divider. It consumes the `DiffRow`/`Cell` structure produced by the
+//! crate-level `diff` parser, applies theme colors per cell kind (context,
+//! added, removed, empty padding), and renders the intra-line word-emphasis
+//! ranges so paired changes are highlighted. The two halves are aligned
+//! row-for-row and share one scroll offset so they move together. The caller
+//! falls back to the unified view when the pane is narrower than the diff
+//! module's minimum width.
+
 use ratatui::{
     layout::Rect,
     style::Style,

@@ -1,3 +1,14 @@
+//! Content-pane geometry and scroll math for `App`.
+//!
+//! These helpers translate between the logical content (lines, columns, folds,
+//! line-number gutter) and the on-screen viewport: the maximum legal scroll
+//! offset, the width of the line-number/fold gutter prefix, and clamping of the
+//! cursor/scroll so the last line never scrolls past the bottom edge. They are
+//! pure functions of the current `App` state and the recorded `content_area`
+//! rectangle, so they read geometry captured during the last render rather than
+//! computing layout themselves. Mouse and keyboard handlers rely on this module
+//! to keep click coordinates and scrolling consistent.
+
 use std::num::NonZeroUsize;
 
 use unicode_width::UnicodeWidthStr;

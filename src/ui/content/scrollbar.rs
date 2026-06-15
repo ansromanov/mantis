@@ -1,3 +1,14 @@
+//! Transient content-pane scrollbar overlay.
+//!
+//! `draw_content_scrollbar` paints a thin scrollbar on the right edge of the
+//! content area, sized and positioned from the current scroll offset and total
+//! line count. It is deliberately transient: it appears only for a short fade
+//! window (`SCROLLBAR_FADE`) after the user last scrolled, tracked via
+//! `App::content_scrolled_at`, so it does not permanently occupy a column. The
+//! optional scroll-percentage readout is drawn alongside it. Whether it shows at
+//! all is gated by the user's `scrollbar` config option, so it can be disabled
+//! entirely.
+
 use std::time::Duration;
 
 use ratatui::{

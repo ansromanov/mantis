@@ -1,3 +1,14 @@
+//! ratatui rendering orchestration: the top-level `draw` entry point.
+//!
+//! `draw` is called once per frame and lays out the whole screen: it paints the
+//! themed background, splits the area into the tree pane, content pane, and
+//! status bar, and renders each by delegating to the `tree`, `content`, and
+//! `statusbar` submodules. Modal overlays (help, search, history, theme picker,
+//! command palette, about, blame) are drawn last, on top, following the same
+//! precedence chain the input handlers use. Rendering is also where panel
+//! geometry (`Rect`s and scroll offsets) is recorded back onto `App` for mouse
+//! hit-testing, so this layer stays purely presentational.
+
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::Style,

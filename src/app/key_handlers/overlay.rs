@@ -1,3 +1,14 @@
+//! Key handling for the fuzzy-picker overlays.
+//!
+//! The search, history, theme-picker, and command-palette overlays share a
+//! common interaction shape - type to filter, up/down to move the selection,
+//! Enter to act, Esc to close - and this module implements the key handling for
+//! each. `handle_search_key` and its siblings push/pop query characters and call
+//! the picker's `refresh()` to re-score the filtered list, toggle search mode
+//! with Tab where applicable, and on Enter hand off to the relevant `App` open
+//! action. Closing an overlay clears its state and returns focus to the
+//! underlying panel.
+
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::super::App;

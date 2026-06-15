@@ -1,3 +1,13 @@
+//! The Ctrl-P command-palette popup.
+//!
+//! `draw_command_palette` renders the command palette as a centered overlay: a
+//! query input on top and, below it, the fuzzy-filtered list of `COMMANDS` with
+//! the selected entry highlighted. It reads the live `CommandPalette` picker
+//! state from `App` (query, filtered-and-scored entries, selection) and is a
+//! no-op when the palette is closed. Selection and dispatch are handled
+//! elsewhere - this module is purely the visual surface, mirroring the layout of
+//! the other list-style pickers (search, history, and theme).
+
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},

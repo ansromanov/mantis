@@ -1,3 +1,14 @@
+//! Mouse event dispatch for `App`.
+//!
+//! `handle_mouse` mirrors the keyboard overlay precedence chain for pointer
+//! input: theme picker, command palette, history, and search overlays intercept
+//! clicks first, then events route to the tree or content panel by hit-testing
+//! the `Rect`s recorded during the last render. It handles left-click selection,
+//! drag-selection of text, splitter dragging to resize the tree pane, scrollbar
+//! dragging, wheel scrolling, and double-click to open a picker result. All
+//! coordinate math must account for the panels' scroll offsets, which are also
+//! captured at render time.
+
 use std::time::{Duration, Instant};
 
 use arboard::Clipboard;

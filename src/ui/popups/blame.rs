@@ -1,3 +1,13 @@
+//! The selection-scoped git-blame panel.
+//!
+//! `draw_blame_panel` renders blame information for the line range currently
+//! selected in visual-line mode. Each row pairs a line with its short commit
+//! hash, author, relative date, and line number, drawn in a bordered overlay so
+//! the user can see who last touched the highlighted lines. It is a no-op when
+//! visual-line mode is inactive. Blame data is gathered through the `git`
+//! module's shell-outs; this file only formats and lays out the result, reading
+//! the active range and theme from `App`.
+
 use std::collections::HashMap;
 
 use ratatui::{

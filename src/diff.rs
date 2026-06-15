@@ -1,7 +1,15 @@
-//! Parses unified-diff text into aligned side-by-side rows for the split diff
-//! view. The parser is theme-agnostic — it only produces structure (old/new
-//! cells, line numbers, and intra-line word-emphasis ranges); colors are
-//! applied by the renderer in `ui/content.rs`.
+//! Unified-diff parsing into aligned side-by-side rows.
+//!
+//! Turns raw unified-diff text (as produced by `git diff`) into the structured
+//! `DiffRow`/`Cell` model the split-view renderer consumes. Each row pairs an
+//! old-side and new-side `Cell`; unpaired adds/removes get an `Empty` padding
+//! cell on the opposite side so the two columns stay aligned line-for-line.
+//! Cells carry their kind (context/added/removed/empty), 1-based source line
+//! number, and intra-line word-emphasis ranges for highlighting fine-grained
+//! changes. `MIN_SIDE_BY_SIDE_WIDTH` is the threshold below which the renderer
+//! falls back to the unified view. The parser is theme-agnostic: it produces
+//! only structure, and colors are applied later by the renderer in
+//! `ui::content::diff`.
 
 /// Below this content-pane width the side-by-side view is too cramped to be
 /// useful, so the renderer falls back to the unified diff.

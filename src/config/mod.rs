@@ -1,3 +1,14 @@
+//! Loading, parsing, and saving of the `tv.toml` configuration.
+//!
+//! Defines the `Config` struct (every user-tunable option, with serde defaults
+//! so partial configs and older files still load) and the `Keymap`/keybinding
+//! types that map config strings to `crossterm` key events. `load` locates and
+//! deserializes the config, returning any validation warning rather than failing
+//! the launch; `save` writes the current settings back. The `pressed` helper
+//! tests a key event against a bound action's list. Unknown-key detection lives
+//! in the `validate` submodule. Keep new fields here in sync with the defaults
+//! so round-tripping a saved config is lossless.
+
 mod validate;
 
 use crate::theme::ThemeConfig;

@@ -1,3 +1,15 @@
+//! Binary entry point for `tv`.
+//!
+//! Handles the command-line surface (`--help`/`--version` and an optional
+//! file-or-directory path argument), then sets up the terminal: enables raw
+//! mode, enters the alternate screen, and turns on mouse capture. It loads the
+//! config, constructs the [`App`], installs the filesystem watcher, and runs the
+//! synchronous render/poll/dispatch loop in `run_event_loop` until the app asks
+//! to quit. On exit it restores the terminal to its original state and prints
+//! any deferred config-load warning. This is the only module that uses `anyhow`
+//! freely alongside `App::new`; everything below degrades errors into UI
+//! messages instead of bubbling them up to here.
+
 use std::io;
 use std::path::{Path, PathBuf};
 

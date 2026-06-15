@@ -1,3 +1,14 @@
+//! Key handling when no overlay is open.
+//!
+//! `handle_normal_key` dispatches the main editing surface: global actions
+//! (quit, help, toggle hidden files, reload, open the search/history/theme/
+//! command overlays, theme cycling, git-mode toggles) plus focus-specific
+//! movement that it forwards to the tree or content handlers based on
+//! `App::focus`. It also handles the entry into visual-line mode and clearing an
+//! active text selection. This is the busiest handler in the app; keep new
+//! global keybindings here and route panel-specific motion to the tree/content
+//! helpers rather than inlining it.
+
 use crossterm::event::{KeyCode, KeyEvent};
 
 use crate::config::pressed;
