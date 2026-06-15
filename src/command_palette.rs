@@ -49,6 +49,10 @@ pub static COMMANDS: &[CommandEntry] = &[
         action_id: "toggle_word_wrap",
     },
     CommandEntry {
+        name: "Toggle line numbers",
+        action_id: "toggle_line_numbers",
+    },
+    CommandEntry {
         name: "Toggle markdown render",
         action_id: "toggle_raw_markdown",
     },
