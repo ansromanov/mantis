@@ -109,7 +109,8 @@ fn tree_dirty_reload_is_debounced() {
     );
 
     // Once the debounce window has passed, tick clears the flag and reloads.
-    app.tree_dirty_at = Some(Instant::now() - Duration::from_secs(1));
+    // Use 61 s so this is still stale past the #[cfg(test)] 60 s window.
+    app.tree_dirty_at = Some(Instant::now() - Duration::from_secs(61));
     app.tick();
     assert!(!app.tree_dirty, "reload runs after the tree goes quiet");
     assert!(app.tree_dirty_at.is_none());

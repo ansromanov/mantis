@@ -328,7 +328,13 @@ impl App {
     /// Debounce window: how long the tree must stay quiet after a filesystem
     /// event before a reload runs. Coalesces bursts (e.g. a build touching many
     /// files) into a single refresh.
+    ///
+    /// In test builds the window is inflated to 60 s so that the debounce tests
+    /// can assert "still fresh" without relying on sub-300 ms scheduling.
+    #[cfg(not(test))]
     const TREE_RELOAD_DEBOUNCE: Duration = Duration::from_millis(300);
+    #[cfg(test)]
+    const TREE_RELOAD_DEBOUNCE: Duration = Duration::from_secs(60);
 
     /// Per-frame update. Refreshes the open file from its watcher, advances the
     /// debounced content search, and drives the tree/git refresh: when the root
