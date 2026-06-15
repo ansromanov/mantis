@@ -209,48 +209,89 @@ fn theme_config_from_preset_sets_name_and_no_overrides() {
 
 // ---------------------------------------------------------------------------
 // install_embedded_themes + discover_all user-themes code path
+//
+// These tests mutate XDG_CONFIG_HOME to redirect to a temporary directory so
+// they never touch the developer's real config. ENV_LOCK serialises the three
+// tests so concurrent env-var reads from other threads don't race.
 // ---------------------------------------------------------------------------
+
+use std::sync::{Mutex, MutexGuard};
+
+static ENV_LOCK: Mutex<()> = Mutex::new(());
+static COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// Redirects XDG_CONFIG_HOME to a fresh temp dir for the duration of `f`,
+/// then restores the original value and removes the temp dir.
+fn with_isolated_config_home<F: FnOnce(&std::path::Path)>(f: F) {
+    let _guard: MutexGuard<()> = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let n = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let tmp = std::env::temp_dir().join(format!("tv2_theme_test_{}_{n}", std::process::id()));
+    std::fs::create_dir_all(&tmp).unwrap();
+
+    let old = std::env::var_os("XDG_CONFIG_HOME");
+    // SAFETY: ENV_LOCK serialises all callers; no other thread mutates this var.
+    unsafe { std::env::set_var("XDG_CONFIG_HOME", &tmp) };
+
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&tmp)));
+
+    unsafe {
+        match old {
+            Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
+            None => std::env::remove_var("XDG_CONFIG_HOME"),
+        }
+    }
+    let _ = std::fs::remove_dir_all(&tmp);
+
+    if let Err(e) = result {
+        std::panic::resume_unwind(e);
+    }
+}
 
 #[test]
 fn install_embedded_themes_creates_theme_files() {
-    install_embedded_themes();
-    let dir = user_themes_dir().expect("must have a themes dir on this platform");
-    assert!(dir.is_dir(), "themes directory should exist after install");
-    assert!(
-        dir.join("default.toml").exists(),
-        "default.toml must be installed"
-    );
-    assert!(
-        dir.join("monokai.toml").exists(),
-        "monokai.toml must be installed"
-    );
+    with_isolated_config_home(|tmp| {
+        install_embedded_themes();
+        let themes_dir = tmp.join("tree-viewer").join("themes");
+        assert!(themes_dir.is_dir(), "themes directory should be created");
+        assert!(
+            themes_dir.join("default.toml").exists(),
+            "default.toml must be installed"
+        );
+        assert!(
+            themes_dir.join("monokai.toml").exists(),
+            "monokai.toml must be installed"
+        );
+    });
 }
 
 #[test]
 fn discover_all_with_existing_user_dir_covers_user_theme_loop() {
-    // Ensure the user themes dir has at least the embedded themes so the
-    // user-theme loop in discover_all executes.
-    install_embedded_themes();
-    let themes = Theme::discover_all();
-    let names: Vec<&str> = themes.iter().map(|(n, _)| n.as_str()).collect();
-    assert!(names.contains(&"default"));
-    assert!(names.contains(&"monokai"));
-    assert!(themes.len() >= 9);
+    with_isolated_config_home(|_tmp| {
+        install_embedded_themes();
+        let themes = Theme::discover_all();
+        let names: Vec<&str> = themes.iter().map(|(n, _)| n.as_str()).collect();
+        assert!(names.contains(&"default"));
+        assert!(names.contains(&"monokai"));
+        assert!(themes.len() >= 9);
+    });
 }
 
 #[test]
 fn discover_all_user_theme_extends_list() {
-    let Some(dir) = user_themes_dir() else {
-        return;
-    };
-    let _ = std::fs::create_dir_all(&dir);
-    let test_name = "__tv2_test_ext__";
-    let path = dir.join(format!("{test_name}.toml"));
-    std::fs::write(&path, include_str!("../themes/default.toml")).unwrap();
+    with_isolated_config_home(|tmp| {
+        let themes_dir = tmp.join("tree-viewer").join("themes");
+        std::fs::create_dir_all(&themes_dir).unwrap();
+        let test_name = "custom-test-theme";
+        std::fs::write(
+            themes_dir.join(format!("{test_name}.toml")),
+            include_str!("../themes/default.toml"),
+        )
+        .unwrap();
 
-    let themes = Theme::discover_all();
-    let found = themes.iter().any(|(n, _)| n == test_name);
-    let _ = std::fs::remove_file(&path);
-
-    assert!(found, "user-added theme must appear in discover_all output");
+        let themes = Theme::discover_all();
+        assert!(
+            themes.iter().any(|(n, _)| n == test_name),
+            "user-added theme must appear in discover_all output"
+        );
+    });
 }
