@@ -15,6 +15,7 @@ scroll_percentage = true
 in_file_search = true
 # search_context_lines = 0  # lines of trailing context shown after each content match (default: 0)
 # keep_search_query = false  # restore last search query when reopening search (default: false)
+# watch = false              # auto-reload file content when the open file changes on disk (default: false)
 
 # Git mode: show only changed files and their working-tree diffs.
 # git_mode = false       # start in git mode (default: false)
@@ -38,6 +39,7 @@ git_mode_toggle = ["ctrl+g"]
 git_mode_flat_toggle = ["alt+g"]
 command_palette = ["ctrl+p"]
 open_in_editor = ["e"]
+toggle_watch = ["W"]
 
 # Navigation (shared by tree and content panels)
 nav_up = ["Up", "k"]

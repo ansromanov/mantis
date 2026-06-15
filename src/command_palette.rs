@@ -73,6 +73,10 @@ pub static COMMANDS: &[CommandEntry] = &[
         action_id: "open_config_in_editor",
     },
     CommandEntry {
+        name: "Toggle auto watch (reload on file change)",
+        action_id: "toggle_watch",
+    },
+    CommandEntry {
         name: "About tree-viewer",
         action_id: "show_about",
     },

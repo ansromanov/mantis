@@ -95,6 +95,8 @@ pub struct App {
     pub walk_errors: usize,
     /// Warning describing a malformed config that was ignored at startup, if any.
     pub config_error: Option<String>,
+    /// Whether to automatically reload file content on disk change.
+    pub auto_watch: bool,
     keys: Keymap,
     config: Config,
     config_path: Option<std::path::PathBuf>,
@@ -255,6 +257,7 @@ impl App {
             show_about: false,
             walk_errors,
             config_error,
+            auto_watch: cfg.watch,
             keys: cfg.keys,
             config: saved_config,
             config_path,
@@ -362,7 +365,7 @@ impl App {
     /// periodic reload so the view never goes permanently stale.
     pub fn tick(&mut self) {
         self.drain_loads();
-        if self.drain_file_watch() {
+        if self.auto_watch && self.drain_file_watch() {
             self.reload_content();
         }
         if let Some(ref mut s) = self.search {
