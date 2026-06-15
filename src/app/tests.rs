@@ -52,6 +52,36 @@ fn temp_git_tree() -> PathBuf {
 }
 
 #[test]
+fn key_release_events_are_ignored() {
+    use crossterm::event::KeyEventKind;
+
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let start = app.tree_selected;
+
+    // A Release event (as Windows emits alongside every Press) must be a no-op,
+    // otherwise each physical key press would be handled twice.
+    app.handle_key(KeyEvent::new_with_kind(
+        KeyCode::Down,
+        KeyModifiers::empty(),
+        KeyEventKind::Release,
+    ));
+    assert_eq!(
+        app.tree_selected, start,
+        "Release must not move the selection"
+    );
+
+    // The matching Press event moves the selection exactly one row.
+    app.handle_key(KeyEvent::new_with_kind(
+        KeyCode::Down,
+        KeyModifiers::empty(),
+        KeyEventKind::Press,
+    ));
+    assert_eq!(app.tree_selected, start + 1, "Press moves selection once");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn file_history_opens_picker_and_shows_diff() {
     let root = temp_git_tree();
     let mut app = app_for(&root);
