@@ -1,9 +1,4 @@
-version = "0.5.5"
+version = "0.6.0"
 date = "2026-06-15"
-whats_new = """- perf(search): pre-split content cache lines to eliminate per-keystroke allocations (#150)
-- perf(tree): slice nodes to viewport before building ListItems (#149)
-- fix(config): add tree-viewer/ subdir to Linux/macOS global config path (#148)
-- perf(reload): drive tree/git refresh from filesystem events, not a blind timer (#147)
-- fix(input): ignore key Release events so keys aren't handled twice on Windows (#146)
-- chore: add changelog to release info [skip ci]"""
-release_url = "https://github.com/ansromanov/tree-viewer/releases/tag/v0.5.5"
+whats_new = ""
+release_url = "https://github.com/ansromanov/tree-viewer/releases/tag/v0.6.0"
