@@ -107,6 +107,7 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         BLAME_COL_WIDTH
     };
     let blame_style = Style::default().fg(app.theme.dim);
+    let show_ln = app.show_line_numbers;
 
     // ln_width, ln_lines, content_lines, fold_gutter_rows
     let (ln_width, ln_lines, mut content_lines, new_fold_gutter_rows) = if app.is_diff {
@@ -133,14 +134,19 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         // JSON pretty view: iterate only the visible window of pre-highlighted lines.
         let ln_style = Style::default().fg(app.theme.dim);
         let lw = app.line_count().to_string().len().max(1);
-        let gutters: Vec<Line> = (scroll..visible_end)
-            .map(|i| {
-                Line::from(Span::styled(
-                    format!("{:>width$} ", i + 1, width = lw),
-                    ln_style,
-                ))
-            })
-            .collect();
+        let gutters: Vec<Line> = if show_ln {
+            (scroll..visible_end)
+                .map(|i| {
+                    Line::from(Span::styled(
+                        format!("{:>width$} ", i + 1, width = lw),
+                        ln_style,
+                    ))
+                })
+                .collect()
+        } else {
+            vec![]
+        };
+        let ln_w = if show_ln { lw + 1 } else { 0 };
         let lines: Vec<Line> = app.json_pretty_lines[scroll..visible_end]
             .iter()
             .enumerate()
@@ -178,23 +184,29 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                 }
             })
             .collect();
-        (lw + 1, gutters, lines, vec![])
+        (ln_w, gutters, lines, vec![])
     } else if app.is_markdown && !app.show_raw_markdown {
         // Markdown: iterate only the visible window of pre-rendered lines.
         let ln_style = Style::default().fg(app.theme.dim);
         let lw = app.line_count().to_string().len().max(1);
+        let ln_w = if show_ln { lw + 1 } else { 0 };
         let gutters: Vec<Line> = (scroll..visible_end)
             .map(|i| {
-                let ln_span = Span::styled(format!("{:>width$} ", i + 1, width = lw), ln_style);
+                let mut spans = Vec::new();
                 if blame_width > 0 {
                     let annotation = blame_annotations
                         .get(i)
                         .cloned()
                         .unwrap_or_else(|| " ".repeat(BLAME_COL_WIDTH));
-                    Line::from(vec![Span::styled(annotation, blame_style), ln_span])
-                } else {
-                    Line::from(ln_span)
+                    spans.push(Span::styled(annotation, blame_style));
                 }
+                if show_ln {
+                    spans.push(Span::styled(
+                        format!("{:>width$} ", i + 1, width = lw),
+                        ln_style,
+                    ));
+                }
+                Line::from(spans)
             })
             .collect();
         let lines: Vec<Line> = app.markdown_lines[scroll..visible_end]
@@ -234,7 +246,7 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                 }
             })
             .collect();
-        (blame_width + lw + 1, gutters, lines, vec![])
+        (blame_width + ln_w, gutters, lines, vec![])
     } else if let Some(vf) = app.virtual_file.as_ref() {
         // Virtual file view: lazy-loaded from mmap, highlighted on the fly.
         let phys_total = app.line_count();
@@ -289,28 +301,24 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                 } else {
                     ""
                 };
-                let ln_str = format!("{fold_marker}{:>lw$} ", phys + 1, lw = lw);
-                let ln_span = Span::styled(ln_str, ln_style);
+                let mut spans = Vec::new();
                 if blame_width > 0 {
                     let annotation = blame_annotations
                         .get(phys)
                         .cloned()
                         .unwrap_or_else(|| " ".repeat(BLAME_COL_WIDTH));
-                    Line::from(vec![
-                        Span::styled(annotation, blame_style),
-                        Span::styled(
-                            if fold_gw > 0 {
-                                fold_marker.to_string()
-                            } else {
-                                String::new()
-                            },
-                            fold_marker_style,
-                        ),
-                        ln_span,
-                    ])
-                } else {
-                    Line::from(ln_span)
+                    spans.push(Span::styled(annotation, blame_style));
                 }
+                if fold_gw > 0 {
+                    spans.push(Span::styled(fold_marker.to_string(), fold_marker_style));
+                }
+                if show_ln {
+                    spans.push(Span::styled(
+                        format!("{:>lw$} ", phys + 1, lw = lw),
+                        ln_style,
+                    ));
+                }
+                Line::from(spans)
             })
             .collect();
 
@@ -392,8 +400,9 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                 Line::from(spans)
             })
             .collect();
+        let ln_w = if show_ln { lw + 1 } else { 0 };
         (
-            blame_width + fold_gw + lw + 1,
+            blame_width + fold_gw + ln_w,
             gutters,
             content,
             new_fold_gutter_rows,
@@ -432,17 +441,24 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                 } else {
                     ""
                 };
-                let ln_str = format!("{fold_marker}{:>lw$} ", phys + 1, lw = lw);
-                let ln_span = Span::styled(ln_str, ln_style);
+                let mut spans = Vec::new();
                 if blame_width > 0 {
                     let annotation = blame_annotations
                         .get(phys)
                         .cloned()
                         .unwrap_or_else(|| " ".repeat(BLAME_COL_WIDTH));
-                    Line::from(vec![Span::styled(annotation, blame_style), ln_span])
-                } else {
-                    Line::from(ln_span)
+                    spans.push(Span::styled(annotation, blame_style));
                 }
+                if fold_gw > 0 {
+                    spans.push(Span::styled(fold_marker.to_string(), ln_style));
+                }
+                if show_ln {
+                    spans.push(Span::styled(
+                        format!("{:>lw$} ", phys + 1, lw = lw),
+                        ln_style,
+                    ));
+                }
+                Line::from(spans)
             })
             .collect();
 
@@ -531,8 +547,9 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                 Line::from(spans)
             })
             .collect();
+        let ln_w = if show_ln { lw + 1 } else { 0 };
         (
-            blame_width + fold_gw + lw + 1,
+            blame_width + fold_gw + ln_w,
             gutters,
             content,
             inline_fold_gutter_rows,
@@ -680,8 +697,14 @@ fn draw_side_by_side_diff(f: &mut Frame, app: &mut App, area: Rect, block: Block
     let avail = inner.width.saturating_sub(divider_w);
     let left_col = avail / 2;
     let right_col = avail - left_col;
-    let left_gutter_w = (old_digits as u16 + 1).min(left_col);
-    let right_gutter_w = (new_digits as u16 + 1).min(right_col);
+    let (left_gutter_w, right_gutter_w) = if app.show_line_numbers {
+        (
+            (old_digits as u16 + 1).min(left_col),
+            (new_digits as u16 + 1).min(right_col),
+        )
+    } else {
+        (0, 0)
+    };
     let left_text_w = left_col - left_gutter_w;
     let right_text_w = right_col - right_gutter_w;
 

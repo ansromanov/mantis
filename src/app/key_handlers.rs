@@ -358,6 +358,11 @@ impl App {
                 self.content_hscroll = 0;
                 self.save_config();
             }
+            Some("toggle_line_numbers") => {
+                self.show_line_numbers = !self.show_line_numbers;
+                self.config.line_numbers = self.show_line_numbers;
+                self.save_config();
+            }
             Some("toggle_raw_markdown") if self.is_markdown => {
                 self.show_raw_markdown = !self.show_raw_markdown;
                 self.content_scroll = 0;
@@ -743,6 +748,7 @@ impl App {
         self.tree_width = cfg.tree_width;
         self.tree_independent_scroll = cfg.tree_independent_scroll;
         self.word_wrap = cfg.word_wrap;
+        self.show_line_numbers = cfg.line_numbers;
         self.git_status_enabled = cfg.git_status || cfg.git_mode;
         self.git_show_deleted = cfg.git_show_deleted;
         self.git_mode = cfg.git_mode;
@@ -802,6 +808,10 @@ impl App {
             self.config.word_wrap = self.word_wrap;
             self.content_scroll = 0;
             self.content_hscroll = 0;
+            self.save_config();
+        } else if pressed(&k.toggle_line_numbers, &key) {
+            self.show_line_numbers = !self.show_line_numbers;
+            self.config.line_numbers = self.show_line_numbers;
             self.save_config();
         } else if pressed(&k.nav_up, &key) {
             self.content_scroll = self.content_scroll.saturating_sub(1);

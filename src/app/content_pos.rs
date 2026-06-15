@@ -18,7 +18,12 @@ impl App {
         if self.is_diff || (self.is_markdown && !self.show_raw_markdown) {
             0
         } else {
-            self.fold_gutter_width() + self.line_count().to_string().len().max(1) + 1
+            let ln = if self.show_line_numbers {
+                self.line_count().to_string().len().max(1) + 1
+            } else {
+                0
+            };
+            self.fold_gutter_width() + ln
         }
     }
 

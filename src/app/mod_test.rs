@@ -2503,6 +2503,20 @@ fn content_key_markdown_toggle_raw_noop_when_not_markdown() {
 }
 
 #[test]
+fn content_key_toggle_line_numbers_toggles() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt"));
+    app.focus = Focus::Content;
+    assert!(app.show_line_numbers);
+    app.handle_key(KeyEvent::new(KeyCode::Char('L'), KeyModifiers::empty()));
+    assert!(!app.show_line_numbers);
+    app.handle_key(KeyEvent::new(KeyCode::Char('L'), KeyModifiers::empty()));
+    assert!(app.show_line_numbers);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn content_key_toggle_blame_toggles() {
     let root = temp_tree();
     let mut app = app_for(&root);

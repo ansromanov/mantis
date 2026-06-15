@@ -5,6 +5,7 @@ show_hidden = false
 ignore_gitignore = false
 tree_width = 28
 word_wrap = false
+line_numbers = true  # show line-number gutter in the content pane (toggle at runtime with L)
 # tree_independent_scroll = false  # PageUp/PageDown and Home/End scroll the tree
                                    # viewport without moving the selection;
                                    # Up/Down still move the cursor (default: false)

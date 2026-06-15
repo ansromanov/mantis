@@ -425,6 +425,47 @@ fn draw_inline_fallback_word_wrap() {
 }
 
 #[test]
+fn line_number_gutter_shown_by_default() {
+    let (mut app, _dir) = render_app();
+    let buffer = render_content(&mut app, |app| {
+        app.current_file = None;
+        app.virtual_file = None;
+        app.content = vec!["hello".to_string()];
+        app.highlighted = vec![vec![(Style::default(), "hello".to_string())]];
+    });
+    // Second row (first content line) should begin with the gutter "1".
+    let row: String = buffer.content().chunks(80).nth(1).unwrap()[..6]
+        .iter()
+        .map(|c| c.symbol())
+        .collect();
+    assert!(
+        row.contains('1'),
+        "gutter should show line number; got {row:?}"
+    );
+}
+
+#[test]
+fn line_number_gutter_hidden_when_disabled() {
+    let (mut app, _dir) = render_app();
+    let buffer = render_content(&mut app, |app| {
+        app.show_line_numbers = false;
+        app.current_file = None;
+        app.virtual_file = None;
+        app.content = vec!["hello".to_string()];
+        app.highlighted = vec![vec![(Style::default(), "hello".to_string())]];
+    });
+    // With the gutter off, content starts flush at the inner edge: "hello".
+    let row: String = buffer.content().chunks(80).nth(1).unwrap()[1..6]
+        .iter()
+        .map(|c| c.symbol())
+        .collect();
+    assert_eq!(
+        row, "hello",
+        "content should start at the edge with no gutter"
+    );
+}
+
+#[test]
 fn draw_diff_mode_renders_without_panicking() {
     let (mut app, _dir) = render_app();
     let _buffer = render_content(&mut app, |app| {
