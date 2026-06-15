@@ -1,4 +1,6 @@
-use crossterm::event::{DisableMouseCapture, EnableMouseCapture, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{
+    DisableMouseCapture, EnableMouseCapture, KeyCode, KeyEvent, KeyEventKind, KeyModifiers,
+};
 use crossterm::execute;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
@@ -15,6 +17,13 @@ impl App {
     /// Dispatches a key event. Overlays (help, theme, history, search) are
     /// checked first; otherwise normal tree/content key handling applies.
     pub fn handle_key(&mut self, key: KeyEvent) {
+        // The Windows console backend reports both a Press and a Release event
+        // for a single physical key press (Unix only reports Press unless the
+        // kitty protocol is enabled). Ignore Release so every action runs once
+        // rather than twice. `Repeat` is kept so held keys still navigate.
+        if key.kind == KeyEventKind::Release {
+            return;
+        }
         if self.show_about {
             match key.code {
                 KeyCode::Char('?') | KeyCode::Esc | KeyCode::Char('q') => {
