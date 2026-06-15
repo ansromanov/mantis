@@ -77,6 +77,46 @@ impl App {
         }
     }
 
+    /// Installs a recursive filesystem watcher on the view root so that
+    /// `drain_root_watch` can detect tree changes (files added/removed, git
+    /// status changes from edits anywhere in the repo) and drive a debounced
+    /// reload instead of a blind periodic one. Best-effort: if the watcher
+    /// cannot be installed (e.g. the OS hits a watch-descriptor limit on a very
+    /// large tree) the field stays `None` and `tick` falls back to the timer.
+    pub fn watch_root(&mut self) {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let Ok(mut watcher) = notify::recommended_watcher(move |res| {
+            let _ = tx.send(res);
+        }) else {
+            return;
+        };
+        if watcher.watch(&self.root, RecursiveMode::Recursive).is_ok() {
+            self.root_watcher = Some(watcher);
+            self.root_watch_rx = Some(rx);
+        }
+    }
+
+    /// Drains all pending root-watch events and returns `true` if any of them
+    /// created, modified, or removed a path since the last check. Access-only
+    /// events are ignored so merely reading files doesn't trigger reloads.
+    pub(super) fn drain_root_watch(&self) -> bool {
+        let Some(rx) = &self.root_watch_rx else {
+            return false;
+        };
+        let mut changed = false;
+        while let Ok(res) = rx.try_recv() {
+            if let Ok(evt) = res {
+                if matches!(
+                    evt.kind,
+                    EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)
+                ) {
+                    changed = true;
+                }
+            }
+        }
+        changed
+    }
+
     /// Drains all pending file-watch events and returns `true` if the watched
     /// file was modified, created, or deleted since the last check.
     pub(super) fn drain_file_watch(&self) -> bool {
