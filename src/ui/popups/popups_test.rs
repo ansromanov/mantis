@@ -1,4 +1,10 @@
-use super::*;
+use ratatui::layout::Rect;
+
+use crate::ui::popups::util::centered_rect;
+use crate::ui::popups::{
+    draw_about, draw_blame_panel, draw_command_palette, draw_help, draw_history,
+    draw_in_file_search, draw_search, draw_theme,
+};
 
 #[test]
 fn centered_rect_returns_inner_rectangle() {

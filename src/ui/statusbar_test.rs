@@ -360,7 +360,6 @@ fn git_info_str_behind_only() {
     };
     assert_eq!(git_info_str(&info), " [main ↓3]");
 }
-
 #[test]
 fn watch_badge_shown_when_active() {
     let mut app = make_app();

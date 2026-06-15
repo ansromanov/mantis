@@ -1,6 +1,12 @@
-use super::*;
+use ratatui::style::{Color, Style};
+use ratatui::text::Span;
+
 use crate::search::InFileSearch;
 use crate::theme::Theme;
+use crate::ui::content::diff::emphasize;
+use crate::ui::content::draw_content;
+use crate::ui::content::search::apply_search_to_regions;
+use crate::ui::content::selection::apply_selection;
 
 fn default_theme() -> Theme {
     Theme::default()
