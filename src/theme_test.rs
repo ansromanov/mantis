@@ -220,24 +220,31 @@ use std::sync::{Mutex, MutexGuard};
 static ENV_LOCK: Mutex<()> = Mutex::new(());
 static COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
-/// Redirects XDG_CONFIG_HOME to a fresh temp dir for the duration of `f`,
-/// then restores the original value and removes the temp dir.
+/// Redirects the platform config-home env var to a fresh temp dir for the
+/// duration of `f`, then restores the original value and removes the temp dir.
+/// On Windows this is APPDATA; everywhere else it is XDG_CONFIG_HOME.
+/// ENV_LOCK serialises callers so concurrent env-var mutations don't race.
 fn with_isolated_config_home<F: FnOnce(&std::path::Path)>(f: F) {
     let _guard: MutexGuard<()> = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let n = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let tmp = std::env::temp_dir().join(format!("tv2_theme_test_{}_{n}", std::process::id()));
     std::fs::create_dir_all(&tmp).unwrap();
 
-    let old = std::env::var_os("XDG_CONFIG_HOME");
     // SAFETY: ENV_LOCK serialises all callers; no other thread mutates this var.
-    unsafe { std::env::set_var("XDG_CONFIG_HOME", &tmp) };
+    #[cfg(windows)]
+    let env_key = "APPDATA";
+    #[cfg(not(windows))]
+    let env_key = "XDG_CONFIG_HOME";
+
+    let old = std::env::var_os(env_key);
+    unsafe { std::env::set_var(env_key, &tmp) };
 
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&tmp)));
 
     unsafe {
         match old {
-            Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
-            None => std::env::remove_var("XDG_CONFIG_HOME"),
+            Some(v) => std::env::set_var(env_key, v),
+            None => std::env::remove_var(env_key),
         }
     }
     let _ = std::fs::remove_dir_all(&tmp);
