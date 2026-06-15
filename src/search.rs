@@ -29,7 +29,8 @@ pub struct SearchState {
     pub content_results: Vec<ContentMatch>,
     pub selected: usize,
     matcher: SkimMatcherV2,
-    content_cache: HashMap<PathBuf, String>,
+    // Lines stored as (original, lowercased) so query refreshes need no per-line allocation.
+    content_cache: HashMap<PathBuf, Vec<(String, String)>>,
     content_cache_dirty: bool,
     pending_refresh: Option<Instant>,
     context_lines: usize,
@@ -149,46 +150,53 @@ impl SearchState {
 
     fn refresh_content(&mut self) {
         self.content_results = Vec::new();
-        if self.query.len() < 2 {
+        // Use char count so a single multibyte character doesn't bypass the guard.
+        if self.query.chars().count() < 2 {
             return;
         }
         // Build cache from disk if dirty (first call or after tree reload).
+        // Each file is pre-split into (original, lowercased) line pairs so that
+        // query refreshes need no per-line allocation.
         if self.content_cache_dirty {
             self.content_cache.clear();
             for path in &self.all_files {
                 let Ok(bytes) = fs::read(path) else { continue };
+                // Skip files larger than 1 MB to cap memory use.
+                if bytes.len() > 1024 * 1024 {
+                    continue;
+                }
                 if is_binary_bytes(&bytes) {
                     continue;
                 }
                 let Ok(text) = String::from_utf8(bytes) else {
                     continue;
                 };
-                self.content_cache.insert(path.clone(), text);
+                let lines: Vec<(String, String)> = text
+                    .lines()
+                    .map(|l| (l.to_string(), l.to_lowercase()))
+                    .collect();
+                self.content_cache.insert(path.clone(), lines);
             }
             self.content_cache_dirty = false;
         }
         let q = self.query.to_lowercase();
         let ctx = self.context_lines;
         for path in &self.all_files {
-            let Some(text) = self.content_cache.get(path) else {
+            let Some(lines) = self.content_cache.get(path) else {
                 continue;
             };
-            let all_lines: Vec<&str> = text.lines().collect();
-            for (i, line) in all_lines.iter().enumerate() {
-                if line.to_lowercase().contains(&q) {
+            for (i, (orig, lower)) in lines.iter().enumerate() {
+                if lower.contains(&q) {
                     let context = if ctx > 0 {
-                        let end = (i + 1 + ctx).min(all_lines.len());
-                        all_lines[i + 1..end]
-                            .iter()
-                            .map(|l| l.to_string())
-                            .collect()
+                        let end = (i + 1 + ctx).min(lines.len());
+                        lines[i + 1..end].iter().map(|(l, _)| l.clone()).collect()
                     } else {
                         Vec::new()
                     };
                     self.content_results.push(ContentMatch {
                         path: path.clone(),
                         line_num: i + 1,
-                        line: line.to_string(),
+                        line: orig.clone(),
                         context,
                     });
                 }
