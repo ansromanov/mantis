@@ -1,0 +1,261 @@
+use crossterm::event::{KeyCode, KeyEvent};
+
+use crate::config::pressed;
+use crate::search::{CommandPalette, InFileSearch, SearchState, ThemePicker};
+
+use super::super::{App, Focus};
+
+impl App {
+    /// Handles all key events when no overlay is active. Dispatches global
+    /// actions (quit, help, search, reload, etc.) and routes to tree/content
+    /// handlers based on `self.focus`.
+    pub(super) fn handle_normal_key(&mut self, key: KeyEvent) {
+        if self.visual_line.is_some() && self.focus == Focus::Content {
+            self.handle_visual_line_key(key);
+            return;
+        }
+        if key.code == KeyCode::Esc && self.selection.is_some() {
+            self.clear_selection();
+            return;
+        }
+        let k = &self.keys;
+        if pressed(&k.quit, &key) {
+            self.should_quit = true;
+        } else if pressed(&k.help, &key) {
+            self.show_help = !self.show_help;
+        } else if pressed(&k.toggle_hidden, &key) {
+            self.show_hidden = !self.show_hidden;
+            self.config.show_hidden = self.show_hidden;
+            self.reload();
+            self.save_config();
+        } else if pressed(&k.search_files, &key) {
+            if self.focus == Focus::Content
+                && self.current_file.is_some()
+                && self.config.in_file_search
+            {
+                self.in_file_search = Some(InFileSearch::new());
+            } else {
+                let root = self.root.clone();
+                let mut s = SearchState::new(
+                    &root,
+                    self.show_hidden,
+                    self.ignore_gitignore,
+                    self.config.search_context_lines,
+                );
+                if self.config.keep_search_query && !self.last_search_query.is_empty() {
+                    s.query = self.last_search_query.clone();
+                    s.refresh_now();
+                }
+                self.search = Some(s);
+            }
+        } else if pressed(&k.reload, &key) {
+            self.reload();
+        } else if pressed(&k.search_content, &key) {
+            let root = self.root.clone();
+            let mut s = SearchState::new(
+                &root,
+                self.show_hidden,
+                self.ignore_gitignore,
+                self.config.search_context_lines,
+            );
+            s.toggle_mode();
+            if self.config.keep_search_query && !self.last_search_query.is_empty() {
+                s.query = self.last_search_query.clone();
+                s.refresh_now();
+            }
+            self.search = Some(s);
+        } else if pressed(&k.file_history, &key) {
+            self.open_file_history();
+        } else if pressed(&k.theme_picker, &key) {
+            self.theme_picker = Some(ThemePicker::default());
+        } else if pressed(&k.command_palette, &key) {
+            self.last_click = None;
+            self.command_palette = Some(CommandPalette::new(&self.keys));
+        } else if pressed(&k.switch_panel, &key) {
+            self.focus = match self.focus {
+                Focus::Tree => Focus::Content,
+                Focus::Content => Focus::Tree,
+            };
+        } else if pressed(&k.git_mode_toggle, &key) {
+            self.toggle_git_mode();
+        } else if pressed(&k.git_mode_flat_toggle, &key) {
+            if self.git_mode {
+                self.git_mode_flat = !self.git_mode_flat;
+                self.config.git_mode_flat = self.git_mode_flat;
+                self.rebuild();
+                self.try_open_selected();
+                self.save_config();
+            }
+        } else if pressed(&k.open_in_editor, &key) {
+            self.open_in_editor();
+        } else {
+            match self.focus {
+                Focus::Tree => self.handle_tree_key(key),
+                Focus::Content => self.handle_content_key(key),
+            }
+        }
+    }
+
+    /// Handles navigation and expand/collapse keys when the tree panel is focused.
+    pub(super) fn handle_tree_key(&mut self, key: KeyEvent) {
+        let k = &self.keys;
+        if pressed(&k.nav_up, &key) {
+            if self.tree_selected > 0 {
+                self.tree_selected -= 1;
+                self.scroll_tree_into_view();
+                self.try_open_selected();
+            }
+        } else if pressed(&k.nav_down, &key) {
+            if self.tree_selected + 1 < self.nodes.len() {
+                self.tree_selected += 1;
+                self.scroll_tree_into_view();
+                self.try_open_selected();
+            }
+        } else if pressed(&k.tree_expand, &key) {
+            self.activate_selected();
+        } else if self.tree_independent_scroll && pressed(&k.content_page_up, &key) {
+            let page = self.tree_page_size();
+            self.tree_scroll = self.tree_scroll.saturating_sub(page);
+        } else if self.tree_independent_scroll && pressed(&k.content_page_down, &key) {
+            let page = self.tree_page_size();
+            self.tree_scroll = (self.tree_scroll + page).min(self.tree_scroll_max());
+        } else if pressed(&k.content_top, &key) {
+            if self.tree_independent_scroll {
+                // Move only the viewport; leave the selection where it is.
+                self.tree_scroll = 0;
+            } else if self.tree_selected != 0 {
+                self.tree_selected = 0;
+                self.try_open_selected();
+            }
+        } else if pressed(&k.content_bottom, &key) {
+            if self.tree_independent_scroll {
+                self.tree_scroll = self.tree_scroll_max();
+            } else {
+                let last = self.nodes.len().saturating_sub(1);
+                if self.tree_selected != last {
+                    self.tree_selected = last;
+                    self.try_open_selected();
+                }
+            }
+        } else if pressed(&k.tree_collapse, &key) {
+            if let Some(node) = self.nodes.get(self.tree_selected) {
+                let depth = node.depth;
+                let path = node.path.clone();
+                let is_dir = node.is_dir;
+
+                if is_dir && self.expanded.contains(&path) {
+                    self.expanded.remove(&path);
+                    self.rebuild();
+                } else if depth > 0 {
+                    for i in (0..self.tree_selected).rev() {
+                        if self.nodes[i].depth < depth {
+                            self.tree_selected = i;
+                            break;
+                        }
+                    }
+                }
+                self.scroll_tree_into_view();
+            }
+        }
+    }
+
+    /// Number of tree rows that fit in the visible viewport, from the geometry
+    /// captured during the last render. Falls back to 1 before the first draw.
+    fn tree_page_size(&self) -> usize {
+        (self.tree_area.height as usize).max(1)
+    }
+
+    /// Largest valid `tree_scroll` value so the last row can sit at the bottom
+    /// of the viewport without scrolling past the end of the tree.
+    pub(crate) fn tree_scroll_max(&self) -> usize {
+        self.nodes.len().saturating_sub(self.tree_page_size())
+    }
+
+    /// When independent tree scrolling is enabled, nudges `tree_scroll` so the
+    /// current selection stays within the viewport after a cursor move. A no-op
+    /// otherwise, since the list widget auto-scrolls to the selection.
+    pub(crate) fn scroll_tree_into_view(&mut self) {
+        if !self.tree_independent_scroll {
+            return;
+        }
+        let height = self.tree_page_size();
+        if self.tree_selected < self.tree_scroll {
+            self.tree_scroll = self.tree_selected;
+        } else if self.tree_selected >= self.tree_scroll + height {
+            self.tree_scroll = self.tree_selected + 1 - height;
+        }
+    }
+
+    /// Handles scrolling, wrapping, and markdown-raw toggle keys when the
+    /// content panel is focused.
+    pub(super) fn handle_content_key(&mut self, key: KeyEvent) {
+        let k = &self.keys;
+        let scroll_before = self.content_scroll;
+        let hscroll_before = self.content_hscroll;
+        if self.is_markdown && pressed(&k.toggle_raw_markdown, &key) {
+            self.show_raw_markdown = !self.show_raw_markdown;
+            self.content_scroll = 0;
+            self.content_hscroll = 0;
+        } else if self.is_json
+            && !self.json_pretty_lines.is_empty()
+            && pressed(&k.toggle_pretty_json, &key)
+        {
+            self.show_pretty_json = !self.show_pretty_json;
+            self.content_scroll = 0;
+            self.content_hscroll = 0;
+        } else if !self.is_diff && pressed(&k.toggle_blame, &key) {
+            self.show_blame = !self.show_blame;
+        } else if !self.is_diff
+            && self.current_file.is_some()
+            && pressed(&k.visual_line_toggle, &key)
+        {
+            self.enter_visual_line();
+        } else if self.is_diff && pressed(&k.toggle_diff_side_by_side, &key) {
+            self.diff_side_by_side = !self.diff_side_by_side;
+            self.content_scroll = 0;
+            self.content_hscroll = 0;
+        } else if self.is_diff && pressed(&k.diff_hunk_next, &key) {
+            self.diff_next_hunk();
+        } else if self.is_diff && pressed(&k.diff_hunk_prev, &key) {
+            self.diff_prev_hunk();
+        } else if !self.yaml_fold_regions.is_empty() && pressed(&k.yaml_fold_toggle, &key) {
+            // Toggle the fold region whose header is at the current scroll position.
+            let phys = self.display_to_physical(self.content_scroll);
+            if let Some(ri) = self.region_idx_at(phys) {
+                self.toggle_fold_region(ri);
+                self.mark_content_scrolled();
+            }
+        } else if pressed(&k.toggle_wrap, &key) {
+            self.word_wrap = !self.word_wrap;
+            self.config.word_wrap = self.word_wrap;
+            self.content_scroll = 0;
+            self.content_hscroll = 0;
+            self.save_config();
+        } else if pressed(&k.nav_up, &key) {
+            self.content_scroll = self.content_scroll.saturating_sub(1);
+        } else if pressed(&k.nav_down, &key) {
+            let max = self.content_scroll_max();
+            if self.content_scroll < max {
+                self.content_scroll += 1;
+            }
+        } else if pressed(&k.content_page_up, &key) {
+            self.content_scroll = self.content_scroll.saturating_sub(20);
+        } else if pressed(&k.content_page_down, &key) {
+            let max = self.content_scroll_max();
+            self.content_scroll = (self.content_scroll + 20).min(max);
+        } else if !self.word_wrap && pressed(&k.content_left, &key) {
+            self.content_hscroll = self.content_hscroll.saturating_sub(4);
+        } else if !self.word_wrap && pressed(&k.content_right, &key) {
+            self.content_hscroll += 4;
+        } else if pressed(&k.content_top, &key) {
+            self.content_scroll = 0;
+        } else if pressed(&k.content_bottom, &key) {
+            self.content_scroll = self.content_scroll_max();
+        } else if !self.word_wrap && pressed(&k.content_reset_col, &key) {
+            self.content_hscroll = 0;
+        }
+        if self.content_scroll != scroll_before || self.content_hscroll != hscroll_before {
+            self.mark_content_scrolled();
+        }
+    }
+}
