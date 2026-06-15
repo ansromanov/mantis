@@ -1,4 +1,5 @@
 /target
+/.agent/worktrees
 /.claude/worktrees
 /docs/book
 /bench-results/
