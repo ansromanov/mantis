@@ -17,6 +17,23 @@ pr:
     git rebase origin/main
     git push -u origin HEAD --force-with-lease
 
+# rebase + push (just pr), then open the PR (e.g. just pr-open --fill, or pass gh flags)
+pr-open *args: pr
+    gh pr create --base main {{ if args == "" { "--fill" } else { args } }}
+
+# start work from a GitHub issue: create + checkout a linked branch, install hooks
+issue-start number:
+    gh issue develop {{number}} --base main --checkout
+    pre-commit install
+
+# list open issues
+issues *args:
+    gh issue list {{args}}
+
+# view a single issue (e.g. just issue 167)
+issue number *args:
+    gh issue view {{number}} {{args}}
+
 # build debug binary
 build:
     cargo build
