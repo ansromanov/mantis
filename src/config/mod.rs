@@ -412,4 +412,5 @@ fn dirs_next() -> Option<PathBuf> {
 }
 
 #[cfg(test)]
+#[path = "mod_test.rs"]
 mod tests;

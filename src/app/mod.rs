@@ -715,4 +715,5 @@ fn diff_line_style(line: &str, theme: &Theme) -> ratatui::style::Style {
 }
 
 #[cfg(test)]
+#[path = "mod_test.rs"]
 mod tests;
