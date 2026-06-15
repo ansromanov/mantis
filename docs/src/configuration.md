@@ -17,6 +17,7 @@ show_hidden = false       # show dotfiles
 ignore_gitignore = false  # show files excluded by .gitignore
 tree_width = 28           # tree panel width, as a percent of the terminal
 word_wrap = false         # wrap long lines in the content panel
+line_numbers = true       # show the line-number gutter in the content panel
 ```
 
 ## Keybindings
@@ -60,6 +61,7 @@ content_page_up = ["PageUp"]
 content_page_down = ["PageDown"]
 content_reset_col = ["0"]
 toggle_wrap = ["z"]
+toggle_line_numbers = ["L"]
 toggle_raw_markdown = ["M"]
 toggle_pretty_json = ["J"]
 ```

@@ -235,6 +235,10 @@ impl App {
             self.content_scroll = 0;
             self.content_hscroll = 0;
             self.save_config();
+        } else if pressed(&k.toggle_line_numbers, &key) {
+            self.show_line_numbers = !self.show_line_numbers;
+            self.config.line_numbers = self.show_line_numbers;
+            self.save_config();
         } else if pressed(&k.nav_up, &key) {
             self.content_scroll = self.content_scroll.saturating_sub(1);
         } else if pressed(&k.nav_down, &key) {

@@ -120,8 +120,8 @@ binding. The essentials:
 **Navigation** — `Up`/`k`, `Down`/`j` move or scroll; `Enter`/`Right`/`l` expand
 a directory or open a file; `Left`/`h` collapse or go up. In the content panel,
 `PageUp`/`PageDown` page, `g`/`G` jump to top/bottom, `0` resets horizontal
-scroll, `z` toggles word wrap, `M` toggles raw/rendered markdown, `J` toggles
-JSON pretty-print.
+scroll, `z` toggles word wrap, `L` toggles line numbers, `M` toggles
+raw/rendered markdown, `J` toggles JSON pretty-print.
 
 **Search popup** — type to filter, `Up`/`Down` to navigate, `Tab` to switch
 files ↔ content mode, `Enter` to open, `Esc` to close.
@@ -227,6 +227,12 @@ just run .     # run against the current directory
 just test      # run the test suite
 just clippy    # lint
 ```
+
+## Contributing
+
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for how to build,
+test, and submit a pull request, plus the branch/commit conventions and what CI
+checks. Project conventions in depth live in [AGENTS.md](AGENTS.md).
 
 ## License
 

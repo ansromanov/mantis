@@ -55,6 +55,7 @@ These work no matter which panel is focused.
 | `Left`/`Right` | Horizontal scroll (when wrap off) |
 | `0`            | Reset horizontal scroll      |
 | `z`            | Toggle word wrap             |
+| `L`            | Toggle line numbers          |
 | `M`            | Toggle raw / rendered markdown |
 | `J`            | Toggle JSON pretty-print     |
 | `V`            | Visual-line mode: select lines, `b` blames the range, `Esc` exits |

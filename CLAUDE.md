@@ -1,28 +1,12 @@
-# Agent isolation
+# CLAUDE.md
 
-Always pass `isolation: "worktree"` when spawning subagents via the Agent tool. This ensures each agent works in its own git worktree so parallel edits never conflict.
+Project conventions — architecture, code style, testing layout, and the branch/PR
+workflow — live in **[AGENTS.md](AGENTS.md)**. It is the single source of truth and is
+read by both Claude Code and opencode. Read it first.
 
-# Agent workflow
+This file holds only the Claude-Code-specific guidance that AGENTS.md does not cover.
 
-When starting work on a new feature or fix, first ensure you are on an up-to-date main branch:
+## Subagents
 
-```bash
-git checkout main
-git pull
-```
-
-Then create a feature branch with:
-
-```bash
-just new your-branch-name
-```
-
-This fetches latest main, creates the branch from `origin/main`, and installs pre-commit hooks.
-
-Before pushing and opening a PR, run:
-
-```bash
-just pr
-```
-
-This fetches latest `origin/main`, rebases onto it (fails loudly on conflicts), and pushes with `--force-with-lease`. Then use `gh pr create` to open the PR.
+Always pass `isolation: "worktree"` when spawning subagents via the Agent tool. Each
+agent then works in its own git worktree, so parallel edits never conflict.

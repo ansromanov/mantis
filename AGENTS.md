@@ -1,161 +1,178 @@
 # AGENTS.md — tree-viewer (tv)
 
-## Overview
+> Canonical instructions for this repo, read by both Claude Code and opencode.
+> Agent assets live in **`.agent/`**, which is symlinked as both `.claude/` and
+> `.opencode/` so the two tools share one config + skills directory. `CLAUDE.md`
+> defers here and adds only Claude-Code-specific notes.
 
-A fast terminal-based file tree viewer with ratatui. Navigate filesystems, preview files with syntax highlighting (`syntect`), render markdown (`pulldown-cmark`), fuzzy-search files/content (`fuzzy-matcher`), browse git history (`git` CLI), and switch themes — all with mouse and keyboard.
+A fast terminal-based file tree viewer built with ratatui. Navigate filesystems,
+preview files with syntax highlighting (`syntect`), render markdown
+(`pulldown-cmark`), fuzzy-search files/content (`fuzzy-matcher`), browse git history
+(`git` CLI), and switch themes — all with mouse and keyboard.
 
-## Commands
+---
 
-| Command | Action |
-|---|---|
-| `cargo build` | Debug build |
-| `cargo build --release` | Release build |
-| `cargo run -- [path]` | Run with optional path |
-| `cargo test` | Run all tests |
-| `cargo test -- --nocapture` | Run tests with stdout |
-| `cargo test <test_name>` | Run specific test |
-| `cargo check` | Type-check only |
-| `cargo clippy --all-targets -- -D warnings` | Lint (must pass) |
-| `cargo fmt --all` | Format (must pass) |
-| `cargo fmt --check` | Check formatting |
-| `pre-commit install` | Install git hooks (run once after clone) |
-| `pre-commit run --all-files` | Run all hooks manually |
-| `pre-commit autoupdate` | Update hook versions |
+# 1. Project Structure
 
-## Architecture (single crate, no workspace)
+Single crate, no workspace. Library code in `src/lib.rs`; the `tv` binary in
+`src/main.rs`. Tests are co-located in `_test.rs` files (see Rust Guidelines →
+Testing).
 
 ```
 src/
 ├── main.rs                 # Entry: terminal setup, event loop, dispatch
+├── lib.rs                  # Module declarations (crate root)
 ├── app/
 │   ├── mod.rs              # App state, input handling, overlays
 │   ├── key_handlers.rs     # Key dispatch to tree/content/search handlers
 │   ├── loader.rs           # Background file loader (thread)
 │   ├── file_ops.rs         # Open/close/reveal file operations
 │   ├── navigation.rs       # Tree navigation helpers
-│   ├── mod_test.rs         # App tests (co-located)
-│   └── loader_test.rs      # Loader tests (co-located)
+│   └── *_test.rs           # Co-located tests
 ├── ui/
 │   ├── mod.rs              # ratatui rendering orchestration
 │   ├── content.rs          # Content panel rendering
 │   ├── popups.rs           # Help, search, history, theme picker overlays
 │   ├── statusbar.rs        # Status bar rendering
 │   ├── tree.rs             # Tree panel rendering
-│   ├── mod_test.rs         # UI tests (co-located)
-│   ├── content_test.rs     # Content tests (co-located)
-│   ├── popups_test.rs      # Popups tests (co-located)
-│   ├── statusbar_test.rs   # Status bar tests (co-located)
-│   └── tree_test.rs        # Tree tests (co-located)
-├── command_palette.rs       # Ctrl-P command palette
+│   └── *_test.rs           # Co-located tests
 ├── config/
 │   ├── mod.rs              # tv.toml deserialization, keybinding parsing
-│   └── mod_test.rs         # Config tests (co-located)
-├── diff.rs                  # Git diff rendering helpers
-├── file.rs                  # Binary file detection (null-byte check)
-├── git.rs                   # Shells out to `git` for log/diff
-├── highlight.rs             # syntect syntax highlighting → ratatui styles
-├── markdown.rs              # pulldown-cmark → styled ratatui spans
-├── search.rs                # Fuzzy file/content search (SkimMatcherV2)
-├── selection.rs             # Text selection state
-├── theme.rs                 # Theme struct + 5 presets, color parsing
-├── tree.rs                  # Flat Vec<TreeNode> from ignore::WalkBuilder
-├── virtual_file.rs          # Virtual file content from highlight/git
-├── yaml_fold.rs             # YAML fold-region detection
-├── config_test.rs           # Config tests (co-located)
-├── diff_test.rs             # Diff tests (co-located)
-├── file_test.rs             # Integration tests (tests/)
-├── git_test.rs              # Git tests (co-located)
-├── highlight_test.rs        # Highlight tests (co-located)
-├── main_test.rs             # Main tests (co-located)
-├── markdown_test.rs         # Markdown tests (co-located)
-├── search_test.rs           # Search tests (co-located)
-├── selection_test.rs        # Selection tests (co-located)
-├── theme_test.rs            # Theme tests (co-located)
-├── tree_test.rs             # Tree tests (co-located)
-├── virtual_file_test.rs     # Virtual file tests (co-located)
-└── yaml_fold_test.rs        # YAML fold tests (co-located)
+│   └── validate.rs         # Config validation
+├── command_palette.rs      # Ctrl-P command palette
+├── diff.rs                 # Git diff rendering helpers
+├── file.rs                 # Binary file detection (null-byte check)
+├── git.rs                  # Shells out to `git` for log/diff
+├── highlight.rs            # syntect syntax highlighting → ratatui styles
+├── markdown.rs             # pulldown-cmark → styled ratatui spans
+├── search.rs               # Fuzzy file/content search (SkimMatcherV2)
+├── selection.rs            # Text selection state
+├── theme.rs                # Theme struct + presets, color parsing
+├── tree.rs                 # Flat Vec<TreeNode> from ignore::WalkBuilder
+├── virtual_file.rs         # Virtual file content from highlight/git
+└── yaml_fold.rs            # YAML fold-region detection
 ```
 
-## Key Patterns & Conventions
+Files grow into the module-directory pattern (`src/app/`, `src/ui/`, `src/config/`)
+once they get large: a thin `mod.rs` re-exports focused submodules.
 
-### 1. Flat tree vector
-The file tree is a `Vec<TreeNode>` with explicit `depth`. Expansion tracked in `HashSet<PathBuf>`. Simpler than nested trees for rendering + mouse hit-testing.
+## Key patterns & conventions
 
-### 2. Overlay state machine
-Event handler chains: `help` > `theme_picker` > `history` > `search` > normal dispatch (tree/content by `Focus`). Same chain in `handle_mouse()` and `draw()`.
+1. **Flat tree vector.** The file tree is a `Vec<TreeNode>` with explicit `depth`;
+   expansion is tracked in a `HashSet<PathBuf>`. Simpler than nested trees for
+   rendering and mouse hit-testing.
+2. **Overlay state machine.** Event handlers chain `help` > `theme_picker` >
+   `history` > `search` > normal dispatch (tree/content by `Focus`). The same chain
+   appears in `handle_mouse()` and `draw()`.
+3. **Recorded geometry for mouse.** Each `draw_*` stores its rendered `Rect` and
+   scroll offset back on `App`; mouse handlers hit-test with `rect_contains()`.
+   **Always account for scroll offsets in click calculations.**
+4. **Fuzzy-filterable picker.** `SearchState`, `HistoryState`, `ThemePicker` share a
+   shape: query string, full list, filtered+scored list, selected index,
+   `push(c)`/`pop()` → `refresh()`. Uses `SkimMatcherV2`, descending score sort.
+5. **Semantic theming.** `Theme` is a set of named color roles (not literal colors)
+   plus a `syntax` syntect theme name. Presets (default, monokai, solarized,
+   catppuccin, synthwave84) live in `PRESETS` plus user overrides; `apply_theme()`
+   re-opens the current file after a switch.
+6. **Keybinding abstraction.** All actions bind through a `Keymap`; `pressed()`
+   checks binding lists. Fully remappable via `tv.toml` `[keys]`.
+7. **Git via shell-out.** `git.rs` runs `git log` / `git diff` rather than linking a
+   Rust git library, with graceful fallback on failure.
+8. **Sync event loop.** `crossterm::event::poll()` with a 16ms timeout — no async
+   runtime, just a synchronous tick loop.
 
-### 3. Recorded geometry for mouse
-Each `draw_*` function stores its rendered `Rect` and scroll offset back on `App`. Mouse handlers use `rect_contains()` for hit-testing. **Always account for scroll offsets in click calculations.**
+---
 
-### 4. Fuzzy-filterable picker pattern
-`SearchState`, `HistoryState`, `ThemePicker` all share: query string, full list, filtered+scored list, selected index, `push(c)`/`pop()` → `refresh()`. Uses `SkimMatcherV2` with descending score sort.
+# 2. Rust Guidelines
 
-### 5. Semantic theming
-`Theme` is a set of named color roles (not literal colors) plus a `syntax` syntect theme name. Presets (default, monokai, solarized, catppuccin, synthwave84) listed in `PRESETS` + user overrides. `apply_theme()` re-opens current file after theme switch.
+## Code style
 
-### 6. Keybinding abstraction
-All actions bound through `Keymap` struct. `pressed()` checks binding lists. Fully remappable via `tv.toml` `[keys]` table.
+- **Indent** 4 spaces, no tabs. **Line length** 100 chars max.
+- **Naming** snake_case for functions/vars/modules, PascalCase for types/enums.
+- **Imports** grouped std → external crates → local modules, separated by blank lines.
+  No wildcard imports except `use super::*;` in test files.
+- **Doc comments** on all public items. No tautological or self-demonstrating comments.
+- **No emoji/unicode** in source (except test assertions exercising multi-byte handling).
+- **Explicit `.clone()`** on non-Copy types — no hidden clones.
 
-### 7. Git via shell-out
-`git.rs` runs `git log` / `git diff` commands rather than linking a Rust git library. Graceful fallback on failure.
+## Error handling
 
-### 8. Error handling
-`anyhow` only in `main` and `App::new`. File/git errors degrade gracefully to UI messages. No unwrap/expect in production paths.
+`anyhow` only in `main` and `App::new`; use `.context()` for actionable messages.
+File and git errors degrade gracefully to UI messages — **no `unwrap`/`expect` in
+production paths** (tests may use them freely). Custom errors via `thiserror`.
 
-### 9. Sync event loop
-Uses `crossterm::event::poll()` with 16ms timeout — no async runtime. Simple synchronous tick loop.
+## Testing
 
-### 10. Co-located test files (mandatory)
-Tests MUST live in separate `module_test.rs` files co-located with their source module, never inline as `#[cfg(test)] mod tests { ... }`. For `src/foo.rs` the test file is `src/foo_test.rs`; for `src/app/mod.rs` it is `src/app/mod_test.rs`. Each source file declares its tests via:
+Tests are **co-located** with the module they cover, in a sibling `_test.rs` file —
+never inline `#[cfg(test)] mod tests { ... }` blocks.
+
+- `src/foo.rs` → tests in `src/foo_test.rs`
+- `src/app/mod.rs` → tests in `src/app/mod_test.rs`
+
+Each `_test.rs` starts with `use super::*;` and contains bare `#[test]` functions
+(no `mod tests` wrapper). The source file wires it up with one line:
+
 ```rust
 #[cfg(test)]
 #[path = "foo_test.rs"]
 mod tests;
 ```
-The test file starts with `use super::*;` and contains bare `#[test]` functions — no module wrapper. When adding new tests to an existing module, append them to the existing `_test.rs` file. When creating a new module, immediately create its `_test.rs` companion. This keeps source files lean and makes module-specific test runs easy (`cargo test foo`).
 
-## Code Style
+When adding tests to an existing module, append to its `_test.rs`. When creating a
+new module, create its `_test.rs` companion at the same time. Cross-module /
+black-box tests live in the integration `tests/` directory. The `split-tests` skill
+(`.agent/skills/split-tests/`) automates extracting any inline block.
 
-- **Indent:** 4 spaces, no tabs
-- **Naming:** snake_case for functions/vars/modules, PascalCase for types/enums
-- **Imports:** std → external crates → local modules, grouped by blank line
-- **No wildcard imports** except in test modules (`use super::*`)
-- **Doc comments** on all public items. No tautological or self-demonstrating comments.
-- **No emoji/unicode** in source (except in test assertions for multi-byte handling)
-- **Line length:** 100 chars max
-- **`.clone()` explicitly** on non-Copy types — no hidden clones
-- **Custom errors** with `thiserror` / `anyhow` `.context()`
+## File size limit
+
+Keep every file under **600 lines** (code and tests alike). When a source file
+approaches the limit, split it into focused submodules using the module-directory
+pattern (`src/app/`, `src/ui/`). When a `_test.rs` approaches it, split by area into
+multiple sibling `_test.rs` files.
+
+---
+
+# 3. Dev Flow
+
+## Commands
+
+| Command | Action |
+|---|---|
+| `cargo build` / `cargo build --release` | Debug / release build |
+| `cargo run -- [path]` | Run with optional path |
+| `cargo test` | Run all tests |
+| `cargo test <name>` | Run specific test |
+| `cargo check` | Type-check only |
+| `cargo clippy --all-targets -- -D warnings` | Lint (must pass) |
+| `cargo fmt --all` / `cargo fmt --check` | Format / check formatting |
+| `just` | List all recipes |
+| `pre-commit install` | Install git hooks (once after clone) |
+| `pre-commit run --all-files` | Run all hooks manually |
 
 ## Branching
 
-Always branch from `origin/main`, never from an existing feature branch. Use the just command:
+Always branch from `origin/main`, never from an existing feature branch:
 
 ```bash
 just new your-branch-name
 ```
 
-This fetches latest main, creates the branch from `origin/main`, and installs pre-commit hooks.
+This fetches latest main, creates the branch from `origin/main`, and installs
+pre-commit hooks. If you find yourself on a branch not based on main, cherry-pick the
+new commits onto a clean branch rather than rebasing through merge noise.
 
-If you find yourself on a branch that isn't based on main, cherry-pick only the new commits onto a clean branch rather than rebasing through merge noise.
-
-Before pushing and opening a PR, use:
+## Opening a PR
 
 ```bash
-just pr
+just pr            # fetch origin/main, rebase, push --force-with-lease
+gh pr create       # open the PR (rebase fails loudly on conflicts so you can resolve)
 ```
 
-This fetches latest `origin/main`, rebases onto it (fails loudly on conflicts so you can resolve them), then pushes with `--force-with-lease`. Run `gh pr create` after to open the PR.
+## Before committing
 
-## File Size Limit
-
-Keep every source file under **400 lines**. If a file grows beyond that, split it into focused submodules (see `src/app/` and `src/ui/` for examples of the Rust module-directory pattern).
-
-## Before Committing
-
-1. `cargo fmt --all` — formatting clean (enforced by pre-commit hook)
-2. `cargo clippy --all-targets -- -D warnings` — no warnings (enforced by pre-commit hook)
+1. `cargo fmt --all` — formatting clean (enforced by pre-commit)
+2. `cargo clippy --all-targets -- -D warnings` — no warnings (enforced by pre-commit)
 3. `cargo test` — all tests pass
-4. `cargo check` — no type errors (enforced by pre-commit hook)
+4. `cargo check` — no type errors (enforced by pre-commit)
 5. No debug `println!`, `dbg!`, or commented-out code
-6. No inline `#[cfg(test)] mod tests { ... }` — tests must be in a co-located `_test.rs` file
-7. No hardcoded secrets or credentials
+6. No hardcoded secrets or credentials

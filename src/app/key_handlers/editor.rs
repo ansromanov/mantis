@@ -78,6 +78,11 @@ impl App {
                 self.content_hscroll = 0;
                 self.save_config();
             }
+            Some("toggle_line_numbers") => {
+                self.show_line_numbers = !self.show_line_numbers;
+                self.config.line_numbers = self.show_line_numbers;
+                self.save_config();
+            }
             Some("toggle_raw_markdown") if self.is_markdown => {
                 self.show_raw_markdown = !self.show_raw_markdown;
                 self.content_scroll = 0;
