@@ -26,16 +26,54 @@ A fast terminal-based file tree viewer with ratatui. Navigate filesystems, previ
 
 ```
 src/
-├── main.rs        # Entry: terminal setup, event loop, dispatch
-├── app.rs         # App state, input handling, overlays (search/history/theme)
-├── ui.rs          # ratatui rendering (tree, content, statusbar, popups)
-├── tree.rs        # Flat Vec<TreeNode> from ignore::WalkBuilder
-├── file.rs        # Binary file detection (null-byte check)
-├── config.rs      # tv.toml deserialization, keybinding parsing
-├── theme.rs       # Theme struct + 5 presets, color parsing
-├── git.rs         # Shells out to `git` for log/diff
-├── highlight.rs   # syntect syntax highlighting → ratatui styles
-└── markdown.rs    # pulldown-cmark → styled ratatui spans (tables, code blocks, lists)
+├── main.rs                 # Entry: terminal setup, event loop, dispatch
+├── app/
+│   ├── mod.rs              # App state, input handling, overlays
+│   ├── key_handlers.rs     # Key dispatch to tree/content/search handlers
+│   ├── loader.rs           # Background file loader (thread)
+│   ├── file_ops.rs         # Open/close/reveal file operations
+│   ├── navigation.rs       # Tree navigation helpers
+│   ├── mod_test.rs         # App tests (co-located)
+│   └── loader_test.rs      # Loader tests (co-located)
+├── ui/
+│   ├── mod.rs              # ratatui rendering orchestration
+│   ├── content.rs          # Content panel rendering
+│   ├── popups.rs           # Help, search, history, theme picker overlays
+│   ├── statusbar.rs        # Status bar rendering
+│   ├── tree.rs             # Tree panel rendering
+│   ├── mod_test.rs         # UI tests (co-located)
+│   ├── content_test.rs     # Content tests (co-located)
+│   ├── popups_test.rs      # Popups tests (co-located)
+│   ├── statusbar_test.rs   # Status bar tests (co-located)
+│   └── tree_test.rs        # Tree tests (co-located)
+├── command_palette.rs       # Ctrl-P command palette
+├── config/
+│   ├── mod.rs              # tv.toml deserialization, keybinding parsing
+│   └── mod_test.rs         # Config tests (co-located)
+├── diff.rs                  # Git diff rendering helpers
+├── file.rs                  # Binary file detection (null-byte check)
+├── git.rs                   # Shells out to `git` for log/diff
+├── highlight.rs             # syntect syntax highlighting → ratatui styles
+├── markdown.rs              # pulldown-cmark → styled ratatui spans
+├── search.rs                # Fuzzy file/content search (SkimMatcherV2)
+├── selection.rs             # Text selection state
+├── theme.rs                 # Theme struct + 5 presets, color parsing
+├── tree.rs                  # Flat Vec<TreeNode> from ignore::WalkBuilder
+├── virtual_file.rs          # Virtual file content from highlight/git
+├── yaml_fold.rs             # YAML fold-region detection
+├── config_test.rs           # Config tests (co-located)
+├── diff_test.rs             # Diff tests (co-located)
+├── file_test.rs             # Integration tests (tests/)
+├── git_test.rs              # Git tests (co-located)
+├── highlight_test.rs        # Highlight tests (co-located)
+├── main_test.rs             # Main tests (co-located)
+├── markdown_test.rs         # Markdown tests (co-located)
+├── search_test.rs           # Search tests (co-located)
+├── selection_test.rs        # Selection tests (co-located)
+├── theme_test.rs            # Theme tests (co-located)
+├── tree_test.rs             # Tree tests (co-located)
+├── virtual_file_test.rs     # Virtual file tests (co-located)
+└── yaml_fold_test.rs        # YAML fold tests (co-located)
 ```
 
 ## Key Patterns & Conventions
@@ -66,6 +104,15 @@ All actions bound through `Keymap` struct. `pressed()` checks binding lists. Ful
 
 ### 9. Sync event loop
 Uses `crossterm::event::poll()` with 16ms timeout — no async runtime. Simple synchronous tick loop.
+
+### 10. Co-located test files (mandatory)
+Tests MUST live in separate `module_test.rs` files co-located with their source module, never inline as `#[cfg(test)] mod tests { ... }`. For `src/foo.rs` the test file is `src/foo_test.rs`; for `src/app/mod.rs` it is `src/app/mod_test.rs`. Each source file declares its tests via:
+```rust
+#[cfg(test)]
+#[path = "foo_test.rs"]
+mod tests;
+```
+The test file starts with `use super::*;` and contains bare `#[test]` functions — no module wrapper. When adding new tests to an existing module, append them to the existing `_test.rs` file. When creating a new module, immediately create its `_test.rs` companion. This keeps source files lean and makes module-specific test runs easy (`cargo test foo`).
 
 ## Code Style
 
@@ -110,4 +157,5 @@ Keep every source file under **400 lines**. If a file grows beyond that, split i
 3. `cargo test` — all tests pass
 4. `cargo check` — no type errors (enforced by pre-commit hook)
 5. No debug `println!`, `dbg!`, or commented-out code
-6. No hardcoded secrets or credentials
+6. No inline `#[cfg(test)] mod tests { ... }` — tests must be in a co-located `_test.rs` file
+7. No hardcoded secrets or credentials
