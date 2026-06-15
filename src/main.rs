@@ -1,12 +1,13 @@
 use std::io;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture, Event},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use ratatui::{backend::CrosstermBackend, Terminal};
+use ratatui::{backend::Backend, backend::CrosstermBackend, Terminal};
 
 use crate::app::App;
 
@@ -54,33 +55,102 @@ where
     args.into_iter().nth(1).map(PathBuf::from)
 }
 
-fn main() -> anyhow::Result<()> {
-    let arg = parse_args();
-    let flag = arg.as_deref().and_then(|p| p.to_str());
-    match flag {
-        Some("--help") | Some("-h") | Some("/?") => {
-            println!("Usage: tv [<path>]");
-            println!("  <path>  File or directory to open (default: current dir)");
-            println!();
-            println!("Options:");
-            println!("  -h, --help, /?    Print this help");
-            println!("  -V, --version     Print version");
-            std::process::exit(0);
+/// A meta CLI action that prints information and exits before launching the UI.
+enum MetaAction {
+    Help,
+    Version,
+}
+
+impl MetaAction {
+    /// The text printed to stdout for this action.
+    fn message(&self) -> String {
+        match self {
+            MetaAction::Help => "Usage: tv [<path>]\n  \
+                 <path>  File or directory to open (default: current dir)\n\n\
+                 Options:\n  \
+                 -h, --help, /?    Print this help\n  \
+                 -V, --version     Print version\n"
+                .to_string(),
+            MetaAction::Version => format!("v{}\n", env!("CARGO_PKG_VERSION")),
         }
-        Some("--version") | Some("-V") => {
-            println!("v{}", env!("CARGO_PKG_VERSION"));
-            std::process::exit(0);
-        }
-        _ => {}
     }
+}
 
-    let arg = arg
+/// Classifies a CLI argument as a meta action (help/version), if it is one.
+fn meta_action(arg: Option<&Path>) -> Option<MetaAction> {
+    match arg.and_then(|p| p.to_str()) {
+        Some("--help") | Some("-h") | Some("/?") => Some(MetaAction::Help),
+        Some("--version") | Some("-V") => Some(MetaAction::Version),
+        _ => None,
+    }
+}
+
+/// Resolves the optional path argument to a canonical path: flag-like args are
+/// ignored and a missing arg defaults to the current directory.
+fn resolve_input_path(arg: Option<PathBuf>) -> anyhow::Result<PathBuf> {
+    let path = arg
         .filter(|a| !a.to_string_lossy().starts_with('-'))
-        .unwrap_or_else(|| PathBuf::from("."))
-        .canonicalize()?;
+        .unwrap_or_else(|| PathBuf::from("."));
+    Ok(path.canonicalize()?)
+}
 
-    let (root, file) = resolve_root_and_file(&arg);
+/// What `main` should do once arguments are parsed: either print a meta message
+/// (help/version) and exit, or launch the TUI rooted at `root`.
+enum Startup {
+    /// Print this text to stdout and exit successfully.
+    Print(String),
+    /// Launch the UI for `root`, optionally revealing `file`.
+    Launch {
+        root: PathBuf,
+        file: Option<PathBuf>,
+    },
+}
 
+/// Decides what to do with the parsed CLI argument. Pure and fully testable:
+/// the only side-effecting work (terminal setup, the event loop) is deferred to
+/// `main` based on the returned `Startup`.
+fn plan_startup(arg: Option<PathBuf>) -> anyhow::Result<Startup> {
+    if let Some(action) = meta_action(arg.as_deref()) {
+        return Ok(Startup::Print(action.message()));
+    }
+    let (root, file) = resolve_root_and_file(&resolve_input_path(arg)?);
+    Ok(Startup::Launch { root, file })
+}
+
+/// A source of input events for the event loop. Abstracted so the loop can be
+/// driven by a real terminal in production and a scripted queue in tests.
+trait EventSource {
+    /// Returns the next available event, or `None` if none arrived in time.
+    fn next_event(&mut self) -> anyhow::Result<Option<Event>>;
+}
+
+/// Production event source backed by crossterm's terminal event queue.
+struct CrosstermEvents;
+
+impl EventSource for CrosstermEvents {
+    fn next_event(&mut self) -> anyhow::Result<Option<Event>> {
+        if crossterm::event::poll(Duration::from_millis(16))? {
+            Ok(Some(crossterm::event::read()?))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+fn main() -> anyhow::Result<()> {
+    match plan_startup(parse_args())? {
+        Startup::Print(message) => {
+            print!("{message}");
+            Ok(())
+        }
+        Startup::Launch { root, file } => launch_tui(root, file),
+    }
+}
+
+/// Puts the terminal into raw/alternate-screen mode, runs the app to completion,
+/// then restores the terminal regardless of how the app exited. This is the only
+/// part of startup that touches the real terminal, so it is not unit-tested.
+fn launch_tui(root: PathBuf, file: Option<PathBuf>) -> anyhow::Result<()> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
@@ -88,15 +158,8 @@ fn main() -> anyhow::Result<()> {
     let mut terminal = Terminal::new(backend)?;
     terminal.hide_cursor()?;
 
-    let (cfg, cfg_path, cfg_error) = config::load(&root);
-    let mut app = app::App::new(root, cfg, cfg_path, cfg_error)?;
-    if let Some(file) = file {
-        app.open_and_reveal(&file);
-    }
-    // Drive tree/git refreshes from filesystem events rather than a blind timer.
-    app.watch_root();
-
-    run_event_loop(&mut terminal, &mut app)?;
+    let mut events = CrosstermEvents;
+    let result = run_app(&mut terminal, root, file, &mut events);
 
     disable_raw_mode()?;
     execute!(
@@ -106,6 +169,28 @@ fn main() -> anyhow::Result<()> {
     )?;
     terminal.show_cursor()?;
 
+    result
+}
+
+/// Builds the app for `root` (optionally revealing `file`), runs the event loop
+/// against `terminal`, and reports any config error after the loop exits.
+/// Generic over the backend so tests can drive it with `TestBackend`.
+fn run_app(
+    terminal: &mut Terminal<impl Backend>,
+    root: PathBuf,
+    file: Option<PathBuf>,
+    events: &mut impl EventSource,
+) -> anyhow::Result<()> {
+    let (cfg, cfg_path, cfg_error) = config::load(&root);
+    let mut app = App::new(root, cfg, cfg_path, cfg_error)?;
+    if let Some(file) = file {
+        app.open_and_reveal(&file);
+    }
+    // Drive tree/git refreshes from filesystem events rather than a blind timer.
+    app.watch_root();
+
+    run_event_loop(terminal, &mut app, events)?;
+
     if let Some(err) = &app.config_error {
         eprintln!("tv: ignoring invalid config: {err}");
     }
@@ -113,26 +198,18 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Drives the event loop: renders the UI, polls for events, dispatches them
-/// to the app, and calls `tick()` every frame.
+/// Drives the event loop: renders the UI, pulls the next event from `events`,
+/// dispatches it to the app, and calls `tick()` every frame.
 fn run_event_loop(
-    terminal: &mut Terminal<impl ratatui::backend::Backend>,
+    terminal: &mut Terminal<impl Backend>,
     app: &mut App,
+    events: &mut impl EventSource,
 ) -> anyhow::Result<()> {
     loop {
-        if app.needs_clear {
-            terminal.clear()?;
-            terminal.hide_cursor()?;
-            app.needs_clear = false;
-        }
-        terminal.draw(|f| ui::draw(f, app))?;
+        render_frame(terminal, app)?;
 
-        if crossterm::event::poll(std::time::Duration::from_millis(16))? {
-            match crossterm::event::read()? {
-                Event::Key(key) => app.handle_key(key),
-                Event::Mouse(m) => app.handle_mouse(m),
-                _ => {}
-            }
+        if let Some(event) = events.next_event()? {
+            dispatch_event(app, event);
         }
 
         if app.should_quit {
@@ -142,6 +219,26 @@ fn run_event_loop(
         app.tick();
     }
     Ok(())
+}
+
+/// Clears the terminal when requested, then renders one frame of the UI.
+fn render_frame(terminal: &mut Terminal<impl Backend>, app: &mut App) -> anyhow::Result<()> {
+    if app.needs_clear {
+        terminal.clear()?;
+        terminal.hide_cursor()?;
+        app.needs_clear = false;
+    }
+    terminal.draw(|f| ui::draw(f, app))?;
+    Ok(())
+}
+
+/// Dispatches a single terminal event to the app's key/mouse handlers.
+fn dispatch_event(app: &mut App, event: Event) {
+    match event {
+        Event::Key(key) => app.handle_key(key),
+        Event::Mouse(m) => app.handle_mouse(m),
+        _ => {}
+    }
 }
 
 #[cfg(test)]
