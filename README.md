@@ -228,6 +228,12 @@ just test      # run the test suite
 just clippy    # lint
 ```
 
+## Contributing
+
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for how to build,
+test, and submit a pull request, plus the branch/commit conventions and what CI
+checks. Project conventions in depth live in [AGENTS.md](AGENTS.md).
+
 ## License
 
 [GPL-3.0-or-later](LICENSE) © Andrei Romanov
