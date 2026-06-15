@@ -360,3 +360,18 @@ fn git_info_str_behind_only() {
     };
     assert_eq!(git_info_str(&info), " [main ↓3]");
 }
+
+#[test]
+fn watch_badge_shown_when_active() {
+    let mut app = make_app();
+    app.auto_watch = true;
+    let text = render_bar_width(&app, 120);
+    assert!(text.contains("[watch]"));
+}
+
+#[test]
+fn watch_badge_hidden_when_inactive() {
+    let app = make_app();
+    let text = render_bar_width(&app, 120);
+    assert!(!text.contains("[watch]"));
+}

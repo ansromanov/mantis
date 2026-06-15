@@ -102,6 +102,10 @@ pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
             }
         }
 
+        if app.auto_watch {
+            spans.push(Span::styled(" [watch]", badge));
+        }
+
         if app.show_scroll_percentage && app.current_file.is_some() {
             let max = app.content_scroll_max();
             if max > 0 {

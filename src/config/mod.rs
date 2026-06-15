@@ -23,6 +23,9 @@ pub struct Config {
     pub in_file_search: bool,
     pub search_context_lines: usize,
     pub keep_search_query: bool,
+    /// Automatically reload file content when the open file changes on disk.
+    /// Toggled at runtime with the `toggle_watch` keybinding.
+    pub watch: bool,
     pub keys: Keymap,
     pub theme: ThemeConfig,
 }
@@ -44,6 +47,7 @@ impl Default for Config {
             in_file_search: true,
             search_context_lines: 0,
             keep_search_query: false,
+            watch: false,
             keys: Keymap::default(),
             theme: ThemeConfig::default(),
         }
@@ -126,6 +130,7 @@ impl Keymap {
             "toggle_diff_side_by_side" => &self.toggle_diff_side_by_side,
             "open_in_editor" => &self.open_in_editor,
             "yaml_fold_toggle" => &self.yaml_fold_toggle,
+            "toggle_watch" => &self.toggle_watch,
             _ => return String::new(),
         };
         bindings.first().map(|b| b.display()).unwrap_or_default()
@@ -173,6 +178,7 @@ pub struct Keymap {
     pub command_palette: Vec<KeyBinding>,
     pub open_in_editor: Vec<KeyBinding>,
     pub yaml_fold_toggle: Vec<KeyBinding>,
+    pub toggle_watch: Vec<KeyBinding>,
 }
 
 impl Default for Keymap {
@@ -212,6 +218,7 @@ impl Default for Keymap {
             command_palette: bind(&["ctrl+p"]),
             open_in_editor: bind(&["e"]),
             yaml_fold_toggle: bind(&["Space"]),
+            toggle_watch: bind(&["W"]),
         }
     }
 }

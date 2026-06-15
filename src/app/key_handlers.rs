@@ -380,6 +380,11 @@ impl App {
             Some("open_in_editor") => self.open_in_editor(),
             Some("open_config_in_editor") => self.open_config_in_editor(),
             Some("show_about") => self.show_about = !self.show_about,
+            Some("toggle_watch") => {
+                self.auto_watch = !self.auto_watch;
+                self.config.watch = self.auto_watch;
+                self.save_config();
+            }
             Some("yaml_fold_all") if !self.yaml_fold_regions.is_empty() => {
                 self.fold_all();
                 self.mark_content_scrolled();
@@ -534,6 +539,10 @@ impl App {
             }
         } else if pressed(&k.open_in_editor, &key) {
             self.open_in_editor();
+        } else if pressed(&k.toggle_watch, &key) {
+            self.auto_watch = !self.auto_watch;
+            self.config.watch = self.auto_watch;
+            self.save_config();
         } else {
             match self.focus {
                 Focus::Tree => self.handle_tree_key(key),

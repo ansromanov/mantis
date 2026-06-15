@@ -2095,6 +2095,18 @@ fn normal_key_reload_does_not_crash() {
 }
 
 #[test]
+fn normal_key_toggle_watch_flips_auto_watch() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    assert!(!app.auto_watch);
+    app.handle_key(KeyEvent::new(KeyCode::Char('W'), KeyModifiers::empty()));
+    assert!(app.auto_watch);
+    app.handle_key(KeyEvent::new(KeyCode::Char('W'), KeyModifiers::empty()));
+    assert!(!app.auto_watch);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn normal_key_theme_picker_opens() {
     let root = temp_tree();
     let mut app = app_for(&root);
