@@ -1,3 +1,13 @@
+//! The file-history popup.
+//!
+//! `draw_history` renders the recently-opened-files picker as a centered overlay
+//! with a query input and a fuzzy-filtered, scored list of paths, the selected
+//! one highlighted. It reads the live `HistoryState` from `App` and shares its
+//! list-picker layout and interaction model with the search, command, and theme
+//! popups. Rendering only - building and reordering the history list and acting
+//! on a selection happen in the search/state and key-handler layers. Drawn only
+//! while the history overlay is open.
+
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},

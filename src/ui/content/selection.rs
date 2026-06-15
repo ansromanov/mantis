@@ -1,3 +1,14 @@
+//! Text-selection highlighting for the content pane.
+//!
+//! `apply_selection` overlays a character-range selection onto a line's styled
+//! regions. For each `(Style, String)` region it splits the text into up to
+//! three segments - before the selection, the selected span, and after - by
+//! character-offset boundaries, applying the selection background color to the
+//! middle segment only. A `col_end` of `usize::MAX` selects to end of line. The
+//! result is a flat list of ratatui `Span`s. Like its in-file-search sibling it
+//! is purely presentational and preserves the original foreground styling of the
+//! highlighted text.
+
 use ratatui::style::{Color, Style};
 use ratatui::text::Span;
 

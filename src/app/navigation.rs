@@ -1,3 +1,14 @@
+//! Tree navigation and rebuilding for `App`.
+//!
+//! `rebuild` regenerates the visible `Vec<TreeNode>` from the filesystem while
+//! preserving the selected entry by path; in git mode it filters to changed
+//! files (hierarchical or flat). The movement helpers move the selection up and
+//! down, expand and collapse directories, jump to the top/bottom, and keep the
+//! viewport scrolled so the selection stays visible. These methods are the
+//! supported way to mutate tree selection and expansion state, so geometry and
+//! git-mode invariants stay consistent across keyboard and mouse input rather
+//! than being poked at from multiple call sites.
+
 use std::path::{Path, PathBuf};
 
 use crate::git::GitStatus;

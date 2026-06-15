@@ -1,3 +1,15 @@
+//! Color themes: semantic roles, built-in presets, and color parsing.
+//!
+//! `Theme` is a set of named color roles (accent, dim, text, dir, file, diff
+//! add/del, selection background, and so on) plus the name of a `syntect` syntax
+//! theme, so a single struct remaps the entire UI without touching call sites.
+//! Built-in presets (default, monokai, solarized, catppuccin, synthwave84) live
+//! in `PRESETS`; `ThemeConfig` captures the user's choice and per-role overrides
+//! from `tv.toml`, which `resolve()` merges onto a base preset. Colors are
+//! parsed from names or hex strings into `ratatui::style::Color`. Switching the
+//! active theme reopens the current file so highlighting picks up the new syntax
+//! theme.
+
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;

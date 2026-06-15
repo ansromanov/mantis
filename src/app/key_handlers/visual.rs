@@ -1,3 +1,14 @@
+//! Visual-line selection mode for the content pane.
+//!
+//! Visual-line mode lets the user select whole content lines with the keyboard
+//! (anchored at one line, extended with motion) and then act on the range - most
+//! notably opening a selection-scoped git-blame panel. `enter_visual_line`
+//! starts the mode at the first visible line, and `handle_visual_line_key`
+//! processes movement, range extension, blame-panel toggling, and Esc to exit.
+//! The selection is stored in `App::visual_line`; this module only manipulates
+//! that state and the blame-panel flag, deferring all rendering to the UI
+//! layer.
+
 use crossterm::event::{KeyCode, KeyEvent};
 
 use crate::config::pressed;

@@ -1,3 +1,13 @@
+//! Shared layout helpers for popup overlays.
+//!
+//! Currently home to `centered_rect`, which computes a `Rect` centered within a
+//! parent area from percentage width and height, splitting the space with
+//! ratatui `Layout` constraints. Every centered popup (search, history, theme,
+//! command palette, help, about) uses it so they share a consistent size and
+//! position model. Keeping this geometry in one place means a change to how
+//! popups are centered applies everywhere at once. Pure layout math with no
+//! `App` or theme dependency.
+
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
 /// Returns a `Rect` centered in `area` using the given percentage widths.

@@ -92,6 +92,11 @@ once they get large: a thin `mod.rs` re-exports focused submodules.
 - **Imports** grouped std → external crates → local modules, separated by blank lines.
   No wildcard imports except `use super::*;` in test files.
 - **Doc comments** on all public items. No tautological or self-demonstrating comments.
+- **File-level module docs.** Every non-test `.rs` file under `src/` opens with a
+  10-15 line `//!` block describing what the module does, the problem it solves, and
+  which public items it owns, written for a developer new to the project. Treat keeping
+  this block in sync as part of any PR that changes the file's behaviour, the way a
+  changelog entry is updated.
 - **No emoji/unicode** in source (except test assertions exercising multi-byte handling).
 - **Explicit `.clone()`** on non-Copy types — no hidden clones.
 

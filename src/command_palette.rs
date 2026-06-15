@@ -1,3 +1,15 @@
+//! The Ctrl-P command palette: a static registry of named actions and a
+//! fuzzy-filterable picker over them.
+//!
+//! `COMMANDS` is the canonical list of every palette-invokable action, each
+//! pairing a human-readable `name` with a stable `action_id` string. The
+//! `CommandPalette` picker holds the query, the scored-and-filtered subset, and
+//! the selected index, refreshing via `SkimMatcherV2` as the user types.
+//! Selecting an entry yields its `action_id`, which `app::key_handlers::editor`
+//! dispatches to the matching `App` method - so the palette and direct
+//! keybindings stay a single source of truth. Add new commands here and wire the
+//! `action_id` into that dispatcher.
+
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 
 use crate::config::Keymap;

@@ -1,3 +1,13 @@
+//! Hunk-to-hunk navigation within a diff for `App`.
+//!
+//! When the content pane shows a diff, these helpers let the user jump between
+//! `@@` hunk headers instead of scrolling line by line. `diff_hunk_rows`
+//! collects the display-row index of every hunk header in the coordinate space
+//! of the active layout (unified or side-by-side), and the `diff_next_hunk` /
+//! `diff_prev_hunk` methods move the scroll position to the nearest header above
+//! or below the current viewport. They are no-ops when the current content is
+//! not a diff, so they can be wired to keybindings unconditionally.
+
 use super::App;
 
 impl App {

@@ -1,3 +1,14 @@
+//! Syntax highlighting via `syntect`, adapted to ratatui styles.
+//!
+//! `Highlighter` wraps a `syntect` `SyntaxSet` and `ThemeSet`, both compiled
+//! once at startup and reused across every file open. It picks a syntax by file
+//! extension or first line, highlights a file line by line, and converts each
+//! `syntect` style span into a ratatui `(Style, String)` pair - translating
+//! colors and font flags (bold/italic/underline) into `ratatui::style`. The
+//! named theme is resolved on construction with a fallback to
+//! `base16-ocean.dark` when unknown, and can be swapped when the user changes
+//! themes. Its output feeds both the synchronous and background file-load paths.
+
 use ratatui::style::{Color, Modifier, Style};
 use std::path::Path;
 use syntect::{

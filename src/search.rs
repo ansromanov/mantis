@@ -1,3 +1,15 @@
+//! Fuzzy file and content search, plus the shared fuzzy-picker overlays.
+//!
+//! Provides the search engine and the state behind several look-alike overlays.
+//! `SearchState` drives the main picker, which fuzzy-matches either file paths
+//! (`SearchMode::Files`) or file contents (`SearchMode::Content`) using
+//! `SkimMatcherV2`, debouncing the expensive content scans. `ContentMatch`
+//! carries a hit's path, line number, and surrounding context. The same
+//! query/filtered-list/selected-index shape backs `HistoryState`, `ThemePicker`,
+//! `CommandPalette`, and the in-file search (`InFileSearch`), all defined here.
+//! Results sort by descending fuzzy score; binary files are skipped via
+//! `is_binary_bytes`.
+
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};

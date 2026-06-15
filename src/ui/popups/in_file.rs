@@ -1,3 +1,13 @@
+//! The in-file search bar.
+//!
+//! `draw_in_file_search` renders the incremental within-the-current-file search
+//! as a thin bar near the bottom of the content area (not a centered popup),
+//! showing the query and the current/total match count. It reads the live
+//! `InFileSearch` state from `App`; the matches themselves are highlighted in
+//! the content pane by `ui::content::search`, so this module draws only the
+//! prompt/status line. It is a no-op when in-file search is inactive, and its
+//! position tracks the content area so it sits just above the status bar.
+
 use ratatui::{
     layout::Rect,
     style::{Modifier, Style},

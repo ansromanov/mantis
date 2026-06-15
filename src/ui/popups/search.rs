@@ -1,3 +1,14 @@
+//! The file/content search popup.
+//!
+//! `draw_search` renders the main fuzzy search overlay: a query input plus a
+//! scored, filtered result list, with a `SearchMode` indicator showing whether
+//! it is searching file paths or file contents (Tab toggles between them).
+//! Content-mode results show the matching line and surrounding context. It reads
+//! the live `SearchState` from `App` and shares its centered list-picker layout
+//! with the history, command, and theme popups. Rendering only - matching,
+//! scoring, and opening a result are handled by the search engine and key
+//! handlers.
+
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},

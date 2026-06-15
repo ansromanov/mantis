@@ -1,3 +1,13 @@
+//! Modal overlay (popup) rendering, split into one submodule per popup.
+//!
+//! This module root collects every floating overlay the UI can draw on top of
+//! the main layout: about, blame, command palette, help, history, in-file
+//! search, file/content search, and the theme picker. Each lives in its own
+//! submodule and is re-exported as a `draw_*` function for the UI orchestrator,
+//! which decides which (if any) is visible. Shared layout helpers - notably
+//! `centered_rect` - live in `util`. Popups generally `Clear` their region
+//! first, then render a bordered block, so they visually float above the panes.
+
 mod about;
 mod blame;
 mod command;

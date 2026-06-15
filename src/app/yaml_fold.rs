@@ -1,3 +1,14 @@
+//! YAML fold state management on `App`.
+//!
+//! Bridges the pure fold-region detection in the crate-level
+//! [`yaml_fold`](crate::yaml_fold) module to the live content pane. It tracks
+//! which regions are collapsed (`yaml_folded`), computes the fold-gutter width,
+//! maps a physical line to its fold region, and rebuilds `fold_display_map` -
+//! the display-line to physical-line table the renderer and scroll math consult
+//! while folds are active. Toggling a fold here keeps that map and the recorded
+//! gutter click rows in sync, so mouse and keyboard fold operations always
+//! agree on what is visible.
+
 use super::App;
 
 impl App {
