@@ -32,7 +32,7 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         Style::default().fg(app.theme.dim)
     };
 
-    let title = if let Some(t) = &app.content_title {
+    let mut title = if let Some(t) = &app.content_title {
         t.clone()
     } else {
         app.current_file
@@ -41,6 +41,11 @@ pub(super) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
             .map(|rel| format!(" {} ", rel.display()))
             .unwrap_or_else(|| " No file ".into())
     };
+    // While a background load is in flight the previous file's content stays on
+    // screen; flag it so fast loads are invisible and slow ones are explained.
+    if app.loading {
+        title.push_str("⟳ loading… ");
+    }
 
     let block = Block::default()
         .title(title)

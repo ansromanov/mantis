@@ -122,10 +122,10 @@ impl App {
                 self.show_deleted(&path);
             } else if self.git_mode {
                 let path = node.path.clone();
-                self.show_working_tree_diff(&path);
+                self.request_working_tree_diff(&path);
             } else {
                 let path = node.path.clone();
-                self.open_file(&path);
+                self.request_open_file(&path);
             }
         }
     }
@@ -176,10 +176,10 @@ impl App {
                 self.show_deleted(&p);
             } else if self.git_mode {
                 let p = node.path.clone();
-                self.show_working_tree_diff(&p);
+                self.request_working_tree_diff(&p);
             } else {
                 let p = node.path.clone();
-                self.open_file(&p);
+                self.request_open_file(&p);
             }
         }
     }

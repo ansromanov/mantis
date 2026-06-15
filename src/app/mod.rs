@@ -20,8 +20,11 @@ use crate::yaml_fold::FoldRegion;
 mod content_pos;
 mod file_ops;
 mod key_handlers;
+mod loader;
 mod mouse_handlers;
 mod navigation;
+
+use loader::{LoadRequest, LoadResponse, Loader};
 
 /// Which panel is currently focused.
 #[derive(Debug, PartialEq)]
@@ -155,6 +158,16 @@ pub struct App {
     pub yaml_anchor_count: usize,
     /// Number of YAML aliases (`*name`) found in the current file.
     pub yaml_alias_count: usize,
+    /// Background worker that reads/highlights files and runs git diffs off the
+    /// main thread so tree navigation never blocks the event loop.
+    loader: Loader,
+    /// Sequence number of the most recently dispatched load. Worker responses
+    /// tagged with an older `seq` are stale (superseded by a newer navigation)
+    /// and discarded.
+    load_seq: u64,
+    /// Whether a background load is currently in flight; drives the "loading…"
+    /// indicator in the content title.
+    pub loading: bool,
 }
 
 impl App {
@@ -191,6 +204,7 @@ impl App {
         let theme = cfg.theme.resolve();
         let saved_config = cfg.clone();
         let highlighter = Highlighter::new(&theme.syntax);
+        let loader = Loader::new(&theme);
         let mut app = App {
             root,
             nodes,
@@ -279,12 +293,17 @@ impl App {
             yaml_error: None,
             yaml_anchor_count: 0,
             yaml_alias_count: 0,
+            loader,
+            load_seq: 0,
+            loading: false,
         };
         if app.git_mode {
             app.expand_git_dirs();
             app.rebuild();
         }
-        app.try_open_selected();
+        // Open the first file synchronously so it is visible on the first frame
+        // (and so callers/tests can observe content right after construction).
+        app.open_selected_sync();
         Ok(app)
     }
 
@@ -342,6 +361,7 @@ impl App {
     /// been quiet for `TREE_RELOAD_DEBOUNCE`); otherwise it falls back to a
     /// periodic reload so the view never goes permanently stale.
     pub fn tick(&mut self) {
+        self.drain_loads();
         if self.drain_file_watch() {
             self.reload_content();
         }
@@ -561,45 +581,98 @@ impl App {
         self.highlighter.highlight_range(path, lines)
     }
 
-    /// Validates YAML content, storing an error message if parsing fails.
-    pub(super) fn validate_yaml(&mut self, content: &str) {
-        match serde_yaml::from_str::<serde_yaml::Value>(content) {
-            Ok(_) => self.yaml_error = None,
-            Err(e) => self.yaml_error = Some(e.to_string()),
+    /// Drains all pending worker responses, applying the one matching the most
+    /// recent `load_seq` and discarding superseded results. Returns `true` if a
+    /// load was applied (so the caller knows to redraw).
+    pub(super) fn drain_loads(&mut self) -> bool {
+        // Collect first so the immutable borrow of `self.loader` is released
+        // before `apply_*` takes `&mut self`.
+        let responses: Vec<LoadResponse> =
+            std::iter::from_fn(|| self.loader.rx.try_recv().ok()).collect();
+        let mut applied = false;
+        for resp in responses {
+            match resp {
+                LoadResponse::File { seq, path, load } => {
+                    if seq == self.load_seq {
+                        self.apply_file_load(&path, *load);
+                        self.loading = false;
+                        applied = true;
+                    }
+                }
+                LoadResponse::Diff { seq, path, load } => {
+                    if seq == self.load_seq {
+                        self.apply_diff_load(&path, *load);
+                        self.loading = false;
+                        applied = true;
+                    }
+                }
+            }
+        }
+        applied
+    }
+
+    /// Bumps the load sequence so any in-flight worker result is treated as
+    /// stale, and clears the in-flight flag. Returns the new sequence number.
+    /// Called by every operation that replaces the displayed content.
+    pub(super) fn invalidate_pending_load(&mut self) -> u64 {
+        self.load_seq = self.load_seq.wrapping_add(1);
+        self.loading = false;
+        self.load_seq
+    }
+
+    /// Dispatches a file open to the background worker (production) or runs it
+    /// synchronously (tests, so assertions can observe content immediately).
+    pub(super) fn request_open_file(&mut self, path: &std::path::Path) {
+        if cfg!(test) {
+            self.open_file(path);
+        } else {
+            let seq = self.invalidate_pending_load();
+            self.loading = true;
+            self.loader.request(LoadRequest::File {
+                seq,
+                path: path.to_path_buf(),
+            });
         }
     }
 
-    /// Counts YAML anchors (`&name`) and aliases (`*name`) in the given lines.
-    pub(super) fn count_yaml_anchors_aliases(&mut self, lines: &[String]) {
-        let mut anchors = 0;
-        let mut aliases = 0;
-        for line in lines {
-            let trimmed = line.trim();
-            // Skip comments
-            if trimmed.starts_with('#') {
-                continue;
+    /// Dispatches a working-tree diff to the background worker (production) or
+    /// runs it synchronously (tests).
+    pub(super) fn request_working_tree_diff(&mut self, path: &std::path::Path) {
+        if cfg!(test) {
+            self.show_working_tree_diff(path);
+        } else {
+            let seq = self.invalidate_pending_load();
+            self.loading = true;
+            self.loader.request(LoadRequest::Diff {
+                seq,
+                root: self.root.clone(),
+                path: path.to_path_buf(),
+            });
+        }
+    }
+
+    /// Opens the currently selected node synchronously. Used at startup so the
+    /// first file renders on the first frame.
+    pub(super) fn open_selected_sync(&mut self) {
+        if let Some(node) = self.nodes.get(self.tree_selected) {
+            if node.is_dir {
+                return;
             }
-            // Count anchors: & followed by alphanumeric/underscore
-            let mut chars = trimmed.chars().peekable();
-            while let Some(ch) = chars.next() {
-                if ch == '&'
-                    && chars
-                        .peek()
-                        .is_some_and(|c| c.is_alphanumeric() || *c == '_')
-                {
-                    anchors += 1;
-                }
-                if ch == '*'
-                    && chars
-                        .peek()
-                        .is_some_and(|c| c.is_alphanumeric() || *c == '_')
-                {
-                    aliases += 1;
-                }
+            let path = node.path.clone();
+            if node.deleted {
+                self.show_deleted(&path);
+            } else if self.git_mode {
+                self.show_working_tree_diff(&path);
+            } else {
+                self.open_file(&path);
             }
         }
-        self.yaml_anchor_count = anchors;
-        self.yaml_alias_count = aliases;
+    }
+
+    /// Tells the worker to rebuild its highlighter/theme after a theme change.
+    pub(super) fn loader_set_theme(&self) {
+        self.loader
+            .request(LoadRequest::SetTheme(Box::new(self.theme.clone())));
     }
 }
 

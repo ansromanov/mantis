@@ -440,6 +440,7 @@ impl App {
     fn apply_theme(&mut self, theme: Theme) {
         self.theme = theme;
         self.highlighter = Highlighter::new(&self.theme.syntax);
+        self.loader_set_theme();
         if self.is_diff {
             self.highlighted = self
                 .content
