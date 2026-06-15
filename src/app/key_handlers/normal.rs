@@ -88,6 +88,10 @@ impl App {
             }
         } else if pressed(&k.open_in_editor, &key) {
             self.open_in_editor();
+        } else if pressed(&k.toggle_watch, &key) {
+            self.auto_watch = !self.auto_watch;
+            self.config.watch = self.auto_watch;
+            self.save_config();
         } else {
             match self.focus {
                 Focus::Tree => self.handle_tree_key(key),
