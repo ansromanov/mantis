@@ -88,7 +88,7 @@ impl App {
                     let left = self.tree_area.x.saturating_sub(1);
                     let total = (self.tree_area.width + self.content_area.width + 4) as u32;
                     let col = ev.column.saturating_sub(left) as u32;
-                    if let Some(pct) = (col * 100).checked_div(total) {
+                    if let Some(pct) = (col * 100 + total / 2).checked_div(total) {
                         self.tree_width = (pct.min(100) as u16).clamp(5, 95);
                     }
                 } else if self.scrollbar_drag {
