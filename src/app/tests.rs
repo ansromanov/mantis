@@ -82,6 +82,42 @@ fn key_release_events_are_ignored() {
 }
 
 #[test]
+fn watch_root_installs_recursive_watcher() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    assert!(app.root_watcher.is_none(), "no watcher before watch_root");
+    app.watch_root();
+    assert!(app.root_watcher.is_some(), "watcher installed on the root");
+    assert!(app.root_watch_rx.is_some());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_dirty_reload_is_debounced() {
+    use std::time::{Duration, Instant};
+
+    let root = temp_tree();
+    let mut app = app_for(&root);
+
+    // A just-seen event must NOT reload yet — the tree has to go quiet first.
+    app.tree_dirty = true;
+    app.tree_dirty_at = Some(Instant::now());
+    app.tick();
+    assert!(
+        app.tree_dirty,
+        "reload deferred while events are still fresh"
+    );
+
+    // Once the debounce window has passed, tick clears the flag and reloads.
+    // Use 61 s so this is still stale past the #[cfg(test)] 60 s window.
+    app.tree_dirty_at = Some(Instant::now() - Duration::from_secs(61));
+    app.tick();
+    assert!(!app.tree_dirty, "reload runs after the tree goes quiet");
+    assert!(app.tree_dirty_at.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn file_history_opens_picker_and_shows_diff() {
     let root = temp_git_tree();
     let mut app = app_for(&root);

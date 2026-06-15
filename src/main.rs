@@ -93,6 +93,8 @@ fn main() -> anyhow::Result<()> {
     if let Some(file) = file {
         app.open_and_reveal(&file);
     }
+    // Drive tree/git refreshes from filesystem events rather than a blind timer.
+    app.watch_root();
 
     run_event_loop(&mut terminal, &mut app)?;
 

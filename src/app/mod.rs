@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::mpsc::Receiver;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use notify::RecommendedWatcher;
 
@@ -118,6 +118,17 @@ pub struct App {
     file_watcher: Option<RecommendedWatcher>,
     file_watch_rx: Option<Receiver<notify::Result<notify::Event>>>,
     file_watch_path: Option<PathBuf>,
+    /// Recursive watcher on the view root, used to drive tree/git refreshes from
+    /// filesystem events instead of a blind timer. `None` if it could not be
+    /// installed (e.g. the OS hit a watch-descriptor limit on a huge tree), in
+    /// which case `tick` falls back to the periodic reload.
+    root_watcher: Option<RecommendedWatcher>,
+    root_watch_rx: Option<Receiver<notify::Result<notify::Event>>>,
+    /// A relevant root filesystem event was seen and a debounced reload is due.
+    tree_dirty: bool,
+    /// Instant of the most recent root event, used to debounce bursts (e.g. a
+    /// build touching many files) into a single reload once the tree goes quiet.
+    tree_dirty_at: Option<Instant>,
     pub selection: Option<TextSelection>,
     /// Active visual-line selection in the content panel, if any. Whole lines
     /// are selected and a scoped git-blame panel can be opened for the range.
@@ -251,6 +262,10 @@ impl App {
             file_watcher: None,
             file_watch_rx: None,
             file_watch_path: None,
+            root_watcher: None,
+            root_watch_rx: None,
+            tree_dirty: false,
+            tree_dirty_at: None,
             selection: None,
             visual_line: None,
             blame_panel: false,
@@ -281,7 +296,9 @@ impl App {
     }
 
     /// Rebuilds the file tree, re-fetches git status, and reloads the current
-    /// file. Called explicitly by the reload key and automatically every 30 s.
+    /// file. Triggered explicitly by the reload key, by debounced filesystem
+    /// events from the root watcher, or by the periodic fallback timer when no
+    /// root watcher is installed.
     pub fn reload(&mut self) {
         self.last_refresh = Instant::now();
         if self.git_status_enabled {
@@ -304,12 +321,26 @@ impl App {
         self.content_scrolled_at = Instant::now();
     }
 
-    /// Periodic per-frame update: drains file-watch events and triggers a
-    /// periodic full reload every 30 seconds.
     pub fn keys(&self) -> &Keymap {
         &self.keys
     }
 
+    /// Debounce window: how long the tree must stay quiet after a filesystem
+    /// event before a reload runs. Coalesces bursts (e.g. a build touching many
+    /// files) into a single refresh.
+    ///
+    /// In test builds the window is inflated to 60 s so that the debounce tests
+    /// can assert "still fresh" without relying on sub-300 ms scheduling.
+    #[cfg(not(test))]
+    const TREE_RELOAD_DEBOUNCE: Duration = Duration::from_millis(300);
+    #[cfg(test)]
+    const TREE_RELOAD_DEBOUNCE: Duration = Duration::from_secs(60);
+
+    /// Per-frame update. Refreshes the open file from its watcher, advances the
+    /// debounced content search, and drives the tree/git refresh: when the root
+    /// watcher is installed this is event-driven (reload only after the tree has
+    /// been quiet for `TREE_RELOAD_DEBOUNCE`); otherwise it falls back to a
+    /// periodic reload so the view never goes permanently stale.
     pub fn tick(&mut self) {
         if self.drain_file_watch() {
             self.reload_content();
@@ -317,7 +348,23 @@ impl App {
         if let Some(ref mut s) = self.search {
             s.maybe_refresh();
         }
-        if self.last_refresh.elapsed().as_secs() >= 30 {
+        if self.drain_root_watch() {
+            self.tree_dirty = true;
+            self.tree_dirty_at = Some(Instant::now());
+        }
+        if self.tree_dirty {
+            // Wait for the tree to go quiet before reloading so a burst of events
+            // produces one refresh, not one per event.
+            let quiet = self
+                .tree_dirty_at
+                .is_some_and(|t| t.elapsed() >= Self::TREE_RELOAD_DEBOUNCE);
+            if quiet {
+                self.tree_dirty = false;
+                self.tree_dirty_at = None;
+                self.reload();
+            }
+        } else if self.root_watcher.is_none() && self.last_refresh.elapsed().as_secs() >= 30 {
+            // No watcher (install failed): fall back to a blind periodic reload.
             self.reload();
         }
     }
