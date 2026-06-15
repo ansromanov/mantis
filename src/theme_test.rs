@@ -108,3 +108,197 @@ fn discover_all_includes_synthwave84() {
         "synthwave84 must be in discovered themes"
     );
 }
+
+// ---------------------------------------------------------------------------
+// parse_color coverage — named colors not hit by embedded theme TOML files
+// ---------------------------------------------------------------------------
+
+#[test]
+fn parse_color_black() {
+    assert_eq!(parse_color("black"), Some(Color::Black));
+}
+
+#[test]
+fn parse_color_gray_and_aliases() {
+    assert_eq!(parse_color("gray"), Some(Color::Gray));
+    assert_eq!(parse_color("grey"), Some(Color::Gray));
+    assert_eq!(parse_color("darkgrey"), Some(Color::DarkGray));
+}
+
+#[test]
+fn parse_color_remaining_light_variants() {
+    assert_eq!(parse_color("lightred"), Some(Color::LightRed));
+    assert_eq!(parse_color("lightblue"), Some(Color::LightBlue));
+    assert_eq!(parse_color("lightmagenta"), Some(Color::LightMagenta));
+}
+
+#[test]
+fn parse_color_magenta() {
+    assert_eq!(parse_color("magenta"), Some(Color::Magenta));
+}
+
+#[test]
+fn parse_color_hex_valid() {
+    assert_eq!(parse_color("#aabbcc"), Some(Color::Rgb(0xaa, 0xbb, 0xcc)));
+    assert_eq!(parse_color(" #001122 "), Some(Color::Rgb(0x00, 0x11, 0x22)));
+}
+
+#[test]
+fn parse_color_hex_wrong_length_returns_none() {
+    assert!(parse_color("#12345").is_none());
+    assert!(parse_color("#1234567").is_none());
+    assert!(parse_color("#").is_none());
+}
+
+#[test]
+fn parse_color_invalid_returns_none() {
+    assert!(parse_color("").is_none());
+    assert!(parse_color("not-a-color").is_none());
+    assert!(parse_color("rgb(1,2,3)").is_none());
+}
+
+// ---------------------------------------------------------------------------
+// Theme::from_toml error paths
+// ---------------------------------------------------------------------------
+
+#[test]
+fn theme_from_toml_invalid_color_returns_none() {
+    let toml = r##"
+        background = "not-a-color"
+        accent = "cyan"
+        accent_alt = "yellow"
+        dim = "darkgray"
+        text = "white"
+        dir = "blue"
+        file = "reset"
+        selection_bg = "#505050"
+        selection_fg = "yellow"
+        heading1 = "lightcyan"
+        heading2 = "lightyellow"
+        heading3 = "lightgreen"
+        code = "lightyellow"
+        diff_add = "green"
+        diff_del = "red"
+        git_clean = "green"
+        git_dirty = "yellow"
+        syntax = "base16-ocean.dark"
+    "##;
+    assert!(Theme::from_toml(toml).is_none());
+}
+
+#[test]
+fn theme_from_toml_malformed_toml_returns_none() {
+    assert!(Theme::from_toml("not toml at all :::").is_none());
+}
+
+// ---------------------------------------------------------------------------
+// ThemeConfig::from_preset
+// ---------------------------------------------------------------------------
+
+#[test]
+fn theme_config_from_preset_sets_name_and_no_overrides() {
+    let cfg = ThemeConfig::from_preset("monokai");
+    assert_eq!(cfg.name, Some("monokai".to_string()));
+    assert!(cfg.accent.is_none());
+    assert!(cfg.dim.is_none());
+    let t = cfg.resolve();
+    let monokai = Theme::load("monokai").unwrap();
+    assert_eq!(t.syntax, monokai.syntax);
+    assert_eq!(t.diff_del, monokai.diff_del);
+}
+
+// ---------------------------------------------------------------------------
+// install_embedded_themes + discover_all user-themes code path
+//
+// These tests mutate XDG_CONFIG_HOME to redirect to a temporary directory so
+// they never touch the developer's real config. ENV_LOCK serialises the three
+// tests so concurrent env-var reads from other threads don't race.
+// ---------------------------------------------------------------------------
+
+use std::sync::{Mutex, MutexGuard};
+
+static ENV_LOCK: Mutex<()> = Mutex::new(());
+static COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// Redirects the platform config-home env var to a fresh temp dir for the
+/// duration of `f`, then restores the original value and removes the temp dir.
+/// On Windows this is APPDATA; everywhere else it is XDG_CONFIG_HOME.
+/// ENV_LOCK serialises callers so concurrent env-var mutations don't race.
+fn with_isolated_config_home<F: FnOnce(&std::path::Path)>(f: F) {
+    let _guard: MutexGuard<()> = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let n = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let tmp = std::env::temp_dir().join(format!("tv2_theme_test_{}_{n}", std::process::id()));
+    std::fs::create_dir_all(&tmp).unwrap();
+
+    // SAFETY: ENV_LOCK serialises all callers; no other thread mutates this var.
+    #[cfg(windows)]
+    let env_key = "APPDATA";
+    #[cfg(not(windows))]
+    let env_key = "XDG_CONFIG_HOME";
+
+    let old = std::env::var_os(env_key);
+    unsafe { std::env::set_var(env_key, &tmp) };
+
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&tmp)));
+
+    unsafe {
+        match old {
+            Some(v) => std::env::set_var(env_key, v),
+            None => std::env::remove_var(env_key),
+        }
+    }
+    let _ = std::fs::remove_dir_all(&tmp);
+
+    if let Err(e) = result {
+        std::panic::resume_unwind(e);
+    }
+}
+
+#[test]
+fn install_embedded_themes_creates_theme_files() {
+    with_isolated_config_home(|tmp| {
+        install_embedded_themes();
+        let themes_dir = tmp.join("tree-viewer").join("themes");
+        assert!(themes_dir.is_dir(), "themes directory should be created");
+        assert!(
+            themes_dir.join("default.toml").exists(),
+            "default.toml must be installed"
+        );
+        assert!(
+            themes_dir.join("monokai.toml").exists(),
+            "monokai.toml must be installed"
+        );
+    });
+}
+
+#[test]
+fn discover_all_with_existing_user_dir_covers_user_theme_loop() {
+    with_isolated_config_home(|_tmp| {
+        install_embedded_themes();
+        let themes = Theme::discover_all();
+        let names: Vec<&str> = themes.iter().map(|(n, _)| n.as_str()).collect();
+        assert!(names.contains(&"default"));
+        assert!(names.contains(&"monokai"));
+        assert!(themes.len() >= 9);
+    });
+}
+
+#[test]
+fn discover_all_user_theme_extends_list() {
+    with_isolated_config_home(|tmp| {
+        let themes_dir = tmp.join("tree-viewer").join("themes");
+        std::fs::create_dir_all(&themes_dir).unwrap();
+        let test_name = "custom-test-theme";
+        std::fs::write(
+            themes_dir.join(format!("{test_name}.toml")),
+            include_str!("../themes/default.toml"),
+        )
+        .unwrap();
+
+        let themes = Theme::discover_all();
+        assert!(
+            themes.iter().any(|(n, _)| n == test_name),
+            "user-added theme must appear in discover_all output"
+        );
+    });
+}
