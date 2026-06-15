@@ -113,6 +113,8 @@ pub struct App {
     pub history_offset: usize,
     pub theme_area: Rect,
     pub theme_offset: usize,
+    /// Hit area of the splitter bar between tree and content panes.
+    pub splitter_area: Rect,
     // Time and result index of the last search-result click, for double-click.
     last_click: Option<(Instant, usize)>,
     // When the user last scrolled the content panel. The scrollbar overlay is
@@ -144,6 +146,7 @@ pub struct App {
     pub blame_panel: bool,
     drag_start: Option<(usize, usize)>,
     scrollbar_drag: bool,
+    splitter_drag: bool,
     /// Set to `true` after suspending the TUI (e.g. for editor), signals
     /// `main.rs` to call `terminal.clear()` before the next `draw()`.
     pub needs_clear: bool,
@@ -274,6 +277,7 @@ impl App {
             history_offset: 0,
             theme_area: Rect::default(),
             theme_offset: 0,
+            splitter_area: Rect::default(),
             last_click: None,
             content_scrolled_at: Instant::now() - std::time::Duration::from_secs(10),
             highlighter,
@@ -290,6 +294,7 @@ impl App {
             blame_panel: false,
             drag_start: None,
             scrollbar_drag: false,
+            splitter_drag: false,
             needs_clear: false,
             yaml_fold_regions: Vec::new(),
             yaml_folded: HashSet::new(),
