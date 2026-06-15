@@ -1,5 +1,8 @@
 # AGENTS.md — tree-viewer (tv)
 
+> Canonical instructions for this repo, read by both Claude Code and opencode.
+> `CLAUDE.md` defers here and adds only Claude-Code-specific notes.
+
 ## Overview
 
 A fast terminal-based file tree viewer with ratatui. Navigate filesystems, preview files with syntax highlighting (`syntect`), render markdown (`pulldown-cmark`), fuzzy-search files/content (`fuzzy-matcher`), browse git history (`git` CLI), and switch themes — all with mouse and keyboard.
