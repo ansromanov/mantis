@@ -35,7 +35,10 @@ impl App {
         let scroll_before = self.content_scroll;
         match ev.kind {
             MouseEventKind::Down(MouseButton::Left) => {
-                if rect_contains(self.tree_area, ev.column, ev.row) {
+                if rect_contains(self.splitter_area, ev.column, ev.row) {
+                    self.splitter_drag = true;
+                    return;
+                } else if rect_contains(self.tree_area, ev.column, ev.row) {
                     self.focus = Focus::Tree;
                     self.clear_selection();
                     let row = (ev.row - self.tree_area.y) as usize;
@@ -81,7 +84,14 @@ impl App {
                 }
             }
             MouseEventKind::Drag(MouseButton::Left) => {
-                if self.scrollbar_drag {
+                if self.splitter_drag {
+                    let left = self.tree_area.x.saturating_sub(1);
+                    let total = (self.tree_area.width + self.content_area.width + 4) as u32;
+                    let col = ev.column.saturating_sub(left) as u32;
+                    if let Some(pct) = (col * 100).checked_div(total) {
+                        self.tree_width = (pct.min(100) as u16).clamp(5, 95);
+                    }
+                } else if self.scrollbar_drag {
                     self.set_scroll_from_mouse_y(ev.row);
                     self.mark_content_scrolled();
                 } else if let Some(start) = self.drag_start {
@@ -102,6 +112,11 @@ impl App {
                 }
             }
             MouseEventKind::Up(MouseButton::Left) => {
+                if self.splitter_drag {
+                    self.splitter_drag = false;
+                    self.config.tree_width = self.tree_width;
+                    self.save_config();
+                }
                 self.scrollbar_drag = false;
                 if self.drag_start.is_some() {
                     if let Some(sel) = &self.selection {

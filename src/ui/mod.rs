@@ -1,5 +1,5 @@
 use ratatui::{
-    layout::{Constraint, Direction, Layout},
+    layout::{Constraint, Direction, Layout, Rect},
     style::Style,
     widgets::Block,
     Frame,
@@ -35,6 +35,14 @@ pub fn draw(f: &mut Frame, app: &mut App) {
             Constraint::Percentage(100 - tree_width),
         ])
         .split(vert[0]);
+
+    // Record the 2-column splitter boundary for mouse hit-testing.
+    app.splitter_area = Rect {
+        x: horiz[0].right().saturating_sub(1),
+        y: vert[0].y,
+        width: 2,
+        height: vert[0].height,
+    };
 
     tree::draw_tree(f, app, horiz[0]);
     content::draw_content(f, app, horiz[1]);
