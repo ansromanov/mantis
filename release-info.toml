@@ -1,4 +1,16 @@
 version = "0.6.0"
 date = "2026-06-15"
-whats_new = ""
+whats_new = """- test: add coverage for tree UI rendering and theme system (#177)
+- test: raise main.rs coverage via testable startup/event-loop seams (#117) (#179)
+- docs: add module-level file descriptions to every source file (closes #174) (#178)
+- refactor: split oversized source files into focused directory modules (#167) (#171)
+- feat: add line-number gutter toggle (config + keybinding) (#173)
+- docs: add CONTRIBUTING.md guide (closes #175) (#176)
+- feat(mouse): drag tree/content splitter to resize tree pane (#170)
+- refactor(agents): canonical .agent dir + reorganized AGENTS.md (#169)
+- feat(watch): add opt-in auto-reload on file change (closes #94) (#165)
+- refactor: split inline tests into co-located _test.rs files (#155) (#166)
+- fix(mouse): scroll tree viewport instead of cursor when tree_independent_scroll is on (#164)
+- perf: load files, highlighting, and git diffs off the main thread (#163)
+- chore: add changelog to release info [skip ci]"""
 release_url = "https://github.com/ansromanov/tree-viewer/releases/tag/v0.6.0"
