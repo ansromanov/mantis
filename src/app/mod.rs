@@ -415,7 +415,10 @@ impl App {
             }
             self.save_config();
         } else {
-            match self.plugin_manager.activate_one(&name, self.current_file.as_deref()) {
+            match self
+                .plugin_manager
+                .activate_one(&name, self.current_file.as_deref())
+            {
                 Ok(()) => {
                     if let Some(entry) = self.config.plugins.get_mut(&name) {
                         entry.enabled = true;
