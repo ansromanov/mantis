@@ -9,8 +9,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 fn temp_tree() -> PathBuf {
     static COUNTER: AtomicUsize = AtomicUsize::new(0);
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-    let dir =
-        std::env::temp_dir().join(format!("tv_nav_test_{}_{n}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("tv_nav_test_{}_{n}", std::process::id()));
     fs::create_dir_all(dir.join("sub")).unwrap();
     fs::write(dir.join("a.txt"), "line1\nline2\n").unwrap();
     fs::write(dir.join("b.txt"), "hello\n").unwrap();
