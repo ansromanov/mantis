@@ -19,7 +19,7 @@ use std::thread::JoinHandle;
 
 use ratatui::style::Style;
 
-use crate::file::is_binary_bytes;
+use crate::file::{detect_encoding_prefix, detect_line_ending, is_binary_bytes};
 use crate::highlight::Highlighter;
 use crate::theme::Theme;
 use crate::virtual_file::VirtualFile;
@@ -44,6 +44,12 @@ pub(super) struct FileLoad {
     /// `false` when the file could not be read; `current_file` is cleared so the
     /// inline `[error: …]` message stands alone.
     pub ok: bool,
+    /// Detected text encoding, e.g. `"UTF-8"`, `"ASCII"`, `"UTF-8 BOM"`.
+    /// `None` when the encoding could not be determined (binary, error).
+    pub encoding: Option<String>,
+    /// Detected line-ending style: `"LF"`, `"CRLF"`, `"CR"`, or `"mixed"`.
+    /// `None` for single-line or empty files.
+    pub line_ending: Option<String>,
 }
 
 /// YAML-specific derived state, computed only for `.yaml`/`.yml` files.
@@ -76,6 +82,8 @@ impl FileLoad {
             show_pretty_json: false,
             yaml: None,
             ok: true,
+            encoding: None,
+            line_ending: None,
         }
     }
 }
@@ -96,6 +104,11 @@ pub(super) fn compute_file_load(path: &Path, theme: &Theme, hl: &Highlighter) ->
     if !is_markdown && !is_json && !is_yaml {
         if let Some(vf) = VirtualFile::open(path) {
             let mut load = FileLoad::empty(false, false);
+            let raw = vf.raw_bytes();
+            // VirtualFile::open already verified valid UTF-8, so skip the full
+            // re-validation pass; only the BOM/ASCII prefix check is needed.
+            load.encoding = Some(detect_encoding_prefix(raw).unwrap_or("UTF-8").to_string());
+            load.line_ending = detect_line_ending(raw).map(|s| s.to_string());
             load.virtual_file = Some(vf);
             return load;
         }
@@ -114,14 +127,32 @@ pub(super) fn compute_file_load(path: &Path, theme: &Theme, hl: &Highlighter) ->
     };
     if is_binary_bytes(&bytes) {
         load.content = vec!["[binary file]".into()];
+        load.encoding = Some("BINARY".into());
         return load;
     }
+    // Detect line endings and BOM/ASCII classification before consuming bytes.
+    // Full UTF-8 validity is confirmed by String::from_utf8 below, avoiding a
+    // double validation pass.
+    load.line_ending = detect_line_ending(&bytes).map(|s| s.to_string());
+    let enc_prefix = detect_encoding_prefix(&bytes);
     let s = match String::from_utf8(bytes) {
         Ok(s) => s,
         Err(_) => {
             load.content = vec!["[binary file]".into()];
+            load.encoding = Some("BINARY".into());
             return load;
         }
+    };
+    // String::from_utf8 succeeded, so the bytes are valid UTF-8; use the
+    // prefix result or fall back to "UTF-8".
+    load.encoding = Some(enc_prefix.unwrap_or("UTF-8").to_string());
+    // str::lines() does not treat bare \r as a line terminator, so CR-only
+    // files would render as a single line with embedded \r control characters.
+    // Normalize CR and CRLF to LF before splitting.
+    let s = if s.contains('\r') {
+        s.replace("\r\n", "\n").replace('\r', "\n")
+    } else {
+        s
     };
     load.content = s.lines().map(|l| l.to_owned()).collect();
     if load.content.is_empty() {

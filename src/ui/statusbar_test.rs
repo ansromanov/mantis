@@ -374,3 +374,44 @@ fn watch_badge_hidden_when_inactive() {
     let text = render_bar_width(&app, 120);
     assert!(!text.contains("[watch]"));
 }
+
+#[test]
+fn file_info_shows_encoding_and_line_ending() {
+    let mut app = make_app();
+    app.show_file_info = true;
+    app.file_encoding = Some("UTF-8".to_string());
+    app.file_line_ending = Some("LF".to_string());
+    let text = render_bar_width(&app, 120);
+    assert!(text.contains("[UTF-8 LF]"));
+}
+
+#[test]
+fn file_info_shows_encoding_without_line_ending() {
+    let mut app = make_app();
+    app.show_file_info = true;
+    app.file_encoding = Some("ASCII".to_string());
+    app.file_line_ending = None;
+    let text = render_bar_width(&app, 120);
+    assert!(text.contains("[ASCII]"));
+    assert!(!text.contains("[ASCII "));
+}
+
+#[test]
+fn file_info_hidden_when_toggled_off() {
+    let mut app = make_app();
+    app.show_file_info = false;
+    app.file_encoding = Some("UTF-8".to_string());
+    app.file_line_ending = Some("LF".to_string());
+    let text = render_bar_width(&app, 120);
+    assert!(!text.contains("[UTF-8 LF]"));
+}
+
+#[test]
+fn file_info_mixed_endings_shown() {
+    let mut app = make_app();
+    app.show_file_info = true;
+    app.file_encoding = Some("UTF-8".to_string());
+    app.file_line_ending = Some("mixed".to_string());
+    let text = render_bar_width(&app, 120);
+    assert!(text.contains("[UTF-8 mixed]"));
+}

@@ -86,6 +86,12 @@ impl VirtualFile {
         self.line_text(index)
             .map(unicode_width::UnicodeWidthStr::width)
     }
+
+    /// Returns the raw memory-mapped bytes of the file. Used by encoding and
+    /// line-ending detection in the file loader.
+    pub fn raw_bytes(&self) -> &[u8] {
+        &self.mmap
+    }
 }
 
 /// Scans `mmap` for `\n` bytes and returns the start offset of each line.
