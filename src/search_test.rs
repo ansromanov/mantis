@@ -371,7 +371,10 @@ fn recent_files_state_selected_path_in_bounds() {
     let mut r = RecentFilesState::new(sample_paths());
     assert_eq!(r.selected_path().unwrap(), &PathBuf::from("/tmp/alpha.rs"));
     r.selected = 2;
-    assert_eq!(r.selected_path().unwrap(), &PathBuf::from("/tmp/gamma.toml"));
+    assert_eq!(
+        r.selected_path().unwrap(),
+        &PathBuf::from("/tmp/gamma.toml")
+    );
 }
 
 #[test]
