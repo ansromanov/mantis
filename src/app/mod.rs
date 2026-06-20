@@ -492,7 +492,7 @@ fn diff_line_style(line: &str, theme: &Theme) -> ratatui::style::Style {
     use ratatui::style::{Modifier, Style};
     if line.starts_with("@@") {
         Style::default().fg(theme.accent)
-    } else if line.starts_with("++") || line.starts_with("---") {
+    } else if line.starts_with("+++") || line.starts_with("---") {
         Style::default().fg(theme.dim).add_modifier(Modifier::BOLD)
     } else if line.starts_with('+') {
         Style::default().fg(theme.diff_add)
