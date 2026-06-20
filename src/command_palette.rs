@@ -108,6 +108,14 @@ pub static COMMANDS: &[CommandEntry] = &[
         name: "Toggle fold at cursor (YAML)",
         action_id: "yaml_fold_toggle",
     },
+    CommandEntry {
+        name: "Copy absolute path",
+        action_id: "copy_path",
+    },
+    CommandEntry {
+        name: "Copy relative path",
+        action_id: "copy_relative_path",
+    },
 ];
 
 pub struct CommandPalette {

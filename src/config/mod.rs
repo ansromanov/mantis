@@ -160,6 +160,8 @@ impl Keymap {
             "yaml_fold_toggle" => &self.yaml_fold_toggle,
             "toggle_watch" => &self.toggle_watch,
             "open_recent_files" => &self.recent_files,
+            "copy_path" => &self.copy_path,
+            "copy_relative_path" => &self.copy_relative_path,
             _ => return String::new(),
         };
         bindings.first().map(|b| b.display()).unwrap_or_default()
@@ -210,6 +212,8 @@ pub struct Keymap {
     pub yaml_fold_toggle: Vec<KeyBinding>,
     pub toggle_watch: Vec<KeyBinding>,
     pub recent_files: Vec<KeyBinding>,
+    pub copy_path: Vec<KeyBinding>,
+    pub copy_relative_path: Vec<KeyBinding>,
 }
 
 impl Default for Keymap {
@@ -252,6 +256,8 @@ impl Default for Keymap {
             yaml_fold_toggle: bind(&["Space"]),
             toggle_watch: bind(&["W"]),
             recent_files: bind(&["ctrl+o"]),
+            copy_path: bind(&["y"]),
+            copy_relative_path: bind(&["Y"]),
         }
     }
 }

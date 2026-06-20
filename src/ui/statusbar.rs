@@ -193,6 +193,10 @@ pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
             spans.push(Span::styled(format!(" {msg}"), base.fg(theme.accent)));
         }
 
+        if let Some(ref msg) = app.status_message {
+            spans.push(Span::styled(format!(" {msg}"), base.fg(theme.accent)));
+        }
+
         spans.push(Span::styled(
             format!(" v{}", env!("CARGO_PKG_VERSION")),
             base.fg(theme.dim),
