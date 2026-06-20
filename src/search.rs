@@ -6,9 +6,9 @@
 //! `SkimMatcherV2`, debouncing the expensive content scans. `ContentMatch`
 //! carries a hit's path, line number, and surrounding context. The same
 //! query/filtered-list/selected-index shape backs `HistoryState`, `ThemePicker`,
-//! `CommandPalette`, and the in-file search (`InFileSearch`), all defined here.
-//! Results sort by descending fuzzy score; binary files are skipped via
-//! `is_binary_bytes`.
+//! `CommandPalette`, `RecentFilesState`, and the in-file search (`InFileSearch`),
+//! all defined here. Results sort by descending fuzzy score; binary files are
+//! skipped via `is_binary_bytes`.
 
 use std::collections::HashMap;
 use std::fs;
@@ -413,6 +413,74 @@ impl ThemePicker {
             .filter_map(|(i, n)| self.matcher.fuzzy_match(n, &self.query).map(|s| (i, s)))
             .collect();
         scored.sort_by_key(|(_, s)| std::cmp::Reverse(*s));
+        self.filtered = scored.into_iter().map(|(i, _)| i).collect();
+    }
+}
+
+/// Fuzzy-filterable list of recently opened files, most-recent-first.
+pub struct RecentFilesState {
+    pub paths: Vec<PathBuf>,
+    pub query: String,
+    pub filtered: Vec<usize>,
+    pub selected: usize,
+    matcher: SkimMatcherV2,
+}
+
+impl RecentFilesState {
+    /// Creates the state from a snapshot of the ring buffer (already in
+    /// most-recent-first order, current file excluded by the caller).
+    pub fn new(paths: Vec<PathBuf>) -> Self {
+        let filtered = (0..paths.len()).collect();
+        RecentFilesState {
+            paths,
+            query: String::new(),
+            filtered,
+            selected: 0,
+            matcher: SkimMatcherV2::default(),
+        }
+    }
+
+    /// Pushes a character onto the query and refilters.
+    pub fn push(&mut self, c: char) {
+        self.query.push(c);
+        self.refilter();
+    }
+
+    /// Removes the last character from the query and refilters.
+    pub fn pop(&mut self) {
+        self.query.pop();
+        self.refilter();
+    }
+
+    /// Returns the number of filtered results.
+    pub fn results_len(&self) -> usize {
+        self.filtered.len()
+    }
+
+    /// Returns the path of the currently selected entry, if any.
+    pub fn selected_path(&self) -> Option<&PathBuf> {
+        self.filtered
+            .get(self.selected)
+            .and_then(|&i| self.paths.get(i))
+    }
+
+    fn refilter(&mut self) {
+        self.selected = 0;
+        if self.query.is_empty() {
+            self.filtered = (0..self.paths.len()).collect();
+            return;
+        }
+        let mut scored: Vec<(usize, i64)> = self
+            .paths
+            .iter()
+            .enumerate()
+            .filter_map(|(i, p)| {
+                self.matcher
+                    .fuzzy_match(&p.to_string_lossy(), &self.query)
+                    .map(|sc| (i, sc))
+            })
+            .collect();
+        scored.sort_by_key(|(_, sc)| std::cmp::Reverse(*sc));
         self.filtered = scored.into_iter().map(|(i, _)| i).collect();
     }
 }

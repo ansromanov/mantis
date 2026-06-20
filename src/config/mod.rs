@@ -42,6 +42,8 @@ pub struct Config {
     /// Automatically reload file content when the open file changes on disk.
     /// Toggled at runtime with the `toggle_watch` keybinding.
     pub watch: bool,
+    /// Maximum number of recently opened files to remember. Defaults to 10.
+    pub recent_files_count: usize,
     /// Show file encoding and line-ending info in the status bar.
     pub show_file_info: bool,
     pub keys: Keymap,
@@ -70,6 +72,7 @@ impl Default for Config {
             search_context_lines: 0,
             keep_search_query: false,
             watch: false,
+            recent_files_count: 10,
             show_file_info: true,
             keys: Keymap::default(),
             theme: ThemeConfig::default(),
@@ -156,6 +159,7 @@ impl Keymap {
             "open_in_editor" => &self.open_in_editor,
             "yaml_fold_toggle" => &self.yaml_fold_toggle,
             "toggle_watch" => &self.toggle_watch,
+            "open_recent_files" => &self.recent_files,
             _ => return String::new(),
         };
         bindings.first().map(|b| b.display()).unwrap_or_default()
@@ -205,6 +209,7 @@ pub struct Keymap {
     pub open_in_editor: Vec<KeyBinding>,
     pub yaml_fold_toggle: Vec<KeyBinding>,
     pub toggle_watch: Vec<KeyBinding>,
+    pub recent_files: Vec<KeyBinding>,
 }
 
 impl Default for Keymap {
@@ -246,6 +251,7 @@ impl Default for Keymap {
             open_in_editor: bind(&["e"]),
             yaml_fold_toggle: bind(&["Space"]),
             toggle_watch: bind(&["W"]),
+            recent_files: bind(&["ctrl+o"]),
         }
     }
 }
