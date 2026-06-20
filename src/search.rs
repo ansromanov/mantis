@@ -6,7 +6,7 @@
 //! `SkimMatcherV2`, debouncing the expensive content scans. `ContentMatch`
 //! carries a hit's path, line number, and surrounding context. The same
 //! query/filtered-list/selected-index shape backs `HistoryState`, `ThemePicker`,
-//! `CommandPalette`, `RecentFilesState`, and the in-file search (`InFileSearch`),
+//! `CommandPalette`, `RecentFilesState`, `PluginPicker`, and the in-file search (`InFileSearch`),
 //! all defined here. Results sort by descending fuzzy score; binary files are
 //! skipped via `is_binary_bytes`.
 
