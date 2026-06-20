@@ -60,6 +60,7 @@ impl App {
                     .map(|(path, _)| path.clone());
                 if let Some(path) = clicked {
                     self.focus = Focus::Tree;
+                    self.clear_selection();
                     self.navigate_to_breadcrumb(&path);
                     return;
                 }

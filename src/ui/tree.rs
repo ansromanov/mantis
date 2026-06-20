@@ -20,6 +20,7 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     Frame,
 };
+use unicode_width::UnicodeWidthStr;
 
 use crate::app::{App, Focus};
 use crate::git::GitStatus;
@@ -156,9 +157,9 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
 }
 
 /// Computes breadcrumb path segments from the selected tree node to root.
-/// Returns a list of (label, target_directory_path) pairs, or empty when there
-/// is no selection or the node is at root depth with nothing to show beyond the
-/// title.
+/// Returns a list of (label, target_directory_path) pairs ordered root-first.
+/// Always includes at least the root segment when a node is selected; returns
+/// empty only when there are no nodes or the path cannot be relativized to root.
 fn compute_breadcrumb(app: &App) -> Vec<(String, PathBuf)> {
     let Some(node) = app.nodes.get(app.tree_selected) else {
         return Vec::new();
@@ -222,7 +223,7 @@ fn render_breadcrumb(f: &mut Frame, app: &mut App, area: Rect, segments: &[(Stri
 
     let sep = " / ";
     let sep_len = sep.len();
-    let names_len: usize = segments.iter().map(|(n, _)| n.len()).sum();
+    let names_len: usize = segments.iter().map(|(n, _)| UnicodeWidthStr::width(n.as_str())).sum();
     let total_len = names_len + segments.len().saturating_sub(1) * sep_len;
 
     // Pick which segment indices to show (indices into `segments`).
@@ -242,13 +243,12 @@ fn render_breadcrumb(f: &mut Frame, app: &mut App, area: Rect, segments: &[(Stri
     let mut col = area.x;
 
     for (pos, &idx) in show_indices.iter().enumerate() {
-        let is_sep = segments[idx].1.as_os_str().is_empty();
-        if is_sep {
-            // Ellipsis marker for truncated segments.
-            let text = "…";
-            spans.push(Span::styled(text, dim_style));
-            let w = text.len() as u16;
-            col += w;
+        if idx >= segments.len() {
+            // Out-of-bounds sentinel pushed by truncate_segments to mark the
+            // position of the "…" ellipsis between kept and dropped segments.
+            // "…" is a single terminal cell despite being 3 UTF-8 bytes.
+            spans.push(Span::styled("…", dim_style));
+            col += 1;
             continue;
         }
 
@@ -263,15 +263,16 @@ fn render_breadcrumb(f: &mut Frame, app: &mut App, area: Rect, segments: &[(Stri
         let text = &segments[idx].0;
         spans.push(Span::styled(text.clone(), style));
 
+        let text_w = UnicodeWidthStr::width(text.as_str()) as u16;
         // Record clickable area for this segment.
         let rect = Rect {
             x: col,
             y: area.y,
-            width: text.len() as u16,
+            width: text_w,
             height: 1,
         };
         app.breadcrumb_areas.push((segments[idx].1.clone(), rect));
-        col += text.len() as u16;
+        col += text_w;
     }
 
     let line = Line::from(spans);
@@ -291,15 +292,17 @@ fn truncate_segments(segments: &[(String, PathBuf)], avail: usize, sep_len: usiz
     // Start with first and last, then try to fit as many middle as possible.
     let first = &segments[0];
     let last = &segments[segments.len() - 1];
-    let mut used = first.0.len() + sep_len + last.0.len();
+    let mut used = UnicodeWidthStr::width(first.0.as_str())
+        + sep_len
+        + UnicodeWidthStr::width(last.0.as_str());
     let mut mid_indices: Vec<usize> = Vec::new();
 
     // Count how many middle segments fit.
     let mut dropped = false;
     for (i, seg) in segments.iter().enumerate().skip(1).take(segments.len() - 2) {
-        let addition = sep_len + seg.0.len();
-        // Reserve 2 chars for " … " ellipsis marker + its separators.
-        if used + addition + 2 <= avail {
+        let addition = sep_len + UnicodeWidthStr::width(seg.0.as_str());
+        // Reserve 1 cell for the "…" ellipsis that signals truncation.
+        if used + addition < avail {
             mid_indices.push(i);
             used += addition;
         } else {
@@ -316,11 +319,12 @@ fn truncate_segments(segments: &[(String, PathBuf)], avail: usize, sep_len: usiz
         // Actually we already reserved 2 chars for the ellipsis above. The middle
         // indices we kept already account for this.
         result.extend(mid_indices);
-        // Add ellipsis marker (PathBuf empty signals "…" in renderer).
-        result.push(segments.len()); // sentinel
+        // Out-of-bounds sentinel: the renderer treats idx >= segments.len()
+        // as an ellipsis placeholder.
+        result.push(segments.len());
     } else if dropped && mid_indices.is_empty() {
         // All middle segments dropped; just show first, "…", last.
-        result.push(segments.len()); // ellipsis sentinel
+        result.push(segments.len());
     } else {
         result.extend(mid_indices);
     }

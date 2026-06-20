@@ -107,6 +107,8 @@ git_clean = "green"        # statusbar git indicator: clean working tree
 git_dirty = "yellow"       # statusbar git indicator: uncommitted changes
 git_conflict = "red"       # statusbar git indicator: conflict / detached HEAD
 git_progress = "#ff8700"   # statusbar git indicator: rebase / merge in progress
+breadcrumb_fg = "cyan"     # breadcrumb path bar foreground (default: accent)
+breadcrumb_bg = "reset"    # breadcrumb path bar background (default: background)
 syntax = "base16-ocean.dark"
 ```
 
