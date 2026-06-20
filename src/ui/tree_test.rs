@@ -211,9 +211,10 @@ fn draw_tree_depth_one_node_is_indented() {
     node.depth = 1;
     app.nodes = vec![node];
     let rows = render_tree(&mut app, 40, 5);
-    // Row 1 is the first content row (inside top border).
-    // After the left border '│': 2-space indent (depth=1) + 2-space non-arrow = 4 spaces.
-    let content_row = &rows[1];
+    // Row 1 is the breadcrumb bar, row 2 is the first tree content row (inside
+    // top border). After the left border '│': 2-space indent (depth=1) +
+    // 2-space non-arrow = 4 spaces.
+    let content_row = &rows[2];
     let after_border: String = content_row.chars().skip(1).take(4).collect();
     assert_eq!(
         after_border, "    ",
@@ -271,9 +272,108 @@ fn draw_tree_auto_scroll_keeps_selected_in_view() {
         .collect();
     app.tree_selected = 15;
     app.tree_scroll = 0;
-    // height=6 → view_height=4; selection=15 must scroll into view
+    // height=6 → view_height=3 (breadcrumb takes 1 of the 4 inner rows);
+    // selection=15 must scroll into view
     render_tree(&mut app, 40, 6);
-    // After render, scroll must bring row 15 into the 4-row viewport
+    // After render, scroll must bring row 15 into the 3-row viewport
     assert!(app.tree_scroll <= 15);
-    assert!(app.tree_scroll + 4 > 15);
+    assert!(app.tree_scroll + 3 > 15);
+}
+
+#[test]
+fn breadcrumb_renders_for_nested_node() {
+    let mut app = make_app(false, HashMap::new());
+    app.root = PathBuf::from("/root");
+    app.nodes = vec![TreeNode {
+        path: PathBuf::from("/root/src/main.rs"),
+        name: "main.rs".to_string(),
+        depth: 2,
+        is_dir: false,
+        deleted: false,
+    }];
+    app.tree_selected = 0;
+    let rows = render_tree(&mut app, 40, 6);
+    let breadcrumb_row = &rows[1]; // row 1 is inside the border, before the tree list
+    assert!(
+        breadcrumb_row.contains("root") && breadcrumb_row.contains("src"),
+        "breadcrumb row should contain path segments, got: {:?}",
+        breadcrumb_row
+    );
+}
+
+#[test]
+fn breadcrumb_areas_match_rendered_columns() {
+    let mut app = make_app(false, HashMap::new());
+    app.root = PathBuf::from("/r");
+    app.nodes = vec![TreeNode {
+        path: PathBuf::from("/r/src"),
+        name: "src".to_string(),
+        depth: 1,
+        is_dir: true,
+        deleted: false,
+    }];
+    app.tree_selected = 0;
+    render_tree(&mut app, 40, 6);
+    // Should have 2 clickable areas: "r" and "src".
+    assert_eq!(app.breadcrumb_areas.len(), 2);
+    let (root_path, root_rect) = &app.breadcrumb_areas[0];
+    let (src_path, src_rect) = &app.breadcrumb_areas[1];
+    assert_eq!(root_path, &PathBuf::from("/r"));
+    assert_eq!(src_path, &PathBuf::from("/r/src"));
+    // "r" is 1 char wide, "src" is 3 chars wide.
+    assert_eq!(root_rect.width, 1);
+    assert_eq!(src_rect.width, 3);
+    // "src" rect must start after "r" + " / " (3 chars separator).
+    assert_eq!(src_rect.x, root_rect.x + root_rect.width + 3);
+}
+
+#[test]
+fn render_breadcrumb_truncation_does_not_panic() {
+    // Regression: truncate_segments used segments.len() as an out-of-bounds
+    // sentinel; render_breadcrumb previously would panic when accessing
+    // segments[idx] for that sentinel value.
+    let mut app = make_app(false, HashMap::new());
+    app.root = PathBuf::from("/r");
+    app.nodes = vec![TreeNode {
+        path: PathBuf::from("/r/a/b/c/d/e"),
+        name: "e".to_string(),
+        depth: 5,
+        is_dir: true,
+        deleted: false,
+    }];
+    app.tree_selected = 0;
+    // Width 20 → inner 18; breadcrumb "r / a / b / c / d / e" = 21 chars,
+    // triggering truncation and the ellipsis sentinel code path.
+    render_tree(&mut app, 20, 6);
+    // Breadcrumb areas must contain only real segments — never the sentinel.
+    for (path, _rect) in &app.breadcrumb_areas {
+        assert!(!path.as_os_str().is_empty());
+    }
+}
+
+#[test]
+fn render_breadcrumb_truncation_shows_ellipsis() {
+    let mut app = make_app(false, HashMap::new());
+    app.root = PathBuf::from("/r");
+    app.nodes = vec![TreeNode {
+        path: PathBuf::from("/r/a/b/c/d/e"),
+        name: "e".to_string(),
+        depth: 5,
+        is_dir: true,
+        deleted: false,
+    }];
+    app.tree_selected = 0;
+    let rows = render_tree(&mut app, 20, 6);
+    let breadcrumb_row = &rows[1];
+    assert!(
+        breadcrumb_row.contains('…'),
+        "truncated breadcrumb must show ellipsis, got: {:?}",
+        breadcrumb_row
+    );
+    // First ("r") and last ("e") segments must always be present.
+    assert!(
+        breadcrumb_row.contains('r'),
+        "first segment must be visible"
+    );
+    assert!(breadcrumb_row.contains('e'), "last segment must be visible");
 }
