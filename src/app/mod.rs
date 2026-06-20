@@ -410,13 +410,16 @@ impl App {
         let running = *running;
         if running {
             self.plugin_manager.deactivate_one(&name);
-        } else {
-            let _ = self.plugin_manager.activate_one(&name);
+            if let Some(entry) = self.config.plugins.get_mut(&name) {
+                entry.enabled = false;
+            }
+            self.save_config();
+        } else if self.plugin_manager.activate_one(&name).is_ok() {
+            if let Some(entry) = self.config.plugins.get_mut(&name) {
+                entry.enabled = true;
+            }
+            self.save_config();
         }
-        if let Some(entry) = self.config.plugins.get_mut(&name) {
-            entry.enabled = !running;
-        }
-        self.save_config();
         let updated = self.plugin_manager.plugin_entries();
         if let Some(picker) = &mut self.plugin_picker {
             picker.entries = updated;
