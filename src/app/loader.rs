@@ -19,7 +19,7 @@ use std::thread::JoinHandle;
 
 use ratatui::style::Style;
 
-use crate::file::is_binary_bytes;
+use crate::file::{detect_encoding, detect_line_ending, is_binary_bytes};
 use crate::highlight::Highlighter;
 use crate::theme::Theme;
 use crate::virtual_file::VirtualFile;
@@ -44,6 +44,12 @@ pub(super) struct FileLoad {
     /// `false` when the file could not be read; `current_file` is cleared so the
     /// inline `[error: …]` message stands alone.
     pub ok: bool,
+    /// Detected text encoding, e.g. `"UTF-8"`, `"ASCII"`, `"UTF-8 BOM"`.
+    /// `None` when the encoding could not be determined (binary, error).
+    pub encoding: Option<String>,
+    /// Detected line-ending style: `"LF"`, `"CRLF"`, `"CR"`, or `"mixed"`.
+    /// `None` for single-line or empty files.
+    pub line_ending: Option<String>,
 }
 
 /// YAML-specific derived state, computed only for `.yaml`/`.yml` files.
@@ -76,6 +82,8 @@ impl FileLoad {
             show_pretty_json: false,
             yaml: None,
             ok: true,
+            encoding: None,
+            line_ending: None,
         }
     }
 }
@@ -96,6 +104,8 @@ pub(super) fn compute_file_load(path: &Path, theme: &Theme, hl: &Highlighter) ->
     if !is_markdown && !is_json && !is_yaml {
         if let Some(vf) = VirtualFile::open(path) {
             let mut load = FileLoad::empty(false, false);
+            load.encoding = detect_encoding(vf.raw_bytes()).map(|s| s.to_string());
+            load.line_ending = detect_line_ending(vf.raw_bytes()).map(|s| s.to_string());
             load.virtual_file = Some(vf);
             return load;
         }
@@ -116,6 +126,9 @@ pub(super) fn compute_file_load(path: &Path, theme: &Theme, hl: &Highlighter) ->
         load.content = vec!["[binary file]".into()];
         return load;
     }
+    // Detect encoding and line endings from raw bytes before consuming them.
+    load.encoding = detect_encoding(&bytes).map(|s| s.to_string());
+    load.line_ending = detect_line_ending(&bytes).map(|s| s.to_string());
     let s = match String::from_utf8(bytes) {
         Ok(s) => s,
         Err(_) => {

@@ -42,6 +42,8 @@ pub struct Config {
     /// Automatically reload file content when the open file changes on disk.
     /// Toggled at runtime with the `toggle_watch` keybinding.
     pub watch: bool,
+    /// Show file encoding and line-ending info in the status bar.
+    pub show_file_info: bool,
     pub keys: Keymap,
     pub theme: ThemeConfig,
     /// Per-plugin entries registered in `[plugins]`.
@@ -68,6 +70,7 @@ impl Default for Config {
             search_context_lines: 0,
             keep_search_query: false,
             watch: false,
+            show_file_info: true,
             keys: Keymap::default(),
             theme: ThemeConfig::default(),
             plugins: HashMap::new(),
