@@ -15,12 +15,14 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{Receiver, Sender};
+use std::sync::Arc;
 use std::thread::JoinHandle;
 
 use ratatui::style::Style;
 
 use crate::file::{detect_encoding_prefix, detect_line_ending, is_binary_bytes};
 use crate::highlight::Highlighter;
+use crate::plugin::ExtraSyntax;
 use crate::theme::Theme;
 use crate::virtual_file::VirtualFile;
 use crate::yaml_fold::{self, FoldRegion};
@@ -250,18 +252,20 @@ pub(super) struct Loader {
 }
 
 impl Loader {
-    pub fn new(theme: &Theme) -> Self {
+    pub fn new(theme: &Theme, extra_syntaxes: Vec<ExtraSyntax>) -> Self {
         let (req_tx, req_rx) = std::sync::mpsc::channel::<LoadRequest>();
         let (res_tx, res_rx) = std::sync::mpsc::channel::<LoadResponse>();
+        let extra = Arc::new(extra_syntaxes);
         let mut theme = theme.clone();
+        let extra_for_thread = Arc::clone(&extra);
         let handle = std::thread::spawn(move || {
-            let mut hl = Highlighter::new(&theme.syntax);
+            let mut hl = Highlighter::with_extra_syntaxes(&theme.syntax, &extra_for_thread);
             while let Ok(req) = req_rx.recv() {
                 match req {
                     LoadRequest::Shutdown => break,
                     LoadRequest::SetTheme(t) => {
                         theme = *t;
-                        hl = Highlighter::new(&theme.syntax);
+                        hl = Highlighter::with_extra_syntaxes(&theme.syntax, &extra_for_thread);
                     }
                     LoadRequest::File { seq, path } => {
                         let load = Box::new(compute_file_load(&path, &theme, &hl));

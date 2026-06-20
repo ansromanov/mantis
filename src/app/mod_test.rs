@@ -4364,6 +4364,7 @@ fn plugin_picker_nav_down_and_up() {
         PluginEntry {
             path: PathBuf::from("/nonexistent/a"),
             enabled: false,
+            ..Default::default()
         },
     );
     cfg.plugins.insert(
@@ -4371,6 +4372,7 @@ fn plugin_picker_nav_down_and_up() {
         PluginEntry {
             path: PathBuf::from("/nonexistent/b"),
             enabled: false,
+            ..Default::default()
         },
     );
     let mut app = App::new(root.clone(), cfg, None, None).unwrap();

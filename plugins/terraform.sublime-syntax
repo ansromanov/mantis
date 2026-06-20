@@ -1,0 +1,127 @@
+%YAML 1.2
+---
+# HCL (HashiCorp Configuration Language) syntax for Terraform,
+# compatible with syntect (Sublime Text .sublime-syntax format).
+name: Terraform (HCL)
+file_extensions:
+  - tf
+  - tfvars
+scope: source.hcl.terraform
+
+contexts:
+  main:
+    - include: comments
+    - include: heredoc
+    - include: strings
+    - include: numbers
+    - include: booleans
+    - include: keywords
+    - include: types
+    - include: functions
+    - include: operators
+    - include: brackets
+    - include: braces
+    - match: '[a-zA-Z_][a-zA-Z0-9_-]*'
+      scope: meta.attribute.hcl
+
+  comments:
+    - match: '\#.*'
+      scope: comment.line.number-sign.hcl
+    - match: '//.*'
+      scope: comment.line.double-slash.hcl
+    - match: '/\*'
+      scope: punctuation.definition.comment.begin.hcl
+      push:
+        - meta_scope: comment.block.hcl
+        - match: '\*/'
+          pop: true
+
+  strings:
+    - match: '"'
+      scope: punctuation.definition.string.begin.hcl
+      push: string_double
+
+  string_double:
+    - meta_scope: string.quoted.double.hcl
+    - match: '"'
+      scope: punctuation.definition.string.end.hcl
+      pop: true
+    - match: '\$\{'
+      push: interpolation
+    - match: '\\[\\"${}]'
+      scope: constant.character.escape.hcl
+
+  interpolation:
+    - meta_scope: meta.interpolation.hcl
+    - match: '\}'
+      pop: true
+    - include: strings
+    - include: numbers
+    - include: booleans
+    - include: keywords
+    - include: types
+    - include: functions
+    - include: operators
+    - include: brackets
+
+  heredoc:
+    - match: '(<<-?)([A-Za-z_][A-Za-z0-9_]*)'
+      captures:
+        1: keyword.operator.heredoc.hcl
+        2: variable.other.heredoc.hcl
+      push:
+        - meta_scope: string.unquoted.heredoc.hcl
+        - match: '^\2$'
+          pop: true
+        - match: '\$\{'
+          push: interpolation
+
+  numbers:
+    - match: '\b[0-9]+(\.[0-9]+)?\b'
+      scope: constant.numeric.hcl
+
+  booleans:
+    - match: '\b(true|false|null)\b'
+      scope: constant.language.hcl
+
+  keywords:
+    - match: '\b(resource|data|provider|variable|output|locals|module|terraform|import|moved|check)\b'
+      scope: keyword.control.hcl
+    - match: '\b(required_providers|backend|cloud|required_version|for_each|count|for|in|each)\b'
+      scope: keyword.other.hcl
+
+  types:
+    - match: '\b(string|number|bool|any)\b'
+      scope: storage.type.hcl
+    - match: '\b(list|map|set|object|tuple)\s*\(\s*(?!\s*\{)'
+      scope: storage.type.hcl
+
+  functions:
+    - match: '(\b[a-z_][a-z0-9_]*\b)(\s*\()'
+      captures:
+        1: support.function.hcl
+        2: punctuation.definition.group.begin.hcl
+
+  operators:
+    - match: '([=!<>]=?|[*/%+-]|&&|\|\||[!~])'
+      scope: keyword.operator.hcl
+    - match: '=>'
+      scope: keyword.operator.arrow.hcl
+
+  brackets:
+    - match: '\['
+      scope: punctuation.definition.bracket.square.begin.hcl
+      push:
+        - meta_scope: meta.bracket.square.hcl
+        - match: '\]'
+          pop: true
+        - include: main
+
+  braces:
+    - match: '\{'
+      scope: punctuation.definition.bracket.curly.begin.hcl
+      push:
+        - meta_scope: meta.bracket.curly.hcl
+        - match: '\}'
+          pop: true
+        - include: main
