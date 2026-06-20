@@ -3,19 +3,19 @@ use std::path::Path;
 
 #[test]
 fn new_with_valid_theme() {
-    let h = Highlighter::new("base16-ocean.dark");
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[]);
     assert_eq!(h.theme, "base16-ocean.dark");
 }
 
 #[test]
 fn new_falls_back_for_unknown_theme() {
-    let h = Highlighter::new("nonexistent-theme-name");
+    let h = Highlighter::with_extra_syntaxes("nonexistent-theme-name", &[]);
     assert_eq!(h.theme, "base16-ocean.dark");
 }
 
 #[test]
 fn highlight_returns_one_vec_per_line() {
-    let h = Highlighter::new("base16-ocean.dark");
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[]);
     let lines = vec!["hello".to_string(), "world".to_string()];
     let result = h.highlight(Path::new("f.txt"), &lines);
     assert_eq!(result.len(), 2);
@@ -25,7 +25,7 @@ fn highlight_returns_one_vec_per_line() {
 
 #[test]
 fn highlight_plain_text_no_extra_styling() {
-    let h = Highlighter::new("base16-ocean.dark");
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[]);
     let result = h.highlight(Path::new("f.txt"), &[":)".to_string()]);
     assert_eq!(result[0][0].1, ":)");
     assert_eq!(result[0][0].0.add_modifier, Modifier::empty());
@@ -33,7 +33,7 @@ fn highlight_plain_text_no_extra_styling() {
 
 #[test]
 fn highlight_rust_code_colors_keywords() {
-    let h = Highlighter::new("base16-ocean.dark");
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[]);
     let result = h.highlight(Path::new("main.rs"), &["fn main() {".to_string()]);
     assert!(
         result[0].len() > 1,
@@ -46,7 +46,7 @@ fn highlight_rust_code_colors_keywords() {
 
 #[test]
 fn highlight_state_tracks_across_lines() {
-    let h = Highlighter::new("base16-ocean.dark");
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[]);
     let lines = vec!["/// doc comment".to_string(), "fn main() {}".to_string()];
     let result = h.highlight(Path::new("main.rs"), &lines);
     assert_eq!(result.len(), 2);
@@ -89,7 +89,7 @@ fn with_extra_syntaxes_recognizes_loaded_extension() {
     );
     // Without the extra syntax, an unknown extension falls back to plain text
     // and returns a single unstyled span.
-    let h2 = Highlighter::new("base16-ocean.dark");
+    let h2 = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[]);
     let result2 = h2.highlight(Path::new("test.xtestlang"), &["kw rest".to_string()]);
     assert_eq!(
         result2[0].len(),

@@ -2,7 +2,7 @@ use super::*;
 use crate::theme::Theme;
 
 fn hl() -> Highlighter {
-    Highlighter::new("base16-ocean.dark")
+    Highlighter::with_extra_syntaxes("base16-ocean.dark", &[])
 }
 
 #[test]

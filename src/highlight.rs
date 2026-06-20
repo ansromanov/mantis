@@ -33,12 +33,6 @@ pub struct Highlighter {
 }
 
 impl Highlighter {
-    /// Builds a highlighter using the named syntect theme, falling back to
-    /// `base16-ocean.dark` if the name is unknown. No extra syntax plugins.
-    pub fn new(theme: &str) -> Self {
-        Self::with_extra_syntaxes(theme, &[])
-    }
-
     /// Builds a highlighter with extra syntax definitions loaded from plugins.
     /// Each [`ExtraSyntax`] provides a `.sublime-syntax` file path that is
     /// loaded into the `SyntaxSet` so syntect recognises its file extensions.
