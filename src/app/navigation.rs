@@ -178,25 +178,28 @@ impl App {
     /// Acts on the currently selected node: toggles a directory's fold state,
     /// or opens a file. Shared by the Enter key and a mouse click.
     pub(super) fn activate_selected(&mut self) {
-        if let Some(node) = self.nodes.get(self.tree_selected) {
-            if node.is_dir {
-                let p = node.path.clone();
-                if self.expanded.contains(&p) {
-                    self.expanded.remove(&p);
-                } else {
-                    self.expanded.insert(p);
-                }
-                self.rebuild();
-            } else if node.deleted {
-                let p = node.path.clone();
+        let Some(node) = self.nodes.get(self.tree_selected) else {
+            return;
+        };
+        if node.is_dir {
+            let p = node.path.clone();
+            if self.expanded.contains(&p) {
+                self.expanded.remove(&p);
+            } else {
+                self.expanded.insert(p);
+            }
+            self.rebuild();
+        } else {
+            let p = node.path.clone();
+            let deleted = node.deleted;
+            if deleted {
                 self.show_deleted(&p);
             } else if self.git_mode {
-                let p = node.path.clone();
                 self.request_working_tree_diff(&p);
             } else {
-                let p = node.path.clone();
                 self.request_open_file(&p);
             }
+            self.plugin_manager.on_selection_change(Some(&p));
         }
     }
 

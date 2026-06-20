@@ -95,7 +95,7 @@ impl Plugin {
         let mut child = Command::new(path)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::inherit())
+            .stderr(Stdio::null())
             .spawn()
             .map_err(|e| format!("failed to spawn plugin '{}': {}", self.name, e))?;
 
@@ -108,7 +108,7 @@ impl Plugin {
             .take()
             .ok_or_else(|| format!("no stdout for plugin '{}'", self.name))?;
 
-        let (read_tx, read_rx) = std::sync::mpsc::channel();
+        let (read_tx, read_rx) = std::sync::mpsc::sync_channel(1024);
         let read_handle = std::thread::Builder::new()
             .name(format!("plugin-reader-{}", self.name))
             .spawn(move || {
@@ -123,7 +123,7 @@ impl Plugin {
                             if let Ok(msg) = serde_json::from_str::<FromPlugin>(trimmed) {
                                 if msg.event == "action" {
                                     if let Some(action) = msg.action {
-                                        let _ = read_tx.send((action, msg.params));
+                                        let _ = read_tx.try_send((action, msg.params));
                                     }
                                 }
                             }
@@ -192,6 +192,7 @@ impl Plugin {
                     Ok(Some(_)) => break,
                     Ok(None) if Instant::now() >= deadline => {
                         let _ = child.kill();
+                        let _ = child.wait();
                         break;
                     }
                     _ => std::thread::sleep(Duration::from_millis(50)),

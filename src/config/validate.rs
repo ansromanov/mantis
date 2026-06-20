@@ -61,8 +61,12 @@ fn collect_unknown(
                 out.push(format!("unknown key '{path}'{hint}"));
             }
             Some(schema_val) => {
-                if let (Some(a), Some(s)) = (val.as_table(), schema_val.as_table()) {
-                    collect_unknown(a, s, &path, out);
+                // The [plugins] table has user-defined plugin names as keys;
+                // do not recurse into it or every plugin entry would be flagged.
+                if key != "plugins" {
+                    if let (Some(a), Some(s)) = (val.as_table(), schema_val.as_table()) {
+                        collect_unknown(a, s, &path, out);
+                    }
                 }
             }
         }

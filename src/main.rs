@@ -204,7 +204,8 @@ fn run_app(
 
     let loop_result = run_event_loop(terminal, &mut app, events);
 
-    // Always shut down plugin subprocesses, even if the event loop errored.
+    // Notify plugins of quit on every exit path, then shut them down.
+    app.plugin_manager.on_quit();
     app.plugin_manager.deactivate_all();
 
     loop_result?;
