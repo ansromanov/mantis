@@ -8,14 +8,21 @@
 //! named theme is resolved on construction with a fallback to
 //! `base16-ocean.dark` when unknown, and can be swapped when the user changes
 //! themes. Its output feeds both the synchronous and background file-load paths.
+//!
+//! Extra syntax definitions (e.g. from plugins) can be passed via
+//! [`with_extra_syntaxes`]; each is a `.sublime-syntax` file loaded into the
+//! `SyntaxSet` so its file extensions are recognised during highlighting.
 
 use ratatui::style::{Color, Modifier, Style};
+use std::fs;
 use std::path::Path;
 use syntect::{
     easy::HighlightLines,
     highlighting::{FontStyle, Style as SynStyle, ThemeSet},
-    parsing::SyntaxSet,
+    parsing::{SyntaxDefinition, SyntaxSet},
 };
+
+use crate::plugin::ExtraSyntax;
 
 /// Wraps a syntect `SyntaxSet` + `ThemeSet` to provide syntax highlighting
 /// for file contents. Compiled once at startup and reused across file opens.
@@ -27,19 +34,37 @@ pub struct Highlighter {
 
 impl Highlighter {
     /// Builds a highlighter using the named syntect theme, falling back to
-    /// `base16-ocean.dark` if the name is unknown.
+    /// `base16-ocean.dark` if the name is unknown. No extra syntax plugins.
     pub fn new(theme: &str) -> Self {
+        Self::with_extra_syntaxes(theme, &[])
+    }
+
+    /// Builds a highlighter with extra syntax definitions loaded from plugins.
+    /// Each [`ExtraSyntax`] provides a `.sublime-syntax` file path that is
+    /// loaded into the `SyntaxSet` so syntect recognises its file extensions.
+    pub fn with_extra_syntaxes(theme: &str, extra: &[ExtraSyntax]) -> Self {
         let ts = ThemeSet::load_defaults();
         let theme = if ts.themes.contains_key(theme) {
             theme.to_string()
         } else {
             "base16-ocean.dark".to_string()
         };
-        Highlighter {
-            ss: SyntaxSet::load_defaults_nonewlines(),
-            ts,
-            theme,
+        // Start from the default syntax set, then add extra definitions.
+        let defaults = SyntaxSet::load_defaults_nonewlines();
+        let mut builder = defaults.into_builder();
+        for extra_syn in extra {
+            if let Ok(s) = fs::read_to_string(&extra_syn.syntax_path) {
+                if let Ok(def) = SyntaxDefinition::load_from_str(
+                    &s,
+                    false,
+                    extra_syn.syntax_path.file_stem().and_then(|n| n.to_str()),
+                ) {
+                    builder.add(def);
+                }
+            }
         }
+        let ss = builder.build();
+        Highlighter { ss, ts, theme }
     }
 
     /// Syntax-highlights the given lines by detecting the file type from

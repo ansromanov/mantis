@@ -1,10 +1,17 @@
 # Plugins
 
-`tv` supports subprocess-based plugins — standalone executables that hook into
-app events and issue actions back to the viewer. Plugins run in separate
-processes; `tv` talks to them over stdin/stdout using newline-delimited JSON, so
-a plugin can be a shell script, a Python script, a compiled binary — anything
-that can read stdin and write stdout.
+`tv` supports two kinds of plugins: **process plugins** (subprocess-based) and
+**syntax plugins** (syntax definitions loaded into the highlighter).
+
+Process plugins are standalone executables that hook into app events and issue
+actions back to the viewer. They run in separate processes; `tv` talks to them
+over stdin/stdout using newline-delimited JSON, so a plugin can be a shell
+script, a Python script, a compiled binary — anything that can read stdin and
+write stdout.
+
+Syntax plugins provide `.sublime-syntax` files that are loaded into the built-in
+syntect highlighter at startup. They add syntax highlighting for new file types
+without modifying the core binary.
 
 ## Installing a plugin
 
@@ -14,10 +21,19 @@ Plugins live in the default plugin directory:
   (or `$XDG_CONFIG_HOME/tree-viewer/plugins/` if that variable is set)
 - **Windows:** `%APPDATA%\tree-viewer\plugins\`
 
+### Process plugins
+
 Drop the executable there and make it executable (`chmod +x my-plugin.sh` on
 Unix).
 
+### Syntax plugins
+
+`.sublime-syntax` files placed in `{plugin_dir}/syntaxes/` are auto-discovered
+at startup. They are installed automatically by `tv`'s first-run setup.
+
 ## Registering a plugin
+
+### Process plugins
 
 Add a `[plugins]` section to your `tv.toml`:
 
@@ -38,6 +54,26 @@ git-stats   = { path = "git-stats.sh" }
 file-logger = { path = "/usr/local/bin/tv-file-logger" }
 dev-tools   = { path = "dev-tools.py", enabled = false }
 ```
+
+### Syntax plugins
+
+Syntax plugins can also be registered explicitly in `tv.toml` with
+`kind = "syntax"`:
+
+```toml
+[plugins]
+terraform = { kind = "syntax", syntax_file = "terraform.sublime-syntax",
+              extensions = ["tf", "tfvars"] }
+```
+
+- **`kind`** — `"syntax"` for syntax-definition plugins (default: `"process"`).
+- **`syntax_file`** — path to the `.sublime-syntax` file. Relative paths are
+  resolved against the plugin directory.
+- **`extensions`** — file extensions this syntax should match (optional; the
+  syntax definition itself also declares its own extensions).
+
+Syntax plugins are not spawned as subprocesses. Their syntax definitions are
+loaded into the highlighter alongside the built-in language set.
 
 ## What plugins can do
 

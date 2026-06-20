@@ -1,11 +1,18 @@
 # Plugin Development
 
-This page describes the protocol for writing a `tv` plugin. See
-[Plugins](plugins.md) for how to install and configure plugins.
+This page describes how to write both kinds of `tv` plugins: **process
+plugins** (subprocess-based) and **syntax plugins** (`.sublime-syntax` files).
+See [Plugins](plugins.md) for how to install and configure plugins.
 
-## Protocol overview
+---
 
-A plugin is any executable that:
+## Process plugins
+
+The protocol for subprocess-based plugins.
+
+### Protocol overview
+
+A process plugin is any executable that:
 
 1. Reads newline-delimited JSON objects from **stdin** (events from `tv`).
 2. Writes newline-delimited JSON objects to **stdout** (actions back to `tv`).
@@ -149,3 +156,69 @@ for line in sys.stdin:
   respectively.
 - Plugin config deserialization lives in `src/config/mod.rs` under the
   `plugins` key.
+
+---
+
+## Syntax plugins
+
+Syntax plugins provide `.sublime-syntax` files that extend the built-in
+syntect-based highlighter. No subprocess is spawned.
+
+### How they work
+
+A syntax plugin is simply a `.sublime-syntax` file (Sublime Text syntax
+definition format, YAML-based). At startup:
+
+1. Files in `{plugin_dir}/syntaxes/` are auto-discovered and loaded.
+2. Explicit `[plugins]` entries with `kind = "syntax"` are also loaded.
+3. Each syntax definition is added to the `SyntaxSet` so syntect associates
+   its declared file extensions with highlights.
+
+### Writing a syntax definition
+
+The `.sublime-syntax` format is documented in the [Sublime Text
+docs](https://www.sublimetext.com/docs/syntax.html).  A minimal syntax file
+looks like:
+
+```yaml
+%YAML 1.2
+---
+name: My Language
+file_extensions: [ext1, ext2]
+scope: source.my_lang
+
+contexts:
+  main:
+    - match: '#.*'
+      scope: comment.line.number-sign.my_lang
+    - match: '\b(keyword)\b'
+      scope: keyword.control.my_lang
+```
+
+The `file_extensions` key tells syntect which files to highlight with this
+syntax. The `scope` key defines the base scope for highlighting, and `contexts`
+define the matching rules.
+
+### Bundled syntax plugins
+
+`tv` ships with a `terraform.sublime-syntax` file that is automatically
+installed to `{plugin_dir}/syntaxes/` on first run. It provides syntax
+highlighting for `.tf` and `.tfvars` files (Terraform / HCL). Enable it by:
+
+```toml
+[plugins]
+terraform = { kind = "syntax", syntax_file = "terraform.sublime-syntax",
+              extensions = ["tf", "tfvars"] }
+```
+
+Or simply leave it in the `syntaxes/` directory for auto-discovery (no config
+entry needed).
+
+### Architecture notes
+
+- `src/highlight.rs`::`with_extra_syntaxes()` loads extra syntax definitions
+  into the syntax set.
+- `src/plugin.rs`::`load_extra_syntaxes()` collects syntax plugins from config
+  entries and the `syntaxes/` directory.
+- Syntax definitions are loaded once at startup and shared between the main
+  thread's `Highlighter` and the background loader thread's `Highlighter`.
