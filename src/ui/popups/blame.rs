@@ -50,8 +50,19 @@ pub(crate) fn draw_blame_panel(f: &mut Frame, app: &App, area: Rect) {
     let inner = block.inner(popup);
     f.render_widget(block, popup);
 
-    let blame = crate::git::file_blame(&app.root, path);
-    if blame.is_empty() {
+    // Plugin-provided blame data takes precedence over live git blame.
+    let plugin_lines: Option<Vec<String>> = app
+        .plugin_blame
+        .get(path)
+        .filter(|v| !v.is_empty())
+        .cloned();
+    let git_blame: Vec<crate::git::BlameLine> = if plugin_lines.is_none() {
+        crate::git::file_blame(&app.root, path)
+    } else {
+        Vec::new()
+    };
+
+    if plugin_lines.is_none() && git_blame.is_empty() {
         f.render_widget(
             Paragraph::new(Line::from(Span::styled(
                 " No blame available — file is untracked or not in a git repo.",
@@ -63,7 +74,7 @@ pub(crate) fn draw_blame_panel(f: &mut Frame, app: &App, area: Rect) {
     }
 
     let by_line: HashMap<u32, &crate::git::BlameLine> =
-        blame.iter().map(|b| (b.line_no, b)).collect();
+        git_blame.iter().map(|b| (b.line_no, b)).collect();
 
     let dim = Style::default().fg(theme.dim);
     let max_rows = inner.height as usize;
@@ -73,25 +84,35 @@ pub(crate) fn draw_blame_panel(f: &mut Frame, app: &App, area: Rect) {
             let phys = app.display_to_physical(disp);
             let lineno = phys + 1;
             let content = app.line_text(phys).unwrap_or("");
-            match by_line.get(&(lineno as u32)) {
-                Some(b) => Line::from(vec![
-                    Span::styled(
-                        format!("{} ", b.short_hash),
-                        Style::default().fg(theme.accent_alt),
-                    ),
-                    Span::styled(
-                        format!("{:<12} ", truncate(&b.author, 12)),
-                        Style::default().fg(theme.accent),
-                    ),
-                    Span::styled(format!("{:<13} ", truncate(&b.date_relative, 13)), dim),
+            if let Some(ref plines) = plugin_lines {
+                // Plugin blame: pre-formatted display strings, render directly.
+                let prefix = plines.get(phys).map(|s| s.as_str()).unwrap_or("");
+                Line::from(vec![
+                    Span::styled(prefix.to_string(), dim),
                     Span::styled(format!("{lineno:>5} "), dim),
                     Span::styled(content.to_string(), Style::default().fg(theme.text)),
-                ]),
-                None => Line::from(vec![
-                    Span::styled(format!("{:<27} ", "(uncommitted)"), dim),
-                    Span::styled(format!("{lineno:>5} "), dim),
-                    Span::styled(content.to_string(), Style::default().fg(theme.text)),
-                ]),
+                ])
+            } else {
+                match by_line.get(&(lineno as u32)) {
+                    Some(b) => Line::from(vec![
+                        Span::styled(
+                            format!("{} ", b.short_hash),
+                            Style::default().fg(theme.accent_alt),
+                        ),
+                        Span::styled(
+                            format!("{:<12} ", truncate(&b.author, 12)),
+                            Style::default().fg(theme.accent),
+                        ),
+                        Span::styled(format!("{:<13} ", truncate(&b.date_relative, 13)), dim),
+                        Span::styled(format!("{lineno:>5} "), dim),
+                        Span::styled(content.to_string(), Style::default().fg(theme.text)),
+                    ]),
+                    None => Line::from(vec![
+                        Span::styled(format!("{:<27} ", "(uncommitted)"), dim),
+                        Span::styled(format!("{lineno:>5} "), dim),
+                        Span::styled(content.to_string(), Style::default().fg(theme.text)),
+                    ]),
+                }
             }
         })
         .collect();
