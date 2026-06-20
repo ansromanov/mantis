@@ -154,8 +154,7 @@ fn default_plugin_dir_respects_xdg() {
 #[cfg(not(windows))]
 fn install_bundled_plugins_creates_scripts() {
     let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-    let tmp = std::env::temp_dir()
-        .join(format!("tv_plugin_test_{}", std::process::id()));
+    let tmp = std::env::temp_dir().join(format!("tv_plugin_test_{}", std::process::id()));
     std::fs::create_dir_all(&tmp).unwrap();
     let old = std::env::var_os("XDG_CONFIG_HOME");
     // SAFETY: ENV_LOCK serialises all callers; no other thread mutates this var.
