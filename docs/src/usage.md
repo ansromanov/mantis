@@ -30,6 +30,7 @@ These work no matter which panel is focused.
 | `e`            | Open current file in `$EDITOR` |
 | `Alt+.`        | Toggle hidden files     |
 | `H`            | Git history of current file |
+| `Ctrl+O`       | Recent files (jump to a recently opened file) |
 | `b`            | Toggle git blame        |
 | `V`            | Visual-line mode (select lines; `b` blames the range) |
 | `t`            | Theme picker            |

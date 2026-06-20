@@ -79,6 +79,10 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         popups::draw_theme(f, app, area);
     }
 
+    if app.recent_files.is_some() {
+        popups::draw_recent(f, app, area);
+    }
+
     if app.blame_panel {
         popups::draw_blame_panel(f, app, area);
     }

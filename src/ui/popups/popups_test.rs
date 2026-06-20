@@ -3,7 +3,7 @@ use ratatui::layout::Rect;
 use crate::ui::popups::util::centered_rect;
 use crate::ui::popups::{
     draw_about, draw_blame_panel, draw_command_palette, draw_help, draw_history,
-    draw_in_file_search, draw_search, draw_theme,
+    draw_in_file_search, draw_recent, draw_search, draw_theme,
 };
 
 #[test]
@@ -325,7 +325,7 @@ fn draw_help_all_sections() {
     let dir = tempfile::tempdir().unwrap();
     let app = make_app(dir.path());
 
-    let backend = TestBackend::new(80, 60);
+    let backend = TestBackend::new(80, 65);
     let mut terminal = Terminal::new(backend).unwrap();
     terminal.draw(|f| draw_help(f, &app, f.area())).unwrap();
     let rows = buffer_rows(&terminal);
@@ -527,4 +527,33 @@ fn draw_about_shows_version() {
     assert!(joined.contains("Version:"));
     assert!(joined.contains("GPL-3.0"));
     assert!(joined.contains("tree viewer"));
+}
+
+// ── draw_recent ─────────────────────────────────────────────────────────
+
+#[test]
+fn draw_recent_shows_paths_and_records_geometry() {
+    use crate::search::RecentFilesState;
+
+    let dir = tempfile::tempdir().unwrap();
+    let a = dir.path().join("alpha.rs");
+    let b = dir.path().join("beta.rs");
+    std::fs::write(&a, "").unwrap();
+    std::fs::write(&b, "").unwrap();
+    let mut app = make_app(dir.path());
+    app.recent_files = Some(RecentFilesState::new(vec![a, b]));
+
+    let backend = TestBackend::new(80, 30);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| draw_recent(f, &mut app, f.area()))
+        .unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(joined.contains("Recent files"));
+    assert!(joined.contains("alpha.rs"));
+    assert!(joined.contains("beta.rs"));
+    // geometry must be recorded for mouse hit-testing
+    assert!(app.recent_area.width > 0);
+    assert!(app.recent_area.height > 0);
 }
