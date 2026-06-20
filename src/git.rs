@@ -2,9 +2,11 @@
 //!
 //! Rather than linking a Rust git library, this module shells out to `git` for
 //! everything it needs: per-file working-tree status (`repo_status`), repository
-//! metadata such as branch/HEAD (`repo_info`/`GitRepoInfo`), commit history, and
-//! unified diffs (working-tree and per-commit). Results are cached behind a mutex
-//! keyed on a coarse timestamp so rapid redraws don't spawn a process per frame.
+//! metadata such as branch/HEAD and upstream counts (`repo_info`/`GitRepoInfo`
+//! and `ahead_behind`), commit history, and unified diffs (working-tree and
+//! per-commit). Results are cached behind a mutex keyed on a coarse timestamp so
+//! rapid redraws don't spawn a process per frame.
+//!
 //! Every call degrades gracefully - a missing repo, a `git` that isn't
 //! installed, or a failed command yields empty/`None` results instead of an
 //! error, so the viewer works fine outside a repository. `GitStatus` and its
@@ -99,8 +101,7 @@ impl GitRepoInfo {
 }
 
 /// Returns rich git repository info for the directory containing `dir`, or
-/// `None` if not in a git repo or git is unavailable. Uses a single
-/// `git status --porcelain -b` call.
+/// `None` if not in a git repo or git is unavailable.
 pub fn repo_info(dir: &Path) -> Option<GitRepoInfo> {
     let root = git_toplevel(dir)?;
 
@@ -115,6 +116,10 @@ pub fn repo_info(dir: &Path) -> Option<GitRepoInfo> {
     }
     let text = String::from_utf8_lossy(&out.stdout);
     let mut info = parse_repo_info(&text);
+    if let Some((ahead, behind)) = ahead_behind(&root) {
+        info.ahead = ahead as usize;
+        info.behind = behind as usize;
+    }
 
     // Refine HEAD state: check for rebase/merge by inspecting git state files.
     // These checks are unconditional — a merge in progress keeps the branch
@@ -127,6 +132,28 @@ pub fn repo_info(dir: &Path) -> Option<GitRepoInfo> {
     }
 
     Some(info)
+}
+
+/// Returns how many commits `HEAD` is ahead of and behind its upstream.
+///
+/// Missing upstreams and git errors return `None` so callers can omit the
+/// indicator entirely.
+pub fn ahead_behind(repo_dir: &Path) -> Option<(u32, u32)> {
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(repo_dir)
+        .args(["rev-list", "--left-right", "--count", "HEAD...@{u}"])
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&out.stdout);
+    // Expected output: "<ahead>\t<behind>" from `--left-right --count`.
+    let mut parts = text.split_whitespace();
+    let ahead = parts.next()?.parse().ok()?;
+    let behind = parts.next()?.parse().ok()?;
+    Some((ahead, behind))
 }
 
 fn parse_branch_line(line: &str) -> (GitHead, usize, usize) {
@@ -181,12 +208,12 @@ fn parse_repo_info(text: &str) -> GitRepoInfo {
 
     // First line is the branch header: "## ..."
     let branch_line = lines.next().unwrap_or("");
-    let (head, ahead, behind) = parse_branch_line(branch_line);
+    let (head, _, _) = parse_branch_line(branch_line);
 
     let mut info = GitRepoInfo {
         head,
-        ahead,
-        behind,
+        ahead: 0,
+        behind: 0,
         total_changed: 0,
         staged: 0,
         untracked: 0,

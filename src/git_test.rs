@@ -1,4 +1,30 @@
-use super::parse_blame_porcelain;
+use std::fs;
+use std::path::Path;
+use std::process::Command;
+
+use super::{ahead_behind, parse_blame_porcelain};
+
+fn git(dir: &Path, args: &[&str]) {
+    let status = Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(["-c", "user.email=t@e.x", "-c", "user.name=T"])
+        .args(args)
+        .status()
+        .unwrap();
+    assert!(status.success(), "git {:?} failed", args);
+}
+
+fn clone_repo(src: &Path, dst: &Path) {
+    let status = Command::new("git")
+        .arg("clone")
+        .arg("-q")
+        .arg(src)
+        .arg(dst)
+        .status()
+        .unwrap();
+    assert!(status.success(), "git clone {:?} -> {:?} failed", src, dst);
+}
 
 #[test]
 fn single_line_single_commit() {
@@ -73,4 +99,40 @@ fn multiple_commits_interleaved() {
 #[test]
 fn empty_input() {
     assert!(parse_blame_porcelain("").is_empty());
+}
+
+#[test]
+fn ahead_behind_missing_upstream_is_none() {
+    let dir = tempfile::tempdir().unwrap();
+    git(dir.path(), &["init", "-q"]);
+    fs::write(dir.path().join("a.txt"), "hello\n").unwrap();
+    git(dir.path(), &["add", "a.txt"]);
+    git(dir.path(), &["commit", "-q", "-m", "init"]);
+
+    assert_eq!(ahead_behind(dir.path()), None);
+}
+
+#[test]
+fn ahead_behind_counts_against_upstream() {
+    let origin = tempfile::tempdir().unwrap();
+    git(origin.path(), &["init", "-q", "--bare"]);
+
+    let local = tempfile::tempdir().unwrap();
+    clone_repo(origin.path(), local.path());
+    fs::write(local.path().join("a.txt"), "base\n").unwrap();
+    git(local.path(), &["add", "a.txt"]);
+    git(local.path(), &["commit", "-q", "-m", "base"]);
+    git(local.path(), &["push", "-q", "-u", "origin", "master"]);
+
+    let other = tempfile::tempdir().unwrap();
+    clone_repo(origin.path(), other.path());
+    fs::write(other.path().join("a.txt"), "base\nremote\n").unwrap();
+    git(other.path(), &["commit", "-q", "-am", "remote"]);
+    git(other.path(), &["push", "-q"]);
+
+    git(local.path(), &["fetch", "-q"]);
+    fs::write(local.path().join("a.txt"), "base\nlocal\n").unwrap();
+    git(local.path(), &["commit", "-q", "-am", "local"]);
+
+    assert_eq!(ahead_behind(local.path()), Some((1, 1)));
 }
