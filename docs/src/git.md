@@ -14,6 +14,9 @@ modified, deleted, or ignored — so you can see at a glance what's changed with
 doing anything. Control this with `git_status` in your config (see
 [Configuration](configuration.md)).
 
+The status bar also shows how far the current branch is from its upstream when a
+tracking branch exists, using the familiar `↑3 ↓1` summary.
+
 ## Git blame
 
 Press `b` with a file open to toggle **inline blame**. A gutter appears to the
