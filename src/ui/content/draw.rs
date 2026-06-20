@@ -90,11 +90,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
             // Plugin-provided blame data takes precedence over live git blame.
             let lines: Option<Vec<String>> = app.plugin_blame.get(path).cloned();
             let lines = if let Some(plugin_lines) = lines {
-                if !plugin_lines.is_empty() {
-                    plugin_lines
-                } else {
-                    Vec::new()
-                }
+                plugin_lines
             } else {
                 let git_lines = crate::git::file_blame(&app.root, path);
                 if git_lines.is_empty() {

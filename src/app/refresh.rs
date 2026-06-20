@@ -213,7 +213,10 @@ impl App {
                         .and_then(|v| v.as_str())
                         .unwrap_or("")
                         .to_string();
-                    let dirty = params.get("dirty").and_then(|v| v.as_str()) == Some("true");
+                    let dirty = params
+                        .get("dirty")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
                     let state = params
                         .get("state")
                         .and_then(|v| v.as_str())
