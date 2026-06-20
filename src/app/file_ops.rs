@@ -182,6 +182,7 @@ impl App {
         self.diff_rows = load.diff_rows;
         self.content = load.content;
         self.set_file_watch(Some(path));
+        self.plugin_manager.on_file_open(path);
     }
 
     /// Shows a "[deleted]" placeholder for a file that was removed from the
@@ -273,6 +274,7 @@ impl App {
         if load.ok {
             self.current_file = Some(path.to_path_buf());
             self.set_file_watch(Some(path));
+            self.plugin_manager.on_file_open(path);
         } else {
             self.current_file = None;
             self.set_file_watch(None);

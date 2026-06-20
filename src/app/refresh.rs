@@ -21,6 +21,7 @@ impl App {
     /// periodic reload so the view never goes permanently stale.
     pub fn tick(&mut self) {
         self.drain_loads();
+        self.drain_plugin_actions();
         if self.auto_watch && self.drain_file_watch() {
             self.reload_content();
         }
@@ -147,5 +148,28 @@ impl App {
     pub(super) fn loader_set_theme(&self) {
         self.loader
             .request(LoadRequest::SetTheme(Box::new(self.theme.clone())));
+    }
+
+    /// Drains pending plugin actions and handles known action types.
+    fn drain_plugin_actions(&mut self) {
+        if self.plugin_manager.is_empty() {
+            return;
+        }
+        self.plugin_manager.drain_actions();
+        for (name, action, params) in self.plugin_manager.take_actions() {
+            match action.as_str() {
+                "show_message" => {
+                    if let Some(msg) = params.get("message") {
+                        self.plugin_message = Some(format!("[{name}] {msg}"));
+                    }
+                }
+                "open_file" => {
+                    if let Some(path_str) = params.get("path") {
+                        self.open_and_reveal(std::path::Path::new(path_str));
+                    }
+                }
+                _ => {}
+            }
+        }
     }
 }

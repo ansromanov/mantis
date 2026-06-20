@@ -165,6 +165,8 @@ impl App {
                     for i in (0..self.tree_selected).rev() {
                         if self.nodes[i].depth < depth {
                             self.tree_selected = i;
+                            let p = self.nodes[i].path.clone();
+                            self.plugin_manager.on_selection_change(Some(&p));
                             break;
                         }
                     }

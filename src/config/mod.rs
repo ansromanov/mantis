@@ -11,11 +11,15 @@
 
 mod validate;
 
-use crate::theme::ThemeConfig;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use serde::{Deserialize, Deserializer, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use serde::{Deserialize, Deserializer, Serialize};
+
+use crate::plugin::PluginEntry;
+use crate::theme::ThemeConfig;
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(default)]
@@ -40,6 +44,9 @@ pub struct Config {
     pub watch: bool,
     pub keys: Keymap,
     pub theme: ThemeConfig,
+    /// Per-plugin entries registered in `[plugins]`.
+    #[serde(default)]
+    pub plugins: HashMap<String, PluginEntry>,
 }
 
 impl Default for Config {
@@ -63,6 +70,7 @@ impl Default for Config {
             watch: false,
             keys: Keymap::default(),
             theme: ThemeConfig::default(),
+            plugins: HashMap::new(),
         }
     }
 }

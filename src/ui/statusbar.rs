@@ -116,6 +116,10 @@ pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
             spans.push(Span::styled(" [watch]", badge));
         }
 
+        if !app.plugin_manager.is_empty() {
+            spans.push(Span::styled(" [plugin]", badge));
+        }
+
         if app.show_scroll_percentage && app.current_file.is_some() {
             let max = app.content_scroll_max();
             if max > 0 {
@@ -166,6 +170,10 @@ pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
                 format!(" [Y{anchor_info} {folded_count}/{total_regions}]"),
                 base.fg(theme.accent),
             ));
+        }
+
+        if let Some(ref msg) = app.plugin_message {
+            spans.push(Span::styled(format!(" {msg}"), base.fg(theme.accent)));
         }
 
         spans.push(Span::styled(

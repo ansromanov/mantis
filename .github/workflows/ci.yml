@@ -119,7 +119,7 @@ jobs:
 
       - name: Post / update PR comment
         if: steps.changes.outputs.code == 'true' && github.event_name == 'pull_request' && always()
-        uses: marocchino/sticky-pull-request-comment@v2
+        uses: marocchino/sticky-pull-request-comment@v3
         with:
           header: test-results
           path: pr_comment.md
@@ -132,7 +132,6 @@ jobs:
           detailed_summary: true
           include_passed: true
           check_name: Test Results
-          comment: false
 
       - name: Fail if tests failed
         if: steps.test.outcome == 'failure'

@@ -31,6 +31,7 @@ mod file;
 mod git;
 mod highlight;
 mod markdown;
+mod plugin;
 mod release_info;
 mod search;
 mod selection;
@@ -201,7 +202,13 @@ fn run_app(
     // Drive tree/git refreshes from filesystem events rather than a blind timer.
     app.watch_root();
 
-    run_event_loop(terminal, &mut app, events)?;
+    let loop_result = run_event_loop(terminal, &mut app, events);
+
+    // Notify plugins of quit on every exit path, then shut them down.
+    app.plugin_manager.on_quit();
+    app.plugin_manager.deactivate_all();
+
+    loop_result?;
 
     if let Some(err) = &app.config_error {
         eprintln!("tv: ignoring invalid config: {err}");

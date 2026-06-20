@@ -22,6 +22,7 @@ use ratatui::layout::Rect;
 use crate::config::{self, Config, Keymap};
 use crate::git::GitStatus;
 use crate::highlight::Highlighter;
+use crate::plugin::PluginManager;
 use crate::search::{CommandPalette, HistoryState, InFileSearch, SearchState, ThemePicker};
 use crate::selection::{TextSelection, VisualLine};
 use crate::theme::Theme;
@@ -190,6 +191,10 @@ pub struct App {
     /// Whether a background load is currently in flight; drives the "loading…"
     /// indicator in the content title.
     pub loading: bool,
+    /// Plugin subprocess manager. Spawned at startup, deactivated on quit.
+    pub plugin_manager: PluginManager,
+    /// Most recent plugin message, shown in the status bar.
+    pub plugin_message: Option<String>,
 }
 
 impl App {
@@ -227,6 +232,15 @@ impl App {
         let saved_config = cfg.clone();
         let highlighter = Highlighter::new(&theme.syntax);
         let loader = Loader::new(&theme);
+        let mut plugin_entries: Vec<_> = cfg.plugins.clone().into_iter().collect();
+        plugin_entries.sort_by(|a, b| a.0.cmp(&b.0));
+        let mut plugin_manager = PluginManager::new(plugin_entries);
+        plugin_manager.activate_all();
+        let plugin_spawn_error = plugin_manager
+            .take_spawn_errors()
+            .into_iter()
+            .next()
+            .map(|e| format!("[plugin] {e}"));
         let mut app = App {
             root,
             nodes,
@@ -322,6 +336,8 @@ impl App {
             loader,
             load_seq: 0,
             loading: false,
+            plugin_manager,
+            plugin_message: plugin_spawn_error,
         };
         if app.git_mode {
             app.expand_git_dirs();
