@@ -201,7 +201,7 @@ fn plugin_entries_shows_registered_plugins_as_not_running() {
 #[test]
 fn activate_one_errors_on_unknown_name() {
     let mut mgr = PluginManager::new(vec![]);
-    assert!(mgr.activate_one("ghost").is_err());
+    assert!(mgr.activate_one("ghost", None).is_err());
 }
 
 #[test]
@@ -211,7 +211,7 @@ fn activate_one_errors_on_bad_path() {
         enabled: false,
     };
     let mut mgr = PluginManager::new(vec![("bad".to_string(), entry)]);
-    assert!(mgr.activate_one("bad").is_err());
+    assert!(mgr.activate_one("bad", None).is_err());
 }
 
 #[test]
@@ -239,7 +239,7 @@ fn activate_one_then_deactivate_one_updates_running_state() {
         !mgr.plugin_entries()[0].1,
         "should not be running before activate"
     );
-    mgr.activate_one("cat-stub").expect("spawn /bin/cat");
+    mgr.activate_one("cat-stub", None).expect("spawn /bin/cat");
     assert!(
         mgr.plugin_entries()[0].1,
         "should be running after activate"
@@ -259,8 +259,8 @@ fn activate_one_is_noop_when_already_running() {
         enabled: false,
     };
     let mut mgr = PluginManager::new(vec![("cat-stub".to_string(), entry)]);
-    mgr.activate_one("cat-stub").expect("first spawn");
-    mgr.activate_one("cat-stub")
+    mgr.activate_one("cat-stub", None).expect("first spawn");
+    mgr.activate_one("cat-stub", None)
         .expect("second call must be noop");
     assert_eq!(
         mgr.plugin_entries().iter().filter(|(_, r)| *r).count(),

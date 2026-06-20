@@ -209,46 +209,27 @@ impl Plugin {
     /// moves the child process into a background thread that waits up to 2 s
     /// for a clean exit before force-killing it. The reader/writer thread
     /// handles are dropped here and exit naturally as their channels close.
-    ///
-    /// If thread creation fails, falls back to a synchronous kill so the child
-    /// is always reaped and never becomes a zombie process.
     fn close_in_background(mut self) {
-        use std::sync::{Arc, Mutex};
         drop(self.write_tx.take());
-        let Some(child) = self.child.take() else {
-            return;
-        };
-        let name = self.name.clone();
-        // Arc<Mutex> lets us reclaim the child if thread spawn fails.
-        let shared = Arc::new(Mutex::new(Some(child)));
-        let thread_shared = shared.clone();
-        if std::thread::Builder::new()
-            .name(format!("plugin-closer-{name}"))
-            .spawn(move || {
-                let Some(mut c) = thread_shared.lock().ok().and_then(|mut g| g.take()) else {
-                    return;
-                };
-                let deadline = Instant::now() + Duration::from_secs(2);
-                loop {
-                    match c.try_wait() {
-                        Ok(Some(_)) => break,
-                        Ok(None) if Instant::now() >= deadline => {
-                            let _ = c.kill();
-                            let _ = c.wait();
-                            break;
+        if let Some(mut child) = self.child.take() {
+            let name = self.name.clone();
+            std::thread::Builder::new()
+                .name(format!("plugin-closer-{name}"))
+                .spawn(move || {
+                    let deadline = Instant::now() + Duration::from_secs(2);
+                    loop {
+                        match child.try_wait() {
+                            Ok(Some(_)) => break,
+                            Ok(None) if Instant::now() >= deadline => {
+                                let _ = child.kill();
+                                let _ = child.wait();
+                                break;
+                            }
+                            _ => std::thread::sleep(Duration::from_millis(50)),
                         }
-                        _ => std::thread::sleep(Duration::from_millis(50)),
                     }
-                }
-            })
-            .is_err()
-        {
-            // Thread creation failed; synchronously reap the child to prevent
-            // a zombie process (Unix) or resource leak (Windows).
-            if let Some(mut c) = shared.lock().ok().and_then(|mut g| g.take()) {
-                let _ = c.kill();
-                let _ = c.wait();
-            }
+                })
+                .ok();
         }
     }
 }
@@ -388,9 +369,7 @@ impl PluginManager {
         self.plugins.is_empty()
     }
 
-    /// Returns every registered plugin as `(name, is_running)`, in the order
-    /// entries were inserted into the manager (alphabetical by name, as loaded
-    /// from config).
+    /// Returns every registered plugin as `(name, is_running)`, in registration order.
     pub fn plugin_entries(&self) -> Vec<(String, bool)> {
         self.entries
             .iter()
@@ -401,9 +380,11 @@ impl PluginManager {
             .collect()
     }
 
-    /// Spawns a single registered plugin by name and sends it the `init` event.
+    /// Spawns a single registered plugin by name, sends it `init`, and
+    /// optionally follows up with `on_file_open` + `on_selection_change` for
+    /// `current_file` so the plugin has the current UI state immediately.
     /// No-op if already running. Returns an error string on spawn failure.
-    pub fn activate_one(&mut self, name: &str) -> Result<(), String> {
+    pub fn activate_one(&mut self, name: &str, current_file: Option<&Path>) -> Result<(), String> {
         if self.plugins.iter().any(|p| p.name == name) {
             return Ok(());
         }
@@ -426,6 +407,19 @@ impl PluginManager {
             path: None,
             key: None,
         });
+        if let Some(file) = current_file {
+            let path_s = file.to_string_lossy().into_owned();
+            plugin.send(&ToPlugin {
+                event: "on_file_open".into(),
+                path: Some(path_s.clone()),
+                key: None,
+            });
+            plugin.send(&ToPlugin {
+                event: "on_selection_change".into(),
+                path: Some(path_s),
+                key: None,
+            });
+        }
         self.plugins.push(plugin);
         Ok(())
     }
