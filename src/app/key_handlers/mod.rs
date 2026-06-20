@@ -29,6 +29,10 @@ impl App {
         if key.kind == KeyEventKind::Release {
             return;
         }
+        // Notify plugins of every keypress so they can react (e.g. custom
+        // keybindings, macros). Plugins receive the key as a readable string:
+        // "q", "ctrl+c", "Enter", etc.
+        self.plugin_manager.on_keypress(&key);
         if self.show_about {
             match key.code {
                 crossterm::event::KeyCode::Char('?')

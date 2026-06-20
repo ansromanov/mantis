@@ -88,3 +88,10 @@ visual_line_blame = ["b"]
 # diff_add = "green"
 # diff_del = "red"
 # syntax = "base16-ocean.dark"
+#
+# Plugin system. Each entry registers a subprocess-based plugin executable.
+# Relative paths are resolved against ~/.config/tree-viewer/plugins/.
+# Plugins communicate via newline-delimited JSON on stdin/stdout. See
+# https://github.com/ansromanov/tree-viewer for protocol docs.
+# [plugins]
+# my-plugin = { path = "my-plugin.sh", enabled = true }

@@ -122,23 +122,25 @@ impl App {
 
     /// Opens the tree node at `self.tree_selected` if it is a file (skips
     /// directories). Delegates to `show_deleted`, `show_working_tree_diff`, or
-    /// `open_file` based on state.
+    /// `open_file` based on state. Notifies plugins of the selection change.
     pub(super) fn try_open_selected(&mut self) {
-        if let Some(node) = self.nodes.get(self.tree_selected) {
-            if node.is_dir {
-                return;
-            }
-            if node.deleted {
-                let path = node.path.clone();
-                self.show_deleted(&path);
-            } else if self.git_mode {
-                let path = node.path.clone();
-                self.request_working_tree_diff(&path);
-            } else {
-                let path = node.path.clone();
-                self.request_open_file(&path);
-            }
+        let path = self.nodes.get(self.tree_selected).map(|n| n.path.clone());
+        let Some(ref path) = path else {
+            return;
+        };
+        let is_dir = self.nodes.get(self.tree_selected).is_some_and(|n| n.is_dir);
+        if is_dir {
+            return;
         }
+        let deleted = self.nodes.get(self.tree_selected).is_some_and(|n| n.deleted);
+        if deleted {
+            self.show_deleted(path);
+        } else if self.git_mode {
+            self.request_working_tree_diff(path);
+        } else {
+            self.request_open_file(path);
+        }
+        self.plugin_manager.on_selection_change(Some(path));
     }
 
     /// Toggles git mode on/off. Enabling git mode fetches git status if needed,

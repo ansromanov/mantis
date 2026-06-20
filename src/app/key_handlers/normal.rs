@@ -31,6 +31,7 @@ impl App {
         }
         let k = &self.keys;
         if pressed(&k.quit, &key) {
+            self.plugin_manager.on_quit();
             self.should_quit = true;
         } else if pressed(&k.help, &key) {
             self.show_help = !self.show_help;

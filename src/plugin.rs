@@ -1,0 +1,355 @@
+//! Subprocess-based plugin system for `tv`.
+//!
+//! Plugins are standalone executables that communicate via newline-delimited
+//! JSON on stdin/stdout. `tv` sends lifecycle and hook events; plugins respond
+//! with action events. A reader thread per plugin drains stdout non-blockingly
+//! over a channel so the event loop never blocks on plugin I/O.
+//!
+//! Protocol (tv → plugin, one JSON object per line on stdin):
+//!   {"event":"init"}
+//!   {"event":"on_file_open","path":"/some/file"}
+//!   {"event":"on_keypress","key":"ctrl+p"}
+//!   {"event":"on_selection_change","path":"/some/file"}
+//!   {"event":"on_quit"}
+//!   {"event":"shutdown"}
+//!
+//! Protocol (plugin → tv, one JSON object per line on stdout):
+//!   {"event":"action","action":"show_message","params":{"message":"hello"}}
+//!   {"event":"action","action":"open_file","params":{"path":"/tmp/x"}}
+
+use std::collections::HashMap;
+use std::io::{BufRead, BufReader, Write};
+use std::path::{Path, PathBuf};
+use std::process::{Child, ChildStdin, Command, Stdio};
+
+use serde::{Deserialize, Serialize};
+
+/// Per-plugin entry in the `[plugins]` section of `tv.toml`.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(default)]
+pub struct PluginEntry {
+    /// Path to the plugin executable. Relative paths are resolved relative to
+    /// the default plugin directory (`~/.config/tree-viewer/plugins/`).
+    pub path: PathBuf,
+    /// When `false` the plugin is registered but not spawned at startup.
+    pub enabled: bool,
+}
+
+impl Default for PluginEntry {
+    fn default() -> Self {
+        PluginEntry {
+            path: PathBuf::new(),
+            enabled: true,
+        }
+    }
+}
+
+/// Message sent from `tv` to a plugin (on its stdin).
+#[derive(Serialize)]
+struct ToPlugin {
+    event: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    key: Option<String>,
+}
+
+/// Message received from a plugin (on its stdout).
+#[derive(Deserialize)]
+struct FromPlugin {
+    #[allow(dead_code)]
+    event: String,
+    action: Option<String>,
+    #[serde(default)]
+    params: HashMap<String, String>,
+}
+
+/// A single running plugin subprocess with a background reader thread.
+pub struct Plugin {
+    name: String,
+    child: Option<Child>,
+    stdin: Option<ChildStdin>,
+    action_rx: Option<std::sync::mpsc::Receiver<(String, HashMap<String, String>)>>,
+    _reader_thread: Option<std::thread::JoinHandle<()>>,
+}
+
+impl Plugin {
+    fn new(name: String) -> Self {
+        Plugin {
+            name,
+            child: None,
+            stdin: None,
+            action_rx: None,
+            _reader_thread: None,
+        }
+    }
+
+    fn spawn(&mut self, path: &Path) -> Result<(), String> {
+        let mut child = Command::new(path)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .map_err(|e| format!("failed to spawn plugin '{}': {}", self.name, e))?;
+
+        let stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| format!("no stdin for plugin '{}'", self.name))?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| format!("no stdout for plugin '{}'", self.name))?;
+
+        let (tx, rx) = std::sync::mpsc::channel();
+        let handle = std::thread::Builder::new()
+            .name(format!("plugin-reader-{}", self.name))
+            .spawn(move || {
+                let reader = BufReader::new(stdout);
+                for line in reader.lines() {
+                    match line {
+                        Ok(line) => {
+                            let trimmed = line.trim();
+                            if trimmed.is_empty() {
+                                continue;
+                            }
+                            if let Ok(msg) = serde_json::from_str::<FromPlugin>(trimmed) {
+                                if msg.event == "action" {
+                                    if let Some(action) = msg.action {
+                                        let _ = tx.send((action, msg.params));
+                                    }
+                                }
+                            }
+                        }
+                        Err(_) => break,
+                    }
+                }
+            })
+            .map_err(|e| format!("failed to spawn reader thread: {e}"))?;
+
+        self.child = Some(child);
+        self.stdin = Some(stdin);
+        self.action_rx = Some(rx);
+        self._reader_thread = Some(handle);
+        Ok(())
+    }
+
+    fn send(&mut self, msg: &ToPlugin) {
+        let Some(ref mut stdin) = self.stdin else {
+            return;
+        };
+        let Ok(json) = serde_json::to_string(msg) else {
+            return;
+        };
+        let _ = writeln!(stdin, "{json}");
+        let _ = stdin.flush();
+    }
+
+    fn drain_actions(&mut self) -> Vec<(String, HashMap<String, String>)> {
+        let mut actions = Vec::new();
+        let Some(ref rx) = self.action_rx else {
+            return actions;
+        };
+        while let Ok((action, params)) = rx.try_recv() {
+            actions.push((action, params));
+        }
+        actions
+    }
+
+    fn close(&mut self) {
+        self.send(&ToPlugin {
+            event: "shutdown".into(),
+            path: None,
+            key: None,
+        });
+        drop(self.stdin.take());
+        if let Some(mut child) = self.child.take() {
+            let _ = child.wait();
+        }
+    }
+}
+
+/// Manages discovery, lifecycle, and hook dispatch for all plugins.
+pub struct PluginManager {
+    entries: Vec<(String, PluginEntry)>,
+    plugins: Vec<Plugin>,
+    pending_actions: Vec<(String, String, HashMap<String, String>)>,
+}
+
+impl PluginManager {
+    pub fn new(entries: Vec<(String, PluginEntry)>) -> Self {
+        PluginManager {
+            entries,
+            plugins: Vec::new(),
+            pending_actions: Vec::new(),
+        }
+    }
+
+    /// Spawns all enabled plugins and sends them the `init` event.
+    pub fn activate_all(&mut self) {
+        let plugin_dir = default_plugin_dir();
+        for (name, entry) in &self.entries {
+            if !entry.enabled {
+                continue;
+            }
+            let path = if entry.path.is_relative() {
+                plugin_dir.join(&entry.path)
+            } else {
+                entry.path.clone()
+            };
+            let mut plugin = Plugin::new(name.clone());
+            if plugin.spawn(&path).is_err() {
+                continue;
+            }
+            plugin.send(&ToPlugin {
+                event: "init".into(),
+                path: None,
+                key: None,
+            });
+            self.plugins.push(plugin);
+        }
+    }
+
+    /// Sends `shutdown` to all plugins, closes their stdin, and waits for
+    /// each subprocess to exit.
+    pub fn deactivate_all(&mut self) {
+        for plugin in &mut self.plugins {
+            plugin.send(&ToPlugin {
+                event: "shutdown".into(),
+                path: None,
+                key: None,
+            });
+        }
+        for mut plugin in self.plugins.drain(..) {
+            plugin.close();
+        }
+    }
+
+    /// Sends `on_file_open` to all active plugins.
+    pub fn on_file_open(&mut self, path: &Path) {
+        let path_s = path.to_string_lossy().into_owned();
+        for plugin in &mut self.plugins {
+            plugin.send(&ToPlugin {
+                event: "on_file_open".into(),
+                path: Some(path_s.clone()),
+                key: None,
+            });
+        }
+    }
+
+    /// Sends `on_keypress` to all active plugins with a human-readable key
+    /// representation (e.g. `"q"`, `"ctrl+c"`, `"Enter"`).
+    pub fn on_keypress(&mut self, key: &crossterm::event::KeyEvent) {
+        let key_str = key_event_to_string(key);
+        for plugin in &mut self.plugins {
+            plugin.send(&ToPlugin {
+                event: "on_keypress".into(),
+                path: None,
+                key: Some(key_str.clone()),
+            });
+        }
+    }
+
+    /// Sends `on_selection_change` to all active plugins.
+    pub fn on_selection_change(&mut self, path: Option<&Path>) {
+        let path_s = path.map(|p| p.to_string_lossy().into_owned());
+        for plugin in &mut self.plugins {
+            plugin.send(&ToPlugin {
+                event: "on_selection_change".into(),
+                path: path_s.clone(),
+                key: None,
+            });
+        }
+    }
+
+    /// Sends `on_quit` to all active plugins (graceful shutdown notice).
+    pub fn on_quit(&mut self) {
+        for plugin in &mut self.plugins {
+            plugin.send(&ToPlugin {
+                event: "on_quit".into(),
+                path: None,
+                key: None,
+            });
+        }
+    }
+
+    /// Non-blockingly drains pending actions from every plugin's reader channel
+    /// into an internal buffer. Call `take_actions` to collect them.
+    pub fn drain_actions(&mut self) {
+        for plugin in &mut self.plugins {
+            for (action, params) in plugin.drain_actions() {
+                self.pending_actions
+                    .push((plugin.name.clone(), action, params));
+            }
+        }
+    }
+
+    /// Consumes and returns all buffered plugin actions since the last call:
+    /// `Vec<(plugin_name, action, params)>`.
+    pub fn take_actions(&mut self) -> Vec<(String, String, HashMap<String, String>)> {
+        std::mem::take(&mut self.pending_actions)
+    }
+
+    /// Whether any plugins are currently active.
+    pub fn is_empty(&self) -> bool {
+        self.plugins.is_empty()
+    }
+}
+
+/// Converts a crossterm `KeyEvent` into a human-readable string like `"q"`,
+/// `"ctrl+c"`, `"Enter"`, `"alt+."`.
+fn key_event_to_string(key: &crossterm::event::KeyEvent) -> String {
+    use crossterm::event::{KeyCode, KeyModifiers};
+    let mut parts = Vec::new();
+    if key.modifiers.contains(KeyModifiers::CONTROL) {
+        parts.push("ctrl");
+    }
+    if key.modifiers.contains(KeyModifiers::ALT) {
+        parts.push("alt");
+    }
+    if key.modifiers.contains(KeyModifiers::SUPER) {
+        parts.push("super");
+    }
+    let key_name = match key.code {
+        KeyCode::Char(' ') => "Space".into(),
+        KeyCode::Char(c) => c.to_string(),
+        KeyCode::Enter => "Enter".into(),
+        KeyCode::Tab => "Tab".into(),
+        KeyCode::Esc => "Esc".into(),
+        KeyCode::Backspace => "Backspace".into(),
+        KeyCode::Up => "Up".into(),
+        KeyCode::Down => "Down".into(),
+        KeyCode::Left => "Left".into(),
+        KeyCode::Right => "Right".into(),
+        KeyCode::PageUp => "PageUp".into(),
+        KeyCode::PageDown => "PageDown".into(),
+        KeyCode::Home => "Home".into(),
+        KeyCode::End => "End".into(),
+        _ => format!("{:?}", key.code),
+    };
+    if parts.is_empty() {
+        key_name
+    } else {
+        format!("{}+{}", parts.join("+"), key_name)
+    }
+}
+
+/// Default plugin discovery directory: `~/.config/tree-viewer/plugins/`.
+fn default_plugin_dir() -> PathBuf {
+    dirs_next().unwrap_or_else(|| PathBuf::from("."))
+}
+
+fn dirs_next() -> Option<PathBuf> {
+    #[cfg(windows)]
+    {
+        std::env::var_os("APPDATA")
+            .map(|p| PathBuf::from(p).join("tree-viewer").join("plugins"))
+    }
+    #[cfg(not(windows))]
+    {
+        std::env::var_os("XDG_CONFIG_HOME")
+            .map(PathBuf::from)
+            .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
+            .map(|base| base.join("tree-viewer").join("plugins"))
+    }
+}

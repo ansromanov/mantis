@@ -31,6 +31,7 @@ mod file;
 mod git;
 mod highlight;
 mod markdown;
+mod plugin;
 mod release_info;
 mod search;
 mod selection;
@@ -202,6 +203,9 @@ fn run_app(
     app.watch_root();
 
     run_event_loop(terminal, &mut app, events)?;
+
+    // Gracefully shut down plugin subprocesses before restoring the terminal.
+    app.plugin_manager.deactivate_all();
 
     if let Some(err) = &app.config_error {
         eprintln!("tv: ignoring invalid config: {err}");
