@@ -115,7 +115,10 @@ fn ahead_behind_missing_upstream_is_none() {
 #[test]
 fn ahead_behind_counts_against_upstream() {
     let origin = tempfile::tempdir().unwrap();
-    git(origin.path(), &["init", "-q", "--bare", "--initial-branch=master"]);
+    git(
+        origin.path(),
+        &["init", "-q", "--bare", "--initial-branch=master"],
+    );
 
     let local = tempfile::tempdir().unwrap();
     clone_repo(origin.path(), local.path());
