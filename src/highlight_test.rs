@@ -91,5 +91,9 @@ fn with_extra_syntaxes_recognizes_loaded_extension() {
     // and returns a single unstyled span.
     let h2 = Highlighter::new("base16-ocean.dark");
     let result2 = h2.highlight(Path::new("test.xtestlang"), &["kw rest".to_string()]);
-    assert_eq!(result2[0].len(), 1, "unknown extension should produce one plain-text span");
+    assert_eq!(
+        result2[0].len(),
+        1,
+        "unknown extension should produce one plain-text span"
+    );
 }
