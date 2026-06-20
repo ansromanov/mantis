@@ -12,8 +12,8 @@ A plugin is any executable that:
 3. Exits cleanly when it receives `shutdown` (or when stdin closes).
 
 `tv` spawns each plugin as a subprocess with `stdin`, `stdout`, and `stderr`
-piped. A background reader thread per plugin drains stdout non-blockingly so
-the `tv` event loop never blocks on plugin I/O.
+piped. A background reader thread drains each plugin's stdout and a background
+writer thread handles stdin so the `tv` event loop never blocks on plugin I/O.
 
 ## Events: tv → plugin (stdin)
 
@@ -87,7 +87,7 @@ Displays a message in the `tv` status bar.
 
 ### `open_file`
 
-Opens a file in the content panel. The path must exist.
+Opens a file in the content panel.
 
 ```json
 {"event":"action","action":"open_file","params":{"path":"/tmp/output.txt"}}
