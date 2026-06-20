@@ -243,6 +243,29 @@ impl App {
         }
     }
 
+    /// Handles keyboard input while the plugin manager overlay is open.
+    /// Up/Down navigates the list; Space or Enter toggles the selected plugin;
+    /// Esc closes without any further action.
+    pub(super) fn handle_plugin_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Esc => self.plugin_picker = None,
+            KeyCode::Enter | KeyCode::Char(' ') => self.toggle_plugin_picker_selection(),
+            KeyCode::Up | KeyCode::Char('k') => {
+                if let Some(p) = &mut self.plugin_picker {
+                    p.selected = p.selected.saturating_sub(1);
+                }
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                if let Some(p) = &mut self.plugin_picker {
+                    if p.selected + 1 < p.results_len() {
+                        p.selected += 1;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
     /// Handles keyboard input while the command palette is open: typing
     /// characters, backspace, up/down navigation, Enter to execute, Esc to close.
     pub(super) fn handle_command_key(&mut self, key: KeyEvent) {

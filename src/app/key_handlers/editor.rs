@@ -17,7 +17,7 @@ use crossterm::terminal::{
 
 use crate::config;
 use crate::highlight::Highlighter;
-use crate::search::{SearchState, ThemePicker};
+use crate::search::{PluginPicker, SearchState, ThemePicker};
 use crate::theme::{Theme, ThemeConfig};
 
 use super::super::{diff_line_style, App, Focus};
@@ -71,6 +71,10 @@ impl App {
             Some("open_file_history") => self.open_file_history(),
             Some("open_theme_picker") => {
                 self.theme_picker = Some(ThemePicker::default());
+            }
+            Some("open_plugin_picker") => {
+                let entries = self.plugin_manager.plugin_entries();
+                self.plugin_picker = Some(PluginPicker::new(entries));
             }
             Some("toggle_git_mode") => self.toggle_git_mode(),
             Some("toggle_git_flat") => {

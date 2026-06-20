@@ -12,7 +12,7 @@
 use crossterm::event::{KeyCode, KeyEvent};
 
 use crate::config::pressed;
-use crate::search::{CommandPalette, InFileSearch, SearchState, ThemePicker};
+use crate::search::{CommandPalette, InFileSearch, PluginPicker, SearchState, ThemePicker};
 
 use super::super::{App, Focus};
 
@@ -84,6 +84,9 @@ impl App {
             self.open_recent_files();
         } else if pressed(&k.theme_picker, &key) {
             self.theme_picker = Some(ThemePicker::default());
+        } else if pressed(&k.plugin_picker, &key) {
+            let entries = self.plugin_manager.plugin_entries();
+            self.plugin_picker = Some(PluginPicker::new(entries));
         } else if pressed(&k.command_palette, &key) {
             self.last_click = None;
             self.command_palette = Some(CommandPalette::new(&self.keys));

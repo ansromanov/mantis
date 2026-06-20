@@ -184,9 +184,13 @@ impl Plugin {
     /// Callers must have already sent `shutdown` via `send()` before calling
     /// this (e.g. `deactivate_all` does so).
     fn close(&mut self) {
+        self.close_with_timeout(Duration::from_secs(2));
+    }
+
+    fn close_with_timeout(&mut self, timeout: Duration) {
         drop(self.write_tx.take());
         if let Some(mut child) = self.child.take() {
-            let deadline = Instant::now() + Duration::from_secs(2);
+            let deadline = Instant::now() + timeout;
             loop {
                 match child.try_wait() {
                     Ok(Some(_)) => break,
@@ -196,6 +200,46 @@ impl Plugin {
                         break;
                     }
                     _ => std::thread::sleep(Duration::from_millis(50)),
+                }
+            }
+        }
+    }
+
+    /// Non-blocking shutdown: drops stdin (signals the plugin to exit), then
+    /// moves the child process into a background thread that waits up to 2 s
+    /// for a clean exit before force-killing it. The reader/writer thread
+    /// handles are dropped here and exit naturally as their channels close.
+    ///
+    /// If the background thread cannot be spawned (resource exhaustion), the
+    /// child is reaped synchronously on the current thread to avoid zombies.
+    fn close_in_background(mut self) {
+        drop(self.write_tx.take());
+        if let Some(child) = self.child.take() {
+            let name = self.name.clone();
+            let child = std::sync::Arc::new(std::sync::Mutex::new(child));
+            let bg = child.clone();
+            if std::thread::Builder::new()
+                .name(format!("plugin-closer-{name}"))
+                .spawn(move || {
+                    let mut c = bg.lock().unwrap_or_else(|e| e.into_inner());
+                    let deadline = Instant::now() + Duration::from_secs(2);
+                    loop {
+                        match c.try_wait() {
+                            Ok(Some(_)) => break,
+                            Ok(None) if Instant::now() >= deadline => {
+                                let _ = c.kill();
+                                let _ = c.wait();
+                                break;
+                            }
+                            _ => std::thread::sleep(Duration::from_millis(50)),
+                        }
+                    }
+                })
+                .is_err()
+            {
+                if let Ok(mut c) = child.lock() {
+                    let _ = c.kill();
+                    let _ = c.wait();
                 }
             }
         }
@@ -335,6 +379,77 @@ impl PluginManager {
     /// Whether any plugins are currently active.
     pub fn is_empty(&self) -> bool {
         self.plugins.is_empty()
+    }
+
+    /// Returns every registered plugin as `(name, is_running)`, in the order held
+    /// by this manager (set at construction time; `App::new` sorts by name).
+    pub fn plugin_entries(&self) -> Vec<(String, bool)> {
+        self.entries
+            .iter()
+            .map(|(name, _)| {
+                let running = self.plugins.iter().any(|p| p.name == *name);
+                (name.clone(), running)
+            })
+            .collect()
+    }
+
+    /// Spawns a single registered plugin by name, sends it `init`, and
+    /// optionally follows up with `on_file_open` + `on_selection_change` for
+    /// `current_file` so the plugin has the current UI state immediately.
+    /// No-op if already running. Returns an error string on spawn failure.
+    pub fn activate_one(&mut self, name: &str, current_file: Option<&Path>) -> Result<(), String> {
+        if self.plugins.iter().any(|p| p.name == name) {
+            return Ok(());
+        }
+        let entry = self
+            .entries
+            .iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, e)| e.clone())
+            .ok_or_else(|| format!("plugin '{name}' not registered"))?;
+        let plugin_dir = default_plugin_dir();
+        let path = if entry.path.is_relative() {
+            plugin_dir.join(&entry.path)
+        } else {
+            entry.path.clone()
+        };
+        let mut plugin = Plugin::new(name.to_string());
+        plugin.spawn(&path)?;
+        plugin.send(&ToPlugin {
+            event: "init".into(),
+            path: None,
+            key: None,
+        });
+        if let Some(file) = current_file {
+            let path_s = file.to_string_lossy().into_owned();
+            plugin.send(&ToPlugin {
+                event: "on_file_open".into(),
+                path: Some(path_s.clone()),
+                key: None,
+            });
+            plugin.send(&ToPlugin {
+                event: "on_selection_change".into(),
+                path: Some(path_s),
+                key: None,
+            });
+        }
+        self.plugins.push(plugin);
+        Ok(())
+    }
+
+    /// Sends `shutdown` to a single running plugin and closes its subprocess.
+    /// No-op if no plugin with that name is running.
+    pub fn deactivate_one(&mut self, name: &str) {
+        let Some(pos) = self.plugins.iter().position(|p| p.name == name) else {
+            return;
+        };
+        let mut plugin = self.plugins.remove(pos);
+        plugin.send(&ToPlugin {
+            event: "shutdown".into(),
+            path: None,
+            key: None,
+        });
+        plugin.close_in_background();
     }
 }
 

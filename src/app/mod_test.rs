@@ -4317,3 +4317,90 @@ fn copy_path_no_file_selected_relative() {
     assert_eq!(app.status_message.as_deref(), Some("no file selected"));
     fs::remove_dir_all(&root).ok();
 }
+
+// -- plugin picker ------------------------------------------------------------
+
+#[test]
+fn plugin_picker_key_opens_overlay() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    assert!(app.plugin_picker.is_none());
+    app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::empty()));
+    assert!(app.plugin_picker.is_some());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn plugin_picker_esc_closes_overlay() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::empty()));
+    assert!(app.plugin_picker.is_some());
+    app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+    assert!(app.plugin_picker.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn plugin_picker_opens_empty_when_no_plugins_configured() {
+    let root = temp_tree();
+    let mut app = app_for(&root); // Config::default() has no plugins
+    app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::empty()));
+    let picker = app.plugin_picker.as_ref().unwrap();
+    assert_eq!(picker.results_len(), 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn plugin_picker_nav_down_and_up() {
+    use crate::plugin::PluginEntry;
+    use std::path::PathBuf;
+
+    let root = temp_tree();
+    // Two plugins with bad paths so activate_all silently skips them.
+    let mut cfg = Config::default();
+    cfg.plugins.insert(
+        "alpha".to_string(),
+        PluginEntry {
+            path: PathBuf::from("/nonexistent/a"),
+            enabled: false,
+        },
+    );
+    cfg.plugins.insert(
+        "beta".to_string(),
+        PluginEntry {
+            path: PathBuf::from("/nonexistent/b"),
+            enabled: false,
+        },
+    );
+    let mut app = App::new(root.clone(), cfg, None, None).unwrap();
+
+    app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::empty()));
+    assert_eq!(app.plugin_picker.as_ref().unwrap().selected, 0);
+
+    app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
+    assert_eq!(app.plugin_picker.as_ref().unwrap().selected, 1);
+
+    app.handle_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()));
+    assert_eq!(app.plugin_picker.as_ref().unwrap().selected, 0);
+
+    // Can't navigate above the first item.
+    app.handle_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()));
+    assert_eq!(app.plugin_picker.as_ref().unwrap().selected, 0);
+
+    // Can't navigate past the last item.
+    app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
+    assert_eq!(app.plugin_picker.as_ref().unwrap().selected, 1);
+
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn plugin_picker_command_palette_entry_exists() {
+    use crate::command_palette::COMMANDS;
+    assert!(
+        COMMANDS.iter().any(|c| c.action_id == "open_plugin_picker"),
+        "command palette must include open_plugin_picker"
+    );
+}

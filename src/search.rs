@@ -6,7 +6,7 @@
 //! `SkimMatcherV2`, debouncing the expensive content scans. `ContentMatch`
 //! carries a hit's path, line number, and surrounding context. The same
 //! query/filtered-list/selected-index shape backs `HistoryState`, `ThemePicker`,
-//! `CommandPalette`, `RecentFilesState`, and the in-file search (`InFileSearch`),
+//! `CommandPalette`, `RecentFilesState`, `PluginPicker`, and the in-file search (`InFileSearch`),
 //! all defined here. Results sort by descending fuzzy score; binary files are
 //! skipped via `is_binary_bytes`.
 
@@ -482,6 +482,27 @@ impl RecentFilesState {
             .collect();
         scored.sort_by_key(|(_, sc)| std::cmp::Reverse(*sc));
         self.filtered = scored.into_iter().map(|(i, _)| i).collect();
+    }
+}
+
+/// Scrollable list of registered plugins with their running state for the plugin manager overlay.
+pub struct PluginPicker {
+    /// `(name, is_running)` for each registered plugin, in the order provided
+    /// by the manager (alphabetical by name as loaded from config).
+    pub entries: Vec<(String, bool)>,
+    pub selected: usize,
+}
+
+impl PluginPicker {
+    pub fn new(entries: Vec<(String, bool)>) -> Self {
+        PluginPicker {
+            entries,
+            selected: 0,
+        }
+    }
+
+    pub fn results_len(&self) -> usize {
+        self.entries.len()
     }
 }
 
