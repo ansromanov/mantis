@@ -112,11 +112,39 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
         }
     };
 
+    // Precompute last index at each depth for indent guide continuation checks.
+    let mut last_at_depth: Vec<usize> = Vec::new();
+    for (i, node) in app.nodes.iter().enumerate() {
+        if node.depth >= last_at_depth.len() {
+            last_at_depth.resize(node.depth + 1, 0);
+        }
+        last_at_depth[node.depth] = i;
+    }
+
+    let guide_style = Style::default().fg(theme.dim).add_modifier(Modifier::DIM);
     let end = (offset + view_height).min(n);
     let items: Vec<ListItem> = app.nodes[offset..end]
         .iter()
-        .map(|node| {
-            let indent = "  ".repeat(node.depth);
+        .enumerate()
+        .map(|(pos, node)| {
+            let global_i = offset + pos;
+            let (color, bold) = git_status_style(node, app, theme);
+            let name_style = Style::default().fg(color).add_modifier(bold);
+
+            let mut spans: Vec<Span> = Vec::new();
+            if app.indent_guides {
+                for lvl in 0..node.depth {
+                    if last_at_depth.get(lvl).copied().unwrap_or(0) > global_i {
+                        spans.push(Span::styled("│  ", guide_style));
+                    } else {
+                        spans.push(Span::styled("   ", guide_style));
+                    }
+                }
+            } else {
+                let indent = "  ".repeat(node.depth);
+                spans.push(Span::styled(indent, name_style));
+            }
+
             let arrow = if node.is_dir {
                 if app.expanded.contains(&node.path) {
                     "▼ "
@@ -126,9 +154,10 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
             } else {
                 "  "
             };
-            let (color, bold) = git_status_style(node, app, theme);
-            ListItem::new(format!("{}{}{}", indent, arrow, node.name))
-                .style(Style::default().fg(color).add_modifier(bold))
+            spans.push(Span::styled(arrow, name_style));
+            spans.push(Span::styled(node.name.clone(), name_style));
+
+            ListItem::new(Line::from(spans))
         })
         .collect();
 
