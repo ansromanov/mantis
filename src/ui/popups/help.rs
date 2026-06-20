@@ -60,6 +60,7 @@ pub(crate) fn draw_help(f: &mut Frame, app: &App, area: Rect) {
         Line::from(vec![key("  q / Ctrl+C "), desc("quit")]),
         Line::from(vec![key("  Alt+.      "), desc("toggle hidden files")]),
         Line::from(vec![key("  t          "), desc("pick a theme")]),
+        Line::from(vec![key("  p          "), desc("plugin manager")]),
         Line::from(vec![
             key("  Ctrl+G     "),
             desc("toggle git mode (changed files only + diffs)"),

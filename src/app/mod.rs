@@ -1,7 +1,7 @@
 //! Central application state: the `App` struct that ties the whole TUI together.
 //!
 //! `App` holds the file tree, content/diff buffers, every overlay's state
-//! (search, history, theme picker, command palette, recent files, help, about, blame), the
+//! (search, history, theme picker, plugin picker, command palette, recent files, help, about, blame), the
 //! resolved theme and keymap, and the geometry captured during the last render
 //! so mouse handlers can hit-test clicks. Construction (`App::new`) walks the
 //! root, loads git status, and opens the first file; `reload`/`tick` keep the
