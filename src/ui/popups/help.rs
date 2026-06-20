@@ -65,6 +65,14 @@ pub(crate) fn draw_help(f: &mut Frame, app: &App, area: Rect) {
             desc("toggle git mode (changed files only + diffs)"),
         ]),
         Line::from(vec![key("  e          "), desc("open file in $EDITOR")]),
+        Line::from(vec![
+            key("  y          "),
+            desc("copy absolute path to clipboard"),
+        ]),
+        Line::from(vec![
+            key("  Y          "),
+            desc("copy path relative to tree root to clipboard"),
+        ]),
         Line::from(vec![key("  Ctrl+O     "), desc("recent files picker")]),
         Line::from(vec![
             key("  Alt+G      "),

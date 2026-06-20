@@ -21,6 +21,9 @@ impl App {
     /// actions (quit, help, search, reload, etc.) and routes to tree/content
     /// handlers based on `self.focus`.
     pub(super) fn handle_normal_key(&mut self, key: KeyEvent) {
+        // Clear transient status messages on the next handled keypress.
+        self.status_message = None;
+
         if self.visual_line.is_some() && self.focus == Focus::Content {
             self.handle_visual_line_key(key);
             return;
@@ -105,6 +108,10 @@ impl App {
             self.auto_watch = !self.auto_watch;
             self.config.watch = self.auto_watch;
             self.save_config();
+        } else if pressed(&k.copy_path, &key) {
+            self.copy_path_to_clipboard(false);
+        } else if pressed(&k.copy_relative_path, &key) {
+            self.copy_path_to_clipboard(true);
         } else {
             match self.focus {
                 Focus::Tree => self.handle_tree_key(key),
@@ -279,6 +286,31 @@ impl App {
         }
         if self.content_scroll != scroll_before || self.content_hscroll != hscroll_before {
             self.mark_content_scrolled();
+        }
+    }
+
+    pub(crate) fn copy_path_to_clipboard(&mut self, relative: bool) {
+        let Some(path) = self.current_file.as_ref() else {
+            self.status_message = Some("no file selected".into());
+            return;
+        };
+        let text = if relative {
+            path.strip_prefix(&self.root)
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|_| path.display().to_string())
+        } else {
+            path.display().to_string()
+        };
+        let mut clipboard = match arboard::Clipboard::new() {
+            Ok(cb) => cb,
+            Err(e) => {
+                self.status_message = Some(format!("clipboard error: {e}"));
+                return;
+            }
+        };
+        match clipboard.set_text(text) {
+            Ok(()) => self.status_message = Some("path copied".into()),
+            Err(e) => self.status_message = Some(format!("clipboard error: {e}")),
         }
     }
 }

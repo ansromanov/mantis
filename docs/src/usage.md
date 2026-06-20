@@ -28,6 +28,8 @@ These work no matter which panel is focused.
 | `f`            | Content (full-text) search |
 | `r`            | Reload tree             |
 | `e`            | Open current file in `$EDITOR` |
+| `y`            | Copy absolute path to clipboard |
+| `Y`            | Copy path relative to tree root to clipboard |
 | `Alt+.`        | Toggle hidden files     |
 | `H`            | Git history of current file |
 | `Ctrl+O`       | Recent files (jump to a recently opened file) |

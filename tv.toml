@@ -41,6 +41,8 @@ git_mode_toggle = ["ctrl+g"]
 git_mode_flat_toggle = ["alt+g"]
 command_palette = ["ctrl+p"]
 open_in_editor = ["e"]
+copy_path = ["y"]
+copy_relative_path = ["Y"]
 toggle_watch = ["W"]
 
 # Navigation (shared by tree and content panels)
