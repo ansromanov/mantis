@@ -116,9 +116,19 @@ pub fn repo_info(dir: &Path) -> Option<GitRepoInfo> {
     }
     let text = String::from_utf8_lossy(&out.stdout);
     let mut info = parse_repo_info(&text);
-    if let Some((ahead, behind)) = ahead_behind(&root) {
-        info.ahead = ahead as usize;
-        info.behind = behind as usize;
+    // The porcelain branch header includes "..." only when a tracking upstream
+    // exists ("## branch...upstream [ahead N]"). Skip the extra rev-list call
+    // entirely for detached HEADs and untracked branches.
+    let has_upstream = text
+        .lines()
+        .next()
+        .and_then(|l| l.strip_prefix("## "))
+        .is_some_and(|l| l.contains("..."));
+    if has_upstream {
+        if let Some((ahead, behind)) = ahead_behind(&root) {
+            info.ahead = ahead;
+            info.behind = behind;
+        }
     }
 
     // Refine HEAD state: check for rebase/merge by inspecting git state files.
@@ -140,7 +150,7 @@ pub fn repo_info(dir: &Path) -> Option<GitRepoInfo> {
 /// indicator entirely. This uses `git rev-list --left-right --count` instead of
 /// re-parsing `git status` so upstream tracking errors stay explicit and the
 /// missing-upstream case can degrade cleanly.
-pub fn ahead_behind(repo_dir: &Path) -> Option<(u32, u32)> {
+pub fn ahead_behind(repo_dir: &Path) -> Option<(usize, usize)> {
     let out = Command::new("git")
         .arg("-C")
         .arg(repo_dir)

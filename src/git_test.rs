@@ -2,7 +2,7 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use super::{ahead_behind, parse_blame_porcelain};
+use super::*;
 
 fn git(dir: &Path, args: &[&str]) {
     let status = Command::new("git")
@@ -115,7 +115,7 @@ fn ahead_behind_missing_upstream_is_none() {
 #[test]
 fn ahead_behind_counts_against_upstream() {
     let origin = tempfile::tempdir().unwrap();
-    git(origin.path(), &["init", "-q", "--bare"]);
+    git(origin.path(), &["init", "-q", "--bare", "--initial-branch=master"]);
 
     let local = tempfile::tempdir().unwrap();
     clone_repo(origin.path(), local.path());
