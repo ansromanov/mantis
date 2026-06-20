@@ -1,5 +1,3 @@
-use std::sync::Mutex;
-
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::*;
@@ -129,9 +127,6 @@ fn default_plugin_dir_ends_with_suffix() {
         &std::path::Component::Normal("tree-viewer".as_ref())
     );
 }
-
-// Serialise env-var mutations so concurrent tests don't race on XDG_CONFIG_HOME.
-static ENV_LOCK: Mutex<()> = Mutex::new(());
 
 #[test]
 #[cfg(not(windows))]

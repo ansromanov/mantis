@@ -424,6 +424,13 @@ pub fn install_bundled_plugins() {
     }
 }
 
+/// Process-wide mutex for tests that mutate `XDG_CONFIG_HOME` / `APPDATA`.
+/// Shared via `crate::plugin::ENV_LOCK` so that `theme_test.rs` and
+/// `plugin_test.rs` serialise against each other (separate per-module statics
+/// would not prevent concurrent mutations of the same env var).
+#[cfg(test)]
+pub(crate) static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 #[cfg(test)]
 #[path = "plugin_test.rs"]
 mod plugin_test;
