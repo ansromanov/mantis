@@ -176,3 +176,96 @@ fn install_bundled_plugins_creates_scripts() {
     );
     std::fs::remove_dir_all(&tmp).ok();
 }
+
+// -- PluginManager lifecycle --------------------------------------------------
+
+#[test]
+fn plugin_entries_empty_when_no_plugins_registered() {
+    let mgr = PluginManager::new(vec![]);
+    assert!(mgr.plugin_entries().is_empty());
+}
+
+#[test]
+fn plugin_entries_shows_registered_plugins_as_not_running() {
+    let entry = PluginEntry {
+        path: std::path::PathBuf::from("/nonexistent/plugin"),
+        enabled: false,
+    };
+    let mgr = PluginManager::new(vec![("test-plugin".to_string(), entry)]);
+    let entries = mgr.plugin_entries();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].0, "test-plugin");
+    assert!(!entries[0].1, "unstarted plugin must not show as running");
+}
+
+#[test]
+fn activate_one_errors_on_unknown_name() {
+    let mut mgr = PluginManager::new(vec![]);
+    assert!(mgr.activate_one("ghost").is_err());
+}
+
+#[test]
+fn activate_one_errors_on_bad_path() {
+    let entry = PluginEntry {
+        path: std::path::PathBuf::from("/nonexistent/plugin"),
+        enabled: false,
+    };
+    let mut mgr = PluginManager::new(vec![("bad".to_string(), entry)]);
+    assert!(mgr.activate_one("bad").is_err());
+}
+
+#[test]
+fn deactivate_one_is_noop_when_plugin_not_running() {
+    let entry = PluginEntry {
+        path: std::path::PathBuf::from("/nonexistent/plugin"),
+        enabled: false,
+    };
+    let mut mgr = PluginManager::new(vec![("p".to_string(), entry)]);
+    mgr.deactivate_one("p"); // must not panic
+    assert!(!mgr.plugin_entries()[0].1);
+}
+
+#[test]
+#[cfg(unix)]
+fn activate_one_then_deactivate_one_updates_running_state() {
+    // /bin/cat acts as a stub plugin: blocks on stdin reads, never writes.
+    let entry = PluginEntry {
+        path: std::path::PathBuf::from("/bin/cat"),
+        enabled: false,
+    };
+    let mut mgr = PluginManager::new(vec![("cat-stub".to_string(), entry)]);
+
+    assert!(
+        !mgr.plugin_entries()[0].1,
+        "should not be running before activate"
+    );
+    mgr.activate_one("cat-stub").expect("spawn /bin/cat");
+    assert!(
+        mgr.plugin_entries()[0].1,
+        "should be running after activate"
+    );
+    mgr.deactivate_one("cat-stub");
+    assert!(
+        !mgr.plugin_entries()[0].1,
+        "should not be running after deactivate"
+    );
+}
+
+#[test]
+#[cfg(unix)]
+fn activate_one_is_noop_when_already_running() {
+    let entry = PluginEntry {
+        path: std::path::PathBuf::from("/bin/cat"),
+        enabled: false,
+    };
+    let mut mgr = PluginManager::new(vec![("cat-stub".to_string(), entry)]);
+    mgr.activate_one("cat-stub").expect("first spawn");
+    mgr.activate_one("cat-stub")
+        .expect("second call must be noop");
+    assert_eq!(
+        mgr.plugin_entries().iter().filter(|(_, r)| *r).count(),
+        1,
+        "must still be only one running instance"
+    );
+    mgr.deactivate_all();
+}
