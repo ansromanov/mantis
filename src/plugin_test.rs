@@ -1,6 +1,8 @@
+use std::sync::Mutex;
+
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use super::{default_plugin_dir, key_event_to_string};
+use super::*;
 
 fn key(code: KeyCode, mods: KeyModifiers) -> KeyEvent {
     KeyEvent::new(code, mods)
@@ -128,12 +130,22 @@ fn default_plugin_dir_ends_with_suffix() {
     );
 }
 
+// Serialise env-var mutations so concurrent tests don't race on XDG_CONFIG_HOME.
+static ENV_LOCK: Mutex<()> = Mutex::new(());
+
 #[test]
 #[cfg(not(windows))]
 fn default_plugin_dir_respects_xdg() {
-    // Temporarily override XDG_CONFIG_HOME
-    std::env::set_var("XDG_CONFIG_HOME", "/tmp/custom_cfg");
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let old = std::env::var_os("XDG_CONFIG_HOME");
+    // SAFETY: ENV_LOCK serialises all callers; no other thread mutates this var.
+    unsafe { std::env::set_var("XDG_CONFIG_HOME", "/tmp/custom_cfg") };
     let dir = default_plugin_dir();
-    std::env::remove_var("XDG_CONFIG_HOME");
+    unsafe {
+        match old {
+            Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
+            None => std::env::remove_var("XDG_CONFIG_HOME"),
+        }
+    }
     assert!(dir.starts_with("/tmp/custom_cfg/tree-viewer/plugins"));
 }

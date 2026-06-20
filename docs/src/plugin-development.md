@@ -11,9 +11,10 @@ A plugin is any executable that:
 2. Writes newline-delimited JSON objects to **stdout** (actions back to `tv`).
 3. Exits cleanly when it receives `shutdown` (or when stdin closes).
 
-`tv` spawns each plugin as a subprocess with `stdin`, `stdout`, and `stderr`
-piped. A background reader thread drains each plugin's stdout and a background
-writer thread handles stdin so the `tv` event loop never blocks on plugin I/O.
+`tv` spawns each plugin as a subprocess with `stdin` and `stdout` piped and
+`stderr` discarded (redirected to `/dev/null`). A background reader thread
+drains each plugin's stdout and a background writer thread handles stdin so the
+`tv` event loop never blocks on plugin I/O.
 
 ## Events: tv → plugin (stdin)
 
@@ -96,7 +97,7 @@ Opens a file in the content panel.
 ## Rules
 
 - **One JSON object per line.** No pretty-printing, no multi-line objects.
-- **Stdout is for actions only.** Debug output goes to stderr.
+- **Stdout is for actions only.** Plugin stderr is discarded; write debug output to a log file instead.
 - **Exit on shutdown.** When stdin closes or you receive `shutdown`, exit.
   Do not loop forever waiting for more input.
 - **Idempotent reads.** `tv` may send multiple `on_file_open` events for the

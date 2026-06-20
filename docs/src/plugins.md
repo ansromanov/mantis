@@ -61,8 +61,7 @@ The `show_message` action accepts a `message` parameter; `open_file` accepts a
 4. When you quit, each plugin receives `on_quit` then `shutdown`, and `tv`
    waits for each subprocess to exit.
 
-Plugin stderr goes to the terminal's stderr (visible if you launched `tv` from a
-shell that shows it). Use it for debugging.
+Plugin stderr is discarded (`/dev/null`). Write debug output to a log file instead.
 
 ## Example: status-bar clock
 
