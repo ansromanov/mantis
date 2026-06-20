@@ -487,7 +487,8 @@ impl RecentFilesState {
 
 /// Scrollable list of registered plugins with their running state for the plugin manager overlay.
 pub struct PluginPicker {
-    /// `(name, is_running)` for each registered plugin, in registration order.
+    /// `(name, is_running)` for each registered plugin, in the order provided
+    /// by the manager (alphabetical by name as loaded from config).
     pub entries: Vec<(String, bool)>,
     pub selected: usize,
 }
