@@ -35,12 +35,12 @@ impl App {
             self.handle_command_palette_mouse(ev);
             return;
         }
-        if self.recent_files.is_some() {
-            self.handle_recent_mouse(ev);
-            return;
-        }
         if self.history.is_some() {
             self.handle_history_mouse(ev);
+            return;
+        }
+        if self.recent_files.is_some() {
+            self.handle_recent_mouse(ev);
             return;
         }
         if self.search.is_some() {
