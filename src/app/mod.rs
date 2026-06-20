@@ -198,6 +198,9 @@ pub struct App {
     pub plugin_manager: PluginManager,
     /// Most recent plugin message, shown in the status bar.
     pub plugin_message: Option<String>,
+    /// Breadcrumb segment areas recorded during the last render, used for mouse
+    /// hit-testing. Each entry is (target_directory_path, clickable_rect).
+    pub breadcrumb_areas: Vec<(std::path::PathBuf, Rect)>,
 }
 
 impl App {
@@ -344,6 +347,7 @@ impl App {
             loading: false,
             plugin_manager,
             plugin_message: plugin_spawn_error,
+            breadcrumb_areas: Vec::new(),
         };
         if app.git_mode {
             app.expand_git_dirs();
