@@ -18,6 +18,7 @@ ignore_gitignore = false  # show files excluded by .gitignore
 tree_width = 28           # tree panel width, as a percent of the terminal
 word_wrap = false         # wrap long lines in the content panel
 line_numbers = true       # show the line-number gutter in the content panel
+show_file_info = true     # show encoding and line-ending info in the status bar
 ```
 
 ## Keybindings

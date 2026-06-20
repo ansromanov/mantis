@@ -41,9 +41,9 @@ pub fn detect_encoding_prefix(bytes: &[u8]) -> Option<&'static str> {
     None
 }
 
-/// Detects the predominant line-ending style: `"LF"`, `"CRLF"`, `"CR"`, or
-/// `"mixed"`. Returns `None` when no line endings are found (single-line or
-/// empty file).
+/// Detects the predominant line-ending style in the scanned prefix: `"LF"`,
+/// `"CRLF"`, `"CR"`, or `"mixed"`. Returns `None` when no line endings are
+/// found (single-line or empty file).
 pub fn detect_line_ending(bytes: &[u8]) -> Option<&'static str> {
     let scan = &bytes[..bytes.len().min(SCAN_LEN)];
     let mut has_lf = false;
@@ -76,3 +76,7 @@ pub fn detect_line_ending(bytes: &[u8]) -> Option<&'static str> {
         _ => Some("mixed"),
     }
 }
+
+#[cfg(test)]
+#[path = "file_test.rs"]
+mod tests;

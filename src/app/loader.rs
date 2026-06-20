@@ -146,6 +146,14 @@ pub(super) fn compute_file_load(path: &Path, theme: &Theme, hl: &Highlighter) ->
     // String::from_utf8 succeeded, so the bytes are valid UTF-8; use the
     // prefix result or fall back to "UTF-8".
     load.encoding = Some(enc_prefix.unwrap_or("UTF-8").to_string());
+    // str::lines() does not treat bare \r as a line terminator, so CR-only
+    // files would render as a single line with embedded \r control characters.
+    // Normalize CR and CRLF to LF before splitting.
+    let s = if s.contains('\r') {
+        s.replace("\r\n", "\n").replace('\r', "\n")
+    } else {
+        s
+    };
     load.content = s.lines().map(|l| l.to_owned()).collect();
     if load.content.is_empty() {
         load.content = vec!["[empty file]".into()];

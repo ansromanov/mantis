@@ -73,6 +73,49 @@ fn empty_file_message() {
 }
 
 #[test]
+fn ascii_vf_path_sets_encoding_and_line_ending() {
+    // .rs extension → VirtualFile path
+    let mut f = tempfile::NamedTempFile::with_suffix(".rs").unwrap();
+    use std::io::Write;
+    f.write_all(b"fn main() {}\nlet x = 1;\n").unwrap();
+    let load = compute_file_load(f.path(), &Theme::default(), &hl());
+    assert_eq!(load.encoding.as_deref(), Some("ASCII"));
+    assert_eq!(load.line_ending.as_deref(), Some("LF"));
+}
+
+#[test]
+fn utf8_bom_fallback_path_sets_encoding() {
+    // .md extension → fallback path (markdown rendering)
+    let mut f = tempfile::NamedTempFile::with_suffix(".md").unwrap();
+    use std::io::Write;
+    f.write_all(b"\xEF\xBB\xBFhello\nworld\n").unwrap();
+    let load = compute_file_load(f.path(), &Theme::default(), &hl());
+    assert_eq!(load.encoding.as_deref(), Some("UTF-8 BOM"));
+}
+
+#[test]
+fn crlf_content_is_split_and_stripped() {
+    // .md extension → fallback path; CRLF must be normalized before splitting
+    let mut f = tempfile::NamedTempFile::with_suffix(".md").unwrap();
+    use std::io::Write;
+    f.write_all(b"line one\r\nline two\r\n").unwrap();
+    let load = compute_file_load(f.path(), &Theme::default(), &hl());
+    assert_eq!(load.line_ending.as_deref(), Some("CRLF"));
+    assert_eq!(load.content, vec!["line one", "line two"]);
+}
+
+#[test]
+fn binary_file_sets_binary_encoding() {
+    // NUL byte → VirtualFile rejects, fallback detects binary
+    let mut f = tempfile::NamedTempFile::with_suffix(".txt").unwrap();
+    use std::io::Write;
+    f.write_all(b"data\x00binary").unwrap();
+    let load = compute_file_load(f.path(), &Theme::default(), &hl());
+    assert_eq!(load.encoding.as_deref(), Some("BINARY"));
+    assert_eq!(load.content, vec!["[binary file]"]);
+}
+
+#[test]
 fn worker_round_trip_returns_matching_seq() {
     let mut f = tempfile::NamedTempFile::with_suffix(".rs").unwrap();
     use std::io::Write;
