@@ -371,6 +371,9 @@ fn render_breadcrumb_truncation_shows_ellipsis() {
         breadcrumb_row
     );
     // First ("r") and last ("e") segments must always be present.
-    assert!(breadcrumb_row.contains('r'), "first segment must be visible");
+    assert!(
+        breadcrumb_row.contains('r'),
+        "first segment must be visible"
+    );
     assert!(breadcrumb_row.contains('e'), "last segment must be visible");
 }

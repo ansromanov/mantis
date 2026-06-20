@@ -223,7 +223,10 @@ fn render_breadcrumb(f: &mut Frame, app: &mut App, area: Rect, segments: &[(Stri
 
     let sep = " / ";
     let sep_len = sep.len();
-    let names_len: usize = segments.iter().map(|(n, _)| UnicodeWidthStr::width(n.as_str())).sum();
+    let names_len: usize = segments
+        .iter()
+        .map(|(n, _)| UnicodeWidthStr::width(n.as_str()))
+        .sum();
     let total_len = names_len + segments.len().saturating_sub(1) * sep_len;
 
     // Pick which segment indices to show (indices into `segments`).
