@@ -22,7 +22,7 @@ use ratatui::layout::Rect;
 use crate::config::{self, Config, Keymap};
 use crate::git::GitStatus;
 use crate::highlight::Highlighter;
-use crate::plugin::PluginManager;
+use crate::plugin::{self, ExtraSyntax, PluginManager};
 use crate::search::{
     CommandPalette, HistoryState, InFileSearch, PluginPicker, RecentFilesState, SearchState,
     ThemePicker,
@@ -175,6 +175,9 @@ pub struct App {
     // scrollbar is hidden on first render.
     pub content_scrolled_at: Instant,
     highlighter: Highlighter,
+    /// Syntax definitions loaded from plugins. Kept so `apply_theme` can
+    /// rebuild the highlighter without losing plugin syntax definitions.
+    extra_syntaxes: Vec<ExtraSyntax>,
     last_refresh: Instant,
     file_watcher: Option<RecommendedWatcher>,
     file_watch_rx: Option<Receiver<notify::Result<notify::Event>>>,
@@ -278,11 +281,22 @@ impl App {
         );
         let theme = cfg.theme.resolve();
         let saved_config = cfg.clone();
-        let highlighter = Highlighter::new(&theme.syntax);
-        let loader = Loader::new(&theme);
+
+        // Collect extra syntax definitions from plugins before constructing
+        // the highlighter and loader (they need them at creation time).
         let mut plugin_entries: Vec<_> = cfg.plugins.clone().into_iter().collect();
         plugin_entries.sort_by(|a, b| a.0.cmp(&b.0));
-        let mut plugin_manager = PluginManager::new(plugin_entries);
+        let extra_syntaxes = plugin::load_extra_syntaxes(&plugin_entries);
+
+        let highlighter = Highlighter::with_extra_syntaxes(&theme.syntax, &extra_syntaxes);
+        let loader = Loader::new(&theme, extra_syntaxes.clone());
+
+        // Syntax plugins go to the highlighter, not the subprocess manager.
+        let process_entries: Vec<_> = plugin_entries
+            .into_iter()
+            .filter(|(_, e)| e.kind != plugin::PluginKind::Syntax)
+            .collect();
+        let mut plugin_manager = PluginManager::new(process_entries);
         plugin_manager.activate_all();
         let plugin_spawn_error = plugin_manager
             .take_spawn_errors()
@@ -370,6 +384,7 @@ impl App {
             last_click: None,
             content_scrolled_at: Instant::now() - std::time::Duration::from_secs(10),
             highlighter,
+            extra_syntaxes,
             last_refresh: Instant::now(),
             file_watcher: None,
             file_watch_rx: None,

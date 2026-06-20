@@ -143,7 +143,7 @@ fn expand_all(root: &Path) -> HashSet<PathBuf> {
 }
 
 fn highlighter() -> Highlighter {
-    Highlighter::new("base16-ocean.dark")
+    Highlighter::with_extra_syntaxes("base16-ocean.dark", &[])
 }
 
 fn theme() -> Theme {

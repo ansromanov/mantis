@@ -2,7 +2,7 @@ use super::*;
 use crate::theme::Theme;
 
 fn hl() -> Highlighter {
-    Highlighter::new("base16-ocean.dark")
+    Highlighter::with_extra_syntaxes("base16-ocean.dark", &[])
 }
 
 #[test]
@@ -120,7 +120,7 @@ fn worker_round_trip_returns_matching_seq() {
     let mut f = tempfile::NamedTempFile::with_suffix(".rs").unwrap();
     use std::io::Write;
     f.write_all(b"let x = 1;\n").unwrap();
-    let loader = Loader::new(&Theme::default());
+    let loader = Loader::new(&Theme::default(), Vec::new());
     loader.request(LoadRequest::File {
         seq: 7,
         path: f.path().to_path_buf(),

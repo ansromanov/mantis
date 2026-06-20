@@ -183,7 +183,8 @@ impl App {
     /// preserving scroll position.
     fn apply_theme(&mut self, theme: Theme) {
         self.theme = theme;
-        self.highlighter = Highlighter::new(&self.theme.syntax);
+        self.highlighter =
+            Highlighter::with_extra_syntaxes(&self.theme.syntax, &self.extra_syntaxes);
         self.loader_set_theme();
         if self.is_diff {
             self.highlighted = self

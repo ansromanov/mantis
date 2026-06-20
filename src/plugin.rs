@@ -1,23 +1,38 @@
-//! Subprocess-based plugin system for `tv`.
+//! Plugin system for `tv`.
 //!
-//! Plugins are standalone executables that communicate via newline-delimited
-//! JSON on stdin/stdout. `tv` sends lifecycle and hook events; plugins respond
-//! with action events. A reader thread per plugin drains stdout non-blockingly
-//! over a channel so the event loop never blocks on plugin I/O. A writer thread
-//! per plugin drains a send queue to stdin, so slow or unresponsive plugins
-//! cannot block the event loop on writes either.
+//! Two kinds of plugins exist:
 //!
-//! Protocol (tv → plugin, one JSON object per line on stdin):
-//!   {"event":"init"}
-//!   {"event":"on_file_open","path":"/some/file"}
-//!   {"event":"on_keypress","key":"ctrl+p"}
-//!   {"event":"on_selection_change","path":"/some/file"}
-//!   {"event":"on_quit"}
-//!   {"event":"shutdown"}
+//! 1. **Process plugins** — standalone executables that communicate via
+//!    newline-delimited JSON on stdin/stdout. `tv` sends lifecycle and hook
+//!    events; plugins respond with action events. A reader thread per plugin
+//!    drains stdout non-blockingly over a channel so the event loop never
+//!    blocks on plugin I/O. A writer thread per plugin drains a send queue to
+//!    stdin, so slow or unresponsive plugins cannot block the event loop on
+//!    writes either.
 //!
-//! Protocol (plugin → tv, one JSON object per line on stdout):
-//!   {"event":"action","action":"show_message","params":{"message":"hello"}}
-//!   {"event":"action","action":"open_file","params":{"path":"/tmp/x"}}
+//!    Protocol (tv → plugin, one JSON object per line on stdin):
+//!
+//!    ```json
+//!    {"event":"init"}
+//!    {"event":"on_file_open","path":"/some/file"}
+//!    {"event":"on_keypress","key":"ctrl+p"}
+//!    {"event":"on_selection_change","path":"/some/file"}
+//!    {"event":"on_quit"}
+//!    {"event":"shutdown"}
+//!    ```
+//!
+//!    Protocol (plugin → tv, one JSON object per line on stdout):
+//!
+//!    ```json
+//!    {"event":"action","action":"show_message","params":{"message":"hello"}}
+//!    {"event":"action","action":"open_file","params":{"path":"/tmp/x"}}
+//!    ```
+//!
+//! 2. **Syntax plugins** — provide a `.sublime-syntax` file that is loaded
+//!    into the syntect highlighter at startup. No subprocess is spawned.
+//!    Syntax plugins are declared in `tv.toml` with `kind = "syntax"` and
+//!    a `syntax_file` path.  Additionally, any `.sublime-syntax` file placed
+//!    in `{plugin_dir}/syntaxes/` is auto-discovered.
 
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
@@ -27,15 +42,51 @@ use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
+/// What kind of plugin this is.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum PluginKind {
+    /// Standard subprocess plugin (the default).
+    #[default]
+    Process,
+    /// A syntax-definition plugin: provides a `.sublime-syntax` file to extend
+    /// the highlighter. No subprocess is spawned.
+    Syntax,
+}
+
+/// A syntax definition loaded from a plugin, ready to be fed to syntect.
+#[derive(Clone, Debug)]
+pub struct ExtraSyntax {
+    /// Path to the `.sublime-syntax` file on disk.
+    pub syntax_path: PathBuf,
+    /// File extensions this syntax should match (e.g. `["tf", "tfvars"]`).
+    /// May be empty when the syntax definition declares them internally.
+    /// Currently unused by the highlighter (extensions come from the syntax
+    /// definition itself); reserved for future explicit mapping.
+    #[allow(dead_code)]
+    pub extensions: Vec<String>,
+}
+
 /// Per-plugin entry in the `[plugins]` section of `tv.toml`.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(default)]
 pub struct PluginEntry {
-    /// Path to the plugin executable. Relative paths are resolved relative to
-    /// the platform config directory (see `default_plugin_dir`).
+    /// Path to the plugin executable (process plugins) or syntax file
+    /// (syntax plugins). Relative paths are resolved relative to the platform
+    /// config directory (see `default_plugin_dir`).
     pub path: PathBuf,
     /// When `false` the plugin is registered but not spawned at startup.
     pub enabled: bool,
+    /// Plugin kind. Defaults to `"process"` for backward compatibility.
+    pub kind: PluginKind,
+    /// File extensions this syntax plugin handles (e.g. `["tf", "tfvars"]`).
+    /// Only meaningful when `kind = "syntax"`.
+    #[serde(default)]
+    pub extensions: Vec<String>,
+    /// Path to the `.sublime-syntax` file. Only meaningful when
+    /// `kind = "syntax"`. Relative paths are resolved against the plugin dir.
+    #[serde(default)]
+    pub syntax_file: Option<PathBuf>,
 }
 
 impl Default for PluginEntry {
@@ -43,6 +94,9 @@ impl Default for PluginEntry {
         PluginEntry {
             path: PathBuf::new(),
             enabled: true,
+            kind: PluginKind::Process,
+            extensions: Vec::new(),
+            syntax_file: None,
         }
     }
 }
@@ -263,11 +317,12 @@ impl PluginManager {
         }
     }
 
-    /// Spawns all enabled plugins and sends them the `init` event.
+    /// Spawns all enabled *process* plugins and sends them the `init` event.
+    /// Syntax plugins are not spawned — they are consumed by the highlighter.
     pub fn activate_all(&mut self) {
         let plugin_dir = default_plugin_dir();
         for (name, entry) in &self.entries {
-            if !entry.enabled {
+            if !entry.enabled || entry.kind != PluginKind::Process {
                 continue;
             }
             let path = if entry.path.is_relative() {
@@ -452,6 +507,64 @@ impl PluginManager {
     }
 }
 
+/// Collects `ExtraSyntax` entries from `[plugins]` entries whose
+/// `kind = "syntax"`. The `syntax_file` path is resolved against the default
+/// plugin directory when relative.
+pub fn collect_syntax_plugins(entries: &[(String, PluginEntry)]) -> Vec<ExtraSyntax> {
+    let plugin_dir = default_plugin_dir();
+    entries
+        .iter()
+        .filter(|(_, e)| e.kind == PluginKind::Syntax && e.enabled)
+        .filter_map(|(_, entry)| {
+            let syntax_path = entry.syntax_file.as_ref()?;
+            let path = if syntax_path.is_relative() {
+                plugin_dir.join(syntax_path)
+            } else {
+                syntax_path.clone()
+            };
+            Some(ExtraSyntax {
+                syntax_path: path,
+                extensions: entry.extensions.clone(),
+            })
+        })
+        .collect()
+}
+
+/// Auto-discovers `.sublime-syntax` files in `{plugin_dir}/syntaxes/`.
+/// These are loaded regardless of whether an explicit `[plugins]` entry exists.
+pub fn discover_syntax_plugins() -> Vec<ExtraSyntax> {
+    let syntax_dir = default_plugin_dir().join("syntaxes");
+    if !syntax_dir.is_dir() {
+        return Vec::new();
+    }
+    let mut extra = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(&syntax_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().is_some_and(|e| e == "sublime-syntax") {
+                extra.push(ExtraSyntax {
+                    syntax_path: path,
+                    extensions: Vec::new(),
+                });
+            }
+        }
+    }
+    extra
+}
+
+/// Combines config-based and auto-discovered syntax plugins into a single
+/// list of extra syntax definitions for the highlighter. Deduplicates by
+/// path (so an explicit `[plugins]` entry for a file that is also
+/// auto-discovered does not load it twice) and sorts for determinism.
+pub fn load_extra_syntaxes(entries: &[(String, PluginEntry)]) -> Vec<ExtraSyntax> {
+    let mut extra = collect_syntax_plugins(entries);
+    extra.extend(discover_syntax_plugins());
+    let mut seen = std::collections::HashSet::new();
+    extra.retain(|e| seen.insert(e.syntax_path.clone()));
+    extra.sort_by(|a, b| a.syntax_path.cmp(&b.syntax_path));
+    extra
+}
+
 /// Converts a crossterm `KeyEvent` into a human-readable string like `"q"`,
 /// `"ctrl+c"`, `"Enter"`, `"alt+."`.
 pub(crate) fn key_event_to_string(key: &crossterm::event::KeyEvent) -> String {
@@ -513,15 +626,24 @@ fn dirs_next() -> Option<PathBuf> {
     }
 }
 
-/// List of (filename, script_content) for each plugin that ships with tv.
+/// List of (filename, script_content) for each process plugin that ships with tv.
 /// Installed to the plugin directory by `install_bundled_plugins()`.
 const BUNDLED_PLUGINS: &[(&str, &str)] = &[
     ("git-diff.sh", include_str!("../plugins/git-diff.sh")),
     ("git-log.sh", include_str!("../plugins/git-log.sh")),
 ];
 
+/// List of (filename, content) for each bundled syntax definition.
+/// Installed to `{plugin_dir}/syntaxes/` by `install_bundled_plugins()`.
+const BUNDLED_SYNTAX_PLUGINS: &[(&str, &str)] = &[(
+    "terraform.sublime-syntax",
+    include_str!("../plugins/terraform.sublime-syntax"),
+)];
+
 /// Copies every bundled plugin to the plugin directory if it doesn't already
 /// exist there, so users can inspect, edit, or register them in `tv.toml`.
+/// Process plugins go directly into `{plugin_dir}/`; syntax definitions go
+/// into `{plugin_dir}/syntaxes/` (auto-discovered at startup).
 pub fn install_bundled_plugins() {
     let dir = default_plugin_dir();
     let _ = std::fs::create_dir_all(&dir);
@@ -534,6 +656,15 @@ pub fn install_bundled_plugins() {
                 use std::os::unix::fs::PermissionsExt;
                 let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755));
             }
+        }
+    }
+    // Install syntax files to syntaxes/ subdirectory for auto-discovery.
+    let syntax_dir = dir.join("syntaxes");
+    let _ = std::fs::create_dir_all(&syntax_dir);
+    for (name, content) in BUNDLED_SYNTAX_PLUGINS {
+        let path = syntax_dir.join(name);
+        if !path.exists() {
+            let _ = std::fs::write(&path, content);
         }
     }
 }

@@ -174,6 +174,17 @@ fn install_bundled_plugins_creates_scripts() {
         plugins_dir.join("git-log.sh").exists(),
         "git-log.sh must be installed"
     );
+    assert!(
+        plugins_dir.join("syntaxes").is_dir(),
+        "syntaxes subdirectory should be created"
+    );
+    assert!(
+        plugins_dir
+            .join("syntaxes")
+            .join("terraform.sublime-syntax")
+            .exists(),
+        "terraform.sublime-syntax must be installed"
+    );
     std::fs::remove_dir_all(&tmp).ok();
 }
 
@@ -190,6 +201,7 @@ fn plugin_entries_shows_registered_plugins_as_not_running() {
     let entry = PluginEntry {
         path: std::path::PathBuf::from("/nonexistent/plugin"),
         enabled: false,
+        ..Default::default()
     };
     let mgr = PluginManager::new(vec![("test-plugin".to_string(), entry)]);
     let entries = mgr.plugin_entries();
@@ -209,6 +221,7 @@ fn activate_one_errors_on_bad_path() {
     let entry = PluginEntry {
         path: std::path::PathBuf::from("/nonexistent/plugin"),
         enabled: false,
+        ..Default::default()
     };
     let mut mgr = PluginManager::new(vec![("bad".to_string(), entry)]);
     assert!(mgr.activate_one("bad", None).is_err());
@@ -219,6 +232,7 @@ fn deactivate_one_is_noop_when_plugin_not_running() {
     let entry = PluginEntry {
         path: std::path::PathBuf::from("/nonexistent/plugin"),
         enabled: false,
+        ..Default::default()
     };
     let mut mgr = PluginManager::new(vec![("p".to_string(), entry)]);
     mgr.deactivate_one("p"); // must not panic
@@ -232,6 +246,7 @@ fn activate_one_then_deactivate_one_updates_running_state() {
     let entry = PluginEntry {
         path: std::path::PathBuf::from("/bin/cat"),
         enabled: false,
+        ..Default::default()
     };
     let mut mgr = PluginManager::new(vec![("cat-stub".to_string(), entry)]);
 
@@ -257,6 +272,7 @@ fn activate_one_is_noop_when_already_running() {
     let entry = PluginEntry {
         path: std::path::PathBuf::from("/bin/cat"),
         enabled: false,
+        ..Default::default()
     };
     let mut mgr = PluginManager::new(vec![("cat-stub".to_string(), entry)]);
     mgr.activate_one("cat-stub", None).expect("first spawn");
