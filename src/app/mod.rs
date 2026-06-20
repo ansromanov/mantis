@@ -136,6 +136,7 @@ pub struct App {
     /// Whether to automatically reload file content on disk change.
     pub auto_watch: bool,
     pub show_file_info: bool,
+    pub indent_guides: bool,
     keys: Keymap,
     config: Config,
     config_path: Option<std::path::PathBuf>,
@@ -329,6 +330,7 @@ impl App {
             config_error,
             auto_watch: cfg.watch,
             show_file_info: cfg.show_file_info,
+            indent_guides: cfg.indent_guides,
             keys: cfg.keys,
             config: saved_config,
             config_path,
