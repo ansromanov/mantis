@@ -21,7 +21,7 @@ impl App {
     /// actions (quit, help, search, reload, etc.) and routes to tree/content
     /// handlers based on `self.focus`.
     pub(super) fn handle_normal_key(&mut self, key: KeyEvent) {
-        // Clear transient status messages so they only survive one frame.
+        // Clear transient status messages on the next handled keypress.
         self.status_message = None;
 
         if self.visual_line.is_some() && self.focus == Focus::Content {
@@ -290,7 +290,7 @@ impl App {
     }
 
     pub(crate) fn copy_path_to_clipboard(&mut self, relative: bool) {
-        let Some(path) = self.current_file.clone() else {
+        let Some(path) = self.current_file.as_ref() else {
             self.status_message = Some("no file selected".into());
             return;
         };
@@ -308,7 +308,7 @@ impl App {
                 return;
             }
         };
-        match clipboard.set_text(text.clone()) {
+        match clipboard.set_text(text) {
             Ok(()) => self.status_message = Some("path copied".into()),
             Err(e) => self.status_message = Some(format!("clipboard error: {e}")),
         }
