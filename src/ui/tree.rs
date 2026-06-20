@@ -4,35 +4,45 @@
 //! visible `TreeNode` with depth-based indentation, expand/collapse arrows for
 //! directories, and git-status coloring (new, modified, deleted, ignored) when
 //! status is enabled, marking deleted ghost nodes distinctly. The selected row
-//! is highlighted, and focus state controls the border style. It records
-//! `tree_area` and `tree_offset` back onto `App` so mouse handlers can map a
-//! click row to a node index. Rendering only - selection and expansion are
-//! driven by the navigation handlers.
+//! is highlighted, and focus state controls the border style. At the top of the
+//! panel a breadcrumb path bar shows the current directory's ancestors (relative
+//! to root) with clickable segments. It records `tree_area`, `tree_offset`, and
+//! `breadcrumb_areas` back onto `App` so mouse handlers can map a click row to a
+//! node index or a breadcrumb segment to a directory. Rendering only - selection
+//! and expansion are driven by the navigation handlers.
+
+use std::path::PathBuf;
 
 use ratatui::{
-    layout::Rect,
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
-    widgets::{Block, Borders, List, ListItem, ListState},
+    text::{Line, Span},
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     Frame,
 };
+use unicode_width::UnicodeWidthStr;
 
 use crate::app::{App, Focus};
 use crate::git::GitStatus;
 
-/// Renders the file tree panel. Iterates `app.nodes`, drawing indentation,
-/// expand/collapse arrows, and git-status coloring. Records `tree_area` and
-/// `tree_offset` for mouse hit-testing.
+/// Renders the file tree panel with a breadcrumb path bar at the top. Iterates
+/// `app.nodes`, drawing indentation, expand/collapse arrows, and git-status
+/// coloring. Records `tree_area`, `tree_offset`, and `breadcrumb_areas` for
+/// mouse hit-testing.
 pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
-    let theme = &app.theme;
     let focused = matches!(app.focus, Focus::Tree)
         && app.search.is_none()
         && app.history.is_none()
         && app.theme_picker.is_none();
     let border_style = if focused {
-        Style::default().fg(theme.accent)
+        Style::default().fg(app.theme.accent)
     } else {
-        Style::default().fg(theme.dim)
+        Style::default().fg(app.theme.dim)
     };
+    // `border_style`, `focused`, and `git_suffix` / `title` are Copy values or
+    // owned Strings, so the short immutable borrows of `app` for them are done.
+    // Defer `let theme = &app.theme` until after breadcrumb rendering, which
+    // needs a mutable borrow of `app`.
 
     let git_suffix = if app.git_mode {
         if app.git_mode_flat {
@@ -57,20 +67,37 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
         .borders(Borders::ALL)
         .border_style(border_style);
 
-    let view_height = area.height.saturating_sub(2).max(1) as usize;
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    // ── Breadcrumb ──────────────────────────────────────────────────────
+    app.breadcrumb_areas.clear();
+    let breadcrumb_segments = compute_breadcrumb(app);
+    // Only reserve a row for the breadcrumb when the inner width is wide enough
+    // for render_breadcrumb to actually draw something (it early-returns at < 3).
+    let has_breadcrumb = !breadcrumb_segments.is_empty() && inner.width >= 3;
+
+    let list_area = if has_breadcrumb {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(1), Constraint::Min(0)])
+            .split(inner);
+        render_breadcrumb(f, app, chunks[0], &breadcrumb_segments);
+        chunks[1]
+    } else {
+        inner
+    };
+
+    // ── Tree list ───────────────────────────────────────────────────────
+    let theme = &app.theme;
+    let view_height = list_area.height.max(1) as usize;
     let n = app.nodes.len();
 
-    // Compute the viewport offset up front so we can slice nodes to exactly
-    // the visible rows, bounding ListItem allocation to O(view_height) instead
-    // of O(n).
     let offset = if app.tree_independent_scroll {
-        // Viewport is cursor-independent; clamp so we never scroll past the end.
         let max_scroll = n.saturating_sub(view_height);
         app.tree_scroll = app.tree_scroll.min(max_scroll);
         app.tree_scroll
     } else {
-        // Keep the selected row inside the visible window, updating tree_scroll
-        // ourselves so ratatui doesn't need to scan the full list to find it.
         let sel = if n > 0 {
             app.tree_selected.min(n - 1)
         } else {
@@ -105,15 +132,12 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
         })
         .collect();
 
-    let list = List::new(items).block(block).highlight_style(
+    let list = List::new(items).highlight_style(
         Style::default()
             .bg(theme.selection_bg)
             .add_modifier(Modifier::BOLD),
     );
 
-    // Items are pre-sliced to [offset..end], so ListState index 0 == node
-    // index `offset`. Express the selection as a relative index within the
-    // slice; leave offset_mut() at 0 since we've already handled scrolling.
     let mut state = ListState::default();
     if app.tree_independent_scroll {
         if n > 0 && app.tree_selected >= offset && app.tree_selected < end {
@@ -126,20 +150,192 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
         }
     }
 
-    f.render_stateful_widget(list, area, &mut state);
+    f.render_stateful_widget(list, list_area, &mut state);
 
-    // Record the geometry of the rendered list (inside the border) and the
-    // scroll offset so mouse clicks can be mapped back to node indices.
-    app.tree_area = Rect {
-        x: area.x + 1,
-        y: area.y + 1,
-        width: area.width.saturating_sub(2),
-        height: area.height.saturating_sub(2),
-    };
-    // state.offset() is relative to the pre-sliced window; add back `offset`
-    // to get the absolute node index for mouse hit-testing and next-frame slicing.
+    // ── Record geometry ─────────────────────────────────────────────────
+    app.tree_area = list_area;
     app.tree_offset = offset + state.offset();
     app.tree_scroll = offset + state.offset();
+}
+
+/// Computes breadcrumb path segments from the selected tree node to root.
+/// Returns a list of (label, target_directory_path) pairs ordered root-first.
+/// Always includes at least the root segment when a node is selected; returns
+/// empty only when there are no nodes or the path cannot be relativized to root.
+fn compute_breadcrumb(app: &App) -> Vec<(String, PathBuf)> {
+    let Some(node) = app.nodes.get(app.tree_selected) else {
+        return Vec::new();
+    };
+
+    let dir_path = if node.is_dir {
+        node.path.clone()
+    } else {
+        match node.path.parent() {
+            Some(p) => {
+                let p = p.to_path_buf();
+                if p.as_os_str().is_empty() {
+                    // Relative path like "file.rs" has parent "" which means root.
+                    app.root.clone()
+                } else {
+                    p
+                }
+            }
+            None => return Vec::new(),
+        }
+    };
+
+    let root_label = app
+        .root
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| "/".to_string());
+
+    let mut segments = vec![(root_label, app.root.clone())];
+
+    if dir_path == app.root {
+        return segments;
+    }
+
+    let Ok(relative) = dir_path.strip_prefix(&app.root) else {
+        return Vec::new();
+    };
+
+    let mut cumulative = app.root.clone();
+    for component in relative.components() {
+        cumulative.push(component.as_os_str());
+        segments.push((
+            component.as_os_str().to_string_lossy().to_string(),
+            cumulative.clone(),
+        ));
+    }
+
+    segments
+}
+
+/// Renders the breadcrumb path bar as a styled line of clickable segments with
+/// " / " separators. Truncates middle segments with "…" when the path is wider
+/// than the available area. Records each visible segment's `Rect` onto
+/// `app.breadcrumb_areas` for mouse hit-testing.
+fn render_breadcrumb(f: &mut Frame, app: &mut App, area: Rect, segments: &[(String, PathBuf)]) {
+    let theme = &app.theme;
+    let avail = area.width as usize;
+    if avail < 3 || segments.is_empty() {
+        return;
+    }
+
+    let sep = " / ";
+    let sep_len = sep.len();
+    let names_len: usize = segments
+        .iter()
+        .map(|(n, _)| UnicodeWidthStr::width(n.as_str()))
+        .sum();
+    let total_len = names_len + segments.len().saturating_sub(1) * sep_len;
+
+    // Pick which segment indices to show (indices into `segments`).
+    let show_indices: Vec<usize> = if total_len <= avail {
+        (0..segments.len()).collect()
+    } else {
+        truncate_segments(segments, avail, sep_len)
+    };
+
+    let dim_style = Style::default().fg(theme.dim).bg(theme.breadcrumb_bg);
+    let fg_style = Style::default()
+        .fg(theme.breadcrumb_fg)
+        .bg(theme.breadcrumb_bg);
+    let last_style = fg_style.add_modifier(Modifier::BOLD);
+
+    let mut spans: Vec<Span> = Vec::new();
+    let mut col = area.x;
+
+    for (pos, &idx) in show_indices.iter().enumerate() {
+        if idx >= segments.len() {
+            // Out-of-bounds sentinel pushed by truncate_segments to mark the
+            // position of the "…" ellipsis between kept and dropped segments.
+            // "…" is a single terminal cell despite being 3 UTF-8 bytes.
+            spans.push(Span::styled("…", dim_style));
+            col += 1;
+            continue;
+        }
+
+        // Separator before each segment except the first.
+        if pos > 0 {
+            spans.push(Span::styled(sep, dim_style));
+            col += sep_len as u16;
+        }
+
+        let is_last = pos == show_indices.len() - 1;
+        let style = if is_last { last_style } else { fg_style };
+        let text = &segments[idx].0;
+        spans.push(Span::styled(text.clone(), style));
+
+        let text_w = UnicodeWidthStr::width(text.as_str()) as u16;
+        // Record clickable area for this segment.
+        let rect = Rect {
+            x: col,
+            y: area.y,
+            width: text_w,
+            height: 1,
+        };
+        app.breadcrumb_areas.push((segments[idx].1.clone(), rect));
+        col += text_w;
+    }
+
+    let line = Line::from(spans);
+    let para = Paragraph::new(line).style(Style::default().bg(theme.breadcrumb_bg));
+    f.render_widget(para, area);
+}
+
+/// Picks which segment indices to display when the full breadcrumb exceeds
+/// available width. Always keeps the first and last segments; fills as many
+/// middle segments as fit, inserting a "…" marker for any that are dropped.
+fn truncate_segments(segments: &[(String, PathBuf)], avail: usize, sep_len: usize) -> Vec<usize> {
+    if segments.len() <= 2 {
+        // With only 2 segments (root + one dir), we can't usefully truncate.
+        return (0..segments.len()).collect();
+    }
+
+    // Start with first and last, then try to fit as many middle as possible.
+    let first = &segments[0];
+    let last = &segments[segments.len() - 1];
+    let mut used = UnicodeWidthStr::width(first.0.as_str())
+        + sep_len
+        + UnicodeWidthStr::width(last.0.as_str());
+    let mut mid_indices: Vec<usize> = Vec::new();
+
+    // Count how many middle segments fit.
+    let mut dropped = false;
+    for (i, seg) in segments.iter().enumerate().skip(1).take(segments.len() - 2) {
+        let addition = sep_len + UnicodeWidthStr::width(seg.0.as_str());
+        // Reserve 1 cell for the "…" ellipsis that signals truncation.
+        if used + addition < avail {
+            mid_indices.push(i);
+            used += addition;
+        } else {
+            dropped = true;
+            break;
+        }
+    }
+
+    let mut result = Vec::new();
+    result.push(0);
+    if dropped && !mid_indices.is_empty() {
+        // If we dropped some but kept others, we need "…" to signal the gap.
+        // Remove the last kept middle segment if it doesn't fit with "…".
+        // Actually we already reserved 2 chars for the ellipsis above. The middle
+        // indices we kept already account for this.
+        result.extend(mid_indices);
+        // Out-of-bounds sentinel: the renderer treats idx >= segments.len()
+        // as an ellipsis placeholder.
+        result.push(segments.len());
+    } else if dropped && mid_indices.is_empty() {
+        // All middle segments dropped; just show first, "…", last.
+        result.push(segments.len());
+    } else {
+        result.extend(mid_indices);
+    }
+    result.push(segments.len() - 1);
+
+    result
 }
 
 /// Returns the foreground color and modifier for a tree node based on its
