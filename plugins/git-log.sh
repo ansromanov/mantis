@@ -31,7 +31,7 @@ while IFS= read -r line; do
         on_file_open)
             path="${line#*\"path\":\"}"
             path="${path%%\"*}"
-            [[ "$path" != /tmp/tv-*-* ]] && LAST_FILE="$path"
+            [[ "$path" != "$TMP_PREFIX"* ]] && LAST_FILE="$path"
             ;;
         on_keypress)
             key="${line#*\"key\":\"}"

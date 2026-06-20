@@ -121,3 +121,12 @@ git-log  = { path = "git-log.sh" }
 >
 > The core git diff and log code paths remain active as a fallback when the
 > plugins are not enabled.
+>
+> **Key conflict:** `H` is also the default binding for the built-in
+> `file_history` picker. Enabling `git-log` without clearing that binding will
+> trigger both actions on the same keypress. To give the plugin sole ownership
+> of `H`, add this to `tv.toml`:
+> ```toml
+> [keys]
+> file_history = []
+> ```

@@ -108,3 +108,5 @@ visual_line_blame = ["b"]
 # git-log:  press H to view the file's git log (--oneline --color=always) as a
 #   static file. Loses the interactive commit-selection popup, but the log
 #   retains git's ANSI colouring.
+#   Note: H is also the default binding for the built-in file_history picker.
+#   To prevent both from firing, add `file_history = []` under [keys].
