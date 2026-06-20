@@ -165,6 +165,7 @@ impl Keymap {
             "open_recent_files" => &self.recent_files,
             "copy_path" => &self.copy_path,
             "copy_relative_path" => &self.copy_relative_path,
+            "open_plugin_picker" => &self.plugin_picker,
             _ => return String::new(),
         };
         bindings.first().map(|b| b.display()).unwrap_or_default()
@@ -217,6 +218,7 @@ pub struct Keymap {
     pub recent_files: Vec<KeyBinding>,
     pub copy_path: Vec<KeyBinding>,
     pub copy_relative_path: Vec<KeyBinding>,
+    pub plugin_picker: Vec<KeyBinding>,
 }
 
 impl Default for Keymap {
@@ -261,6 +263,7 @@ impl Default for Keymap {
             recent_files: bind(&["ctrl+o"]),
             copy_path: bind(&["y"]),
             copy_relative_path: bind(&["Y"]),
+            plugin_picker: bind(&["p"]),
         }
     }
 }

@@ -336,6 +336,61 @@ impl PluginManager {
     pub fn is_empty(&self) -> bool {
         self.plugins.is_empty()
     }
+
+    /// Returns every registered plugin as `(name, is_running)`, in registration order.
+    pub fn plugin_entries(&self) -> Vec<(String, bool)> {
+        self.entries
+            .iter()
+            .map(|(name, _)| {
+                let running = self.plugins.iter().any(|p| p.name == *name);
+                (name.clone(), running)
+            })
+            .collect()
+    }
+
+    /// Spawns a single registered plugin by name and sends it the `init` event.
+    /// No-op if already running. Returns an error string on spawn failure.
+    pub fn activate_one(&mut self, name: &str) -> Result<(), String> {
+        if self.plugins.iter().any(|p| p.name == name) {
+            return Ok(());
+        }
+        let entry = self
+            .entries
+            .iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, e)| e.clone())
+            .ok_or_else(|| format!("plugin '{name}' not registered"))?;
+        let plugin_dir = default_plugin_dir();
+        let path = if entry.path.is_relative() {
+            plugin_dir.join(&entry.path)
+        } else {
+            entry.path.clone()
+        };
+        let mut plugin = Plugin::new(name.to_string());
+        plugin.spawn(&path)?;
+        plugin.send(&ToPlugin {
+            event: "init".into(),
+            path: None,
+            key: None,
+        });
+        self.plugins.push(plugin);
+        Ok(())
+    }
+
+    /// Sends `shutdown` to a single running plugin and closes its subprocess.
+    /// No-op if no plugin with that name is running.
+    pub fn deactivate_one(&mut self, name: &str) {
+        let Some(pos) = self.plugins.iter().position(|p| p.name == name) else {
+            return;
+        };
+        let mut plugin = self.plugins.remove(pos);
+        plugin.send(&ToPlugin {
+            event: "shutdown".into(),
+            path: None,
+            key: None,
+        });
+        plugin.close();
+    }
 }
 
 /// Converts a crossterm `KeyEvent` into a human-readable string like `"q"`,

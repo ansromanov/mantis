@@ -79,6 +79,10 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         popups::draw_theme(f, app, area);
     }
 
+    if app.plugin_picker.is_some() {
+        popups::draw_plugin_picker(f, app, area);
+    }
+
     if app.recent_files.is_some() {
         popups::draw_recent(f, app, area);
     }

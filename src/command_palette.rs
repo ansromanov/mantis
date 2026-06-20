@@ -116,6 +116,10 @@ pub static COMMANDS: &[CommandEntry] = &[
         name: "Copy relative path",
         action_id: "copy_relative_path",
     },
+    CommandEntry {
+        name: "Open plugin manager",
+        action_id: "open_plugin_picker",
+    },
 ];
 
 pub struct CommandPalette {

@@ -24,7 +24,8 @@ use crate::git::GitStatus;
 use crate::highlight::Highlighter;
 use crate::plugin::PluginManager;
 use crate::search::{
-    CommandPalette, HistoryState, InFileSearch, RecentFilesState, SearchState, ThemePicker,
+    CommandPalette, HistoryState, InFileSearch, PluginPicker, RecentFilesState, SearchState,
+    ThemePicker,
 };
 use crate::selection::{TextSelection, VisualLine};
 use crate::theme::Theme;
@@ -97,6 +98,12 @@ pub struct App {
     pub command_palette: Option<CommandPalette>,
     pub history: Option<HistoryState>,
     pub theme_picker: Option<ThemePicker>,
+    /// State for the plugin manager overlay. `Some` while the picker is open.
+    pub plugin_picker: Option<PluginPicker>,
+    /// Hit area of the plugin list recorded during the last render.
+    pub plugin_picker_area: Rect,
+    /// Scroll offset of the plugin list recorded during the last render.
+    pub plugin_picker_offset: usize,
     /// Persistent ring of recently opened file paths, most-recent-first, capped at
     /// `config.recent_files_count`. Maintained across overlay open/close cycles.
     pub recent_ring: Vec<PathBuf>,
@@ -295,6 +302,9 @@ impl App {
             command_palette: None,
             history: None,
             theme_picker: None,
+            plugin_picker: None,
+            plugin_picker_area: Rect::default(),
+            plugin_picker_offset: 0,
             recent_ring: Vec::new(),
             recent_files: None,
             recent_area: Rect::default(),
@@ -383,6 +393,33 @@ impl App {
     fn save_config(&self) {
         if let Some(path) = &self.config_path {
             config::save(&self.config, path);
+        }
+    }
+
+    /// Toggles the currently highlighted plugin in the picker: spawns it if
+    /// stopped, kills it if running. Updates `config.plugins[name].enabled`
+    /// and writes `tv.toml` so the change persists across restarts.
+    pub(crate) fn toggle_plugin_picker_selection(&mut self) {
+        let Some(picker) = &self.plugin_picker else {
+            return;
+        };
+        let Some((name, running)) = picker.entries.get(picker.selected) else {
+            return;
+        };
+        let name = name.clone();
+        let running = *running;
+        if running {
+            self.plugin_manager.deactivate_one(&name);
+        } else {
+            let _ = self.plugin_manager.activate_one(&name);
+        }
+        if let Some(entry) = self.config.plugins.get_mut(&name) {
+            entry.enabled = !running;
+        }
+        self.save_config();
+        let updated = self.plugin_manager.plugin_entries();
+        if let Some(picker) = &mut self.plugin_picker {
+            picker.entries = updated;
         }
     }
 

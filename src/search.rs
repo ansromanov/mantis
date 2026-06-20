@@ -485,6 +485,26 @@ impl RecentFilesState {
     }
 }
 
+/// Scrollable list of registered plugins with their running state for the plugin manager overlay.
+pub struct PluginPicker {
+    /// `(name, is_running)` for each registered plugin, in registration order.
+    pub entries: Vec<(String, bool)>,
+    pub selected: usize,
+}
+
+impl PluginPicker {
+    pub fn new(entries: Vec<(String, bool)>) -> Self {
+        PluginPicker {
+            entries,
+            selected: 0,
+        }
+    }
+
+    pub fn results_len(&self) -> usize {
+        self.entries.len()
+    }
+}
+
 pub use crate::command_palette::CommandPalette;
 
 #[cfg(test)]
