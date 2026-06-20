@@ -120,6 +120,14 @@ pub static COMMANDS: &[CommandEntry] = &[
         name: "Open plugin manager",
         action_id: "open_plugin_picker",
     },
+    CommandEntry {
+        name: "Collapse all directories",
+        action_id: "tree_collapse_all",
+    },
+    CommandEntry {
+        name: "Expand all directories",
+        action_id: "tree_expand_all",
+    },
 ];
 
 pub struct CommandPalette {

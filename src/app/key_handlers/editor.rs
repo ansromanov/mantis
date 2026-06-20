@@ -137,6 +137,8 @@ impl App {
             }
             Some("copy_path") => self.copy_path_to_clipboard(false),
             Some("copy_relative_path") => self.copy_path_to_clipboard(true),
+            Some("tree_collapse_all") => self.collapse_all(),
+            Some("tree_expand_all") => self.expand_all(),
             _ => {}
         }
     }

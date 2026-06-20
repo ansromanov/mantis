@@ -140,6 +140,21 @@ fn collect(
     }
 }
 
+/// Returns a flat list of all directories (non-root) under `root` using
+/// `ignore::WalkBuilder`. Used by `expand_all` to populate the expanded set.
+pub fn collect_all_dirs(root: &Path, show_hidden: bool, ignore_gitignore: bool) -> Vec<PathBuf> {
+    WalkBuilder::new(root)
+        .hidden(!show_hidden)
+        .git_ignore(!ignore_gitignore)
+        .git_global(!ignore_gitignore)
+        .git_exclude(!ignore_gitignore)
+        .build()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.depth() > 0 && e.file_type().map(|t| t.is_dir()).unwrap_or(false))
+        .map(|e| e.path().to_path_buf())
+        .collect()
+}
+
 /// Returns a flat list of all files (non-directories) under `root` using
 /// `ignore::WalkBuilder`. Used to populate the search index.
 pub fn collect_all_files(root: &Path, show_hidden: bool, ignore_gitignore: bool) -> Vec<PathBuf> {

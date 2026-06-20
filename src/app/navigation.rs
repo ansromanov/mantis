@@ -257,6 +257,63 @@ impl App {
         }
     }
 
+    /// Collapses every expanded directory, resetting the tree to its top-level
+    /// view. When the previously selected path is no longer visible (it was
+    /// nested under a collapsed directory), the nearest visible ancestor
+    /// directory is selected instead of falling back to an arbitrary index.
+    pub(super) fn collapse_all(&mut self) {
+        let prev_path = self.nodes.get(self.tree_selected).map(|n| n.path.clone());
+        self.expanded.clear();
+        self.rebuild();
+        // rebuild() preserves the selection when the path is still visible.
+        // When the path is hidden (was nested), walk up to the nearest ancestor
+        // that is now visible so the user lands on a related entry.
+        if let Some(ref path) = prev_path {
+            if self.nodes.get(self.tree_selected).map(|n| &n.path) != Some(path) {
+                let mut ancestor = path.parent();
+                while let Some(dir) = ancestor {
+                    if let Some(i) = self.nodes.iter().position(|n| n.path == dir) {
+                        self.tree_selected = i;
+                        break;
+                    }
+                    if dir == self.root {
+                        break;
+                    }
+                    ancestor = dir.parent();
+                }
+            }
+        }
+        self.scroll_tree_into_view();
+        if let Some(i) = self
+            .nodes
+            .get(self.tree_selected)
+            .map(|_| self.tree_selected)
+        {
+            let path = self.nodes[i].path.as_path();
+            self.plugin_manager.on_selection_change(Some(path));
+        }
+    }
+
+    /// Expands every directory in the tree so all files are visible. The
+    /// selection is preserved by path across the rebuild.
+    pub(super) fn expand_all(&mut self) {
+        let dirs =
+            crate::tree::collect_all_dirs(&self.root, self.show_hidden, self.ignore_gitignore);
+        for dir in dirs {
+            self.expanded.insert(dir);
+        }
+        self.rebuild();
+        self.scroll_tree_into_view();
+        if let Some(i) = self
+            .nodes
+            .get(self.tree_selected)
+            .map(|_| self.tree_selected)
+        {
+            let path = self.nodes[i].path.as_path();
+            self.plugin_manager.on_selection_change(Some(path));
+        }
+    }
+
     /// Opens the currently selected search result and closes the overlay.
     /// Shared by the Enter key and a mouse click in the results list.
     pub(super) fn activate_search_selection(&mut self) {
@@ -277,3 +334,7 @@ impl App {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "navigation_test.rs"]
+mod tests;

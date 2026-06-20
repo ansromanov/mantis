@@ -166,6 +166,8 @@ impl Keymap {
             "copy_path" => &self.copy_path,
             "copy_relative_path" => &self.copy_relative_path,
             "open_plugin_picker" => &self.plugin_picker,
+            "tree_collapse_all" => &self.tree_collapse_all,
+            "tree_expand_all" => &self.tree_expand_all,
             _ => return String::new(),
         };
         bindings.first().map(|b| b.display()).unwrap_or_default()
@@ -191,6 +193,8 @@ pub struct Keymap {
     // Tree panel
     pub tree_expand: Vec<KeyBinding>,
     pub tree_collapse: Vec<KeyBinding>,
+    pub tree_collapse_all: Vec<KeyBinding>,
+    pub tree_expand_all: Vec<KeyBinding>,
     // Content panel
     pub content_left: Vec<KeyBinding>,
     pub content_right: Vec<KeyBinding>,
@@ -237,6 +241,8 @@ impl Default for Keymap {
             nav_down: bind(&["Down", "j"]),
             tree_expand: bind(&["Enter", "Right", "l"]),
             tree_collapse: bind(&["Left", "h"]),
+            tree_collapse_all: bind(&["-"]),
+            tree_expand_all: bind(&["="]),
             content_left: bind(&["Left"]),
             content_right: bind(&["Right"]),
             content_top: bind(&["g", "Home"]),

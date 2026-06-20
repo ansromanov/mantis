@@ -84,7 +84,7 @@ fn draw_theme_picker_overlay() {
 fn draw_help_overlay() {
     let mut app = make_app();
     app.show_help = true;
-    let backend = TestBackend::new(80, 60);
+    let backend = TestBackend::new(80, 65);
     let mut terminal = Terminal::new(backend).unwrap();
     terminal.draw(|f| super::draw(f, &mut app)).unwrap();
     let rows = buffer_rows(&terminal);

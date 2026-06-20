@@ -325,7 +325,7 @@ fn draw_help_all_sections() {
     let dir = tempfile::tempdir().unwrap();
     let app = make_app(dir.path());
 
-    let backend = TestBackend::new(80, 65);
+    let backend = TestBackend::new(80, 75);
     let mut terminal = Terminal::new(backend).unwrap();
     terminal.draw(|f| draw_help(f, &app, f.area())).unwrap();
     let rows = buffer_rows(&terminal);
