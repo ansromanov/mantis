@@ -112,11 +112,45 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
         }
     };
 
+    // Precompute indent guide masks via a right-to-left pass.
+    // pending[lvl] = true means a node at depth `lvl` has been seen (right-to-left)
+    // without a shallower node closing it, so ancestors at that level still have
+    // siblings ahead — the guide line (│) should continue.
+    let max_depth = app.nodes.iter().map(|nd| nd.depth).max().unwrap_or(0);
+    let mut guide_masks: Vec<Vec<bool>> = vec![Vec::new(); n];
+    let mut pending = vec![false; max_depth + 1];
+    for i in (0..n).rev() {
+        let d = app.nodes[i].depth;
+        guide_masks[i] = (0..d).map(|lvl| pending[lvl]).collect();
+        pending[d] = true;
+        pending[(d + 1)..=max_depth].fill(false);
+    }
+
+    let guide_style = Style::default().fg(theme.dim).add_modifier(Modifier::DIM);
     let end = (offset + view_height).min(n);
     let items: Vec<ListItem> = app.nodes[offset..end]
         .iter()
-        .map(|node| {
-            let indent = "  ".repeat(node.depth);
+        .enumerate()
+        .map(|(pos, node)| {
+            let global_i = offset + pos;
+            let (color, bold) = git_status_style(node, app, theme);
+            let name_style = Style::default().fg(color).add_modifier(bold);
+
+            let mut spans: Vec<Span> = Vec::new();
+            if app.indent_guides {
+                let mask = &guide_masks[global_i];
+                for lvl in 0..node.depth {
+                    if mask.get(lvl).copied().unwrap_or(false) {
+                        spans.push(Span::styled("│  ", guide_style));
+                    } else {
+                        spans.push(Span::styled("   ", guide_style));
+                    }
+                }
+            } else {
+                let indent = "  ".repeat(node.depth);
+                spans.push(Span::styled(indent, name_style));
+            }
+
             let arrow = if node.is_dir {
                 if app.expanded.contains(&node.path) {
                     "▼ "
@@ -126,9 +160,10 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
             } else {
                 "  "
             };
-            let (color, bold) = git_status_style(node, app, theme);
-            ListItem::new(format!("{}{}{}", indent, arrow, node.name))
-                .style(Style::default().fg(color).add_modifier(bold))
+            spans.push(Span::styled(arrow, name_style));
+            spans.push(Span::styled(node.name.clone(), name_style));
+
+            ListItem::new(Line::from(spans))
         })
         .collect();
 

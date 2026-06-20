@@ -20,6 +20,7 @@ word_wrap = false         # wrap long lines in the content panel
 line_numbers = true       # show the line-number gutter in the content panel
 show_file_info = true     # show encoding and line-ending info in the status bar
 recent_files_count = 10   # number of recently opened files to remember
+indent_guides = true      # draw indentation guide lines (│) in the tree pane
 ```
 
 ## Keybindings

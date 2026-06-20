@@ -18,6 +18,7 @@ in_file_search = true
 # keep_search_query = false  # restore last search query when reopening search (default: false)
 # watch = false              # auto-reload file content when the open file changes on disk (default: false)
 # show_file_info = true      # show encoding and line-ending info in the status bar (default: true)
+indent_guides = true         # draw indentation guides (│) in the tree pane
 
 # Git mode: show only changed files and their working-tree diffs.
 # git_mode = false       # start in git mode (default: false)
