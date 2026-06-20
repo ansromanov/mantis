@@ -258,11 +258,31 @@ impl App {
     }
 
     /// Collapses every expanded directory, resetting the tree to its top-level
-    /// view. The selection is kept if its path is still visible; otherwise it
-    /// falls back to the nearest reachable index.
+    /// view. When the previously selected path is no longer visible (it was
+    /// nested under a collapsed directory), the nearest visible ancestor
+    /// directory is selected instead of falling back to an arbitrary index.
     pub(super) fn collapse_all(&mut self) {
+        let prev_path = self.nodes.get(self.tree_selected).map(|n| n.path.clone());
         self.expanded.clear();
         self.rebuild();
+        // rebuild() preserves the selection when the path is still visible.
+        // When the path is hidden (was nested), walk up to the nearest ancestor
+        // that is now visible so the user lands on a related entry.
+        if let Some(ref path) = prev_path {
+            if self.nodes.get(self.tree_selected).map(|n| &n.path) != Some(path) {
+                let mut ancestor = path.parent();
+                while let Some(dir) = ancestor {
+                    if let Some(i) = self.nodes.iter().position(|n| n.path == dir) {
+                        self.tree_selected = i;
+                        break;
+                    }
+                    if dir == self.root {
+                        break;
+                    }
+                    ancestor = dir.parent();
+                }
+            }
+        }
         self.scroll_tree_into_view();
     }
 

@@ -4512,3 +4512,29 @@ fn collapse_all_preserves_selection_when_visible() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn collapse_all_selects_nearest_ancestor_for_nested_selection() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+
+    // Expand sub/ and select the nested c.txt.
+    app.expanded.insert(root.join("sub"));
+    app.rebuild();
+    let nested_idx = app
+        .nodes
+        .iter()
+        .position(|n| n.path == root.join("sub").join("c.txt"))
+        .unwrap();
+    app.tree_selected = nested_idx;
+
+    app.collapse_all();
+
+    // c.txt is now hidden; the nearest visible ancestor (sub/) should be selected.
+    assert_eq!(
+        app.nodes[app.tree_selected].path,
+        root.join("sub"),
+        "collapse_all must select the nearest visible ancestor when the selected path is hidden"
+    );
+    fs::remove_dir_all(&root).ok();
+}
