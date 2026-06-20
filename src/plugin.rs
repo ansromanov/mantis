@@ -342,8 +342,7 @@ fn default_plugin_dir() -> PathBuf {
 fn dirs_next() -> Option<PathBuf> {
     #[cfg(windows)]
     {
-        std::env::var_os("APPDATA")
-            .map(|p| PathBuf::from(p).join("tree-viewer").join("plugins"))
+        std::env::var_os("APPDATA").map(|p| PathBuf::from(p).join("tree-viewer").join("plugins"))
     }
     #[cfg(not(windows))]
     {

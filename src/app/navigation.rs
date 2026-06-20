@@ -132,7 +132,10 @@ impl App {
         if is_dir {
             return;
         }
-        let deleted = self.nodes.get(self.tree_selected).is_some_and(|n| n.deleted);
+        let deleted = self
+            .nodes
+            .get(self.tree_selected)
+            .is_some_and(|n| n.deleted);
         if deleted {
             self.show_deleted(path);
         } else if self.git_mode {

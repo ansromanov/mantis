@@ -173,6 +173,12 @@ just pr            # fetch origin/main, rebase, push --force-with-lease
 gh pr create       # open the PR (rebase fails loudly on conflicts so you can resolve)
 ```
 
+> **macOS credential helper note:** If `git push` fails with `Device not configured`,
+> the macOS keychain isn't available (e.g. in SSH sessions). Workaround:
+> ```bash
+> GH_TOKEN=$(gh auth token) just pr
+> ```
+
 ## Before committing
 
 1. `cargo fmt --all` — formatting clean (enforced by pre-commit)

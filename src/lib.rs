@@ -12,12 +12,12 @@
 pub mod app;
 pub mod command_palette;
 pub mod config;
-pub mod plugin;
 pub mod diff;
 pub mod file;
 pub mod git;
 pub mod highlight;
 pub mod markdown;
+pub mod plugin;
 pub mod release_info;
 pub mod search;
 pub mod selection;
