@@ -128,7 +128,6 @@ pub struct App {
     pub show_scrollbar: bool,
     pub show_scroll_percentage: bool,
     pub show_line_numbers: bool,
-    pub indent_guides: bool,
     pub show_blame: bool,
     pub show_about: bool,
     pub walk_errors: usize,
@@ -187,7 +186,7 @@ pub struct App {
     scrollbar_drag: bool,
     splitter_drag: bool,
     /// Set to `true` after suspending the TUI (e.g. for editor), signals
-    /// `main.rs` to call `terminal.clear()` before the next `draw()`.
+    /// `main.rs` to call `terminal.clear()` before the next `draw()`.  
     pub needs_clear: bool,
     // YAML folding state
     pub yaml_fold_regions: Vec<FoldRegion>,
@@ -324,7 +323,6 @@ impl App {
             show_scrollbar: cfg.scrollbar,
             show_scroll_percentage: cfg.scroll_percentage,
             show_line_numbers: cfg.line_numbers,
-            indent_guides: cfg.indent_guides,
             show_blame: false,
             show_about: false,
             walk_errors,
@@ -415,7 +413,7 @@ impl App {
             }
             self.save_config();
         } else {
-            match self.plugin_manager.activate_one(&name) {
+            match self.plugin_manager.activate_one(&name, self.current_file.as_deref()) {
                 Ok(()) => {
                     if let Some(entry) = self.config.plugins.get_mut(&name) {
                         entry.enabled = true;
@@ -489,7 +487,7 @@ fn diff_line_style(line: &str, theme: &Theme) -> ratatui::style::Style {
     use ratatui::style::{Modifier, Style};
     if line.starts_with("@@") {
         Style::default().fg(theme.accent)
-    } else if line.starts_with("+++") || line.starts_with("---") {
+    } else if line.starts_with("++") || line.starts_with("---") {
         Style::default().fg(theme.dim).add_modifier(Modifier::BOLD)
     } else if line.starts_with('+') {
         Style::default().fg(theme.diff_add)
