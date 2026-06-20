@@ -112,13 +112,18 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
         }
     };
 
-    // Precompute last index at each depth for indent guide continuation checks.
-    let mut last_at_depth: Vec<usize> = Vec::new();
-    for (i, node) in app.nodes.iter().enumerate() {
-        if node.depth >= last_at_depth.len() {
-            last_at_depth.resize(node.depth + 1, 0);
-        }
-        last_at_depth[node.depth] = i;
+    // Precompute indent guide masks via a right-to-left pass.
+    // pending[lvl] = true means a node at depth `lvl` has been seen (right-to-left)
+    // without a shallower node closing it, so ancestors at that level still have
+    // siblings ahead — the guide line (│) should continue.
+    let max_depth = app.nodes.iter().map(|nd| nd.depth).max().unwrap_or(0);
+    let mut guide_masks: Vec<Vec<bool>> = vec![Vec::new(); n];
+    let mut pending = vec![false; max_depth + 1];
+    for i in (0..n).rev() {
+        let d = app.nodes[i].depth;
+        guide_masks[i] = (0..d).map(|lvl| pending[lvl]).collect();
+        pending[d] = true;
+        pending[(d + 1)..=max_depth].fill(false);
     }
 
     let guide_style = Style::default().fg(theme.dim).add_modifier(Modifier::DIM);
@@ -133,8 +138,9 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
 
             let mut spans: Vec<Span> = Vec::new();
             if app.indent_guides {
+                let mask = &guide_masks[global_i];
                 for lvl in 0..node.depth {
-                    if last_at_depth.get(lvl).copied().unwrap_or(0) > global_i {
+                    if mask.get(lvl).copied().unwrap_or(false) {
                         spans.push(Span::styled("│  ", guide_style));
                     } else {
                         spans.push(Span::styled("   ", guide_style));

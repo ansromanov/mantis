@@ -212,13 +212,13 @@ fn draw_tree_depth_one_node_is_indented() {
     app.nodes = vec![node];
     let rows = render_tree(&mut app, 40, 5);
     // Row 1 is the breadcrumb bar, row 2 is the first tree content row (inside
-    // top border). After the left border '│': 2-space indent (depth=1) +
-    // 2-space non-arrow = 4 spaces.
+    // top border). After the left border '│': 3-space indent guide cell (depth=1,
+    // no siblings so no │) + 2-space non-arrow = 5 chars.
     let content_row = &rows[2];
-    let after_border: String = content_row.chars().skip(1).take(4).collect();
+    let after_border: String = content_row.chars().skip(1).take(5).collect();
     assert_eq!(
-        after_border, "    ",
-        "depth=1 file must be preceded by 4 spaces"
+        after_border, "     ",
+        "depth=1 file must be preceded by 5 chars (3 guide + 2 arrow placeholder)"
     );
 }
 

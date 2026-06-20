@@ -48,10 +48,10 @@ pub struct Config {
     pub show_file_info: bool,
     pub keys: Keymap,
     pub theme: ThemeConfig,
-    /// Per-plugin entries registered in `[plugins]`.
-    #[serde(default)]
     /// Render indentation guide lines (│) in the tree pane.
     pub indent_guides: bool,
+    /// Per-plugin entries registered in `[plugins]`.
+    #[serde(default)]
     pub plugins: HashMap<String, PluginEntry>,
 }
 
