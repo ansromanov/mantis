@@ -21,8 +21,10 @@ use crate::app::App;
 use super::util::centered_rect;
 
 pub(crate) fn draw_plugin_picker(f: &mut Frame, app: &mut App, area: Rect) {
+    let Some(picker) = app.plugin_picker.as_ref() else {
+        return;
+    };
     let theme = &app.theme;
-    let picker = app.plugin_picker.as_ref().unwrap();
 
     let popup = centered_rect(44, 55, area);
     f.render_widget(Clear, popup);

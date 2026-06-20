@@ -184,9 +184,13 @@ impl Plugin {
     /// Callers must have already sent `shutdown` via `send()` before calling
     /// this (e.g. `deactivate_all` does so).
     fn close(&mut self) {
+        self.close_with_timeout(Duration::from_secs(2));
+    }
+
+    fn close_with_timeout(&mut self, timeout: Duration) {
         drop(self.write_tx.take());
         if let Some(mut child) = self.child.take() {
-            let deadline = Instant::now() + Duration::from_secs(2);
+            let deadline = Instant::now() + timeout;
             loop {
                 match child.try_wait() {
                     Ok(Some(_)) => break,
@@ -389,7 +393,7 @@ impl PluginManager {
             path: None,
             key: None,
         });
-        plugin.close();
+        plugin.close_with_timeout(Duration::from_millis(200));
     }
 }
 

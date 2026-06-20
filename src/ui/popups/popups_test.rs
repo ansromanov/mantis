@@ -3,7 +3,7 @@ use ratatui::layout::Rect;
 use crate::ui::popups::util::centered_rect;
 use crate::ui::popups::{
     draw_about, draw_blame_panel, draw_command_palette, draw_help, draw_history,
-    draw_in_file_search, draw_recent, draw_search, draw_theme,
+    draw_in_file_search, draw_plugin_picker, draw_recent, draw_search, draw_theme,
 };
 
 #[test]
@@ -527,6 +527,60 @@ fn draw_about_shows_version() {
     assert!(joined.contains("Version:"));
     assert!(joined.contains("GPL-3.0"));
     assert!(joined.contains("tree viewer"));
+}
+
+// ── draw_plugin_picker ──────────────────────────────────────────────────
+
+#[test]
+fn draw_plugin_picker_empty_list() {
+    use crate::search::PluginPicker;
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    app.plugin_picker = Some(PluginPicker::new(vec![]));
+    let backend = TestBackend::new(80, 30);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| draw_plugin_picker(f, &mut app, f.area()))
+        .unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(joined.contains("Plugins"));
+    assert!(joined.contains("Space/Enter"));
+}
+
+#[test]
+fn draw_plugin_picker_with_entries_shows_names_and_state() {
+    use crate::search::PluginPicker;
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    app.plugin_picker = Some(PluginPicker::new(vec![
+        ("alpha".to_string(), true),
+        ("beta".to_string(), false),
+    ]));
+    let backend = TestBackend::new(80, 30);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| draw_plugin_picker(f, &mut app, f.area()))
+        .unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(joined.contains("Plugins"));
+    assert!(joined.contains("alpha"));
+    assert!(joined.contains("beta"));
+    // geometry must be recorded for mouse hit-testing
+    assert!(app.plugin_picker_area.width > 0);
+}
+
+#[test]
+fn draw_plugin_picker_none_returns_early() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    app.plugin_picker = None;
+    let backend = TestBackend::new(80, 30);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| draw_plugin_picker(f, &mut app, f.area()))
+        .unwrap();
 }
 
 // ── draw_recent ─────────────────────────────────────────────────────────

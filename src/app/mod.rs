@@ -414,11 +414,18 @@ impl App {
                 entry.enabled = false;
             }
             self.save_config();
-        } else if self.plugin_manager.activate_one(&name).is_ok() {
-            if let Some(entry) = self.config.plugins.get_mut(&name) {
-                entry.enabled = true;
+        } else {
+            match self.plugin_manager.activate_one(&name) {
+                Ok(()) => {
+                    if let Some(entry) = self.config.plugins.get_mut(&name) {
+                        entry.enabled = true;
+                    }
+                    self.save_config();
+                }
+                Err(e) => {
+                    self.plugin_message = Some(format!("Plugin error: {e}"));
+                }
             }
-            self.save_config();
         }
         let updated = self.plugin_manager.plugin_entries();
         if let Some(picker) = &mut self.plugin_picker {
