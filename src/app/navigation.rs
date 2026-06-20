@@ -284,8 +284,13 @@ impl App {
             }
         }
         self.scroll_tree_into_view();
-        if let Some(p) = self.nodes.get(self.tree_selected).map(|n| n.path.clone()) {
-            self.plugin_manager.on_selection_change(Some(&p));
+        if let Some(i) = self
+            .nodes
+            .get(self.tree_selected)
+            .map(|_| self.tree_selected)
+        {
+            let path = self.nodes[i].path.as_path();
+            self.plugin_manager.on_selection_change(Some(path));
         }
     }
 
@@ -299,8 +304,13 @@ impl App {
         }
         self.rebuild();
         self.scroll_tree_into_view();
-        if let Some(p) = self.nodes.get(self.tree_selected).map(|n| n.path.clone()) {
-            self.plugin_manager.on_selection_change(Some(&p));
+        if let Some(i) = self
+            .nodes
+            .get(self.tree_selected)
+            .map(|_| self.tree_selected)
+        {
+            let path = self.nodes[i].path.as_path();
+            self.plugin_manager.on_selection_change(Some(path));
         }
     }
 
