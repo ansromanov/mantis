@@ -15,10 +15,11 @@
 set -euo pipefail
 
 TMP_PREFIX="/tmp/tv-git-log"
+TMP_PATTERN="${TMP_PREFIX}-$$"
 LAST_FILE=""
 
 cleanup() {
-    rm -f "${TMP_PREFIX}-"* 2>/dev/null
+    rm -f "${TMP_PATTERN}-"* 2>/dev/null
 }
 trap cleanup EXIT
 
@@ -40,7 +41,7 @@ while IFS= read -r line; do
                 repo="$(cd "$dir" && git rev-parse --show-toplevel 2>/dev/null)" || continue
                 log="$(git -C "$repo" log --oneline --color=always -- "$LAST_FILE" 2>/dev/null)" || continue
                 [[ -z "$log" ]] && continue
-                tmp="$(mktemp "${TMP_PREFIX}-XXXXXX")"
+                tmp="$(mktemp "${TMP_PATTERN}-XXXXXX")"
                 printf '%s\n' "$log" > "$tmp"
                 printf '{"event":"action","action":"open_file","params":{"path":"%s"}}\n' "$tmp"
             fi

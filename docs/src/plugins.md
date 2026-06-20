@@ -102,8 +102,9 @@ functionality into subprocess-based scripts:
 | git-log | `git-log.sh` | On `H` keypress, shows `git log --oneline --color=always` for the current file as a static file view. |
 
 Both are installed to the plugin directory the first time `tv` creates its
-global config (`~/.config/tree-viewer/plugins/`). Enable them by uncommenting
-or adding entries in `tv.toml`:
+global config. The default plugin directory is `~/.config/tree-viewer/plugins/`
+on Linux/macOS and `%APPDATA%\tree-viewer\plugins\` on Windows. Enable them by
+uncommenting or adding entries in `tv.toml`:
 
 ```toml
 [plugins]
