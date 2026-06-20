@@ -148,7 +148,21 @@ pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
             }
         }
 
-        if let Some(ref info) = app.git_info {
+        // Plugin git info takes precedence over live git info.
+        if let Some(ref plugin) = app.plugin_git_info {
+            let fg = match plugin.state.as_str() {
+                "conflict" => theme.git_conflict,
+                "rebase" | "merge" => theme.git_progress,
+                "dirty" => theme.git_dirty,
+                _ => theme.git_clean,
+            };
+            let label = if plugin.dirty {
+                format!(" [{} +1]", plugin.branch)
+            } else {
+                format!(" [{}]", plugin.branch)
+            };
+            spans.push(Span::styled(label, base.fg(fg)));
+        } else if let Some(ref info) = app.git_info {
             // Semantic git color: green clean, yellow dirty, red for a detached
             // HEAD, orange while a rebase/merge is in progress.
             let fg = match info.head {

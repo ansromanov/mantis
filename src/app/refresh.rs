@@ -159,14 +159,72 @@ impl App {
         for (name, action, params) in self.plugin_manager.take_actions() {
             match action.as_str() {
                 "show_message" => {
-                    if let Some(msg) = params.get("message") {
+                    if let Some(msg) = params.get("message").and_then(|v| v.as_str()) {
                         self.plugin_message = Some(format!("[{name}] {msg}"));
                     }
                 }
                 "open_file" => {
-                    if let Some(path_str) = params.get("path") {
+                    if let Some(path_str) = params.get("path").and_then(|v| v.as_str()) {
                         self.open_and_reveal(std::path::Path::new(path_str));
                     }
+                }
+                "set_file_statuses" => {
+                    if let Some(obj) = params.as_object() {
+                        for (path_str, status_val) in obj {
+                            let Some(status_str) = status_val.as_str() else {
+                                continue;
+                            };
+                            let git_status = match status_str {
+                                "modified" | "renamed" | "conflict" => {
+                                    crate::git::GitStatus::Modified
+                                }
+                                "added" | "untracked" => crate::git::GitStatus::New,
+                                "deleted" => crate::git::GitStatus::Deleted,
+                                "ignored" => crate::git::GitStatus::Ignored,
+                                _ => continue,
+                            };
+                            self.git_status_map
+                                .insert(std::path::PathBuf::from(path_str), git_status);
+                        }
+                    }
+                }
+                "set_blame_data" => {
+                    let path = match params.get("path").and_then(|v| v.as_str()) {
+                        Some(p) => std::path::PathBuf::from(p),
+                        None => continue,
+                    };
+                    let lines: Vec<String> = match params.get("lines").and_then(|v| v.as_array()) {
+                        Some(arr) => arr
+                            .iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect(),
+                        None => continue,
+                    };
+                    self.plugin_blame.insert(path, lines);
+                }
+                "set_status_bar_git_info" => {
+                    let branch = params
+                        .get("branch")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    let head = params
+                        .get("head")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    let dirty = params.get("dirty").and_then(|v| v.as_str()) == Some("true");
+                    let state = params
+                        .get("state")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("clean")
+                        .to_string();
+                    self.plugin_git_info = Some(super::PluginGitInfo {
+                        branch,
+                        head,
+                        dirty,
+                        state,
+                    });
                 }
                 _ => {}
             }

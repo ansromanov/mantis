@@ -19,7 +19,6 @@
 //!   {"event":"action","action":"show_message","params":{"message":"hello"}}
 //!   {"event":"action","action":"open_file","params":{"path":"/tmp/x"}}
 
-use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -65,7 +64,7 @@ struct FromPlugin {
     event: String,
     action: Option<String>,
     #[serde(default)]
-    params: HashMap<String, String>,
+    params: serde_json::Value,
 }
 
 /// A single running plugin subprocess with background reader and writer threads.
@@ -74,7 +73,7 @@ pub struct Plugin {
     child: Option<Child>,
     /// Sends serialised JSON lines to the plugin's stdin via the writer thread.
     write_tx: Option<Sender<String>>,
-    action_rx: Option<std::sync::mpsc::Receiver<(String, HashMap<String, String>)>>,
+    action_rx: Option<std::sync::mpsc::Receiver<(String, serde_json::Value)>>,
     _reader_thread: Option<std::thread::JoinHandle<()>>,
     _writer_thread: Option<std::thread::JoinHandle<()>>,
 }
@@ -167,7 +166,7 @@ impl Plugin {
         let _ = write_tx.send(json);
     }
 
-    fn drain_actions(&mut self) -> Vec<(String, HashMap<String, String>)> {
+    fn drain_actions(&mut self) -> Vec<(String, serde_json::Value)> {
         let mut actions = Vec::new();
         let Some(ref rx) = self.action_rx else {
             return actions;
@@ -250,7 +249,7 @@ impl Plugin {
 pub struct PluginManager {
     entries: Vec<(String, PluginEntry)>,
     plugins: Vec<Plugin>,
-    pending_actions: Vec<(String, String, HashMap<String, String>)>,
+    pending_actions: Vec<(String, String, serde_json::Value)>,
     spawn_errors: Vec<String>,
 }
 
@@ -372,7 +371,7 @@ impl PluginManager {
 
     /// Consumes and returns all buffered plugin actions since the last call:
     /// `Vec<(plugin_name, action, params)>`.
-    pub fn take_actions(&mut self) -> Vec<(String, String, HashMap<String, String>)> {
+    pub fn take_actions(&mut self) -> Vec<(String, String, serde_json::Value)> {
         std::mem::take(&mut self.pending_actions)
     }
 

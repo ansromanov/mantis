@@ -55,6 +55,20 @@ pub enum Focus {
     Content,
 }
 
+/// Git info provided by a plugin for the status bar, replacing the live
+/// `git::repo_info()` call when set.
+pub struct PluginGitInfo {
+    /// Branch name (e.g. "main", "feature/x").
+    pub branch: String,
+    /// Short commit hash (e.g. "abc1234").
+    #[allow(dead_code)]
+    pub head: String,
+    /// Whether the working tree is dirty.
+    pub dirty: bool,
+    /// State label: "clean", "dirty", "conflict", "rebase", or "merge".
+    pub state: String,
+}
+
 /// Central application state. Holds the file tree, content buffers, overlay
 /// state, geometry captured during rendering, and configuration.
 pub struct App {
@@ -217,6 +231,13 @@ pub struct App {
     pub plugin_manager: PluginManager,
     /// Most recent plugin message, shown in the status bar.
     pub plugin_message: Option<String>,
+    /// Per-file blame annotations provided by a plugin, keyed by absolute path.
+    /// Each entry is a Vec of formatted blame strings (one per line, 0-indexed).
+    /// Checked before the live `git::file_blame()` call in the content pane.
+    pub plugin_blame: HashMap<PathBuf, Vec<String>>,
+    /// Git branch/HEAD/dirty/state info provided by a plugin for the status bar.
+    /// When set, displayed instead of the live `git_info`.
+    pub plugin_git_info: Option<PluginGitInfo>,
     /// Transient status message (e.g. "path copied"), shown until the next keypress.
     pub status_message: Option<String>,
     /// Breadcrumb segment areas recorded during the last render, used for mouse
@@ -376,6 +397,8 @@ impl App {
             loading: false,
             plugin_manager,
             plugin_message: plugin_spawn_error,
+            plugin_blame: HashMap::new(),
+            plugin_git_info: None,
             status_message: None,
             breadcrumb_areas: Vec::new(),
         };

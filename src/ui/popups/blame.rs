@@ -50,8 +50,38 @@ pub(crate) fn draw_blame_panel(f: &mut Frame, app: &App, area: Rect) {
     let inner = block.inner(popup);
     f.render_widget(block, popup);
 
-    let blame = crate::git::file_blame(&app.root, path);
-    if blame.is_empty() {
+    // Plugin-provided blame data takes precedence over live git blame.
+    let blame_raw: Option<Vec<String>> = app.plugin_blame.get(path).cloned();
+    let blame_lines: Vec<crate::git::BlameLine> = if let Some(plugin_lines) = blame_raw {
+        if !plugin_lines.is_empty() {
+            // Parse plugin blame strings into BlameLine structs.
+            plugin_lines
+                .iter()
+                .enumerate()
+                .map(|(i, line)| {
+                    let short_hash = line.chars().take(7).collect::<String>();
+                    crate::git::BlameLine {
+                        commit_hash: short_hash.clone(),
+                        short_hash,
+                        author: String::new(),
+                        date_relative: String::new(),
+                        line_no: (i + 1) as u32,
+                    }
+                })
+                .collect()
+        } else {
+            Vec::new()
+        }
+    } else {
+        let git_lines = crate::git::file_blame(&app.root, path);
+        if !git_lines.is_empty() {
+            git_lines
+        } else {
+            Vec::new()
+        }
+    };
+
+    if blame_lines.is_empty() {
         f.render_widget(
             Paragraph::new(Line::from(Span::styled(
                 " No blame available — file is untracked or not in a git repo.",
@@ -63,7 +93,7 @@ pub(crate) fn draw_blame_panel(f: &mut Frame, app: &App, area: Rect) {
     }
 
     let by_line: HashMap<u32, &crate::git::BlameLine> =
-        blame.iter().map(|b| (b.line_no, b)).collect();
+        blame_lines.iter().map(|b| (b.line_no, b)).collect();
 
     let dim = Style::default().fg(theme.dim);
     let max_rows = inner.height as usize;

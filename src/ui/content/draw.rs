@@ -87,22 +87,38 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     const BLAME_COL_WIDTH: usize = 26;
     let blame_annotations: Vec<String> = if app.show_blame && !app.is_diff {
         if let Some(path) = &app.current_file {
-            let lines = crate::git::file_blame(&app.root, path);
-            if lines.is_empty() {
-                Vec::new()
-            } else {
-                let max_line = lines.iter().map(|l| l.line_no as usize).max().unwrap_or(0);
-                let mut annotations = vec![String::new(); max_line + 1];
-                for bl in &lines {
-                    let idx = (bl.line_no as usize).saturating_sub(1);
-                    if idx < annotations.len() {
-                        let author: String = bl.author.chars().take(10).collect();
-                        let date: String = bl.date_relative.chars().take(6).collect();
-                        annotations[idx] = format!("{} {:<10} {:<6} ", bl.short_hash, author, date);
-                    }
+            // Plugin-provided blame data takes precedence over live git blame.
+            let lines: Option<Vec<String>> = app.plugin_blame.get(path).cloned();
+            let lines = if let Some(plugin_lines) = lines {
+                if !plugin_lines.is_empty() {
+                    plugin_lines
+                } else {
+                    Vec::new()
                 }
-                annotations
-            }
+            } else {
+                let git_lines = crate::git::file_blame(&app.root, path);
+                if git_lines.is_empty() {
+                    Vec::new()
+                } else {
+                    let max_line = git_lines
+                        .iter()
+                        .map(|l| l.line_no as usize)
+                        .max()
+                        .unwrap_or(0);
+                    let mut annotations = vec![String::new(); max_line + 1];
+                    for bl in &git_lines {
+                        let idx = (bl.line_no as usize).saturating_sub(1);
+                        if idx < annotations.len() {
+                            let author: String = bl.author.chars().take(10).collect();
+                            let date: String = bl.date_relative.chars().take(6).collect();
+                            annotations[idx] =
+                                format!("{} {:<10} {:<6} ", bl.short_hash, author, date);
+                        }
+                    }
+                    annotations
+                }
+            };
+            lines
         } else {
             Vec::new()
         }
