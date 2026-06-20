@@ -19,6 +19,7 @@ tree_width = 28           # tree panel width, as a percent of the terminal
 word_wrap = false         # wrap long lines in the content panel
 line_numbers = true       # show the line-number gutter in the content panel
 show_file_info = true     # show encoding and line-ending info in the status bar
+recent_files_count = 10   # number of recently opened files to remember
 ```
 
 ## Keybindings
@@ -39,6 +40,7 @@ search_content = ["f"]
 reload = ["r"]
 switch_panel = ["Tab"]
 file_history = ["H"]
+recent_files = ["ctrl+o"]
 theme_picker = ["t"]
 command_palette = ["ctrl+p"]
 open_in_editor = ["e"]

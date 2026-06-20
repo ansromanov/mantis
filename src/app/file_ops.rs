@@ -9,12 +9,12 @@
 //! synchronous variants used at startup and in tests. It also installs the
 //! per-file watcher so an open file auto-reloads when it changes on disk.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use notify::{EventKind, RecursiveMode, Watcher};
 
 use crate::git::GitStatus;
-use crate::search::HistoryState;
+use crate::search::{HistoryState, RecentFilesState};
 
 use super::loader::{compute_diff_load, compute_file_load, DiffLoad, FileLoad};
 use super::{diff_line_style, App, Focus};
@@ -253,7 +253,8 @@ impl App {
         self.clear_selection();
         // Drop visual-line mode only when navigating to a different file; a same
         // -file reopen (reload / external edit) keeps the selection in place.
-        if self.current_file.as_deref() != Some(path) {
+        let is_new_file = self.current_file.as_deref() != Some(path);
+        if is_new_file {
             self.exit_visual_line();
         }
 
@@ -281,9 +282,49 @@ impl App {
             self.current_file = Some(path.to_path_buf());
             self.set_file_watch(Some(path));
             self.plugin_manager.on_file_open(path);
+            if is_new_file {
+                self.push_recent(path.to_path_buf());
+            }
         } else {
             self.current_file = None;
             self.set_file_watch(None);
+        }
+    }
+
+    /// Adds `path` to the front of the recent-files ring, deduplicating
+    /// and capping to `config.recent_files_count`.
+    fn push_recent(&mut self, path: PathBuf) {
+        self.recent_ring.retain(|p| p != &path);
+        self.recent_ring.insert(0, path);
+        let cap = self.config.recent_files_count.max(1);
+        self.recent_ring.truncate(cap);
+    }
+
+    /// Opens the recent-files overlay. Does nothing when the ring is empty
+    /// or every entry is the currently open file.
+    pub(super) fn open_recent_files(&mut self) {
+        let current = self.current_file.clone();
+        let paths: Vec<PathBuf> = self
+            .recent_ring
+            .iter()
+            .filter(|p| Some(*p) != current.as_ref())
+            .cloned()
+            .collect();
+        if paths.is_empty() {
+            return;
+        }
+        self.recent_files = Some(RecentFilesState::new(paths));
+    }
+
+    /// Opens the file selected in the recent-files overlay and closes it.
+    pub(super) fn activate_recent_selection(&mut self) {
+        let path = self
+            .recent_files
+            .as_ref()
+            .and_then(|r| r.selected_path().cloned());
+        self.recent_files = None;
+        if let Some(path) = path {
+            self.open_and_reveal(&path);
         }
     }
 
@@ -348,3 +389,7 @@ impl App {
         self.set_file_watch(None);
     }
 }
+
+#[cfg(test)]
+#[path = "file_ops_test.rs"]
+mod tests;

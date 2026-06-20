@@ -1,13 +1,13 @@
 //! Mouse event dispatch for `App`.
 //!
 //! `handle_mouse` mirrors the keyboard overlay precedence chain for pointer
-//! input: theme picker, command palette, history, and search overlays intercept
-//! clicks first, then events route to the tree or content panel by hit-testing
-//! the `Rect`s recorded during the last render. It handles left-click selection,
-//! drag-selection of text, splitter dragging to resize the tree pane, scrollbar
-//! dragging, wheel scrolling, and double-click to open a picker result. All
-//! coordinate math must account for the panels' scroll offsets, which are also
-//! captured at render time.
+//! input: theme picker, command palette, history, recent files, and search
+//! overlays intercept clicks first, then events route to the tree or content
+//! panel by hit-testing the `Rect`s recorded during the last render. It handles
+//! left-click selection, drag-selection of text, splitter dragging to resize the
+//! tree pane, scrollbar dragging, wheel scrolling, and double-click to open a
+//! picker result. All coordinate math must account for the panels' scroll
+//! offsets, which are also captured at render time.
 
 use std::time::{Duration, Instant};
 
@@ -37,6 +37,10 @@ impl App {
         }
         if self.history.is_some() {
             self.handle_history_mouse(ev);
+            return;
+        }
+        if self.recent_files.is_some() {
+            self.handle_recent_mouse(ev);
             return;
         }
         if self.search.is_some() {
@@ -186,6 +190,44 @@ impl App {
         }
         if self.content_scroll != scroll_before {
             self.mark_content_scrolled();
+        }
+    }
+
+    /// Handles mouse events on the recent-files overlay: click to open,
+    /// outside click to close, scroll to navigate.
+    fn handle_recent_mouse(&mut self, ev: MouseEvent) {
+        match ev.kind {
+            MouseEventKind::Down(MouseButton::Left) => {
+                if rect_contains(self.recent_area, ev.column, ev.row) {
+                    let row = (ev.row - self.recent_area.y) as usize;
+                    let index = self.recent_offset + row;
+                    let in_range = self
+                        .recent_files
+                        .as_ref()
+                        .is_some_and(|r| index < r.results_len());
+                    if in_range {
+                        if let Some(r) = &mut self.recent_files {
+                            r.selected = index;
+                        }
+                        self.activate_recent_selection();
+                    }
+                } else {
+                    self.recent_files = None;
+                }
+            }
+            MouseEventKind::ScrollUp => {
+                if let Some(r) = &mut self.recent_files {
+                    r.selected = r.selected.saturating_sub(1);
+                }
+            }
+            MouseEventKind::ScrollDown => {
+                if let Some(r) = &mut self.recent_files {
+                    if r.selected + 1 < r.results_len() {
+                        r.selected += 1;
+                    }
+                }
+            }
+            _ => {}
         }
     }
 

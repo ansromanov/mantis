@@ -2,12 +2,12 @@
 //!
 //! `handle_normal_key` dispatches the main editing surface: global actions
 //! (quit, help, toggle hidden files, reload, open the search/history/theme/
-//! command overlays, theme cycling, git-mode toggles) plus focus-specific
-//! movement that it forwards to the tree or content handlers based on
-//! `App::focus`. It also handles the entry into visual-line mode and clearing an
-//! active text selection. This is the busiest handler in the app; keep new
-//! global keybindings here and route panel-specific motion to the tree/content
-//! helpers rather than inlining it.
+//! recent-files/command overlays, theme cycling, git-mode toggles) plus
+//! focus-specific movement that it forwards to the tree or content handlers
+//! based on `App::focus`. It also handles the entry into visual-line mode and
+//! clearing an active text selection. This is the busiest handler in the app;
+//! keep new global keybindings here and route panel-specific motion to the
+//! tree/content helpers rather than inlining it.
 
 use crossterm::event::{KeyCode, KeyEvent};
 
@@ -77,6 +77,8 @@ impl App {
             self.search = Some(s);
         } else if pressed(&k.file_history, &key) {
             self.open_file_history();
+        } else if pressed(&k.recent_files, &key) {
+            self.open_recent_files();
         } else if pressed(&k.theme_picker, &key) {
             self.theme_picker = Some(ThemePicker::default());
         } else if pressed(&k.command_palette, &key) {

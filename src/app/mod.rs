@@ -1,7 +1,7 @@
 //! Central application state: the `App` struct that ties the whole TUI together.
 //!
 //! `App` holds the file tree, content/diff buffers, every overlay's state
-//! (search, history, theme picker, command palette, help, about, blame), the
+//! (search, history, theme picker, command palette, recent files, help, about, blame), the
 //! resolved theme and keymap, and the geometry captured during the last render
 //! so mouse handlers can hit-test clicks. Construction (`App::new`) walks the
 //! root, loads git status, and opens the first file; `reload`/`tick` keep the
@@ -23,7 +23,9 @@ use crate::config::{self, Config, Keymap};
 use crate::git::GitStatus;
 use crate::highlight::Highlighter;
 use crate::plugin::PluginManager;
-use crate::search::{CommandPalette, HistoryState, InFileSearch, SearchState, ThemePicker};
+use crate::search::{
+    CommandPalette, HistoryState, InFileSearch, RecentFilesState, SearchState, ThemePicker,
+};
 use crate::selection::{TextSelection, VisualLine};
 use crate::theme::Theme;
 use crate::tree::{build_visible, TreeNode};
@@ -95,6 +97,15 @@ pub struct App {
     pub command_palette: Option<CommandPalette>,
     pub history: Option<HistoryState>,
     pub theme_picker: Option<ThemePicker>,
+    /// Persistent ring of recently opened file paths, most-recent-first, capped at
+    /// `config.recent_files_count`. Maintained across overlay open/close cycles.
+    pub recent_ring: Vec<PathBuf>,
+    /// State for the recent-files overlay. `Some` while the picker is open.
+    pub recent_files: Option<RecentFilesState>,
+    /// Hit area of the recent-files list recorded during the last render.
+    pub recent_area: Rect,
+    /// Scroll offset of the recent-files list recorded during the last render.
+    pub recent_offset: usize,
     pub show_hidden: bool,
     pub ignore_gitignore: bool,
     pub tree_width: u16,
@@ -281,6 +292,10 @@ impl App {
             command_palette: None,
             history: None,
             theme_picker: None,
+            recent_ring: Vec::new(),
+            recent_files: None,
+            recent_area: Rect::default(),
+            recent_offset: 0,
             show_hidden: cfg.show_hidden,
             ignore_gitignore: cfg.ignore_gitignore,
             tree_width: cfg.tree_width,
