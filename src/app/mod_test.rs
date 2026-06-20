@@ -4297,3 +4297,23 @@ fn opening_different_file_exits_visual_line() {
     assert!(!app.blame_panel);
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn copy_path_no_file_selected() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.current_file = None;
+    app.copy_path_to_clipboard(false);
+    assert_eq!(app.status_message.as_deref(), Some("no file selected"));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn copy_path_no_file_selected_relative() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.current_file = None;
+    app.copy_path_to_clipboard(true);
+    assert_eq!(app.status_message.as_deref(), Some("no file selected"));
+    fs::remove_dir_all(&root).ok();
+}
