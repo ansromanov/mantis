@@ -8,7 +8,10 @@ fn key(code: KeyCode, mods: KeyModifiers) -> KeyEvent {
 
 #[test]
 fn plain_char() {
-    assert_eq!(key_event_to_string(&key(KeyCode::Char('q'), KeyModifiers::NONE)), "q");
+    assert_eq!(
+        key_event_to_string(&key(KeyCode::Char('q'), KeyModifiers::NONE)),
+        "q"
+    );
 }
 
 #[test]
@@ -30,30 +33,72 @@ fn alt_modifier() {
 #[test]
 fn ctrl_alt_modifier() {
     assert_eq!(
-        key_event_to_string(&key(KeyCode::Char('x'), KeyModifiers::CONTROL | KeyModifiers::ALT)),
+        key_event_to_string(&key(
+            KeyCode::Char('x'),
+            KeyModifiers::CONTROL | KeyModifiers::ALT
+        )),
         "ctrl+alt+x"
     );
 }
 
 #[test]
 fn named_keys() {
-    assert_eq!(key_event_to_string(&key(KeyCode::Enter, KeyModifiers::NONE)), "Enter");
-    assert_eq!(key_event_to_string(&key(KeyCode::Tab, KeyModifiers::NONE)), "Tab");
-    assert_eq!(key_event_to_string(&key(KeyCode::Esc, KeyModifiers::NONE)), "Esc");
-    assert_eq!(key_event_to_string(&key(KeyCode::Backspace, KeyModifiers::NONE)), "Backspace");
-    assert_eq!(key_event_to_string(&key(KeyCode::Up, KeyModifiers::NONE)), "Up");
-    assert_eq!(key_event_to_string(&key(KeyCode::Down, KeyModifiers::NONE)), "Down");
-    assert_eq!(key_event_to_string(&key(KeyCode::Left, KeyModifiers::NONE)), "Left");
-    assert_eq!(key_event_to_string(&key(KeyCode::Right, KeyModifiers::NONE)), "Right");
-    assert_eq!(key_event_to_string(&key(KeyCode::PageUp, KeyModifiers::NONE)), "PageUp");
-    assert_eq!(key_event_to_string(&key(KeyCode::PageDown, KeyModifiers::NONE)), "PageDown");
-    assert_eq!(key_event_to_string(&key(KeyCode::Home, KeyModifiers::NONE)), "Home");
-    assert_eq!(key_event_to_string(&key(KeyCode::End, KeyModifiers::NONE)), "End");
+    assert_eq!(
+        key_event_to_string(&key(KeyCode::Enter, KeyModifiers::NONE)),
+        "Enter"
+    );
+    assert_eq!(
+        key_event_to_string(&key(KeyCode::Tab, KeyModifiers::NONE)),
+        "Tab"
+    );
+    assert_eq!(
+        key_event_to_string(&key(KeyCode::Esc, KeyModifiers::NONE)),
+        "Esc"
+    );
+    assert_eq!(
+        key_event_to_string(&key(KeyCode::Backspace, KeyModifiers::NONE)),
+        "Backspace"
+    );
+    assert_eq!(
+        key_event_to_string(&key(KeyCode::Up, KeyModifiers::NONE)),
+        "Up"
+    );
+    assert_eq!(
+        key_event_to_string(&key(KeyCode::Down, KeyModifiers::NONE)),
+        "Down"
+    );
+    assert_eq!(
+        key_event_to_string(&key(KeyCode::Left, KeyModifiers::NONE)),
+        "Left"
+    );
+    assert_eq!(
+        key_event_to_string(&key(KeyCode::Right, KeyModifiers::NONE)),
+        "Right"
+    );
+    assert_eq!(
+        key_event_to_string(&key(KeyCode::PageUp, KeyModifiers::NONE)),
+        "PageUp"
+    );
+    assert_eq!(
+        key_event_to_string(&key(KeyCode::PageDown, KeyModifiers::NONE)),
+        "PageDown"
+    );
+    assert_eq!(
+        key_event_to_string(&key(KeyCode::Home, KeyModifiers::NONE)),
+        "Home"
+    );
+    assert_eq!(
+        key_event_to_string(&key(KeyCode::End, KeyModifiers::NONE)),
+        "End"
+    );
 }
 
 #[test]
 fn space_char() {
-    assert_eq!(key_event_to_string(&key(KeyCode::Char(' '), KeyModifiers::NONE)), "Space");
+    assert_eq!(
+        key_event_to_string(&key(KeyCode::Char(' '), KeyModifiers::NONE)),
+        "Space"
+    );
 }
 
 #[test]
@@ -73,8 +118,14 @@ fn default_plugin_dir_ends_with_suffix() {
     let components: Vec<_> = dir.components().collect();
     let last_two: Vec<_> = components.iter().rev().take(2).collect();
     // .../<platform-config>/tree-viewer/plugins
-    assert_eq!(last_two[0], &std::path::Component::Normal("plugins".as_ref()));
-    assert_eq!(last_two[1], &std::path::Component::Normal("tree-viewer".as_ref()));
+    assert_eq!(
+        last_two[0],
+        &std::path::Component::Normal("plugins".as_ref())
+    );
+    assert_eq!(
+        last_two[1],
+        &std::path::Component::Normal("tree-viewer".as_ref())
+    );
 }
 
 #[test]
