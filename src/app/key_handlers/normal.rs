@@ -185,6 +185,10 @@ impl App {
                 }
                 self.scroll_tree_into_view();
             }
+        } else if pressed(&k.tree_collapse_all, &key) {
+            self.collapse_all();
+        } else if pressed(&k.tree_expand_all, &key) {
+            self.expand_all();
         }
     }
 

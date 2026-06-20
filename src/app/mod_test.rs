@@ -4404,3 +4404,111 @@ fn plugin_picker_command_palette_entry_exists() {
         "command palette must include open_plugin_picker"
     );
 }
+
+// -- collapse / expand all ----------------------------------------------------
+
+#[test]
+fn collapse_all_clears_expanded() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+
+    // Expand the sub/ directory so something is in the expanded set.
+    app.expanded.insert(root.join("sub"));
+    app.rebuild();
+    assert!(!app.expanded.is_empty(), "sub should be expanded");
+
+    app.collapse_all();
+
+    assert!(
+        app.expanded.is_empty(),
+        "collapse_all must clear all expansions"
+    );
+    // After collapse the tree should only contain top-level entries.
+    assert!(
+        app.nodes.iter().all(|n| n.depth == 0),
+        "all nodes must be at depth 0 after collapse_all"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn expand_all_exposes_nested_files() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+
+    // Initially the tree only has top-level entries (nothing expanded).
+    let before_count = app.nodes.len();
+    app.expand_all();
+
+    assert!(
+        app.nodes.len() > before_count,
+        "expand_all must expose at least the nested c.txt"
+    );
+    assert!(
+        app.nodes
+            .iter()
+            .any(|n| n.path == root.join("sub").join("c.txt")),
+        "c.txt inside sub/ must be visible after expand_all"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn collapse_all_key_binding() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+
+    // Pre-expand sub/.
+    app.expanded.insert(root.join("sub"));
+    app.rebuild();
+
+    // Press the default collapse-all key ('-').
+    app.handle_key(KeyEvent::new(KeyCode::Char('-'), KeyModifiers::empty()));
+
+    assert!(
+        app.expanded.is_empty(),
+        "'-' key must collapse all directories"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn expand_all_key_binding() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+
+    let before_count = app.nodes.len();
+
+    // Press the default expand-all key ('=').
+    app.handle_key(KeyEvent::new(KeyCode::Char('='), KeyModifiers::empty()));
+
+    assert!(
+        app.nodes.len() > before_count,
+        "'=' key must expand all directories"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn collapse_all_preserves_selection_when_visible() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+
+    // Select the sub/ directory (it should be at index 0 since dirs sort first).
+    let sub_idx = app
+        .nodes
+        .iter()
+        .position(|n| n.path == root.join("sub"))
+        .unwrap();
+    app.tree_selected = sub_idx;
+
+    app.collapse_all();
+
+    // sub/ is still a top-level node, so the selection should be preserved.
+    assert_eq!(
+        app.nodes[app.tree_selected].path,
+        root.join("sub"),
+        "selection should remain on sub/ after collapse_all"
+    );
+    fs::remove_dir_all(&root).ok();
+}

@@ -59,6 +59,8 @@ nav_down = ["Down", "j"]
 
 tree_expand = ["Enter", "Right", "l"]
 tree_collapse = ["Left", "h"]
+tree_collapse_all = ["-"]
+tree_expand_all = ["="]
 
 content_left = ["Left"]
 content_right = ["Right"]

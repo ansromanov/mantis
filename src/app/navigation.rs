@@ -257,6 +257,27 @@ impl App {
         }
     }
 
+    /// Collapses every expanded directory, resetting the tree to its top-level
+    /// view. The selection is kept if its path is still visible; otherwise it
+    /// falls back to the nearest reachable index.
+    pub(super) fn collapse_all(&mut self) {
+        self.expanded.clear();
+        self.rebuild();
+        self.scroll_tree_into_view();
+    }
+
+    /// Expands every directory in the tree so all files are visible. The
+    /// selection is preserved by path across the rebuild.
+    pub(super) fn expand_all(&mut self) {
+        let dirs =
+            crate::tree::collect_all_dirs(&self.root, self.show_hidden, self.ignore_gitignore);
+        for dir in dirs {
+            self.expanded.insert(dir);
+        }
+        self.rebuild();
+        self.scroll_tree_into_view();
+    }
+
     /// Opens the currently selected search result and closes the overlay.
     /// Shared by the Enter key and a mouse click in the results list.
     pub(super) fn activate_search_selection(&mut self) {
