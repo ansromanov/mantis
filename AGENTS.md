@@ -128,6 +128,20 @@ new module, create its `_test.rs` companion at the same time. Cross-module /
 black-box tests live in the integration `tests/` directory. The `split-tests` skill
 (`.agent/skills/split-tests/`) automates extracting any inline block.
 
+## Documentation
+
+User-facing docs live in `docs/src/`. Any PR that adds, removes, or changes a
+user-visible feature (config keys, keybindings, plugin protocol, new UI modes)
+**must** update the relevant doc page in the same commit. Treat doc updates the
+same way as the `//!` module-doc rule: part of the PR, not a follow-up.
+
+Key pages to consider when changing code:
+- Plugin system (`src/plugin.rs`, `src/config/mod.rs`) → `docs/src/plugins.md`,
+  `docs/src/plugin-development.md`
+- Config options (`src/config/`) → `docs/src/configuration.md`
+- Keybindings (`src/config/mod.rs`, `tv.toml`) → `docs/src/configuration.md`
+- New UI features → `docs/src/usage.md` or a new page added to `docs/src/SUMMARY.md`
+
 ## File size limit
 
 Keep every file under **600 lines** (code and tests alike). When a source file

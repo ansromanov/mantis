@@ -13,7 +13,9 @@
 - [Usage & Keybindings](usage.md)
 - [Git Features](git.md)
 - [Configuration](configuration.md)
+- [Plugins](plugins.md)
 
 # Reference
 
 - [Development](development.md)
+- [Plugin Development](plugin-development.md)
