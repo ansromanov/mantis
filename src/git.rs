@@ -137,7 +137,9 @@ pub fn repo_info(dir: &Path) -> Option<GitRepoInfo> {
 /// Returns how many commits `HEAD` is ahead of and behind its upstream.
 ///
 /// Missing upstreams and git errors return `None` so callers can omit the
-/// indicator entirely.
+/// indicator entirely. This uses `git rev-list --left-right --count` instead of
+/// re-parsing `git status` so upstream tracking errors stay explicit and the
+/// missing-upstream case can degrade cleanly.
 pub fn ahead_behind(repo_dir: &Path) -> Option<(u32, u32)> {
     let out = Command::new("git")
         .arg("-C")
@@ -156,13 +158,13 @@ pub fn ahead_behind(repo_dir: &Path) -> Option<(u32, u32)> {
     Some((ahead, behind))
 }
 
-fn parse_branch_line(line: &str) -> (GitHead, usize, usize) {
+fn parse_branch_line(line: &str) -> GitHead {
     let line = match line.strip_prefix("## ") {
         Some(l) => l,
-        None => return (GitHead::default(), 0, 0),
+        None => return GitHead::default(),
     };
 
-    let head = if line.starts_with("HEAD (no branch)")
+    if line.starts_with("HEAD (no branch)")
         || line.starts_with("Initial commit on ")
         || line.starts_with("No commits yet on ")
     {
@@ -176,31 +178,7 @@ fn parse_branch_line(line: &str) -> (GitHead, usize, usize) {
             line
         };
         GitHead::Branch(branch.to_string())
-    };
-
-    let (ahead, behind) = if let Some(start) = line.find('[') {
-        let rest = &line[start + 1..];
-        if let Some(end) = rest.find(']') {
-            let inner = &rest[..end];
-            let mut a = 0usize;
-            let mut b = 0usize;
-            for part in inner.split(',') {
-                let p = part.trim();
-                if let Some(n) = p.strip_prefix("ahead ") {
-                    a = n.trim().parse().unwrap_or(0);
-                } else if let Some(n) = p.strip_prefix("behind ") {
-                    b = n.trim().parse().unwrap_or(0);
-                }
-            }
-            (a, b)
-        } else {
-            (0, 0)
-        }
-    } else {
-        (0, 0)
-    };
-
-    (head, ahead, behind)
+    }
 }
 
 fn parse_repo_info(text: &str) -> GitRepoInfo {
@@ -208,7 +186,7 @@ fn parse_repo_info(text: &str) -> GitRepoInfo {
 
     // First line is the branch header: "## ..."
     let branch_line = lines.next().unwrap_or("");
-    let (head, _, _) = parse_branch_line(branch_line);
+    let head = parse_branch_line(branch_line);
 
     let mut info = GitRepoInfo {
         head,
