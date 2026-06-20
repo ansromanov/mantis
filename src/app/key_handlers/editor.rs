@@ -131,6 +131,8 @@ impl App {
                     self.mark_content_scrolled();
                 }
             }
+            Some("copy_path") => self.copy_path_to_clipboard(false),
+            Some("copy_relative_path") => self.copy_path_to_clipboard(true),
             _ => {}
         }
     }
