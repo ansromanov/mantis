@@ -201,12 +201,14 @@ impl App {
                 if rect_contains(self.recent_area, ev.column, ev.row) {
                     let row = (ev.row - self.recent_area.y) as usize;
                     let index = self.recent_offset + row;
-                    if let Some(r) = &mut self.recent_files {
-                        if index < r.results_len() {
+                    let in_range =
+                        self.recent_files.as_ref().is_some_and(|r| index < r.results_len());
+                    if in_range {
+                        if let Some(r) = &mut self.recent_files {
                             r.selected = index;
                         }
+                        self.activate_recent_selection();
                     }
-                    self.activate_recent_selection();
                 } else {
                     self.recent_files = None;
                 }

@@ -64,7 +64,7 @@ pub(crate) fn draw_recent(f: &mut Frame, app: &mut App, area: Rect) {
         parts[1],
     );
 
-    let root = &app.root.clone();
+    let root = &app.root;
     let recent = app.recent_files.as_ref().unwrap();
     let items: Vec<ListItem> = recent
         .filtered

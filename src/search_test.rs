@@ -327,3 +327,73 @@ fn search_state_reload_files() {
     assert_eq!(s.file_results.len(), 2);
     fs::remove_dir_all(&root).ok();
 }
+
+// -- RecentFilesState -------------------------------------------------------
+
+fn sample_paths() -> Vec<PathBuf> {
+    vec![
+        PathBuf::from("/tmp/alpha.rs"),
+        PathBuf::from("/tmp/beta.rs"),
+        PathBuf::from("/tmp/gamma.toml"),
+    ]
+}
+
+#[test]
+fn recent_files_state_starts_with_all_paths() {
+    let r = RecentFilesState::new(sample_paths());
+    assert_eq!(r.results_len(), 3);
+    assert_eq!(r.selected, 0);
+    assert!(r.query.is_empty());
+}
+
+#[test]
+fn recent_files_state_push_filters() {
+    let mut r = RecentFilesState::new(sample_paths());
+    // 'h' only appears in "/tmp/alpha.rs" (not in beta or gamma)
+    r.push('h');
+    assert!(r.results_len() < 3);
+    let path = r.selected_path().unwrap();
+    assert!(path.to_string_lossy().contains('h'));
+}
+
+#[test]
+fn recent_files_state_pop_restores() {
+    let mut r = RecentFilesState::new(sample_paths());
+    r.push('h');
+    let after_push = r.results_len();
+    r.pop();
+    assert_eq!(r.results_len(), 3);
+    assert!(after_push < 3);
+}
+
+#[test]
+fn recent_files_state_selected_path_in_bounds() {
+    let mut r = RecentFilesState::new(sample_paths());
+    assert_eq!(r.selected_path().unwrap(), &PathBuf::from("/tmp/alpha.rs"));
+    r.selected = 2;
+    assert_eq!(r.selected_path().unwrap(), &PathBuf::from("/tmp/gamma.toml"));
+}
+
+#[test]
+fn recent_files_state_selected_path_returns_none_when_empty() {
+    let paths: Vec<PathBuf> = vec![];
+    let r = RecentFilesState::new(paths);
+    assert!(r.selected_path().is_none());
+}
+
+#[test]
+fn recent_files_state_selected_path_returns_none_out_of_bounds() {
+    let mut r = RecentFilesState::new(sample_paths());
+    r.selected = 99;
+    assert!(r.selected_path().is_none());
+}
+
+#[test]
+fn recent_files_state_no_match_gives_empty_results() {
+    let mut r = RecentFilesState::new(sample_paths());
+    for c in "zzzzzzz".chars() {
+        r.push(c);
+    }
+    assert_eq!(r.results_len(), 0);
+    assert!(r.selected_path().is_none());
+}
