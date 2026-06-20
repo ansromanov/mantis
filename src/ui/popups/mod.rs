@@ -35,3 +35,7 @@ pub(super) use theme::draw_theme;
 #[cfg(test)]
 #[path = "popups_test.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "popups_plugin_test.rs"]
+mod plugin_tests;

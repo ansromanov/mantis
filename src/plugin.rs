@@ -204,6 +204,34 @@ impl Plugin {
             }
         }
     }
+
+    /// Non-blocking shutdown: drops stdin (signals the plugin to exit), then
+    /// moves the child process into a background thread that waits up to 2 s
+    /// for a clean exit before force-killing it. The reader/writer thread
+    /// handles are dropped here and exit naturally as their channels close.
+    fn close_in_background(mut self) {
+        drop(self.write_tx.take());
+        if let Some(mut child) = self.child.take() {
+            let name = self.name.clone();
+            std::thread::Builder::new()
+                .name(format!("plugin-closer-{name}"))
+                .spawn(move || {
+                    let deadline = Instant::now() + Duration::from_secs(2);
+                    loop {
+                        match child.try_wait() {
+                            Ok(Some(_)) => break,
+                            Ok(None) if Instant::now() >= deadline => {
+                                let _ = child.kill();
+                                let _ = child.wait();
+                                break;
+                            }
+                            _ => std::thread::sleep(Duration::from_millis(50)),
+                        }
+                    }
+                })
+                .ok();
+        }
+    }
 }
 
 /// Manages discovery, lifecycle, and hook dispatch for all plugins.
@@ -393,7 +421,7 @@ impl PluginManager {
             path: None,
             key: None,
         });
-        plugin.close_with_timeout(Duration::from_millis(200));
+        plugin.close_in_background();
     }
 }
 
