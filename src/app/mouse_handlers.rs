@@ -49,7 +49,21 @@ impl App {
                 if rect_contains(self.splitter_area, ev.column, ev.row) {
                     self.splitter_drag = true;
                     return;
-                } else if rect_contains(self.tree_area, ev.column, ev.row) {
+                }
+                // Breadcrumb click: check before the tree area so breadcrumb
+                // segments take priority over the tree row that happens to lie
+                // at the same screen position (breadcrumb sits above the list).
+                let clicked = self
+                    .breadcrumb_areas
+                    .iter()
+                    .find(|(_, area)| rect_contains(*area, ev.column, ev.row))
+                    .map(|(path, _)| path.clone());
+                if let Some(path) = clicked {
+                    self.focus = Focus::Tree;
+                    self.navigate_to_breadcrumb(&path);
+                    return;
+                }
+                if rect_contains(self.tree_area, ev.column, ev.row) {
                     self.focus = Focus::Tree;
                     self.clear_selection();
                     let row = (ev.row - self.tree_area.y) as usize;

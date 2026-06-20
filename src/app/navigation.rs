@@ -228,6 +228,35 @@ impl App {
         }
     }
 
+    /// Navigates the tree to the directory at `path` by expanding ancestors and
+    /// selecting it. Called when a breadcrumb segment is clicked.
+    pub(super) fn navigate_to_breadcrumb(&mut self, path: &std::path::Path) {
+        if path == self.root {
+            self.tree_selected = 0;
+            self.scroll_tree_into_view();
+            return;
+        }
+        // Expand all ancestors of the target directory.
+        let mut current = path.parent();
+        while let Some(dir) = current {
+            if dir == self.root {
+                break;
+            }
+            if dir.starts_with(&self.root) {
+                self.expanded.insert(dir.to_path_buf());
+            } else {
+                break;
+            }
+            current = dir.parent();
+        }
+        self.expanded.insert(path.to_path_buf());
+        self.rebuild();
+        if let Some(i) = self.nodes.iter().position(|n| n.path == path) {
+            self.tree_selected = i;
+            self.scroll_tree_into_view();
+        }
+    }
+
     /// Opens the currently selected search result and closes the overlay.
     /// Shared by the Enter key and a mouse click in the results list.
     pub(super) fn activate_search_selection(&mut self) {

@@ -211,9 +211,10 @@ fn draw_tree_depth_one_node_is_indented() {
     node.depth = 1;
     app.nodes = vec![node];
     let rows = render_tree(&mut app, 40, 5);
-    // Row 1 is the first content row (inside top border).
-    // After the left border '│': 2-space indent (depth=1) + 2-space non-arrow = 4 spaces.
-    let content_row = &rows[1];
+    // Row 1 is the breadcrumb bar, row 2 is the first tree content row (inside
+    // top border). After the left border '│': 2-space indent (depth=1) +
+    // 2-space non-arrow = 4 spaces.
+    let content_row = &rows[2];
     let after_border: String = content_row.chars().skip(1).take(4).collect();
     assert_eq!(
         after_border, "    ",
@@ -271,9 +272,10 @@ fn draw_tree_auto_scroll_keeps_selected_in_view() {
         .collect();
     app.tree_selected = 15;
     app.tree_scroll = 0;
-    // height=6 → view_height=4; selection=15 must scroll into view
+    // height=6 → view_height=3 (breadcrumb takes 1 of the 4 inner rows);
+    // selection=15 must scroll into view
     render_tree(&mut app, 40, 6);
-    // After render, scroll must bring row 15 into the 4-row viewport
+    // After render, scroll must bring row 15 into the 3-row viewport
     assert!(app.tree_scroll <= 15);
-    assert!(app.tree_scroll + 4 > 15);
+    assert!(app.tree_scroll + 3 > 15);
 }
