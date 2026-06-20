@@ -207,7 +207,7 @@ highlighting for `.tf` and `.tfvars` files (Terraform / HCL). Enable it by:
 
 ```toml
 [plugins]
-terraform = { kind = "syntax", syntax_file = "terraform.sublime-syntax",
+terraform = { kind = "syntax", syntax_file = "syntaxes/terraform.sublime-syntax",
               extensions = ["tf", "tfvars"] }
 ```
 

@@ -53,3 +53,43 @@ fn highlight_state_tracks_across_lines() {
     assert!(result[0][0].0.fg.is_some());
     assert!(result[1][0].0.fg.is_some());
 }
+
+#[test]
+fn with_extra_syntaxes_recognizes_loaded_extension() {
+    use crate::plugin::ExtraSyntax;
+
+    // A minimal syntax that highlights "kw" as a keyword in .xtestlang files.
+    // concat! keeps indentation correct (backslash continuations strip it).
+    let syntax_yaml = concat!(
+        "%YAML 1.2\n",
+        "---\n",
+        "name: TestLang\n",
+        "file_extensions: [xtestlang]\n",
+        "scope: source.xtestlang\n",
+        "contexts:\n",
+        "  main:\n",
+        "    - match: 'kw'\n",
+        "      scope: keyword.control.xtestlang\n",
+    );
+    let dir = tempfile::tempdir().unwrap();
+    let syntax_path = dir.path().join("testlang.sublime-syntax");
+    std::fs::write(&syntax_path, syntax_yaml).unwrap();
+
+    let extra = vec![ExtraSyntax {
+        syntax_path: syntax_path.clone(),
+        extensions: vec![],
+    }];
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &extra);
+    // Extra syntax loaded → "kw rest" in a .xtestlang file should produce
+    // multiple spans (keyword + trailing text), since the keyword rule fires.
+    let result = h.highlight(Path::new("test.xtestlang"), &["kw rest".to_string()]);
+    assert!(
+        result[0].len() > 1,
+        "extra syntax should produce multiple spans for .xtestlang files"
+    );
+    // Without the extra syntax, an unknown extension falls back to plain text
+    // and returns a single unstyled span.
+    let h2 = Highlighter::new("base16-ocean.dark");
+    let result2 = h2.highlight(Path::new("test.xtestlang"), &["kw rest".to_string()]);
+    assert_eq!(result2[0].len(), 1, "unknown extension should produce one plain-text span");
+}

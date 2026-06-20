@@ -554,10 +554,15 @@ pub fn discover_syntax_plugins() -> Vec<ExtraSyntax> {
 }
 
 /// Combines config-based and auto-discovered syntax plugins into a single
-/// list of extra syntax definitions for the highlighter.
+/// list of extra syntax definitions for the highlighter. Deduplicates by
+/// path (so an explicit `[plugins]` entry for a file that is also
+/// auto-discovered does not load it twice) and sorts for determinism.
 pub fn load_extra_syntaxes(entries: &[(String, PluginEntry)]) -> Vec<ExtraSyntax> {
     let mut extra = collect_syntax_plugins(entries);
     extra.extend(discover_syntax_plugins());
+    let mut seen = std::collections::HashSet::new();
+    extra.retain(|e| seen.insert(e.syntax_path.clone()));
+    extra.sort_by(|a, b| a.syntax_path.cmp(&b.syntax_path));
     extra
 }
 

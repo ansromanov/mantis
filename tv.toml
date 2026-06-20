@@ -119,5 +119,5 @@ visual_line_blame = ["b"]
 # Syntax plugins register new syntax highlighting definitions. The highlighter
 # auto-discovers .sublime-syntax files in {plugin_dir}/syntaxes/ (installed
 # by tv on first run).  You can also add explicit entries:
-#   terraform = { kind = "syntax", syntax_file = "terraform.sublime-syntax",
+#   terraform = { kind = "syntax", syntax_file = "syntaxes/terraform.sublime-syntax",
 #                 extensions = ["tf", "tfvars"] }

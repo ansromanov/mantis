@@ -62,7 +62,7 @@ Syntax plugins can also be registered explicitly in `tv.toml` with
 
 ```toml
 [plugins]
-terraform = { kind = "syntax", syntax_file = "terraform.sublime-syntax",
+terraform = { kind = "syntax", syntax_file = "syntaxes/terraform.sublime-syntax",
               extensions = ["tf", "tfvars"] }
 ```
 
