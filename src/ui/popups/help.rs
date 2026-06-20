@@ -65,6 +65,7 @@ pub(crate) fn draw_help(f: &mut Frame, app: &App, area: Rect) {
             desc("toggle git mode (changed files only + diffs)"),
         ]),
         Line::from(vec![key("  e          "), desc("open file in $EDITOR")]),
+        Line::from(vec![key("  Ctrl+O     "), desc("recent files picker")]),
         Line::from(vec![
             key("  Alt+G      "),
             desc("toggle git flat/tree view (in git mode)"),

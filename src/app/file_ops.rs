@@ -389,3 +389,7 @@ impl App {
         self.set_file_watch(None);
     }
 }
+
+#[cfg(test)]
+#[path = "file_ops_test.rs"]
+mod tests;
