@@ -209,27 +209,42 @@ impl Plugin {
     /// moves the child process into a background thread that waits up to 2 s
     /// for a clean exit before force-killing it. The reader/writer thread
     /// handles are dropped here and exit naturally as their channels close.
+    /// If the background thread fails to spawn, the child is killed inline so
+    /// it is always reaped and never left as a zombie.
     fn close_in_background(mut self) {
+        use std::sync::{Arc, Mutex};
         drop(self.write_tx.take());
-        if let Some(mut child) = self.child.take() {
-            let name = self.name.clone();
-            std::thread::Builder::new()
-                .name(format!("plugin-closer-{name}"))
-                .spawn(move || {
-                    let deadline = Instant::now() + Duration::from_secs(2);
-                    loop {
-                        match child.try_wait() {
-                            Ok(Some(_)) => break,
-                            Ok(None) if Instant::now() >= deadline => {
-                                let _ = child.kill();
-                                let _ = child.wait();
-                                break;
-                            }
-                            _ => std::thread::sleep(Duration::from_millis(50)),
+        let Some(child) = self.child.take() else {
+            return;
+        };
+        let name = self.name.clone();
+        let shared = Arc::new(Mutex::new(Some(child)));
+        let thread_shared = shared.clone();
+        if std::thread::Builder::new()
+            .name(format!("plugin-closer-{name}"))
+            .spawn(move || {
+                let Some(mut c) = thread_shared.lock().ok().and_then(|mut g| g.take()) else {
+                    return;
+                };
+                let deadline = Instant::now() + Duration::from_secs(2);
+                loop {
+                    match c.try_wait() {
+                        Ok(Some(_)) => break,
+                        Ok(None) if Instant::now() >= deadline => {
+                            let _ = c.kill();
+                            let _ = c.wait();
+                            break;
                         }
+                        _ => std::thread::sleep(Duration::from_millis(50)),
                     }
-                })
-                .ok();
+                }
+            })
+            .is_err()
+        {
+            if let Some(mut c) = shared.lock().ok().and_then(|mut g| g.take()) {
+                let _ = c.kill();
+                let _ = c.wait();
+            }
         }
     }
 }

@@ -187,7 +187,7 @@ pub struct App {
     scrollbar_drag: bool,
     splitter_drag: bool,
     /// Set to `true` after suspending the TUI (e.g. for editor), signals
-    /// `main.rs` to call `terminal.clear()` before the next `draw()`.  
+    /// `main.rs` to call `terminal.clear()` before the next `draw()`.
     pub needs_clear: bool,
     // YAML folding state
     pub yaml_fold_regions: Vec<FoldRegion>,
