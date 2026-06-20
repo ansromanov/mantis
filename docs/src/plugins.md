@@ -90,3 +90,33 @@ Register it:
 [plugins]
 clock = { path = "clock.sh" }
 ```
+
+## Bundled plugins
+
+`tv` ships with two optional bundled plugins that extract git diff and file-log
+functionality into subprocess-based scripts:
+
+| Plugin | File | What it does |
+|---|---|---|
+| git-diff | `git-diff.sh` | On `on_file_open`, if the file is git-tracked, shows `git diff --color=always HEAD` as the content (replacing the file view). |
+| git-log | `git-log.sh` | On `H` keypress, shows `git log --oneline --color=always` for the current file as a static file view. |
+
+Both are installed to the plugin directory the first time `tv` creates its
+global config (`~/.config/tree-viewer/plugins/`). Enable them by uncommenting
+or adding entries in `tv.toml`:
+
+```toml
+[plugins]
+git-diff = { path = "git-diff.sh" }
+git-log  = { path = "git-log.sh" }
+```
+
+> **Note:** The bundled plugins provide a simpler implementation than the
+> built-in core features:
+> - `git-diff` uses git's ANSI colouring rather than tv's theme-aware
+>   `diff_line_style` / side-by-side rendering.
+> - `git-log` shows the log as a static file; it does not have the interactive
+>   commit-selection popup that the built-in `H` key provides.
+>
+> The core git diff and log code paths remain active as a fallback when the
+> plugins are not enabled.

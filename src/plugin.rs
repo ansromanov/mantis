@@ -399,6 +399,31 @@ fn dirs_next() -> Option<PathBuf> {
     }
 }
 
+/// List of (filename, script_content) for each plugin that ships with tv.
+/// Installed to the plugin directory by `install_bundled_plugins()`.
+const BUNDLED_PLUGINS: &[(&str, &str)] = &[
+    ("git-diff.sh", include_str!("../plugins/git-diff.sh")),
+    ("git-log.sh", include_str!("../plugins/git-log.sh")),
+];
+
+/// Copies every bundled plugin to the plugin directory if it doesn't already
+/// exist there, so users can inspect, edit, or register them in `tv.toml`.
+pub fn install_bundled_plugins() {
+    let dir = default_plugin_dir();
+    let _ = std::fs::create_dir_all(&dir);
+    for (name, script) in BUNDLED_PLUGINS {
+        let path = dir.join(name);
+        if !path.exists() {
+            let _ = std::fs::write(&path, script);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755));
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 #[path = "plugin_test.rs"]
 mod plugin_test;
