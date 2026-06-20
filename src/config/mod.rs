@@ -11,13 +11,15 @@
 
 mod validate;
 
-use crate::plugin::PluginEntry;
-use crate::theme::ThemeConfig;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use serde::{Deserialize, Deserializer, Serialize};
+
+use crate::plugin::PluginEntry;
+use crate::theme::ThemeConfig;
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(default)]

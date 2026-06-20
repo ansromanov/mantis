@@ -202,10 +202,12 @@ fn run_app(
     // Drive tree/git refreshes from filesystem events rather than a blind timer.
     app.watch_root();
 
-    run_event_loop(terminal, &mut app, events)?;
+    let loop_result = run_event_loop(terminal, &mut app, events);
 
-    // Gracefully shut down plugin subprocesses before restoring the terminal.
+    // Always shut down plugin subprocesses, even if the event loop errored.
     app.plugin_manager.deactivate_all();
+
+    loop_result?;
 
     if let Some(err) = &app.config_error {
         eprintln!("tv: ignoring invalid config: {err}");

@@ -165,10 +165,7 @@ impl App {
                 }
                 "open_file" => {
                     if let Some(path_str) = params.get("path") {
-                        let path = std::path::Path::new(path_str);
-                        if path.exists() {
-                            self.open_and_reveal(path);
-                        }
+                        self.open_and_reveal(std::path::Path::new(path_str));
                     }
                 }
                 _ => {}

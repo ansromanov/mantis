@@ -3,7 +3,9 @@
 //! Plugins are standalone executables that communicate via newline-delimited
 //! JSON on stdin/stdout. `tv` sends lifecycle and hook events; plugins respond
 //! with action events. A reader thread per plugin drains stdout non-blockingly
-//! over a channel so the event loop never blocks on plugin I/O.
+//! over a channel so the event loop never blocks on plugin I/O. A writer thread
+//! per plugin drains a send queue to stdin, so slow or unresponsive plugins
+//! cannot block the event loop on writes either.
 //!
 //! Protocol (tv → plugin, one JSON object per line on stdin):
 //!   {"event":"init"}
@@ -20,7 +22,9 @@
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Child, ChildStdin, Command, Stdio};
+use std::process::{Child, Command, Stdio};
+use std::sync::mpsc::Sender;
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
@@ -29,7 +33,7 @@ use serde::{Deserialize, Serialize};
 #[serde(default)]
 pub struct PluginEntry {
     /// Path to the plugin executable. Relative paths are resolved relative to
-    /// the default plugin directory (`~/.config/tree-viewer/plugins/`).
+    /// the platform config directory (see `default_plugin_dir`).
     pub path: PathBuf,
     /// When `false` the plugin is registered but not spawned at startup.
     pub enabled: bool,
@@ -64,13 +68,15 @@ struct FromPlugin {
     params: HashMap<String, String>,
 }
 
-/// A single running plugin subprocess with a background reader thread.
+/// A single running plugin subprocess with background reader and writer threads.
 pub struct Plugin {
     name: String,
     child: Option<Child>,
-    stdin: Option<ChildStdin>,
+    /// Sends serialised JSON lines to the plugin's stdin via the writer thread.
+    write_tx: Option<Sender<String>>,
     action_rx: Option<std::sync::mpsc::Receiver<(String, HashMap<String, String>)>>,
     _reader_thread: Option<std::thread::JoinHandle<()>>,
+    _writer_thread: Option<std::thread::JoinHandle<()>>,
 }
 
 impl Plugin {
@@ -78,9 +84,10 @@ impl Plugin {
         Plugin {
             name,
             child: None,
-            stdin: None,
+            write_tx: None,
             action_rx: None,
             _reader_thread: None,
+            _writer_thread: None,
         }
     }
 
@@ -101,8 +108,8 @@ impl Plugin {
             .take()
             .ok_or_else(|| format!("no stdout for plugin '{}'", self.name))?;
 
-        let (tx, rx) = std::sync::mpsc::channel();
-        let handle = std::thread::Builder::new()
+        let (read_tx, read_rx) = std::sync::mpsc::channel();
+        let read_handle = std::thread::Builder::new()
             .name(format!("plugin-reader-{}", self.name))
             .spawn(move || {
                 let reader = BufReader::new(stdout);
@@ -116,7 +123,7 @@ impl Plugin {
                             if let Ok(msg) = serde_json::from_str::<FromPlugin>(trimmed) {
                                 if msg.event == "action" {
                                     if let Some(action) = msg.action {
-                                        let _ = tx.send((action, msg.params));
+                                        let _ = read_tx.send((action, msg.params));
                                     }
                                 }
                             }
@@ -127,22 +134,37 @@ impl Plugin {
             })
             .map_err(|e| format!("failed to spawn reader thread: {e}"))?;
 
+        let (write_tx, write_rx) = std::sync::mpsc::channel::<String>();
+        let write_handle = std::thread::Builder::new()
+            .name(format!("plugin-writer-{}", self.name))
+            .spawn(move || {
+                let mut stdin = stdin;
+                for msg in write_rx {
+                    if writeln!(stdin, "{msg}").is_err() {
+                        break;
+                    }
+                    let _ = stdin.flush();
+                }
+            })
+            .map_err(|e| format!("failed to spawn writer thread: {e}"))?;
+
         self.child = Some(child);
-        self.stdin = Some(stdin);
-        self.action_rx = Some(rx);
-        self._reader_thread = Some(handle);
+        self.write_tx = Some(write_tx);
+        self.action_rx = Some(read_rx);
+        self._reader_thread = Some(read_handle);
+        self._writer_thread = Some(write_handle);
         Ok(())
     }
 
+    /// Enqueues a message for the writer thread; never blocks the caller.
     fn send(&mut self, msg: &ToPlugin) {
-        let Some(ref mut stdin) = self.stdin else {
+        let Some(ref write_tx) = self.write_tx else {
             return;
         };
         let Ok(json) = serde_json::to_string(msg) else {
             return;
         };
-        let _ = writeln!(stdin, "{json}");
-        let _ = stdin.flush();
+        let _ = write_tx.send(json);
     }
 
     fn drain_actions(&mut self) -> Vec<(String, HashMap<String, String>)> {
@@ -156,15 +178,25 @@ impl Plugin {
         actions
     }
 
+    /// Drops the write channel (so the writer thread flushes and exits), then
+    /// waits up to 2 s for the child to exit before killing it.
+    ///
+    /// Callers must have already sent `shutdown` via `send()` before calling
+    /// this (e.g. `deactivate_all` does so).
     fn close(&mut self) {
-        self.send(&ToPlugin {
-            event: "shutdown".into(),
-            path: None,
-            key: None,
-        });
-        drop(self.stdin.take());
+        drop(self.write_tx.take());
         if let Some(mut child) = self.child.take() {
-            let _ = child.wait();
+            let deadline = Instant::now() + Duration::from_secs(2);
+            loop {
+                match child.try_wait() {
+                    Ok(Some(_)) => break,
+                    Ok(None) if Instant::now() >= deadline => {
+                        let _ = child.kill();
+                        break;
+                    }
+                    _ => std::thread::sleep(Duration::from_millis(50)),
+                }
+            }
         }
     }
 }
@@ -174,6 +206,7 @@ pub struct PluginManager {
     entries: Vec<(String, PluginEntry)>,
     plugins: Vec<Plugin>,
     pending_actions: Vec<(String, String, HashMap<String, String>)>,
+    spawn_errors: Vec<String>,
 }
 
 impl PluginManager {
@@ -182,6 +215,7 @@ impl PluginManager {
             entries,
             plugins: Vec::new(),
             pending_actions: Vec::new(),
+            spawn_errors: Vec::new(),
         }
     }
 
@@ -198,7 +232,8 @@ impl PluginManager {
                 entry.path.clone()
             };
             let mut plugin = Plugin::new(name.clone());
-            if plugin.spawn(&path).is_err() {
+            if let Err(e) = plugin.spawn(&path) {
+                self.spawn_errors.push(e);
                 continue;
             }
             plugin.send(&ToPlugin {
@@ -210,8 +245,14 @@ impl PluginManager {
         }
     }
 
-    /// Sends `shutdown` to all plugins, closes their stdin, and waits for
-    /// each subprocess to exit.
+    /// Returns (and clears) any errors that occurred while spawning plugins
+    /// during `activate_all`. Intended to be called once after `activate_all`.
+    pub fn take_spawn_errors(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.spawn_errors)
+    }
+
+    /// Sends `shutdown` to all plugins, then closes each subprocess (with a
+    /// per-plugin 2-second timeout before forceful kill).
     pub fn deactivate_all(&mut self) {
         for plugin in &mut self.plugins {
             plugin.send(&ToPlugin {
@@ -298,7 +339,7 @@ impl PluginManager {
 
 /// Converts a crossterm `KeyEvent` into a human-readable string like `"q"`,
 /// `"ctrl+c"`, `"Enter"`, `"alt+."`.
-fn key_event_to_string(key: &crossterm::event::KeyEvent) -> String {
+pub(crate) fn key_event_to_string(key: &crossterm::event::KeyEvent) -> String {
     use crossterm::event::{KeyCode, KeyModifiers};
     let mut parts = Vec::new();
     if key.modifiers.contains(KeyModifiers::CONTROL) {
@@ -334,8 +375,12 @@ fn key_event_to_string(key: &crossterm::event::KeyEvent) -> String {
     }
 }
 
-/// Default plugin discovery directory: `~/.config/tree-viewer/plugins/`.
-fn default_plugin_dir() -> PathBuf {
+/// Default plugin discovery directory.
+///
+/// - Linux/macOS: `$XDG_CONFIG_HOME/tree-viewer/plugins/` (falls back to
+///   `~/.config/tree-viewer/plugins/` when the variable is unset)
+/// - Windows:     `%APPDATA%\tree-viewer\plugins\`
+pub(crate) fn default_plugin_dir() -> PathBuf {
     dirs_next().unwrap_or_else(|| PathBuf::from("."))
 }
 
@@ -352,3 +397,7 @@ fn dirs_next() -> Option<PathBuf> {
             .map(|base| base.join("tree-viewer").join("plugins"))
     }
 }
+
+#[cfg(test)]
+#[path = "plugin_test.rs"]
+mod plugin_test;

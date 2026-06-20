@@ -90,7 +90,9 @@ visual_line_blame = ["b"]
 # syntax = "base16-ocean.dark"
 #
 # Plugin system. Each entry registers a subprocess-based plugin executable.
-# Relative paths are resolved against ~/.config/tree-viewer/plugins/.
+# Relative paths are resolved against the platform config directory:
+#   Linux/macOS: $XDG_CONFIG_HOME/tree-viewer/plugins/ (default: ~/.config/tree-viewer/plugins/)
+#   Windows:     %APPDATA%\tree-viewer\plugins\
 # Plugins communicate via newline-delimited JSON on stdin/stdout. See
 # https://github.com/ansromanov/tree-viewer for protocol docs.
 # [plugins]
