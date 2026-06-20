@@ -73,7 +73,9 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
     // ── Breadcrumb ──────────────────────────────────────────────────────
     app.breadcrumb_areas.clear();
     let breadcrumb_segments = compute_breadcrumb(app);
-    let has_breadcrumb = !breadcrumb_segments.is_empty();
+    // Only reserve a row for the breadcrumb when the inner width is wide enough
+    // for render_breadcrumb to actually draw something (it early-returns at < 3).
+    let has_breadcrumb = !breadcrumb_segments.is_empty() && inner.width >= 3;
 
     let list_area = if has_breadcrumb {
         let chunks = Layout::default()
@@ -236,7 +238,7 @@ fn render_breadcrumb(f: &mut Frame, app: &mut App, area: Rect, segments: &[(Stri
         truncate_segments(segments, avail, sep_len)
     };
 
-    let dim_style = Style::default().fg(theme.dim);
+    let dim_style = Style::default().fg(theme.dim).bg(theme.breadcrumb_bg);
     let fg_style = Style::default()
         .fg(theme.breadcrumb_fg)
         .bg(theme.breadcrumb_bg);
@@ -279,7 +281,7 @@ fn render_breadcrumb(f: &mut Frame, app: &mut App, area: Rect, segments: &[(Stri
     }
 
     let line = Line::from(spans);
-    let para = Paragraph::new(line);
+    let para = Paragraph::new(line).style(Style::default().bg(theme.breadcrumb_bg));
     f.render_widget(para, area);
 }
 
