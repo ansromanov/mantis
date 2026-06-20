@@ -135,7 +135,11 @@ pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
         if app.show_file_info {
             if let Some(ref enc) = app.file_encoding {
                 let (label, style) = if let Some(ref le) = app.file_line_ending {
-                    let style = if le == "mixed" { error } else { base.fg(theme.dim) };
+                    let style = if le == "mixed" {
+                        error
+                    } else {
+                        base.fg(theme.dim)
+                    };
                     (format!(" [{enc} {le}]"), style)
                 } else {
                     (format!(" [{enc}]"), base.fg(theme.dim))
