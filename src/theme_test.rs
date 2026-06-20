@@ -215,17 +215,19 @@ fn theme_config_from_preset_sets_name_and_no_overrides() {
 // tests so concurrent env-var reads from other threads don't race.
 // ---------------------------------------------------------------------------
 
-use std::sync::{Mutex, MutexGuard};
+use std::sync::MutexGuard;
 
-static ENV_LOCK: Mutex<()> = Mutex::new(());
 static COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
 /// Redirects the platform config-home env var to a fresh temp dir for the
 /// duration of `f`, then restores the original value and removes the temp dir.
 /// On Windows this is APPDATA; everywhere else it is XDG_CONFIG_HOME.
-/// ENV_LOCK serialises callers so concurrent env-var mutations don't race.
+/// Uses the shared ENV_LOCK from plugin.rs so this serialises against
+/// plugin_test.rs, which also mutates the same env var.
 fn with_isolated_config_home<F: FnOnce(&std::path::Path)>(f: F) {
-    let _guard: MutexGuard<()> = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _guard: MutexGuard<()> = crate::plugin::ENV_LOCK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     let n = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let tmp = std::env::temp_dir().join(format!("tv2_theme_test_{}_{n}", std::process::id()));
     std::fs::create_dir_all(&tmp).unwrap();
