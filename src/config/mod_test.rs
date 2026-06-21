@@ -124,10 +124,9 @@ fn malformed_local_config_reports_warning_and_falls_back() {
     fs::remove_dir_all(&dir).ok();
 }
 
-#[test]
-fn install_default_writes_template_and_is_parseable() {
+fn scratch_dir(tag: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!(
-        "tv_cfg_install_{}_{}",
+        "tv_cfg_{tag}_{}_{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -135,19 +134,85 @@ fn install_default_writes_template_and_is_parseable() {
             .unwrap_or(0)
     ));
     fs::create_dir_all(&dir).unwrap();
-    let path = dir.join("tv.toml");
-    install_default(&path);
-    let content = fs::read_to_string(&path).unwrap();
-    // Template must include the config hint comment.
+    dir
+}
+
+#[test]
+fn init_writes_stub_user_config_and_default_reference() {
+    let dir = scratch_dir("init");
+    let user = dir.join("tv.toml");
+    init_config_dir(&user);
+
+    // User config is a minimal stub, not the full template.
+    let stub = fs::read_to_string(&user).unwrap();
+    assert!(stub.contains("your overrides only"), "stub missing header");
     assert!(
-        content.contains("Open config in editor"),
-        "template missing palette hint"
+        !stub.contains("Open config in editor"),
+        "user config must not be the full template"
     );
-    // Template must be valid TOML that parses as Config with defaults.
-    let cfg: Config = toml::from_str(&content).expect("default template should parse");
-    assert!(!cfg.show_hidden);
+    // The fully-commented reference is written separately and parses as Config.
+    let reference = fs::read_to_string(dir.join("tv.default.toml")).unwrap();
+    assert!(reference.contains("Open config in editor"));
+    let cfg: Config = toml::from_str(&reference).expect("default reference should parse");
     assert_eq!(cfg.tree_width, 28);
+
     fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn init_never_overwrites_existing_user_config() {
+    let dir = scratch_dir("noclobber");
+    let user = dir.join("tv.toml");
+    fs::write(&user, "tree_width = 99\n").unwrap();
+    init_config_dir(&user);
+    // Upgrade path must leave the user's file byte-for-byte untouched.
+    assert_eq!(fs::read_to_string(&user).unwrap(), "tree_width = 99\n");
+    fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn refresh_default_reference_rewrites_only_when_stale() {
+    let dir = scratch_dir("refresh");
+    // Missing -> written.
+    assert!(refresh_default_reference(&dir));
+    // Identical -> skipped.
+    assert!(!refresh_default_reference(&dir));
+    // Stale (simulating an old version) -> rewritten to the current template.
+    fs::write(dir.join("tv.default.toml"), "# outdated\n").unwrap();
+    assert!(refresh_default_reference(&dir));
+    assert_eq!(
+        fs::read_to_string(dir.join("tv.default.toml")).unwrap(),
+        DEFAULT_CONFIG_TEMPLATE
+    );
+    fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn sparse_toml_omits_defaults_and_keeps_overrides() {
+    let mut cfg = Config::default();
+    let out = sparse_toml(&cfg);
+    // A pristine config serialises to (essentially) nothing.
+    assert!(
+        !out.contains("tree_width"),
+        "default-valued key should be omitted: {out}"
+    );
+
+    cfg.tree_width = 42;
+    cfg.show_hidden = true;
+    let out = sparse_toml(&cfg);
+    assert!(out.contains("tree_width = 42"), "override missing: {out}");
+    assert!(
+        out.contains("show_hidden = true"),
+        "override missing: {out}"
+    );
+    // Untouched defaults stay out of the file.
+    assert!(!out.contains("word_wrap"), "default leaked: {out}");
+
+    // Round-trips: a sparse file re-parses to the same effective values.
+    let reparsed: Config = toml::from_str(&out).unwrap();
+    assert_eq!(reparsed.tree_width, 42);
+    assert!(reparsed.show_hidden);
+    assert!(!reparsed.word_wrap); // falls back to default
 }
 
 #[test]
