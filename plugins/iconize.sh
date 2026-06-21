@@ -86,32 +86,7 @@ send_icon_map() {
 
   # Assemble the JSON payload (use %s for printf-safe values).
   # The { and } are literal; variables contain the UTF-8 glyph bytes.
-  printf '{"event":"action","action":"set_icon_map","params":{
-  "dir_open":"%s",
-  "dir_closed":"%s",
-  "fallback":"%s",
-  "icons":{
-    "rs":"%s","py":"%s","js":"%s","ts":"%s","go":"%s",
-    "java":"%s","c":"%s","cpp":"%s","cs":"%s","zig":"%s",
-    "rb":"%s","php":"%s","lua":"%s","hs":"%s","swift":"%s",
-    "kt":"%s","kts":"%s","dart":"%s","ex":"%s","clj":"%s","cljs":"%s",
-    "erl":"%s","scala":"%s","r":"%s","rmd":"%s",
-    "html":"%s","htm":"%s","css":"%s","scss":"%s","less":"%s",
-    "vue":"%s","svelte":"%s",
-    "json":"%s","yaml":"%s","yml":"%s","toml":"%s",
-    "sql":"%s","db":"%s","sqlite":"%s","graphql":"%s","gql":"%s",
-    "dockerfile":"%s",
-    "sh":"%s","bash":"%s","zsh":"%s","fish":"%s",
-    "md":"%s","markdown":"%s","lock":"%s",
-    "exe":"%s","bin":"%s","so":"%s","dll":"%s","dylib":"%s",
-    "png":"%s","jpg":"%s","jpeg":"%s","gif":"%s","svg":"%s","ico":"%s","webp":"%s",
-    "mp4":"%s","avi":"%s","mkv":"%s","mov":"%s",
-    "mp3":"%s","wav":"%s","ogg":"%s","flac":"%s","m4a":"%s",
-    "pdf":"%s","epub":"%s","mobi":"%s",
-    "zip":"%s","tar":"%s","gz":"%s","xz":"%s","bz2":"%s","7z":"%s","rar":"%s",
-    "ttf":"%s","otf":"%s","woff":"%s","woff2":"%s","eot":"%s",
-    "node":"%s"
-  }}\n' \
+  printf '{"event":"action","action":"set_icon_map","params":{"dir_open":"%s","dir_closed":"%s","fallback":"%s","icons":{"rs":"%s","py":"%s","js":"%s","ts":"%s","go":"%s","java":"%s","c":"%s","cpp":"%s","cs":"%s","zig":"%s","rb":"%s","php":"%s","lua":"%s","hs":"%s","swift":"%s","kt":"%s","kts":"%s","dart":"%s","ex":"%s","clj":"%s","cljs":"%s","erl":"%s","scala":"%s","r":"%s","rmd":"%s","html":"%s","htm":"%s","css":"%s","scss":"%s","less":"%s","vue":"%s","svelte":"%s","json":"%s","yaml":"%s","yml":"%s","toml":"%s","sql":"%s","db":"%s","sqlite":"%s","graphql":"%s","gql":"%s","dockerfile":"%s","sh":"%s","bash":"%s","zsh":"%s","fish":"%s","md":"%s","markdown":"%s","lock":"%s","exe":"%s","bin":"%s","so":"%s","dll":"%s","dylib":"%s","png":"%s","jpg":"%s","jpeg":"%s","gif":"%s","svg":"%s","ico":"%s","webp":"%s","mp4":"%s","avi":"%s","mkv":"%s","mov":"%s","mp3":"%s","wav":"%s","ogg":"%s","flac":"%s","m4a":"%s","pdf":"%s","epub":"%s","mobi":"%s","zip":"%s","tar":"%s","gz":"%s","xz":"%s","bz2":"%s","7z":"%s","rar":"%s","ttf":"%s","otf":"%s","woff":"%s","woff2":"%s","eot":"%s","node":"%s"}}}\n' \
     "$dir_open" "$dir_closed" "$fallback" \
     "$rs" "$py" "$js" "$ts" "$go" \
     "$java" "$c" "$cpp" "$cs" "$zig" \

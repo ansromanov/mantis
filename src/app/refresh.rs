@@ -207,7 +207,8 @@ impl App {
                         if let Some(icons) = obj.get("icons").and_then(|v| v.as_object()) {
                             for (ext, glyph) in icons {
                                 if let Some(g) = glyph.as_str() {
-                                    self.icon_map.insert(ext.clone(), g.to_string());
+                                    self.icon_map
+                                        .insert(ext.to_ascii_lowercase(), g.to_string());
                                 }
                             }
                         }
@@ -272,3 +273,7 @@ impl App {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "refresh_test.rs"]
+mod tests;

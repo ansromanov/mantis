@@ -145,8 +145,43 @@ fn default_plugin_dir_respects_xdg() {
     assert!(dir.starts_with("/tmp/custom_cfg/tree-viewer/plugins"));
 }
 
-#[test]
 #[cfg(not(windows))]
+#[test]
+fn bundled_plugins_includes_iconize() {
+    let names: Vec<&str> = BUNDLED_PLUGINS.iter().map(|(n, _)| *n).collect();
+    assert!(
+        names.contains(&"iconize.sh"),
+        "iconize.sh must be in BUNDLED_PLUGINS: {names:?}"
+    );
+}
+
+#[test]
+fn install_bundled_plugins_creates_iconize_script() {
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let tmp = std::env::temp_dir().join(format!("tv_iconize_plugin_{}", std::process::id()));
+    std::fs::create_dir_all(&tmp).unwrap();
+    let old = std::env::var_os("XDG_CONFIG_HOME");
+    unsafe { std::env::set_var("XDG_CONFIG_HOME", &tmp) };
+
+    install_bundled_plugins();
+
+    unsafe {
+        match old {
+            Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
+            None => std::env::remove_var("XDG_CONFIG_HOME"),
+        }
+    }
+
+    let plugins_dir = tmp.join("tree-viewer").join("plugins");
+    assert!(
+        plugins_dir.join("iconize.sh").exists(),
+        "iconize.sh must be installed"
+    );
+    std::fs::remove_dir_all(&tmp).ok();
+}
+
+#[cfg(not(windows))]
+#[test]
 fn install_bundled_plugins_creates_scripts() {
     let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let tmp = std::env::temp_dir().join(format!("tv_plugin_test_{}", std::process::id()));

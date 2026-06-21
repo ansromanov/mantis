@@ -139,6 +139,7 @@ the tv workspace.
 |---|---|---|---|
 | git-diff | `git-diff.sh` | Shell script | On `on_file_open`, if the file is git-tracked, shows `git diff --color=always HEAD` as the content (replacing the file view). |
 | git-log | `git-log.sh` | Shell script | On `H` keypress, shows `git log --oneline --color=always` for the current file as a static file view. |
+| iconize | `iconize.sh` | Shell script | On `init`, sends a `set_icon_map` action with Nerd Font glyphs for ~80 file extensions. Requires `icons = true` in `tv.toml` and a Nerd Font terminal. |
 | markdown | `tv-plugin-markdown` | Rust binary (workspace) | Renders `.md` files using pulldown-cmark, sending the output as ANSI-escaped lines via `set_content`. Responds to theme changes and `M` keypress for raw/rendered toggle. |
 
 The shell-script plugins are installed to the plugin directory the first time
@@ -153,6 +154,7 @@ uncommenting or adding entries in `tv.toml`:
 [plugins]
 git-diff  = { path = "git-diff.sh" }
 git-log   = { path = "git-log.sh" }
+iconize   = { path = "iconize.sh" }
 markdown  = { path = "tv-plugin-markdown" }
 ```
 

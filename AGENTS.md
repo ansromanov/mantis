@@ -216,6 +216,11 @@ include tests. There are no exceptions. If a change is untestable (e.g. pure UI
 paint code), explain why in the PR description. Otherwise add or update tests in
 the same commit as the code change, never as a follow-up.
 
+**Every feature PR must include tests** that cover the new functionality at
+the unit level (the modified module's `_test.rs`) and, where applicable, at the
+integration level. Untested features are not complete. Reviewers should block
+any PR that adds user-visible behaviour without corresponding test coverage.
+
 ## Documentation
 
 User-facing docs live in `docs/src/`. Any PR that adds, removes, or changes a
