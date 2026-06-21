@@ -1,3 +1,13 @@
+[workspace]
+members = [
+    "plugins/tv-plugin-markdown",
+    "plugins/tv-plugin-git-diff",
+    "plugins/tv-plugin-git-log",
+    "plugins/tv-plugin-git",
+    "plugins/tv-plugin-iconize",
+]
+resolver = "2"
+
 [package]
 name = "tree-viewer"
 version = "0.6.5"

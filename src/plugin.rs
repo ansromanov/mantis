@@ -401,10 +401,8 @@ fn dirs_next() -> Option<PathBuf> {
 
 /// List of (filename, script_content) for each plugin that ships with tv.
 /// Installed to the plugin directory by `install_bundled_plugins()`.
-const BUNDLED_PLUGINS: &[(&str, &str)] = &[
-    ("git-diff.sh", include_str!("../plugins/git-diff.sh")),
-    ("git-log.sh", include_str!("../plugins/git-log.sh")),
-];
+/// Shell plugins have been replaced by Rust crates (see `plugins/` workspace members).
+const BUNDLED_PLUGINS: &[(&str, &str)] = &[];
 
 /// Copies every bundled plugin to the plugin directory if it doesn't already
 /// exist there, so users can inspect, edit, or register them in `tv.toml`.

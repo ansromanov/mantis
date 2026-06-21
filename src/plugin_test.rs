@@ -147,7 +147,10 @@ fn default_plugin_dir_respects_xdg() {
 
 #[test]
 #[cfg(not(windows))]
-fn install_bundled_plugins_creates_scripts() {
+fn install_bundled_plugins_creates_plugins_dir() {
+    // Shell plugins have been replaced by Rust crates; BUNDLED_PLUGINS is empty.
+    // This test verifies that `install_bundled_plugins` still runs without error
+    // and creates the plugin directory even when there are no bundled scripts to copy.
     let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let tmp = std::env::temp_dir().join(format!("tv_plugin_test_{}", std::process::id()));
     std::fs::create_dir_all(&tmp).unwrap();
@@ -166,13 +169,5 @@ fn install_bundled_plugins_creates_scripts() {
 
     let plugins_dir = tmp.join("tree-viewer").join("plugins");
     assert!(plugins_dir.is_dir(), "plugins directory should be created");
-    assert!(
-        plugins_dir.join("git-diff.sh").exists(),
-        "git-diff.sh must be installed"
-    );
-    assert!(
-        plugins_dir.join("git-log.sh").exists(),
-        "git-log.sh must be installed"
-    );
     std::fs::remove_dir_all(&tmp).ok();
 }
