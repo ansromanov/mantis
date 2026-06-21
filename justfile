@@ -51,6 +51,20 @@ install: release
 test *args:
     cargo test {{args}}
 
+# run only tests related to files changed vs origin/main (fast path for PRs)
+# falls back to the full suite when broad files (Cargo.toml, lib.rs, …) change
+test-pr:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    filterset=$(git diff --name-only origin/main...HEAD | bash scripts/related-tests.sh)
+    if [[ "$filterset" == "__ALL__" ]]; then
+        echo "[test-pr] broad change detected — running full suite"
+        cargo nextest run
+    else
+        echo "[test-pr] running related tests: $filterset"
+        cargo nextest run -E "$filterset"
+    fi
+
 # type-check without building
 check:
     cargo check
