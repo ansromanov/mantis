@@ -4318,6 +4318,32 @@ fn copy_path_no_file_selected_relative() {
     fs::remove_dir_all(&root).ok();
 }
 
+// -- icons_enabled ------------------------------------------------------------
+
+#[test]
+fn icons_enabled_defaults_to_false() {
+    let root = temp_tree();
+    let app = app_for(&root);
+    assert!(!app.icons_enabled);
+    assert!(app.icon_map.is_empty());
+    assert!(app.icon_dir_open.is_empty());
+    assert!(app.icon_dir_closed.is_empty());
+    assert!(app.icon_fallback.is_empty());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn icons_enabled_true_when_config_says_so() {
+    let root = temp_tree();
+    let cfg = Config {
+        icons: true,
+        ..Config::default()
+    };
+    let app = App::new(root.to_path_buf(), cfg, None, None).unwrap();
+    assert!(app.icons_enabled);
+    fs::remove_dir_all(&root).ok();
+}
+
 // -- plugin picker ------------------------------------------------------------
 
 #[test]

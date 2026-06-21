@@ -121,6 +121,19 @@ that generate rich output (e.g. markdown renderers, linters).
 {"event":"action","action":"set_content","params":{"lines":["\u001b[32mgreen line\u001b[0m","plain line"]}}
 ```
 
+### `set_icon_map`
+
+Sets the file-type icon glyphs used in the tree. Requires `icons = true` in `tv.toml` and a Nerd Font terminal. Keys in `icons` are file extensions (lowercase) or full filenames for extensionless files (e.g. `"dockerfile"`).
+
+```json
+{"event":"action","action":"set_icon_map","params":{"dir_open":"","dir_closed":"","fallback":"","icons":{"rs":"","py":"","dockerfile":""}}}
+```
+
+Fields:
+- `dir_open` — glyph for open directories
+- `dir_closed` — glyph for closed directories
+- `fallback` — glyph used when no extension key matches
+- `icons` — map of extension/filename → glyph
 ## Rules
 
 - **One JSON object per line.** No pretty-printing, no multi-line objects.

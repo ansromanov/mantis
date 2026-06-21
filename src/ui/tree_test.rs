@@ -351,6 +351,118 @@ fn render_breadcrumb_truncation_does_not_panic() {
     }
 }
 
+// -- icon rendering -----------------------------------------------------------
+
+#[test]
+fn draw_tree_icon_enabled_shows_icon_glyph() {
+    let mut app = make_app(false, HashMap::new());
+    app.icons_enabled = true;
+    app.icon_map
+        .insert("rs".to_string(), "\u{e7a8}".to_string());
+    app.icon_fallback = "\u{f15b}".to_string();
+    app.nodes = vec![make_node("main.rs", false, false)];
+    let rows = render_tree(&mut app, 40, 5);
+    let text = all_text(&rows);
+    assert!(
+        text.contains('\u{e7a8}'),
+        "icon glyph should appear in tree row when icons_enabled"
+    );
+    assert!(
+        text.contains("main.rs"),
+        "filename must still appear next to the icon"
+    );
+}
+
+#[test]
+fn draw_tree_icon_enabled_fallback_for_unknown_ext() {
+    let mut app = make_app(false, HashMap::new());
+    app.icons_enabled = true;
+    app.icon_fallback = "\u{f15b}".to_string();
+    app.nodes = vec![make_node("readme.md", false, false)];
+    let rows = render_tree(&mut app, 40, 5);
+    let text = all_text(&rows);
+    assert!(
+        text.contains('\u{f15b}'),
+        "unknown extension should use fallback icon"
+    );
+}
+
+#[test]
+fn draw_tree_icon_enabled_dir_shows_dir_icon() {
+    let mut app = make_app(false, HashMap::new());
+    app.icons_enabled = true;
+    app.icon_dir_open = "\u{f07c}".to_string();
+    app.icon_dir_closed = "\u{f07b}".to_string();
+    let node = make_node("src", true, false);
+    app.expanded.insert(node.path.clone());
+    app.nodes = vec![node];
+    let rows = render_tree(&mut app, 40, 5);
+    let text = all_text(&rows);
+    assert!(
+        text.contains('\u{f07c}'),
+        "expanded dir should show dir_open icon"
+    );
+}
+
+#[test]
+fn draw_tree_icon_enabled_collapsed_dir_shows_closed_icon() {
+    let mut app = make_app(false, HashMap::new());
+    app.icons_enabled = true;
+    app.icon_dir_open = "\u{f07c}".to_string();
+    app.icon_dir_closed = "\u{f07b}".to_string();
+    let node = make_node("src", true, false);
+    app.nodes = vec![node];
+    let rows = render_tree(&mut app, 40, 5);
+    let text = all_text(&rows);
+    assert!(
+        text.contains('\u{f07b}'),
+        "collapsed dir should show dir_closed icon"
+    );
+}
+
+#[test]
+fn draw_tree_icon_enabled_empty_map_omits_icons() {
+    let mut app = make_app(false, HashMap::new());
+    app.icons_enabled = true;
+    app.icon_map.clear();
+    app.nodes = vec![make_node("main.rs", false, false)];
+    let rows = render_tree(&mut app, 40, 5);
+    let text = all_text(&rows);
+    // Icons disabled because map is empty, so just the filename
+    assert!(text.contains("main.rs"));
+}
+
+#[test]
+fn draw_tree_icons_disabled_omits_icon_glyph() {
+    let mut app = make_app(false, HashMap::new());
+    app.icons_enabled = false;
+    app.icon_map
+        .insert("rs".to_string(), "\u{e7a8}".to_string());
+    app.nodes = vec![make_node("main.rs", false, false)];
+    let rows = render_tree(&mut app, 40, 5);
+    let text = all_text(&rows);
+    assert!(
+        !text.contains('\u{e7a8}'),
+        "icon must not appear when icons_enabled is false"
+    );
+}
+
+#[test]
+fn draw_tree_icon_looks_up_extensionless_file_by_name() {
+    let mut app = make_app(false, HashMap::new());
+    app.icons_enabled = true;
+    app.icon_map
+        .insert("dockerfile".to_string(), "\u{e7b0}".to_string());
+    app.icon_fallback = "\u{f15b}".to_string();
+    app.nodes = vec![make_node("Dockerfile", false, false)];
+    let rows = render_tree(&mut app, 40, 5);
+    let text = all_text(&rows);
+    assert!(
+        text.contains('\u{e7b0}'),
+        "extensionless file should look up by its full filename"
+    );
+}
+
 #[test]
 fn render_breadcrumb_truncation_shows_ellipsis() {
     let mut app = make_app(false, HashMap::new());

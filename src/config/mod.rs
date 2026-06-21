@@ -50,6 +50,10 @@ pub struct Config {
     pub theme: ThemeConfig,
     /// Render indentation guide lines (│) in the tree pane.
     pub indent_guides: bool,
+    /// Show Nerd Font file-type icons in the tree. The icon map is provided by
+    /// a plugin (e.g. the bundled iconize plugin). Off by default — requires a
+    /// Nerd Font in your terminal.
+    pub icons: bool,
     /// Per-plugin entries registered in `[plugins]`.
     #[serde(default)]
     pub plugins: HashMap<String, PluginEntry>,
@@ -79,6 +83,7 @@ impl Default for Config {
             keys: Keymap::default(),
             theme: ThemeConfig::default(),
             indent_guides: true,
+            icons: false,
             plugins: HashMap::new(),
         }
     }

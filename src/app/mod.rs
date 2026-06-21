@@ -190,6 +190,19 @@ pub struct App {
     pub auto_watch: bool,
     pub show_file_info: bool,
     pub indent_guides: bool,
+    /// Whether to show file-type icon glyphs in the tree. The glyphs come from
+    /// a plugin via the `set_icon_map` action; off by default because they
+    /// require a Nerd Font in the terminal.
+    pub icons_enabled: bool,
+    /// Extension (lowercase) → Nerd Font icon glyph, provided by the iconize
+    /// plugin. Used when `icons_enabled` is true and non-empty.
+    pub icon_map: HashMap<String, String>,
+    /// Folder icon for expanded directories.
+    pub icon_dir_open: String,
+    /// Folder icon for collapsed directories.
+    pub icon_dir_closed: String,
+    /// Fallback icon for file types not in `icon_map`.
+    pub icon_fallback: String,
     keys: Keymap,
     config: Config,
     config_path: Option<std::path::PathBuf>,
@@ -427,6 +440,11 @@ impl App {
             auto_watch: cfg.watch,
             show_file_info: cfg.show_file_info,
             indent_guides: cfg.indent_guides,
+            icons_enabled: cfg.icons,
+            icon_map: HashMap::new(),
+            icon_dir_open: String::new(),
+            icon_dir_closed: String::new(),
+            icon_fallback: String::new(),
             keys: cfg.keys,
             config: saved_config,
             config_path,

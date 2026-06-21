@@ -318,6 +318,7 @@ impl App {
         self.show_scrollbar = cfg.scrollbar;
         self.show_scroll_percentage = cfg.scroll_percentage;
         self.keys = cfg.keys.clone();
+        self.icons_enabled = cfg.icons;
 
         let theme_name = cfg.theme.name.as_deref().unwrap_or("default").to_string();
         let theme = cfg.theme.resolve();

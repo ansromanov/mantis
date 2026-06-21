@@ -151,8 +151,9 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
                 spans.push(Span::styled(indent, name_style));
             }
 
+            let is_open = node.is_dir && app.expanded.contains(&node.path);
             let arrow = if node.is_dir {
-                if app.expanded.contains(&node.path) {
+                if is_open {
                     "▼ "
                 } else {
                     "▶ "
@@ -161,6 +162,43 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
                 "  "
             };
             spans.push(Span::styled(arrow, name_style));
+
+            if app.icons_enabled
+                && (!app.icon_map.is_empty()
+                    || !app.icon_fallback.is_empty()
+                    || !app.icon_dir_open.is_empty()
+                    || !app.icon_dir_closed.is_empty())
+            {
+                let icon = if node.is_dir {
+                    if is_open {
+                        &app.icon_dir_open
+                    } else {
+                        &app.icon_dir_closed
+                    }
+                } else {
+                    let ext = node
+                        .path
+                        .extension()
+                        .and_then(|e| e.to_str())
+                        .unwrap_or("")
+                        .to_lowercase();
+                    let key = if ext.is_empty() {
+                        node.path
+                            .file_name()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("")
+                            .to_lowercase()
+                    } else {
+                        ext
+                    };
+                    app.icon_map.get(&key).unwrap_or(&app.icon_fallback)
+                };
+                if !icon.is_empty() {
+                    spans.push(Span::styled(icon.as_str(), name_style));
+                    spans.push(Span::styled(" ", name_style));
+                }
+            }
+
             spans.push(Span::styled(node.name.clone(), name_style));
 
             ListItem::new(Line::from(spans))

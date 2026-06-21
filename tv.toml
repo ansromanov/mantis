@@ -19,6 +19,8 @@ in_file_search = true
 # watch = false              # auto-reload file content when the open file changes on disk (default: false)
 # show_file_info = true      # show encoding and line-ending info in the status bar (default: true)
 indent_guides = true         # draw indentation guides (│) in the tree pane
+# icons = false               # show Nerd Font file-type icons in the tree (requires a
+                               # Nerd Font in your terminal and the iconize plugin enabled)
 
 # Git mode: show only changed files and their working-tree diffs.
 # git_mode = false       # start in git mode (default: false)
@@ -108,6 +110,7 @@ visual_line_blame = ["b"]
 # run). Uncomment to enable:
 #   git-diff  = { path = "git-diff.sh" }
 #   git-log   = { path = "git-log.sh" }
+#   iconize   = { path = "iconize.sh" }  # file-type icons in the tree (requires icons = true)
 #   markdown  = { path = "tv-plugin-markdown" }
 # git-diff: shows the working-tree diff (with ANSI colours from git) when a
 #   tracked file is opened, replacing the file content.

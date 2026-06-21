@@ -175,6 +175,31 @@ fn validate_keys_accepts_full_default_template() {
 }
 
 #[test]
+fn icons_defaults_to_false() {
+    let cfg = Config::default();
+    assert!(!cfg.icons);
+}
+
+#[test]
+fn icons_round_trips_through_serde() {
+    let cfg = Config {
+        icons: true,
+        ..Config::default()
+    };
+    let toml_str = toml::to_string_pretty(&cfg).unwrap();
+    let parsed: Config = toml::from_str(&toml_str).unwrap();
+    assert!(parsed.icons);
+}
+
+#[test]
+fn icons_false_round_trips_through_serde() {
+    let cfg = Config::default();
+    let toml_str = toml::to_string_pretty(&cfg).unwrap();
+    let parsed: Config = toml::from_str(&toml_str).unwrap();
+    assert!(!parsed.icons);
+}
+
+#[test]
 fn validate_keys_flags_unknown_top_level_key_with_suggestion() {
     let warnings = validate_keys("tre_width = 30\n");
     assert_eq!(warnings.len(), 1);
