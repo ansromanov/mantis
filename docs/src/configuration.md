@@ -8,6 +8,26 @@ viewed (and its ancestors), then falls back to the global config at
 `$XDG_CONFIG_HOME/tv.toml` (or `~/.config/tv.toml`). A project-local file
 overrides the global one, so a repository can ship its own defaults.
 
+## Defaults vs. your config
+
+Configuration has two layers:
+
+- **Built-in defaults** ship inside `tv` and supply every value. You don't have
+  to set anything.
+- **Your `tv.toml`** overrides only the keys you set; everything else falls
+  through to the defaults.
+
+On first run `tv` creates a tiny stub `tv.toml` (just a header comment) next to a
+read-only **`tv.default.toml`** in your config directory. `tv.default.toml` lists
+every option with comments and is **refreshed on every upgrade**, so it always
+documents the current set of options. Your own `tv.toml` is **never modified by an
+upgrade** — edit it freely.
+
+When you change a setting at runtime (e.g. switching theme), `tv` saves only the
+keys that differ from the defaults back to your `tv.toml`, keeping it small. To
+see all available options, open `tv.default.toml`; to change one, copy that line
+into your `tv.toml`.
+
 ## General options
 
 These top-level keys control default behavior:

@@ -1,5 +1,14 @@
 //! Loading, parsing, and saving of the `tv.toml` configuration.
 //!
+//! Two layers: the **embedded defaults** (the fully-commented `tv.toml` template
+//! baked into the binary) supply every value, and the user's `tv.toml` overrides
+//! only the keys it sets — serde's `#[serde(default)]` merges the two. On launch
+//! a read-only `tv.default.toml` reference is (re)written next to the user config
+//! whenever it is missing or stale, so an upgrade always refreshes the documented
+//! option catalogue without ever touching the user's own file. The user `tv.toml`
+//! is created once as a minimal stub and from then on is only written by `save`,
+//! which emits a *sparse* override file (changed-from-default keys only).
+//!
 //! Defines the `Config` struct (every user-tunable option, with serde defaults
 //! so partial configs and older files still load) and the `Keymap`/keybinding
 //! types that map config strings to `crossterm` key events. `load` locates and
@@ -389,17 +398,17 @@ impl Serialize for KeyBinding {
 
 /// Loads config for the given view root. A project-local `tv.toml` found in
 /// the root or any ancestor takes precedence over the global config; this lets
-/// a repo ship its own defaults. Creates the global config with defaults if it
-/// doesn't exist yet. Returns the loaded config, the path it was loaded from
+/// a repo ship its own defaults. On first run it seeds a minimal user config and
+/// the bundled themes/plugins, and on every run refreshes the `tv.default.toml`
+/// reference; it never overwrites an existing user config. Returns the loaded
+/// config, the path it was loaded from
 /// (so that live changes are saved back to the same file), and a warning
 /// describing the first malformed config encountered, if any, so the caller can
 /// tell the user their config was ignored instead of failing silently.
 pub fn load(root: &Path) -> (Config, Option<PathBuf>, Option<String>) {
     let global = global_config_path();
     if let Some(ref path) = global {
-        if !path.exists() {
-            install_default(path);
-        }
+        init_config_dir(path);
     }
     let mut error = None;
     for path in config_paths(root) {
@@ -431,25 +440,85 @@ pub fn load(root: &Path) -> (Config, Option<PathBuf>, Option<String>) {
     (Config::default(), global, error)
 }
 
-/// Writes `config` to `path`, silently ignoring errors.
+/// Writes `config` back to the user's `path` as a *sparse* override file: only
+/// the keys whose value differs from the built-in defaults are written, so the
+/// user config stays small and readable instead of growing into a full dump of
+/// every setting. Silently ignores I/O errors.
 pub fn save(config: &Config, path: &Path) {
-    if let Ok(content) = toml::to_string_pretty(config) {
-        let _ = fs::write(path, content);
+    let _ = fs::write(path, sparse_toml(config));
+}
+
+/// Serialises `config` keeping only the top-level keys whose value differs from
+/// `Config::default()`. This keeps the user's `tv.toml` a minimal override file:
+/// untouched settings fall through to the embedded defaults rather than being
+/// pinned to their current value (which would also mask future default changes).
+pub fn sparse_toml(config: &Config) -> String {
+    let current = toml::Value::try_from(config);
+    let default = toml::Value::try_from(Config::default());
+    let (Ok(toml::Value::Table(cur)), Ok(toml::Value::Table(def))) = (current, default) else {
+        // Serialisation should never fail for our own type; fall back to a full
+        // dump rather than losing the user's settings.
+        return toml::to_string_pretty(config).unwrap_or_default();
+    };
+    let mut out = toml::map::Map::new();
+    for (k, v) in &cur {
+        if def.get(k) != Some(v) {
+            out.insert(k.clone(), v.clone());
+        }
+    }
+    toml::to_string_pretty(&toml::Value::Table(out)).unwrap_or_default()
+}
+
+/// Prepares the global config directory on launch. The fully-commented default
+/// reference (`tv.default.toml`) is refreshed whenever it is missing or stale
+/// (i.e. after an upgrade), so users always have an up-to-date catalogue of every
+/// option. The user's own `tv.toml` is **never** overwritten: it is created once,
+/// as a minimal stub, only when absent. Bundled themes and plugins are seeded on
+/// that same first run.
+fn init_config_dir(user_path: &Path) {
+    let Some(dir) = user_path.parent() else {
+        return;
+    };
+    let _ = fs::create_dir_all(dir);
+    refresh_default_reference(dir);
+    if !user_path.exists() {
+        let _ = fs::write(user_path, USER_CONFIG_STUB);
+        crate::theme::install_embedded_themes();
+        crate::plugin::install_bundled_plugins();
     }
 }
 
-/// Creates the global config file with defaults if the directory is writable,
-/// and seeds bundled theme files and bundled plugins to their respective directories.
-fn install_default(path: &Path) {
-    if let Some(parent) = path.parent() {
-        let _ = fs::create_dir_all(parent);
+/// Writes the embedded fully-commented template to `{dir}/tv.default.toml`, but
+/// only when the file is missing or its contents differ from the embedded
+/// version (the upgrade case). Returns whether the file was (re)written. This is
+/// a read-only reference for users; `tv` itself reads values from the embedded
+/// defaults, never from this file.
+fn refresh_default_reference(dir: &Path) -> bool {
+    let path = dir.join(DEFAULT_REFERENCE_NAME);
+    if fs::read_to_string(&path).ok().as_deref() == Some(DEFAULT_CONFIG_TEMPLATE) {
+        return false;
     }
-    let _ = fs::write(path, DEFAULT_CONFIG_TEMPLATE);
-    crate::theme::install_embedded_themes();
-    crate::plugin::install_bundled_plugins();
+    fs::write(&path, DEFAULT_CONFIG_TEMPLATE).is_ok()
 }
 
+/// The embedded, fully-commented default configuration. Source of truth for both
+/// default values and the on-disk `tv.default.toml` reference.
 const DEFAULT_CONFIG_TEMPLATE: &str = include_str!("../../tv.toml");
+
+/// Filename of the read-only default reference written next to the user config.
+const DEFAULT_REFERENCE_NAME: &str = "tv.default.toml";
+
+/// Minimal first-run user config. Kept deliberately tiny: the user adds only the
+/// overrides they want, and consults `tv.default.toml` for the full option list.
+const USER_CONFIG_STUB: &str = "\
+# tv user config -- your overrides only.
+#
+# This file is never modified by upgrades. Add only the settings you want to
+# change; everything else falls back to the built-in defaults.
+#
+# See tv.default.toml in this directory (refreshed on every upgrade) for the
+# full, commented list of available options.
+";
 
 /// Candidate config paths in precedence order: project-local (`tv.toml` in the
 /// root and each ancestor), then the global config.
