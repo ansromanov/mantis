@@ -301,6 +301,48 @@ impl Plugin {
     }
 }
 
+/// Returns `(name, PluginEntry)` pairs for every plugin that ships with `tv`,
+/// each pre-set to `enabled = false` so they appear in the palette without
+/// being spawned automatically. Used to seed the picker on a bare config.
+pub fn bundled_plugin_entries() -> Vec<(String, PluginEntry)> {
+    let plugin_dir = default_plugin_dir();
+    let mut entries = Vec::new();
+    for (filename, _) in BUNDLED_PLUGINS {
+        let stem = std::path::Path::new(filename)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or(filename);
+        let name = stem.strip_suffix(".sh").unwrap_or(stem).to_string();
+        entries.push((
+            name,
+            PluginEntry {
+                path: plugin_dir.join(filename),
+                enabled: false,
+                kind: PluginKind::Process,
+                extensions: Vec::new(),
+                syntax_file: None,
+            },
+        ));
+    }
+    // Markdown binary plugin.
+    let md_name = if cfg!(windows) {
+        "tv-plugin-markdown.exe"
+    } else {
+        "tv-plugin-markdown"
+    };
+    entries.push((
+        "markdown".to_string(),
+        PluginEntry {
+            path: plugin_dir.join(md_name),
+            enabled: false,
+            kind: PluginKind::Process,
+            extensions: Vec::new(),
+            syntax_file: None,
+        },
+    ));
+    entries
+}
+
 /// Manages discovery, lifecycle, and hook dispatch for all plugins.
 pub struct PluginManager {
     entries: Vec<(String, PluginEntry)>,
@@ -461,14 +503,14 @@ impl PluginManager {
         self.plugins.is_empty()
     }
 
-    /// Returns every registered plugin as `(name, is_running)`, in the order held
-    /// by this manager (set at construction time; `App::new` sorts by name).
-    pub fn plugin_entries(&self) -> Vec<(String, bool)> {
+    /// Returns every registered plugin as `(name, is_running, kind)`, in the order
+    /// held by this manager (set at construction time; `App::new` sorts by name).
+    pub fn plugin_entries(&self) -> Vec<(String, bool, PluginKind)> {
         self.entries
             .iter()
-            .map(|(name, _)| {
+            .map(|(name, entry)| {
                 let running = self.plugins.iter().any(|p| p.name == *name);
-                (name.clone(), running)
+                (name.clone(), running, entry.kind.clone())
             })
             .collect()
     }

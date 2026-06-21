@@ -17,6 +17,7 @@ use ratatui::{
 };
 
 use crate::app::App;
+use crate::plugin::PluginKind;
 
 use super::util::centered_rect;
 
@@ -63,15 +64,20 @@ pub(crate) fn draw_plugin_picker(f: &mut Frame, app: &mut App, area: Rect) {
     let items: Vec<ListItem> = picker
         .entries
         .iter()
-        .map(|(name, running)| {
+        .map(|(name, running, kind)| {
             let (marker, marker_style) = if *running {
                 ("[✓] ", Style::default().fg(theme.diff_add))
             } else {
                 ("[ ] ", Style::default().fg(theme.dim))
             };
+            let kind_badge = match kind {
+                PluginKind::Syntax => " [syntax]",
+                PluginKind::Process => "",
+            };
             ListItem::new(Line::from(vec![
                 Span::styled(marker, marker_style),
                 Span::raw(name.as_str()),
+                Span::styled(kind_badge, Style::default().fg(theme.dim)),
             ]))
         })
         .collect();

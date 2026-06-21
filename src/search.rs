@@ -526,14 +526,14 @@ impl RecentFilesState {
 
 /// Scrollable list of registered plugins with their running state for the plugin manager overlay.
 pub struct PluginPicker {
-    /// `(name, is_running)` for each registered plugin, in the order provided
+    /// `(name, is_running, kind)` for each registered plugin, in the order provided
     /// by the manager (alphabetical by name as loaded from config).
-    pub entries: Vec<(String, bool)>,
+    pub entries: Vec<(String, bool, crate::plugin::PluginKind)>,
     pub selected: usize,
 }
 
 impl PluginPicker {
-    pub fn new(entries: Vec<(String, bool)>) -> Self {
+    pub fn new(entries: Vec<(String, bool, crate::plugin::PluginKind)>) -> Self {
         PluginPicker {
             entries,
             selected: 0,

@@ -49,8 +49,16 @@ fn draw_plugin_picker_with_entries_shows_names_and_state() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());
     app.plugin_picker = Some(PluginPicker::new(vec![
-        ("alpha".to_string(), true),
-        ("beta".to_string(), false),
+        (
+            "alpha".to_string(),
+            true,
+            crate::plugin::PluginKind::Process,
+        ),
+        (
+            "beta".to_string(),
+            false,
+            crate::plugin::PluginKind::Process,
+        ),
     ]));
     let backend = TestBackend::new(80, 30);
     let mut terminal = Terminal::new(backend).unwrap();
