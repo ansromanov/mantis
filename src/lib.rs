@@ -6,8 +6,9 @@
 //! owns ratatui rendering, and `config` parses `tv.toml`. The remaining leaf
 //! modules (`tree`, `git`, `highlight`, `markdown`, `search`, `diff`,
 //! `selection`, `theme`, `virtual_file`, `yaml_fold`, `file`, `command_palette`,
-//! `release_info`) each provide one focused capability consumed by `app`/`ui`.
-//! Keep this list in sync with the directory structure documented in AGENTS.md.
+//! `release_info`, `ansi`) each provide one focused capability consumed by
+//! `app`/`ui`. Keep this list in sync with the directory structure documented
+//! in AGENTS.md.
 
 pub mod ansi;
 pub mod app;
@@ -17,6 +18,7 @@ pub mod diff;
 pub mod file;
 pub mod git;
 pub mod highlight;
+#[cfg(feature = "markdown-core")]
 pub mod markdown;
 pub mod plugin;
 pub mod release_info;
