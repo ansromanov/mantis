@@ -9,6 +9,11 @@
 //! fallback. Behaviour is split across sibling submodules (key/mouse handlers,
 //! navigation, file_ops, loader, refresh, content/diff/yaml helpers); this file
 //! owns the struct, its fields, and a few shared free functions.
+//!
+//! The `DiffMode` enum governs which diff variant is shown in the content pane
+//! when `is_diff` is `true`: `All` (default, `git diff HEAD`), `Staged`
+//! (`git diff --cached`), or `Unstaged` (`git diff`). The active mode is cycled
+//! with the `S` keybinding and is reflected in the content title badge.
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -53,6 +58,38 @@ pub enum Focus {
     Tree,
     /// The file content / diff panel on the right.
     Content,
+}
+
+/// Which git diff view is active in the content pane.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DiffMode {
+    /// All changes vs HEAD (`git diff HEAD`) — the default.
+    #[default]
+    All,
+    /// Only staged changes (`git diff --cached`).
+    Staged,
+    /// Only unstaged changes (`git diff`).
+    Unstaged,
+}
+
+impl DiffMode {
+    /// Cycles through All -> Staged -> Unstaged -> All.
+    pub fn next(self) -> Self {
+        match self {
+            DiffMode::All => DiffMode::Staged,
+            DiffMode::Staged => DiffMode::Unstaged,
+            DiffMode::Unstaged => DiffMode::All,
+        }
+    }
+
+    /// Short label used in the content title badge.
+    pub fn label(self) -> &'static str {
+        match self {
+            DiffMode::All => "all",
+            DiffMode::Staged => "staged",
+            DiffMode::Unstaged => "unstaged",
+        }
+    }
 }
 
 /// Git info provided by a plugin for the status bar, replacing the live
@@ -100,6 +137,8 @@ pub struct App {
     pub word_wrap: bool,
     pub current_file: Option<PathBuf>,
     pub is_diff: bool,
+    /// Active diff variant: all changes vs HEAD, staged only, or unstaged only.
+    pub diff_mode: DiffMode,
     /// When `true`, diffs render in a split old|new layout instead of unified.
     pub diff_side_by_side: bool,
     /// Side-by-side rows parsed from the current diff; empty for non-diffs.
@@ -334,6 +373,7 @@ impl App {
             word_wrap: cfg.word_wrap,
             current_file: None,
             is_diff: false,
+            diff_mode: DiffMode::default(),
             diff_side_by_side: false,
             diff_rows: Vec::new(),
             content_title: None,

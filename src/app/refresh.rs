@@ -116,6 +116,7 @@ impl App {
                 seq,
                 root: self.root.clone(),
                 path: path.to_path_buf(),
+                diff_mode: self.diff_mode,
             });
         }
     }

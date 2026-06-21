@@ -247,6 +247,11 @@ impl App {
             self.diff_side_by_side = !self.diff_side_by_side;
             self.content_scroll = 0;
             self.content_hscroll = 0;
+        } else if self.is_diff && pressed(&k.toggle_diff_staged, &key) {
+            self.diff_mode = self.diff_mode.next();
+            if let Some(path) = self.current_file.clone() {
+                self.show_working_tree_diff(&path);
+            }
         } else if self.is_diff && pressed(&k.diff_hunk_next, &key) {
             self.diff_next_hunk();
         } else if self.is_diff && pressed(&k.diff_hunk_prev, &key) {
