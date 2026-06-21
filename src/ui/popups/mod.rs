@@ -19,6 +19,7 @@ mod plugin;
 mod recent;
 mod search;
 mod theme;
+mod tree_filter;
 mod util;
 
 pub(super) use about::draw_about;
@@ -31,6 +32,7 @@ pub(super) use plugin::draw_plugin_picker;
 pub(super) use recent::draw_recent;
 pub(super) use search::draw_search;
 pub(super) use theme::draw_theme;
+pub(super) use tree_filter::draw_tree_filter;
 
 #[cfg(test)]
 #[path = "popups_test.rs"]

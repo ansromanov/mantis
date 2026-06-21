@@ -255,6 +255,8 @@ fn create_base_app() -> App {
         plugin_content_active: false,
         status_message: None,
         breadcrumb_areas: Vec::new(),
+        diff_mode: crate::app::DiffMode::default(),
+        tree_filter: None,
     }
 }
 

@@ -30,7 +30,7 @@ use crate::highlight::Highlighter;
 use crate::plugin::{self, ExtraSyntax, PluginManager};
 use crate::search::{
     CommandPalette, HistoryState, InFileSearch, PluginPicker, RecentFilesState, SearchState,
-    ThemePicker,
+    ThemePicker, TreeFilter,
 };
 use crate::selection::{TextSelection, VisualLine};
 use crate::theme::Theme;
@@ -148,6 +148,9 @@ pub struct App {
     pub search: Option<SearchState>,
     pub last_search_query: String,
     pub in_file_search: Option<InFileSearch>,
+    /// Inline tree name filter, open when the user presses `/` with the tree
+    /// focused. `None` means no filter is active; the full node list is shown.
+    pub tree_filter: Option<TreeFilter>,
     pub command_palette: Option<CommandPalette>,
     pub history: Option<HistoryState>,
     pub theme_picker: Option<ThemePicker>,
@@ -408,6 +411,7 @@ impl App {
             search: None,
             last_search_query: String::new(),
             in_file_search: None,
+            tree_filter: None,
             command_palette: None,
             history: None,
             theme_picker: None,

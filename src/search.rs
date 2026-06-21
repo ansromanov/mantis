@@ -282,6 +282,45 @@ impl HistoryState {
     }
 }
 
+/// State for the inline tree filter (/ while the tree panel is focused).
+///
+/// The query is matched case-insensitively against each node's file/directory
+/// name; parent directories of matching nodes are also kept so the tree remains
+/// navigable. An empty query means no filter is active.
+pub struct TreeFilter {
+    pub query: String,
+}
+
+impl TreeFilter {
+    /// Creates a new, empty tree filter.
+    pub fn new() -> Self {
+        TreeFilter {
+            query: String::new(),
+        }
+    }
+
+    /// Appends `c` to the query.
+    pub fn push(&mut self, c: char) {
+        self.query.push(c);
+    }
+
+    /// Removes the last character from the query.
+    pub fn pop(&mut self) {
+        self.query.pop();
+    }
+
+    /// Returns `true` when the query is empty (no filter applied).
+    pub fn is_empty(&self) -> bool {
+        self.query.is_empty()
+    }
+}
+
+impl Default for TreeFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// A single match occurrence within a file for in-file search.
 #[derive(Clone, Debug)]
 pub struct InFileMatch {

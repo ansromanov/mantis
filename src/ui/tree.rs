@@ -3,14 +3,17 @@
 //! `draw_tree` renders the left-hand file tree from `App::nodes`: it draws each
 //! visible `TreeNode` with depth-based indentation, expand/collapse arrows for
 //! directories, and git-status coloring (new, modified, deleted, ignored) when
-//! status is enabled, marking deleted ghost nodes distinctly. The selected row
-//! is highlighted, and focus state controls the border style. At the top of the
+//! status is enabled, marking deleted ghost nodes distinctly. When an inline tree
+//! filter (`App::tree_filter`) is active, only nodes whose names match the query
+//! (plus their ancestor directories) are rendered. The selected row is
+//! highlighted, and focus state controls the border style. At the top of the
 //! panel a breadcrumb path bar shows the current directory's ancestors (relative
 //! to root) with clickable segments. It records `tree_area`, `tree_offset`, and
 //! `breadcrumb_areas` back onto `App` so mouse handlers can map a click row to a
 //! node index or a breadcrumb segment to a directory. Rendering only - selection
 //! and expansion are driven by the navigation handlers.
 
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 use ratatui::{
@@ -91,18 +94,61 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
     // ── Tree list ───────────────────────────────────────────────────────
     let theme = &app.theme;
     let view_height = list_area.height.max(1) as usize;
-    let n = app.nodes.len();
+    let total_nodes = app.nodes.len();
+
+    // When an inline tree filter is active, compute which node indices to show:
+    // any node whose name contains the query (case-insensitive), plus all
+    // ancestor directories of matching nodes so the tree remains navigable.
+    let visible_indices: Vec<usize> = if let Some(ref filter) = app.tree_filter {
+        if filter.is_empty() {
+            (0..total_nodes).collect()
+        } else {
+            let q: String = filter.query.to_lowercase();
+            // First pass: collect indices of nodes whose names match.
+            let matching: HashSet<usize> = (0..total_nodes)
+                .filter(|&i| app.nodes[i].name.to_lowercase().contains(&q))
+                .collect();
+            // Second pass: include ancestors of every match so the path from
+            // root to each match is visible. Ancestors are nodes at smaller
+            // depth that are prefix-paths of the matching node's path.
+            let mut include = matching.clone();
+            for &mi in &matching {
+                let match_path = &app.nodes[mi].path;
+                let match_depth = app.nodes[mi].depth;
+                // Walk backwards: direct parent dirs appear before `mi` in the
+                // flat vec and have smaller depth.
+                for j in (0..mi).rev() {
+                    let nd = &app.nodes[j];
+                    if nd.depth >= match_depth {
+                        continue;
+                    }
+                    if nd.is_dir && match_path.starts_with(&nd.path) {
+                        include.insert(j);
+                    }
+                }
+            }
+            let mut sorted: Vec<usize> = include.into_iter().collect();
+            sorted.sort_unstable();
+            sorted
+        }
+    } else {
+        (0..total_nodes).collect()
+    };
+
+    let n = visible_indices.len();
+
+    // Map `tree_selected` (original index) to its position in the filtered view.
+    let sel_in_view = visible_indices
+        .iter()
+        .position(|&i| i == app.tree_selected)
+        .unwrap_or(0);
 
     let offset = if app.tree_independent_scroll {
         let max_scroll = n.saturating_sub(view_height);
         app.tree_scroll = app.tree_scroll.min(max_scroll);
         app.tree_scroll
     } else {
-        let sel = if n > 0 {
-            app.tree_selected.min(n - 1)
-        } else {
-            0
-        };
+        let sel = if n > 0 { sel_in_view.min(n - 1) } else { 0 };
         if sel < app.tree_scroll {
             sel
         } else if sel >= app.tree_scroll + view_height {
@@ -112,14 +158,14 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
         }
     };
 
-    // Precompute indent guide masks via a right-to-left pass.
-    // pending[lvl] = true means a node at depth `lvl` has been seen (right-to-left)
-    // without a shallower node closing it, so ancestors at that level still have
-    // siblings ahead — the guide line (│) should continue.
+    // Precompute indent guide masks via a right-to-left pass over the full node
+    // list. pending[lvl] = true means a node at depth `lvl` has been seen
+    // (right-to-left) without a shallower node closing it, so ancestors at that
+    // level still have siblings ahead — the guide line (│) should continue.
     let max_depth = app.nodes.iter().map(|nd| nd.depth).max().unwrap_or(0);
-    let mut guide_masks: Vec<Vec<bool>> = vec![Vec::new(); n];
+    let mut guide_masks: Vec<Vec<bool>> = vec![Vec::new(); total_nodes];
     let mut pending = vec![false; max_depth + 1];
-    for i in (0..n).rev() {
+    for i in (0..total_nodes).rev() {
         let d = app.nodes[i].depth;
         guide_masks[i] = (0..d).map(|lvl| pending[lvl]).collect();
         pending[d] = true;
@@ -128,11 +174,10 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
 
     let guide_style = Style::default().fg(theme.dim).add_modifier(Modifier::DIM);
     let end = (offset + view_height).min(n);
-    let items: Vec<ListItem> = app.nodes[offset..end]
+    let items: Vec<ListItem> = visible_indices[offset..end]
         .iter()
-        .enumerate()
-        .map(|(pos, node)| {
-            let global_i = offset + pos;
+        .map(|&global_i| {
+            let node = &app.nodes[global_i];
             let (color, bold) = git_status_style(node, app, theme);
             let name_style = Style::default().fg(color).add_modifier(bold);
 
@@ -213,11 +258,11 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
 
     let mut state = ListState::default();
     if app.tree_independent_scroll {
-        if n > 0 && app.tree_selected >= offset && app.tree_selected < end {
-            state.select(Some(app.tree_selected - offset));
+        if n > 0 && sel_in_view >= offset && sel_in_view < end {
+            state.select(Some(sel_in_view - offset));
         }
     } else if n > 0 {
-        let sel = app.tree_selected.min(n - 1);
+        let sel = sel_in_view.min(n - 1);
         if sel >= offset && sel < end {
             state.select(Some(sel - offset));
         }

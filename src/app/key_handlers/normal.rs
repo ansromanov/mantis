@@ -12,7 +12,9 @@
 use crossterm::event::{KeyCode, KeyEvent};
 
 use crate::config::pressed;
-use crate::search::{CommandPalette, InFileSearch, PluginPicker, SearchState, ThemePicker};
+use crate::search::{
+    CommandPalette, InFileSearch, PluginPicker, SearchState, ThemePicker, TreeFilter,
+};
 
 use super::super::{App, Focus};
 
@@ -47,8 +49,14 @@ impl App {
                 && self.current_file.is_some()
                 && self.config.in_file_search
             {
+                // Content focused with an open file: open the in-file search bar.
                 self.in_file_search = Some(InFileSearch::new());
+            } else if self.focus == Focus::Tree {
+                // Tree focused: open the inline tree name filter.
+                self.tree_filter = Some(TreeFilter::new());
             } else {
+                // Content focused but no file open (or in-file search disabled):
+                // fall back to the full filesystem search picker.
                 let root = self.root.clone();
                 let mut s = SearchState::new(
                     &root,
