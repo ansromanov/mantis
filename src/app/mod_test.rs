@@ -4406,3 +4406,124 @@ fn plugin_picker_command_palette_entry_exists() {
         "command palette must include open_plugin_picker"
     );
 }
+
+// -- DiffMode -----------------------------------------------------------------
+
+#[test]
+fn diff_mode_next_cycles_all_staged_unstaged() {
+    assert_eq!(DiffMode::All.next(), DiffMode::Staged);
+    assert_eq!(DiffMode::Staged.next(), DiffMode::Unstaged);
+    assert_eq!(DiffMode::Unstaged.next(), DiffMode::All);
+}
+
+#[test]
+fn diff_mode_labels_are_distinct() {
+    let labels = [
+        DiffMode::All.label(),
+        DiffMode::Staged.label(),
+        DiffMode::Unstaged.label(),
+    ];
+    let unique: std::collections::HashSet<_> = labels.iter().collect();
+    assert_eq!(
+        unique.len(),
+        3,
+        "each DiffMode variant must have a unique label"
+    );
+}
+
+#[test]
+fn diff_mode_default_is_all() {
+    assert_eq!(DiffMode::default(), DiffMode::All);
+}
+
+// -- S keybinding toggles diff mode in git mode --------------------------------
+
+/// Builds a git repo with one committed file and an unstaged modification.
+fn temp_git_for_diff_mode() -> PathBuf {
+    use std::process::Command;
+    static COUNTER: AtomicUsize = AtomicUsize::new(0);
+    let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+    let dir = std::env::temp_dir().join(format!("tv_diff_mode_{}_{n}", std::process::id()));
+    fs::create_dir_all(&dir).unwrap();
+    let git = |args: &[&str]| {
+        Command::new("git")
+            .arg("-C")
+            .arg(&dir)
+            .args(["-c", "user.email=t@e.x", "-c", "user.name=T"])
+            .args(args)
+            .status()
+            .unwrap();
+    };
+    git(&["init", "-q"]);
+    fs::write(dir.join("tracked.txt"), "one\n").unwrap();
+    git(&["add", "tracked.txt"]);
+    git(&["commit", "-q", "-m", "init"]);
+    fs::write(dir.join("tracked.txt"), "one\ntwo\n").unwrap();
+    dir.canonicalize().unwrap()
+}
+
+#[test]
+fn s_key_cycles_diff_mode_in_diff_view() {
+    let root = temp_git_for_diff_mode();
+    let mut app = app_for(&root);
+    // Enter git mode so the content pane shows a working-tree diff.
+    app.handle_key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL));
+    assert!(app.is_diff, "git mode should show a diff");
+    assert_eq!(app.diff_mode, DiffMode::All, "default mode should be All");
+
+    app.focus = Focus::Content;
+
+    // First S: All → Staged
+    app.handle_key(KeyEvent::new(KeyCode::Char('S'), KeyModifiers::empty()));
+    assert_eq!(app.diff_mode, DiffMode::Staged);
+    assert!(
+        app.is_diff,
+        "content pane must still show a diff after mode switch"
+    );
+    assert!(
+        app.content_title
+            .as_deref()
+            .unwrap_or("")
+            .contains("[staged]"),
+        "title should reflect staged mode, was: {:?}",
+        app.content_title
+    );
+
+    // Second S: Staged → Unstaged
+    app.handle_key(KeyEvent::new(KeyCode::Char('S'), KeyModifiers::empty()));
+    assert_eq!(app.diff_mode, DiffMode::Unstaged);
+    assert!(
+        app.content_title
+            .as_deref()
+            .unwrap_or("")
+            .contains("[unstaged]"),
+        "title should reflect unstaged mode, was: {:?}",
+        app.content_title
+    );
+
+    // Third S: Unstaged → All (full cycle)
+    app.handle_key(KeyEvent::new(KeyCode::Char('S'), KeyModifiers::empty()));
+    assert_eq!(app.diff_mode, DiffMode::All);
+    assert!(
+        app.content_title.as_deref().unwrap_or("").contains("[all]"),
+        "title should reflect all mode, was: {:?}",
+        app.content_title
+    );
+
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn s_key_outside_diff_view_is_noop() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt"));
+    app.focus = Focus::Content;
+    assert!(!app.is_diff);
+
+    // S should not change anything outside a diff view.
+    app.handle_key(KeyEvent::new(KeyCode::Char('S'), KeyModifiers::empty()));
+    assert_eq!(app.diff_mode, DiffMode::All, "mode unchanged outside diff");
+    assert!(!app.is_diff);
+    fs::remove_dir_all(&root).ok();
+}

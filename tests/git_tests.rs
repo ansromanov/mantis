@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use tree_viewer::git::{file_diff, file_log, working_tree_diff};
+use tree_viewer::git::{file_diff, file_log, staged_diff, unstaged_diff, working_tree_diff};
 
 fn git(dir: &Path, args: &[&str]) {
     let status = Command::new("git")
@@ -82,6 +82,66 @@ fn working_tree_diff_shows_untracked_file() {
     assert!(
         joined.contains("+brand new"),
         "expected '+brand new' in diff, got: {joined}"
+    );
+    fs::remove_dir_all(&repo).ok();
+}
+
+#[test]
+fn staged_diff_shows_only_staged_changes() {
+    let repo = temp_repo();
+    // Stage the working-tree change.
+    git(&repo, &["add", "file.txt"]);
+    let diff = staged_diff(&repo, &repo.join("file.txt"));
+    let joined = diff.join("\n");
+    assert!(
+        joined.contains("+three"),
+        "staged diff should include the staged addition, got: {joined}"
+    );
+    fs::remove_dir_all(&repo).ok();
+}
+
+#[test]
+fn staged_diff_empty_when_nothing_staged() {
+    let repo = temp_repo();
+    // file.txt has an unstaged change but nothing is staged.
+    let diff = staged_diff(&repo, &repo.join("file.txt"));
+    // No staged hunk → placeholder message, not an actual diff.
+    assert!(
+        diff.iter()
+            .any(|l| !l.starts_with('+') && !l.starts_with('-')),
+        "expected a placeholder, not a real diff header, got: {diff:?}"
+    );
+    let joined = diff.join("\n");
+    assert!(
+        !joined.contains("@@"),
+        "no staged changes should mean no hunk headers, got: {joined}"
+    );
+    fs::remove_dir_all(&repo).ok();
+}
+
+#[test]
+fn unstaged_diff_shows_only_unstaged_changes() {
+    let repo = temp_repo();
+    // Nothing is staged: the modification is purely in the working tree.
+    let diff = unstaged_diff(&repo, &repo.join("file.txt"));
+    let joined = diff.join("\n");
+    assert!(
+        joined.contains("+three"),
+        "unstaged diff should include the working-tree addition, got: {joined}"
+    );
+    fs::remove_dir_all(&repo).ok();
+}
+
+#[test]
+fn unstaged_diff_empty_after_staging() {
+    let repo = temp_repo();
+    // Stage everything: nothing remains unstaged.
+    git(&repo, &["add", "file.txt"]);
+    let diff = unstaged_diff(&repo, &repo.join("file.txt"));
+    let joined = diff.join("\n");
+    assert!(
+        !joined.contains("@@"),
+        "after staging all changes there should be no unstaged hunk headers, got: {joined}"
     );
     fs::remove_dir_all(&repo).ok();
 }
