@@ -313,14 +313,20 @@ impl App {
             if self.content_scroll < max {
                 self.content_scroll += 1;
             }
-        } else if !self.is_diff && pressed(&k.content_top, &key) {
+        } else if pressed(&k.content_top, &key) {
             self.show_line_blame = false;
-            self.active_line = 0;
+            if !self.is_diff {
+                self.active_line = 0;
+            }
             self.content_scroll = 0;
-        } else if !self.is_diff && pressed(&k.content_bottom, &key) {
+        } else if pressed(&k.content_bottom, &key) {
             self.show_line_blame = false;
-            self.active_line = self.display_line_count().saturating_sub(1);
-            self.scroll_active_line_into_view();
+            if !self.is_diff {
+                self.active_line = self.display_line_count().saturating_sub(1);
+                self.scroll_active_line_into_view();
+            } else {
+                self.content_scroll = self.content_scroll_max();
+            }
         } else if pressed(&k.content_page_up, &key) {
             self.content_scroll = self.content_scroll.saturating_sub(20);
         } else if pressed(&k.content_page_down, &key) {
@@ -330,23 +336,10 @@ impl App {
             self.content_hscroll = self.content_hscroll.saturating_sub(4);
         } else if !self.word_wrap && pressed(&k.content_right, &key) {
             self.content_hscroll += 4;
-        } else if pressed(&k.content_top, &key) {
-            self.content_scroll = 0;
-        } else if pressed(&k.content_bottom, &key) {
-            self.content_scroll = self.content_scroll_max();
         } else if !self.word_wrap && pressed(&k.content_reset_col, &key) {
             self.content_hscroll = 0;
         } else if !self.is_diff && pressed(&k.blame_line, &key) {
             self.show_line_blame = !self.show_line_blame;
-            self.content_hscroll = self.content_hscroll.saturating_sub(4);
-        } else if !self.word_wrap && pressed(&k.content_right, &key) {
-            self.content_hscroll += 4;
-        } else if pressed(&k.content_top, &key) {
-            self.content_scroll = 0;
-        } else if pressed(&k.content_bottom, &key) {
-            self.content_scroll = self.content_scroll_max();
-        } else if !self.word_wrap && pressed(&k.content_reset_col, &key) {
-            self.content_hscroll = 0;
         }
         if self.content_scroll != scroll_before || self.content_hscroll != hscroll_before {
             self.mark_content_scrolled();
