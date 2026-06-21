@@ -1202,6 +1202,8 @@ fn mouse_click_in_diff_does_not_start_drag() {
 fn search_mouse_scroll_down_up() {
     let root = temp_tree();
     let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
     app.search_area = Rect {
         x: 0,
@@ -3110,6 +3112,8 @@ fn command_palette_mouse_single_then_double_click_executes() {
 fn search_mouse_click_outside_area_is_noop() {
     let root = temp_tree();
     let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
     app.search_area = Rect {
         x: 5,
@@ -3127,6 +3131,8 @@ fn search_mouse_click_outside_area_is_noop() {
 fn search_mouse_click_out_of_range_index_noop() {
     let root = temp_tree();
     let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
     app.search_area = Rect {
         x: 0,
@@ -4157,6 +4163,8 @@ fn command_palette_mouse_scroll_up_at_zero() {
 fn search_mouse_scroll_up_at_zero() {
     let root = temp_tree();
     let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
     app.search_area = full_rect();
     app.search_offset = 0;
