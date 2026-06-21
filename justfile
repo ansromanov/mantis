@@ -1,12 +1,14 @@
 default:
     @just --list
 
-# install git hooks (run once after cloning)
+# install git hooks and required tools (run once after cloning)
 setup:
+    cargo install cargo-nextest --locked
     pre-commit install
 
 # start a new feature branch from latest origin/main (e.g. just new my-feature)
 new branch:
+    cargo install cargo-nextest --locked
     git fetch origin
     git checkout -b {{branch}} origin/main
     pre-commit install

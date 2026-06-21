@@ -88,3 +88,7 @@ jobs:
           else
             cargo nextest run --profile ci --all -E '${{ steps.select.outputs.filter }}'
           fi
+
+      - name: Require sibling _test.rs (backstop for --no-verify)
+        if: steps.changes.outputs.code == 'true'
+        run: bash scripts/require-tests.sh < changed_files.txt
