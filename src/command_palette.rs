@@ -117,6 +117,10 @@ pub static COMMANDS: &[CommandEntry] = &[
         action_id: "copy_relative_path",
     },
     CommandEntry {
+        name: "Blame active line",
+        action_id: "blame_line",
+    },
+    CommandEntry {
         name: "Open plugin manager",
         action_id: "open_plugin_picker",
     },

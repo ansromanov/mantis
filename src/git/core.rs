@@ -442,7 +442,7 @@ pub fn file_blame(repo_dir: &Path, file: &Path) -> Vec<BlameLine> {
 
 fn parse_blame_porcelain(text: &str) -> Vec<BlameLine> {
     let mut blames = Vec::new();
-    let mut meta: HashMap<String, (String, String)> = HashMap::new();
+    let mut meta: HashMap<String, (String, String, String)> = HashMap::new();
     let mut lines = text.lines();
 
     while let Some(line) = lines.next() {
@@ -453,11 +453,12 @@ fn parse_blame_porcelain(text: &str) -> Vec<BlameLine> {
         let hash = parts[0].to_string();
         let line_no: u32 = parts[2].parse().unwrap_or(0);
 
-        let (author, date_relative) = if let Some(m) = meta.get(&hash) {
-            m.clone()
+        let (author, date_relative, subject) = if let Some(m) = meta.get(&hash) {
+            (m.0.clone(), m.1.clone(), m.2.clone())
         } else {
             let mut author = String::from("Unknown");
             let mut author_time: u64 = 0;
+            let mut subject = String::new();
 
             loop {
                 match lines.next() {
@@ -467,6 +468,9 @@ fn parse_blame_porcelain(text: &str) -> Vec<BlameLine> {
                     Some(meta_line) if meta_line.starts_with("author-time ") => {
                         author_time = meta_line["author-time ".len()..].parse().unwrap_or(0);
                     }
+                    Some(meta_line) if meta_line.starts_with("summary ") => {
+                        subject = meta_line["summary ".len()..].to_string();
+                    }
                     Some(meta_line) if meta_line.starts_with("filename ") => break,
                     Some(_) => continue,
                     None => break,
@@ -474,8 +478,11 @@ fn parse_blame_porcelain(text: &str) -> Vec<BlameLine> {
             }
 
             let date_relative = format_relative_time(author_time);
-            meta.insert(hash.clone(), (author.clone(), date_relative.clone()));
-            (author, date_relative)
+            meta.insert(
+                hash.clone(),
+                (author.clone(), date_relative.clone(), subject.clone()),
+            );
+            (author, date_relative, subject)
         };
 
         if lines.next().is_some() {
@@ -489,6 +496,7 @@ fn parse_blame_porcelain(text: &str) -> Vec<BlameLine> {
                 author,
                 date_relative,
                 line_no,
+                subject,
             });
         }
     }

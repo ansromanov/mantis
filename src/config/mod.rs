@@ -183,6 +183,7 @@ impl Keymap {
             "open_plugin_picker" => &self.plugin_picker,
             "tree_collapse_all" => &self.tree_collapse_all,
             "tree_expand_all" => &self.tree_expand_all,
+            "blame_line" => &self.blame_line,
             _ => return String::new(),
         };
         bindings.first().map(|b| b.display()).unwrap_or_default()
@@ -225,6 +226,7 @@ pub struct Keymap {
     pub toggle_blame: Vec<KeyBinding>,
     pub visual_line_toggle: Vec<KeyBinding>,
     pub visual_line_blame: Vec<KeyBinding>,
+    pub blame_line: Vec<KeyBinding>,
     pub toggle_diff_side_by_side: Vec<KeyBinding>,
     /// Cycles the active diff mode: all -> staged -> unstaged -> all.
     pub toggle_diff_staged: Vec<KeyBinding>,
@@ -274,6 +276,7 @@ impl Default for Keymap {
             toggle_blame: bind(&["b"]),
             visual_line_toggle: bind(&["V"]),
             visual_line_blame: bind(&["b"]),
+            blame_line: bind(&["B"]),
             toggle_diff_side_by_side: bind(&["D"]),
             toggle_diff_staged: bind(&["S"]),
             diff_hunk_next: bind(&["n"]),
