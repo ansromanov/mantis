@@ -577,7 +577,7 @@ impl App {
     /// events from the root watcher, or by the periodic fallback timer when no
     /// root watcher is installed.
     pub fn reload(&mut self) {
-        self.last_refresh = Instant::now();
+        self.last_refresh = self.now();
         if self.git_status_enabled {
             #[cfg(feature = "git-core")]
             {
@@ -595,10 +595,16 @@ impl App {
         self.reload_content();
     }
 
+    /// Injectible time source. Returns `Instant::now()` in production; tests may
+    /// substitute a mock to avoid wall-clock waits.
+    pub(crate) fn now(&self) -> Instant {
+        Instant::now()
+    }
+
     /// Records that the user scrolled the content, used to show a transient
     /// scrollbar.
     pub fn mark_content_scrolled(&mut self) {
-        self.content_scrolled_at = Instant::now();
+        self.content_scrolled_at = self.now();
     }
 
     pub fn keys(&self) -> &Keymap {
