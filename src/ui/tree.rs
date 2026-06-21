@@ -372,28 +372,34 @@ fn compute_breadcrumb(app: &App) -> Vec<(String, PathBuf)> {
     };
 
     // Build segments from the filesystem root (/) down through app.root.
+    // Walk leaf-first, then reverse once so we allocate only one Vec.
     let mut segments: Vec<(String, PathBuf)> = Vec::new();
-    let mut stack: Vec<(String, PathBuf)> = Vec::new();
     let mut current = app.root.as_path();
     loop {
         let label = current
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_else(|| "/".to_string());
-        stack.push((label, current.to_path_buf()));
+        segments.push((label, current.to_path_buf()));
         match current.parent() {
             Some(parent) if parent != current => current = parent,
             _ => break,
         }
     }
-    // stack is leaf-first; reverse to root-first.
-    segments.extend(stack.into_iter().rev());
+    segments.reverse();
 
     if dir_path == app.root {
         return segments;
     }
 
+    // dir_path is always a child of app.root (it comes from app.nodes), so
+    // strip_prefix should never fail in practice.
     let Ok(relative) = dir_path.strip_prefix(&app.root) else {
+        debug_assert!(
+            false,
+            "dir_path {dir_path:?} is not under root {:?}",
+            app.root
+        );
         return segments;
     };
 

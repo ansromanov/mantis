@@ -506,6 +506,42 @@ fn render_breadcrumb_truncation_shows_ellipsis() {
     assert!(breadcrumb_row.contains('e'), "last segment must be visible");
 }
 
+#[test]
+fn breadcrumb_when_root_is_filesystem_root() {
+    let mut app = make_app(false, HashMap::new());
+    app.root = PathBuf::from("/");
+    app.nodes = vec![TreeNode {
+        path: PathBuf::from("/etc"),
+        name: "etc".to_string(),
+        depth: 1,
+        is_dir: true,
+        deleted: false,
+    }];
+    app.tree_selected = 0;
+    let rows = render_tree(&mut app, 40, 6);
+    let breadcrumb_row = &rows[1];
+    // When root is /, the single root segment must render as "/" without panic.
+    assert!(
+        breadcrumb_row.contains('/'),
+        "breadcrumb must render the / root segment, got: {:?}",
+        breadcrumb_row
+    );
+    assert!(
+        breadcrumb_row.contains("etc"),
+        "breadcrumb must include child segment, got: {:?}",
+        breadcrumb_row
+    );
+    // Exactly two clickable areas: "/" and "etc".
+    assert_eq!(
+        app.breadcrumb_areas.len(),
+        2,
+        "expected 2 segments (/ and etc), got {}",
+        app.breadcrumb_areas.len()
+    );
+    assert_eq!(app.breadcrumb_areas[0].0, PathBuf::from("/"));
+    assert_eq!(app.breadcrumb_areas[1].0, PathBuf::from("/etc"));
+}
+
 // ---------------------------------------------------------------------------
 // highlight_matches
 // ---------------------------------------------------------------------------

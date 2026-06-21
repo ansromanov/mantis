@@ -239,12 +239,15 @@ impl App {
     /// root is changed to that path so the tree shows that directory's contents.
     /// Called when a breadcrumb segment is clicked.
     pub(super) fn navigate_to_breadcrumb(&mut self, path: &std::path::Path) {
+        // Three cases, in order:
+        //   1. path == root  → select index 0 in place.
+        //   2. path above root → change the viewer root so the tree shows that dir.
+        //   3. path inside root → expand ancestors and select the node.
         if path == self.root {
             self.tree_selected = 0;
             self.scroll_tree_into_view();
             return;
         }
-        // Path above the current root: change root to that directory.
         if !path.starts_with(&self.root) {
             self.set_root(path);
             return;
@@ -273,6 +276,12 @@ impl App {
     /// Changes the viewer root to `path`, rebuilding the tree and resetting
     /// content state. Clears the current file, reselects the root node, and
     /// re-fetches git status when the feature is enabled.
+    ///
+    /// # Maintenance note
+    /// Every field below that holds per-file view state must stay in sync with
+    /// `App`. When you add a new field to `App` that caches file or view state,
+    /// add a reset here or verify that its default value is correct after a root
+    /// change.
     fn set_root(&mut self, path: &std::path::Path) {
         self.root = path.to_path_buf();
         self.expanded.clear();
