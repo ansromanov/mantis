@@ -511,8 +511,11 @@ fn highlight_matches_exact_match_highlights_all() {
     assert_eq!(spans.len(), 1);
     assert_eq!(spans[0].content, "foobar");
     assert!(
-        spans[0].style.add_modifier | ratatui::style::Modifier::BOLD
-            != ratatui::style::Modifier::empty()
+        spans[0]
+            .style
+            .add_modifier
+            .contains(ratatui::style::Modifier::BOLD),
+        "matched span should be bold"
     );
 }
 
@@ -536,6 +539,30 @@ fn highlight_matches_case_insensitive() {
     assert_eq!(spans.len(), 2);
     assert_eq!(spans[0].content, "Hello");
     assert_eq!(spans[1].content, "World");
+}
+
+#[test]
+fn highlight_matches_non_ascii_slices_on_char_boundary() {
+    let theme = default_theme();
+    let style = Style::default().fg(theme.file);
+    // Multibyte chars: char index != byte index. Must not panic and must
+    // split into prefix + match + suffix on character boundaries.
+    let spans = highlight_matches("café_main.rs", "main", style, &theme);
+    assert_eq!(spans.len(), 3);
+    assert_eq!(spans[0].content, "café_");
+    assert_eq!(spans[1].content, "main");
+    assert_eq!(spans[2].content, ".rs");
+}
+
+#[test]
+fn highlight_matches_non_ascii_query_matches() {
+    let theme = default_theme();
+    let style = Style::default().fg(theme.file);
+    let spans = highlight_matches("日本語.txt", "本語", style, &theme);
+    assert_eq!(spans.len(), 3);
+    assert_eq!(spans[0].content, "日");
+    assert_eq!(spans[1].content, "本語");
+    assert_eq!(spans[2].content, ".txt");
 }
 
 #[test]
