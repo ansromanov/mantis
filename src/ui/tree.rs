@@ -151,8 +151,9 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
                 spans.push(Span::styled(indent, name_style));
             }
 
+            let is_open = node.is_dir && app.expanded.contains(&node.path);
             let arrow = if node.is_dir {
-                if app.expanded.contains(&node.path) {
+                if is_open {
                     "▼ "
                 } else {
                     "▶ "
@@ -164,7 +165,7 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
 
             if app.icons_enabled && !app.icon_map.is_empty() {
                 let icon = if node.is_dir {
-                    if app.expanded.contains(&node.path) {
+                    if is_open {
                         &app.icon_dir_open
                     } else {
                         &app.icon_dir_closed
@@ -179,7 +180,7 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
                     app.icon_map.get(&ext).unwrap_or(&app.icon_fallback)
                 };
                 if !icon.is_empty() {
-                    spans.push(Span::styled(icon.clone(), name_style));
+                    spans.push(Span::styled(icon.as_str(), name_style));
                     spans.push(Span::styled(" ", name_style));
                 }
             }

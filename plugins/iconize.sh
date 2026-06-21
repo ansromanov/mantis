@@ -15,10 +15,10 @@ set -euo pipefail
 # Build the icon map once on startup and send it to tv.
 send_icon_map() {
   # Directory icons
-  local dir_open dir_closed file_default
-  dir_open=$(printf '\uf07c')    # nf-fa-folder_open
-  dir_closed=$(printf '\uf07b')  # nf-fa-folder
-  file_default=$(printf '\uf15b') # nf-fa-file_code
+  local dir_open dir_closed fallback
+  dir_open=$(printf '\uf07c')   # nf-fa-folder_open
+  dir_closed=$(printf '\uf07b') # nf-fa-folder
+  fallback=$(printf '\uf15b')   # nf-fa-file_code
 
   # Language icons (Devicons / Nerd Font)
   local rs py js ts go java c cpp cs zig
@@ -60,7 +60,7 @@ send_icon_map() {
   local json yaml toml sql graphql docker
   json=$(printf '\ue60b')    # nf-dev-json
   yaml=$(printf '\ue73a')    # nf-dev-yaml
-  toml=$(printf '\ue60b')    # nf-dev-json
+  toml=$(printf '\ue60b')    # no dedicated toml icon; reuse json glyph
   sql=$(printf '\ue706')     # nf-dev-database
   graphql=$(printf '\ue844') # nf-dev-graphql
   docker=$(printf '\ue7b0')  # nf-dev-docker
@@ -112,7 +112,7 @@ send_icon_map() {
     "ttf":"%s","otf":"%s","woff":"%s","woff2":"%s","eot":"%s",
     "node":"%s"
   }}\n' \
-    "$dir_open" "$dir_closed" "$file_default" \
+    "$dir_open" "$dir_closed" "$fallback" \
     "$rs" "$py" "$js" "$ts" "$go" \
     "$java" "$c" "$cpp" "$cs" "$zig" \
     "$rb" "$php" "$lua" "$hs" "$swift" \
