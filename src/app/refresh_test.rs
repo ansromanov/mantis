@@ -1,6 +1,37 @@
 use std::collections::HashSet;
+use std::time::{Duration, Instant};
 
 use super::*;
+
+// -- debounce / tick tests ----------------------------------------------------
+
+#[test]
+fn tick_debounce_holds_while_not_quiet() {
+    let mut app = create_base_app();
+    app.tree_dirty = true;
+    app.tree_dirty_at = Some(Instant::now());
+    app.tick();
+    // TREE_RELOAD_DEBOUNCE is 60 s in test builds; a freshly set timestamp
+    // cannot have elapsed, so the dirty flag must remain.
+    assert!(
+        app.tree_dirty,
+        "debounce must keep tree_dirty until quiet period elapses"
+    );
+}
+
+#[test]
+fn tick_debounce_clears_dirty_after_quiet_period() {
+    let mut app = create_base_app();
+    app.tree_dirty = true;
+    app.tree_dirty_at = Some(Instant::now() - Duration::from_secs(61));
+    app.tick();
+    // Quiet period has elapsed; tick() should reload and clear the flag.
+    assert!(!app.tree_dirty, "tree_dirty must be cleared after reload");
+    assert!(
+        app.tree_dirty_at.is_none(),
+        "tree_dirty_at must be cleared after reload"
+    );
+}
 
 // -- set_icon_map action tests ------------------------------------------------
 
