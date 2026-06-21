@@ -1,8 +1,9 @@
 name: CI
 
+# Pull-request gate: format, lint, and only the tests related to the changed
+# files. The full suite, Windows, bench-smoke and coverage run elsewhere
+# (main.yml on merge, coverage.yml on demand).
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
 
@@ -10,13 +11,15 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  ci:
-    name: build, test, clippy
+  pr:
+    name: fmt, clippy, related tests (Linux)
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: write
-      checks: write
+    env:
+      # Link with lld in CI only (local builds keep the default linker).
+      # Linux-only — the Windows job below uses the default MSVC linker.
+      RUSTFLAGS: "-C link-arg=-fuse-ld=lld"
     steps:
       - uses: actions/checkout@v6
         with:
@@ -27,33 +30,35 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            changed=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files \
-              --paginate --jq '.[].filename')
-          else
-            changed=$(git diff --name-only HEAD~1 HEAD)
-          fi
+          changed=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files \
+            --paginate --jq '.[].filename')
           if echo "$changed" | grep -qE '^(src/|tests/|benches/|Cargo\.(toml|lock)|tv\.toml)'; then
             echo "code=true" >> "$GITHUB_OUTPUT"
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
           fi
+          # Stash the changed-file list for the related-tests step.
+          printf '%s\n' "$changed" > changed_files.txt
+
+      - name: Install lld
+        if: steps.changes.outputs.code == 'true'
+        run: sudo apt-get update && sudo apt-get install -y lld
 
       - name: Install Rust toolchain
         if: steps.changes.outputs.code == 'true'
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy, rustfmt, llvm-tools-preview
+          components: clippy, rustfmt
 
       - name: Cache cargo
         if: steps.changes.outputs.code == 'true'
         uses: Swatinem/rust-cache@v2
 
-      - name: Install nextest and cargo-llvm-cov
+      - name: Install nextest
         if: steps.changes.outputs.code == 'true'
         uses: taiki-e/install-action@v2
         with:
-          tool: nextest,cargo-llvm-cov
+          tool: nextest
 
       - name: Format
         if: steps.changes.outputs.code == 'true'
@@ -61,156 +66,25 @@ jobs:
 
       - name: Clippy
         if: steps.changes.outputs.code == 'true'
-        run: cargo clippy --all-targets -- -D warnings
+        # Skip benches (criterion) on PRs — they are compile-checked in main.yml.
+        run: cargo clippy --lib --bins --tests -- -D warnings
 
-      - name: Test with coverage
+      - name: Select related tests
         if: steps.changes.outputs.code == 'true'
-        id: test
-        continue-on-error: true
-        run: cargo llvm-cov nextest --profile ci --all --no-report
-
-      - name: Generate coverage reports
-        if: steps.changes.outputs.code == 'true'
-        continue-on-error: true
+        id: select
         run: |
-          cargo llvm-cov report --lcov --output-path lcov.info
-          cargo llvm-cov report 2>&1 | tee coverage_summary.txt
+          filter=$(bash scripts/related-tests.sh < changed_files.txt)
+          echo "filter<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$filter" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          echo "Selected filter: $filter"
 
-      - name: Build PR comment
-        if: steps.changes.outputs.code == 'true' && github.event_name == 'pull_request'
+      - name: Run related tests
+        if: steps.changes.outputs.code == 'true'
         run: |
-          if [ "${{ steps.test.outcome }}" = "success" ]; then
-            STATUS="✅ passed"
+          if [ "${{ steps.select.outputs.filter }}" = "__ALL__" ]; then
+            echo "Running full suite (broad change detected)."
+            cargo nextest run --profile ci --all
           else
-            STATUS="❌ failed"
+            cargo nextest run --profile ci --all -E '${{ steps.select.outputs.filter }}'
           fi
-
-          TOTAL=$(grep '^TOTAL' coverage_summary.txt 2>/dev/null || echo "")
-          if [ -n "$TOTAL" ]; then
-            LINE_COV=$(echo "$TOTAL"  | awk '{print $10}')
-            FUNC_COV=$(echo "$TOTAL"  | awk '{print $7}')
-            REGION_COV=$(echo "$TOTAL" | awk '{print $4}')
-          else
-            LINE_COV="n/a"; FUNC_COV="n/a"; REGION_COV="n/a"
-          fi
-
-          {
-            echo "## 🧪 Test Results — $STATUS"
-            echo ""
-            echo "### 📊 Coverage"
-            echo ""
-            echo "| Metric    | Coverage |"
-            echo "|-----------|:--------:|"
-            echo "| Lines     | \`$LINE_COV\`   |"
-            echo "| Functions | \`$FUNC_COV\`   |"
-            echo "| Regions   | \`$REGION_COV\` |"
-            if [ -f coverage_summary.txt ]; then
-              echo ""
-              echo "<details>"
-              echo "<summary>Full coverage report</summary>"
-              echo ""
-              echo '```'
-              cat coverage_summary.txt
-              echo '```'
-              echo ""
-              echo "</details>"
-            fi
-          } > pr_comment.md
-
-      - name: Post / update PR comment
-        if: steps.changes.outputs.code == 'true' && github.event_name == 'pull_request' && always()
-        uses: marocchino/sticky-pull-request-comment@v3
-        with:
-          header: test-results
-          path: pr_comment.md
-
-      - name: Job summary
-        if: steps.changes.outputs.code == 'true' && always()
-        uses: mikepenz/action-junit-report@v4
-        with:
-          report_paths: target/nextest/ci/junit.xml
-          detailed_summary: true
-          include_passed: true
-          check_name: Test Results
-
-      - name: Fail if tests failed
-        if: steps.test.outcome == 'failure'
-        run: exit 1
-
-  windows:
-    name: build + test (Windows)
-    runs-on: windows-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 2
-
-      - name: Detect code changes
-        id: changes
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            changed=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files \
-              --paginate --jq '.[].filename')
-          else
-            changed=$(git diff --name-only HEAD~1 HEAD)
-          fi
-          if echo "$changed" | grep -qE '^(src/|tests/|benches/|Cargo\.(toml|lock)|tv\.toml|install\.ps1)'; then
-            echo "code=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "code=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - uses: dtolnay/rust-toolchain@stable
-        if: steps.changes.outputs.code == 'true'
-      - uses: Swatinem/rust-cache@v2
-        if: steps.changes.outputs.code == 'true'
-
-      - name: Build
-        if: steps.changes.outputs.code == 'true'
-        run: cargo build --all-targets
-
-      - name: Test
-        if: steps.changes.outputs.code == 'true'
-        run: cargo test --all
-
-  bench-smoke:
-    name: bench (compile check)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 2
-
-      - name: Detect code changes
-        id: changes
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            changed=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files \
-              --paginate --jq '.[].filename')
-          else
-            changed=$(git diff --name-only HEAD~1 HEAD)
-          fi
-          if echo "$changed" | grep -qE '^(src/|benches/|Cargo\.(toml|lock))'; then
-            echo "code=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "code=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - uses: dtolnay/rust-toolchain@stable
-        if: steps.changes.outputs.code == 'true'
-      - uses: Swatinem/rust-cache@v2
-        if: steps.changes.outputs.code == 'true'
-      - name: Bench smoke test (compiles + runs one group)
-        if: steps.changes.outputs.code == 'true'
-        # Target the Criterion binary explicitly so libtest in src/lib.rs is not invoked.
-        # --test runs each benchmark once without statistics — sufficient to catch crashes.
-        run: cargo bench --bench performance -- "scroll_redraw/highlight_range/top/25" --test
