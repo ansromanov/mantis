@@ -266,6 +266,30 @@ impl App {
         }
     }
 
+    /// Handles keyboard input while the inline tree filter is open.
+    ///
+    /// Typing characters narrows the tree to nodes whose names contain the
+    /// query (case-insensitive); Backspace removes the last character; Esc or
+    /// Enter dismisses the filter bar and resets the filter.
+    pub(super) fn handle_tree_filter_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Esc | KeyCode::Enter => {
+                self.tree_filter = None;
+            }
+            KeyCode::Backspace => {
+                if let Some(ref mut f) = self.tree_filter {
+                    f.pop();
+                }
+            }
+            KeyCode::Char(c) => {
+                if let Some(ref mut f) = self.tree_filter {
+                    f.push(c);
+                }
+            }
+            _ => {}
+        }
+    }
+
     /// Handles keyboard input while the command palette is open: typing
     /// characters, backspace, up/down navigation, Enter to execute, Esc to close.
     pub(super) fn handle_command_key(&mut self, key: KeyEvent) {
