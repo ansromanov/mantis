@@ -92,7 +92,10 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
             let lines = if let Some(plugin_lines) = lines {
                 plugin_lines
             } else {
+                #[cfg(feature = "git-core")]
                 let git_lines = crate::git::file_blame(&app.root, path);
+                #[cfg(not(feature = "git-core"))]
+                let git_lines: Vec<crate::git::BlameLine> = Vec::new();
                 if git_lines.is_empty() {
                     Vec::new()
                 } else {

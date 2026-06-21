@@ -334,7 +334,10 @@ impl App {
         let Some(file) = self.current_file.clone() else {
             return;
         };
+        #[cfg(feature = "git-core")]
         let commits = crate::git::file_log(&self.root, &file);
+        #[cfg(not(feature = "git-core"))]
+        let commits: Vec<crate::git::Commit> = Vec::new();
         if commits.is_empty() {
             return;
         }
@@ -349,7 +352,10 @@ impl App {
         });
         self.history = None;
         if let Some((hash, short, file)) = picked {
+            #[cfg(feature = "git-core")]
             let diff = crate::git::file_diff(&self.root, &hash, &file);
+            #[cfg(not(feature = "git-core"))]
+            let diff: Vec<String> = Vec::new();
             self.show_diff(&file, &short, diff);
         }
     }

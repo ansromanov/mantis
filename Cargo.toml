@@ -21,6 +21,10 @@ lto = true          # cross-crate link-time optimization
 codegen-units = 1   # better optimization at the cost of build time
 panic = "abort"     # no unwinding tables; smaller binary
 
+[features]
+default = ["git-core"]
+git-core = []
+
 [dependencies]
 ratatui = "0.28"
 crossterm = "0.27"
