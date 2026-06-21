@@ -211,6 +211,11 @@ new module, create its `_test.rs` companion at the same time. Cross-module /
 black-box tests live in the integration `tests/` directory. The `split-tests` skill
 (`.agent/skills/split-tests/`) automates extracting any inline block.
 
+**Mandatory test rule:** every code change — bug fix, feature, refactor — must
+include tests. There are no exceptions. If a change is untestable (e.g. pure UI
+paint code), explain why in the PR description. Otherwise add or update tests in
+the same commit as the code change, never as a follow-up.
+
 ## Documentation
 
 User-facing docs live in `docs/src/`. Any PR that adds, removes, or changes a
@@ -242,8 +247,10 @@ multiple sibling `_test.rs` files.
 |---|---|
 | `cargo build` / `cargo build --release` | Debug / release build |
 | `cargo run -- [path]` | Run with optional path |
-| `cargo test` | Run all tests |
-| `cargo test <name>` | Run specific test |
+| `just test-pr` | **Run only tests related to your changes** (default for PRs) |
+| `cargo nextest run` | Run full test suite (use only when `just test-pr` prints "broad change") |
+| `cargo nextest run -E 'test(foo)'` | Run tests matching a filter |
+| `cargo test` | Run full suite via built-in runner (fallback if nextest unavailable) |
 | `cargo check` | Type-check only |
 | `cargo clippy --all-targets -- -D warnings` | Lint (must pass) |
 | `cargo fmt --all` / `cargo fmt --check` | Format / check formatting |
@@ -280,7 +287,19 @@ gh pr create       # open the PR (rebase fails loudly on conflicts so you can re
 
 1. `cargo fmt --all` — formatting clean (enforced by pre-commit)
 2. `cargo clippy --all-targets -- -D warnings` — no warnings (enforced by pre-commit)
-3. `cargo test` — all tests pass
+3. `just test-pr` — related tests pass (**never run the full suite for a single PR**)
 4. `cargo check` — no type errors (enforced by pre-commit)
-5. No debug `println!`, `dbg!`, or commented-out code
-6. No hardcoded secrets or credentials
+5. Every changed module has accompanying test changes — no untested diffs
+6. No debug `println!`, `dbg!`, or commented-out code
+7. No hardcoded secrets or credentials
+
+### How `just test-pr` works
+
+`just test-pr` diffs your branch against `origin/main`, pipes the changed file
+list through `scripts/related-tests.sh`, and runs only the matching tests with
+`cargo nextest`. If the changes touch broad files (`Cargo.toml`, `src/lib.rs`,
+etc.) it automatically falls back to the full suite and prints a notice.
+
+Do **not** run `cargo nextest run` (full suite) or `cargo test` (full suite)
+as your default verification step — it wastes minutes and defeats the purpose
+of the targeted script. Use `just test-pr` instead.
