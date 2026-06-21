@@ -164,10 +164,17 @@ fn bundled_plugin_entries_all_disabled_and_include_markdown() {
             !entry.enabled,
             "bundled entries must default to enabled=false"
         );
-        assert_eq!(entry.kind, PluginKind::Process, "all bundled entries are process plugins");
+        assert_eq!(
+            entry.kind,
+            PluginKind::Process,
+            "all bundled entries are process plugins"
+        );
     }
     let names: Vec<&str> = entries.iter().map(|(n, _)| n.as_str()).collect();
-    assert!(names.contains(&"markdown"), "markdown plugin must be listed");
+    assert!(
+        names.contains(&"markdown"),
+        "markdown plugin must be listed"
+    );
     assert!(names.contains(&"iconize"), "iconize plugin must be listed");
 }
 
