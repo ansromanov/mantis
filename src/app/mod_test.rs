@@ -4519,11 +4519,16 @@ fn plugin_picker_esc_closes_overlay() {
 
 #[test]
 fn plugin_picker_opens_empty_when_no_plugins_configured() {
+    // Even with an empty tv.toml, bundled plugins are seeded so the palette
+    // is not empty.
     let root = temp_tree();
-    let mut app = app_for(&root); // Config::default() has no plugins
+    let mut app = app_for(&root);
     app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::empty()));
     let picker = app.plugin_picker.as_ref().unwrap();
-    assert_eq!(picker.results_len(), 0);
+    assert!(
+        picker.results_len() > 0,
+        "bundled plugins must appear even with a bare config"
+    );
     fs::remove_dir_all(&root).ok();
 }
 
@@ -4566,10 +4571,15 @@ fn plugin_picker_nav_down_and_up() {
     app.handle_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()));
     assert_eq!(app.plugin_picker.as_ref().unwrap().selected, 0);
 
-    // Can't navigate past the last item.
+    // Navigate to the very last item and verify we can't go further.
+    let total = app.plugin_picker.as_ref().unwrap().results_len();
+    // Move to the end.
+    for _ in 0..total {
+        app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
+    }
+    let last_idx = app.plugin_picker.as_ref().unwrap().selected;
     app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
-    app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
-    assert_eq!(app.plugin_picker.as_ref().unwrap().selected, 1);
+    assert_eq!(app.plugin_picker.as_ref().unwrap().selected, last_idx);
 
     fs::remove_dir_all(&root).ok();
 }

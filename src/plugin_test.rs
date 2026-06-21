@@ -156,6 +156,38 @@ fn bundled_plugins_includes_iconize() {
 }
 
 #[test]
+fn bundled_plugin_entries_all_disabled_and_include_markdown() {
+    let entries = bundled_plugin_entries();
+    assert!(!entries.is_empty(), "must have at least one bundled plugin");
+    for (_, entry) in &entries {
+        assert!(
+            !entry.enabled,
+            "bundled entries must default to enabled=false"
+        );
+        assert_eq!(
+            entry.kind,
+            PluginKind::Process,
+            "all bundled entries are process plugins"
+        );
+    }
+    let names: Vec<&str> = entries.iter().map(|(n, _)| n.as_str()).collect();
+    assert!(
+        names.contains(&"markdown"),
+        "markdown plugin must be listed"
+    );
+    assert!(names.contains(&"iconize"), "iconize plugin must be listed");
+}
+
+#[test]
+fn bundled_plugin_entries_no_duplicates() {
+    let entries = bundled_plugin_entries();
+    let mut seen = std::collections::HashSet::new();
+    for (name, _) in &entries {
+        assert!(seen.insert(name.as_str()), "duplicate entry: {name}");
+    }
+}
+
+#[test]
 fn install_bundled_plugins_creates_iconize_script() {
     let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let tmp = std::env::temp_dir().join(format!("tv_iconize_plugin_{}", std::process::id()));
@@ -314,7 +346,7 @@ fn activate_one_is_noop_when_already_running() {
     mgr.activate_one("cat-stub", None)
         .expect("second call must be noop");
     assert_eq!(
-        mgr.plugin_entries().iter().filter(|(_, r)| *r).count(),
+        mgr.plugin_entries().iter().filter(|(_, r, _)| *r).count(),
         1,
         "must still be only one running instance"
     );

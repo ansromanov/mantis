@@ -319,7 +319,7 @@ impl App {
     /// the theme, and opens the first selected file.
     pub fn new(
         root: PathBuf,
-        cfg: Config,
+        mut cfg: Config,
         config_path: Option<std::path::PathBuf>,
         config_error: Option<String>,
     ) -> anyhow::Result<Self> {
@@ -361,6 +361,12 @@ impl App {
         );
         let theme = cfg.theme.resolve();
         let saved_config = cfg.clone();
+
+        // Seed bundled plugins into the config map (insert-if-absent) so the
+        // plugin palette shows them even when tv.toml has no [plugins] section.
+        for (name, entry) in plugin::bundled_plugin_entries() {
+            cfg.plugins.entry(name).or_insert(entry);
+        }
 
         // Collect extra syntax definitions from plugins before constructing
         // the highlighter and loader (they need them at creation time).
@@ -531,7 +537,7 @@ impl App {
         let Some(picker) = &self.plugin_picker else {
             return;
         };
-        let Some((name, running)) = picker.entries.get(picker.selected) else {
+        let Some((name, running, _kind)) = picker.entries.get(picker.selected) else {
             return;
         };
         let name = name.clone();
@@ -543,6 +549,8 @@ impl App {
             }
             self.save_config();
         } else {
+            // Ensure the plugin file is present on disk before spawning.
+            plugin::install_bundled_plugins();
             match self
                 .plugin_manager
                 .activate_one(&name, self.current_file.as_deref())
