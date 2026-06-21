@@ -20,37 +20,70 @@ Testing).
 
 ```
 src/
-├── main.rs                 # Entry: terminal setup, event loop, dispatch
-├── lib.rs                  # Module declarations (crate root)
+├── main.rs                         # Entry: terminal setup, sync event loop, dispatch
+├── lib.rs                          # Module declarations (crate root)
 ├── app/
-│   ├── mod.rs              # App state, input handling, overlays
-│   ├── key_handlers.rs     # Key dispatch to tree/content/search handlers
-│   ├── loader.rs           # Background file loader (thread)
-│   ├── file_ops.rs         # Open/close/reveal file operations
-│   ├── navigation.rs       # Tree navigation helpers
-│   └── *_test.rs           # Co-located tests
+│   ├── mod.rs                      # App struct + shared free functions
+│   ├── content_pos.rs              # Content-pane geometry/scroll math (viewport, gutter)
+│   ├── content_query.rs            # Read-only line-count/line-text queries (VirtualFile vs raw vs MD vs JSON)
+│   ├── diff_nav.rs                 # Jump between @@ hunk headers in diffs
+│   ├── file_ops.rs                 # Open/close/reveal file operations
+│   ├── key_handlers/
+│   │   ├── mod.rs                  # Top-level key dispatch (overlay chain → mode → panel)
+│   │   ├── editor.rs               # Key handling when in text-edit/insert mode
+│   │   ├── normal.rs               # Key handling in normal (tree/content) mode
+│   │   ├── overlay.rs              # Key handling for all overlay popups
+│   │   └── visual.rs               # Key handling in visual-selection mode
+│   ├── loader.rs                   # Background file-loader thread (LoadRequest/LoadResponse)
+│   ├── mouse_handlers.rs           # Mouse event dispatch and click hit-testing
+│   ├── navigation.rs               # Tree cursor movement helpers
+│   ├── refresh.rs                  # Per-frame tick: drain loads, watcher, debounced search
+│   ├── yaml_fold.rs                # YAML fold-region detection (re-export shim)
+│   └── *_test.rs                   # Co-located tests
 ├── ui/
-│   ├── mod.rs              # ratatui rendering orchestration
-│   ├── content.rs          # Content panel rendering
-│   ├── popups.rs           # Help, search, history, theme picker overlays
-│   ├── statusbar.rs        # Status bar rendering
-│   ├── tree.rs             # Tree panel rendering
-│   └── *_test.rs           # Co-located tests
+│   ├── mod.rs                      # ratatui rendering orchestration (draw entry point)
+│   ├── content/
+│   │   ├── mod.rs                  # Content panel draw entry point
+│   │   ├── diff.rs                 # Side-by-side and unified diff rendering
+│   │   ├── draw.rs                 # Core content rendering (lines, gutter, highlights)
+│   │   ├── scrollbar.rs            # Transient fade scrollbar overlay
+│   │   ├── search.rs               # In-file search match highlight overlay
+│   │   └── selection.rs            # Visual-selection highlight overlay
+│   ├── popups/
+│   │   ├── mod.rs                  # Re-exports all popup draw functions
+│   │   ├── about.rs                # About + release notes overlay
+│   │   ├── blame.rs                # Git blame panel for visual-selection range
+│   │   ├── command.rs              # Ctrl-P command palette popup
+│   │   ├── help.rs                 # ? keybinding help overlay
+│   │   ├── history.rs              # Git file-log history overlay
+│   │   ├── in_file.rs              # / in-file search bar (bottom of content pane)
+│   │   ├── plugin.rs               # Plugin manager overlay
+│   │   ├── recent.rs               # Recent-files overlay
+│   │   ├── search.rs               # Fuzzy file/content search overlay
+│   │   ├── theme.rs                # Theme picker overlay
+│   │   └── util.rs                 # Shared popup layout helpers
+│   ├── statusbar.rs                # Status bar rendering
+│   ├── tree.rs                     # Tree panel rendering
+│   └── *_test.rs                   # Co-located tests
 ├── config/
-│   ├── mod.rs              # tv.toml deserialization, keybinding parsing
-│   └── validate.rs         # Config validation
-├── command_palette.rs      # Ctrl-P command palette
-├── diff.rs                 # Git diff rendering helpers
-├── file.rs                 # Binary file detection (null-byte check)
-├── git.rs                  # Shells out to `git` for log/diff
-├── highlight.rs            # syntect syntax highlighting → ratatui styles
-├── markdown.rs             # pulldown-cmark → styled ratatui spans
-├── search.rs               # Fuzzy file/content search (SkimMatcherV2)
-├── selection.rs            # Text selection state
-├── theme.rs                # Theme struct + presets, color parsing
-├── tree.rs                 # Flat Vec<TreeNode> from ignore::WalkBuilder
-├── virtual_file.rs         # Virtual file content from highlight/git
-└── yaml_fold.rs            # YAML fold-region detection
+│   ├── mod.rs                      # tv.toml deserialization, keybinding parsing
+│   └── validate.rs                 # Config validation
+├── ansi.rs                         # ANSI SGR parser → ratatui Style/Span (for plugin content)
+├── command_palette.rs              # CommandPalette + CommandEntry structs and COMMANDS table
+├── diff.rs                         # Git diff parse (DiffRow, Cell, parse_side_by_side)
+├── file.rs                         # Binary detection, encoding/line-ending probe
+├── git.rs                          # Shell-out to git: log, diff, blame, status, repo_info
+├── highlight.rs                    # syntect Highlighter → ratatui Style spans
+├── markdown.rs                     # pulldown-cmark → styled ratatui spans
+├── plugin.rs                       # Plugin, PluginManager, PluginKind, ExtraSyntax; subprocess IPC
+├── release_info.rs                 # Compile-time release metadata (ReleaseInfo, RELEASE static)
+├── search.rs                       # SearchState, HistoryState, ThemePicker, InFileSearch,
+│                                   #   RecentFilesState, PluginPicker (SkimMatcherV2)
+├── selection.rs                    # TextSelection + VisualLine for copy/visual mode
+├── theme.rs                        # Theme struct, color roles, presets, parse_color
+├── tree.rs                         # TreeNode, build_visible (flat Vec from ignore::WalkBuilder)
+├── virtual_file.rs                 # Memory-mapped lazily-indexed file (VirtualFile)
+└── yaml_fold.rs                    # FoldRegion detection and display-map builder
 ```
 
 Files grow into the module-directory pattern (`src/app/`, `src/ui/`, `src/config/`)
@@ -61,25 +94,75 @@ once they get large: a thin `mod.rs` re-exports focused submodules.
 1. **Flat tree vector.** The file tree is a `Vec<TreeNode>` with explicit `depth`;
    expansion is tracked in a `HashSet<PathBuf>`. Simpler than nested trees for
    rendering and mouse hit-testing.
-2. **Overlay state machine.** Event handlers chain `help` > `theme_picker` >
-   `history` > `search` > normal dispatch (tree/content by `Focus`). The same chain
-   appears in `handle_mouse()` and `draw()`.
+2. **Overlay state machine.** Event handlers chain `help` > `about` > `plugin_picker` >
+   `recent_files` > `command_palette` > `theme_picker` > `history` > `in_file_search` >
+   `search` > normal dispatch (tree/content by `Focus`). The same chain appears in
+   `handle_mouse()` and `draw()`.
 3. **Recorded geometry for mouse.** Each `draw_*` stores its rendered `Rect` and
    scroll offset back on `App`; mouse handlers hit-test with `rect_contains()`.
    **Always account for scroll offsets in click calculations.**
-4. **Fuzzy-filterable picker.** `SearchState`, `HistoryState`, `ThemePicker` share a
-   shape: query string, full list, filtered+scored list, selected index,
-   `push(c)`/`pop()` → `refresh()`. Uses `SkimMatcherV2`, descending score sort.
+4. **Fuzzy-filterable picker.** `SearchState`, `HistoryState`, `ThemePicker`,
+   `RecentFilesState`, `PluginPicker`, and `CommandPalette` share a shape: query
+   string, full list, filtered+scored list, selected index, `push(c)`/`pop()` →
+   `refresh()`. Uses `SkimMatcherV2`, descending score sort.
 5. **Semantic theming.** `Theme` is a set of named color roles (not literal colors)
    plus a `syntax` syntect theme name. Presets (default, monokai, solarized,
-   catppuccin, synthwave84) live in `PRESETS` plus user overrides; `apply_theme()`
+   catppuccin, synthwave84) live in `themes/` plus user overrides; `apply_theme()`
    re-opens the current file after a switch.
 6. **Keybinding abstraction.** All actions bind through a `Keymap`; `pressed()`
    checks binding lists. Fully remappable via `tv.toml` `[keys]`.
-7. **Git via shell-out.** `git.rs` runs `git log` / `git diff` rather than linking a
-   Rust git library, with graceful fallback on failure.
+7. **Git via shell-out.** `git.rs` runs `git log` / `git diff` / `git blame` rather
+   than linking a Rust git library, with graceful fallback on failure.
 8. **Sync event loop.** `crossterm::event::poll()` with a 16ms timeout — no async
    runtime, just a synchronous tick loop.
+9. **Content source abstraction.** `app/content_query.rs` hides whether the active
+   content is a `VirtualFile`, `Vec<String>`, JSON pretty-print, or markdown spans;
+   everything calls `app.line_count()` / `app.line_text(n)`.
+10. **Plugin IPC.** Plugins are external processes communicating over stdin/stdout
+    JSON lines (`plugin.rs`). `PluginManager` spawns, kills, and routes actions;
+    the content pane can be taken over by plugin-provided ANSI text (`ansi.rs`).
+
+---
+
+## Symbol index
+
+Quick lookup: type/function → file. Use this before grepping.
+
+| Symbol | File | Notes |
+|---|---|---|
+| `App` | `src/app/mod.rs:74` | Central state struct |
+| `Focus` | `src/app/mod.rs:51` | `Tree` / `Content` enum |
+| `PluginGitInfo` | `src/app/mod.rs:60` | Plugin-supplied git status |
+| `App::tick` | `src/app/refresh.rs` | Per-frame update |
+| `App::handle_key` | `src/app/key_handlers/mod.rs` | Top-level key dispatch |
+| `App::handle_mouse` | `src/app/mouse_handlers.rs` | Mouse event dispatch |
+| `App::open_file` | `src/app/file_ops.rs` | Load a file into the content pane |
+| `App::line_count` / `App::line_text` | `src/app/content_query.rs` | Unified content access |
+| `App::content_scroll_max` / `App::line_prefix_width` | `src/app/content_pos.rs` | Scroll/gutter math |
+| `App::diff_next_hunk` / `App::diff_prev_hunk` | `src/app/diff_nav.rs` | Hunk navigation |
+| `Loader` / `LoadRequest` / `LoadResponse` | `src/app/loader.rs` | Background file I/O thread |
+| `TreeNode` / `build_visible` | `src/tree.rs` | Flat tree vector |
+| `VirtualFile` | `src/virtual_file.rs` | Mmap'd lazily-indexed file |
+| `SearchState` | `src/search.rs:36` | Fuzzy file+content search |
+| `HistoryState` | `src/search.rs:221` | Git file-log picker |
+| `InFileSearch` | `src/search.rs:294` | Within-file incremental search |
+| `ThemePicker` | `src/search.rs:357` | Theme selection overlay |
+| `RecentFilesState` | `src/search.rs:421` | Recent-files overlay |
+| `PluginPicker` | `src/search.rs:489` | Plugin manager overlay |
+| `CommandPalette` / `CommandEntry` | `src/command_palette.rs` | Ctrl-P palette |
+| `TextSelection` / `VisualLine` | `src/selection.rs` | Visual/copy selection |
+| `Theme` / `parse_color` | `src/theme.rs` | Color roles + presets |
+| `ThemeConfig` | `src/theme.rs:290` | TOML deserialization target |
+| `Highlighter` | `src/highlight.rs:30` | syntect → ratatui styles |
+| `DiffRow` / `parse_side_by_side` | `src/diff.rs` | Diff parse/render types |
+| `GitRepoInfo` / `GitStatus` / `Commit` / `BlameLine` | `src/git.rs` | Git shell-out types |
+| `FoldRegion` / `detect_fold_regions` | `src/yaml_fold.rs` | YAML fold regions |
+| `Plugin` / `PluginManager` / `PluginKind` | `src/plugin.rs` | Plugin subprocess IPC |
+| `ExtraSyntax` / `PluginEntry` | `src/plugin.rs` | Plugin-registered syntaxes |
+| `ReleaseInfo` / `RELEASE` | `src/release_info.rs` | Embedded release metadata |
+| `parse_ansi_line` | `src/ansi.rs` | ANSI SGR → ratatui Span |
+| `Config` / `Keymap` | `src/config/mod.rs` | tv.toml deserialization |
+| `draw` | `src/ui/mod.rs:26` | Main ratatui draw entry point |
 
 ---
 
