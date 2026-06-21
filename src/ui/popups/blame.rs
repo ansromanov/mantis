@@ -57,7 +57,14 @@ pub(crate) fn draw_blame_panel(f: &mut Frame, app: &App, area: Rect) {
         .filter(|v| !v.is_empty())
         .cloned();
     let git_blame: Vec<crate::git::BlameLine> = if plugin_lines.is_none() {
-        crate::git::file_blame(&app.root, path)
+        #[cfg(feature = "git-core")]
+        {
+            crate::git::file_blame(&app.root, path)
+        }
+        #[cfg(not(feature = "git-core"))]
+        {
+            Vec::new()
+        }
     } else {
         Vec::new()
     };

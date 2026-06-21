@@ -9,8 +9,12 @@
 //!
 //! Every call degrades gracefully - a missing repo, a `git` that isn't
 //! installed, or a failed command yields empty/`None` results instead of an
-//! error, so the viewer works fine outside a repository. `GitStatus` and its
-//! priority ordering drive the tree's status coloring.
+//! error, so the viewer works fine outside a repository.
+//!
+//! **Feature gate:** This module is compiled only when the `git-core` feature
+//! is enabled (default on). When disabled, the same functionality is provided
+//! by the bundled `git-plugin` subprocess plugin. Types are in the sibling `types` module
+//! and are always available regardless of the feature flag.
 //!
 //! Three diff helpers cover the main diff modes available in the content pane:
 //! `working_tree_diff` (all changes vs HEAD), `staged_diff` (index vs HEAD),
@@ -22,30 +26,7 @@ use std::process::Command;
 use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// Per-file git working-tree status.
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum GitStatus {
-    New,
-    Modified,
-    Deleted,
-    Ignored,
-}
-
-fn status_priority(s: GitStatus) -> u8 {
-    match s {
-        GitStatus::Modified => 3,
-        GitStatus::New => 2,
-        GitStatus::Deleted => 1,
-        GitStatus::Ignored => 0,
-    }
-}
-
-fn set_if_higher(map: &mut HashMap<PathBuf, GitStatus>, key: PathBuf, val: GitStatus) {
-    let cur = map.entry(key).or_insert(val);
-    if status_priority(val) > status_priority(*cur) {
-        *cur = val;
-    }
-}
+use super::types::*;
 
 /// Returns the git repository root containing `dir`, canonicalized.
 fn git_toplevel(dir: &Path) -> Option<PathBuf> {
@@ -60,48 +41,6 @@ fn git_toplevel(dir: &Path) -> Option<PathBuf> {
     }
     let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
     PathBuf::from(s).canonicalize().ok()
-}
-
-/// The current HEAD state of the repository.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub enum GitHead {
-    Branch(String),
-    #[default]
-    Detached,
-    Rebase,
-    Merge,
-}
-
-impl GitHead {
-    pub fn display(&self) -> String {
-        match self {
-            GitHead::Branch(name) => name.clone(),
-            GitHead::Detached => "HEAD (detached)".to_string(),
-            GitHead::Rebase => "REBASE".to_string(),
-            GitHead::Merge => "MERGE".to_string(),
-        }
-    }
-}
-
-/// Rich git repository info: branch/HEAD state, ahead/behind counts, and
-/// dirty file counts.
-#[derive(Debug, Clone)]
-pub struct GitRepoInfo {
-    pub head: GitHead,
-    pub ahead: usize,
-    pub behind: usize,
-    /// Total non-ignored changed files.
-    pub total_changed: usize,
-    /// Files with staged changes.
-    pub staged: usize,
-    /// Untracked files.
-    pub untracked: usize,
-}
-
-impl GitRepoInfo {
-    pub fn is_dirty(&self) -> bool {
-        self.total_changed > 0
-    }
 }
 
 /// Returns rich git repository info for the directory containing `dir`, or
@@ -136,8 +75,6 @@ pub fn repo_info(dir: &Path) -> Option<GitRepoInfo> {
     }
 
     // Refine HEAD state: check for rebase/merge by inspecting git state files.
-    // These checks are unconditional — a merge in progress keeps the branch
-    // name in the porcelain header, so we cannot gate on GitHead::Detached.
     let git_dir = root.join(".git");
     if git_dir.join("rebase-merge").exists() || git_dir.join("rebase-apply").exists() {
         info.head = GitHead::Rebase;
@@ -151,9 +88,7 @@ pub fn repo_info(dir: &Path) -> Option<GitRepoInfo> {
 /// Returns how many commits `HEAD` is ahead of and behind its upstream.
 ///
 /// Missing upstreams and git errors return `None` so callers can omit the
-/// indicator entirely. This uses `git rev-list --left-right --count` instead of
-/// re-parsing `git status` so upstream tracking errors stay explicit and the
-/// missing-upstream case can degrade cleanly.
+/// indicator entirely.
 pub fn ahead_behind(repo_dir: &Path) -> Option<(usize, usize)> {
     let out = Command::new("git")
         .arg("-C")
@@ -165,7 +100,6 @@ pub fn ahead_behind(repo_dir: &Path) -> Option<(usize, usize)> {
         return None;
     }
     let text = String::from_utf8_lossy(&out.stdout);
-    // Expected output: "<ahead>\t<behind>" from `--left-right --count`.
     let mut parts = text.split_whitespace();
     let ahead = parts.next()?.parse().ok()?;
     let behind = parts.next()?.parse().ok()?;
@@ -198,7 +132,6 @@ fn parse_branch_line(line: &str) -> GitHead {
 fn parse_repo_info(text: &str) -> GitRepoInfo {
     let mut lines = text.lines();
 
-    // First line is the branch header: "## ..."
     let branch_line = lines.next().unwrap_or("");
     let head = parse_branch_line(branch_line);
 
@@ -219,7 +152,6 @@ fn parse_repo_info(text: &str) -> GitRepoInfo {
         let x = bytes[0] as char;
         let y = bytes[1] as char;
 
-        // Skip ignored files.
         if x == '!' && y == '!' {
             continue;
         }
@@ -239,8 +171,6 @@ fn parse_repo_info(text: &str) -> GitRepoInfo {
 /// Builds an absolute-path → status map for the repository containing `dir`.
 /// Parent directories are included with their highest-priority child status so
 /// collapsed dirs can be colored when they contain changes.
-/// Pass `include_ignored = true` only when the tree is showing gitignored files;
-/// omitting `--ignored` makes the status call significantly faster on large repos.
 pub fn repo_status(dir: &Path, include_ignored: bool) -> HashMap<PathBuf, GitStatus> {
     let Some(root) = git_toplevel(dir) else {
         return HashMap::new();
@@ -266,11 +196,9 @@ pub fn repo_status(dir: &Path, include_ignored: bool) -> HashMap<PathBuf, GitSta
         let x = line.as_bytes()[0] as char;
         let y = line.as_bytes()[1] as char;
         let path_str = line[3..].trim();
-        // Renames: "old -> new" — keep the destination path.
         let path_str = path_str
             .find(" -> ")
             .map_or(path_str, |i| &path_str[i + 4..]);
-        // Ignored directories are listed with a trailing slash.
         let path_str = path_str.trim_end_matches('/');
         if path_str.is_empty() {
             continue;
@@ -291,8 +219,6 @@ pub fn repo_status(dir: &Path, include_ignored: bool) -> HashMap<PathBuf, GitSta
         let abs = root.join(path_str);
         set_if_higher(&mut map, abs.clone(), status);
 
-        // Propagate up through parent directories, but never for Ignored — doing
-        // so would incorrectly taint the parent with the ignored status.
         if status != GitStatus::Ignored {
             let mut cur = abs.parent();
             while let Some(d) = cur {
@@ -327,13 +253,10 @@ pub fn working_tree_diff(repo_dir: &Path, file: &Path) -> Vec<String> {
     }
 
     // Untracked (unstaged) new file: build the diff manually.
-    // git diff --no-index against /dev/null is unreliable on Windows
-    // (git does not translate the path in --no-index mode).
     let bytes = match std::fs::read(file) {
         Ok(b) => b,
         Err(_) => return vec!["(no diff available)".to_string()],
     };
-    // Show a placeholder for binary files, matching git's behaviour.
     if bytes.contains(&0u8) {
         let rel = file
             .strip_prefix(repo_dir)
@@ -397,15 +320,6 @@ pub fn unstaged_diff(repo_dir: &Path, file: &Path) -> Vec<String> {
         _ => vec!["(no unstaged changes)".to_string()],
     }
 }
-
-/// A commit that touched a particular file.
-pub struct Commit {
-    pub hash: String,
-    pub short: String,
-    pub date: String,
-    pub subject: String,
-}
-
 /// Returns the commit history for a single file, newest first. Empty if the
 /// file is untracked, not in a git repository, or git is unavailable.
 pub fn file_log(repo_dir: &Path, file: &Path) -> Vec<Commit> {
@@ -416,7 +330,6 @@ pub fn file_log(repo_dir: &Path, file: &Path) -> Vec<Commit> {
             "log",
             "--no-color",
             "--date=short",
-            // hash, short hash, date, subject — separated by unit-separator
             "--format=%H%x1f%h%x1f%ad%x1f%s",
             "--",
         ])
@@ -469,17 +382,6 @@ pub fn file_diff(repo_dir: &Path, rev: &str, file: &Path) -> Vec<String> {
     }
 }
 
-/// Per-line git blame annotation.
-#[derive(Clone, Debug)]
-pub struct BlameLine {
-    #[allow(dead_code)]
-    pub commit_hash: String,
-    pub short_hash: String,
-    pub author: String,
-    pub date_relative: String,
-    pub line_no: u32,
-}
-
 struct CachedBlame {
     mtime: SystemTime,
     lines: Vec<BlameLine>,
@@ -493,8 +395,7 @@ fn blame_cache() -> &'static Mutex<HashMap<PathBuf, CachedBlame>> {
 
 /// Returns per-line git blame annotations for `file` in the repository at
 /// `repo_dir`. Returns an empty `Vec` if the file is untracked, not in a git
-/// repo, or git is unavailable. Results are cached by (path, mtime) so
-/// repeated renders don't re-invoke git.
+/// repo, or git is unavailable.
 pub fn file_blame(repo_dir: &Path, file: &Path) -> Vec<BlameLine> {
     let mtime = match std::fs::metadata(file).and_then(|m| m.modified()) {
         Ok(t) => t,
@@ -545,9 +446,6 @@ fn parse_blame_porcelain(text: &str) -> Vec<BlameLine> {
     let mut lines = text.lines();
 
     while let Some(line) = lines.next() {
-        // Header: "<hash> <orig_lineno> <final_lineno> [<group_count>]"
-        // <group_count> is present only on the first line of a new commit group.
-        // Subsequent lines from the same commit have 3 fields and no metadata block.
         let parts: Vec<&str> = line.splitn(4, ' ').collect();
         if parts.len() < 3 {
             continue;
@@ -580,7 +478,6 @@ fn parse_blame_porcelain(text: &str) -> Vec<BlameLine> {
             (author, date_relative)
         };
 
-        // Every header (first or repeat) is followed by exactly one tab-prefixed content line.
         if lines.next().is_some() {
             blames.push(BlameLine {
                 short_hash: if hash.len() >= 7 {
@@ -599,7 +496,6 @@ fn parse_blame_porcelain(text: &str) -> Vec<BlameLine> {
     blames
 }
 
-#[allow(dead_code)]
 fn format_relative_time(unix_ts: u64) -> String {
     if unix_ts == 0 {
         return "Not committed yet".to_string();
@@ -630,7 +526,6 @@ fn format_relative_time(unix_ts: u64) -> String {
     }
 }
 
-#[allow(dead_code)]
 fn pluralize(n: u64, unit: &str) -> String {
     if n == 1 {
         format!("1 {unit} ago")
@@ -640,5 +535,5 @@ fn pluralize(n: u64, unit: &str) -> String {
 }
 
 #[cfg(test)]
-#[path = "git_test.rs"]
+#[path = "core_test.rs"]
 mod tests;

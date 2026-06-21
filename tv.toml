@@ -106,8 +106,9 @@ visual_line_blame = ["b"]
 #
 # Bundled plugins (ship with tv, installed to the plugin directory on first
 # run). Uncomment to enable:
-#   git-diff = { path = "git-diff.sh" }
-#   git-log  = { path = "git-log.sh" }
+#   git-diff  = { path = "git-diff.sh" }
+#   git-log   = { path = "git-log.sh" }
+#   markdown  = { path = "tv-plugin-markdown" }
 # git-diff: shows the working-tree diff (with ANSI colours from git) when a
 #   tracked file is opened, replacing the file content.
 # git-log:  press H to view the file's git log (--oneline --color=always) as a
@@ -115,9 +116,19 @@ visual_line_blame = ["b"]
 #   retains git's ANSI colouring.
 #   Note: H is also the default binding for the built-in file_history picker.
 #   To prevent both from firing, add `file_history = []` under [keys].
+# markdown: renders .md files with pulldown-cmark, responds to M keypress
+#   (raw/rendered toggle) and theme changes.
 #
 # Syntax plugins register new syntax highlighting definitions. The highlighter
 # auto-discovers .sublime-syntax files in {plugin_dir}/syntaxes/ (installed
 # by tv on first run).  You can also add explicit entries:
 #   terraform = { kind = "syntax", syntax_file = "syntaxes/terraform.sublime-syntax",
 #                 extensions = ["tf", "tfvars"] }
+#
+# git-plugin: unified git status / repo info / diff / log / blame via a single
+#   subprocess. Replaces the built-in git integration when `git-core` is
+#   disabled in the binary (currently the built-in git integration runs by
+#   default; this plugin is an alternative for testing).
+#
+# [plugins]
+# git-plugin = { path = "git-plugin.sh" }

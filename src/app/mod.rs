@@ -308,12 +308,26 @@ impl App {
         let git_status_enabled = cfg.git_status || cfg.git_mode;
         let git_show_deleted = cfg.git_show_deleted;
         let git_status_map = if git_status_enabled {
-            crate::git::repo_status(&root, cfg.ignore_gitignore)
+            #[cfg(feature = "git-core")]
+            {
+                crate::git::repo_status(&root, cfg.ignore_gitignore)
+            }
+            #[cfg(not(feature = "git-core"))]
+            {
+                HashMap::new()
+            }
         } else {
             HashMap::new()
         };
         let git_info = if git_status_enabled {
-            crate::git::repo_info(&root)
+            #[cfg(feature = "git-core")]
+            {
+                crate::git::repo_info(&root)
+            }
+            #[cfg(not(feature = "git-core"))]
+            {
+                None
+            }
         } else {
             None
         };
@@ -343,7 +357,7 @@ impl App {
             .filter(|(_, e)| e.kind != plugin::PluginKind::Syntax)
             .collect();
         let mut plugin_manager = PluginManager::new(process_entries);
-        plugin_manager.activate_all();
+        plugin_manager.activate_all(cfg.theme.name.as_deref());
         let plugin_spawn_error = plugin_manager
             .take_spawn_errors()
             .into_iter()
@@ -530,8 +544,11 @@ impl App {
     pub fn reload(&mut self) {
         self.last_refresh = Instant::now();
         if self.git_status_enabled {
-            self.git_status_map = crate::git::repo_status(&self.root, self.ignore_gitignore);
-            self.git_info = crate::git::repo_info(&self.root);
+            #[cfg(feature = "git-core")]
+            {
+                self.git_status_map = crate::git::repo_status(&self.root, self.ignore_gitignore);
+                self.git_info = crate::git::repo_info(&self.root);
+            }
         }
         let root = self.root.clone();
         let show_hidden = self.show_hidden;

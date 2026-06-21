@@ -180,6 +180,7 @@ pub(super) fn compute_file_load(path: &Path, theme: &Theme, hl: &Highlighter) ->
         });
     }
     load.highlighted = hl.highlight(path, &load.content);
+    #[cfg(feature = "markdown-core")]
     if is_markdown {
         load.markdown_lines = crate::markdown::render(&s, theme);
     }
@@ -205,11 +206,14 @@ pub(super) fn compute_diff_load(
     theme: &Theme,
     diff_mode: DiffMode,
 ) -> DiffLoad {
+    #[cfg(feature = "git-core")]
     let lines = match diff_mode {
         DiffMode::All => crate::git::working_tree_diff(root, path),
         DiffMode::Staged => crate::git::staged_diff(root, path),
         DiffMode::Unstaged => crate::git::unstaged_diff(root, path),
     };
+    #[cfg(not(feature = "git-core"))]
+    let lines: Vec<String> = vec!["(git-core disabled)".to_string()];
     let rel = path.strip_prefix(root).unwrap_or(path);
     let highlighted = lines
         .iter()

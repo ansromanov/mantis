@@ -84,16 +84,18 @@ Plugins receive lifecycle and hook events from `tv` and can respond with
 |---|---|
 | `show_message` | Displays a message in the status bar |
 | `open_file` | Opens a file in the content panel |
+| `set_content` | Replaces content panel with ANSI-escaped lines |
 
 The `show_message` action accepts a `message` parameter; `open_file` accepts a
-`path` parameter pointing to an existing file.
+`path` parameter pointing to an existing file; `set_content` accepts a `lines`
+parameter — an array of strings that may contain ANSI escape codes.
 
 ## Lifecycle
 
 1. `tv` starts, reads `[plugins]` from config, and spawns each enabled plugin.
-2. Each plugin receives an `init` event.
+2. Each plugin receives an `init` event (with the active theme name).
 3. As you use `tv`, plugins receive hook events (`on_file_open`,
-   `on_keypress`, `on_selection_change`).
+   `on_keypress`, `on_selection_change`, `on_theme_change`).
 4. When you quit, each plugin receives `on_quit` then `shutdown`, and `tv`
    waits for each subprocess to exit.
 
@@ -129,23 +131,29 @@ clock = { path = "clock.sh" }
 
 ## Bundled plugins
 
-`tv` ships with two optional bundled plugins that extract git diff and file-log
-functionality into subprocess-based scripts:
+`tv` ships with several bundled plugins. Shell-script plugins are installed on
+first run.  The markdown plugin is a compiled Rust binary compiled as part of
+the tv workspace.
 
-| Plugin | File | What it does |
-|---|---|---|
-| git-diff | `git-diff.sh` | On `on_file_open`, if the file is git-tracked, shows `git diff --color=always HEAD` as the content (replacing the file view). |
-| git-log | `git-log.sh` | On `H` keypress, shows `git log --oneline --color=always` for the current file as a static file view. |
+| Plugin | File | Type | What it does |
+|---|---|---|---|
+| git-diff | `git-diff.sh` | Shell script | On `on_file_open`, if the file is git-tracked, shows `git diff --color=always HEAD` as the content (replacing the file view). |
+| git-log | `git-log.sh` | Shell script | On `H` keypress, shows `git log --oneline --color=always` for the current file as a static file view. |
+| markdown | `tv-plugin-markdown` | Rust binary (workspace) | Renders `.md` files using pulldown-cmark, sending the output as ANSI-escaped lines via `set_content`. Responds to theme changes and `M` keypress for raw/rendered toggle. |
 
-Both are installed to the plugin directory the first time `tv` creates its
-global config. The default plugin directory is `~/.config/tree-viewer/plugins/`
-on Linux/macOS and `%APPDATA%\tree-viewer\plugins\` on Windows. Enable them by
+The shell-script plugins are installed to the plugin directory the first time
+`tv` creates its global config. The markdown Rust binary is compiled as a
+workspace member and installed alongside `tv` the first time it runs.
+
+The default plugin directory is `~/.config/tree-viewer/plugins/` on Linux/macOS
+and `%APPDATA%\tree-viewer\plugins\` on Windows. Enable bundled plugins by
 uncommenting or adding entries in `tv.toml`:
 
 ```toml
 [plugins]
-git-diff = { path = "git-diff.sh" }
-git-log  = { path = "git-log.sh" }
+git-diff  = { path = "git-diff.sh" }
+git-log   = { path = "git-log.sh" }
+markdown  = { path = "tv-plugin-markdown" }
 ```
 
 > **Note:** The bundled plugins provide a simpler implementation than the

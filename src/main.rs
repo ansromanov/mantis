@@ -31,6 +31,7 @@ mod diff;
 mod file;
 mod git;
 mod highlight;
+#[cfg(feature = "markdown-core")]
 mod markdown;
 mod plugin;
 mod release_info;
