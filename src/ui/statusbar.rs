@@ -89,9 +89,14 @@ pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
                 } else {
                     "  \u{2190}/\u{2192} h-scroll  0 reset col"
                 };
+                let diff_hint = if app.is_diff {
+                    "  S mode  D side-by-side  n/N hunks"
+                } else {
+                    ""
+                };
                 format!(
-                    " j/k scroll  PgUp/PgDn{}  g/G top/bot  H history  Tab panel  q quit{}{}",
-                    hscroll, md, wrap
+                    " j/k scroll  PgUp/PgDn{}  g/G top/bot  H history  Tab panel  q quit{}{}{}",
+                    hscroll, md, wrap, diff_hint
                 )
             }
         };

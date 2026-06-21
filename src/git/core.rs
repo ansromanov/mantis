@@ -15,6 +15,10 @@
 //! is enabled (default on). When disabled, the same functionality is provided
 //! by the bundled `git-plugin` subprocess plugin. Types are in the sibling `types` module
 //! and are always available regardless of the feature flag.
+//!
+//! Three diff helpers cover the main diff modes available in the content pane:
+//! `working_tree_diff` (all changes vs HEAD), `staged_diff` (index vs HEAD),
+//! and `unstaged_diff` (worktree vs index).
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -281,6 +285,41 @@ pub fn working_tree_diff(repo_dir: &Path, file: &Path) -> Vec<String> {
     lines
 }
 
+/// Returns the staged diff for `file` (index vs. HEAD), as lines.
+/// Returns a placeholder message when there are no staged changes.
+pub fn staged_diff(repo_dir: &Path, file: &Path) -> Vec<String> {
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(repo_dir)
+        .args(["diff", "--cached", "--no-color", "--"])
+        .arg(file)
+        .output();
+    match out {
+        Ok(o) if !o.stdout.is_empty() => String::from_utf8_lossy(&o.stdout)
+            .lines()
+            .map(|l| l.to_string())
+            .collect(),
+        _ => vec!["(no staged changes)".to_string()],
+    }
+}
+
+/// Returns the unstaged diff for `file` (worktree vs. index), as lines.
+/// Returns a placeholder message when there are no unstaged changes.
+pub fn unstaged_diff(repo_dir: &Path, file: &Path) -> Vec<String> {
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(repo_dir)
+        .args(["diff", "--no-color", "--"])
+        .arg(file)
+        .output();
+    match out {
+        Ok(o) if !o.stdout.is_empty() => String::from_utf8_lossy(&o.stdout)
+            .lines()
+            .map(|l| l.to_string())
+            .collect(),
+        _ => vec!["(no unstaged changes)".to_string()],
+    }
+}
 /// Returns the commit history for a single file, newest first. Empty if the
 /// file is untracked, not in a git repository, or git is unavailable.
 pub fn file_log(repo_dir: &Path, file: &Path) -> Vec<Commit> {

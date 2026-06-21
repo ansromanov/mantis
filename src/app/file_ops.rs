@@ -149,12 +149,13 @@ impl App {
         changed
     }
 
-    /// Displays the working-tree diff of `path` (relative to HEAD) in the
-    /// content panel synchronously. The async navigation path uses
-    /// `request_working_tree_diff`; both share `apply_diff_load`.
+    /// Displays the working-tree diff of `path` in the content panel
+    /// synchronously, using `self.diff_mode` to select the diff variant. The
+    /// async navigation path uses `request_working_tree_diff`; both share
+    /// `apply_diff_load`.
     pub(super) fn show_working_tree_diff(&mut self, path: &Path) {
         self.invalidate_pending_load();
-        let load = compute_diff_load(&self.root, path, &self.theme);
+        let load = compute_diff_load(&self.root, path, &self.theme, self.diff_mode);
         self.apply_diff_load(path, load);
     }
 

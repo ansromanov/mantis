@@ -12,6 +12,9 @@
 //! so the synchronous `App::open_file` / `App::show_working_tree_diff` paths
 //! (used at startup, on reload, and in tests) share exactly the same logic as
 //! the worker.
+//!
+//! `compute_diff_load` accepts a [`crate::app::DiffMode`] parameter to choose
+//! between all-changes, staged, and unstaged diff variants.
 
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{Receiver, Sender};
@@ -20,6 +23,7 @@ use std::thread::JoinHandle;
 
 use ratatui::style::Style;
 
+use crate::app::DiffMode;
 use crate::file::{detect_encoding_prefix, detect_line_ending, is_binary_bytes};
 use crate::highlight::Highlighter;
 use crate::plugin::ExtraSyntax;
@@ -193,10 +197,21 @@ pub(super) fn compute_file_load(path: &Path, theme: &Theme, hl: &Highlighter) ->
     load
 }
 
-/// Runs `git diff HEAD` for `path` and parses it into renderable diff state.
-pub(super) fn compute_diff_load(root: &Path, path: &Path, theme: &Theme) -> DiffLoad {
+/// Runs the appropriate `git diff` variant for `path` and parses it into
+/// renderable diff state. The `diff_mode` parameter selects between all changes
+/// vs HEAD, staged changes only, or unstaged changes only.
+pub(super) fn compute_diff_load(
+    root: &Path,
+    path: &Path,
+    theme: &Theme,
+    diff_mode: DiffMode,
+) -> DiffLoad {
     #[cfg(feature = "git-core")]
-    let lines = crate::git::working_tree_diff(root, path);
+    let lines = match diff_mode {
+        DiffMode::All => crate::git::working_tree_diff(root, path),
+        DiffMode::Staged => crate::git::staged_diff(root, path),
+        DiffMode::Unstaged => crate::git::unstaged_diff(root, path),
+    };
     #[cfg(not(feature = "git-core"))]
     let lines: Vec<String> = vec!["(git-core disabled)".to_string()];
     let rel = path.strip_prefix(root).unwrap_or(path);
@@ -206,7 +221,7 @@ pub(super) fn compute_diff_load(root: &Path, path: &Path, theme: &Theme) -> Diff
         .collect();
     let diff_rows = crate::diff::parse_side_by_side(&lines);
     DiffLoad {
-        content_title: format!(" working diff — {} ", rel.display()),
+        content_title: format!(" working diff — {} [{}] ", rel.display(), diff_mode.label()),
         highlighted,
         diff_rows,
         content: lines,
@@ -225,6 +240,7 @@ pub(super) enum LoadRequest {
         seq: u64,
         root: PathBuf,
         path: PathBuf,
+        diff_mode: DiffMode,
     },
     /// Rebuild the worker's highlighter/theme after a theme change.
     SetTheme(Box<Theme>),
@@ -277,8 +293,13 @@ impl Loader {
                             break;
                         }
                     }
-                    LoadRequest::Diff { seq, root, path } => {
-                        let load = Box::new(compute_diff_load(&root, &path, &theme));
+                    LoadRequest::Diff {
+                        seq,
+                        root,
+                        path,
+                        diff_mode,
+                    } => {
+                        let load = Box::new(compute_diff_load(&root, &path, &theme, diff_mode));
                         if res_tx.send(LoadResponse::Diff { seq, path, load }).is_err() {
                             break;
                         }
