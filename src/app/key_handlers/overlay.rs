@@ -270,7 +270,7 @@ impl App {
     ///
     /// Typing characters narrows the tree to nodes whose names contain the
     /// query (case-insensitive); Backspace removes the last character; Esc or
-    /// Enter dismisses the filter bar and resets the filter.
+    /// Enter dismisses the filter bar and accepts the current selection.
     pub(super) fn handle_tree_filter_key(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Esc | KeyCode::Enter => {
@@ -280,14 +280,35 @@ impl App {
                 if let Some(ref mut f) = self.tree_filter {
                     f.pop();
                 }
+                self.move_tree_filter_selection_to_first_match();
             }
             KeyCode::Char(c) => {
                 if let Some(ref mut f) = self.tree_filter {
                     f.push(c);
                 }
+                self.move_tree_filter_selection_to_first_match();
             }
             _ => {}
         }
+    }
+
+    /// Moves `tree_selected` to the first visible match index when the inline
+    /// tree filter is active. If the query is empty or no node matches, the
+    /// selection stays at index 0 (the root).
+    fn move_tree_filter_selection_to_first_match(&mut self) {
+        let Some(ref filter) = self.tree_filter else {
+            return;
+        };
+        if filter.is_empty() {
+            self.tree_selected = 0;
+            return;
+        }
+        let q = filter.query.to_lowercase();
+        let first_match = self
+            .nodes
+            .iter()
+            .position(|n| n.name.to_lowercase().contains(&q));
+        self.tree_selected = first_match.unwrap_or(0);
     }
 
     /// Handles keyboard input while the command palette is open: typing
