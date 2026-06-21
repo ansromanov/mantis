@@ -176,6 +176,7 @@ pub(super) fn compute_file_load(path: &Path, theme: &Theme, hl: &Highlighter) ->
         });
     }
     load.highlighted = hl.highlight(path, &load.content);
+    #[cfg(feature = "markdown-core")]
     if is_markdown {
         load.markdown_lines = crate::markdown::render(&s, theme);
     }

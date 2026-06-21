@@ -74,24 +74,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     }
 
     let view_height = inner.height as usize;
-
-    // Plugin content: pre-rendered styled lines from a plugin. Takes priority
-    // over markdown/virtual-file rendering. When no content has arrived yet,
-    // show a dimmed [rendering…] placeholder while plugins are active.
-    let pc_lines: Option<&Vec<Vec<(Style, String)>>> = app
-        .current_file
-        .as_ref()
-        .and_then(|path| app.plugin_content.get(path));
-    let show_rendering_placeholder =
-        pc_lines.is_none() && app.plugin_content_active && !app.plugin_manager.is_empty();
-
-    let total_lines = if pc_lines.is_some() {
-        pc_lines.map_or(0, |p| p.len())
-    } else if show_rendering_placeholder {
-        1
-    } else {
-        app.display_line_count()
-    };
+    let total_lines = app.display_line_count();
     let scroll = app.content_scroll.min(total_lines.saturating_sub(1));
     let visible_end = (scroll + view_height).min(total_lines);
 
@@ -222,75 +205,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
             })
             .collect();
         (ln_w, gutters, lines, vec![])
-    } else if let Some(plugin_lines) = pc_lines {
-        // Plugin content: pre-rendered styled spans from a plugin.
-        let ln_style = Style::default().fg(app.theme.dim);
-        let lw = plugin_lines.len().to_string().len().max(1);
-        let ln_w = if show_ln { lw + 1 } else { 0 };
-        let gutters: Vec<Line> = (scroll..visible_end)
-            .map(|i| {
-                let mut spans = Vec::new();
-                if blame_width > 0 {
-                    let annotation = blame_annotations
-                        .get(i)
-                        .cloned()
-                        .unwrap_or_else(|| " ".repeat(BLAME_COL_WIDTH));
-                    spans.push(Span::styled(annotation, blame_style));
-                }
-                if show_ln {
-                    spans.push(Span::styled(
-                        format!("{:>width$} ", i + 1, width = lw),
-                        ln_style,
-                    ));
-                }
-                Line::from(spans)
-            })
-            .collect();
-        let lines: Vec<Line> = plugin_lines[scroll..visible_end]
-            .iter()
-            .enumerate()
-            .map(|(offset, spans)| {
-                let logical_idx = scroll + offset;
-                let regions_owned: Vec<(Style, String)> =
-                    spans.iter().map(|(s, t)| (*s, t.clone())).collect();
-                if let Some(s) = in_file_search {
-                    Line::from(apply_search_to_regions(
-                        &regions_owned,
-                        logical_idx,
-                        s,
-                        &app.theme,
-                    ))
-                } else if let Some(((sl, sc), (el, ec))) = sel {
-                    if logical_idx >= sl && logical_idx <= el {
-                        let col_start = if logical_idx == sl { sc } else { 0 };
-                        let col_end = if logical_idx == el { ec } else { usize::MAX };
-                        Line::from(apply_selection(&regions_owned, col_start, col_end, sel_bg))
-                    } else {
-                        Line::from(
-                            regions_owned
-                                .iter()
-                                .map(|(s, t)| Span::styled(t.clone(), *s))
-                                .collect::<Vec<_>>(),
-                        )
-                    }
-                } else {
-                    Line::from(
-                        regions_owned
-                            .iter()
-                            .map(|(s, t)| Span::styled(t.clone(), *s))
-                            .collect::<Vec<_>>(),
-                    )
-                }
-            })
-            .collect();
-        (blame_width + ln_w, gutters, lines, vec![])
-    } else if show_rendering_placeholder {
-        // Plugin rendering placeholder: dimmed single line while a plugin
-        // processes the current file but hasn't sent set_content yet.
-        let dim = Style::default().fg(app.theme.dim);
-        let lines = vec![Line::from(Span::styled("[rendering…]", dim))];
-        (0, vec![], lines, vec![])
-    } else if app.is_markdown && !app.show_raw_markdown {
+    } else if app.is_markdown && !app.show_raw_markdown && !app.markdown_lines.is_empty() {
         // Markdown: iterate only the visible window of pre-rendered lines.
         let ln_style = Style::default().fg(app.theme.dim);
         let lw = app.line_count().to_string().len().max(1);

@@ -32,7 +32,7 @@ Each event is one JSON object on a single line. Unknown fields are ignored.
 Sent once immediately after spawn, before any user interaction.
 
 ```json
-{"event":"init"}
+{"event":"init","theme":"default"}
 ```
 
 ### `on_file_open`
@@ -59,6 +59,15 @@ tree is empty.
 
 ```json
 {"event":"on_selection_change","path":"/absolute/path/to/entry"}
+```
+
+### `on_theme_change`
+
+Sent when the user switches themes at runtime (via the theme picker or command
+palette). The `theme` field carries the new theme name exactly as configured.
+
+```json
+{"event":"on_theme_change","theme":"monokai"}
 ```
 
 ### `on_quit`
@@ -99,6 +108,17 @@ Opens a file in the content panel.
 
 ```json
 {"event":"action","action":"open_file","params":{"path":"/tmp/output.txt"}}
+```
+
+### `set_content`
+
+Replaces the content panel with the given lines. Each line is a string that may
+contain ANSI escape codes for colour and styling. `tv` parses the ANSI codes
+with its built-in parser and displays them as styled text. Handy for plugins
+that generate rich output (e.g. markdown renderers, linters).
+
+```json
+{"event":"action","action":"set_content","params":{"lines":["\u001b[32mgreen line\u001b[0m","plain line"]}}
 ```
 
 ## Rules
