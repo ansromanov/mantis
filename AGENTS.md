@@ -281,6 +281,19 @@ new commits onto a clean branch rather than rebasing through merge noise.
 
 ## Opening a PR
 
+**Branch naming — always rename before pushing.**
+The session may start on an auto-generated branch (e.g. `claude/quirky-edison-7sxvm3`).
+Before pushing or creating a PR, rename it to a descriptive name that matches the work:
+
+```bash
+git branch -m <old-name> feat/<short-description>   # or fix/, chore/, docs/, …
+git push -u origin feat/<short-description>
+git push origin --delete <old-name> || true          # best-effort; ignore 403
+```
+
+Use the `feat/` prefix for new features, `fix/` for bug fixes, `docs/` for
+documentation-only changes, and `chore/` for maintenance tasks.
+
 Prefer the one-shot recipe — it never drops a step (fmt → related tests → push →
 open PR that closes the issue):
 
