@@ -231,19 +231,27 @@ impl App {
                     });
                 }
                 "set_content" => {
-                    self.plugin_content_active = true;
                     let path = params
                         .get("path")
                         .and_then(|v| v.as_str())
                         .map(PathBuf::from);
-                    let lines = params.get("lines").and_then(|v| v.as_array());
-                    if let (Some(path), Some(lines)) = (path, lines) {
-                        let parsed: Vec<Vec<(ratatui::style::Style, String)>> = lines
-                            .iter()
-                            .filter_map(|v| v.as_str())
-                            .map(crate::ansi::parse_ansi_line)
-                            .collect();
-                        self.plugin_content.insert(path, parsed);
+                    match (path, params.get("lines").and_then(|v| v.as_array())) {
+                        (Some(path), Some(lines)) => {
+                            let parsed: Vec<Vec<(ratatui::style::Style, String)>> = lines
+                                .iter()
+                                .filter_map(|v| v.as_str())
+                                .map(crate::ansi::parse_ansi_line)
+                                .collect();
+                            if self.current_file.as_deref() == Some(path.as_path()) {
+                                self.plugin_content_active = true;
+                            }
+                            self.plugin_content.insert(path, parsed);
+                        }
+                        (Some(_), None) => {
+                            self.plugin_message =
+                                Some("[plugin] set_content: 'lines' must be an array".into());
+                        }
+                        _ => {}
                     }
                 }
                 _ => {}

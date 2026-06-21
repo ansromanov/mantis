@@ -42,7 +42,8 @@ pub(crate) fn parse_ansi_line(line: &str) -> Vec<(Style, String)> {
                 pos += 1;
             }
             if pos < len && bytes[pos] == b'm' {
-                let params_str = std::str::from_utf8(&bytes[param_start..pos]).unwrap_or("");
+                let params_str = std::str::from_utf8(&bytes[param_start..pos])
+                    .expect("param bytes are ASCII digits, semicolons, and spaces");
                 current_style = apply_sgr(params_str, current_style);
                 pos += 1;
             } else if pos < len && bytes[pos] >= 0x40 && bytes[pos] <= 0x7e {
@@ -57,12 +58,11 @@ pub(crate) fn parse_ansi_line(line: &str) -> Vec<(Style, String)> {
                 }
                 pos += 1;
             }
-            if let Ok(text) = std::str::from_utf8(&bytes[text_start..pos]) {
-                if !text.is_empty() {
-                    match result.last_mut() {
-                        Some((s, t)) if *s == current_style => t.push_str(text),
-                        _ => result.push((current_style, text.to_string())),
-                    }
+            let text = String::from_utf8_lossy(&bytes[text_start..pos]);
+            if !text.is_empty() {
+                match result.last_mut() {
+                    Some((s, t)) if *s == current_style => t.push_str(&text),
+                    _ => result.push((current_style, text.into_owned())),
                 }
             }
         }
