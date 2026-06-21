@@ -34,3 +34,11 @@ repos:
         language: system
         types: [rust]
         pass_filenames: false
+
+      - id: require-tests
+        name: require sibling _test.rs
+        description: "Every changed src/*.rs must have a sibling _test.rs in the diff (escape hatch: [skip-tests: reason] in commit message)"
+        entry: bash scripts/require-tests.sh
+        language: system
+        types: [rust]
+        pass_filenames: false
