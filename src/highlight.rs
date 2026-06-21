@@ -16,6 +16,7 @@
 use ratatui::style::{Color, Modifier, Style};
 use std::fs;
 use std::path::Path;
+use std::sync::{Arc, OnceLock};
 use syntect::{
     easy::HighlightLines,
     highlighting::{FontStyle, Style as SynStyle, ThemeSet},
@@ -27,37 +28,54 @@ use crate::plugin::ExtraSyntax;
 /// Wraps a syntect `SyntaxSet` + `ThemeSet` to provide syntax highlighting
 /// for file contents. Compiled once at startup and reused across file opens.
 pub struct Highlighter {
-    ss: SyntaxSet,
-    ts: ThemeSet,
+    ss: Arc<SyntaxSet>,
+    ts: Arc<ThemeSet>,
     theme: String,
+}
+
+/// Returns the process-wide default `SyntaxSet`, loading it on first call.
+fn default_ss() -> &'static Arc<SyntaxSet> {
+    static SS: OnceLock<Arc<SyntaxSet>> = OnceLock::new();
+    SS.get_or_init(|| Arc::new(SyntaxSet::load_defaults_nonewlines()))
+}
+
+/// Returns the process-wide default `ThemeSet`, loading it on first call.
+fn default_ts() -> &'static Arc<ThemeSet> {
+    static TS: OnceLock<Arc<ThemeSet>> = OnceLock::new();
+    TS.get_or_init(|| Arc::new(ThemeSet::load_defaults()))
 }
 
 impl Highlighter {
     /// Builds a highlighter with extra syntax definitions loaded from plugins.
     /// Each [`ExtraSyntax`] provides a `.sublime-syntax` file path that is
     /// loaded into the `SyntaxSet` so syntect recognises its file extensions.
+    ///
+    /// When `extra` is empty the process-wide cached `SyntaxSet` and `ThemeSet`
+    /// are reused (Arc clone), so repeated construction is nearly free.
     pub fn with_extra_syntaxes(theme: &str, extra: &[ExtraSyntax]) -> Self {
-        let ts = ThemeSet::load_defaults();
+        let ts = default_ts().clone();
         let theme = if ts.themes.contains_key(theme) {
             theme.to_string()
         } else {
             "base16-ocean.dark".to_string()
         };
-        // Start from the default syntax set, then add extra definitions.
-        let defaults = SyntaxSet::load_defaults_nonewlines();
-        let mut builder = defaults.into_builder();
-        for extra_syn in extra {
-            if let Ok(s) = fs::read_to_string(&extra_syn.syntax_path) {
-                if let Ok(def) = SyntaxDefinition::load_from_str(
-                    &s,
-                    false,
-                    extra_syn.syntax_path.file_stem().and_then(|n| n.to_str()),
-                ) {
-                    builder.add(def);
+        let ss = if extra.is_empty() {
+            default_ss().clone()
+        } else {
+            let mut builder = (**default_ss()).clone().into_builder();
+            for extra_syn in extra {
+                if let Ok(s) = fs::read_to_string(&extra_syn.syntax_path) {
+                    if let Ok(def) = SyntaxDefinition::load_from_str(
+                        &s,
+                        false,
+                        extra_syn.syntax_path.file_stem().and_then(|n| n.to_str()),
+                    ) {
+                        builder.add(def);
+                    }
                 }
             }
-        }
-        let ss = builder.build();
+            Arc::new(builder.build())
+        };
         Highlighter { ss, ts, theme }
     }
 
