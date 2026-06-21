@@ -1,0 +1,62 @@
+name: Coverage
+
+# On-demand coverage run. Coverage uses an instrumented rebuild that roughly
+# doubles compile time, so it is kept out of the PR and merge paths and run
+# manually instead.
+on:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-C link-arg=-fuse-ld=lld"
+
+jobs:
+  coverage:
+    name: llvm-cov (full suite)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install lld
+        run: sudo apt-get update && sudo apt-get install -y lld
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install nextest and cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: nextest,cargo-llvm-cov
+
+      - name: Test with coverage
+        run: cargo llvm-cov nextest --profile ci --all --no-report
+
+      - name: Generate coverage reports
+        run: |
+          cargo llvm-cov report --lcov --output-path lcov.info
+          cargo llvm-cov report 2>&1 | tee coverage_summary.txt
+
+      - name: Coverage job summary
+        run: |
+          {
+            echo "## 📊 Coverage"
+            echo ""
+            echo '```'
+            cat coverage_summary.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage
+          path: |
+            lcov.info
+            coverage_summary.txt

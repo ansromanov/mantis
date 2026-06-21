@@ -1,0 +1,141 @@
+name: Main
+
+# Runs after merge to main: the full test suite on Linux + Windows, plus the
+# bench compile-smoke. Coverage is separate (coverage.yml, on demand).
+on:
+  push:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: full test suite (Linux)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    env:
+      RUSTFLAGS: "-C link-arg=-fuse-ld=lld"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Detect code changes
+        id: changes
+        run: |
+          changed=$(git diff --name-only HEAD~1 HEAD)
+          if echo "$changed" | grep -qE '^(src/|tests/|benches/|Cargo\.(toml|lock)|tv\.toml)'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install lld
+        if: steps.changes.outputs.code == 'true'
+        run: sudo apt-get update && sudo apt-get install -y lld
+
+      - name: Install Rust toolchain
+        if: steps.changes.outputs.code == 'true'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache cargo
+        if: steps.changes.outputs.code == 'true'
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install nextest
+        if: steps.changes.outputs.code == 'true'
+        uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
+
+      - name: Format
+        if: steps.changes.outputs.code == 'true'
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        if: steps.changes.outputs.code == 'true'
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Test
+        if: steps.changes.outputs.code == 'true'
+        run: cargo nextest run --profile ci --all
+
+      - name: Job summary
+        if: steps.changes.outputs.code == 'true' && always()
+        uses: mikepenz/action-junit-report@v4
+        with:
+          report_paths: target/nextest/ci/junit.xml
+          detailed_summary: true
+          include_passed: true
+          check_name: Test Results
+
+  windows:
+    name: test (Windows)
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Detect code changes
+        id: changes
+        shell: bash
+        run: |
+          changed=$(git diff --name-only HEAD~1 HEAD)
+          if echo "$changed" | grep -qE '^(src/|tests/|benches/|Cargo\.(toml|lock)|tv\.toml|install\.ps1)'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.changes.outputs.code == 'true'
+      - uses: Swatinem/rust-cache@v2
+        if: steps.changes.outputs.code == 'true'
+
+      # `cargo test` compiles the test targets itself — no separate build step.
+      - name: Test
+        if: steps.changes.outputs.code == 'true'
+        run: cargo test --all
+
+  bench-smoke:
+    name: bench (compile check)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      RUSTFLAGS: "-C link-arg=-fuse-ld=lld"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Detect code changes
+        id: changes
+        run: |
+          changed=$(git diff --name-only HEAD~1 HEAD)
+          if echo "$changed" | grep -qE '^(src/|benches/|Cargo\.(toml|lock))'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install lld
+        if: steps.changes.outputs.code == 'true'
+        run: sudo apt-get update && sudo apt-get install -y lld
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.changes.outputs.code == 'true'
+      - uses: Swatinem/rust-cache@v2
+        if: steps.changes.outputs.code == 'true'
+      - name: Bench smoke test (compiles + runs one group)
+        if: steps.changes.outputs.code == 'true'
+        # Target the Criterion binary explicitly so libtest in src/lib.rs is not invoked.
+        # --test runs each benchmark once without statistics — sufficient to catch crashes.
+        run: cargo bench --bench performance -- "scroll_redraw/highlight_range/top/25" --test
