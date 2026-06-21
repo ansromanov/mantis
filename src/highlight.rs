@@ -43,21 +43,26 @@ impl Highlighter {
         } else {
             "base16-ocean.dark".to_string()
         };
-        // Start from the default syntax set, then add extra definitions.
-        let defaults = SyntaxSet::load_defaults_nonewlines();
-        let mut builder = defaults.into_builder();
-        for extra_syn in extra {
-            if let Ok(s) = fs::read_to_string(&extra_syn.syntax_path) {
-                if let Ok(def) = SyntaxDefinition::load_from_str(
-                    &s,
-                    false,
-                    extra_syn.syntax_path.file_stem().and_then(|n| n.to_str()),
-                ) {
-                    builder.add(def);
+        // Only pay the into_builder()+build() round-trip when there are extra
+        // syntaxes to add; the pre-compiled default set is reused directly
+        // otherwise (avoids ~1.5s overhead per Highlighter construction).
+        let ss = if extra.is_empty() {
+            SyntaxSet::load_defaults_nonewlines()
+        } else {
+            let mut builder = SyntaxSet::load_defaults_nonewlines().into_builder();
+            for extra_syn in extra {
+                if let Ok(s) = fs::read_to_string(&extra_syn.syntax_path) {
+                    if let Ok(def) = SyntaxDefinition::load_from_str(
+                        &s,
+                        false,
+                        extra_syn.syntax_path.file_stem().and_then(|n| n.to_str()),
+                    ) {
+                        builder.add(def);
+                    }
                 }
             }
-        }
-        let ss = builder.build();
+            builder.build()
+        };
         Highlighter { ss, ts, theme }
     }
 
