@@ -367,6 +367,10 @@ fn scroll_wheel_scrolls_content() {
 }
 
 fn open_file_search(app: &mut App) {
+    // Focus content with no file open so `/` falls through to the full
+    // filesystem search picker rather than the in-file search or tree filter.
+    app.focus = Focus::Content;
+    app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
     assert!(app.search.is_some());
     app.search_area = full_rect();
@@ -1049,6 +1053,8 @@ fn normal_key_esc_clears_selection() {
 fn search_key_esc_closes() {
     let root = temp_tree();
     let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
     assert!(app.search.is_some());
     app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
@@ -1060,6 +1066,8 @@ fn search_key_esc_closes() {
 fn search_key_tab_toggles_mode() {
     let root = temp_tree();
     let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
     app.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::empty()));
     assert_eq!(app.search.as_ref().unwrap().mode, SearchMode::Content);
@@ -1698,6 +1706,8 @@ fn handle_key_show_help_blocks_other_keys() {
 fn search_key_enter_activates_and_closes() {
     let root = temp_tree();
     let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
     app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
     assert!(app.search.is_none());
@@ -1708,6 +1718,8 @@ fn search_key_enter_activates_and_closes() {
 fn search_key_up_down_navigation() {
     let root = temp_tree();
     let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
     let max = app.search.as_ref().unwrap().results_len().saturating_sub(1);
     app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
@@ -1721,6 +1733,8 @@ fn search_key_up_down_navigation() {
 fn search_key_up_stays_at_zero() {
     let root = temp_tree();
     let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
     app.handle_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()));
     assert_eq!(app.search.as_ref().unwrap().selected, 0);
@@ -1731,6 +1745,8 @@ fn search_key_up_stays_at_zero() {
 fn search_key_down_stays_at_boundary() {
     let root = temp_tree();
     let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
     let s = app.search.as_mut().unwrap();
     let max = s.results_len().saturating_sub(1);
@@ -1749,6 +1765,8 @@ fn search_key_down_stays_at_boundary() {
 fn search_key_backspace_and_char() {
     let root = temp_tree();
     let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
     app.handle_key(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::empty()));
     assert_eq!(app.search.as_ref().unwrap().query, "a");
@@ -4170,6 +4188,8 @@ fn mouse_unhandled_event_kind_is_noop() {
 fn search_key_unrecognized_key_is_noop() {
     let root = temp_tree();
     let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
     assert!(app.search.is_some());
     let selected = app.search.as_ref().unwrap().selected;
