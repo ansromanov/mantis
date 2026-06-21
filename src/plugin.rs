@@ -109,6 +109,8 @@ struct ToPlugin {
     path: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    theme: Option<String>,
 }
 
 /// Message received from a plugin (on its stdout).
@@ -339,6 +341,7 @@ impl PluginManager {
                 event: "init".into(),
                 path: None,
                 key: None,
+                theme: None,
             });
             self.plugins.push(plugin);
         }
@@ -358,6 +361,7 @@ impl PluginManager {
                 event: "shutdown".into(),
                 path: None,
                 key: None,
+                theme: None,
             });
         }
         for mut plugin in self.plugins.drain(..) {
@@ -373,6 +377,7 @@ impl PluginManager {
                 event: "on_file_open".into(),
                 path: Some(path_s.clone()),
                 key: None,
+                theme: None,
             });
         }
     }
@@ -386,6 +391,19 @@ impl PluginManager {
                 event: "on_keypress".into(),
                 path: None,
                 key: Some(key_str.clone()),
+                theme: None,
+            });
+        }
+    }
+
+    /// Sends `on_theme_change` to all active plugins with the new theme name.
+    pub fn on_theme_change(&mut self, theme: &str) {
+        for plugin in &mut self.plugins {
+            plugin.send(&ToPlugin {
+                event: "on_theme_change".into(),
+                path: None,
+                key: None,
+                theme: Some(theme.into()),
             });
         }
     }
@@ -398,6 +416,7 @@ impl PluginManager {
                 event: "on_selection_change".into(),
                 path: path_s.clone(),
                 key: None,
+                theme: None,
             });
         }
     }
@@ -409,6 +428,7 @@ impl PluginManager {
                 event: "on_quit".into(),
                 path: None,
                 key: None,
+                theme: None,
             });
         }
     }
@@ -473,6 +493,7 @@ impl PluginManager {
             event: "init".into(),
             path: None,
             key: None,
+            theme: None,
         });
         if let Some(file) = current_file {
             let path_s = file.to_string_lossy().into_owned();
@@ -480,11 +501,13 @@ impl PluginManager {
                 event: "on_file_open".into(),
                 path: Some(path_s.clone()),
                 key: None,
+                theme: None,
             });
             plugin.send(&ToPlugin {
                 event: "on_selection_change".into(),
                 path: Some(path_s),
                 key: None,
+                theme: None,
             });
         }
         self.plugins.push(plugin);
@@ -502,6 +525,7 @@ impl PluginManager {
             event: "shutdown".into(),
             path: None,
             key: None,
+            theme: None,
         });
         plugin.close_in_background();
     }

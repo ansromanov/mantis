@@ -8,6 +8,7 @@
 //! `TREE_RELOAD_DEBOUNCE`, to coalesce bursts), with a periodic timer fallback
 //! when no watcher could be installed so the view never goes permanently stale.
 
+use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use super::loader::{LoadRequest, LoadResponse};
@@ -228,6 +229,22 @@ impl App {
                         dirty,
                         state,
                     });
+                }
+                "set_content" => {
+                    self.plugin_content_active = true;
+                    let path = params
+                        .get("path")
+                        .and_then(|v| v.as_str())
+                        .map(PathBuf::from);
+                    let lines = params.get("lines").and_then(|v| v.as_array());
+                    if let (Some(path), Some(lines)) = (path, lines) {
+                        let parsed: Vec<Vec<(ratatui::style::Style, String)>> = lines
+                            .iter()
+                            .filter_map(|v| v.as_str())
+                            .map(crate::ansi::parse_ansi_line)
+                            .collect();
+                        self.plugin_content.insert(path, parsed);
+                    }
                 }
                 _ => {}
             }

@@ -172,7 +172,7 @@ impl App {
         self.theme_picker = None;
         if let Some(ref name) = name {
             if let Some(theme) = Theme::load(name) {
-                self.apply_theme(theme);
+                self.apply_theme(name, theme);
                 self.config.theme = ThemeConfig::from_preset(name);
                 self.save_config();
             }
@@ -181,7 +181,10 @@ impl App {
 
     /// Switches the active theme and re-renders the current view with it,
     /// preserving scroll position.
-    fn apply_theme(&mut self, theme: Theme) {
+    fn apply_theme(&mut self, theme_name: &str, theme: Theme) {
+        // Notify plugins so they can re-render content with matching colours.
+        self.plugin_manager.on_theme_change(theme_name);
+        self.plugin_content.clear();
         self.theme = theme;
         self.highlighter =
             Highlighter::with_extra_syntaxes(&self.theme.syntax, &self.extra_syntaxes);
@@ -307,8 +310,9 @@ impl App {
         self.show_scroll_percentage = cfg.scroll_percentage;
         self.keys = cfg.keys.clone();
 
+        let theme_name = cfg.theme.name.as_deref().unwrap_or("default").to_string();
         let theme = cfg.theme.resolve();
-        self.apply_theme(theme);
+        self.apply_theme(&theme_name, theme);
 
         self.config = cfg;
         self.reload();
