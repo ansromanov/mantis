@@ -96,3 +96,7 @@ pub(crate) fn set_if_higher(map: &mut HashMap<PathBuf, GitStatus>, key: PathBuf,
         *cur = val;
     }
 }
+
+#[cfg(test)]
+#[path = "types_test.rs"]
+mod tests;
