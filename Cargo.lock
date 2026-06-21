@@ -1700,6 +1700,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "tv-plugin-git-diff"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
+name = "tv-plugin-git-log"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
+name = "tv-plugin-git-plugin"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
+name = "tv-plugin-iconize"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
 name = "tv-plugin-markdown"
 version = "0.1.0"
 dependencies = [

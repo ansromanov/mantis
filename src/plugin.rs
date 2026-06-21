@@ -307,16 +307,16 @@ impl Plugin {
 pub fn bundled_plugin_entries() -> Vec<(String, PluginEntry)> {
     let plugin_dir = default_plugin_dir();
     let mut entries = Vec::new();
-    for (filename, _) in BUNDLED_PLUGINS {
-        let stem = std::path::Path::new(filename)
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or(filename);
-        let name = stem.strip_suffix(".sh").unwrap_or(stem).to_string();
+    for (name, binary_name) in BUNDLED_PLUGINS {
+        let filename = if cfg!(windows) {
+            format!("{binary_name}.exe")
+        } else {
+            binary_name.to_string()
+        };
         entries.push((
-            name,
+            name.to_string(),
             PluginEntry {
-                path: plugin_dir.join(filename),
+                path: plugin_dir.join(&filename),
                 enabled: false,
                 kind: PluginKind::Process,
                 extensions: Vec::new(),
@@ -324,22 +324,6 @@ pub fn bundled_plugin_entries() -> Vec<(String, PluginEntry)> {
             },
         ));
     }
-    // Markdown binary plugin.
-    let md_name = if cfg!(windows) {
-        "tv-plugin-markdown.exe"
-    } else {
-        "tv-plugin-markdown"
-    };
-    entries.push((
-        "markdown".to_string(),
-        PluginEntry {
-            path: plugin_dir.join(md_name),
-            enabled: false,
-            kind: PluginKind::Process,
-            extensions: Vec::new(),
-            syntax_file: None,
-        },
-    ));
     entries
 }
 
@@ -715,13 +699,16 @@ fn dirs_next() -> Option<PathBuf> {
     }
 }
 
-/// List of (filename, script_content) for each process plugin that ships with tv.
+/// List of (user-facing_name, binary_name) for each bundled process plugin.
+/// Binary names are without platform-specific extension (`.exe` is added on
+/// Windows). Each is a workspace-member Rust crate under `plugins/`.
 /// Installed to the plugin directory by `install_bundled_plugins()`.
 const BUNDLED_PLUGINS: &[(&str, &str)] = &[
-    ("git-plugin.sh", include_str!("../plugins/git-plugin.sh")),
-    ("git-diff.sh", include_str!("../plugins/git-diff.sh")),
-    ("git-log.sh", include_str!("../plugins/git-log.sh")),
-    ("iconize.sh", include_str!("../plugins/iconize.sh")),
+    ("git-plugin", "tv-plugin-git-plugin"),
+    ("git-diff", "tv-plugin-git-diff"),
+    ("git-log", "tv-plugin-git-log"),
+    ("iconize", "tv-plugin-iconize"),
+    ("markdown", "tv-plugin-markdown"),
 ];
 
 /// List of (filename, content) for each bundled syntax definition.
@@ -732,85 +719,28 @@ const BUNDLED_SYNTAX_PLUGINS: &[(&str, &str)] = &[(
 )];
 
 /// Copies every bundled plugin to the plugin directory if it doesn't already
-/// exist there, so users can inspect, edit, or register them in `tv.toml`.
-/// Process plugins go directly into `{plugin_dir}/`; syntax definitions go
-/// into `{plugin_dir}/syntaxes/` (auto-discovered at startup).
+/// exist there. Rust binary plugins are searched for alongside the tv binary,
+/// then in `target/debug/` and `target/release/` (development builds), and
+/// finally built from source as a last resort. Syntax definitions go into
+/// `{plugin_dir}/syntaxes/` (auto-discovered at startup).
 pub fn install_bundled_plugins() {
     let dir = default_plugin_dir();
     let _ = std::fs::create_dir_all(&dir);
-    for (name, script) in BUNDLED_PLUGINS {
-        let path = dir.join(name);
-        if !path.exists() {
-            let _ = std::fs::write(&path, script);
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755));
-            }
-        }
-    }
-    // Install the bundled markdown plugin (Rust binary).
-    // Searches alongside the tv binary, then in ../target/debug/ and
-    // ../target/release/ relative to the project root (development builds).
-    let md_plugin_name = "tv-plugin-markdown";
-    let md_plugin_path = dir.join(md_plugin_name);
-    if !md_plugin_path.exists() {
-        let binary_name = if cfg!(windows) {
-            format!("{md_plugin_name}.exe")
+
+    // Install all bundled Rust binary plugins.
+    for (_name, binary_name) in BUNDLED_PLUGINS {
+        let binary_filename = if cfg!(windows) {
+            format!("{binary_name}.exe")
         } else {
-            md_plugin_name.to_string()
+            binary_name.to_string()
         };
-        // Try: next to the tv binary, target/debug, target/release
-        let candidates: Vec<PathBuf> = {
-            let exe_dir = std::env::current_exe()
-                .ok()
-                .and_then(|p| p.parent().map(|d| d.to_path_buf()));
-            let mut c = Vec::new();
-            if let Some(ref d) = exe_dir {
-                c.push(d.join(&binary_name));
-                c.push(d.join("..").join("debug").join(&binary_name));
-                c.push(d.join("..").join("release").join(&binary_name));
-            }
-            c.push(PathBuf::from("target/debug").join(&binary_name));
-            c.push(PathBuf::from("target/release").join(&binary_name));
-            c
-        };
-        let mut found = false;
-        for cand in &candidates {
-            if cand.exists() {
-                if std::fs::copy(cand, &md_plugin_path).is_ok() {
-                    set_executable(&md_plugin_path);
-                    found = true;
-                }
-                break;
-            }
+        let plugin_path = dir.join(&binary_filename);
+        if plugin_path.exists() {
+            continue;
         }
-        if !found {
-            // Last resort: build with cargo in a background thread so startup
-            // is not blocked. The binary will be available on the next run.
-            if let Some(cargo) = which_cargo() {
-                let project_manifest = PathBuf::from("Cargo.toml");
-                if project_manifest.exists() {
-                    let md_plugin_path = md_plugin_path.clone();
-                    std::thread::spawn(move || {
-                        let status = Command::new(&cargo)
-                            .arg("build")
-                            .arg("--package")
-                            .arg(md_plugin_name)
-                            .arg("--release")
-                            .status();
-                        if status.map(|s| s.success()).unwrap_or(false) {
-                            let release_path = PathBuf::from("target/release").join(&binary_name);
-                            if release_path.exists() {
-                                let _ = std::fs::copy(&release_path, &md_plugin_path);
-                                set_executable(&md_plugin_path);
-                            }
-                        }
-                    });
-                }
-            }
-        }
+        install_one_binary(binary_name, &plugin_path);
     }
+
     // Install syntax files to syntaxes/ subdirectory for auto-discovery.
     let syntax_dir = dir.join("syntaxes");
     let _ = std::fs::create_dir_all(&syntax_dir);
@@ -818,6 +748,65 @@ pub fn install_bundled_plugins() {
         let path = syntax_dir.join(name);
         if !path.exists() {
             let _ = std::fs::write(&path, content);
+        }
+    }
+}
+
+/// Searches for a compiled Rust binary and copies it to `dest`.
+/// Tries alongside the tv binary, then `target/debug/`, `target/release/`,
+/// and finally builds from source in a background thread.
+fn install_one_binary(binary_name: &str, dest: &Path) {
+    let platform_name = if cfg!(windows) {
+        format!("{binary_name}.exe")
+    } else {
+        binary_name.to_string()
+    };
+
+    let candidates: Vec<PathBuf> = {
+        let exe_dir = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|d| d.to_path_buf()));
+        let mut c = Vec::new();
+        if let Some(ref d) = exe_dir {
+            c.push(d.join(&platform_name));
+            c.push(d.join("..").join("debug").join(&platform_name));
+            c.push(d.join("..").join("release").join(&platform_name));
+        }
+        c.push(PathBuf::from("target/debug").join(&platform_name));
+        c.push(PathBuf::from("target/release").join(&platform_name));
+        c
+    };
+
+    for cand in &candidates {
+        if cand.exists() {
+            if std::fs::copy(cand, dest).is_ok() {
+                set_executable(dest);
+            }
+            return;
+        }
+    }
+
+    // Last resort: build with cargo in a background thread.
+    if let Some(cargo) = which_cargo() {
+        if PathBuf::from("Cargo.toml").exists() {
+            let dest = dest.to_path_buf();
+            let pkg_name = binary_name.to_string();
+            let platform_name_clone = platform_name.clone();
+            std::thread::spawn(move || {
+                let status = Command::new(&cargo)
+                    .arg("build")
+                    .arg("--package")
+                    .arg(&pkg_name)
+                    .arg("--release")
+                    .status();
+                if status.map(|s| s.success()).unwrap_or(false) {
+                    let release_path = PathBuf::from("target/release").join(&platform_name_clone);
+                    if release_path.exists() {
+                        let _ = std::fs::copy(&release_path, &dest);
+                        set_executable(&dest);
+                    }
+                }
+            });
         }
     }
 }
