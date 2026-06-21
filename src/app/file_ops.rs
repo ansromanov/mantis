@@ -236,7 +236,17 @@ impl App {
     /// than crashing.
     pub fn open_file(&mut self, path: &Path) {
         self.invalidate_pending_load();
-        let load = compute_file_load(path, &self.theme, &self.highlighter);
+        let provider: Box<dyn crate::language_provider::LanguageProvider> =
+            if self.language_registry.wants_fold(path) {
+                Box::new(crate::language_provider::SyntaxFoldProvider::new(
+                    self.highlighter.clone(),
+                ))
+            } else {
+                Box::new(crate::language_provider::SyntaxOnlyProvider::new(
+                    self.highlighter.clone(),
+                ))
+            };
+        let load = compute_file_load(path, &self.theme, provider.as_ref());
         self.apply_file_load(path, load);
     }
 
@@ -277,6 +287,8 @@ impl App {
             self.yaml_anchor_count = y.anchor_count;
             self.yaml_alias_count = y.alias_count;
         }
+
+        self.active_provider_caps = self.language_registry.capabilities_for(path);
 
         if load.ok {
             self.current_file = Some(path.to_path_buf());

@@ -28,6 +28,23 @@ use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
+/// What kind of plugin this is.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum PluginKind {
+    /// Standard subprocess plugin (the default).
+    #[default]
+    Process,
+    /// A syntax-definition plugin: provides a `.sublime-syntax` file to extend
+    /// the highlighter. No subprocess is spawned.
+    Syntax,
+    /// A language-provider plugin: declares a `.sublime-syntax` file for
+    /// highlighting *and* opts in to indentation-based fold regions for its
+    /// registered file extensions. The fold computation runs host-side via the
+    /// `LanguageProvider` abstraction; no subprocess is spawned.
+    Language,
+}
+
 /// Per-plugin entry in the `[plugins]` section of `tv.toml`.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(default)]
@@ -37,6 +54,12 @@ pub struct PluginEntry {
     pub path: PathBuf,
     /// When `false` the plugin is registered but not spawned at startup.
     pub enabled: bool,
+    /// Plugin kind. Defaults to `"process"` for backward compatibility.
+    pub kind: PluginKind,
+    /// File extensions this language plugin handles (e.g. `["tf", "tfvars"]`).
+    /// Only meaningful when `kind = "language"`.
+    #[serde(default)]
+    pub extensions: Vec<String>,
 }
 
 impl Default for PluginEntry {
@@ -44,6 +67,8 @@ impl Default for PluginEntry {
         PluginEntry {
             path: PathBuf::new(),
             enabled: true,
+            kind: PluginKind::Process,
+            extensions: Vec::new(),
         }
     }
 }
@@ -220,11 +245,13 @@ impl PluginManager {
         }
     }
 
-    /// Spawns all enabled plugins and sends them the `init` event.
+    /// Spawns all enabled *process* plugins and sends them the `init` event.
+    /// `Syntax` and `Language` plugins are not spawned — they are consumed by
+    /// the highlighter and `LanguageRegistry` respectively.
     pub fn activate_all(&mut self) {
         let plugin_dir = default_plugin_dir();
         for (name, entry) in &self.entries {
-            if !entry.enabled {
+            if !entry.enabled || entry.kind != PluginKind::Process {
                 continue;
             }
             let path = if entry.path.is_relative() {
@@ -335,6 +362,16 @@ impl PluginManager {
     /// Whether any plugins are currently active.
     pub fn is_empty(&self) -> bool {
         self.plugins.is_empty()
+    }
+
+    /// Returns the file extensions declared by enabled `Language`-kind plugins.
+    /// Used to populate the `LanguageRegistry` with fold-capable extensions.
+    pub fn language_fold_extensions(&self) -> Vec<String> {
+        self.entries
+            .iter()
+            .filter(|(_, e)| e.enabled && e.kind == PluginKind::Language)
+            .flat_map(|(_, e)| e.extensions.iter().cloned())
+            .collect()
     }
 }
 

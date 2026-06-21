@@ -21,6 +21,7 @@ use ratatui::style::Style;
 
 use crate::file::{detect_encoding_prefix, detect_line_ending, is_binary_bytes};
 use crate::highlight::Highlighter;
+use crate::language_provider::LanguageProvider;
 use crate::theme::Theme;
 use crate::virtual_file::VirtualFile;
 use crate::yaml_fold::{self, FoldRegion};
@@ -92,11 +93,20 @@ impl FileLoad {
 /// content. Plain files use a memory-mapped [`VirtualFile`] (highlighted lazily
 /// in the UI); markdown/JSON/YAML are read fully and rendered here. This is the
 /// single source of truth shared by the synchronous and worker code paths.
-pub(super) fn compute_file_load(path: &Path, theme: &Theme, hl: &Highlighter) -> FileLoad {
+///
+/// Highlighting and fold-region detection are delegated to `provider`, which is
+/// selected by the caller via `LanguageRegistry::wants_fold`.
+pub(super) fn compute_file_load(
+    path: &Path,
+    theme: &Theme,
+    provider: &dyn LanguageProvider,
+) -> FileLoad {
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
     let is_markdown = matches!(ext, "md" | "markdown");
     let is_json = ext == "json";
     let is_yaml = matches!(ext, "yaml" | "yml");
+
+    let caps = provider.capabilities();
 
     // Try memory-mapped virtual file first (lazy, no full content in memory).
     // Markdown, JSON, and YAML are excluded: they need full content for
@@ -161,7 +171,12 @@ pub(super) fn compute_file_load(path: &Path, theme: &Theme, hl: &Highlighter) ->
     }
 
     if is_yaml {
-        let fold_regions = yaml_fold::detect_fold_regions(&load.content);
+        // YAML error/anchor/alias detection stays here regardless of provider.
+        let fold_regions = if caps.fold {
+            provider.fold_regions(&load.content)
+        } else {
+            yaml_fold::detect_fold_regions(&load.content)
+        };
         let error = serde_yaml::from_str::<serde_yaml::Value>(&s)
             .err()
             .map(|e| e.to_string());
@@ -172,8 +187,23 @@ pub(super) fn compute_file_load(path: &Path, theme: &Theme, hl: &Highlighter) ->
             anchor_count,
             alias_count,
         });
+    } else if caps.fold {
+        // Non-YAML file with fold support (e.g. a Language plugin extension).
+        let fold_regions = provider.fold_regions(&load.content);
+        if !fold_regions.is_empty() {
+            load.yaml = Some(YamlLoad {
+                fold_regions,
+                error: None,
+                anchor_count: 0,
+                alias_count: 0,
+            });
+        }
     }
-    load.highlighted = hl.highlight(path, &load.content);
+    load.highlighted = if caps.highlight {
+        provider.highlight(path, &load.content)
+    } else {
+        Vec::new()
+    };
     if is_markdown {
         load.markdown_lines = crate::markdown::render(&s, theme);
     }
@@ -181,7 +211,11 @@ pub(super) fn compute_file_load(path: &Path, theme: &Theme, hl: &Highlighter) ->
         if let Ok(value) = serde_json::from_str::<serde_json::Value>(&s) {
             if let Ok(pretty) = serde_json::to_string_pretty(&value) {
                 let pretty_lines: Vec<String> = pretty.lines().map(|l| l.to_owned()).collect();
-                load.json_pretty_lines = hl.highlight(path, &pretty_lines);
+                load.json_pretty_lines = if caps.highlight {
+                    provider.highlight(path, &pretty_lines)
+                } else {
+                    Vec::new()
+                };
                 load.json_pretty_text = pretty_lines;
                 load.show_pretty_json = true;
             }
@@ -241,8 +275,8 @@ pub(super) enum LoadResponse {
 }
 
 /// Owns the worker thread and the request/response channels. The worker keeps
-/// its own [`Highlighter`] and [`Theme`] so highlighting never touches the
-/// main thread's copy.
+/// its own [`Highlighter`], [`crate::language_provider::LanguageRegistry`], and
+/// [`Theme`] so highlighting never touches the main thread's copy.
 pub(super) struct Loader {
     tx: Sender<LoadRequest>,
     pub rx: Receiver<LoadResponse>,
@@ -250,7 +284,7 @@ pub(super) struct Loader {
 }
 
 impl Loader {
-    pub fn new(theme: &Theme) -> Self {
+    pub fn new(theme: &Theme, registry: crate::language_provider::LanguageRegistry) -> Self {
         let (req_tx, req_rx) = std::sync::mpsc::channel::<LoadRequest>();
         let (res_tx, res_rx) = std::sync::mpsc::channel::<LoadResponse>();
         let mut theme = theme.clone();
@@ -264,7 +298,17 @@ impl Loader {
                         hl = Highlighter::new(&theme.syntax);
                     }
                     LoadRequest::File { seq, path } => {
-                        let load = Box::new(compute_file_load(&path, &theme, &hl));
+                        let provider: Box<dyn crate::language_provider::LanguageProvider> =
+                            if registry.wants_fold(&path) {
+                                Box::new(crate::language_provider::SyntaxFoldProvider::new(
+                                    hl.clone(),
+                                ))
+                            } else {
+                                Box::new(crate::language_provider::SyntaxOnlyProvider::new(
+                                    hl.clone(),
+                                ))
+                            };
+                        let load = Box::new(compute_file_load(&path, &theme, provider.as_ref()));
                         if res_tx.send(LoadResponse::File { seq, path, load }).is_err() {
                             break;
                         }

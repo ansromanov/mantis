@@ -25,6 +25,15 @@ pub struct Highlighter {
     theme: String,
 }
 
+impl Clone for Highlighter {
+    /// Clones by reconstructing the highlighter from the stored theme name.
+    /// This re-loads the default `SyntaxSet` and `ThemeSet`, which are
+    /// cached internally by syntect and thus cheap to re-create.
+    fn clone(&self) -> Self {
+        Highlighter::new(&self.theme)
+    }
+}
+
 impl Highlighter {
     /// Builds a highlighter using the named syntect theme, falling back to
     /// `base16-ocean.dark` if the name is unknown.

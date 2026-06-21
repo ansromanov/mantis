@@ -212,6 +212,13 @@ pub struct App {
     /// Breadcrumb segment areas recorded during the last render, used for mouse
     /// hit-testing. Each entry is (target_directory_path, clickable_rect).
     pub breadcrumb_areas: Vec<(std::path::PathBuf, Rect)>,
+    /// Registry of file-extension → language capabilities, populated at startup
+    /// from built-in defaults and enabled `Language`-kind plugins.
+    pub language_registry: crate::language_provider::LanguageRegistry,
+    /// Capabilities reported by the active language provider for the current file.
+    /// Queried at file-open time (capability negotiation); UI degrades gracefully
+    /// when a capability is false.
+    pub active_provider_caps: crate::language_provider::ProviderCapabilities,
 }
 
 impl App {
@@ -248,11 +255,13 @@ impl App {
         let theme = cfg.theme.resolve();
         let saved_config = cfg.clone();
         let highlighter = Highlighter::new(&theme.syntax);
-        let loader = Loader::new(&theme);
         let mut plugin_entries: Vec<_> = cfg.plugins.clone().into_iter().collect();
         plugin_entries.sort_by(|a, b| a.0.cmp(&b.0));
         let mut plugin_manager = PluginManager::new(plugin_entries);
         plugin_manager.activate_all();
+        let mut language_registry = crate::language_provider::LanguageRegistry::new();
+        language_registry.register_fold_extensions(plugin_manager.language_fold_extensions());
+        let loader = Loader::new(&theme, language_registry.clone());
         let plugin_spawn_error = plugin_manager
             .take_spawn_errors()
             .into_iter()
@@ -363,6 +372,8 @@ impl App {
             plugin_manager,
             plugin_message: plugin_spawn_error,
             breadcrumb_areas: Vec::new(),
+            language_registry,
+            active_provider_caps: crate::language_provider::ProviderCapabilities::default(),
         };
         if app.git_mode {
             app.expand_git_dirs();

@@ -16,6 +16,7 @@ pub mod diff;
 pub mod file;
 pub mod git;
 pub mod highlight;
+pub mod language_provider;
 pub mod markdown;
 pub mod plugin;
 pub mod release_info;

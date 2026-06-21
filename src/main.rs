@@ -30,6 +30,7 @@ mod diff;
 mod file;
 mod git;
 mod highlight;
+mod language_provider;
 mod markdown;
 mod plugin;
 mod release_info;
