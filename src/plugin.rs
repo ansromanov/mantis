@@ -307,6 +307,7 @@ pub struct PluginManager {
     plugins: Vec<Plugin>,
     pending_actions: Vec<(String, String, serde_json::Value)>,
     spawn_errors: Vec<String>,
+    active_theme: Option<String>,
 }
 
 impl PluginManager {
@@ -316,12 +317,16 @@ impl PluginManager {
             plugins: Vec::new(),
             pending_actions: Vec::new(),
             spawn_errors: Vec::new(),
+            active_theme: None,
         }
     }
 
     /// Spawns all enabled *process* plugins and sends them the `init` event.
     /// Syntax plugins are not spawned — they are consumed by the highlighter.
-    pub fn activate_all(&mut self) {
+    /// The `theme_name` is sent in the `init` payload so the plugin is aware
+    /// of the active theme from the start.
+    pub fn activate_all(&mut self, theme_name: Option<&str>) {
+        self.active_theme = theme_name.map(|s| s.to_string());
         let plugin_dir = default_plugin_dir();
         for (name, entry) in &self.entries {
             if !entry.enabled || entry.kind != PluginKind::Process {
@@ -341,7 +346,7 @@ impl PluginManager {
                 event: "init".into(),
                 path: None,
                 key: None,
-                theme: None,
+                theme: self.active_theme.clone(),
             });
             self.plugins.push(plugin);
         }
@@ -398,6 +403,7 @@ impl PluginManager {
 
     /// Sends `on_theme_change` to all active plugins with the new theme name.
     pub fn on_theme_change(&mut self, theme: &str) {
+        self.active_theme = Some(theme.to_string());
         for plugin in &mut self.plugins {
             plugin.send(&ToPlugin {
                 event: "on_theme_change".into(),
@@ -493,7 +499,7 @@ impl PluginManager {
             event: "init".into(),
             path: None,
             key: None,
-            theme: None,
+            theme: self.active_theme.clone(),
         });
         if let Some(file) = current_file {
             let path_s = file.to_string_lossy().into_owned();
@@ -627,6 +633,23 @@ pub(crate) fn key_event_to_string(key: &crossterm::event::KeyEvent) -> String {
     }
 }
 
+/// Tries to find `cargo` on PATH. Returns `Some(path)` when found.
+fn which_cargo() -> Option<String> {
+    if let Ok(cargo) = std::env::var("CARGO") {
+        return Some(cargo);
+    }
+    for dir in std::env::var_os("PATH")
+        .map(|p| std::env::split_paths(&p).collect::<Vec<_>>())
+        .unwrap_or_default()
+    {
+        let cand = dir.join(if cfg!(windows) { "cargo.exe" } else { "cargo" });
+        if cand.is_file() {
+            return Some(cand.to_string_lossy().into_owned());
+        }
+    }
+    None
+}
+
 /// Default plugin discovery directory.
 ///
 /// - Linux/macOS: `$XDG_CONFIG_HOME/tree-viewer/plugins/` (falls back to
@@ -683,6 +706,68 @@ pub fn install_bundled_plugins() {
             }
         }
     }
+    // Install the bundled markdown plugin (Rust binary).
+    // Searches alongside the tv binary, then in ../target/debug/ and
+    // ../target/release/ relative to the project root (development builds).
+    let md_plugin_name = "tv-plugin-markdown";
+    let md_plugin_path = dir.join(md_plugin_name);
+    if !md_plugin_path.exists() {
+        let binary_name = if cfg!(windows) {
+            format!("{md_plugin_name}.exe")
+        } else {
+            md_plugin_name.to_string()
+        };
+        // Try: next to the tv binary, target/debug, target/release
+        let candidates: Vec<PathBuf> = {
+            let exe_dir = std::env::current_exe()
+                .ok()
+                .and_then(|p| p.parent().map(|d| d.to_path_buf()));
+            let mut c = Vec::new();
+            if let Some(ref d) = exe_dir {
+                c.push(d.join(&binary_name));
+                c.push(d.join("..").join("debug").join(&binary_name));
+                c.push(d.join("..").join("release").join(&binary_name));
+            }
+            c.push(PathBuf::from("target/debug").join(&binary_name));
+            c.push(PathBuf::from("target/release").join(&binary_name));
+            c
+        };
+        let mut found = false;
+        for cand in &candidates {
+            if cand.exists() {
+                if std::fs::copy(cand, &md_plugin_path).is_ok() {
+                    set_executable(&md_plugin_path);
+                    found = true;
+                }
+                break;
+            }
+        }
+        if !found {
+            // Last resort: build with cargo in a background thread so startup
+            // is not blocked. The binary will be available on the next run.
+            if let Some(cargo) = which_cargo() {
+                let project_manifest = PathBuf::from("Cargo.toml");
+                if project_manifest.exists() {
+                    let md_plugin_path = md_plugin_path.clone();
+                    std::thread::spawn(move || {
+                        let status = Command::new(&cargo)
+                            .arg("build")
+                            .arg("--package")
+                            .arg(md_plugin_name)
+                            .arg("--release")
+                            .status();
+                        if status.map(|s| s.success()).unwrap_or(false) {
+                            let release_path = PathBuf::from("target/release").join(&binary_name);
+                            if release_path.exists() {
+                                let _ = std::fs::copy(&release_path, &md_plugin_path);
+                                set_executable(&md_plugin_path);
+                            }
+                        }
+                    });
+                }
+            }
+        }
+    }
     // Install syntax files to syntaxes/ subdirectory for auto-discovery.
     let syntax_dir = dir.join("syntaxes");
     let _ = std::fs::create_dir_all(&syntax_dir);
@@ -693,6 +778,14 @@ pub fn install_bundled_plugins() {
         }
     }
 }
+
+#[cfg(unix)]
+fn set_executable(path: &Path) {
+    use std::os::unix::fs::PermissionsExt;
+    let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755));
+}
+#[cfg(not(unix))]
+fn set_executable(_path: &Path) {}
 
 /// Process-wide mutex for tests that mutate `XDG_CONFIG_HOME` / `APPDATA`.
 /// Shared via `crate::plugin::ENV_LOCK` so that `theme_test.rs` and

@@ -8,7 +8,6 @@
 //! `TREE_RELOAD_DEBOUNCE`, to coalesce bursts), with a periodic timer fallback
 //! when no watcher could be installed so the view never goes permanently stale.
 
-use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use super::loader::{LoadRequest, LoadResponse};
@@ -231,28 +230,22 @@ impl App {
                     });
                 }
                 "set_content" => {
-                    let path = params
-                        .get("path")
-                        .and_then(|v| v.as_str())
-                        .map(PathBuf::from);
-                    match (path, params.get("lines").and_then(|v| v.as_array())) {
-                        (Some(path), Some(lines)) => {
-                            let parsed: Vec<Vec<(ratatui::style::Style, String)>> = lines
-                                .iter()
-                                .filter_map(|v| v.as_str())
-                                .map(crate::ansi::parse_ansi_line)
-                                .collect();
-                            if self.current_file.as_deref() == Some(path.as_path()) {
-                                self.plugin_content_active = true;
-                            }
-                            self.plugin_content.insert(path, parsed);
-                        }
-                        (Some(_), None) => {
-                            self.plugin_message =
-                                Some("[plugin] set_content: 'lines' must be an array".into());
-                        }
-                        _ => {}
+                    let lines: Vec<String> = match params.get("lines").and_then(|v| v.as_array()) {
+                        Some(arr) => arr
+                            .iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect(),
+                        None => continue,
+                    };
+                    self.markdown_lines = lines
+                        .iter()
+                        .map(|l| crate::ansi::parse_ansi_line(l))
+                        .collect();
+                    if let Some(path_str) = params.get("path").and_then(|v| v.as_str()) {
+                        self.current_file = Some(std::path::PathBuf::from(path_str));
                     }
+                    self.content_scroll = 0;
+                    self.content_hscroll = 0;
                 }
                 _ => {}
             }

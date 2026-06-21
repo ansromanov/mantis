@@ -1,6 +1,10 @@
+[workspace]
+members = ["plugins/tv-plugin-markdown"]
+resolver = "2"
+
 [package]
 name = "tree-viewer"
-version = "0.6.15"
+version = "0.6.16"
 edition = "2021"
 description = "A fast terminal file tree viewer with syntax highlighting, markdown rendering, fuzzy search, and mouse support."
 license = "GPL-3.0-or-later"
@@ -27,8 +31,9 @@ codegen-units = 1   # better optimization at the cost of build time
 panic = "abort"     # no unwinding tables; smaller binary
 
 [features]
-default = ["git-core"]
+default = ["git-core", "markdown-core"]
 git-core = []
+markdown-core = ["dep:pulldown-cmark"]
 
 [dependencies]
 ratatui = "0.28"
@@ -37,7 +42,7 @@ ignore = "0.4"
 fuzzy-matcher = "0.3"
 syntect = "5"
 anyhow = "1"
-pulldown-cmark = "0.9"
+pulldown-cmark = { version = "0.9", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"

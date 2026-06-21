@@ -318,7 +318,7 @@ impl App {
             .filter(|(_, e)| e.kind != plugin::PluginKind::Syntax)
             .collect();
         let mut plugin_manager = PluginManager::new(process_entries);
-        plugin_manager.activate_all();
+        plugin_manager.activate_all(cfg.theme.name.as_deref());
         let plugin_spawn_error = plugin_manager
             .take_spawn_errors()
             .into_iter()
