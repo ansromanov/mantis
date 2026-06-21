@@ -1773,10 +1773,12 @@ fn content_pos_word_wrap_counts_wide_chars_by_display_width() {
 fn mark_content_scrolled_sets_timestamp() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    let before = app.content_scrolled_at;
-    std::thread::sleep(std::time::Duration::from_millis(1));
+    let before = std::time::Instant::now();
     app.mark_content_scrolled();
-    assert!(app.content_scrolled_at > before);
+    assert!(
+        app.content_scrolled_at >= before,
+        "timestamp must be set to now or later"
+    );
     fs::remove_dir_all(&root).ok();
 }
 

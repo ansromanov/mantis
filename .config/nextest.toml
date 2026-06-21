@@ -1,2 +1,14 @@
+[profile.default]
+# Use all available logical CPUs for test parallelism. This is the default
+# behaviour when the option is omitted; we set it explicitly so the intent
+# is clear and to document the knob.
+threads-required = 1
+
 [profile.ci.junit]
 path = "junit.xml"
+
+# Isolable group for tests that are irreducibly slow (e.g. real filesystem
+# I/O or integration-style tests). Run with `cargo nextest run -E 'test_group(slow)'`.
+# Tests are assigned to this group with `#[nextest(test_group = "slow")]`.
+[test-groups.slow]
+max-threads = 1

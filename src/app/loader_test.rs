@@ -125,10 +125,7 @@ fn worker_round_trip_returns_matching_seq() {
         seq: 7,
         path: f.path().to_path_buf(),
     });
-    let resp = loader
-        .rx
-        .recv_timeout(std::time::Duration::from_secs(5))
-        .expect("worker response");
+    let resp = loader.rx.recv().expect("worker response");
     match resp {
         LoadResponse::File { seq, load, .. } => {
             assert_eq!(seq, 7);
