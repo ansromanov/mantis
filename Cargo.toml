@@ -15,6 +15,11 @@ path = "src/lib.rs"
 name = "tv"
 path = "src/main.rs"
 
+[profile.dev]
+# Full debuginfo dominates compile + link time for the test build; line tables
+# keep usable backtraces at a fraction of the cost.
+debug = "line-tables-only"
+
 [profile.release]
 strip = true        # drop symbols/debuginfo from the binary
 lto = true          # cross-crate link-time optimization
