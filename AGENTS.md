@@ -128,6 +128,13 @@ new module, create its `_test.rs` companion at the same time. Cross-module /
 black-box tests live in the integration `tests/` directory. The `split-tests` skill
 (`.agent/skills/split-tests/`) automates extracting any inline block.
 
+**Every PR that adds or changes behaviour MUST include tests.** This is not
+optional. New public functions need at least one unit test each. Changed logic
+needs a test that would have caught the regression. If a function is hard to
+test in isolation (e.g. it shells out to `git`), add an integration test in
+`tests/` or a doc-comment example instead — but never ship a feature without
+any test coverage for it.
+
 ## Documentation
 
 User-facing docs live in `docs/src/`. Any PR that adds, removes, or changes a
