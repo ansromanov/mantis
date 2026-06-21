@@ -49,11 +49,6 @@ fn handle_open(path_str: &str, out: &mut impl Write) {
         Some(r) => r,
         None => return,
     };
-    // Skip diff for files that are already plugin-generated (temp files).
-    let file_name = file_path.to_string_lossy();
-    if file_name.contains("/tv-git-diff-") || file_name.contains("/tv-git-log-") {
-        return;
-    }
     let diff = match Command::new("git")
         .args(["diff", "--color=always", "HEAD", "--", path_str])
         .current_dir(&repo)

@@ -233,10 +233,6 @@ fn send_file_statuses(path_str: &str, out: &mut impl Write) {
 
 fn send_diff(path_str: &str, out: &mut impl Write) {
     let file_path = Path::new(path_str);
-    let file_name = file_path.to_string_lossy();
-    if file_name.contains("/tv-git-diff-") || file_name.contains("/tv-git-log-") {
-        return;
-    }
     if !file_path.is_file() {
         return;
     }
@@ -314,8 +310,10 @@ fn send_blame(path_str: &str, out: &mut impl Write) {
 
     let blame_str = String::from_utf8_lossy(&blame_output);
     let mut blame_map: HashMap<usize, String> = HashMap::new();
+    let mut total = 0usize;
 
     for (i, line) in blame_str.lines().enumerate() {
+        total = i + 1;
         let line = line.trim();
         if line.is_empty() {
             continue;
@@ -325,11 +323,6 @@ fn send_blame(path_str: &str, out: &mut impl Write) {
             blame_map.insert(i, prefix.to_string());
         }
     }
-
-    let total = match std::fs::read_to_string(path_str) {
-        Ok(content) => content.lines().count(),
-        Err(_) => blame_map.keys().max().map(|&k| k + 1).unwrap_or(0),
-    };
 
     let lines: Vec<String> = (0..total)
         .map(|i| blame_map.get(&i).cloned().unwrap_or_default())

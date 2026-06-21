@@ -22,20 +22,6 @@ fn handle_open_skips_nonexistent_file() {
 }
 
 #[test]
-fn handle_open_skips_temp_diff_files() {
-    let mut buf: Vec<u8> = Vec::new();
-    handle_open("/tmp/tv-git-diff-abc123", &mut buf);
-    assert!(buf.is_empty(), "no output for temp diff files");
-}
-
-#[test]
-fn handle_open_skips_temp_log_files() {
-    let mut buf: Vec<u8> = Vec::new();
-    handle_open("/tmp/tv-git-log-abc123", &mut buf);
-    assert!(buf.is_empty(), "no output for temp log files");
-}
-
-#[test]
 fn main_loop_handles_init_and_shutdown() {
     let input = "{\"event\":\"init\"}\n{\"event\":\"shutdown\"}\n";
     for line in input.lines() {

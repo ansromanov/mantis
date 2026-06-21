@@ -26,16 +26,6 @@ fn send_repo_info_produces_valid_json() {
 }
 
 #[test]
-fn send_diff_skips_temp_files() {
-    let mut buf = Vec::new();
-    send_diff("/tmp/tv-git-diff-abc123", &mut buf);
-    assert!(buf.is_empty(), "no output for temp diff files");
-    let mut buf2 = Vec::new();
-    send_diff("/tmp/tv-git-log-abc123", &mut buf2);
-    assert!(buf2.is_empty(), "no output for temp log files");
-}
-
-#[test]
 fn send_blame_produces_valid_json_for_nonexistent_file() {
     let mut buf = Vec::new();
     send_blame("/nonexistent/path/file.txt", &mut buf);
