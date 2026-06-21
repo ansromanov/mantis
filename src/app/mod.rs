@@ -241,6 +241,13 @@ pub struct App {
     /// Git branch/HEAD/dirty/state info provided by a plugin for the status bar.
     /// When set, displayed instead of the live `git_info`.
     pub plugin_git_info: Option<PluginGitInfo>,
+    /// Plugin-rendered content keyed by file path. Populated by the `set_content`
+    /// action; the content pane checks this before markdown/virtual-file rendering.
+    pub plugin_content: HashMap<PathBuf, Vec<Vec<(ratatui::style::Style, String)>>>,
+    /// Set to `true` when a plugin sends `set_content` for the current file and
+    /// reset to `false` when `current_file` changes, so the `[rendering…]`
+    /// placeholder only shows while the plugin is actively working on that file.
+    pub plugin_content_active: bool,
     /// Transient status message (e.g. "path copied"), shown until the next keypress.
     pub status_message: Option<String>,
     /// Breadcrumb segment areas recorded during the last render, used for mouse
@@ -428,6 +435,8 @@ impl App {
             plugin_message: plugin_spawn_error,
             plugin_blame: HashMap::new(),
             plugin_git_info: None,
+            plugin_content: HashMap::new(),
+            plugin_content_active: false,
             status_message: None,
             breadcrumb_areas: Vec::new(),
         };

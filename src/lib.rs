@@ -9,6 +9,7 @@
 //! `release_info`) each provide one focused capability consumed by `app`/`ui`.
 //! Keep this list in sync with the directory structure documented in AGENTS.md.
 
+pub mod ansi;
 pub mod app;
 pub mod command_palette;
 pub mod config;
