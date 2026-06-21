@@ -742,22 +742,27 @@ pub fn install_bundled_plugins() {
             }
         }
         if !found {
-            // Last resort: attempt to build with cargo.
+            // Last resort: build with cargo in a background thread so startup
+            // is not blocked. The binary will be available on the next run.
             if let Some(cargo) = which_cargo() {
                 let project_manifest = PathBuf::from("Cargo.toml");
                 if project_manifest.exists() {
-                    let _ = Command::new(&cargo)
-                        .arg("build")
-                        .arg("--package")
-                        .arg(md_plugin_name)
-                        .arg("--release")
-                        .status()
-                        .ok();
-                    let release_path = PathBuf::from("target/release").join(&binary_name);
-                    if release_path.exists() {
-                        let _ = std::fs::copy(&release_path, &md_plugin_path);
-                        set_executable(&md_plugin_path);
-                    }
+                    let md_plugin_path = md_plugin_path.clone();
+                    std::thread::spawn(move || {
+                        let status = Command::new(&cargo)
+                            .arg("build")
+                            .arg("--package")
+                            .arg(md_plugin_name)
+                            .arg("--release")
+                            .status();
+                        if status.map(|s| s.success()).unwrap_or(false) {
+                            let release_path = PathBuf::from("target/release").join(&binary_name);
+                            if release_path.exists() {
+                                let _ = std::fs::copy(&release_path, &md_plugin_path);
+                                set_executable(&md_plugin_path);
+                            }
+                        }
+                    });
                 }
             }
         }

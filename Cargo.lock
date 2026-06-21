@@ -1705,6 +1705,7 @@ version = "0.1.0"
 dependencies = [
  "pulldown-cmark",
  "serde_json",
+ "unicode-width 0.2.2",
 ]
 
 [[package]]

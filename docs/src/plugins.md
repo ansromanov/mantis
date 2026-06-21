@@ -81,7 +81,7 @@ Plugins receive lifecycle and hook events from `tv` and can respond with
 **actions**:
 
 | Action | Effect |
-|---|---|---|
+|---|---|
 | `show_message` | Displays a message in the status bar |
 | `open_file` | Opens a file in the content panel |
 | `set_content` | Replaces content panel with ANSI-escaped lines |

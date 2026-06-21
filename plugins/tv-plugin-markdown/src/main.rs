@@ -26,6 +26,7 @@ use std::io::{self, BufRead, Write};
 use std::path::Path;
 
 use pulldown_cmark::{Alignment, Event, HeadingLevel, Options, Parser, Tag};
+use unicode_width::UnicodeWidthStr;
 
 fn main() {
     let stdin = io::stdin();
@@ -373,13 +374,15 @@ fn render_to_ansi(src: &str, theme: &ThemeColors) -> Vec<String> {
                 lines.push(String::new());
             }
             Event::TaskListMarker(checked) => {
-                if let Some(last) = lines.last_mut() {
-                    if last.ends_with("• ") {
-                        let marker = if checked { "☑" } else { "☐" };
-                        last.push_str(marker);
-                        last.push(' ');
-                    }
-                }
+                // TaskListMarker fires immediately after Start(Item) sets
+                // `current` to the bullet prefix. Replace the bullet in
+                // `current` directly — lines hasn't been flushed yet.
+                let indent = "  ".repeat(list_depth.saturating_sub(1));
+                let marker = if checked { "☑" } else { "☐" };
+                current = format!(
+                    "\x1b[{accent}m{indent}{marker} \x1b[0m",
+                    accent = theme.accent
+                );
             }
             _ => {}
         }
@@ -511,24 +514,19 @@ fn table_border(left: char, fill: char, mid: char, right: char, widths: &[usize]
 
 fn pad_width(text: &str, width: usize, align: Alignment) -> String {
     let vw = visible_width(text);
+    let pad = width.saturating_sub(vw);
     match align {
-        Alignment::Right => {
-            let pad = width.saturating_sub(vw);
-            format!("{:>width$}", text, width = vw + pad)
-        }
-        Alignment::Center => {
-            let pad = width.saturating_sub(vw);
-            format!(
-                "{}{}{}",
-                " ".repeat(pad / 2),
-                text,
-                " ".repeat(pad - pad / 2)
-            )
-        }
-        _ => format!("{:<width$}", text, width = vw),
+        Alignment::Right => format!("{}{}", " ".repeat(pad), text),
+        Alignment::Center => format!(
+            "{}{}{}",
+            " ".repeat(pad / 2),
+            text,
+            " ".repeat(pad - pad / 2)
+        ),
+        _ => format!("{}{}", text, " ".repeat(pad)),
     }
 }
 
 fn visible_width(s: &str) -> usize {
-    s.chars().count()
+    UnicodeWidthStr::width(s)
 }
