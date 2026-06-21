@@ -8,7 +8,7 @@
 //! `TREE_RELOAD_DEBOUNCE`, to coalesce bursts), with a periodic timer fallback
 //! when no watcher could be installed so the view never goes permanently stale.
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use super::loader::{LoadRequest, LoadResponse};
 use super::App;
@@ -30,7 +30,7 @@ impl App {
         }
         if self.drain_root_watch() {
             self.tree_dirty = true;
-            self.tree_dirty_at = Some(Instant::now());
+            self.tree_dirty_at = Some(self.now());
         }
         if self.tree_dirty {
             // Wait for the tree to go quiet before reloading so a burst of events
