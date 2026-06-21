@@ -345,8 +345,8 @@ fn render_to_ansi(src: &str, theme: &ThemeColors) -> Vec<String> {
                 } else if in_table_cell {
                     table_cell_buf.push_str(&t);
                 } else {
-                    let s = style_stack.last().map(|s| s.as_str()).unwrap_or("");
-                    current.push_str(&apply_style(s, &t));
+                    let combined = style_stack.join(";");
+                    current.push_str(&apply_style(&combined, &t));
                 }
             }
             Event::Code(t) => {

@@ -94,6 +94,7 @@ fn apply_sgr(param: &str, style: &mut Style) {
 
     for token in &tokens {
         match token.as_str() {
+            "0" => *style = Style::default(),
             "1" => *style = style.add_modifier(Modifier::BOLD),
             "2" => *style = style.add_modifier(Modifier::DIM),
             "3" => *style = style.add_modifier(Modifier::ITALIC),
