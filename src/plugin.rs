@@ -676,6 +676,7 @@ fn dirs_next() -> Option<PathBuf> {
 /// List of (filename, script_content) for each process plugin that ships with tv.
 /// Installed to the plugin directory by `install_bundled_plugins()`.
 const BUNDLED_PLUGINS: &[(&str, &str)] = &[
+    ("git-plugin.sh", include_str!("../plugins/git-plugin.sh")),
     ("git-diff.sh", include_str!("../plugins/git-diff.sh")),
     ("git-log.sh", include_str!("../plugins/git-log.sh")),
 ];

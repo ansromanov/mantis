@@ -124,3 +124,11 @@ visual_line_blame = ["b"]
 # by tv on first run).  You can also add explicit entries:
 #   terraform = { kind = "syntax", syntax_file = "syntaxes/terraform.sublime-syntax",
 #                 extensions = ["tf", "tfvars"] }
+#
+# git-plugin: unified git status / repo info / diff / log / blame via a single
+#   subprocess. Replaces the built-in git integration when `git-core` is
+#   disabled in the binary (currently the built-in git integration runs by
+#   default; this plugin is an alternative for testing).
+#
+# [plugins]
+# git-plugin = { path = "git-plugin.sh" }

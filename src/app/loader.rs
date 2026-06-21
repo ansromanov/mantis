@@ -195,7 +195,10 @@ pub(super) fn compute_file_load(path: &Path, theme: &Theme, hl: &Highlighter) ->
 
 /// Runs `git diff HEAD` for `path` and parses it into renderable diff state.
 pub(super) fn compute_diff_load(root: &Path, path: &Path, theme: &Theme) -> DiffLoad {
+    #[cfg(feature = "git-core")]
     let lines = crate::git::working_tree_diff(root, path);
+    #[cfg(not(feature = "git-core"))]
+    let lines: Vec<String> = vec!["(git-core disabled)".to_string()];
     let rel = path.strip_prefix(root).unwrap_or(path);
     let highlighted = lines
         .iter()
