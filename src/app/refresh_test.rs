@@ -208,6 +208,7 @@ fn create_base_app() -> App {
         config_path: None,
         tree_area: ratatui::layout::Rect::default(),
         tree_offset: 0,
+        tree_visible_indices: Vec::new(),
         content_area: ratatui::layout::Rect::default(),
         search_area: ratatui::layout::Rect::default(),
         search_offset: 0,

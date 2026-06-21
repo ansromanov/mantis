@@ -6,11 +6,35 @@ name: CI
 on:
   pull_request:
     branches: [main]
+    # `edited` so editing the PR body re-runs the issue-link check.
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  link:
+    name: PR closes an issue
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Require a closing keyword
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          if echo "$LABELS" | tr ',' '\n' | grep -qx 'no-issue'; then
+            echo "no-issue label present — skipping link check."
+            exit 0
+          fi
+          if echo "$BODY" | grep -qiE '(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved) +#[0-9]+'; then
+            echo "PR links an issue."
+            exit 0
+          fi
+          echo "::error::PR body must close an issue (e.g. 'Closes #123') so it auto-closes on merge. Add the keyword or apply the 'no-issue' label."
+          exit 1
+
   pr:
     name: fmt, clippy, related tests (Linux)
     runs-on: ubuntu-latest

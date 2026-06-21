@@ -73,7 +73,17 @@ impl App {
                     self.clear_selection();
                     let row = (ev.row - self.tree_area.y) as usize;
                     let index = self.tree_offset + row;
-                    if index < self.nodes.len() {
+                    // When the inline tree filter is active, map the click
+                    // through the visible-indices array to get the global node
+                    // index, then close the filter (accept the selection).
+                    if self.tree_filter.is_some() {
+                        if index < self.tree_visible_indices.len() {
+                            let global = self.tree_visible_indices[index];
+                            self.tree_selected = global;
+                            self.tree_filter = None;
+                            self.activate_selected();
+                        }
+                    } else if index < self.nodes.len() {
                         self.tree_selected = index;
                         self.activate_selected();
                     }

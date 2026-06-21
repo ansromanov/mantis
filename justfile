@@ -7,10 +7,27 @@ setup:
     pre-commit install
 
 # start a new feature branch from latest origin/main (e.g. just new my-feature)
+# refuses to branch when the current branch already has an open PR — fixing
+# review comments must push to that PR, not spawn a new branch. Override for
+# genuinely unrelated work with: ALLOW_NESTED=1 just new my-feature
 new branch:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ "${ALLOW_NESTED:-0}" != "1" ]] && pr=$(gh pr view --json number -q .number 2>/dev/null); then
+        echo "[new] BLOCKED: current branch has open PR #$pr." >&2
+        echo "      Fixing review comments? Don't branch — push to this branch then 'just resolve-threads'." >&2
+        echo "      Genuinely starting unrelated work? Re-run: ALLOW_NESTED=1 just new {{branch}}" >&2
+        exit 1
+    fi
     cargo install cargo-nextest --locked
     git fetch origin
     git checkout -b {{branch}} origin/main
+    pre-commit install
+
+# check out an existing PR's branch to push fixes (never branch for fixes)
+# usage: just fix 240
+fix pr:
+    gh pr checkout {{pr}}
     pre-commit install
 
 # safe push before opening a PR: fetch latest main, rebase, then push
@@ -18,6 +35,26 @@ pr:
     git fetch origin
     git rebase origin/main
     git push -u origin HEAD --force-with-lease
+
+# resolve every unresolved review thread on the current branch's PR
+resolve-threads:
+    ./scripts/resolve-threads.sh
+
+# end-to-end ship of the current branch: fmt, related tests, push, then open a
+# PR that closes the given issue (or update the existing PR + resolve threads).
+# usage: just ship 239
+ship issue:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cargo fmt --all
+    just test-pr
+    git push -u origin HEAD --force-with-lease
+    if gh pr view --json number -q .number >/dev/null 2>&1; then
+        echo "[ship] existing PR updated; resolving addressed review threads"
+        ./scripts/resolve-threads.sh || true
+    else
+        gh pr create --title "$(git log -1 --format=%s)" --body "Closes #{{issue}}"
+    fi
 
 # build debug binary
 build:

@@ -212,6 +212,10 @@ pub struct App {
     // Geometry captured during the last render, used to map mouse events.
     pub tree_area: Rect,
     pub tree_offset: usize,
+    /// The set of node indices (into `nodes`) that were visible during the last
+    /// tree render. Populated by `draw_tree` when `tree_filter` is active so
+    /// mouse handlers can map screen rows back to global indices.
+    pub tree_visible_indices: Vec<usize>,
     pub content_area: Rect,
     pub search_area: Rect,
     pub search_offset: usize,
@@ -454,6 +458,7 @@ impl App {
             config_path,
             tree_area: Rect::default(),
             tree_offset: 0,
+            tree_visible_indices: Vec::new(),
             content_area: Rect::default(),
             search_area: Rect::default(),
             search_offset: 0,

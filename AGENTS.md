@@ -246,6 +246,10 @@ multiple sibling `_test.rs` files.
 
 # 3. Dev Flow
 
+> **AI agents: never run `cargo test`, `cargo nextest run`, or any other full-suite
+> command during feature development. Always use `just test-pr` instead. Running the
+> full suite wastes minutes and is explicitly forbidden by project convention.**
+
 ## Commands
 
 | Command | Action |
@@ -277,6 +281,15 @@ new commits onto a clean branch rather than rebasing through merge noise.
 
 ## Opening a PR
 
+Prefer the one-shot recipe — it never drops a step (fmt → related tests → push →
+open PR that closes the issue):
+
+```bash
+just ship 239      # fmt, just test-pr, push, then `gh pr create` with "Closes #239"
+```
+
+Or the manual path:
+
 ```bash
 just pr            # fetch origin/main, rebase, push --force-with-lease
 gh pr create       # open the PR (rebase fails loudly on conflicts so you can resolve)
@@ -287,6 +300,28 @@ gh pr create       # open the PR (rebase fails loudly on conflicts so you can re
 > ```bash
 > GH_TOKEN=$(gh auth token) just pr
 > ```
+
+## PR lifecycle rules (mandatory)
+
+These four are non-negotiable — CI enforces #1, and `just` recipes make the rest
+a single command. They are the difference between a PR that lands clean and one that
+leaves manual cleanup behind.
+
+1. **Every PR closes its issue.** The PR body must contain `Closes #<n>` (or
+   `Fixes`/`Resolves`) so GitHub auto-closes the issue on merge. CI's `link` job
+   fails the PR otherwise. Only exception: apply the `no-issue` label for genuinely
+   issue-less PRs. `just ship <n>` writes this for you.
+2. **Always push your work.** Code that isn't pushed doesn't exist. Finish a unit of
+   work → push. `just ship` does it; if you push manually, do it before reporting the
+   work done.
+3. **Fix review comments on the SAME branch — never a new one.** Pushing more commits
+   to the PR branch updates the PR. To return to a PR's branch use `just fix <pr>`
+   (wraps `gh pr checkout`). `just new` refuses to branch when the current branch
+   already has an open PR, to stop this mistake.
+4. **Resolve threads after addressing comments.** Fixing the code is half the job;
+   the reviewer still sees an open thread until it's resolved. Run
+   `just resolve-threads` (or `just ship`, which resolves automatically when updating
+   an existing PR) after pushing the fixes.
 
 ## Before committing
 

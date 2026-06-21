@@ -184,6 +184,10 @@ fn app_draw_with_search_open() {
     let dir = temp_dir();
     fs::write(dir.join("a.txt"), "hello\nworld\n").unwrap();
     let mut app = app_for(&dir);
+    // Switch to Content focus + no file so '/' opens SearchState
+    // instead of TreeFilter or in-file search.
+    app.focus = crate::app::Focus::Content;
+    app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
     assert!(app.search.is_some());
     let backend = TestBackend::new(80, 30);
@@ -297,6 +301,9 @@ fn event_loop_key_search_toggles_search() {
     fs::write(dir.join("a.txt"), "hello\n").unwrap();
     let mut app = app_for(&dir);
     assert!(app.search.is_none());
+    // Switch to Content focus + no file so '/' opens SearchState.
+    app.focus = crate::app::Focus::Content;
+    app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
     assert!(app.search.is_some());
     app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
