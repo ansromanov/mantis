@@ -679,6 +679,7 @@ const BUNDLED_PLUGINS: &[(&str, &str)] = &[
     ("git-plugin.sh", include_str!("../plugins/git-plugin.sh")),
     ("git-diff.sh", include_str!("../plugins/git-diff.sh")),
     ("git-log.sh", include_str!("../plugins/git-log.sh")),
+    ("iconize.sh", include_str!("../plugins/iconize.sh")),
 ];
 
 /// List of (filename, content) for each bundled syntax definition.

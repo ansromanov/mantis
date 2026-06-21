@@ -161,6 +161,29 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
                 "  "
             };
             spans.push(Span::styled(arrow, name_style));
+
+            if app.icons_enabled && !app.icon_map.is_empty() {
+                let icon = if node.is_dir {
+                    if app.expanded.contains(&node.path) {
+                        &app.icon_dir_open
+                    } else {
+                        &app.icon_dir_closed
+                    }
+                } else {
+                    let ext = node
+                        .path
+                        .extension()
+                        .and_then(|e| e.to_str())
+                        .unwrap_or("")
+                        .to_lowercase();
+                    app.icon_map.get(&ext).unwrap_or(&app.icon_fallback)
+                };
+                if !icon.is_empty() {
+                    spans.push(Span::styled(icon.clone(), name_style));
+                    spans.push(Span::styled(" ", name_style));
+                }
+            }
+
             spans.push(Span::styled(node.name.clone(), name_style));
 
             ListItem::new(Line::from(spans))

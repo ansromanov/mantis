@@ -202,6 +202,26 @@ impl App {
                     };
                     self.plugin_blame.insert(path, lines);
                 }
+                "set_icon_map" => {
+                    if let Some(obj) = params.as_object() {
+                        if let Some(icons) = obj.get("icons").and_then(|v| v.as_object()) {
+                            for (ext, glyph) in icons {
+                                if let Some(g) = glyph.as_str() {
+                                    self.icon_map.insert(ext.clone(), g.to_string());
+                                }
+                            }
+                        }
+                        if let Some(open) = obj.get("dir_open").and_then(|v| v.as_str()) {
+                            self.icon_dir_open = open.to_string();
+                        }
+                        if let Some(closed) = obj.get("dir_closed").and_then(|v| v.as_str()) {
+                            self.icon_dir_closed = closed.to_string();
+                        }
+                        if let Some(fallback) = obj.get("fallback").and_then(|v| v.as_str()) {
+                            self.icon_fallback = fallback.to_string();
+                        }
+                    }
+                }
                 "set_status_bar_git_info" => {
                     let branch = params
                         .get("branch")
