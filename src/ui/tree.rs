@@ -244,7 +244,17 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
                 }
             }
 
-            spans.push(Span::styled(node.name.clone(), name_style));
+            // Inline tree-filter match highlighting
+            let name_spans = if let Some(ref filter) = app.tree_filter {
+                if filter.is_empty() {
+                    vec![Span::styled(node.name.clone(), name_style)]
+                } else {
+                    highlight_matches(&node.name, &filter.query, name_style, theme)
+                }
+            } else {
+                vec![Span::styled(node.name.clone(), name_style)]
+            };
+            spans.extend(name_spans);
 
             ListItem::new(Line::from(spans))
         })
@@ -274,6 +284,59 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
     app.tree_area = list_area;
     app.tree_offset = offset + state.offset();
     app.tree_scroll = offset + state.offset();
+    app.tree_visible_indices = visible_indices;
+}
+
+/// Splits `name` into spans, highlighting substrings that match `query`
+/// (case-insensitive). Matching segments get an underlined accent style.
+fn highlight_matches(
+    name: &str,
+    query: &str,
+    base_style: Style,
+    theme: &crate::theme::Theme,
+) -> Vec<Span<'static>> {
+    let q_lower: Vec<char> = query.to_lowercase().chars().collect();
+    let name_lower: Vec<char> = name.to_lowercase().chars().collect();
+    let q_char_len = q_lower.len();
+    if q_char_len == 0 || name_lower.len() < q_char_len {
+        return vec![Span::styled(name.to_string(), base_style)];
+    }
+
+    // Find all match start positions.
+    let mut match_starts = Vec::new();
+    let mut i = 0;
+    while i + q_char_len <= name_lower.len() {
+        if name_lower[i..i + q_char_len] == q_lower[..] {
+            match_starts.push(i);
+            i += q_char_len;
+        } else {
+            i += 1;
+        }
+    }
+
+    if match_starts.is_empty() {
+        return vec![Span::styled(name.to_string(), base_style)];
+    }
+
+    let highlight_style = base_style
+        .fg(theme.accent_alt)
+        .add_modifier(ratatui::style::Modifier::BOLD);
+    let mut spans = Vec::new();
+    let mut pos = 0;
+    for &ms in &match_starts {
+        if ms > pos {
+            spans.push(Span::styled(name[pos..ms].to_string(), base_style));
+        }
+        spans.push(Span::styled(
+            name[ms..ms + q_char_len].to_string(),
+            highlight_style,
+        ));
+        pos = ms + q_char_len;
+    }
+    if pos < name.len() {
+        spans.push(Span::styled(name[pos..].to_string(), base_style));
+    }
+    spans
 }
 
 /// Computes breadcrumb path segments from the selected tree node to root.

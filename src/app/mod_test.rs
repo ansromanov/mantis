@@ -3,7 +3,7 @@ use std::fs;
 use super::*;
 use crate::command_palette::COMMANDS;
 use crate::config::Config;
-use crate::search::{InFileMatch, SearchMode};
+use crate::search::{InFileMatch, SearchMode, TreeFilter};
 use crate::yaml_fold::FoldRegion;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -309,6 +309,38 @@ fn left_click_respects_scroll_offset() {
 
     app.handle_mouse(click(1, 0));
     assert_eq!(app.tree_selected, 1);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_filter_mouse_click_maps_through_visible_indices_and_closes() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    // a.txt at index 0, subdir/ at index 1, long.txt at index 2+, ...
+    // Set up a filter that only shows 'long.txt' (index ~2) and its ancestors.
+    app.tree_filter = Some(TreeFilter::new());
+    for c in "long".chars() {
+        app.tree_filter.as_mut().unwrap().push(c);
+    }
+    // Simulate the visible_indices that draw_tree would compute.
+    let matching: Vec<usize> = (0..app.nodes.len())
+        .filter(|&i| app.nodes[i].name.to_lowercase().contains("long"))
+        .collect();
+    assert!(!matching.is_empty(), "long.txt should match");
+    app.tree_visible_indices = matching.clone();
+    app.tree_area = full_rect();
+    app.tree_offset = 0;
+
+    // Click on the first visible row (which maps to matching[0]).
+    app.handle_mouse(click(1, 0));
+    assert_eq!(
+        app.tree_selected, matching[0],
+        "should select the global index from visible_indices"
+    );
+    assert!(
+        app.tree_filter.is_none(),
+        "click should accept (close) the filter"
+    );
     fs::remove_dir_all(&root).ok();
 }
 
@@ -1044,6 +1076,96 @@ fn normal_key_esc_clears_selection() {
     });
     app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
     assert!(app.selection.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- handle_tree_filter_key -------------------------------------------------
+
+#[test]
+fn tree_filter_key_esc_closes() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.tree_filter = Some(TreeFilter::new());
+    app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+    assert!(app.tree_filter.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_filter_key_enter_closes() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.tree_filter = Some(TreeFilter::new());
+    app.tree_filter.as_mut().unwrap().push('a');
+    app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert!(app.tree_filter.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_filter_key_backspace_removes_char() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.tree_filter = Some(TreeFilter::new());
+    app.tree_filter.as_mut().unwrap().push('a');
+    assert_eq!(app.tree_filter.as_ref().unwrap().query, "a");
+    app.handle_key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::empty()));
+    assert_eq!(app.tree_filter.as_ref().unwrap().query, "");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_filter_key_char_appends() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.tree_filter = Some(TreeFilter::new());
+    app.handle_key(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::empty()));
+    assert_eq!(app.tree_filter.as_ref().unwrap().query, "x");
+    app.handle_key(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::empty()));
+    assert_eq!(app.tree_filter.as_ref().unwrap().query, "xy");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_filter_key_moves_selection_to_first_match() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    // Open the tree filter explicitly (normally done via '/' with tree focus).
+    app.tree_filter = Some(TreeFilter::new());
+    app.handle_key(KeyEvent::new(KeyCode::Char('l'), KeyModifiers::empty()));
+    assert_eq!(app.tree_filter.as_ref().unwrap().query, "l");
+    // tree_selected should move to the first node whose name contains 'l'
+    // (long.txt at index ~2, after a.txt, b.txt, and possibly a directory).
+    let matching = app
+        .nodes
+        .iter()
+        .position(|n| n.name.to_lowercase().contains('l'));
+    assert!(matching.is_some(), "at least one node should match 'l'");
+    assert_eq!(app.tree_selected, matching.unwrap());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_filter_key_moves_selection_to_zero_when_no_match() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.tree_filter = Some(TreeFilter::new());
+    app.tree_selected = 2;
+    app.handle_key(KeyEvent::new(KeyCode::Char('z'), KeyModifiers::empty()));
+    // 'z' matches nothing; selection should fall back to 0
+    assert_eq!(app.tree_selected, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_filter_key_unrecognized_key_is_noop() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.tree_filter = Some(TreeFilter::new());
+    app.tree_filter.as_mut().unwrap().push('a');
+    let query_before = app.tree_filter.as_ref().unwrap().query.clone();
+    app.handle_key(KeyEvent::new(KeyCode::F(1), KeyModifiers::empty()));
+    assert_eq!(app.tree_filter.as_ref().unwrap().query, query_before);
     fs::remove_dir_all(&root).ok();
 }
 

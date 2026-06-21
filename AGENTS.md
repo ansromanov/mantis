@@ -246,6 +246,10 @@ multiple sibling `_test.rs` files.
 
 # 3. Dev Flow
 
+> **AI agents: never run `cargo test`, `cargo nextest run`, or any other full-suite
+> command during feature development. Always use `just test-pr` instead. Running the
+> full suite wastes minutes and is explicitly forbidden by project convention.**
+
 ## Commands
 
 | Command | Action |

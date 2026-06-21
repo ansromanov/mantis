@@ -489,3 +489,164 @@ fn render_breadcrumb_truncation_shows_ellipsis() {
     );
     assert!(breadcrumb_row.contains('e'), "last segment must be visible");
 }
+
+// ---------------------------------------------------------------------------
+// highlight_matches
+// ---------------------------------------------------------------------------
+
+#[test]
+fn highlight_matches_no_match_returns_single_span() {
+    let theme = default_theme();
+    let style = Style::default().fg(theme.file);
+    let spans = highlight_matches("foobar", "xyz", style, &theme);
+    assert_eq!(spans.len(), 1);
+    assert_eq!(spans[0].content, "foobar");
+}
+
+#[test]
+fn highlight_matches_exact_match_highlights_all() {
+    let theme = default_theme();
+    let style = Style::default().fg(theme.file);
+    let spans = highlight_matches("foobar", "foobar", style, &theme);
+    assert_eq!(spans.len(), 1);
+    assert_eq!(spans[0].content, "foobar");
+    assert!(
+        spans[0].style.add_modifier | ratatui::style::Modifier::BOLD
+            != ratatui::style::Modifier::empty()
+    );
+}
+
+#[test]
+fn highlight_matches_partial_match_three_spans() {
+    let theme = default_theme();
+    let style = Style::default().fg(theme.file);
+    // "foo_bar_baz" matching "bar" → "foo_" + "bar" + "_baz"
+    let spans = highlight_matches("foo_bar_baz", "bar", style, &theme);
+    assert_eq!(spans.len(), 3);
+    assert_eq!(spans[0].content, "foo_");
+    assert_eq!(spans[1].content, "bar");
+    assert_eq!(spans[2].content, "_baz");
+}
+
+#[test]
+fn highlight_matches_case_insensitive() {
+    let theme = default_theme();
+    let style = Style::default().fg(theme.file);
+    let spans = highlight_matches("HelloWorld", "world", style, &theme);
+    assert_eq!(spans.len(), 2);
+    assert_eq!(spans[0].content, "Hello");
+    assert_eq!(spans[1].content, "World");
+}
+
+#[test]
+fn highlight_matches_empty_query_returns_single_span() {
+    let theme = default_theme();
+    let style = Style::default().fg(theme.file);
+    let spans = highlight_matches("anything", "", style, &theme);
+    assert_eq!(spans.len(), 1);
+    assert_eq!(spans[0].content, "anything");
+}
+
+#[test]
+fn highlight_matches_multiple_occurrences() {
+    let theme = default_theme();
+    let style = Style::default().fg(theme.file);
+    // "aba" has "a" at positions 0 and 2
+    let spans = highlight_matches("aba", "a", style, &theme);
+    assert_eq!(spans.len(), 3);
+    assert_eq!(spans[0].content, "a");
+    assert_eq!(spans[1].content, "b");
+    assert_eq!(spans[2].content, "a");
+}
+
+// ---------------------------------------------------------------------------
+// draw_tree with tree_filter
+// ---------------------------------------------------------------------------
+
+#[test]
+fn draw_tree_filter_shows_only_matching_nodes() {
+    let mut app = make_app(false, HashMap::new());
+    app.nodes = vec![
+        make_node("main.rs", false, false),
+        make_node("README.md", false, false),
+        make_node("src", true, false),
+    ];
+    app.tree_filter = Some(crate::search::TreeFilter::new());
+    app.tree_filter.as_mut().unwrap().push('m');
+    app.tree_selected = 0;
+
+    let rows = render_tree(&mut app, 40, 10);
+    let text = all_text(&rows);
+    assert!(text.contains("main.rs"), "main.rs should match 'm'");
+    assert!(!text.contains("src"), "src should not match 'm'");
+}
+
+#[test]
+fn draw_tree_filter_records_visible_indices() {
+    let mut app = make_app(false, HashMap::new());
+    app.nodes = vec![
+        make_node("main.rs", false, false),
+        make_node("README.md", false, false),
+        make_node("src", true, false),
+    ];
+    app.tree_filter = Some(crate::search::TreeFilter::new());
+    app.tree_filter.as_mut().unwrap().push('z');
+    app.tree_selected = 0;
+
+    render_tree(&mut app, 40, 10);
+    // 'z' matches nothing, so visible_indices should be empty
+    assert!(app.tree_visible_indices.is_empty());
+}
+
+#[test]
+fn draw_tree_filter_empty_shows_all_nodes() {
+    let mut app = make_app(false, HashMap::new());
+    app.nodes = vec![
+        make_node("main.rs", false, false),
+        make_node("README.md", false, false),
+    ];
+    app.tree_filter = Some(crate::search::TreeFilter::new());
+
+    let rows = render_tree(&mut app, 40, 10);
+    let text = all_text(&rows);
+    assert!(text.contains("main.rs"));
+    assert!(text.contains("README.md"));
+}
+
+#[test]
+fn draw_tree_filter_with_ancestors_includes_parent_dirs() {
+    let mut app = make_app(false, HashMap::new());
+    app.nodes = vec![
+        TreeNode {
+            path: PathBuf::from("/r/src"),
+            name: "src".to_string(),
+            depth: 0,
+            is_dir: true,
+            deleted: false,
+        },
+        TreeNode {
+            path: PathBuf::from("/r/src/main.rs"),
+            name: "main.rs".to_string(),
+            depth: 1,
+            is_dir: false,
+            deleted: false,
+        },
+        TreeNode {
+            path: PathBuf::from("/r/tests"),
+            name: "tests".to_string(),
+            depth: 0,
+            is_dir: true,
+            deleted: false,
+        },
+    ];
+    app.tree_filter = Some(crate::search::TreeFilter::new());
+    for c in "main".chars() {
+        app.tree_filter.as_mut().unwrap().push(c);
+    }
+
+    let rows = render_tree(&mut app, 40, 10);
+    let text = all_text(&rows);
+    assert!(text.contains("main.rs"), "matching node must be visible");
+    assert!(text.contains("src"), "ancestor dir must be visible");
+    assert!(!text.contains("tests"), "non-matching dir must be hidden");
+}
