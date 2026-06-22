@@ -336,4 +336,3 @@ impl App {
         self.reload();
     }
 }
-
