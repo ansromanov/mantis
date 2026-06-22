@@ -87,3 +87,32 @@ fn set_if_higher_equal_priority_unchanged() {
     set_if_higher(&mut map, PathBuf::from("a.rs"), GitStatus::New);
     assert!(matches!(map[&PathBuf::from("a.rs")], GitStatus::New));
 }
+
+// -- BlameLine subject field -------------------------------------------------
+
+#[test]
+fn blame_line_subject_empty_by_default_construction() {
+    let b = BlameLine {
+        commit_hash: "a".repeat(40),
+        short_hash: "aaaaaaa".to_string(),
+        author: "Alice".to_string(),
+        date_relative: "2 days ago".to_string(),
+        line_no: 1,
+        subject: String::new(),
+    };
+    assert_eq!(b.subject, "");
+}
+
+#[test]
+fn blame_line_subject_roundtrips() {
+    let msg = "add tests for blame popup".to_string();
+    let b = BlameLine {
+        commit_hash: "b".repeat(40),
+        short_hash: "bbbbbbb".to_string(),
+        author: "Bob".to_string(),
+        date_relative: "1 hour ago".to_string(),
+        line_no: 5,
+        subject: msg.clone(),
+    };
+    assert_eq!(b.subject, msg);
+}
