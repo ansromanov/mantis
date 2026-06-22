@@ -1321,6 +1321,19 @@ fn goto_line_key_unrecognized_key_is_noop() {
     fs::remove_dir_all(&root).ok();
 }
 
+#[test]
+fn goto_line_key_open_binding_not_appended_to_query() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.handle_key(KeyEvent::new(KeyCode::Char(':'), KeyModifiers::empty()));
+    assert!(app.goto_line.is_some());
+    // pressing ':' again should not append it to the query
+    app.handle_key(KeyEvent::new(KeyCode::Char(':'), KeyModifiers::empty()));
+    assert!(app.goto_line.as_ref().unwrap().query.is_empty());
+    fs::remove_dir_all(&root).ok();
+}
+
 // -- handle_search_key -----------------------------------------------------
 
 #[test]

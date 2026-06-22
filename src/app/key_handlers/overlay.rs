@@ -385,8 +385,11 @@ impl App {
                 }
             }
             KeyCode::Char(c) => {
-                if let Some(ref mut g) = self.goto_line {
-                    g.push(c);
+                let is_open_binding = crate::config::pressed(&self.config.keys.goto_line, &key);
+                if !is_open_binding {
+                    if let Some(ref mut g) = self.goto_line {
+                        g.push(c);
+                    }
                 }
             }
             _ => {}
