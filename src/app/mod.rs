@@ -325,6 +325,16 @@ pub struct App {
     /// Breadcrumb segment areas recorded during the last render, used for mouse
     /// hit-testing. Each entry is (target_directory_path, clickable_rect).
     pub breadcrumb_areas: Vec<(std::path::PathBuf, Rect)>,
+    /// Session state loaded from the cache. `None` when no state dir is
+    /// available or no cached session exists for this root. Used at startup
+    /// to restore expanded dirs, file, and scroll position.
+    pub session_state: Option<crate::session::SessionState>,
+    /// When `true`, the session cache needs to be re-written.
+    session_dirty: bool,
+    /// When the session was last dirtied, for debounced writes.
+    session_dirty_at: Option<std::time::Instant>,
+    /// Last time the session cache was flushed to disk.
+    session_last_save: std::time::Instant,
 }
 
 impl App {
@@ -529,14 +539,57 @@ impl App {
             plugin_content_active: false,
             status_message: None,
             breadcrumb_areas: Vec::new(),
+            session_state: None,
+            session_dirty: false,
+            session_dirty_at: None,
+            session_last_save: Instant::now(),
         };
+
+        // Load session state and apply it over the config-driven defaults.
+        let session_state = crate::session::load(&app.root);
+        let has_session_override = session_state.is_some();
+        if let Some(ref s) = session_state {
+            // Restore expanded directories that still exist.
+            for dir in &s.expanded {
+                if dir.starts_with(&app.root) && dir.is_dir() {
+                    app.expanded.insert(dir.clone());
+                }
+            }
+            // Restore git mode from session (overrides config default).
+            app.git_mode = s.git_mode;
+        }
+
         if app.git_mode {
             app.expand_git_dirs();
+        }
+        if has_session_override || app.git_mode {
             app.rebuild();
         }
-        // Open the first file synchronously so it is visible on the first frame
-        // (and so callers/tests can observe content right after construction).
+
+        // If the session specifies a file, select it in the tree.
+        if let Some(ref s) = session_state {
+            if let Some(ref cf) = s.current_file {
+                if let Some(i) = app.nodes.iter().position(|n| n.path == *cf) {
+                    app.tree_selected = i;
+                }
+            }
+        }
+
+        // Open the selected file synchronously so it is visible on the first
+        // frame (and so callers/tests can observe content right after
+        // construction).
         app.open_selected_sync();
+
+        // Restore scroll/active-line position after the file is loaded.
+        if let Some(ref s) = session_state {
+            if s.current_file.as_deref() == app.current_file.as_deref() {
+                let max_scroll = app.content_scroll_max();
+                app.content_scroll = s.content_scroll.min(max_scroll);
+                app.active_line = s.active_line.min(app.line_count().saturating_sub(1));
+            }
+        }
+
+        app.session_state = session_state;
         Ok(app)
     }
 
@@ -545,6 +598,31 @@ impl App {
         if let Some(path) = &self.config_path {
             config::save(&self.config, path);
         }
+    }
+
+    /// Marks the session cache as needing a write. The actual write is
+    /// debounced in `tick` so rapid state changes (scrolling, repeated
+    /// expand/collapse) coalesce into one disk write.
+    pub(crate) fn mark_session_dirty(&mut self) {
+        self.session_dirty = true;
+        self.session_dirty_at = Some(self.now());
+    }
+
+    /// Immediately writes the current session state to the cache. Called on
+    /// quit and by the debounced `tick` path.
+    pub(crate) fn save_session(&mut self) {
+        let state = crate::session::SessionState {
+            expanded: self.expanded.iter().cloned().collect(),
+            current_file: self.current_file.clone(),
+            content_scroll: self.content_scroll,
+            active_line: self.active_line,
+            git_mode: self.git_mode,
+        };
+        crate::session::save(&self.root, &state);
+        self.session_state = Some(state);
+        self.session_dirty = false;
+        self.session_dirty_at = None;
+        self.session_last_save = self.now();
     }
 
     /// Toggles the currently highlighted plugin in the picker: spawns it if

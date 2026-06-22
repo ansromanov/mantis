@@ -10,6 +10,15 @@ tv file.md      # open a single file directly
 
 Press `?` at any time for in-app help, and `q` to quit.
 
+## Session persistence
+
+`tv` automatically remembers your workspace state across restarts:
+expanded directories, the last open file, scroll position, and git mode.
+State is cached outside the project tree (`~/.local/state/tree-viewer/`
+or `%APPDATA%\tree-viewer\`) so it survives re-clones and never writes
+dotfiles into the repository. To reset the session for a directory, quit
+and delete the `sessions.json` file from the state directory.
+
 > 💡 **Can't remember a key?** Press `?` for the help overlay, or `Ctrl+P` to
 > open the command palette and search for an action by name — it shows you the
 > shortcut too. New to `tv`? Start with the [Quick Start](quickstart.md).

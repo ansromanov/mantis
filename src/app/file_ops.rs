@@ -166,6 +166,7 @@ impl App {
         self.virtual_file = None;
         self.current_file = Some(path.to_path_buf());
         self.current_syntax = None;
+        self.mark_session_dirty();
         self.plugin_content_active = false;
         self.is_markdown = false;
         self.show_raw_markdown = false;
@@ -199,6 +200,7 @@ impl App {
         self.in_file_search = None;
         self.current_file = Some(path.to_path_buf());
         self.current_syntax = None;
+        self.mark_session_dirty();
         self.plugin_content_active = false;
         self.is_diff = false;
         self.diff_rows = Vec::new();
@@ -292,6 +294,7 @@ impl App {
         if load.ok {
             self.current_file = Some(path.to_path_buf());
             self.current_syntax = load.syntax_name;
+            self.mark_session_dirty();
             self.plugin_content_active = false;
             self.set_file_watch(Some(path));
             self.plugin_manager.on_file_open(path);
@@ -301,6 +304,7 @@ impl App {
         } else {
             self.current_file = None;
             self.current_syntax = None;
+            self.mark_session_dirty();
             self.set_file_watch(None);
         }
     }
@@ -382,6 +386,7 @@ impl App {
         self.in_file_search = None;
         self.virtual_file = None;
         self.current_file = Some(file.to_path_buf());
+        self.mark_session_dirty();
         self.plugin_content_active = false;
         self.is_markdown = false;
         self.show_raw_markdown = false;
