@@ -304,7 +304,7 @@ fn search_current_vs_other_distinct_bgs_on_one_line() {
 
 /// Background color of the rendered cell at (x, y) in the buffer.
 fn cell_bg(buffer: &ratatui::buffer::Buffer, x: u16, y: u16) -> Color {
-    buffer.get(x, y).bg
+    buffer[(x, y)].bg
 }
 
 #[test]
