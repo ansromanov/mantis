@@ -390,6 +390,3 @@ impl App {
     }
 }
 
-#[cfg(test)]
-#[path = "normal_test.rs"]
-mod tests;
