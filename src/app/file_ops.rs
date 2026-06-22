@@ -179,6 +179,8 @@ impl App {
         self.file_line_ending = None;
         self.content_scroll = 0;
         self.content_hscroll = 0;
+        self.active_line = 0;
+        self.show_line_blame = false;
         self.clear_selection();
         self.exit_visual_line();
         self.content_title = Some(load.content_title);
@@ -214,6 +216,8 @@ impl App {
         self.content_title = None;
         self.content_scroll = 0;
         self.content_hscroll = 0;
+        self.active_line = 0;
+        self.show_line_blame = false;
         self.clear_selection();
         self.exit_visual_line();
         self.set_file_watch(None);
@@ -253,6 +257,8 @@ impl App {
         self.content_title = None;
         self.content_scroll = 0;
         self.content_hscroll = 0;
+        self.active_line = 0;
+        self.show_line_blame = false;
         self.clear_selection();
         // Drop visual-line mode only when navigating to a different file; a same
         // -file reopen (reload / external edit) keeps the selection in place.
@@ -386,6 +392,8 @@ impl App {
         self.file_line_ending = None;
         self.content_scroll = 0;
         self.content_hscroll = 0;
+        self.active_line = 0;
+        self.show_line_blame = false;
         self.clear_selection();
         self.exit_visual_line();
         let rel = file.strip_prefix(&self.root).unwrap_or(file);

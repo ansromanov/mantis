@@ -2541,26 +2541,30 @@ fn tree_key_other_key_noop_when_focus_tree() {
 // -- handle_content_key -----------------------------------------------------
 
 #[test]
-fn content_key_k_scrolls_up() {
+fn content_key_k_moves_active_line_up() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
     app.focus = Focus::Content;
     app.content_scroll = 5;
+    app.active_line = 5;
     app.handle_key(KeyEvent::new(KeyCode::Char('k'), KeyModifiers::empty()));
+    assert_eq!(app.active_line, 4);
+    // active_line moves even at scroll=5; auto-scroll brings it into view.
     assert_eq!(app.content_scroll, 4);
     fs::remove_dir_all(&root).ok();
 }
 
 #[test]
-fn content_key_up_stays_at_zero() {
+fn content_key_up_stays_at_zero_active_line() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
     app.focus = Focus::Content;
     app.content_scroll = 0;
+    app.active_line = 0;
     app.handle_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()));
-    assert_eq!(app.content_scroll, 0);
+    assert_eq!(app.active_line, 0);
     fs::remove_dir_all(&root).ok();
 }
 

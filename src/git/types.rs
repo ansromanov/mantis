@@ -79,6 +79,8 @@ pub struct BlameLine {
     pub author: String,
     pub date_relative: String,
     pub line_no: u32,
+    /// Subject line of the commit (commit message summary).
+    pub subject: String,
 }
 
 pub(crate) fn status_priority(s: GitStatus) -> u8 {

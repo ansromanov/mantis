@@ -139,3 +139,46 @@ fn ahead_behind_counts_against_upstream() {
 
     assert_eq!(ahead_behind(local.path()), Some((1, 1)));
 }
+
+// -- subject field -----------------------------------------------------------
+
+#[test]
+fn blame_porcelain_parses_subject() {
+    let input = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 1 1 1\n\
+         author Alice\n\
+         author-time 1000000\n\
+         summary fix the thing\n\
+         filename src/foo.rs\n\
+         \tcode here\n";
+    let result = parse_blame_porcelain(input);
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0].subject, "fix the thing");
+}
+
+#[test]
+fn blame_porcelain_subject_shared_across_lines_same_commit() {
+    let input = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 1 1 2\n\
+         author Alice\n\
+         author-time 1000000\n\
+         summary shared subject\n\
+         filename src/foo.rs\n\
+         \tline one\n\
+         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 2 2\n\
+         \tline two\n";
+    let result = parse_blame_porcelain(input);
+    assert_eq!(result.len(), 2);
+    assert_eq!(result[0].subject, "shared subject");
+    assert_eq!(result[1].subject, "shared subject");
+}
+
+#[test]
+fn blame_porcelain_missing_summary_gives_empty_subject() {
+    let input = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 1 1 1\n\
+         author Alice\n\
+         author-time 1000000\n\
+         filename src/foo.rs\n\
+         \tcode here\n";
+    let result = parse_blame_porcelain(input);
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0].subject, "");
+}
