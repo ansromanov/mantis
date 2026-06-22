@@ -331,3 +331,7 @@ impl App {
         self.reload();
     }
 }
+
+#[cfg(test)]
+#[path = "editor_test.rs"]
+mod tests;

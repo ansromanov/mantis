@@ -59,3 +59,7 @@ pub(crate) fn draw_goto_line(f: &mut Frame, app: &mut App, area: Rect) {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "goto_line_test.rs"]
+mod tests;

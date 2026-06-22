@@ -396,3 +396,7 @@ impl App {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "overlay_test.rs"]
+mod tests;
