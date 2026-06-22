@@ -318,6 +318,7 @@ fn search_highlight_on_correct_wrapped_row() {
         app.current_file = None;
         app.virtual_file = None;
         app.show_line_numbers = false; // content starts flush at inner.x = 1
+        app.active_line = usize::MAX; // disable active-line tint so only search highlights colour cells
         app.word_wrap = true;
         app.content = vec![line.clone()];
         app.highlighted = vec![vec![(Style::default(), line.clone())]];
@@ -380,6 +381,7 @@ fn search_highlight_spans_wrap_boundary() {
         app.current_file = None;
         app.virtual_file = None;
         app.show_line_numbers = false;
+        app.active_line = usize::MAX; // disable active-line tint so only search highlights colour cells
         app.word_wrap = true;
         app.content = vec![line.clone()];
         app.highlighted = vec![vec![(Style::default(), line.clone())]];
