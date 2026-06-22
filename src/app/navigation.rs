@@ -316,7 +316,11 @@ impl App {
         self.file_watcher = None;
         self.file_watch_rx = None;
         self.file_watch_path = None;
+        self.in_file_search = None;
         self.plugin_content_active = false;
+        self.plugin_content.clear();
+        self.plugin_blame.clear();
+        self.plugin_git_info = None;
         self.load_seq = self.load_seq.wrapping_add(1);
         #[cfg(feature = "git-core")]
         if self.git_status_enabled {
@@ -334,6 +338,9 @@ impl App {
         self.rebuild();
         self.tree_selected = 0;
         self.scroll_tree_into_view();
+        if let Some(node) = self.nodes.get(self.tree_selected) {
+            self.plugin_manager.on_selection_change(Some(node.path.as_path()));
+        }
     }
 
     /// Collapses every expanded directory, resetting the tree to its top-level
