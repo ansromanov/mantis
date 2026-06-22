@@ -82,8 +82,10 @@ pub fn load(dir: &Path) -> Option<PluginManifest> {
 ///
 /// All discovered entries are returned with `enabled = false` so no freshly
 /// fetched code runs without explicit user opt-in. The entry `path` is set to
-/// `<name>/<entry>` (relative) so that `PluginManager` resolves it correctly
-/// against `default_plugin_dir()`.
+/// `<dir_name>/<entry>` (relative to `plugin_dir`) so that `PluginManager`
+/// resolves it correctly against `default_plugin_dir()`. The actual subdirectory
+/// name is always used for the path, regardless of the `name` field in the
+/// manifest, to prevent path traversal via crafted manifests.
 pub fn discover(plugin_dir: &Path) -> Vec<(String, PluginEntry)> {
     let mut entries = Vec::new();
     let Ok(read_dir) = std::fs::read_dir(plugin_dir) else {
@@ -94,15 +96,21 @@ pub fn discover(plugin_dir: &Path) -> Vec<(String, PluginEntry)> {
         if !path.is_dir() {
             continue;
         }
+        let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
         let Some(manifest) = load(&path) else {
             continue;
         };
+        if !is_safe_name(&manifest.name) || !is_safe_entry(&manifest.entry) {
+            continue;
+        }
         if let Some(ref platforms) = manifest.platforms {
             if !platform_matches(platforms) {
                 continue;
             }
         }
-        let entry_path: PathBuf = [&manifest.name, &manifest.entry].iter().collect();
+        let entry_path: PathBuf = [dir_name, &manifest.entry].iter().collect();
         entries.push((
             manifest.name.clone(),
             PluginEntry {
@@ -118,9 +126,26 @@ pub fn discover(plugin_dir: &Path) -> Vec<(String, PluginEntry)> {
     entries
 }
 
+/// Returns `false` if `s` (a manifest `name` value) contains path separators
+/// or `..`, which would allow it to escape the plugin directory when used as a
+/// single `PathBuf` component.
+fn is_safe_name(s: &str) -> bool {
+    !s.contains("..") && !s.contains('/') && !s.contains('\\')
+}
+
+/// Returns `false` if `s` (a manifest `entry` value) would escape the plugin
+/// subdirectory. Forward slashes are allowed for subdirectory-relative paths
+/// (e.g. `"bin/myplugin"`), but `..` components and absolute paths are not.
+fn is_safe_entry(s: &str) -> bool {
+    !s.starts_with('/') && !s.starts_with('\\') && !Path::new(s).components().any(|c| {
+        matches!(c, std::path::Component::ParentDir | std::path::Component::RootDir)
+    })
+}
+
 /// Checks whether the current platform matches one of the given platform names.
-/// Uses `std::env::consts::OS` which returns `"linux"`, `"macos"`, `"windows"`.
+/// Comparison is case-insensitive; `std::env::consts::OS` returns lowercase
+/// (`"linux"`, `"macos"`, `"windows"`), but manifest authors may use any case.
 fn platform_matches(platforms: &[String]) -> bool {
     let current = std::env::consts::OS;
-    platforms.iter().any(|p| p == current)
+    platforms.iter().any(|p| p.to_lowercase() == current)
 }

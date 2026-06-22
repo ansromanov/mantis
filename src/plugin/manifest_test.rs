@@ -94,6 +94,8 @@ tv_protocol = "1"
 
     let entries = crate::plugin::manifest::discover(&dir);
     assert_eq!(entries.len(), 1);
+    // The plugin name comes from the manifest; the path uses the directory name.
+    // Both happen to be "my-plugin" here, verified explicitly below.
     assert_eq!(entries[0].0, "my-plugin");
     assert!(
         !entries[0].1.enabled,
@@ -195,10 +197,11 @@ fn discover_multi_plugin_dir() {
     let dir = std::env::temp_dir().join(format!("tv_discover_multi_{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
 
+    // entry values are relative to the plugin's own subdirectory
     let plugins = [
-        ("alpha", "alpha/run.sh"),
-        ("beta", "beta/start.py"),
-        ("gamma", "gamma/bin/gamma"),
+        ("alpha", "run.sh"),
+        ("beta", "start.py"),
+        ("gamma", "bin/gamma"),
     ];
     for (name, entry) in &plugins {
         let sub = dir.join(name);
@@ -216,10 +219,57 @@ tv_protocol = "1"
 
     let entries = crate::plugin::manifest::discover(&dir);
     assert_eq!(entries.len(), 3);
-    // Verify paths use the manifest entry value (relative to plugin dir)
-    for (name, _) in &plugins {
+    // Verify paths are <dir_name>/<entry> and plugins default to disabled
+    for (name, entry) in &plugins {
         let found = entries.iter().find(|(n, _)| n == name).unwrap();
         assert!(!found.1.enabled);
+        assert_eq!(found.1.path, PathBuf::from(name).join(entry));
     }
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn discover_skips_manifest_with_unsafe_name() {
+    let dir = std::env::temp_dir().join(format!("tv_discover_unsafe_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+
+    let sub = dir.join("legit");
+    std::fs::create_dir_all(&sub).unwrap();
+    // name contains ".." — should be rejected by is_safe_name
+    let toml = r#"
+name = "../escape"
+version = "0.1.0"
+entry = "run.sh"
+tv_protocol = "1"
+"#;
+    std::fs::write(sub.join("plugin.toml"), toml).unwrap();
+
+    assert!(crate::plugin::manifest::discover(&dir).is_empty());
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn discover_platform_match_is_case_insensitive() {
+    let dir = std::env::temp_dir().join(format!("tv_discover_case_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+
+    let current_os = std::env::consts::OS;
+    // Use the uppercase version of the OS name in the manifest
+    let os_upper = current_os.to_uppercase();
+    let sub = dir.join("case-plugin");
+    std::fs::create_dir_all(&sub).unwrap();
+    let toml = format!(
+        r#"
+name = "case-plugin"
+version = "0.1.0"
+entry = "run.sh"
+tv_protocol = "1"
+platforms = ["{os_upper}"]
+"#
+    );
+    std::fs::write(sub.join("plugin.toml"), toml).unwrap();
+
+    let entries = crate::plugin::manifest::discover(&dir);
+    assert_eq!(entries.len(), 1, "uppercase OS name should match current platform");
     std::fs::remove_dir_all(&dir).ok();
 }
