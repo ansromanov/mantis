@@ -95,7 +95,8 @@ test *args:
 test-pr:
     #!/usr/bin/env bash
     set -euo pipefail
-    filterset=$(git diff --name-only origin/main...HEAD | bash scripts/related-tests.sh)
+    changed=$( { git diff --name-only origin/main...HEAD; git diff --name-only; git diff --name-only --cached; } | sort -u )
+    filterset=$(echo "$changed" | bash scripts/related-tests.sh)
     if [[ "$filterset" == "__ALL__" ]]; then
         echo "[test-pr] broad change detected — running full suite"
         cargo nextest run
