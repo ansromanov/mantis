@@ -270,6 +270,10 @@ platforms = ["{os_upper}"]
     std::fs::write(sub.join("plugin.toml"), toml).unwrap();
 
     let entries = crate::plugin::manifest::discover(&dir);
-    assert_eq!(entries.len(), 1, "uppercase OS name should match current platform");
+    assert_eq!(
+        entries.len(),
+        1,
+        "uppercase OS name should match current platform"
+    );
     std::fs::remove_dir_all(&dir).ok();
 }

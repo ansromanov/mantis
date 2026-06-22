@@ -137,9 +137,14 @@ fn is_safe_name(s: &str) -> bool {
 /// subdirectory. Forward slashes are allowed for subdirectory-relative paths
 /// (e.g. `"bin/myplugin"`), but `..` components and absolute paths are not.
 fn is_safe_entry(s: &str) -> bool {
-    !s.starts_with('/') && !s.starts_with('\\') && !Path::new(s).components().any(|c| {
-        matches!(c, std::path::Component::ParentDir | std::path::Component::RootDir)
-    })
+    !s.starts_with('/')
+        && !s.starts_with('\\')
+        && !Path::new(s).components().any(|c| {
+            matches!(
+                c,
+                std::path::Component::ParentDir | std::path::Component::RootDir
+            )
+        })
 }
 
 /// Checks whether the current platform matches one of the given platform names.
