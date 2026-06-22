@@ -89,9 +89,9 @@ fn overlay_line(text: &str, style: Style, max_width: u16) -> Line<'static> {
     let prefix_len = (max_width as usize).saturating_sub(1);
     let prefix: String = text.chars().take(prefix_len).collect();
     let display = if prefix.is_empty() {
-        String::from("…")
+        String::from("\u{2026}")
     } else {
-        format!("{prefix}…")
+        format!("{prefix}\u{2026}")
     };
     Line::from(vec![Span::styled(display, style)])
 }
@@ -309,7 +309,7 @@ fn fit_segments(segs: Vec<(Span<'static>, u8)>, max_width: usize) -> Line<'stati
     let mut order: Vec<usize> = (0..n).collect();
     order.sort_by(|&a, &b| segs[a].1.cmp(&segs[b].1).then(b.cmp(&a)));
 
-    let mut current_width: usize = segs.iter().map(|(s, _)| s.width()).sum();
+    let mut current_width = total;
 
     for idx in order {
         if current_width <= max_width {
