@@ -427,13 +427,13 @@ fn file_info_mixed_endings_shown() {
 }
 
 #[test]
-fn ln_col_shown_when_file_open() {
+fn ln_shown_when_file_open() {
     let mut app = make_app();
     app.current_file = Some(PathBuf::from("Cargo.toml"));
     app.active_line = 10;
-    app.content_hscroll = 5;
     let text = render_bar_width(&app, 120);
-    assert!(text.contains("Ln 11, Col 6"));
+    assert!(text.contains("Ln 11"));
+    assert!(!text.contains("Col"));
 }
 
 #[test]
@@ -470,7 +470,8 @@ fn syntax_name_hidden_when_none() {
     app.current_file = Some(PathBuf::from("plain.txt"));
     app.current_syntax = None;
     let text = render_bar_width(&app, 120);
-    // No syntax badge appears; only Ln/Col is shown.
-    assert!(text.contains("Ln 1, Col 1"));
+    // No syntax badge appears; only Ln is shown.
+    assert!(text.contains("Ln 1"));
+    assert!(!text.contains("Col")); // no Col indicator
     assert!(!text.contains("plain")); // no "[plain]" badge
 }

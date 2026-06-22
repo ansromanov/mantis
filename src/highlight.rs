@@ -80,8 +80,9 @@ impl Highlighter {
     }
 
     /// Returns the detected syntax name for the given file path, or `None` if
-    /// only plain text was matched. Useful for the status bar language indicator.
-    pub fn syntax_name(&self, path: &Path) -> Option<String> {
+    /// only plain text was matched. Used by `compute_file_load` to populate
+    /// `FileLoad::syntax_name` on the worker thread.
+    pub(crate) fn syntax_name(&self, path: &Path) -> Option<String> {
         self.ss
             .find_syntax_for_file(path)
             .ok()

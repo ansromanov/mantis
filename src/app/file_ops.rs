@@ -291,7 +291,7 @@ impl App {
 
         if load.ok {
             self.current_file = Some(path.to_path_buf());
-            self.current_syntax = self.highlighter.syntax_name(path);
+            self.current_syntax = load.syntax_name;
             self.plugin_content_active = false;
             self.set_file_watch(Some(path));
             self.plugin_manager.on_file_open(path);

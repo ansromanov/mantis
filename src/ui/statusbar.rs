@@ -141,11 +141,10 @@ pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
             }
         }
 
-        // Cursor position (Ln/Col) and detected language syntax name.
+        // Active line number and detected language syntax name.
         if app.current_file.is_some() && !app.is_diff {
             let line = app.active_line + 1;
-            let col = app.content_hscroll + 1;
-            let pos = format!(" Ln {line}, Col {col}");
+            let pos = format!(" Ln {line}");
             spans.push(Span::styled(pos, base.fg(theme.dim)));
             if let Some(ref syn) = app.current_syntax {
                 spans.push(Span::styled(format!(" [{syn}]"), base.fg(theme.dim)));

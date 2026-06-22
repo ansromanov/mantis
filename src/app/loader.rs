@@ -56,6 +56,10 @@ pub(super) struct FileLoad {
     /// Detected line-ending style: `"LF"`, `"CRLF"`, `"CR"`, or `"mixed"`.
     /// `None` for single-line or empty files.
     pub line_ending: Option<String>,
+    /// Detected syntax/language name from syntect, e.g. `"Rust"` or `"Python"`.
+    /// `None` for plain text or when syntect has no match. Populated by the
+    /// worker thread so the main thread never calls `find_syntax_for_file`.
+    pub syntax_name: Option<String>,
 }
 
 /// YAML-specific derived state, computed only for `.yaml`/`.yml` files.
@@ -90,6 +94,7 @@ impl FileLoad {
             ok: true,
             encoding: None,
             line_ending: None,
+            syntax_name: None,
         }
     }
 }
@@ -115,6 +120,7 @@ pub(super) fn compute_file_load(path: &Path, theme: &Theme, hl: &Highlighter) ->
             // re-validation pass; only the BOM/ASCII prefix check is needed.
             load.encoding = Some(detect_encoding_prefix(raw).unwrap_or("UTF-8").to_string());
             load.line_ending = detect_line_ending(raw).map(|s| s.to_string());
+            load.syntax_name = hl.syntax_name(path);
             load.virtual_file = Some(vf);
             return load;
         }
@@ -180,6 +186,7 @@ pub(super) fn compute_file_load(path: &Path, theme: &Theme, hl: &Highlighter) ->
         });
     }
     load.highlighted = hl.highlight(path, &load.content);
+    load.syntax_name = hl.syntax_name(path);
     #[cfg(feature = "markdown-core")]
     if is_markdown {
         load.markdown_lines = crate::markdown::render(&s, theme);
