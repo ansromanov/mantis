@@ -144,3 +144,36 @@ fn open_file_resets_active_line_and_blame_popup() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn open_file_sets_current_syntax_from_load() {
+    let root = temp_dir();
+    let f = root.join("main.rs");
+    fs::write(&f, "fn main() {}\n").unwrap();
+    let mut app = app_for(&root);
+    app.open_file(&f);
+    assert_eq!(
+        app.current_syntax.as_deref(),
+        Some("Rust"),
+        "current_syntax should reflect detected language after file open"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn open_file_clears_current_syntax_for_unknown_type() {
+    let root = temp_dir();
+    let rs = root.join("main.rs");
+    let unk = root.join("data.zzunknown");
+    fs::write(&rs, "fn main() {}\n").unwrap();
+    fs::write(&unk, "hello\n").unwrap();
+    let mut app = app_for(&root);
+    app.open_file(&rs);
+    assert!(app.current_syntax.is_some(), "should detect Rust");
+    app.open_file(&unk);
+    assert_eq!(
+        app.current_syntax, None,
+        "current_syntax should be None for unknown extension"
+    );
+    fs::remove_dir_all(&root).ok();
+}

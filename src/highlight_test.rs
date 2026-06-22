@@ -1,4 +1,5 @@
 use super::*;
+use std::io::Write;
 use std::path::Path;
 
 #[test]
@@ -96,4 +97,22 @@ fn with_extra_syntaxes_recognizes_loaded_extension() {
         1,
         "unknown extension should produce one plain-text span"
     );
+}
+
+#[test]
+fn syntax_name_returns_known_language() {
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[]);
+    let mut f = tempfile::NamedTempFile::with_suffix(".rs").unwrap();
+    f.write_all(b"fn main() {}\n").unwrap();
+    let name = h.syntax_name(f.path());
+    assert_eq!(name.as_deref(), Some("Rust"));
+}
+
+#[test]
+fn syntax_name_returns_none_for_unknown_extension() {
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[]);
+    let mut f = tempfile::NamedTempFile::with_suffix(".zzunknown").unwrap();
+    f.write_all(b"hello\n").unwrap();
+    let name = h.syntax_name(f.path());
+    assert_eq!(name, None);
 }

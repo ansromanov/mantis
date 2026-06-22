@@ -425,3 +425,53 @@ fn file_info_mixed_endings_shown() {
     let text = render_bar_width(&app, 120);
     assert!(text.contains("[UTF-8 mixed]"));
 }
+
+#[test]
+fn ln_shown_when_file_open() {
+    let mut app = make_app();
+    app.current_file = Some(PathBuf::from("Cargo.toml"));
+    app.active_line = 10;
+    let text = render_bar_width(&app, 120);
+    assert!(text.contains("Ln 11"));
+    assert!(!text.contains("Col"));
+}
+
+#[test]
+fn ln_col_hidden_when_no_file() {
+    let mut app = make_app();
+    app.current_file = None;
+    let text = render_bar_width(&app, 120);
+    assert!(!text.contains("Ln "));
+}
+
+#[test]
+fn ln_col_hidden_when_diff() {
+    let mut app = make_app();
+    app.current_file = Some(PathBuf::from("file.patch"));
+    app.is_diff = true;
+    let text = render_bar_width(&app, 120);
+    assert!(!text.contains("Ln "));
+}
+
+#[test]
+fn syntax_name_shown_when_present() {
+    let mut app = make_app();
+    app.current_file = Some(PathBuf::from("main.rs"));
+    app.current_syntax = Some("Rust".to_string());
+    app.active_line = 0;
+    app.content_hscroll = 0;
+    let text = render_bar_width(&app, 120);
+    assert!(text.contains("[Rust]"));
+}
+
+#[test]
+fn syntax_name_hidden_when_none() {
+    let mut app = make_app();
+    app.current_file = Some(PathBuf::from("plain.txt"));
+    app.current_syntax = None;
+    let text = render_bar_width(&app, 120);
+    // No syntax badge appears; only Ln is shown.
+    assert!(text.contains("Ln 1"));
+    assert!(!text.contains("Col")); // no Col indicator
+    assert!(!text.contains("plain")); // no "[plain]" badge
+}

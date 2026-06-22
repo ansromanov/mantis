@@ -93,6 +93,19 @@ resumes when you exit; the file is reloaded afterwards so you see your changes.
 > 💡 `$EDITOR` can include arguments — e.g. `export EDITOR="code --wait"` opens
 > the file in VS Code and waits for you to close the tab before returning.
 
+## Status bar
+
+The status bar at the bottom of the screen shows context-sensitive information
+about the open file:
+
+- **`Ln N`** — the active (highlighted) line number, 1-indexed.
+- **`[Language]`** — the detected syntax name from syntect (e.g. `[Rust]`,
+  `[Python]`, `[TOML]`). Hidden when the file type is not recognised or when
+  viewing a diff.
+- **Scroll percentage** — how far through the file the content pane is
+  scrolled.
+- **Encoding and line endings** — shown when `I` (file info) is toggled on.
+
 ## JSON pretty-printing
 
 Viewing a JSON file? Press `J` to reformat it with indentation for easier

@@ -134,3 +134,21 @@ fn worker_round_trip_returns_matching_seq() {
         _ => panic!("expected File response"),
     }
 }
+
+#[test]
+fn compute_file_load_sets_syntax_name_for_rust_file() {
+    let mut f = tempfile::NamedTempFile::with_suffix(".rs").unwrap();
+    use std::io::Write;
+    f.write_all(b"fn main() {}\n").unwrap();
+    let load = compute_file_load(f.path(), &Theme::default(), &hl());
+    assert_eq!(load.syntax_name.as_deref(), Some("Rust"));
+}
+
+#[test]
+fn compute_file_load_sets_no_syntax_name_for_unknown_extension() {
+    let mut f = tempfile::NamedTempFile::with_suffix(".zzunknown").unwrap();
+    use std::io::Write;
+    f.write_all(b"hello world\n").unwrap();
+    let load = compute_file_load(f.path(), &Theme::default(), &hl());
+    assert_eq!(load.syntax_name, None);
+}
