@@ -145,37 +145,46 @@ Fields:
 - **No blocking.** Actions are drained non-blockingly every tick. Sending many
   actions in rapid succession is fine; they are buffered and processed in order.
 
-## Minimal Python example
+## Minimal Rust example
 
-```python
-#!/usr/bin/env python3
-"""Logs every opened file to ~/.config/tree-viewer/plugins/open-log.txt."""
-import json
-import sys
-from pathlib import Path
+All bundled plugins are Rust crates under `plugins/`. The simplest possible
+plugin responds to `init` with a status message:
 
-LOG = Path.home() / ".config" / "tree-viewer" / "plugins" / "open-log.txt"
+```rust
+use std::io::{self, BufRead, Write};
 
-for line in sys.stdin:
-    line = line.strip()
-    if not line:
-        continue
-    try:
-        msg = json.loads(line)
-    except json.JSONDecodeError:
-        continue
+fn main() {
+    let stdin = io::stdin();
+    let stdout = io::stdout();
 
-    event = msg.get("event")
-    if event == "on_file_open":
-        with LOG.open("a") as f:
-            f.write(msg.get("path", "") + "\n")
-        print(json.dumps({
-            "event": "action",
-            "action": "show_message",
-            "params": {"message": f"logged {msg.get('path','')}"},
-        }), flush=True)
-    elif event == "shutdown":
-        sys.exit(0)
+    for line in stdin.lock().lines() {
+        let line = match line {
+            Ok(l) => l,
+            Err(_) => break,
+        };
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let msg: serde_json::Value = match serde_json::from_str(trimmed) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        match msg["event"].as_str().unwrap_or("") {
+            "init" => {
+                let response = serde_json::json!({
+                    "event": "action",
+                    "action": "show_message",
+                    "params": {"message": "hello from plugin"}
+                });
+                let _ = writeln!(stdout.lock(), "{}",
+                    serde_json::to_string(&response).unwrap());
+            }
+            "shutdown" => break,
+            _ => {}
+        }
+    }
+}
 ```
 
 ## Architecture notes
@@ -189,6 +198,10 @@ for line in sys.stdin:
   respectively.
 - Plugin config deserialization lives in `src/config/mod.rs` under the
   `plugins` key.
+- Bundled plugins are declared in `BUNDLED_PLUGINS` (`src/plugin.rs`) as
+  `(name, binary_name)` pairs and built as workspace-member Rust crates under
+  `plugins/`. The `install_bundled_plugins()` function finds and copies
+  compiled binaries to the plugin directory on first run.
 
 ---
 

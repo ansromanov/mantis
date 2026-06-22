@@ -1,5 +1,11 @@
 [workspace]
-members = ["plugins/tv-plugin-markdown"]
+members = [
+    "plugins/tv-plugin-markdown",
+    "plugins/tv-plugin-git-diff",
+    "plugins/tv-plugin-git-log",
+    "plugins/tv-plugin-git-plugin",
+    "plugins/tv-plugin-iconize",
+]
 resolver = "2"
 
 [package]

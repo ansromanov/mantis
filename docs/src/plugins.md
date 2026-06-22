@@ -5,9 +5,9 @@
 
 Process plugins are standalone executables that hook into app events and issue
 actions back to the viewer. They run in separate processes; `tv` talks to them
-over stdin/stdout using newline-delimited JSON, so a plugin can be a shell
-script, a Python script, a compiled binary — anything that can read stdin and
-write stdout.
+over stdin/stdout using newline-delimited JSON, so a plugin can be any
+executable — a compiled binary, a Python script, or anything that can read
+stdin and write stdout.
 
 Syntax plugins provide `.sublime-syntax` files that are loaded into the built-in
 syntect highlighter at startup. They add syntax highlighting for new file types
@@ -131,20 +131,19 @@ clock = { path = "clock.sh" }
 
 ## Bundled plugins
 
-`tv` ships with several bundled plugins. Shell-script plugins are installed on
-first run.  The markdown plugin is a compiled Rust binary compiled as part of
-the tv workspace.
+`tv` ships with several bundled Rust plugins. Each is a workspace member
+compiled alongside `tv` and installed on first run.
 
-| Plugin | File | Type | What it does |
-|---|---|---|---|
-| git-diff | `git-diff.sh` | Shell script | On `on_file_open`, if the file is git-tracked, shows `git diff --color=always HEAD` as the content (replacing the file view). |
-| git-log | `git-log.sh` | Shell script | On `H` keypress, shows `git log --oneline --color=always` for the current file as a static file view. |
-| iconize | `iconize.sh` | Shell script | On `init`, sends a `set_icon_map` action with Nerd Font glyphs for ~80 file extensions. Requires `icons = true` in `tv.toml` and a Nerd Font terminal. |
-| markdown | `tv-plugin-markdown` | Rust binary (workspace) | Renders `.md` files using pulldown-cmark, sending the output as ANSI-escaped lines via `set_content`. Responds to theme changes and `M` keypress for raw/rendered toggle. |
+| Plugin | Binary | What it does |
+|---|---|---|
+| git-diff | `tv-plugin-git-diff` | On `on_file_open`, if the file is git-tracked, shows `git diff --color=always HEAD` as the content (replacing the file view). |
+| git-log | `tv-plugin-git-log` | On `H` keypress, shows `git log --oneline --color=always` for the current file as a static file view. |
+| git-plugin | `tv-plugin-git-plugin` | Comprehensive git support: repo info in status bar, file statuses for tree coloring, working-tree diff on file open, file log on `H`, file blame on `b`. |
+| iconize | `tv-plugin-iconize` | On `init`, sends a `set_icon_map` action with Nerd Font glyphs for ~80 file extensions. Requires `icons = true` in `tv.toml` and a Nerd Font terminal. |
+| markdown | `tv-plugin-markdown` | Renders `.md` files using pulldown-cmark, sending the output as ANSI-escaped lines via `set_content`. Responds to theme changes and `M` keypress for raw/rendered toggle. |
 
-The shell-script plugins are installed to the plugin directory the first time
-`tv` creates its global config. The markdown Rust binary is compiled as a
-workspace member and installed alongside `tv` the first time it runs.
+All bundled plugins are compiled as workspace members and installed to the
+plugin directory the first time `tv` creates its global config.
 
 The default plugin directory is `~/.config/tree-viewer/plugins/` on Linux/macOS
 and `%APPDATA%\tree-viewer\plugins\` on Windows. Enable bundled plugins by
@@ -152,18 +151,19 @@ uncommenting or adding entries in `tv.toml`:
 
 ```toml
 [plugins]
-git-diff  = { path = "git-diff.sh" }
-git-log   = { path = "git-log.sh" }
-iconize   = { path = "iconize.sh" }
+git-diff  = { path = "tv-plugin-git-diff" }
+git-log   = { path = "tv-plugin-git-log" }
+git-plugin = { path = "tv-plugin-git-plugin" }
+iconize   = { path = "tv-plugin-iconize" }
 markdown  = { path = "tv-plugin-markdown" }
 ```
 
 > **Note:** The bundled plugins provide a simpler implementation than the
 > built-in core features:
-> - `git-diff` uses git's ANSI colouring rather than tv's theme-aware
->   `diff_line_style` / side-by-side rendering.
-> - `git-log` shows the log as a static file; it does not have the interactive
->   commit-selection popup that the built-in `H` key provides.
+> - `git-diff` / `git-plugin` use git's ANSI colouring rather than tv's
+>   theme-aware `diff_line_style` / side-by-side rendering.
+> - `git-log` / `git-plugin` show the log as static content; they do not have
+>   the interactive commit-selection popup that the built-in `H` key provides.
 >
 > The core git diff and log code paths remain active as a fallback when the
 > plugins are not enabled.
