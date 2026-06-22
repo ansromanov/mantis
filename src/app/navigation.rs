@@ -9,6 +9,7 @@
 //! git-mode invariants stay consistent across keyboard and mouse input rather
 //! than being poked at from multiple call sites.
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use crate::git::GitStatus;
@@ -232,12 +233,23 @@ impl App {
         }
     }
 
-    /// Navigates the tree to the directory at `path` by expanding ancestors and
-    /// selecting it. Called when a breadcrumb segment is clicked.
+    /// Navigates the tree to the directory at `path`. When `path` is within the
+    /// current root, it expands ancestors and selects the node. When `path` is
+    /// above the root (e.g. a parent directory clicked in the breadcrumb), the
+    /// root is changed to that path so the tree shows that directory's contents.
+    /// Called when a breadcrumb segment is clicked.
     pub(super) fn navigate_to_breadcrumb(&mut self, path: &std::path::Path) {
+        // Three cases, in order:
+        //   1. path == root  → select index 0 in place.
+        //   2. path above root → change the viewer root so the tree shows that dir.
+        //   3. path inside root → expand ancestors and select the node.
         if path == self.root {
             self.tree_selected = 0;
             self.scroll_tree_into_view();
+            return;
+        }
+        if !path.starts_with(&self.root) {
+            self.set_root(path);
             return;
         }
         // Expand all ancestors of the target directory.
@@ -258,6 +270,77 @@ impl App {
         if let Some(i) = self.nodes.iter().position(|n| n.path == path) {
             self.tree_selected = i;
             self.scroll_tree_into_view();
+        }
+    }
+
+    /// Changes the viewer root to `path`, rebuilding the tree and resetting
+    /// content state. Clears the current file, reselects the root node, and
+    /// re-fetches git status when the feature is enabled.
+    ///
+    /// # Maintenance note
+    /// Every field below that holds per-file view state must stay in sync with
+    /// `App`. When you add a new field to `App` that caches file or view state,
+    /// add a reset here or verify that its default value is correct after a root
+    /// change.
+    fn set_root(&mut self, path: &std::path::Path) {
+        self.root = path.to_path_buf();
+        self.expanded.clear();
+        self.current_file = None;
+        self.content = Vec::new();
+        self.highlighted = Vec::new();
+        self.markdown_lines = Vec::new();
+        self.virtual_file = None;
+        self.is_markdown = false;
+        self.is_json = false;
+        self.file_encoding = None;
+        self.file_line_ending = None;
+        self.show_pretty_json = false;
+        self.json_pretty_text = Vec::new();
+        self.json_pretty_lines = Vec::new();
+        self.content_scroll = 0;
+        self.content_hscroll = 0;
+        self.is_diff = false;
+        self.diff_side_by_side = false;
+        self.diff_rows = Vec::new();
+        self.content_title = None;
+        self.selection = None;
+        self.visual_line = None;
+        self.blame_panel = false;
+        self.drag_start = None;
+        self.yaml_fold_regions = Vec::new();
+        self.yaml_folded = HashSet::new();
+        self.fold_display_map = Vec::new();
+        self.yaml_error = None;
+        self.yaml_anchor_count = 0;
+        self.yaml_alias_count = 0;
+        self.file_watcher = None;
+        self.file_watch_rx = None;
+        self.file_watch_path = None;
+        self.in_file_search = None;
+        self.plugin_content_active = false;
+        self.plugin_content.clear();
+        self.plugin_blame.clear();
+        self.plugin_git_info = None;
+        self.load_seq = self.load_seq.wrapping_add(1);
+        #[cfg(feature = "git-core")]
+        if self.git_status_enabled {
+            self.git_status_map = crate::git::repo_status(&self.root, self.ignore_gitignore);
+            self.git_info = crate::git::repo_info(&self.root);
+        }
+        #[cfg(not(feature = "git-core"))]
+        {
+            self.git_status_map.clear();
+            self.git_info = None;
+        }
+        if self.git_mode {
+            self.expand_git_dirs();
+        }
+        self.rebuild();
+        self.tree_selected = 0;
+        self.scroll_tree_into_view();
+        if let Some(node) = self.nodes.get(self.tree_selected) {
+            self.plugin_manager
+                .on_selection_change(Some(node.path.as_path()));
         }
     }
 
