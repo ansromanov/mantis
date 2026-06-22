@@ -15,6 +15,13 @@ mod normal;
 mod overlay;
 mod visual;
 
+#[cfg(test)]
+#[path = "editor_test.rs"]
+mod editor_tests;
+#[cfg(test)]
+#[path = "normal_test.rs"]
+mod normal_tests;
+
 use super::App;
 
 impl App {

@@ -71,6 +71,16 @@ fn command_palette_filters_by_keybinding() {
 }
 
 #[test]
+fn command_palette_filters_blame_line() {
+    let mut p = CommandPalette::default();
+    for c in "Blame active".chars() {
+        p.push(c);
+    }
+    let cmd = p.selected_command().unwrap();
+    assert_eq!(cmd.action_id, "blame_line");
+}
+
+#[test]
 fn go_to_line_command_is_registered() {
     let found = COMMANDS.iter().any(|c| c.action_id == "go_to_line");
     assert!(found, "go_to_line command must be in COMMANDS");

@@ -135,6 +135,12 @@ pub struct App {
     pub json_pretty_lines: Vec<Vec<(ratatui::style::Style, String)>>,
     pub content_scroll: usize,
     pub content_hscroll: usize,
+    /// Cursor (active line) index in the content pane (display-line coordinate).
+    /// `j`/`k` move this when the content pane is focused; the viewport
+    /// auto-scrolls to keep it visible.
+    pub active_line: usize,
+    /// When `true`, a one-line blame popup is shown for the active line.
+    pub show_line_blame: bool,
     pub word_wrap: bool,
     pub current_file: Option<PathBuf>,
     pub is_diff: bool,
@@ -414,6 +420,8 @@ impl App {
             json_pretty_lines: Vec::new(),
             content_scroll: 0,
             content_hscroll: 0,
+            active_line: 0,
+            show_line_blame: false,
             word_wrap: cfg.word_wrap,
             current_file: None,
             is_diff: false,

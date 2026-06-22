@@ -299,6 +299,12 @@ fn breadcrumb_renders_for_nested_node() {
         "breadcrumb row should contain path segments, got: {:?}",
         breadcrumb_row
     );
+    // Should also include the filesystem root segment (/).
+    assert!(
+        breadcrumb_row.contains('/'),
+        "breadcrumb should include filesystem root, got: {:?}",
+        breadcrumb_row
+    );
 }
 
 #[test]
@@ -314,16 +320,26 @@ fn breadcrumb_areas_match_rendered_columns() {
     }];
     app.tree_selected = 0;
     render_tree(&mut app, 40, 6);
-    // Should have 2 clickable areas: "r" and "src".
-    assert_eq!(app.breadcrumb_areas.len(), 2);
-    let (root_path, root_rect) = &app.breadcrumb_areas[0];
-    let (src_path, src_rect) = &app.breadcrumb_areas[1];
+    // Should have 3 clickable areas: "/", "r", and "src".
+    assert_eq!(
+        app.breadcrumb_areas.len(),
+        3,
+        "expected 3 segments (/, r, src), got {}",
+        app.breadcrumb_areas.len()
+    );
+    let (fs_path, fs_rect) = &app.breadcrumb_areas[0];
+    let (root_path, root_rect) = &app.breadcrumb_areas[1];
+    let (src_path, src_rect) = &app.breadcrumb_areas[2];
+    assert_eq!(fs_path, &PathBuf::from("/"));
     assert_eq!(root_path, &PathBuf::from("/r"));
     assert_eq!(src_path, &PathBuf::from("/r/src"));
-    // "r" is 1 char wide, "src" is 3 chars wide.
+    // "/" is 1 char wide, "r" is 1 char, "src" is 3 chars.
+    assert_eq!(fs_rect.width, 1);
     assert_eq!(root_rect.width, 1);
     assert_eq!(src_rect.width, 3);
-    // "src" rect must start after "r" + " / " (3 chars separator).
+    // "r" rect must start after "/" + " / " (3 chars separator).
+    assert_eq!(root_rect.x, fs_rect.x + fs_rect.width + 3);
+    // "src" rect must start after "r" + " / ".
     assert_eq!(src_rect.x, root_rect.x + root_rect.width + 3);
 }
 
@@ -482,12 +498,48 @@ fn render_breadcrumb_truncation_shows_ellipsis() {
         "truncated breadcrumb must show ellipsis, got: {:?}",
         breadcrumb_row
     );
-    // First ("r") and last ("e") segments must always be present.
+    // First segment ("/") and last segment ("e") must always be present.
     assert!(
-        breadcrumb_row.contains('r'),
+        breadcrumb_row.contains('/'),
         "first segment must be visible"
     );
     assert!(breadcrumb_row.contains('e'), "last segment must be visible");
+}
+
+#[test]
+fn breadcrumb_when_root_is_filesystem_root() {
+    let mut app = make_app(false, HashMap::new());
+    app.root = PathBuf::from("/");
+    app.nodes = vec![TreeNode {
+        path: PathBuf::from("/etc"),
+        name: "etc".to_string(),
+        depth: 1,
+        is_dir: true,
+        deleted: false,
+    }];
+    app.tree_selected = 0;
+    let rows = render_tree(&mut app, 40, 6);
+    let breadcrumb_row = &rows[1];
+    // When root is /, the single root segment must render as "/" without panic.
+    assert!(
+        breadcrumb_row.contains('/'),
+        "breadcrumb must render the / root segment, got: {:?}",
+        breadcrumb_row
+    );
+    assert!(
+        breadcrumb_row.contains("etc"),
+        "breadcrumb must include child segment, got: {:?}",
+        breadcrumb_row
+    );
+    // Exactly two clickable areas: "/" and "etc".
+    assert_eq!(
+        app.breadcrumb_areas.len(),
+        2,
+        "expected 2 segments (/ and etc), got {}",
+        app.breadcrumb_areas.len()
+    );
+    assert_eq!(app.breadcrumb_areas[0].0, PathBuf::from("/"));
+    assert_eq!(app.breadcrumb_areas[1].0, PathBuf::from("/etc"));
 }
 
 // ---------------------------------------------------------------------------

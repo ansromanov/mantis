@@ -135,6 +135,11 @@ impl App {
                     self.mark_content_scrolled();
                 }
             }
+            Some("blame_line") => {
+                if !self.is_diff {
+                    self.show_line_blame = !self.show_line_blame;
+                }
+            }
             Some("copy_path") => self.copy_path_to_clipboard(false),
             Some("copy_relative_path") => self.copy_path_to_clipboard(true),
             Some("tree_collapse_all") => self.collapse_all(),

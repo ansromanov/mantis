@@ -2706,26 +2706,30 @@ fn tree_key_other_key_noop_when_focus_tree() {
 // -- handle_content_key -----------------------------------------------------
 
 #[test]
-fn content_key_k_scrolls_up() {
+fn content_key_k_moves_active_line_up() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
     app.focus = Focus::Content;
     app.content_scroll = 5;
+    app.active_line = 5;
     app.handle_key(KeyEvent::new(KeyCode::Char('k'), KeyModifiers::empty()));
+    assert_eq!(app.active_line, 4);
+    // active_line moves even at scroll=5; auto-scroll brings it into view.
     assert_eq!(app.content_scroll, 4);
     fs::remove_dir_all(&root).ok();
 }
 
 #[test]
-fn content_key_up_stays_at_zero() {
+fn content_key_up_stays_at_zero_active_line() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
     app.focus = Focus::Content;
     app.content_scroll = 0;
+    app.active_line = 0;
     app.handle_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()));
-    assert_eq!(app.content_scroll, 0);
+    assert_eq!(app.active_line, 0);
     fs::remove_dir_all(&root).ok();
 }
 
@@ -4477,6 +4481,150 @@ fn mouse_unhandled_event_kind_is_noop() {
     // Should not panic and no state should change.
     assert!(!app.should_quit);
     fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn breadcrumb_mouse_click_navigates_to_root() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+
+    // Expand sub/ and select a nested file so tree_selected is not root.
+    app.expanded.insert(root.join("sub"));
+    app.rebuild();
+    let nested = app
+        .nodes
+        .iter()
+        .position(|n| n.path == root.join("sub").join("c.txt"))
+        .unwrap();
+    app.tree_selected = nested;
+    let prev = app.tree_selected;
+    assert!(prev > 0, "nested file should not be at index 0");
+
+    // Simulate a rendered breadcrumb: root segment spanning columns 1..5 at row 1.
+    app.breadcrumb_areas.push((
+        root.clone(),
+        Rect {
+            x: 1,
+            y: 1,
+            width: 5,
+            height: 1,
+        },
+    ));
+
+    // Click on the root breadcrumb segment.
+    app.handle_mouse(mouse(MouseEventKind::Down(MouseButton::Left), 2, 1));
+
+    assert_eq!(
+        app.tree_selected,
+        0,
+        "clicking root breadcrumb should select index 0, got {} (len={})",
+        app.tree_selected,
+        app.nodes.len(),
+    );
+    assert!(matches!(app.focus, Focus::Tree));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn breadcrumb_mouse_click_navigates_to_intermediate_dir() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+
+    // Expand sub/ and select a nested file so breadcrumb shows root + "sub".
+    app.expanded.insert(root.join("sub"));
+    app.rebuild();
+    let nested = app
+        .nodes
+        .iter()
+        .position(|n| n.path == root.join("sub").join("c.txt"))
+        .unwrap();
+    app.tree_selected = nested;
+    let sub_idx = app
+        .nodes
+        .iter()
+        .position(|n| n.path == root.join("sub"))
+        .unwrap();
+
+    // Breadcrumb: root (cols 1..5), sub (cols 9..12) with " / " separator.
+    app.breadcrumb_areas.push((
+        root.clone(),
+        Rect {
+            x: 1,
+            y: 1,
+            width: 5,
+            height: 1,
+        },
+    ));
+    app.breadcrumb_areas.push((
+        root.join("sub"),
+        Rect {
+            x: 9,
+            y: 1,
+            width: 3,
+            height: 1,
+        },
+    ));
+
+    // Click on the "sub" breadcrumb segment.
+    app.handle_mouse(mouse(MouseEventKind::Down(MouseButton::Left), 10, 1));
+
+    assert_eq!(
+        app.tree_selected, sub_idx,
+        "clicking sub breadcrumb should select sub directory"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn breadcrumb_mouse_click_parent_changes_root() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let orig_root = root.clone();
+    let parent = root.parent().expect("temp dir has a parent").to_path_buf();
+
+    // Select a nested file.
+    app.expanded.insert(root.join("sub"));
+    app.rebuild();
+    let nested = app
+        .nodes
+        .iter()
+        .position(|n| n.path == root.join("sub").join("c.txt"))
+        .unwrap();
+    app.tree_selected = nested;
+
+    // Simulate a breadcrumb that includes the parent directory segment.
+    app.breadcrumb_areas.push((
+        parent.clone(),
+        Rect {
+            x: 1,
+            y: 1,
+            width: 5,
+            height: 1,
+        },
+    ));
+    app.breadcrumb_areas.push((
+        root.clone(),
+        Rect {
+            x: 9,
+            y: 1,
+            width: 7,
+            height: 1,
+        },
+    ));
+
+    // Click on the parent directory breadcrumb segment.
+    app.handle_mouse(mouse(MouseEventKind::Down(MouseButton::Left), 3, 1));
+
+    assert_eq!(
+        app.root, parent,
+        "clicking parent breadcrumb should change root to parent"
+    );
+    assert!(
+        !app.nodes.is_empty(),
+        "tree should have contents for parent root"
+    );
+    assert!(app.current_file.is_none(), "current file should be cleared");
+    fs::remove_dir_all(&orig_root).ok();
 }
 
 // -- handle_key: catch-all in overlays ----------------------------------------

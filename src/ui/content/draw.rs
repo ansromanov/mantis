@@ -594,6 +594,26 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         }
     }
 
+    // Active-line highlight: tint the active cursor line with a subtle
+    // selection_bg tint across the full row width. Skip when visual-line mode
+    // already paints the same line to avoid double-tint.
+    if !app.is_diff && !app.diff_sbs_active() {
+        let active = app.active_line;
+        let already_painted = app.visual_line.as_ref().is_some_and(|v| {
+            let (vs, ve) = v.range();
+            vs <= active && active <= ve
+        });
+        if !already_painted {
+            for (j, line) in content_lines.iter_mut().enumerate() {
+                if scroll + j == active {
+                    for span in &mut line.spans {
+                        span.style = span.style.bg(sel_bg);
+                    }
+                }
+            }
+        }
+    }
+
     let inner = block.inner(area);
     f.render_widget(block, area);
 
@@ -650,3 +670,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
 
     draw_content_scrollbar(f, app, inner_x, inner_y, inner_w, inner_h);
 }
+
+#[cfg(test)]
+#[path = "draw_test.rs"]
+mod draw_tests;

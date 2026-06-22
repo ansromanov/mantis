@@ -30,9 +30,15 @@ impl App {
             self.handle_visual_line_key(key);
             return;
         }
-        if key.code == KeyCode::Esc && self.selection.is_some() {
-            self.clear_selection();
-            return;
+        if key.code == KeyCode::Esc {
+            if self.show_line_blame {
+                self.show_line_blame = false;
+                return;
+            }
+            if self.selection.is_some() {
+                self.clear_selection();
+                return;
+            }
         }
         let k = &self.keys;
         if pressed(&k.quit, &key) {
@@ -285,12 +291,45 @@ impl App {
             self.show_line_numbers = !self.show_line_numbers;
             self.config.line_numbers = self.show_line_numbers;
             self.save_config();
+        } else if !self.is_diff && pressed(&k.nav_up, &key) {
+            // Move active line up (non-diff content).
+            self.show_line_blame = false;
+            if self.active_line > 0 {
+                self.active_line -= 1;
+                self.scroll_active_line_into_view();
+                self.mark_content_scrolled();
+            }
+        } else if !self.is_diff && pressed(&k.nav_down, &key) {
+            // Move active line down (non-diff content).
+            self.show_line_blame = false;
+            let max = self.display_line_count().saturating_sub(1);
+            if self.active_line < max {
+                self.active_line += 1;
+                self.scroll_active_line_into_view();
+                self.mark_content_scrolled();
+            }
         } else if pressed(&k.nav_up, &key) {
+            // Diff: fall back to scrolling.
             self.content_scroll = self.content_scroll.saturating_sub(1);
         } else if pressed(&k.nav_down, &key) {
+            // Diff: fall back to scrolling.
             let max = self.content_scroll_max();
             if self.content_scroll < max {
                 self.content_scroll += 1;
+            }
+        } else if pressed(&k.content_top, &key) {
+            self.show_line_blame = false;
+            if !self.is_diff {
+                self.active_line = 0;
+            }
+            self.content_scroll = 0;
+        } else if pressed(&k.content_bottom, &key) {
+            self.show_line_blame = false;
+            if !self.is_diff {
+                self.active_line = self.display_line_count().saturating_sub(1);
+                self.scroll_active_line_into_view();
+            } else {
+                self.content_scroll = self.content_scroll_max();
             }
         } else if pressed(&k.content_page_up, &key) {
             self.content_scroll = self.content_scroll.saturating_sub(20);
@@ -301,12 +340,10 @@ impl App {
             self.content_hscroll = self.content_hscroll.saturating_sub(4);
         } else if !self.word_wrap && pressed(&k.content_right, &key) {
             self.content_hscroll += 4;
-        } else if pressed(&k.content_top, &key) {
-            self.content_scroll = 0;
-        } else if pressed(&k.content_bottom, &key) {
-            self.content_scroll = self.content_scroll_max();
         } else if !self.word_wrap && pressed(&k.content_reset_col, &key) {
             self.content_hscroll = 0;
+        } else if !self.is_diff && pressed(&k.blame_line, &key) {
+            self.show_line_blame = !self.show_line_blame;
         }
         if self.content_scroll != scroll_before || self.content_hscroll != hscroll_before {
             self.mark_content_scrolled();
@@ -335,6 +372,20 @@ impl App {
         match clipboard.set_text(text) {
             Ok(()) => self.status_message = Some("path copied".into()),
             Err(e) => self.status_message = Some(format!("clipboard error: {e}")),
+        }
+    }
+
+    /// Nudges `content_scroll` so `active_line` stays within the visible
+    /// viewport after a cursor move.
+    fn scroll_active_line_into_view(&mut self) {
+        let view_height = (self.content_area.height as usize).max(1);
+        if self.active_line < self.content_scroll {
+            self.content_scroll = self.active_line;
+        } else if self.active_line >= self.content_scroll + view_height {
+            self.content_scroll = self
+                .active_line
+                .saturating_sub(view_height)
+                .saturating_add(1);
         }
     }
 }

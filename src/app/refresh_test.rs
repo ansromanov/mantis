@@ -187,6 +187,8 @@ fn create_base_app() -> App {
         json_pretty_lines: Vec::new(),
         content_scroll: 0,
         content_hscroll: 0,
+        active_line: 0,
+        show_line_blame: false,
         word_wrap: false,
         current_file: None,
         is_diff: false,
