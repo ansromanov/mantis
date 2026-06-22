@@ -400,3 +400,37 @@ fn recent_files_state_no_match_gives_empty_results() {
     assert_eq!(r.results_len(), 0);
     assert!(r.selected_path().is_none());
 }
+
+// -- GotoLineState -----------------------------------------------------------
+
+#[test]
+fn goto_line_state_new_is_empty() {
+    let s = GotoLineState::new();
+    assert!(s.query.is_empty());
+}
+
+#[test]
+fn goto_line_state_push_appends() {
+    let mut s = GotoLineState::new();
+    s.push('4');
+    assert_eq!(s.query, "4");
+    s.push('2');
+    assert_eq!(s.query, "42");
+}
+
+#[test]
+fn goto_line_state_pop_removes() {
+    let mut s = GotoLineState::new();
+    s.push('4');
+    s.push('2');
+    s.pop();
+    assert_eq!(s.query, "4");
+    s.pop();
+    assert!(s.query.is_empty());
+}
+
+#[test]
+fn goto_line_state_default_is_empty() {
+    let s = GotoLineState::default();
+    assert!(s.query.is_empty());
+}

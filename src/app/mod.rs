@@ -1,7 +1,8 @@
 //! Central application state: the `App` struct that ties the whole TUI together.
 //!
 //! `App` holds the file tree, content/diff buffers, every overlay's state
-//! (search, history, theme picker, plugin picker, command palette, recent files, help, about, blame), the
+//! (search, history, theme picker, plugin picker, command palette, recent files,
+//! help, about, blame, goto line), the
 //! resolved theme and keymap, and the geometry captured during the last render
 //! so mouse handlers can hit-test clicks. Construction (`App::new`) walks the
 //! root, loads git status, and opens the first file; `reload`/`tick` keep the
@@ -29,8 +30,8 @@ use crate::git::GitStatus;
 use crate::highlight::Highlighter;
 use crate::plugin::{self, ExtraSyntax, PluginManager};
 use crate::search::{
-    CommandPalette, HistoryState, InFileSearch, PluginPicker, RecentFilesState, SearchState,
-    ThemePicker, TreeFilter,
+    CommandPalette, GotoLineState, HistoryState, InFileSearch, PluginPicker, RecentFilesState,
+    SearchState, ThemePicker, TreeFilter,
 };
 use crate::selection::{TextSelection, VisualLine};
 use crate::theme::Theme;
@@ -151,6 +152,9 @@ pub struct App {
     /// Inline tree name filter, open when the user presses `/` with the tree
     /// focused. `None` means no filter is active; the full node list is shown.
     pub tree_filter: Option<TreeFilter>,
+    /// Inline go-to-line dialog, open when the user presses the `goto_line`
+    /// keybinding (default `:`). `Some` while the dialog is open.
+    pub goto_line: Option<GotoLineState>,
     pub command_palette: Option<CommandPalette>,
     pub history: Option<HistoryState>,
     pub theme_picker: Option<ThemePicker>,
@@ -422,6 +426,7 @@ impl App {
             last_search_query: String::new(),
             in_file_search: None,
             tree_filter: None,
+            goto_line: None,
             command_palette: None,
             history: None,
             theme_picker: None,

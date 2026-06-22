@@ -13,7 +13,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 
 use crate::config::pressed;
 use crate::search::{
-    CommandPalette, InFileSearch, PluginPicker, SearchState, ThemePicker, TreeFilter,
+    CommandPalette, GotoLineState, InFileSearch, PluginPicker, SearchState, ThemePicker, TreeFilter,
 };
 
 use super::super::{App, Focus};
@@ -123,6 +123,10 @@ impl App {
             self.copy_path_to_clipboard(false);
         } else if pressed(&k.copy_relative_path, &key) {
             self.copy_path_to_clipboard(true);
+        } else if pressed(&k.goto_line, &key) {
+            if self.focus == Focus::Content {
+                self.goto_line = Some(GotoLineState::new());
+            }
         } else {
             match self.focus {
                 Focus::Tree => self.handle_tree_key(key),

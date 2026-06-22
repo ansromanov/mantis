@@ -3,7 +3,7 @@ use std::fs;
 use super::*;
 use crate::command_palette::COMMANDS;
 use crate::config::Config;
-use crate::search::{InFileMatch, SearchMode, TreeFilter};
+use crate::search::{GotoLineState, InFileMatch, SearchMode, TreeFilter};
 use crate::yaml_fold::FoldRegion;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -1166,6 +1166,158 @@ fn tree_filter_key_unrecognized_key_is_noop() {
     let query_before = app.tree_filter.as_ref().unwrap().query.clone();
     app.handle_key(KeyEvent::new(KeyCode::F(1), KeyModifiers::empty()));
     assert_eq!(app.tree_filter.as_ref().unwrap().query, query_before);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- handle_goto_line_key -------------------------------------------------
+
+#[test]
+fn goto_line_key_opens_with_colon_and_content_focus() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.handle_key(KeyEvent::new(KeyCode::Char(':'), KeyModifiers::empty()));
+    assert!(app.goto_line.is_some());
+    assert!(app.goto_line.as_ref().unwrap().query.is_empty());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn goto_line_key_does_not_open_with_tree_focus() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Tree;
+    app.handle_key(KeyEvent::new(KeyCode::Char(':'), KeyModifiers::empty()));
+    assert!(app.goto_line.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn goto_line_key_esc_closes() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.handle_key(KeyEvent::new(KeyCode::Char(':'), KeyModifiers::empty()));
+    assert!(app.goto_line.is_some());
+    app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+    assert!(app.goto_line.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn goto_line_key_char_appends() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.handle_key(KeyEvent::new(KeyCode::Char(':'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('4'), KeyModifiers::empty()));
+    assert_eq!(app.goto_line.as_ref().unwrap().query, "4");
+    app.handle_key(KeyEvent::new(KeyCode::Char('2'), KeyModifiers::empty()));
+    assert_eq!(app.goto_line.as_ref().unwrap().query, "42");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn goto_line_key_backspace_removes_char() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.handle_key(KeyEvent::new(KeyCode::Char(':'), KeyModifiers::empty()));
+    app.goto_line.as_mut().unwrap().push('4');
+    app.goto_line.as_mut().unwrap().push('2');
+    assert_eq!(app.goto_line.as_ref().unwrap().query, "42");
+    app.handle_key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::empty()));
+    assert_eq!(app.goto_line.as_ref().unwrap().query, "4");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn goto_line_key_enter_jumps_to_absolute_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.open_file(&root.join("long.txt"));
+    app.content_scroll = 0;
+    app.goto_line = Some(GotoLineState::new());
+    app.handle_key(KeyEvent::new(KeyCode::Char('5'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert!(app.goto_line.is_none());
+    assert_eq!(app.content_scroll, 4);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn goto_line_key_enter_relative_plus_jump() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.open_file(&root.join("long.txt"));
+    app.content_scroll = 10;
+    app.goto_line = Some(GotoLineState::new());
+    app.handle_key(KeyEvent::new(KeyCode::Char('+'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('5'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert!(app.goto_line.is_none());
+    assert_eq!(app.content_scroll, 15);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn goto_line_key_enter_relative_minus_jump() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.open_file(&root.join("long.txt"));
+    app.content_scroll = 20;
+    app.goto_line = Some(GotoLineState::new());
+    app.handle_key(KeyEvent::new(KeyCode::Char('-'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('5'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert!(app.goto_line.is_none());
+    assert_eq!(app.content_scroll, 15);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn goto_line_key_enter_clamps_to_max() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.open_file(&root.join("long.txt"));
+    app.content_area = Rect::new(0, 0, 80, 10);
+    app.content_scroll = 0;
+    app.goto_line = Some(GotoLineState::new());
+    app.handle_key(KeyEvent::new(KeyCode::Char('9'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('9'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert!(app.goto_line.is_none());
+    assert_eq!(app.content_scroll, 40);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn goto_line_key_enter_empty_query_is_noop() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.content_scroll = 5;
+    app.goto_line = Some(GotoLineState::new());
+    app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert!(app.goto_line.is_none());
+    assert_eq!(app.content_scroll, 5);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn goto_line_key_unrecognized_key_is_noop() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.handle_key(KeyEvent::new(KeyCode::Char(':'), KeyModifiers::empty()));
+    assert!(app.goto_line.is_some());
+    let query_before = app.goto_line.as_ref().unwrap().query.clone();
+    app.handle_key(KeyEvent::new(KeyCode::F(1), KeyModifiers::empty()));
+    assert_eq!(app.goto_line.as_ref().unwrap().query, query_before);
     fs::remove_dir_all(&root).ok();
 }
 

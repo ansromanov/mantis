@@ -2,7 +2,7 @@ use super::*;
 use crate::app::{App, Focus};
 use crate::config::Config;
 use crate::git::{GitHead, GitRepoInfo};
-use crate::search::{HistoryState, SearchState, ThemePicker};
+use crate::search::{GotoLineState, HistoryState, SearchState, ThemePicker};
 use ratatui::backend::TestBackend;
 use ratatui::Terminal;
 use std::path::{Path, PathBuf};
@@ -51,6 +51,16 @@ fn hint_search() {
     app.search = Some(SearchState::new(Path::new("."), false, true, 0));
     let text = render_bar(&app);
     assert!(text.contains("Enter select"));
+}
+
+#[test]
+fn hint_goto_line() {
+    let mut app = make_app();
+    app.goto_line = Some(GotoLineState::new());
+    let text = render_bar(&app);
+    assert!(text.contains("Enter jump"));
+    assert!(text.contains("+N forward"));
+    assert!(text.contains("-N back"));
 }
 
 #[test]

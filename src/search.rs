@@ -6,9 +6,9 @@
 //! `SkimMatcherV2`, debouncing the expensive content scans. `ContentMatch`
 //! carries a hit's path, line number, and surrounding context. The same
 //! query/filtered-list/selected-index shape backs `HistoryState`, `ThemePicker`,
-//! `CommandPalette`, `RecentFilesState`, `PluginPicker`, and the in-file search (`InFileSearch`),
-//! all defined here. Results sort by descending fuzzy score; binary files are
-//! skipped via `is_binary_bytes`.
+//! `CommandPalette`, `RecentFilesState`, `PluginPicker`, the in-file search (`InFileSearch`),
+//! and the go-to-line dialog (`GotoLineState`), all defined here. Results sort by
+//! descending fuzzy score; binary files are skipped via `is_binary_bytes`.
 
 use std::collections::HashMap;
 use std::fs;
@@ -318,6 +318,38 @@ impl TreeFilter {
 impl Default for TreeFilter {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// State for the go-to-line dialog.
+///
+/// Opened by the `goto_line` keybinding (default `:`). The user types a line
+/// number and presses Enter to jump (1-indexed, clamped to valid range), or Esc
+/// to cancel. Supports relative jumps: `+N` jumps forward N lines, `-N` jumps
+/// backward N lines.
+pub struct GotoLineState {
+    pub query: String,
+}
+
+impl Default for GotoLineState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl GotoLineState {
+    pub fn new() -> Self {
+        GotoLineState {
+            query: String::new(),
+        }
+    }
+
+    pub fn push(&mut self, c: char) {
+        self.query.push(c);
+    }
+
+    pub fn pop(&mut self) {
+        self.query.pop();
     }
 }
 
