@@ -243,6 +243,176 @@ fn search_multi_byte_chars() {
     assert_eq!(total, "héllo wörld");
 }
 
+#[test]
+fn search_current_vs_other_distinct_bgs_on_one_line() {
+    // Two matches on the same logical line; only the `current` one gets
+    // selection_bg, the other gets dim. Order in the span vec follows column
+    // order regardless of which is current.
+    let regions = single_region("aa bb aa");
+    let theme = default_theme();
+    let search = make_search(
+        vec![
+            crate::search::InFileMatch {
+                line: 0,
+                col: 0,
+                len: 2,
+            },
+            crate::search::InFileMatch {
+                line: 0,
+                col: 6,
+                len: 2,
+            },
+        ],
+        1, // second match is current
+    );
+    let result = apply_search_to_regions(&regions, 0, &search, &theme);
+    let current: String = result
+        .iter()
+        .filter(|s| s.style.bg == Some(theme.selection_bg))
+        .map(|s| s.content.as_ref())
+        .collect();
+    let other: String = result
+        .iter()
+        .filter(|s| s.style.bg == Some(theme.dim))
+        .map(|s| s.content.as_ref())
+        .collect();
+    // Both occurrences are the literal "aa"; the current is the trailing one.
+    assert_eq!(current, "aa");
+    assert_eq!(other, "aa");
+    // Trailing "aa" (current) must come after the leading "aa" (other) in order.
+    let cur_idx = result
+        .iter()
+        .position(|s| s.style.bg == Some(theme.selection_bg))
+        .unwrap();
+    let oth_idx = result
+        .iter()
+        .position(|s| s.style.bg == Some(theme.dim))
+        .unwrap();
+    assert!(
+        oth_idx < cur_idx,
+        "leading match should render before trailing"
+    );
+}
+
+// ── word-wrap highlight verification (#206) ───────────────────────────────
+//
+// Match columns are computed against unwrapped char positions. ratatui's
+// `Wrap` re-flows the styled spans onto visual rows at render time, carrying
+// each span's background with it. These tests render through `draw_content`
+// with `word_wrap` on and assert the highlight lands on the correct visual
+// row/column — guarding against the wrap-related drift seen in #42/#56.
+
+/// Background color of the rendered cell at (x, y) in the buffer.
+fn cell_bg(buffer: &ratatui::buffer::Buffer, x: u16, y: u16) -> Color {
+    buffer[(x, y)].bg
+}
+
+#[test]
+fn search_highlight_on_correct_wrapped_row() {
+    let (mut app, _dir) = render_app();
+    // 160-char line with no spaces wraps at the content width (78 cols, no
+    // gutter) into rows of 0..78, 78..156, 156..160.
+    let line: String = "x".repeat(160);
+    let theme = app.theme.clone();
+    let buffer = render_content(&mut app, |app| {
+        app.current_file = None;
+        app.virtual_file = None;
+        app.show_line_numbers = false; // content starts flush at inner.x = 1
+        app.active_line = usize::MAX; // disable active-line tint so only search highlights colour cells
+        app.word_wrap = true;
+        app.content = vec![line.clone()];
+        app.highlighted = vec![vec![(Style::default(), line.clone())]];
+        app.in_file_search = Some(make_search(
+            vec![
+                // current: cols 5..9 -> visual row 0
+                crate::search::InFileMatch {
+                    line: 0,
+                    col: 5,
+                    len: 4,
+                },
+                // other: cols 100..104 -> visual row 1 (local cols 22..26)
+                crate::search::InFileMatch {
+                    line: 0,
+                    col: 100,
+                    len: 4,
+                },
+            ],
+            0,
+        ));
+    });
+
+    // Row 0 (y = 1): current match at screen x = 1 + 5 .. 1 + 9.
+    for x in 6u16..10 {
+        assert_eq!(
+            cell_bg(&buffer, x, 1),
+            theme.selection_bg,
+            "current match cell ({x},1) should use selection_bg"
+        );
+    }
+    // Cell just before the match on row 0 is unhighlighted.
+    assert_eq!(cell_bg(&buffer, 5, 1), Color::Reset);
+
+    // Row 1 (y = 2): other match at local cols 22..26 -> screen x = 23..27.
+    for x in 23u16..27 {
+        assert_eq!(
+            cell_bg(&buffer, x, 2),
+            theme.dim,
+            "other match cell ({x},2) should use dim bg"
+        );
+    }
+    // The other match must NOT bleed onto row 0 at the same screen columns.
+    for x in 23u16..27 {
+        assert_eq!(
+            cell_bg(&buffer, x, 1),
+            Color::Reset,
+            "other match must not appear on row 0 at ({x},1)"
+        );
+    }
+}
+
+#[test]
+fn search_highlight_spans_wrap_boundary() {
+    let (mut app, _dir) = render_app();
+    // Match straddles the wrap point: cols 76..82 split as 76,77 on row 0 and
+    // 78..82 on row 1. Both halves must keep the selection background.
+    let line: String = "y".repeat(160);
+    let theme = app.theme.clone();
+    let buffer = render_content(&mut app, |app| {
+        app.current_file = None;
+        app.virtual_file = None;
+        app.show_line_numbers = false;
+        app.active_line = usize::MAX; // disable active-line tint so only search highlights colour cells
+        app.word_wrap = true;
+        app.content = vec![line.clone()];
+        app.highlighted = vec![vec![(Style::default(), line.clone())]];
+        app.in_file_search = Some(make_search(
+            vec![crate::search::InFileMatch {
+                line: 0,
+                col: 76,
+                len: 6,
+            }],
+            0,
+        ));
+    });
+
+    // Tail of row 0: cols 76,77 -> screen x = 77, 78.
+    for x in 77u16..79 {
+        assert_eq!(
+            cell_bg(&buffer, x, 1),
+            theme.selection_bg,
+            "wrap-boundary match tail on row 0 at ({x},1)"
+        );
+    }
+    // Head of row 1: local cols 0..4 -> screen x = 1..5.
+    for x in 1u16..5 {
+        assert_eq!(
+            cell_bg(&buffer, x, 2),
+            theme.selection_bg,
+            "wrap-boundary match head on row 1 at ({x},2)"
+        );
+    }
+}
+
 // ── emphasize ──────────────────────────────────────────────────────────
 
 #[test]

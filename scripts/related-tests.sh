@@ -31,7 +31,17 @@ while IFS= read -r f; do
     Cargo.toml|Cargo.lock|tv.toml|.cargo/config.toml|.github/workflows/*) echo __ALL__; exit 0 ;;
     src/lib.rs|src/main.rs) echo __ALL__; exit 0 ;;
     src/*.rs)
-      m=${f#src/}; m=${m%.rs}; m=${m%_test}; m=${m%/mod}
+      m=${f#src/}; m=${m%.rs}
+      # When a _test.rs file's stem matches the parent directory name
+      # (e.g. src/ui/content/content_test.rs), the tests are declared in
+      # the parent module (mod.rs declares `mod tests`), so map to the
+      # parent path rather than the nonexistent sibling module.
+      _base=${m##*/}; _dir=${m%/*}
+      if [[ "$_base" != "$m" && "${_base%_test}" == "${_dir##*/}" ]]; then
+        m=$_dir
+      else
+        m=${m%_test}; m=${m%/mod}
+      fi
       seg=${m##*/}
       m=${m//\//::}
       add_unit "$m"
