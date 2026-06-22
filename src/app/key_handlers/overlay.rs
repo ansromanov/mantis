@@ -344,4 +344,59 @@ impl App {
             _ => {}
         }
     }
+
+    /// Handles keyboard input while the go-to-line dialog is open.
+    ///
+    /// Typing digits appends to the query; Backspace removes the last character;
+    /// Enter parses the query (supports absolute `42`, relative `+5` / `-3`) and
+    /// jumps; Esc closes without jumping.
+    pub(super) fn handle_goto_line_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Esc => {
+                self.goto_line = None;
+            }
+            KeyCode::Enter => {
+                let target = self.goto_line.as_ref().and_then(|g| {
+                    let q = g.query.as_str();
+                    if q.is_empty() {
+                        return None;
+                    }
+                    if let Some(offset) = q.strip_prefix('+') {
+                        let n = offset.parse::<usize>().ok()?;
+                        Some(self.content_scroll.saturating_add(n))
+                    } else if let Some(offset) = q.strip_prefix('-') {
+                        let n = offset.parse::<usize>().ok()?;
+                        Some(self.content_scroll.saturating_sub(n))
+                    } else {
+                        let n = q.parse::<usize>().ok()?;
+                        Some(n.saturating_sub(1)) // 1-indexed → 0-indexed
+                    }
+                });
+                if let Some(line) = target {
+                    let max = self.content_scroll_max();
+                    self.content_scroll = line.min(max);
+                    self.mark_content_scrolled();
+                }
+                self.goto_line = None;
+            }
+            KeyCode::Backspace => {
+                if let Some(ref mut g) = self.goto_line {
+                    g.pop();
+                }
+            }
+            KeyCode::Char(c) => {
+                let is_open_binding = crate::config::pressed(&self.config.keys.goto_line, &key);
+                if !is_open_binding {
+                    if let Some(ref mut g) = self.goto_line {
+                        g.push(c);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
 }
+
+#[cfg(test)]
+#[path = "overlay_test.rs"]
+mod tests;

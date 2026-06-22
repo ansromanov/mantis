@@ -82,6 +82,8 @@ impl App {
             self.handle_in_file_search_key(key);
         } else if self.tree_filter.is_some() {
             self.handle_tree_filter_key(key);
+        } else if self.goto_line.is_some() {
+            self.handle_goto_line_key(key);
         } else {
             self.handle_normal_key(key);
         }

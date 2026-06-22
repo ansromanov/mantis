@@ -17,7 +17,7 @@ use crossterm::terminal::{
 
 use crate::config;
 use crate::highlight::Highlighter;
-use crate::search::{PluginPicker, SearchState, ThemePicker};
+use crate::search::{GotoLineState, PluginPicker, SearchState, ThemePicker};
 use crate::theme::{Theme, ThemeConfig};
 
 use super::super::{diff_line_style, App, Focus};
@@ -144,6 +144,9 @@ impl App {
             Some("copy_relative_path") => self.copy_path_to_clipboard(true),
             Some("tree_collapse_all") => self.collapse_all(),
             Some("tree_expand_all") => self.expand_all(),
+            Some("go_to_line") if self.focus == Focus::Content => {
+                self.goto_line = Some(GotoLineState::new());
+            }
             _ => {}
         }
     }

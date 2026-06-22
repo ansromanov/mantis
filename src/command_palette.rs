@@ -132,6 +132,10 @@ pub static COMMANDS: &[CommandEntry] = &[
         name: "Expand all directories",
         action_id: "tree_expand_all",
     },
+    CommandEntry {
+        name: "Go to line",
+        action_id: "go_to_line",
+    },
 ];
 
 pub struct CommandPalette {

@@ -23,7 +23,12 @@ pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
     let theme = &app.theme;
     let base = Style::default().bg(theme.selection_bg).fg(theme.text);
 
-    let spans: Vec<Span> = if app.theme_picker.is_some() {
+    let spans: Vec<Span> = if app.goto_line.is_some() {
+        vec![Span::styled(
+            " type line number  Enter jump  Esc cancel  +N forward  -N back",
+            base,
+        )]
+    } else if app.theme_picker.is_some() {
         vec![Span::styled(
             " \u{2191}\u{2193} navigate  type to filter  Enter apply theme  Esc cancel",
             base,

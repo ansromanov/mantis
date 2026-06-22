@@ -1,11 +1,10 @@
-use std::fs;
-use std::path::PathBuf;
-use std::sync::atomic::{AtomicUsize, Ordering};
-
 use crate::app::{App, Focus};
 use crate::command_palette::COMMANDS;
 use crate::config::Config;
 use crate::search::CommandPalette;
+use std::fs;
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -21,6 +20,14 @@ fn app_for(root: &std::path::Path) -> App {
     App::new(root.to_path_buf(), Config::default(), None, None).unwrap()
 }
 
+fn palette_with_query(query: &str) -> CommandPalette {
+    let mut p = CommandPalette::default();
+    for c in query.chars() {
+        p.push(c);
+    }
+    p
+}
+
 fn dispatch_blame_line(app: &mut App) {
     let mut p = CommandPalette::default();
     for c in "Blame active".chars() {
@@ -30,22 +37,17 @@ fn dispatch_blame_line(app: &mut App) {
     app.dispatch_command();
 }
 
-// -- blame_line action via command palette -----------------------------------
-
 #[test]
 fn editor_blame_line_action_toggles_show_line_blame() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("a.txt"));
     app.focus = Focus::Content;
-
     assert!(!app.show_line_blame);
     dispatch_blame_line(&mut app);
     assert!(app.show_line_blame);
-
     dispatch_blame_line(&mut app);
     assert!(!app.show_line_blame);
-
     fs::remove_dir_all(&root).ok();
 }
 
@@ -54,21 +56,14 @@ fn editor_blame_line_action_noop_when_is_diff() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.is_diff = true;
-
     dispatch_blame_line(&mut app);
     assert!(!app.show_line_blame);
-
     fs::remove_dir_all(&root).ok();
 }
 
-// -- blame_line present in COMMANDS -----------------------------------------
-
 #[test]
 fn commands_includes_blame_line_action() {
-    assert!(
-        COMMANDS.iter().any(|c| c.action_id == "blame_line"),
-        "blame_line must be registered in COMMANDS"
-    );
+    assert!(COMMANDS.iter().any(|c| c.action_id == "blame_line"));
 }
 
 #[test]
@@ -78,4 +73,26 @@ fn commands_blame_line_has_expected_name() {
         .find(|c| c.action_id == "blame_line")
         .unwrap();
     assert_eq!(entry.name, "Blame active line");
+}
+
+#[test]
+fn go_to_line_command_opens_dialog_when_content_focused() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.command_palette = Some(palette_with_query("Go to line"));
+    app.dispatch_command();
+    assert!(app.goto_line.is_some());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn go_to_line_command_no_op_when_tree_focused() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Tree;
+    app.command_palette = Some(palette_with_query("Go to line"));
+    app.dispatch_command();
+    assert!(app.goto_line.is_none());
+    fs::remove_dir_all(&root).ok();
 }

@@ -290,6 +290,7 @@ fn create_base_app() -> App {
         status_message: None,
         breadcrumb_areas: Vec::new(),
         diff_mode: crate::app::DiffMode::default(),
+        goto_line: None,
         tree_filter: None,
     }
 }

@@ -79,3 +79,19 @@ fn command_palette_filters_blame_line() {
     let cmd = p.selected_command().unwrap();
     assert_eq!(cmd.action_id, "blame_line");
 }
+
+#[test]
+fn go_to_line_command_is_registered() {
+    let found = COMMANDS.iter().any(|c| c.action_id == "go_to_line");
+    assert!(found, "go_to_line command must be in COMMANDS");
+}
+
+#[test]
+fn go_to_line_command_is_searchable_by_name() {
+    let mut p = CommandPalette::default();
+    for c in "Go to line".chars() {
+        p.push(c);
+    }
+    let cmd = p.selected_command().unwrap();
+    assert_eq!(cmd.action_id, "go_to_line");
+}

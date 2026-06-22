@@ -116,10 +116,7 @@ fn blame_line_key_does_not_change_hscroll() {
     app.focus = Focus::Content;
     app.content_hscroll = 8;
     app.handle_key(key(KeyCode::Char('B')));
-    assert_eq!(
-        app.content_hscroll, 8,
-        "blame toggle must not shift hscroll"
-    );
+    assert_eq!(app.content_hscroll, 8);
     fs::remove_dir_all(&root).ok();
 }
 
@@ -161,5 +158,27 @@ fn nav_down_clears_line_blame() {
     app.show_line_blame = true;
     app.handle_key(key(KeyCode::Char('j')));
     assert!(!app.show_line_blame);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- goto_line keybinding ----------------------------------------------------
+
+#[test]
+fn goto_line_keybinding_opens_dialog_with_content_focus() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.handle_key(key(KeyCode::Char(':')));
+    assert!(app.goto_line.is_some());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn goto_line_keybinding_is_noop_with_tree_focus() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Tree;
+    app.handle_key(key(KeyCode::Char(':')));
+    assert!(app.goto_line.is_none());
     fs::remove_dir_all(&root).ok();
 }
