@@ -339,7 +339,8 @@ impl App {
         self.tree_selected = 0;
         self.scroll_tree_into_view();
         if let Some(node) = self.nodes.get(self.tree_selected) {
-            self.plugin_manager.on_selection_change(Some(node.path.as_path()));
+            self.plugin_manager
+                .on_selection_change(Some(node.path.as_path()));
         }
     }
 
