@@ -143,6 +143,9 @@ pub struct App {
     pub show_line_blame: bool,
     pub word_wrap: bool,
     pub current_file: Option<PathBuf>,
+    /// Detected syntax/language name for the open file, or `None` for plain text
+    /// or diffs. Set by `apply_file_load`; used by the status bar.
+    pub current_syntax: Option<String>,
     pub is_diff: bool,
     /// Active diff variant: all changes vs HEAD, staged only, or unstaged only.
     pub diff_mode: DiffMode,
@@ -424,6 +427,7 @@ impl App {
             show_line_blame: false,
             word_wrap: cfg.word_wrap,
             current_file: None,
+            current_syntax: None,
             is_diff: false,
             diff_mode: DiffMode::default(),
             diff_side_by_side: false,

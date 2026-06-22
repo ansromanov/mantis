@@ -191,6 +191,7 @@ fn create_base_app() -> App {
         show_line_blame: false,
         word_wrap: false,
         current_file: None,
+        current_syntax: None,
         is_diff: false,
         diff_side_by_side: false,
         diff_rows: Vec::new(),

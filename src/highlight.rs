@@ -79,6 +79,16 @@ impl Highlighter {
         Highlighter { ss, ts, theme }
     }
 
+    /// Returns the detected syntax name for the given file path, or `None` if
+    /// only plain text was matched. Useful for the status bar language indicator.
+    pub fn syntax_name(&self, path: &Path) -> Option<String> {
+        self.ss
+            .find_syntax_for_file(path)
+            .ok()
+            .flatten()
+            .map(|s| s.name.clone())
+    }
+
     /// Syntax-highlights the given lines by detecting the file type from
     /// `path` and applying the configured syntect theme. Returns one Vec of
     /// styled spans per line. Unrecognized files get plain-text style.
