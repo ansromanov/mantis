@@ -68,7 +68,10 @@ fn commands_includes_blame_line_action() {
 
 #[test]
 fn commands_blame_line_has_expected_name() {
-    let entry = COMMANDS.iter().find(|c| c.action_id == "blame_line").unwrap();
+    let entry = COMMANDS
+        .iter()
+        .find(|c| c.action_id == "blame_line")
+        .unwrap();
     assert_eq!(entry.name, "Blame active line");
 }
 

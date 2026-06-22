@@ -9,8 +9,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 fn temp_tree() -> PathBuf {
     static COUNTER: AtomicUsize = AtomicUsize::new(0);
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-    let dir =
-        std::env::temp_dir().join(format!("tv_overlay_test_{}_{n}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("tv_overlay_test_{}_{n}", std::process::id()));
     fs::create_dir_all(&dir).unwrap();
     fs::write(dir.join("a.txt"), "hello\n").unwrap();
     dir.canonicalize().unwrap()
