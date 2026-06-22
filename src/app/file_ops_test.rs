@@ -138,6 +138,9 @@ fn open_file_resets_active_line_and_blame_popup() {
     app.show_line_blame = true;
     app.open_file(&b);
     assert_eq!(app.active_line, 0, "active_line must reset on file open");
-    assert!(!app.show_line_blame, "show_line_blame must close on file open");
+    assert!(
+        !app.show_line_blame,
+        "show_line_blame must close on file open"
+    );
     fs::remove_dir_all(&root).ok();
 }

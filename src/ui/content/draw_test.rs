@@ -16,8 +16,7 @@ static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 fn temp_tree() -> PathBuf {
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-    let dir =
-        std::env::temp_dir().join(format!("tv_draw_test_{}_{n}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("tv_draw_test_{}_{n}", std::process::id()));
     fs::create_dir_all(&dir).unwrap();
     let long: String = (1..=20).map(|i| format!("line {i}\n")).collect();
     fs::write(dir.join("long.txt"), long).unwrap();

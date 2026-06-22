@@ -11,8 +11,7 @@ static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 fn temp_tree() -> PathBuf {
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-    let dir =
-        std::env::temp_dir().join(format!("tv_normal_key_{}_{n}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("tv_normal_key_{}_{n}", std::process::id()));
     fs::create_dir_all(&dir).unwrap();
     let long: String = (1..=50).map(|i| format!("line {i}\n")).collect();
     fs::write(dir.join("long.txt"), long).unwrap();
@@ -117,7 +116,10 @@ fn blame_line_key_does_not_change_hscroll() {
     app.focus = Focus::Content;
     app.content_hscroll = 8;
     app.handle_key(key(KeyCode::Char('B')));
-    assert_eq!(app.content_hscroll, 8, "blame toggle must not shift hscroll");
+    assert_eq!(
+        app.content_hscroll, 8,
+        "blame toggle must not shift hscroll"
+    );
     fs::remove_dir_all(&root).ok();
 }
 

@@ -11,8 +11,7 @@ static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 fn temp_tree() -> PathBuf {
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-    let dir =
-        std::env::temp_dir().join(format!("tv_editor_key_{}_{n}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("tv_editor_key_{}_{n}", std::process::id()));
     fs::create_dir_all(&dir).unwrap();
     fs::write(dir.join("a.txt"), "line1\nline2\n").unwrap();
     dir.canonicalize().unwrap()
@@ -74,6 +73,9 @@ fn commands_includes_blame_line_action() {
 
 #[test]
 fn commands_blame_line_has_expected_name() {
-    let entry = COMMANDS.iter().find(|c| c.action_id == "blame_line").unwrap();
+    let entry = COMMANDS
+        .iter()
+        .find(|c| c.action_id == "blame_line")
+        .unwrap();
     assert_eq!(entry.name, "Blame active line");
 }
