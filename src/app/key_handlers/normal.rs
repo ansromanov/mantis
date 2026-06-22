@@ -190,6 +190,7 @@ impl App {
 
                 if is_dir && self.expanded.contains(&path) {
                     self.expanded.remove(&path);
+                    self.mark_session_dirty();
                     self.rebuild();
                 } else if depth > 0 {
                     for i in (0..self.tree_selected).rev() {
@@ -243,6 +244,7 @@ impl App {
         let k = &self.keys;
         let scroll_before = self.content_scroll;
         let hscroll_before = self.content_hscroll;
+        let active_line_before = self.active_line;
         if self.is_markdown && pressed(&k.toggle_raw_markdown, &key) {
             self.show_raw_markdown = !self.show_raw_markdown;
             self.content_scroll = 0;
@@ -347,6 +349,9 @@ impl App {
         }
         if self.content_scroll != scroll_before || self.content_hscroll != hscroll_before {
             self.mark_content_scrolled();
+        }
+        if self.content_scroll != scroll_before || self.active_line != active_line_before {
+            self.mark_session_dirty();
         }
     }
 

@@ -6,8 +6,10 @@ use super::*;
 /// written by two tests concurrently when `cargo test` runs in parallel.
 static SESSION_LOCK: Mutex<()> = Mutex::new(());
 
-/// A per-test environment: creates a unique root directory under the
-/// system temp directory. Cleans up on drop.
+/// A per-test environment: creates a unique root and state directory under the
+/// system temp directory, then points `TV_STATE_DIR` at the isolated state dir
+/// so tests never touch the real `~/.local/state/tree-viewer/sessions.json`.
+/// Cleans up on drop.
 struct TestEnv {
     root: PathBuf,
 }
@@ -15,13 +17,17 @@ struct TestEnv {
 impl TestEnv {
     fn new(name: &str) -> Self {
         let root = std::env::temp_dir().join(format!("tv_session_{name}_{}", std::process::id()));
-        fs::create_dir_all(&root).unwrap();
+        let state = root.join("state");
+        fs::create_dir_all(&state).unwrap();
+        // Redirect session I/O away from the real state directory.
+        std::env::set_var("TV_STATE_DIR", &state);
         TestEnv { root }
     }
 }
 
 impl Drop for TestEnv {
     fn drop(&mut self) {
+        std::env::remove_var("TV_STATE_DIR");
         fs::remove_dir_all(&self.root).ok();
     }
 }
@@ -103,7 +109,7 @@ fn stale_current_file_is_filtered() {
 fn corrupt_file_returns_none() {
     let _lock = SESSION_LOCK.lock().unwrap();
     let env = TestEnv::new("corrupt");
-    // Write garbage to the sessions file
+    // Write garbage to the isolated sessions file (TV_STATE_DIR set by TestEnv).
     let mut p = state_dir().unwrap();
     p.push(SESSION_FILE_NAME);
     fs::write(&p, "not json at all").unwrap();

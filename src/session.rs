@@ -101,7 +101,12 @@ pub fn save(root: &Path, state: &SessionState) {
         });
     file.sessions.insert(root_key(root), state.clone());
     if let Ok(json) = serde_json::to_string_pretty(&file) {
-        let _ = fs::write(&path, json);
+        // Write to a sibling temp file then rename so a crash mid-write never
+        // leaves a truncated sessions.json.
+        let tmp = path.with_extension("json.tmp");
+        if fs::write(&tmp, &json).is_ok() {
+            let _ = fs::rename(&tmp, &path);
+        }
     }
 }
 

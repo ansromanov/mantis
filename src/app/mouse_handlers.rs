@@ -200,6 +200,7 @@ impl App {
         }
         if self.content_scroll != scroll_before {
             self.mark_content_scrolled();
+            self.mark_session_dirty();
         }
     }
 

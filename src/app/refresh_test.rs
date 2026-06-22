@@ -290,7 +290,6 @@ fn create_base_app() -> App {
         plugin_content_active: false,
         status_message: None,
         breadcrumb_areas: Vec::new(),
-        session_state: None,
         session_dirty: false,
         session_dirty_at: None,
         session_last_save: std::time::Instant::now(),

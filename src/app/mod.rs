@@ -325,10 +325,6 @@ pub struct App {
     /// Breadcrumb segment areas recorded during the last render, used for mouse
     /// hit-testing. Each entry is (target_directory_path, clickable_rect).
     pub breadcrumb_areas: Vec<(std::path::PathBuf, Rect)>,
-    /// Session state loaded from the cache. `None` when no state dir is
-    /// available or no cached session exists for this root. Used at startup
-    /// to restore expanded dirs, file, and scroll position.
-    pub session_state: Option<crate::session::SessionState>,
     /// When `true`, the session cache needs to be re-written.
     session_dirty: bool,
     /// When the session was last dirtied, for debounced writes.
@@ -539,7 +535,6 @@ impl App {
             plugin_content_active: false,
             status_message: None,
             breadcrumb_areas: Vec::new(),
-            session_state: None,
             session_dirty: false,
             session_dirty_at: None,
             session_last_save: Instant::now(),
@@ -589,7 +584,6 @@ impl App {
             }
         }
 
-        app.session_state = session_state;
         Ok(app)
     }
 
@@ -619,7 +613,6 @@ impl App {
             git_mode: self.git_mode,
         };
         crate::session::save(&self.root, &state);
-        self.session_state = Some(state);
         self.session_dirty = false;
         self.session_dirty_at = None;
         self.session_last_save = self.now();
