@@ -89,7 +89,7 @@ fn go_to_line_command_is_registered() {
 #[test]
 fn go_to_line_command_is_searchable_by_name() {
     let mut p = CommandPalette::default();
-    for c in "line".chars() {
+    for c in "Go to line".chars() {
         p.push(c);
     }
     let cmd = p.selected_command().unwrap();
