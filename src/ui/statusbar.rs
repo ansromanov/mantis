@@ -7,6 +7,11 @@
 //! and scroll percentage, and active mode flags. Colors come from the active
 //! theme. It is a read-only projection of `App`; it never mutates state and is
 //! drawn last so it always reflects the final per-frame state.
+//!
+//! On narrow terminals the bar elides low-priority segments so it never
+//! overflows `area.width`. Keybinding hints are dropped first, then YAML
+//! metadata and plugin/status messages, then badges and file info, then git
+//! info; error indicators and the version string are always shown.
 
 use ratatui::{
     layout::Rect,
@@ -19,227 +24,311 @@ use ratatui::{
 use crate::app::{App, Focus};
 use crate::git::{GitHead, GitRepoInfo};
 
+/// Priority levels for status-bar segments (higher = kept when eliding).
+const P_HINT: u8 = 0; // keybinding hints
+const P_META: u8 = 1; // YAML stats, plugin/status messages
+const P_INFO: u8 = 2; // badges, scroll %, file encoding
+const P_GIT: u8 = 3; // git branch info
+const P_ERR: u8 = 4; // error indicators
+const P_VER: u8 = 5; // version string
+
 pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
     let theme = &app.theme;
     let base = Style::default().bg(theme.selection_bg).fg(theme.text);
 
-    let spans: Vec<Span> = if app.goto_line.is_some() {
-        vec![Span::styled(
+    let line = if app.goto_line.is_some() {
+        overlay_line(
             " type line number  Enter jump  Esc cancel  +N forward  -N back",
             base,
-        )]
+            area.width,
+        )
     } else if app.theme_picker.is_some() {
-        vec![Span::styled(
+        overlay_line(
             " \u{2191}\u{2193} navigate  type to filter  Enter apply theme  Esc cancel",
             base,
-        )]
+            area.width,
+        )
     } else if app.history.is_some() {
-        vec![Span::styled(
+        overlay_line(
             " \u{2191}\u{2193} navigate  type to filter  Enter show diff  Esc cancel",
             base,
-        )]
+            area.width,
+        )
     } else if app.search.is_some() {
-        vec![Span::styled(
+        overlay_line(
             " \u{2191}\u{2193} navigate  Enter select  Tab toggle mode  Esc cancel",
             base,
-        )]
+            area.width,
+        )
     } else if app.visual_line.is_some() {
         let blame = if app.blame_panel {
             "  b hide blame"
         } else {
             "  b blame"
         };
-        vec![Span::styled(
-            format!(" VISUAL LINE  j/k extend  g/G top/bot{blame}  Esc exit"),
+        overlay_line(
+            &format!(" VISUAL LINE  j/k extend  g/G top/bot{blame}  Esc exit"),
             base,
-        )]
+            area.width,
+        )
     } else {
-        let mut spans = vec![];
-
-        // Accent style for active-mode badges; bold to stand apart from the
-        // dimmed hint text.
-        let badge = base.fg(theme.accent).add_modifier(Modifier::BOLD);
-        // Red+bold style for error indicators.
-        let error = base.fg(theme.diff_del).add_modifier(Modifier::BOLD);
-        // Hint text recedes behind the state indicators.
-        let hint_style = base.fg(theme.dim);
-
-        let hint = match app.focus {
-            Focus::Tree => {
-                " j/k nav  Enter/l expand  h collapse  / files  f content  t theme  Tab panel  q quit  ? help".to_string()
-            }
-            Focus::Content => {
-                let md = if app.is_markdown {
-                    if app.show_raw_markdown {
-                        "  M render"
-                    } else {
-                        "  M raw"
-                    }
-                } else if app.is_json && !app.json_pretty_lines.is_empty() {
-                    if app.show_pretty_json {
-                        "  J raw"
-                    } else {
-                        "  J pretty"
-                    }
-                } else {
-                    ""
-                };
-                let wrap = if app.word_wrap {
-                    "  z no-wrap"
-                } else {
-                    "  z wrap"
-                };
-                let hscroll = if app.word_wrap {
-                    ""
-                } else {
-                    "  \u{2190}/\u{2192} h-scroll  0 reset col"
-                };
-                let diff_hint = if app.is_diff {
-                    "  S mode  D side-by-side  n/N hunks"
-                } else {
-                    ""
-                };
-                format!(
-                    " j/k scroll  PgUp/PgDn{}  g/G top/bot  H history  Tab panel  q quit{}{}{}",
-                    hscroll, md, wrap, diff_hint
-                )
-            }
-        };
-        spans.push(Span::styled(hint, hint_style));
-
-        // Active-mode badges (only meaningful in the tree panel).
-        if matches!(app.focus, Focus::Tree) {
-            if app.show_hidden {
-                spans.push(Span::styled(" [hidden]", badge));
-            }
-            if app.git_mode {
-                let label = if app.git_mode_flat {
-                    " [git:flat]"
-                } else {
-                    " [git]"
-                };
-                spans.push(Span::styled(label, badge));
-            }
-        }
-
-        if app.auto_watch {
-            spans.push(Span::styled(" [watch]", badge));
-        }
-
-        if !app.plugin_manager.is_empty() {
-            spans.push(Span::styled(" [plugin]", badge));
-        }
-
-        if app.show_scroll_percentage && app.current_file.is_some() {
-            let max = app.content_scroll_max();
-            if max > 0 {
-                let pct = (app.content_scroll * 100)
-                    .checked_div(max)
-                    .unwrap_or(0)
-                    .min(100);
-                spans.push(Span::styled(format!("  {pct}%"), base));
-            }
-        }
-
-        // Active line number and detected language syntax name.
-        if app.current_file.is_some() && !app.is_diff {
-            let line = app.active_line + 1;
-            let pos = format!(" Ln {line}");
-            spans.push(Span::styled(pos, base.fg(theme.dim)));
-            if let Some(ref syn) = app.current_syntax {
-                spans.push(Span::styled(format!(" [{syn}]"), base.fg(theme.dim)));
-            }
-        }
-
-        // File encoding and line-ending info (only when a real file is open)
-        if app.show_file_info {
-            if let Some(ref enc) = app.file_encoding {
-                let (label, style) = if let Some(ref le) = app.file_line_ending {
-                    let style = if le == "mixed" {
-                        error
-                    } else {
-                        base.fg(theme.dim)
-                    };
-                    (format!(" [{enc} {le}]"), style)
-                } else {
-                    (format!(" [{enc}]"), base.fg(theme.dim))
-                };
-                spans.push(Span::styled(label, style));
-            }
-        }
-
-        // Plugin git info takes precedence over live git info.
-        if let Some(ref plugin) = app.plugin_git_info {
-            let fg = match plugin.state.as_str() {
-                "conflict" => theme.git_conflict,
-                "rebase" | "merge" => theme.git_progress,
-                "dirty" => theme.git_dirty,
-                _ => theme.git_clean,
-            };
-            let label = if plugin.dirty {
-                format!(" [{} +1]", plugin.branch)
-            } else {
-                format!(" [{}]", plugin.branch)
-            };
-            spans.push(Span::styled(label, base.fg(fg)));
-        } else if let Some(ref info) = app.git_info {
-            // Semantic git color: green clean, yellow dirty, red for a detached
-            // HEAD, orange while a rebase/merge is in progress.
-            let fg = match info.head {
-                GitHead::Detached => theme.git_conflict,
-                GitHead::Rebase | GitHead::Merge => theme.git_progress,
-                GitHead::Branch(_) if info.is_dirty() => theme.git_dirty,
-                GitHead::Branch(_) => theme.git_clean,
-            };
-            spans.push(Span::styled(git_info_str(info), base.fg(fg)));
-        }
-
-        if app.walk_errors > 0 {
-            spans.push(Span::styled(format!(" [!{}]", app.walk_errors), error));
-        }
-
-        if app.config_error.is_some() {
-            spans.push(Span::styled(" [config error]", error));
-        }
-
-        // YAML validation error indicator
-        if let Some(ref err) = app.yaml_error {
-            let label = err.lines().next().unwrap_or(err);
-            spans.push(Span::styled(format!(" [YAML: {label}]"), error));
-        }
-
-        // YAML anchor/alias/fold stats (only when a YAML file is open)
-        if !app.yaml_fold_regions.is_empty() {
-            let folded_count = app.yaml_folded.len();
-            let total_regions = app.yaml_fold_regions.len();
-            let anchor_info = if app.yaml_anchor_count > 0 || app.yaml_alias_count > 0 {
-                format!(" &{} *{}", app.yaml_anchor_count, app.yaml_alias_count)
-            } else {
-                String::new()
-            };
-            spans.push(Span::styled(
-                format!(" [Y{anchor_info} {folded_count}/{total_regions}]"),
-                base.fg(theme.accent),
-            ));
-        }
-
-        if let Some(ref msg) = app.plugin_message {
-            spans.push(Span::styled(format!(" {msg}"), base.fg(theme.accent)));
-        }
-
-        if let Some(ref msg) = app.status_message {
-            spans.push(Span::styled(format!(" {msg}"), base.fg(theme.accent)));
-        }
-
-        spans.push(Span::styled(
-            format!(" v{}", env!("CARGO_PKG_VERSION")),
-            base.fg(theme.dim),
-        ));
-
-        spans
+        build_normal_line(app, base, area.width)
     };
 
-    f.render_widget(Paragraph::new(Line::from(spans)).style(base), area);
+    f.render_widget(Paragraph::new(line).style(base), area);
+}
+
+/// Overlay hint text, truncated with ellipsis if it exceeds `max_width`.
+fn overlay_line(text: &str, style: Style, max_width: u16) -> Line<'static> {
+    let full = Span::styled(text.to_string(), style);
+    let w = full.width();
+    if w as u16 <= max_width {
+        return Line::from(vec![full]);
+    }
+    // Truncate with ellipsis: reserve 1 column for "…".
+    let prefix_len = (max_width as usize).saturating_sub(1);
+    let prefix: String = text.chars().take(prefix_len).collect();
+    let display = if prefix.is_empty() {
+        String::from("\u{2026}")
+    } else {
+        format!("{prefix}\u{2026}")
+    };
+    Line::from(vec![Span::styled(display, style)])
+}
+
+/// Normal (non-overlay) status bar with priority-based elision.
+fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
+    let badge = base.fg(app.theme.accent).add_modifier(Modifier::BOLD);
+    let err_style = base.fg(app.theme.diff_del).add_modifier(Modifier::BOLD);
+    let dim = base.fg(app.theme.dim);
+
+    let mut segs: Vec<(Span<'static>, u8)> = Vec::new();
+
+    // -- Priority 0: keybinding hint (dropped first) --
+    let hint = match app.focus {
+        Focus::Tree => {
+            " j/k nav  Enter/l expand  h collapse  / files  f content  t theme  Tab panel  q quit  ? help".to_string()
+        }
+        Focus::Content => {
+            let md = if app.is_markdown {
+                if app.show_raw_markdown {
+                    "  M render"
+                } else {
+                    "  M raw"
+                }
+            } else if app.is_json && !app.json_pretty_lines.is_empty() {
+                if app.show_pretty_json {
+                    "  J raw"
+                } else {
+                    "  J pretty"
+                }
+            } else {
+                ""
+            };
+            let wrap = if app.word_wrap {
+                "  z no-wrap"
+            } else {
+                "  z wrap"
+            };
+            let hscroll = if app.word_wrap {
+                ""
+            } else {
+                "  \u{2190}/\u{2192} h-scroll  0 reset col"
+            };
+            let diff_hint = if app.is_diff {
+                "  S mode  D side-by-side  n/N hunks"
+            } else {
+                ""
+            };
+            format!(
+                " j/k scroll  PgUp/PgDn{}  g/G top/bot  H history  Tab panel  q quit{}{}{}",
+                hscroll, md, wrap, diff_hint
+            )
+        }
+    };
+    segs.push((Span::styled(hint, dim), P_HINT));
+
+    // -- Priority 2: active-mode badges --
+    if matches!(app.focus, Focus::Tree) {
+        if app.show_hidden {
+            segs.push((Span::styled(" [hidden]", badge), P_INFO));
+        }
+        if app.git_mode {
+            let label = if app.git_mode_flat {
+                " [git:flat]"
+            } else {
+                " [git]"
+            };
+            segs.push((Span::styled(label, badge), P_INFO));
+        }
+    }
+    if app.auto_watch {
+        segs.push((Span::styled(" [watch]", badge), P_INFO));
+    }
+    if !app.plugin_manager.is_empty() {
+        segs.push((Span::styled(" [plugin]", badge), P_INFO));
+    }
+
+    // -- Priority 2: scroll percentage --
+    if app.show_scroll_percentage && app.current_file.is_some() {
+        let max = app.content_scroll_max();
+        if max > 0 {
+            let pct = (app.content_scroll * 100)
+                .checked_div(max)
+                .unwrap_or(0)
+                .min(100);
+            segs.push((Span::styled(format!("  {pct}%"), base), P_INFO));
+        }
+    }
+
+    // -- Priority 2: active line number and language indicator --
+    if app.current_file.is_some() && !app.is_diff {
+        let ln = app.active_line + 1;
+        segs.push((Span::styled(format!(" Ln {ln}"), dim), P_INFO));
+        if let Some(ref syn) = app.current_syntax {
+            segs.push((Span::styled(format!(" [{syn}]"), dim), P_INFO));
+        }
+    }
+
+    // -- Priority 2: file encoding info --
+    if app.show_file_info {
+        if let Some(ref enc) = app.file_encoding {
+            let (label, style) = if let Some(ref le) = app.file_line_ending {
+                let s = if le == "mixed" { err_style } else { dim };
+                (format!(" [{enc} {le}]"), s)
+            } else {
+                (format!(" [{enc}]"), dim)
+            };
+            segs.push((Span::styled(label, style), P_INFO));
+        }
+    }
+
+    // -- Priority 3: git info --
+    if let Some(ref plugin) = app.plugin_git_info {
+        let fg = match plugin.state.as_str() {
+            "conflict" => app.theme.git_conflict,
+            "rebase" | "merge" => app.theme.git_progress,
+            "dirty" => app.theme.git_dirty,
+            _ => app.theme.git_clean,
+        };
+        let label = if plugin.dirty {
+            format!(" [{} +1]", plugin.branch)
+        } else {
+            format!(" [{}]", plugin.branch)
+        };
+        segs.push((Span::styled(label, base.fg(fg)), P_GIT));
+    } else if let Some(ref info) = app.git_info {
+        let fg = match info.head {
+            GitHead::Detached => app.theme.git_conflict,
+            GitHead::Rebase | GitHead::Merge => app.theme.git_progress,
+            GitHead::Branch(_) if info.is_dirty() => app.theme.git_dirty,
+            GitHead::Branch(_) => app.theme.git_clean,
+        };
+        segs.push((Span::styled(git_info_str(info), base.fg(fg)), P_GIT));
+    }
+
+    // -- Priority 4: error indicators --
+    if app.walk_errors > 0 {
+        segs.push((
+            Span::styled(format!(" [!{}]", app.walk_errors), err_style),
+            P_ERR,
+        ));
+    }
+    if app.config_error.is_some() {
+        segs.push((Span::styled(" [config error]", err_style), P_ERR));
+    }
+    if let Some(ref err) = app.yaml_error {
+        let label = err.lines().next().unwrap_or(err);
+        segs.push((Span::styled(format!(" [YAML: {label}]"), err_style), P_ERR));
+    }
+
+    // -- Priority 1: YAML fold stats --
+    if !app.yaml_fold_regions.is_empty() {
+        let folded_count = app.yaml_folded.len();
+        let total_regions = app.yaml_fold_regions.len();
+        let anchor_info = if app.yaml_anchor_count > 0 || app.yaml_alias_count > 0 {
+            format!(" &{} *{}", app.yaml_anchor_count, app.yaml_alias_count)
+        } else {
+            String::new()
+        };
+        segs.push((
+            Span::styled(
+                format!(" [Y{anchor_info} {folded_count}/{total_regions}]"),
+                base.fg(app.theme.accent),
+            ),
+            P_META,
+        ));
+    }
+
+    // -- Priority 1: plugin / status messages --
+    if let Some(ref msg) = app.plugin_message {
+        segs.push((
+            Span::styled(format!(" {msg}"), base.fg(app.theme.accent)),
+            P_META,
+        ));
+    }
+    if let Some(ref msg) = app.status_message {
+        segs.push((
+            Span::styled(format!(" {msg}"), base.fg(app.theme.accent)),
+            P_META,
+        ));
+    }
+
+    // -- Priority 5: version (always kept) --
+    segs.push((
+        Span::styled(
+            format!(" v{}", env!("CARGO_PKG_VERSION")),
+            base.fg(app.theme.dim),
+        ),
+        P_VER,
+    ));
+
+    fit_segments(segs, max_width as usize)
+}
+
+/// From a list of `(Span, priority)` pairs, return a `Line` containing a
+/// subset that fits within `max_width`.  Higher-priority items are kept
+/// first; within the same priority level, items further to the right
+/// (added later) are dropped before items on the left.
+fn fit_segments(segs: Vec<(Span<'static>, u8)>, max_width: usize) -> Line<'static> {
+    if segs.is_empty() || max_width == 0 {
+        return Line::from(Vec::<Span>::new());
+    }
+
+    // Fast path: everything fits.
+    let total: usize = segs.iter().map(|(s, _)| s.width()).sum();
+    if total <= max_width {
+        return Line::from(segs.into_iter().map(|(s, _)| s).collect::<Vec<_>>());
+    }
+
+    let n = segs.len();
+    let mut keep = vec![true; n];
+
+    // Indices sorted by priority (ascending) then position (descending),
+    // so we remove lowest-priority, rightmost items first.
+    let mut order: Vec<usize> = (0..n).collect();
+    order.sort_by(|&a, &b| segs[a].1.cmp(&segs[b].1).then(b.cmp(&a)));
+
+    let mut current_width = total;
+
+    for idx in order {
+        if current_width <= max_width {
+            break;
+        }
+        if keep[idx] {
+            current_width -= segs[idx].0.width();
+            keep[idx] = false;
+        }
+    }
+
+    let final_spans: Vec<Span<'static>> = segs
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| keep[*i])
+        .map(|(_, s)| s.0)
+        .collect();
+
+    Line::from(final_spans)
 }
 
 fn git_info_str(info: &GitRepoInfo) -> String {
