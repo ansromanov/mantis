@@ -34,6 +34,8 @@
 //!    a `syntax_file` path.  Additionally, any `.sublime-syntax` file placed
 //!    in `{plugin_dir}/syntaxes/` is auto-discovered.
 
+pub mod manifest;
+
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -829,3 +831,7 @@ pub(crate) static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 #[cfg(test)]
 #[path = "mod_test.rs"]
 mod plugin_test;
+
+#[cfg(test)]
+#[path = "manifest_test.rs"]
+mod manifest_tests;
