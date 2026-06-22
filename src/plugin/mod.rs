@@ -715,7 +715,7 @@ const BUNDLED_PLUGINS: &[(&str, &str)] = &[
 /// Installed to `{plugin_dir}/syntaxes/` by `install_bundled_plugins()`.
 const BUNDLED_SYNTAX_PLUGINS: &[(&str, &str)] = &[(
     "terraform.sublime-syntax",
-    include_str!("../plugins/terraform.sublime-syntax"),
+    include_str!("../../plugins/terraform.sublime-syntax"),
 )];
 
 /// Copies every bundled plugin to the plugin directory if it doesn't already
@@ -827,5 +827,5 @@ fn set_executable(_path: &Path) {}
 pub(crate) static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[cfg(test)]
-#[path = "plugin_test.rs"]
+#[path = "mod_test.rs"]
 mod plugin_test;

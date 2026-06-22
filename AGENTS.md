@@ -75,7 +75,8 @@ src/
 ├── git.rs                          # Shell-out to git: log, diff, blame, status, repo_info
 ├── highlight.rs                    # syntect Highlighter → ratatui Style spans
 ├── markdown.rs                     # pulldown-cmark → styled ratatui spans
-├── plugin.rs                       # Plugin, PluginManager, PluginKind, ExtraSyntax; subprocess IPC
+├── plugin/
+│   └── mod.rs                      # Plugin, PluginManager, PluginKind, ExtraSyntax; subprocess IPC
 ├── release_info.rs                 # Compile-time release metadata (ReleaseInfo, RELEASE static)
 ├── search.rs                       # SearchState, HistoryState, ThemePicker, InFileSearch,
 │                                   #   RecentFilesState, PluginPicker (SkimMatcherV2)
@@ -119,7 +120,7 @@ once they get large: a thin `mod.rs` re-exports focused submodules.
    content is a `VirtualFile`, `Vec<String>`, JSON pretty-print, or markdown spans;
    everything calls `app.line_count()` / `app.line_text(n)`.
 10. **Plugin IPC.** Plugins are external processes communicating over stdin/stdout
-    JSON lines (`plugin.rs`). `PluginManager` spawns, kills, and routes actions;
+    JSON lines (`plugin/mod.rs`). `PluginManager` spawns, kills, and routes actions;
     the content pane can be taken over by plugin-provided ANSI text (`ansi.rs`).
 
 ---
@@ -157,8 +158,8 @@ Quick lookup: type/function → file. Use this before grepping.
 | `DiffRow` / `parse_side_by_side` | `src/diff.rs` | Diff parse/render types |
 | `GitRepoInfo` / `GitStatus` / `Commit` / `BlameLine` | `src/git.rs` | Git shell-out types |
 | `FoldRegion` / `detect_fold_regions` | `src/yaml_fold.rs` | YAML fold regions |
-| `Plugin` / `PluginManager` / `PluginKind` | `src/plugin.rs` | Plugin subprocess IPC |
-| `ExtraSyntax` / `PluginEntry` | `src/plugin.rs` | Plugin-registered syntaxes |
+| `Plugin` / `PluginManager` / `PluginKind` | `src/plugin/mod.rs` | Plugin subprocess IPC |
+| `ExtraSyntax` / `PluginEntry` | `src/plugin/mod.rs` | Plugin-registered syntaxes |
 | `ReleaseInfo` / `RELEASE` | `src/release_info.rs` | Embedded release metadata |
 | `parse_ansi_line` | `src/ansi.rs` | ANSI SGR → ratatui Span |
 | `Config` / `Keymap` | `src/config/mod.rs` | tv.toml deserialization |
@@ -229,7 +230,7 @@ user-visible feature (config keys, keybindings, plugin protocol, new UI modes)
 same way as the `//!` module-doc rule: part of the PR, not a follow-up.
 
 Key pages to consider when changing code:
-- Plugin system (`src/plugin.rs`, `src/config/mod.rs`) → `docs/src/plugins.md`,
+- Plugin system (`src/plugin/mod.rs`, `src/config/mod.rs`) → `docs/src/plugins.md`,
   `docs/src/plugin-development.md`
 - Config options (`src/config/`) → `docs/src/configuration.md`
 - Keybindings (`src/config/mod.rs`, `tv.toml`) → `docs/src/configuration.md`
