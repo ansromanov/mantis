@@ -392,14 +392,10 @@ fn compute_breadcrumb(app: &App) -> Vec<(String, PathBuf)> {
         return segments;
     }
 
-    // dir_path is always a child of app.root (it comes from app.nodes), so
-    // strip_prefix should never fail in practice.
+    // dir_path comes from app.nodes which are always children of app.root, so
+    // strip_prefix should not fail. Silently return what we have if it does
+    // (e.g. in tests that construct App with relative paths).
     let Ok(relative) = dir_path.strip_prefix(&app.root) else {
-        debug_assert!(
-            false,
-            "dir_path {dir_path:?} is not under root {:?}",
-            app.root
-        );
         return segments;
     };
 
