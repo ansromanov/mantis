@@ -105,3 +105,7 @@ pub(crate) fn draw_line_blame(f: &mut Frame, app: &App, area: Rect) {
 
     f.render_widget(Paragraph::new(rows), inner);
 }
+
+#[cfg(test)]
+#[path = "line_blame_test.rs"]
+mod line_blame_tests;

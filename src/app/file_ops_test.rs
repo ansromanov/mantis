@@ -122,3 +122,22 @@ fn open_recent_files_opens_overlay_with_non_current_paths() {
     assert_eq!(state.paths[0], b);
     fs::remove_dir_all(&root).ok();
 }
+
+// -- active_line / show_line_blame reset on navigation ----------------------
+
+#[test]
+fn open_file_resets_active_line_and_blame_popup() {
+    let root = temp_dir();
+    let a = root.join("a.txt");
+    let b = root.join("b.txt");
+    fs::write(&a, "line1\nline2\n").unwrap();
+    fs::write(&b, "other\n").unwrap();
+    let mut app = app_for(&root);
+    app.open_file(&a);
+    app.active_line = 5;
+    app.show_line_blame = true;
+    app.open_file(&b);
+    assert_eq!(app.active_line, 0, "active_line must reset on file open");
+    assert!(!app.show_line_blame, "show_line_blame must close on file open");
+    fs::remove_dir_all(&root).ok();
+}

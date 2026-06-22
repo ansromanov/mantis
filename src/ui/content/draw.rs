@@ -670,3 +670,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
 
     draw_content_scrollbar(f, app, inner_x, inner_y, inner_w, inner_h);
 }
+
+#[cfg(test)]
+#[path = "draw_test.rs"]
+mod draw_tests;
