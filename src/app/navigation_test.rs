@@ -17,6 +17,25 @@ fn temp_tree() -> PathBuf {
     dir.canonicalize().unwrap()
 }
 
+fn deep_tree() -> PathBuf {
+    static COUNTER: AtomicUsize = AtomicUsize::new(0);
+    let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+    let dir = std::env::temp_dir().join(format!("tv_nav_test_{}_{n}", std::process::id()));
+    fs::create_dir_all(dir.join("sub1").join("sub2").join("sub3")).unwrap();
+    fs::write(dir.join("top.txt"), "top\n").unwrap();
+    fs::write(dir.join("sub1").join("mid.txt"), "mid\n").unwrap();
+    fs::write(dir.join("sub1").join("sub2").join("deep.txt"), "deep\n").unwrap();
+    fs::write(
+        dir.join("sub1")
+            .join("sub2")
+            .join("sub3")
+            .join("deepest.txt"),
+        "deepest\n",
+    )
+    .unwrap();
+    dir.canonicalize().unwrap()
+}
+
 fn app_for(root: &std::path::Path) -> App {
     App::new(root.to_path_buf(), Config::default(), None, None).unwrap()
 }
@@ -139,6 +158,155 @@ fn collapse_all_selects_nearest_ancestor_for_nested_selection() {
         app.nodes[app.tree_selected].path,
         root.join("sub"),
         "collapse_all must select the nearest visible ancestor when the selected path is hidden"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn navigate_to_breadcrumb_root_selects_index_zero() {
+    let root = deep_tree();
+    let mut app = app_for(&root);
+
+    // Expand sub1 and select a deeply nested file.
+    app.expanded.insert(root.join("sub1"));
+    app.expanded.insert(root.join("sub1").join("sub2"));
+    app.expanded
+        .insert(root.join("sub1").join("sub2").join("sub3"));
+    app.rebuild();
+    let deepest = root
+        .join("sub1")
+        .join("sub2")
+        .join("sub3")
+        .join("deepest.txt");
+    app.tree_selected = app.nodes.iter().position(|n| n.path == deepest).unwrap();
+
+    // Navigate to root via breadcrumb.
+    app.navigate_to_breadcrumb(&root);
+
+    assert_eq!(app.tree_selected, 0, "root should be selected at index 0");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn navigate_to_breadcrumb_selects_intermediate_dir() {
+    let root = deep_tree();
+    let mut app = app_for(&root);
+
+    // Expand all directories and select the deepest file.
+    app.expanded.insert(root.join("sub1"));
+    app.expanded.insert(root.join("sub1").join("sub2"));
+    app.expanded
+        .insert(root.join("sub1").join("sub2").join("sub3"));
+    app.rebuild();
+    let deepest = root
+        .join("sub1")
+        .join("sub2")
+        .join("sub3")
+        .join("deepest.txt");
+    app.tree_selected = app.nodes.iter().position(|n| n.path == deepest).unwrap();
+
+    let sub2 = root.join("sub1").join("sub2");
+    app.navigate_to_breadcrumb(&sub2);
+
+    let selected_path = app.nodes[app.tree_selected].path.clone();
+    assert_eq!(
+        selected_path, sub2,
+        "navigate_to_breadcrumb should select sub2"
+    );
+    assert!(
+        app.expanded.contains(&sub2),
+        "target directory should be in expanded set"
+    );
+    assert!(
+        app.expanded.contains(&root.join("sub1")),
+        "ancestor sub1 should remain expanded"
+    );
+    assert!(
+        app.nodes
+            .iter()
+            .any(|n| n.path == root.join("sub1").join("sub2").join("deep.txt")),
+        "sub2 children should be visible"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn navigate_to_breadcrumb_expands_ancestors_of_unexpanded_target() {
+    let root = deep_tree();
+    let mut app = app_for(&root);
+
+    // Select top.txt at root level — no directories expanded.
+    let top = root.join("top.txt");
+    app.tree_selected = app.nodes.iter().position(|n| n.path == top).unwrap();
+
+    // Navigate to sub2 which is not currently expanded.
+    let sub2 = root.join("sub1").join("sub2");
+    app.navigate_to_breadcrumb(&sub2);
+
+    assert!(
+        app.expanded.contains(&root.join("sub1")),
+        "ancestor sub1 should be expanded"
+    );
+    assert!(
+        app.expanded.contains(&sub2),
+        "target sub2 should be expanded"
+    );
+    let selected_path = app.nodes[app.tree_selected].path.clone();
+    assert_eq!(
+        selected_path, sub2,
+        "breadcrumb navigation should select sub2"
+    );
+    assert!(
+        app.nodes.iter().any(|n| n.path == sub2.join("deep.txt")),
+        "sub2 children should be visible after ancestor expansion"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn navigate_to_breadcrumb_outside_root_changes_root() {
+    let root = deep_tree();
+    let mut app = app_for(&root);
+    let orig_root = root.clone();
+
+    // Navigate to a parent of the current root (simulating clicking ".." in
+    // the breadcrumb). This should change the viewer root to the parent.
+    let parent = root.parent().expect("temp dir has a parent").to_path_buf();
+    app.navigate_to_breadcrumb(&parent);
+
+    assert_eq!(app.root, parent, "root should change to parent");
+    assert!(app.expanded.is_empty(), "expanded should be cleared");
+    assert!(app.current_file.is_none(), "current file should be cleared");
+    assert!(
+        !app.nodes.is_empty(),
+        "parent directory should have contents"
+    );
+    fs::remove_dir_all(&orig_root).ok();
+}
+
+#[test]
+fn navigate_to_breadcrumb_preserves_other_expansions() {
+    let root = deep_tree();
+    let mut app = app_for(&root);
+
+    // Expand sub1 + sub1/sub2 and keep them open.
+    app.expanded.insert(root.join("sub1"));
+    app.expanded.insert(root.join("sub1").join("sub2"));
+    app.rebuild();
+
+    let top = root.join("top.txt");
+    app.tree_selected = app.nodes.iter().position(|n| n.path == top).unwrap();
+
+    // Navigate to root — unrelated nodes should stay expanded.
+    app.navigate_to_breadcrumb(&root);
+
+    assert!(
+        app.expanded.contains(&root.join("sub1")),
+        "unrelated expansions should be preserved"
+    );
+    assert!(
+        app.expanded.contains(&root.join("sub1").join("sub2")),
+        "nested unrelated expansions should be preserved"
     );
     fs::remove_dir_all(&root).ok();
 }

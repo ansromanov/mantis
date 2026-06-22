@@ -346,10 +346,10 @@ fn highlight_matches(
     spans
 }
 
-/// Computes breadcrumb path segments from the selected tree node to root.
-/// Returns a list of (label, target_directory_path) pairs ordered root-first.
-/// Always includes at least the root segment when a node is selected; returns
-/// empty only when there are no nodes or the path cannot be relativized to root.
+/// Computes breadcrumb path segments from the selected tree node up to the
+/// filesystem root (`/`). Returns a list of (label, target_directory_path)
+/// pairs ordered root-first. Always includes at least the root segment when a
+/// node is selected; returns empty only when there are no nodes.
 fn compute_breadcrumb(app: &App) -> Vec<(String, PathBuf)> {
     let Some(node) = app.nodes.get(app.tree_selected) else {
         return Vec::new();
@@ -362,7 +362,6 @@ fn compute_breadcrumb(app: &App) -> Vec<(String, PathBuf)> {
             Some(p) => {
                 let p = p.to_path_buf();
                 if p.as_os_str().is_empty() {
-                    // Relative path like "file.rs" has parent "" which means root.
                     app.root.clone()
                 } else {
                     p
@@ -372,20 +371,32 @@ fn compute_breadcrumb(app: &App) -> Vec<(String, PathBuf)> {
         }
     };
 
-    let root_label = app
-        .root
-        .file_name()
-        .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_else(|| "/".to_string());
-
-    let mut segments = vec![(root_label, app.root.clone())];
+    // Build segments from the filesystem root (/) down through app.root.
+    // Walk leaf-first, then reverse once so we allocate only one Vec.
+    let mut segments: Vec<(String, PathBuf)> = Vec::new();
+    let mut current = app.root.as_path();
+    loop {
+        let label = current
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| "/".to_string());
+        segments.push((label, current.to_path_buf()));
+        match current.parent() {
+            Some(parent) if parent != current => current = parent,
+            _ => break,
+        }
+    }
+    segments.reverse();
 
     if dir_path == app.root {
         return segments;
     }
 
+    // dir_path comes from app.nodes which are always children of app.root, so
+    // strip_prefix should not fail. Silently return what we have if it does
+    // (e.g. in tests that construct App with relative paths).
     let Ok(relative) = dir_path.strip_prefix(&app.root) else {
-        return Vec::new();
+        return segments;
     };
 
     let mut cumulative = app.root.clone();
