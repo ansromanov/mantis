@@ -516,7 +516,10 @@ fn narrow_keeps_errors_over_badges() {
     // [!3] (P_ERR=4) and version (P_VER=5).
     let text = render_bar_width(&app, 19);
     assert!(text.contains("[!3]"), "errors should be kept at width 19");
-    assert!(text.contains(&format!("v{}", env!("CARGO_PKG_VERSION"))), "version should be kept");
+    assert!(
+        text.contains(&format!("v{}", env!("CARGO_PKG_VERSION"))),
+        "version should be kept"
+    );
     assert!(!text.contains("[hidden]"), "badges elided before errors");
 }
 
@@ -537,7 +540,10 @@ fn narrow_keeps_git_over_badges() {
     // Git (P_GIT=3) and version (P_VER=5) stay.
     let text = render_bar_width(&app, 20);
     assert!(text.contains("[main ↑2]"), "git info kept at width 20");
-    assert!(text.contains(&format!("v{}", env!("CARGO_PKG_VERSION"))), "version kept");
+    assert!(
+        text.contains(&format!("v{}", env!("CARGO_PKG_VERSION"))),
+        "version kept"
+    );
     assert!(!text.contains("[hidden]"), "badge elided before git info");
 }
 
@@ -557,7 +563,10 @@ fn narrow_keeps_git_info() {
         text.contains("[main ↑1 ↓2 +3]"),
         "git info kept at width 45"
     );
-    assert!(text.contains(&format!("v{}", env!("CARGO_PKG_VERSION"))), "version kept");
+    assert!(
+        text.contains(&format!("v{}", env!("CARGO_PKG_VERSION"))),
+        "version kept"
+    );
 }
 
 #[test]
@@ -569,7 +578,10 @@ fn narrow_keeps_config_error() {
         text.contains("[config error]"),
         "config error kept at width 30"
     );
-    assert!(text.contains(&format!("v{}", env!("CARGO_PKG_VERSION"))), "version kept");
+    assert!(
+        text.contains(&format!("v{}", env!("CARGO_PKG_VERSION"))),
+        "version kept"
+    );
 }
 
 #[test]
@@ -585,7 +597,10 @@ fn narrow_drops_meta_before_badges() {
         !text.contains("hello"),
         "status message (P_META) should be elided before badges"
     );
-    assert!(text.contains(&format!("v{}", env!("CARGO_PKG_VERSION"))), "version kept");
+    assert!(
+        text.contains(&format!("v{}", env!("CARGO_PKG_VERSION"))),
+        "version kept"
+    );
 }
 
 #[test]
