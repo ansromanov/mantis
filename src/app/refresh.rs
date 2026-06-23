@@ -269,6 +269,30 @@ impl App {
                     self.content_scroll = 0;
                     self.content_hscroll = 0;
                 }
+                "set_fold_regions" => {
+                    let path = match params.get("path").and_then(|v| v.as_str()) {
+                        Some(p) => std::path::PathBuf::from(p),
+                        None => continue,
+                    };
+                    let regions: Vec<crate::fold::FoldRegion> = params
+                        .get("regions")
+                        .and_then(|v| v.as_array())
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(|r| {
+                                    let pair = r.as_array()?;
+                                    let start = pair.first()?.as_i64()? as usize;
+                                    let end = pair.get(1)?.as_i64()? as usize;
+                                    Some(crate::fold::FoldRegion { start, end })
+                                })
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    self.plugin_fold_regions.insert(path.clone(), regions);
+                    if self.current_file.as_deref() == Some(&path) {
+                        self.apply_plugin_fold_regions(&path);
+                    }
+                }
                 _ => {}
             }
         }

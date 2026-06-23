@@ -26,6 +26,7 @@ use notify::RecommendedWatcher;
 use ratatui::layout::Rect;
 
 use crate::config::{self, Config, Keymap};
+use crate::fold::FoldRegion;
 use crate::git::GitStatus;
 use crate::highlight::Highlighter;
 use crate::plugin::{self, ExtraSyntax, PluginManager};
@@ -37,18 +38,17 @@ use crate::selection::{TextSelection, VisualLine};
 use crate::theme::Theme;
 use crate::tree::{build_visible, TreeNode};
 use crate::virtual_file::VirtualFile;
-use crate::yaml_fold::FoldRegion;
 
 mod content_pos;
 mod content_query;
 mod diff_nav;
 mod file_ops;
+mod fold;
 mod key_handlers;
 mod loader;
 mod mouse_handlers;
 mod navigation;
 mod refresh;
-mod yaml_fold;
 
 use loader::Loader;
 
@@ -278,14 +278,18 @@ pub struct App {
     /// Set to `true` after suspending the TUI (e.g. for editor), signals
     /// `main.rs` to call `terminal.clear()` before the next `draw()`.
     pub needs_clear: bool,
-    // YAML folding state
-    pub yaml_fold_regions: Vec<FoldRegion>,
-    pub yaml_folded: HashSet<usize>,
+    // Folding state (YAML built-in, or plugin-provided)
+    pub fold_regions: Vec<FoldRegion>,
+    pub folded: HashSet<usize>,
     /// display_line → physical_line mapping; empty when no folds are active.
     pub fold_display_map: Vec<usize>,
     /// (screen_y, region_idx) pairs recorded during the last render, used for
     /// fold-gutter mouse click detection.
     pub fold_gutter_rows: Vec<(u16, usize)>,
+    /// Per-path fold regions provided by plugins, keyed by absolute path.
+    /// Checked when a file is opened; overrides the built-in YAML fold regions
+    /// when present for the current file.
+    pub plugin_fold_regions: HashMap<PathBuf, Vec<FoldRegion>>,
     /// YAML parse error message, if any (set when opening a `.yaml`/`.yml` file).
     pub yaml_error: Option<String>,
     /// Number of YAML anchors (`&name`) found in the current file.
@@ -518,10 +522,11 @@ impl App {
             scrollbar_drag: false,
             splitter_drag: false,
             needs_clear: false,
-            yaml_fold_regions: Vec::new(),
-            yaml_folded: HashSet::new(),
+            fold_regions: Vec::new(),
+            folded: HashSet::new(),
             fold_display_map: Vec::new(),
             fold_gutter_rows: Vec::new(),
+            plugin_fold_regions: HashMap::new(),
             yaml_error: None,
             yaml_anchor_count: 0,
             yaml_alias_count: 0,

@@ -120,15 +120,15 @@ impl App {
             Some("open_in_editor") => self.open_in_editor(),
             Some("open_config_in_editor") => self.open_config_in_editor(),
             Some("show_about") => self.show_about = !self.show_about,
-            Some("yaml_fold_all") if !self.yaml_fold_regions.is_empty() => {
+            Some("fold_all") | Some("yaml_fold_all") if !self.fold_regions.is_empty() => {
                 self.fold_all();
                 self.mark_content_scrolled();
             }
-            Some("yaml_unfold_all") if !self.yaml_fold_regions.is_empty() => {
+            Some("unfold_all") | Some("yaml_unfold_all") if !self.fold_regions.is_empty() => {
                 self.unfold_all();
                 self.mark_content_scrolled();
             }
-            Some("yaml_fold_toggle") if !self.yaml_fold_regions.is_empty() => {
+            Some("fold_toggle") | Some("yaml_fold_toggle") if !self.fold_regions.is_empty() => {
                 let phys = self.display_to_physical(self.content_scroll);
                 if let Some(ri) = self.region_idx_at(phys) {
                     self.toggle_fold_region(ri);

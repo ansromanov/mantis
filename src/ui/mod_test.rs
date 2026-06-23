@@ -28,7 +28,7 @@ fn buffer_rows(terminal: &Terminal<TestBackend>) -> Vec<String> {
 }
 
 fn render(app: &mut App) -> Vec<String> {
-    let backend = TestBackend::new(80, 30);
+    let backend = TestBackend::new(120, 30);
     let mut terminal = Terminal::new(backend).unwrap();
     terminal.draw(|f| super::draw(f, app)).unwrap();
     buffer_rows(&terminal)

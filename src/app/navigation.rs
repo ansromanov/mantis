@@ -307,8 +307,8 @@ impl App {
         self.visual_line = None;
         self.blame_panel = false;
         self.drag_start = None;
-        self.yaml_fold_regions = Vec::new();
-        self.yaml_folded = HashSet::new();
+        self.fold_regions = Vec::new();
+        self.folded = HashSet::new();
         self.fold_display_map = Vec::new();
         self.yaml_error = None;
         self.yaml_anchor_count = 0;

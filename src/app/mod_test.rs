@@ -3,8 +3,8 @@ use std::fs;
 use super::*;
 use crate::command_palette::COMMANDS;
 use crate::config::Config;
+use crate::fold::FoldRegion;
 use crate::search::{GotoLineState, InFileMatch, SearchMode, TreeFilter};
-use crate::yaml_fold::FoldRegion;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -3761,7 +3761,7 @@ fn line_prefix_width_with_fold_gutter() {
     let mut app = app_for(&root);
     app.content = vec!["hello".to_string(); 10];
     // Simulate YAML fold regions
-    app.yaml_fold_regions = vec![crate::yaml_fold::FoldRegion { start: 0, end: 5 }];
+    app.fold_regions = vec![crate::fold::FoldRegion { start: 0, end: 5 }];
     // fold_gutter_width = 2, line_width = len("10") + 1 = 3, total = 2 + 3 = 5
     assert_eq!(app.line_prefix_width(), 5);
     fs::remove_dir_all(&root).ok();
@@ -3961,7 +3961,7 @@ fn fold_gutter_width_zero_when_no_regions() {
 fn fold_gutter_width_two_when_regions_exist() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.yaml_fold_regions = vec![crate::yaml_fold::FoldRegion { start: 0, end: 3 }];
+    app.fold_regions = vec![crate::fold::FoldRegion { start: 0, end: 3 }];
     assert_eq!(app.fold_gutter_width(), 2);
     fs::remove_dir_all(&root).ok();
 }
@@ -4125,17 +4125,17 @@ fn dispatch_command_yaml_unfold_all_works() {
         "  child1: 1".to_string(),
         "  child2: 2".to_string(),
     ];
-    app.yaml_fold_regions = vec![FoldRegion { start: 0, end: 2 }];
-    app.yaml_folded.insert(0);
+    app.fold_regions = vec![FoldRegion { start: 0, end: 2 }];
+    app.folded.insert(0);
     app.rebuild_fold_display_map();
     assert_eq!(
         app.fold_display_map,
         vec![0],
         "folded should show only header"
     );
-    setup_command(&mut app, "yaml_unfold_all");
+    setup_command(&mut app, "unfold_all");
     app.dispatch_command();
-    assert!(app.yaml_folded.is_empty());
+    assert!(app.folded.is_empty());
     assert!(app.fold_display_map.is_empty());
     fs::remove_dir_all(&root).ok();
 }
@@ -4145,13 +4145,13 @@ fn dispatch_command_yaml_fold_toggle_toggles() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.content = vec!["header".to_string(), "  child".to_string()];
-    app.yaml_fold_regions = vec![FoldRegion { start: 0, end: 1 }];
+    app.fold_regions = vec![FoldRegion { start: 0, end: 1 }];
     app.rebuild_fold_display_map();
-    setup_command(&mut app, "yaml_fold_toggle");
-    assert!(app.yaml_folded.is_empty());
+    setup_command(&mut app, "fold_toggle");
+    assert!(app.folded.is_empty());
     app.dispatch_command();
     // The region at content_scroll (0) should be folded
-    assert!(app.yaml_folded.contains(&0));
+    assert!(app.folded.contains(&0));
     fs::remove_dir_all(&root).ok();
 }
 
@@ -4204,12 +4204,12 @@ fn content_key_yaml_fold_toggle_toggles() {
     let mut app = app_for(&root);
     app.open_file(&root.join("a.txt"));
     app.focus = Focus::Content;
-    app.yaml_fold_regions = vec![FoldRegion { start: 0, end: 1 }];
+    app.fold_regions = vec![FoldRegion { start: 0, end: 1 }];
     app.rebuild_fold_display_map();
-    assert!(app.yaml_folded.is_empty());
+    assert!(app.folded.is_empty());
     // Space is the yaml_fold_toggle binding
     app.handle_key(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::empty()));
-    assert!(app.yaml_folded.contains(&0));
+    assert!(app.folded.contains(&0));
     fs::remove_dir_all(&root).ok();
 }
 
@@ -4285,12 +4285,12 @@ fn mouse_fold_gutter_click_toggles_region() {
         width: 10,
         height: 10,
     };
-    app.yaml_fold_regions = vec![FoldRegion { start: 0, end: 1 }];
+    app.fold_regions = vec![FoldRegion { start: 0, end: 1 }];
     app.fold_gutter_rows = vec![(0, 0)];
-    assert!(app.yaml_folded.is_empty());
+    assert!(app.folded.is_empty());
     // Click at (col=0, row=0) which is in the fold gutter
     app.handle_mouse(click(0, 0));
-    assert!(app.yaml_folded.contains(&0));
+    assert!(app.folded.contains(&0));
     fs::remove_dir_all(&root).ok();
 }
 

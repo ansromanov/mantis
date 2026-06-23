@@ -158,6 +158,17 @@ Opens a file in the content panel.
 {"event":"action","action":"open_file","params":{"path":"/tmp/output.txt"}}
 ```
 
+### `set_fold_regions`
+
+Provides fold regions for a file, overriding the built-in YAML indentation-based
+folding. The plugin receives `on_file_open`, computes foldable blocks, and sends
+the regions back. Each region is a `[start_line, end_line]` pair (0-indexed,
+inclusive). When a file is re-opened, the previously stored regions are re-applied.
+
+```json
+{"event":"action","action":"set_fold_regions","params":{"path":"/absolute/path/to/file","regions":[[0,5],[10,20]]}}
+```
+
 ### `set_content`
 
 Replaces the content panel with the given lines. Each line is a string that may
