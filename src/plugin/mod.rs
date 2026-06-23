@@ -35,6 +35,7 @@
 //!    in `{plugin_dir}/syntaxes/` is auto-discovered.
 
 pub mod manifest;
+pub mod registry;
 
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
