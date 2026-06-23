@@ -3,7 +3,7 @@
 //! Persists and restores expanded directories, the last-opened file,
 //! scroll/active-line position, and git-mode state across `tv` restarts.
 //! State is cached outside the working directory (under
-//! `$XDG_STATE_HOME/tree-viewer/` on Linux/macOS, `%APPDATA%\tree-viewer\`
+//! `$XDG_STATE_HOME/tree-viewer/` on Linux/macOS, `%APPDATA%\\tree-viewer\\`
 //! on Windows) so it survives re-clones and never litters the project tree.
 //!
 //! The on-disk format is a single `sessions.json` mapping canonical root paths
@@ -122,7 +122,14 @@ fn root_key(root: &Path) -> String {
             .unwrap_or_else(|| root.to_path_buf())
     };
     // Normalise: strip trailing separator so `/repo/` and `/repo` match.
-    let s = canonical.to_string_lossy().to_string();
+    // Use lossless encoding: valid UTF-8 paths are kept as-is; non-UTF-8 paths
+    // are hex-encoded so distinct byte sequences never map to the same key.
+    let bytes = canonical.as_os_str().as_encoded_bytes();
+    let s = if let Ok(utf8) = std::str::from_utf8(bytes) {
+        utf8.to_string()
+    } else {
+        format!("hex:{}", bytes.iter().map(|b| format!("{b:02x}")).collect::<String>())
+    };
     s.trim_end_matches(std::path::MAIN_SEPARATOR).to_string()
 }
 
