@@ -42,7 +42,10 @@ fn draw_no_overlay() {
     assert!(joined.contains("tv") || joined.contains("tree-viewer"));
     // The version badge (P_VER, highest priority) fills the 80-char status bar;
     // the 92-char keybinding hint is correctly elided at this width.
-    assert!(rows[29].contains("v0.7"), "status bar should show version string");
+    assert!(
+        rows[29].contains("v0.7"),
+        "status bar should show version string"
+    );
 }
 
 #[test]

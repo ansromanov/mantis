@@ -128,7 +128,10 @@ fn root_key(root: &Path) -> String {
     let s = if let Ok(utf8) = std::str::from_utf8(bytes) {
         utf8.to_string()
     } else {
-        format!("hex:{}", bytes.iter().map(|b| format!("{b:02x}")).collect::<String>())
+        format!(
+            "hex:{}",
+            bytes.iter().map(|b| format!("{b:02x}")).collect::<String>()
+        )
     };
     s.trim_end_matches(std::path::MAIN_SEPARATOR).to_string()
 }
