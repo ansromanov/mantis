@@ -484,7 +484,7 @@ fn syntax_name_hidden_when_none() {
 fn narrow5_shows_empty_bar() {
     let app = make_app();
     let text = render_bar_width(&app, 5);
-    // At width 5 even the version string (" v0.7.12", 8 chars) can't fit.
+    // At width 5 even the version string can't fit.
     let trimmed = text.trim_end_matches(' ');
     assert!(
         trimmed.is_empty(),
@@ -496,7 +496,10 @@ fn narrow5_shows_empty_bar() {
 fn narrow20_keeps_version_drops_hint() {
     let app = make_app();
     let text = render_bar_width(&app, 20);
-    assert!(text.contains("v0.7.12"), "version should fit at width 20");
+    assert!(
+        text.contains(&format!("v{}", env!("CARGO_PKG_VERSION"))),
+        "version should fit at width 20"
+    );
     assert!(
         !text.contains("j/k"),
         "keybinding hint should be elided at width 20"
@@ -508,12 +511,12 @@ fn narrow_keeps_errors_over_badges() {
     let mut app = make_app();
     app.show_hidden = true;
     app.walk_errors = 3;
-    // Version " v0.7.12" (8) + " [!3]" (5) = 13; " [hidden]" (9) = 22 total.
+    // Version " vX.Y.Z" (8) + " [!3]" (5) = 13; " [hidden]" (9) = 22 total.
     // At width 19, one must go; [hidden] (P_INFO=2) has lower priority than
     // [!3] (P_ERR=4) and version (P_VER=5).
     let text = render_bar_width(&app, 19);
     assert!(text.contains("[!3]"), "errors should be kept at width 19");
-    assert!(text.contains("v0.7.12"), "version should be kept");
+    assert!(text.contains(&format!("v{}", env!("CARGO_PKG_VERSION"))), "version should be kept");
     assert!(!text.contains("[hidden]"), "badges elided before errors");
 }
 
@@ -534,7 +537,7 @@ fn narrow_keeps_git_over_badges() {
     // Git (P_GIT=3) and version (P_VER=5) stay.
     let text = render_bar_width(&app, 20);
     assert!(text.contains("[main ↑2]"), "git info kept at width 20");
-    assert!(text.contains("v0.7.12"), "version kept");
+    assert!(text.contains(&format!("v{}", env!("CARGO_PKG_VERSION"))), "version kept");
     assert!(!text.contains("[hidden]"), "badge elided before git info");
 }
 
@@ -554,7 +557,7 @@ fn narrow_keeps_git_info() {
         text.contains("[main ↑1 ↓2 +3]"),
         "git info kept at width 45"
     );
-    assert!(text.contains("v0.7.12"), "version kept");
+    assert!(text.contains(&format!("v{}", env!("CARGO_PKG_VERSION"))), "version kept");
 }
 
 #[test]
@@ -566,7 +569,7 @@ fn narrow_keeps_config_error() {
         text.contains("[config error]"),
         "config error kept at width 30"
     );
-    assert!(text.contains("v0.7.12"), "version kept");
+    assert!(text.contains(&format!("v{}", env!("CARGO_PKG_VERSION"))), "version kept");
 }
 
 #[test]
@@ -582,7 +585,7 @@ fn narrow_drops_meta_before_badges() {
         !text.contains("hello"),
         "status message (P_META) should be elided before badges"
     );
-    assert!(text.contains("v0.7.12"), "version kept");
+    assert!(text.contains(&format!("v{}", env!("CARGO_PKG_VERSION"))), "version kept");
 }
 
 #[test]
