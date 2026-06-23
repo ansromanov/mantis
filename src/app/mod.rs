@@ -381,6 +381,13 @@ impl App {
             cfg.plugins.entry(name).or_insert(entry);
         }
 
+        // Discover plugins from the plugin directory via plugin.toml manifests.
+        // Explicit tv.toml entries win on name collision; discovered plugins
+        // default to disabled so no freshly fetched code runs without user opt-in.
+        for (name, entry) in plugin::manifest::discover(&plugin::default_plugin_dir()) {
+            cfg.plugins.entry(name).or_insert(entry);
+        }
+
         // Collect extra syntax definitions from plugins before constructing
         // the highlighter and loader (they need them at creation time).
         let mut plugin_entries: Vec<_> = cfg.plugins.clone().into_iter().collect();

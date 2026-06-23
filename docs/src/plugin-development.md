@@ -6,6 +6,54 @@ See [Plugins](plugins.md) for how to install and configure plugins.
 
 ---
 
+## Plugin manifest (`plugin.toml`)
+
+Every plugin **must** have a `plugin.toml` manifest file in its own subdirectory
+of the plugin directory (see [Plugins](plugins.md) for where that is). The
+manifest is how `tv` discovers the plugin and learns its entry point, version,
+and other metadata.
+
+### Schema
+
+```toml
+name = "git-tools"                   # Required: plugin name (shown in picker)
+version = "0.1.0"                    # Required: semver recommended
+description = "git diff on open"     # Optional: one-line description
+author = "ansromanov"                # Optional: author name/handle
+entry = "run.sh"                     # Required: executable relative to this dir
+tv_protocol = "1"                    # Required: IPC protocol version
+platforms = ["linux", "macos"]       # Optional: OS filter (default: all)
+events = ["on_file_open"]            # Optional: handled events (advisory)
+permissions = ["run_git"]            # Optional: required permissions (advisory)
+```
+
+Fields:
+
+| Field | Required | Description |
+|---|---|---|
+| `name` | Yes | Human-readable name shown in the plugin picker. |
+| `version` | Yes | Plugin version. Semver recommended. |
+| `description` | No | One-line description displayed in the picker. |
+| `author` | No | Author name or handle. |
+| `entry` | Yes | Path to the executable, relative to this manifest's directory. |
+| `tv_protocol` | Yes | IPC protocol version (`"1"` for the current protocol). |
+| `platforms` | No | OS filter: list of `"linux"`, `"macos"`, `"windows"`. Absent = all. |
+| `events` | No | Events the plugin handles (advisory, not enforced). |
+| `permissions` | No | Permissions the plugin needs (advisory, shown at install). |
+
+### Discovery
+
+On startup `tv` scans every subdirectory of the plugin directory for
+`plugin.toml`. Each discovered manifest produces a `(name, PluginEntry)` pair
+that appears in the plugin picker. **Discovered plugins default to disabled**
+— no code runs without explicit user opt-in via the picker or `tv.toml`.
+
+If a plugin is also declared in `[plugins]` in `tv.toml`, the explicit config
+entry takes precedence (allowing the user to override the entry path, enable
+it, or set its kind).
+
+---
+
 ## Process plugins
 
 The protocol for subprocess-based plugins.
