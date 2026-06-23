@@ -136,42 +136,35 @@ compiled alongside `tv` and installed on first run.
 
 | Plugin | Binary | What it does |
 |---|---|---|
-| git-diff | `tv-plugin-git-diff` | On `on_file_open`, if the file is git-tracked, shows `git diff --color=always HEAD` as the content (replacing the file view). |
-| git-log | `tv-plugin-git-log` | On `H` keypress, shows `git log --oneline --color=always` for the current file as a static file view. |
 | git-plugin | `tv-plugin-git-plugin` | Comprehensive git support: repo info in status bar, file statuses for tree coloring, working-tree diff on file open, file log on `H`, file blame on `b`. |
 | iconize | `tv-plugin-iconize` | On `init`, sends a `set_icon_map` action with Nerd Font glyphs for ~80 file extensions. Requires `icons = true` in `tv.toml` and a Nerd Font terminal. |
 | markdown | `tv-plugin-markdown` | Renders `.md` files using pulldown-cmark, sending the output as ANSI-escaped lines via `set_content`. Responds to theme changes and `M` keypress for raw/rendered toggle. |
 
 All bundled plugins are compiled as workspace members and installed to the
-plugin directory the first time `tv` creates its global config.
-
-The default plugin directory is `~/.config/tree-viewer/plugins/` on Linux/macOS
-and `%APPDATA%\tree-viewer\plugins\` on Windows. Enable bundled plugins by
-uncommenting or adding entries in `tv.toml`:
+plugin directory the first time `tv` creates its global config. Enable them by
+adding entries in `tv.toml`:
 
 ```toml
 [plugins]
-git-diff  = { path = "tv-plugin-git-diff" }
-git-log   = { path = "tv-plugin-git-log" }
 git-plugin = { path = "tv-plugin-git-plugin" }
-iconize   = { path = "tv-plugin-iconize" }
-markdown  = { path = "tv-plugin-markdown" }
+iconize    = { path = "tv-plugin-iconize" }
+markdown   = { path = "tv-plugin-markdown" }
 ```
 
 > **Note:** The bundled plugins provide a simpler implementation than the
 > built-in core features:
-> - `git-diff` / `git-plugin` use git's ANSI colouring rather than tv's
->   theme-aware `diff_line_style` / side-by-side rendering.
-> - `git-log` / `git-plugin` show the log as static content; they do not have
->   the interactive commit-selection popup that the built-in `H` key provides.
+> - `git-plugin` uses git's ANSI colouring rather than tv's theme-aware
+>   `diff_line_style` / side-by-side rendering.
+> - `git-plugin` shows the log as static content; it does not have the
+>   interactive commit-selection popup that the built-in `H` key provides.
 >
 > The core git diff and log code paths remain active as a fallback when the
 > plugins are not enabled.
 >
 > **Key conflict:** `H` is also the default binding for the built-in
-> `file_history` picker. Enabling `git-log` without clearing that binding will
-> trigger both actions on the same keypress. To give the plugin sole ownership
-> of `H`, add this to `tv.toml`:
+> `file_history` picker. Enabling `git-plugin` without clearing that binding
+> will trigger both actions on the same keypress. To give the plugin sole
+> ownership of `H`, add this to `tv.toml`:
 > ```toml
 > [keys]
 > file_history = []

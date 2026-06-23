@@ -157,18 +157,10 @@ fn bundled_plugins_includes_all_plugins() {
         "git-plugin must be in BUNDLED_PLUGINS: {names:?}"
     );
     assert!(
-        names.contains(&"git-diff"),
-        "git-diff must be in BUNDLED_PLUGINS: {names:?}"
-    );
-    assert!(
-        names.contains(&"git-log"),
-        "git-log must be in BUNDLED_PLUGINS: {names:?}"
-    );
-    assert!(
         names.contains(&"markdown"),
         "markdown must be in BUNDLED_PLUGINS: {names:?}"
     );
-    assert_eq!(names.len(), 5, "should have exactly 5 bundled plugins");
+    assert_eq!(names.len(), 3, "should have exactly 3 bundled Rust plugins");
 }
 
 #[test]
@@ -196,11 +188,6 @@ fn bundled_plugin_entries_all_disabled_and_include_markdown() {
         names.contains(&"git-plugin"),
         "git-plugin plugin must be listed"
     );
-    assert!(
-        names.contains(&"git-diff"),
-        "git-diff plugin must be listed"
-    );
-    assert!(names.contains(&"git-log"), "git-log plugin must be listed");
 }
 
 #[test]
