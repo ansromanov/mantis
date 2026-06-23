@@ -14,6 +14,7 @@
 - [Git Features](git.md)
 - [Configuration](configuration.md)
 - [Plugins](plugins.md)
+- [Plugin Registry](plugin-registry.md)
 
 # Reference
 
