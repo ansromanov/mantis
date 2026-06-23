@@ -88,9 +88,9 @@ fn registry_repo() -> String {
 /// Ensures the local registry cache exists and is up to date.
 ///
 /// If the cache directory does not exist, performs a `git clone`. If it does
-/// exist, runs `git pull` to refresh. Silently returns `Ok(())` on success or
-/// if git is unavailable; returns `Err` with a description on unexpected
-/// failures (e.g. permissions).
+/// exist, runs `git pull` to refresh. Returns `Ok(())` on success; returns
+/// `Err` with a description on any failure (git unavailable, clone/pull error,
+/// or permission issues).
 pub fn clone_or_pull() -> Result<(), String> {
     let dir = registry_dir();
     let repo = registry_repo();
