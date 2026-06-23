@@ -37,6 +37,7 @@ mod plugin;
 mod release_info;
 mod search;
 mod selection;
+mod session;
 mod theme;
 mod tree;
 mod ui;
@@ -205,6 +206,9 @@ fn run_app(
     app.watch_root();
 
     let loop_result = run_event_loop(terminal, &mut app, events);
+
+    // Persist session state (expanded dirs, open file, scroll pos, git mode).
+    app.save_session();
 
     // Notify plugins of quit on every exit path, then shut them down.
     app.plugin_manager.on_quit();

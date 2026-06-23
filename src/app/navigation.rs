@@ -154,6 +154,7 @@ impl App {
     pub(super) fn toggle_git_mode(&mut self) {
         self.git_mode = !self.git_mode;
         self.config.git_mode = self.git_mode;
+        self.mark_session_dirty();
         if self.git_mode {
             // Ensure git status is populated even if git_status was disabled.
             if !self.git_status_enabled {
@@ -193,6 +194,7 @@ impl App {
             } else {
                 self.expanded.insert(p);
             }
+            self.mark_session_dirty();
             self.rebuild();
         } else {
             let p = node.path.clone();
@@ -351,6 +353,7 @@ impl App {
     pub(super) fn collapse_all(&mut self) {
         let prev_path = self.nodes.get(self.tree_selected).map(|n| n.path.clone());
         self.expanded.clear();
+        self.mark_session_dirty();
         self.rebuild();
         // rebuild() preserves the selection when the path is still visible.
         // When the path is hidden (was nested), walk up to the nearest ancestor
@@ -389,6 +392,7 @@ impl App {
         for dir in dirs {
             self.expanded.insert(dir);
         }
+        self.mark_session_dirty();
         self.rebuild();
         self.scroll_tree_into_view();
         if let Some(i) = self

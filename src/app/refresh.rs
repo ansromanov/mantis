@@ -32,6 +32,15 @@ impl App {
             self.tree_dirty = true;
             self.tree_dirty_at = Some(self.now());
         }
+        // Debounced session save: persist 2 s after the last state change.
+        if self.session_dirty {
+            let quiet = self
+                .session_dirty_at
+                .is_some_and(|t| t.elapsed() >= Duration::from_secs(2));
+            if quiet {
+                self.save_session();
+            }
+        }
         if self.tree_dirty {
             // Wait for the tree to go quiet before reloading so a burst of events
             // produces one refresh, not one per event.

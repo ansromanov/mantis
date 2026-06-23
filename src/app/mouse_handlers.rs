@@ -18,6 +18,10 @@ use crate::selection::TextSelection;
 
 use super::{rect_contains, App, Focus};
 
+#[cfg(test)]
+#[path = "mouse_handlers_test.rs"]
+mod tests;
+
 impl App {
     /// Dispatches a mouse event. Overlays (theme, history, search) intercept
     /// first; otherwise routes based on the click location (tree vs content
@@ -200,6 +204,7 @@ impl App {
         }
         if self.content_scroll != scroll_before {
             self.mark_content_scrolled();
+            self.mark_session_dirty();
         }
     }
 

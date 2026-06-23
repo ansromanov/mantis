@@ -44,6 +44,26 @@ fn content_gg_resets_active_line_to_zero() {
 
 #[test]
 #[allow(non_snake_case)]
+fn content_G_marks_session_dirty() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.session_dirty = false;
+    app.handle_key(key(KeyCode::Char('G')));
+    assert!(
+        app.active_line > 0,
+        "precondition: G must move the active line"
+    );
+    assert!(
+        app.session_dirty,
+        "moving the active line in content must mark the session dirty so scroll position persists"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+#[allow(non_snake_case)]
 fn content_G_moves_active_line_to_last() {
     let root = temp_tree();
     let mut app = app_for(&root);

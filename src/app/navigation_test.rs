@@ -63,6 +63,25 @@ fn collapse_all_clears_expanded() {
 }
 
 #[test]
+fn activate_dir_marks_session_dirty() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let sub_idx = app
+        .nodes
+        .iter()
+        .position(|n| n.is_dir && n.path == root.join("sub"))
+        .expect("sub dir node should exist");
+    app.tree_selected = sub_idx;
+    app.session_dirty = false;
+    app.activate_selected();
+    assert!(
+        app.session_dirty,
+        "toggling a directory's fold state must mark the session dirty"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn expand_all_exposes_nested_files() {
     let root = temp_tree();
     let mut app = app_for(&root);
