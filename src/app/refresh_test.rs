@@ -358,6 +358,12 @@ fn set_fold_regions_applies_to_current_file() {
     // Provide 3 lines of content so the display map has something to work with.
     app.content = vec!["a".into(), "  b".into(), "  c".into()];
 
+    // A provider must declare the py/fold capability before regions are honored.
+    app.drain_plugin_actions_for_test(
+        "lang-plugin",
+        "register_language_provider",
+        serde_json::json!({"extensions": ["py"], "capabilities": ["fold"]}),
+    );
     app.drain_plugin_actions_for_test(
         "lang-plugin",
         "set_fold_regions",
@@ -385,6 +391,11 @@ fn set_fold_regions_stores_for_future_open() {
 
     app.drain_plugin_actions_for_test(
         "lang-plugin",
+        "register_language_provider",
+        serde_json::json!({"extensions": ["py"], "capabilities": ["fold"]}),
+    );
+    app.drain_plugin_actions_for_test(
+        "lang-plugin",
         "set_fold_regions",
         serde_json::json!({
             "path": "/other/file.py",
@@ -399,7 +410,35 @@ fn set_fold_regions_stores_for_future_open() {
     assert!(app.fold_regions.is_empty());
 }
 
-/// Extension trait to call the private `drain_plugin_actions` with a synthetic action.
+#[test]
+fn set_fold_regions_ignored_without_registered_provider() {
+    let mut app = create_base_app();
+    let path = std::path::PathBuf::from("/some/file.py");
+    app.current_file = Some(path.clone());
+    app.content = vec!["a".into(), "  b".into(), "  c".into()];
+
+    // No register_language_provider sent — the gate must reject the regions.
+    app.drain_plugin_actions_for_test(
+        "lang-plugin",
+        "set_fold_regions",
+        serde_json::json!({
+            "path": "/some/file.py",
+            "regions": [[0, 2]]
+        }),
+    );
+
+    assert!(
+        !app.plugin_fold_regions.contains_key(&path),
+        "regions from an unregistered provider must not be cached"
+    );
+    assert!(
+        app.fold_regions.is_empty(),
+        "unregistered provider must not affect fold_regions"
+    );
+}
+
+/// Extension trait to drive the production `handle_plugin_action` with a
+/// synthetic action, so tests exercise the real code path instead of a copy.
 trait DrainPluginActionsForTest {
     fn drain_plugin_actions_for_test(
         &mut self,
@@ -416,79 +455,6 @@ impl DrainPluginActionsForTest for App {
         action: &str,
         params: serde_json::Value,
     ) {
-        match action {
-            "set_icon_map" => {
-                if let Some(obj) = params.as_object() {
-                    if let Some(icons) = obj.get("icons").and_then(|v| v.as_object()) {
-                        for (ext, glyph) in icons {
-                            if let Some(g) = glyph.as_str() {
-                                self.icon_map
-                                    .insert(ext.to_ascii_lowercase(), g.to_string());
-                            }
-                        }
-                    }
-                    if let Some(open) = obj.get("dir_open").and_then(|v| v.as_str()) {
-                        self.icon_dir_open = open.to_string();
-                    }
-                    if let Some(closed) = obj.get("dir_closed").and_then(|v| v.as_str()) {
-                        self.icon_dir_closed = closed.to_string();
-                    }
-                    if let Some(fallback) = obj.get("fallback").and_then(|v| v.as_str()) {
-                        self.icon_fallback = fallback.to_string();
-                    }
-                }
-            }
-            "register_language_provider" => {
-                let extensions: Vec<String> = params
-                    .get("extensions")
-                    .and_then(|v| v.as_array())
-                    .map(|arr| {
-                        arr.iter()
-                            .filter_map(|v| v.as_str().map(str::to_ascii_lowercase))
-                            .collect()
-                    })
-                    .unwrap_or_default();
-                let capabilities: std::collections::HashSet<crate::plugin::Capability> = params
-                    .get("capabilities")
-                    .and_then(|v| v.as_array())
-                    .map(|arr| {
-                        arr.iter()
-                            .filter_map(|v| serde_json::from_value(v.clone()).ok())
-                            .collect()
-                    })
-                    .unwrap_or_default();
-                let reg = crate::plugin::LanguageProviderRegistration {
-                    plugin_name: name.to_string(),
-                    extensions,
-                    capabilities,
-                };
-                self.plugin_manager.register_provider(reg);
-            }
-            "set_fold_regions" => {
-                let path = match params.get("path").and_then(|v| v.as_str()) {
-                    Some(p) => std::path::PathBuf::from(p),
-                    None => return,
-                };
-                let regions: Vec<crate::fold::FoldRegion> = params
-                    .get("regions")
-                    .and_then(|v| v.as_array())
-                    .map(|arr| {
-                        arr.iter()
-                            .filter_map(|r| {
-                                let pair = r.as_array()?;
-                                let start = pair.first()?.as_i64()? as usize;
-                                let end = pair.get(1)?.as_i64()? as usize;
-                                Some(crate::fold::FoldRegion { start, end })
-                            })
-                            .collect()
-                    })
-                    .unwrap_or_default();
-                self.plugin_fold_regions.insert(path.clone(), regions);
-                if self.current_file.as_deref() == Some(&path) {
-                    self.apply_plugin_fold_regions(&path);
-                }
-            }
-            _ => {}
-        }
+        self.handle_plugin_action(name, action, &params);
     }
 }

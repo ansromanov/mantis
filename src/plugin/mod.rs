@@ -135,11 +135,9 @@ pub struct LanguageProviderRegistration {
     pub plugin_name: String,
     /// Lowercase file extensions handled by this provider (no leading dot).
     /// Used by `PluginManager::provider_for` to match against open files.
-    #[allow(dead_code)]
     pub extensions: Vec<String>,
     /// Capabilities declared by this provider.
     /// Used by `PluginManager::provider_for` for capability routing.
-    #[allow(dead_code)]
     pub capabilities: std::collections::HashSet<Capability>,
 }
 
@@ -404,8 +402,7 @@ impl PluginManager {
 
     /// Returns the first registered provider whose extensions include `ext`
     /// (case-insensitive) and whose capabilities include `cap`, if any.
-    /// Reserved for LSP routing in 0.9; not yet called in production paths.
-    #[allow(dead_code)]
+    /// Gates `set_fold_regions` today; also the routing hook for LSP in 0.9.
     pub fn provider_for(
         &self,
         ext: &str,
