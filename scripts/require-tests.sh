@@ -15,13 +15,18 @@ set -euo pipefail
 
 # --- Escape hatch -----------------------------------------------------------
 # In pre-commit context the message draft lives in .git/COMMIT_EDITMSG.
-# In CI context check commits on the branch not yet in origin/main.
+# In CI context check commits on the branch not yet in origin/main; when the
+# checkout is shallow (fetch-depth) and origin/main is not a ref, fall back to
+# scanning every commit message reachable within the fetched depth so the
+# escape hatch still works for PR/merge-ref checkouts.
 skip_token_present() {
     local msg=""
     if [[ -f ".git/COMMIT_EDITMSG" ]]; then
         msg=$(cat .git/COMMIT_EDITMSG)
     elif git rev-parse --verify origin/main >/dev/null 2>&1; then
         msg=$(git log origin/main..HEAD --format=%B 2>/dev/null || true)
+    else
+        msg=$(git log --format=%B 2>/dev/null || true)
     fi
     echo "$msg" | grep -qE '\[skip-tests:[^]]+\]'
 }
