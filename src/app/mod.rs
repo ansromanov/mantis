@@ -551,7 +551,23 @@ impl App {
                 }
             }
             // Restore git mode from session (overrides config default).
-            app.git_mode = s.git_mode;
+            // Mirror toggle_git_mode: if git_status was disabled in config but
+            // the session had git_mode on, fetch git status so expand_git_dirs()
+            // has a non-empty map instead of producing an empty tree.
+            if s.git_mode && !app.git_mode {
+                app.git_mode = true;
+                if !app.git_status_enabled {
+                    app.git_status_enabled = true;
+                    #[cfg(feature = "git-core")]
+                    {
+                        app.git_status_map =
+                            crate::git::repo_status(&app.root, app.ignore_gitignore);
+                        app.git_info = crate::git::repo_info(&app.root);
+                    }
+                }
+            } else {
+                app.git_mode = s.git_mode;
+            }
         }
 
         if app.git_mode {
