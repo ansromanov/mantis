@@ -53,8 +53,8 @@ pub fn build_visible(
 }
 
 /// Recursive helper for `build_visible`. Lists a single directory's entries
-/// (depth 1 via `WalkBuilder`), sorts dirs before files, and recurses into
-/// expanded directories.
+/// (depth 1 via `WalkBuilder`), sorts dirs before then files by extension
+/// then name, and recurses into expanded directories.
 #[allow(clippy::too_many_arguments)]
 fn collect(
     dir: &Path,
@@ -85,7 +85,19 @@ fn collect(
     entries.sort_by(|a, b| {
         let ad = a.file_type().map(|t| t.is_dir()).unwrap_or(false);
         let bd = b.file_type().map(|t| t.is_dir()).unwrap_or(false);
-        bd.cmp(&ad).then_with(|| a.file_name().cmp(b.file_name()))
+        bd.cmp(&ad).then_with(|| {
+            let a_name = a.file_name();
+            let b_name = b.file_name();
+            let a_ext = Path::new(a_name)
+                .extension()
+                .map(|e| e.to_string_lossy())
+                .unwrap_or_default();
+            let b_ext = Path::new(b_name)
+                .extension()
+                .map(|e| e.to_string_lossy())
+                .unwrap_or_default();
+            a_ext.cmp(&b_ext).then_with(|| a_name.cmp(b_name))
+        })
     });
 
     for e in entries {
