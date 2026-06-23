@@ -161,6 +161,21 @@ fn open_file_sets_current_syntax_from_load() {
 }
 
 #[test]
+fn open_file_marks_session_dirty() {
+    let root = temp_dir();
+    let a = root.join("a.txt");
+    fs::write(&a, "line1\nline2\n").unwrap();
+    let mut app = app_for(&root);
+    app.session_dirty = false;
+    app.open_file(&a);
+    assert!(
+        app.session_dirty,
+        "opening a file must mark the session dirty so the new current_file persists"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn open_file_clears_current_syntax_for_unknown_type() {
     let root = temp_dir();
     let rs = root.join("main.rs");
