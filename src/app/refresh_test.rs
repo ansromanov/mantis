@@ -272,8 +272,9 @@ fn create_base_app() -> App {
         scrollbar_drag: false,
         splitter_drag: false,
         needs_clear: false,
-        yaml_fold_regions: Vec::new(),
-        yaml_folded: HashSet::new(),
+        fold_regions: Vec::new(),
+        folded: HashSet::new(),
+        plugin_fold_regions: HashMap::new(),
         fold_display_map: Vec::new(),
         fold_gutter_rows: Vec::new(),
         yaml_error: None,
@@ -299,7 +300,148 @@ fn create_base_app() -> App {
     }
 }
 
-/// Extension trait to call the private `drain_plugin_actions` with a synthetic action.
+// -- language provider protocol tests -----------------------------------------
+
+#[test]
+fn register_language_provider_stores_registration() {
+    let mut app = create_base_app();
+    app.drain_plugin_actions_for_test(
+        "my-lang-plugin",
+        "register_language_provider",
+        serde_json::json!({
+            "extensions": ["rs", "rlib"],
+            "capabilities": ["highlight", "fold"]
+        }),
+    );
+    let cap = crate::plugin::Capability::Fold;
+    assert!(
+        app.plugin_manager.provider_for("rs", &cap).is_some(),
+        "provider must be stored for 'rs' extension with Fold capability"
+    );
+    assert!(
+        app.plugin_manager.provider_for("rlib", &cap).is_some(),
+        "provider must be stored for 'rlib' extension"
+    );
+    assert!(
+        app.plugin_manager.provider_for("py", &cap).is_none(),
+        "unregistered extension must return None"
+    );
+}
+
+#[test]
+fn register_language_provider_overwrites_prior() {
+    let mut app = create_base_app();
+    app.drain_plugin_actions_for_test(
+        "my-lang-plugin",
+        "register_language_provider",
+        serde_json::json!({"extensions": ["rs"], "capabilities": ["fold"]}),
+    );
+    // Re-register with different extensions.
+    app.drain_plugin_actions_for_test(
+        "my-lang-plugin",
+        "register_language_provider",
+        serde_json::json!({"extensions": ["py"], "capabilities": ["fold"]}),
+    );
+    let cap = crate::plugin::Capability::Fold;
+    assert!(
+        app.plugin_manager.provider_for("py", &cap).is_some(),
+        "new extension must be registered"
+    );
+    assert!(
+        app.plugin_manager.provider_for("rs", &cap).is_none(),
+        "old extension must no longer be registered after re-registration"
+    );
+}
+
+#[test]
+fn set_fold_regions_applies_to_current_file() {
+    let mut app = create_base_app();
+    let path = std::path::PathBuf::from("/some/file.py");
+    app.current_file = Some(path.clone());
+    // Provide 3 lines of content so the display map has something to work with.
+    app.content = vec!["a".into(), "  b".into(), "  c".into()];
+
+    // A provider must declare the py/fold capability before regions are honored.
+    app.drain_plugin_actions_for_test(
+        "lang-plugin",
+        "register_language_provider",
+        serde_json::json!({"extensions": ["py"], "capabilities": ["fold"]}),
+    );
+    app.drain_plugin_actions_for_test(
+        "lang-plugin",
+        "set_fold_regions",
+        serde_json::json!({
+            "path": "/some/file.py",
+            "regions": [[0, 2]]
+        }),
+    );
+
+    assert_eq!(
+        app.fold_regions.len(),
+        1,
+        "fold_regions must be updated for the current file"
+    );
+    assert_eq!(app.fold_regions[0].start, 0);
+    assert_eq!(app.fold_regions[0].end, 2);
+}
+
+#[test]
+fn set_fold_regions_stores_for_future_open() {
+    let mut app = create_base_app();
+    let path = std::path::PathBuf::from("/other/file.py");
+    // current_file is None — the file is not yet open.
+    app.current_file = None;
+
+    app.drain_plugin_actions_for_test(
+        "lang-plugin",
+        "register_language_provider",
+        serde_json::json!({"extensions": ["py"], "capabilities": ["fold"]}),
+    );
+    app.drain_plugin_actions_for_test(
+        "lang-plugin",
+        "set_fold_regions",
+        serde_json::json!({
+            "path": "/other/file.py",
+            "regions": [[1, 5], [10, 20]]
+        }),
+    );
+
+    let stored = app.plugin_fold_regions.get(&path);
+    assert!(stored.is_some(), "regions must be cached for future open");
+    assert_eq!(stored.unwrap().len(), 2);
+    // fold_regions on App should be untouched (no current file match).
+    assert!(app.fold_regions.is_empty());
+}
+
+#[test]
+fn set_fold_regions_ignored_without_registered_provider() {
+    let mut app = create_base_app();
+    let path = std::path::PathBuf::from("/some/file.py");
+    app.current_file = Some(path.clone());
+    app.content = vec!["a".into(), "  b".into(), "  c".into()];
+
+    // No register_language_provider sent — the gate must reject the regions.
+    app.drain_plugin_actions_for_test(
+        "lang-plugin",
+        "set_fold_regions",
+        serde_json::json!({
+            "path": "/some/file.py",
+            "regions": [[0, 2]]
+        }),
+    );
+
+    assert!(
+        !app.plugin_fold_regions.contains_key(&path),
+        "regions from an unregistered provider must not be cached"
+    );
+    assert!(
+        app.fold_regions.is_empty(),
+        "unregistered provider must not affect fold_regions"
+    );
+}
+
+/// Extension trait to drive the production `handle_plugin_action` with a
+/// synthetic action, so tests exercise the real code path instead of a copy.
 trait DrainPluginActionsForTest {
     fn drain_plugin_actions_for_test(
         &mut self,
@@ -312,31 +454,10 @@ trait DrainPluginActionsForTest {
 impl DrainPluginActionsForTest for App {
     fn drain_plugin_actions_for_test(
         &mut self,
-        _name: &str,
-        _action: &str,
-        _params: serde_json::Value,
+        name: &str,
+        action: &str,
+        params: serde_json::Value,
     ) {
-        // Replicate the logic from drain_plugin_actions for the set_icon_map case.
-        if _action == "set_icon_map" {
-            if let Some(obj) = _params.as_object() {
-                if let Some(icons) = obj.get("icons").and_then(|v| v.as_object()) {
-                    for (ext, glyph) in icons {
-                        if let Some(g) = glyph.as_str() {
-                            self.icon_map
-                                .insert(ext.to_ascii_lowercase(), g.to_string());
-                        }
-                    }
-                }
-                if let Some(open) = obj.get("dir_open").and_then(|v| v.as_str()) {
-                    self.icon_dir_open = open.to_string();
-                }
-                if let Some(closed) = obj.get("dir_closed").and_then(|v| v.as_str()) {
-                    self.icon_dir_closed = closed.to_string();
-                }
-                if let Some(fallback) = obj.get("fallback").and_then(|v| v.as_str()) {
-                    self.icon_fallback = fallback.to_string();
-                }
-            }
-        }
+        self.handle_plugin_action(name, action, &params);
     }
 }

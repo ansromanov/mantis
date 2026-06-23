@@ -313,7 +313,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                     if let Some(ri) = app.region_idx_at(phys) {
                         let screen_y = inner.y + offset as u16;
                         new_fold_gutter_rows.push((screen_y, ri));
-                        if app.yaml_folded.contains(&ri) {
+                        if app.folded.contains(&ri) {
                             "▶ "
                         } else {
                             "▼ "
@@ -352,7 +352,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                 // If this line is a collapsed fold header, show a dimmed ellipsis.
                 if fold_gw > 0 {
                     if let Some(ri) = app.region_idx_at(physical_idx) {
-                        if app.yaml_folded.contains(&ri) {
+                        if app.folded.contains(&ri) {
                             let header_spans: Vec<Span> = if has_highlight {
                                 if let Some(regions) = highlighted.get(offset) {
                                     let regions_owned: Vec<(Style, String)> =
@@ -453,7 +453,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                     if let Some(ri) = app.region_idx_at(phys) {
                         let screen_y = inner.y + offset as u16;
                         inline_fold_gutter_rows.push((screen_y, ri));
-                        if app.yaml_folded.contains(&ri) {
+                        if app.folded.contains(&ri) {
                             "▶ "
                         } else {
                             "▼ "
@@ -491,7 +491,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                 // Collapsed fold header: show header + ellipsis.
                 if fold_gw > 0 {
                     if let Some(ri) = app.region_idx_at(physical_idx) {
-                        if app.yaml_folded.contains(&ri) {
+                        if app.folded.contains(&ri) {
                             let ellipsis_style = Style::default().fg(app.theme.dim);
                             let header_spans: Vec<Span> = if has_highlight {
                                 app.highlighted

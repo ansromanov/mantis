@@ -175,7 +175,7 @@ impl Keymap {
             "toggle_diff_side_by_side" => &self.toggle_diff_side_by_side,
             "toggle_diff_staged" => &self.toggle_diff_staged,
             "open_in_editor" => &self.open_in_editor,
-            "yaml_fold_toggle" => &self.yaml_fold_toggle,
+            "fold_toggle" | "yaml_fold_toggle" => &self.yaml_fold_toggle,
             "toggle_watch" => &self.toggle_watch,
             "open_recent_files" => &self.recent_files,
             "copy_path" => &self.copy_path,

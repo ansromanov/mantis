@@ -16,6 +16,7 @@ pub mod command_palette;
 pub mod config;
 pub mod diff;
 pub mod file;
+pub mod fold;
 pub mod git;
 pub mod highlight;
 #[cfg(feature = "markdown-core")]

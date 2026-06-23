@@ -25,11 +25,12 @@ use ratatui::style::Style;
 
 use crate::app::DiffMode;
 use crate::file::{detect_encoding_prefix, detect_line_ending, is_binary_bytes};
+use crate::fold::FoldRegion;
 use crate::highlight::Highlighter;
 use crate::plugin::ExtraSyntax;
 use crate::theme::Theme;
 use crate::virtual_file::VirtualFile;
-use crate::yaml_fold::{self, FoldRegion};
+use crate::yaml_fold;
 
 type Spans = Vec<Vec<(Style, String)>>;
 

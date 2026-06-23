@@ -29,6 +29,7 @@ mod command_palette;
 mod config;
 mod diff;
 mod file;
+mod fold;
 mod git;
 mod highlight;
 #[cfg(feature = "markdown-core")]
