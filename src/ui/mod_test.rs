@@ -40,7 +40,9 @@ fn draw_no_overlay() {
     let rows = render(&mut app);
     let joined = rows.join("\n");
     assert!(joined.contains("tv") || joined.contains("tree-viewer"));
-    assert!(rows[29].contains("j/k nav"));
+    // The version badge (highest priority) occupies the status bar at width 80;
+    // the keybinding hint is elided because combined width exceeds the terminal.
+    assert!(rows[29].contains("v0.7"), "status bar should show version string");
 }
 
 #[test]
