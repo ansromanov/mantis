@@ -708,8 +708,6 @@ fn dirs_next() -> Option<PathBuf> {
 /// Installed to the plugin directory by `install_bundled_plugins()`.
 const BUNDLED_PLUGINS: &[(&str, &str)] = &[
     ("git-plugin", "tv-plugin-git-plugin"),
-    ("git-diff", "tv-plugin-git-diff"),
-    ("git-log", "tv-plugin-git-log"),
     ("iconize", "tv-plugin-iconize"),
     ("markdown", "tv-plugin-markdown"),
 ];
