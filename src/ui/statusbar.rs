@@ -9,9 +9,10 @@
 //! drawn last so it always reflects the final per-frame state.
 //!
 //! On narrow terminals the bar elides low-priority segments so it never
-//! overflows `area.width`. Keybinding hints are dropped first, then YAML
-//! metadata and plugin/status messages, then badges and file info, then git
-//! info; error indicators and the version string are always shown.
+//! overflows `area.width`. Keybinding hints are dropped first, then plugin
+//! and status messages (`P_META`), then YAML fold stats, badges, and file
+//! info (`P_INFO`), then git info; error indicators and the version string
+//! are always shown.
 
 use ratatui::{
     layout::Rect,
@@ -26,8 +27,8 @@ use crate::git::{GitHead, GitRepoInfo};
 
 /// Priority levels for status-bar segments (higher = kept when eliding).
 const P_HINT: u8 = 0; // keybinding hints
-const P_META: u8 = 1; // YAML stats, plugin/status messages
-const P_INFO: u8 = 2; // badges, scroll %, file encoding
+const P_META: u8 = 1; // plugin/status messages
+const P_INFO: u8 = 2; // YAML fold stats, badges, scroll %, file encoding
 const P_GIT: u8 = 3; // git branch info
 const P_ERR: u8 = 4; // error indicators
 const P_VER: u8 = 5; // version string
@@ -242,7 +243,7 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
         segs.push((Span::styled(format!(" [YAML: {label}]"), err_style), P_ERR));
     }
 
-    // -- Priority 1: YAML fold stats --
+    // -- Priority 2: YAML fold stats --
     if !app.yaml_fold_regions.is_empty() {
         let folded_count = app.yaml_folded.len();
         let total_regions = app.yaml_fold_regions.len();
@@ -256,7 +257,7 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
                 format!(" [Y{anchor_info} {folded_count}/{total_regions}]"),
                 base.fg(app.theme.accent),
             ),
-            P_META,
+            P_INFO,
         ));
     }
 
