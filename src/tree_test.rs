@@ -24,12 +24,39 @@ fn dir_tree() -> PathBuf {
 }
 
 #[test]
-fn dirs_before_files_alphabetical() {
+fn dirs_before_files_same_extension_sorted_by_name() {
     let root = dir_tree();
     let expanded = HashSet::from([root.clone()]);
     let (nodes, _) = build_visible(&root, &expanded, false, true, &HashSet::new());
     let names: Vec<&str> = nodes.iter().map(|n| n.name.as_str()).collect();
     assert_eq!(names, vec!["dir_a", "dir_b", "a.txt", "b.txt"]);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn files_sorted_by_extension_then_name() {
+    let root = temp_dir("ext_sort");
+    fs::create_dir_all(root.join("z_app")).unwrap();
+    fs::write(root.join("main.rs"), "").unwrap();
+    fs::write(root.join("lib.rs"), "").unwrap();
+    fs::write(root.join("README.md"), "").unwrap();
+    fs::write(root.join("Cargo.toml"), "").unwrap();
+    fs::write(root.join("LICENSE"), "").unwrap();
+    let expanded = HashSet::from([root.clone()]);
+    let (nodes, _) = build_visible(&root, &expanded, false, true, &HashSet::new());
+    let names: Vec<&str> = nodes.iter().map(|n| n.name.as_str()).collect();
+    // dir first, then files grouped by extension: no-ext -> md -> rs -> toml
+    assert_eq!(
+        names,
+        vec![
+            "z_app",
+            "LICENSE",
+            "README.md",
+            "lib.rs",
+            "main.rs",
+            "Cargo.toml"
+        ]
+    );
     fs::remove_dir_all(&root).ok();
 }
 
