@@ -103,6 +103,46 @@ impl Default for PluginEntry {
     }
 }
 
+/// Capabilities a language provider can advertise at `init` time.
+///
+/// Adding a variant here in a future release is the only change needed to
+/// extend the protocol — existing providers that do not recognise the new
+/// capability simply ignore it. `Hover`, `Diagnostics`, and `Definition` are
+/// reserved for the 0.9 LSP provider without further protocol changes.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum Capability {
+    /// Syntax highlighting for declared file extensions.
+    Highlight,
+    /// Code folding regions for declared file extensions.
+    Fold,
+    /// Hover documentation (reserved; not implemented in 0.8).
+    Hover,
+    /// Inline diagnostics (reserved; not implemented in 0.8).
+    Diagnostics,
+    /// Go-to-definition navigation (reserved; not implemented in 0.8).
+    Definition,
+}
+
+/// A language provider registration received from a plugin via the
+/// `register_language_provider` action after `init`.
+///
+/// The host stores one registration per plugin-declaration and uses it to
+/// route capabilities to the correct provider when a file is opened.
+#[derive(Clone, Debug)]
+pub struct LanguageProviderRegistration {
+    /// Name of the plugin that sent this registration.
+    pub plugin_name: String,
+    /// Lowercase file extensions handled by this provider (no leading dot).
+    /// Used by `PluginManager::provider_for` to match against open files.
+    #[allow(dead_code)]
+    pub extensions: Vec<String>,
+    /// Capabilities declared by this provider.
+    /// Used by `PluginManager::provider_for` for capability routing.
+    #[allow(dead_code)]
+    pub capabilities: std::collections::HashSet<Capability>,
+}
+
 /// Message sent from `tv` to a plugin (on its stdin).
 #[derive(Serialize)]
 struct ToPlugin {
@@ -336,6 +376,8 @@ pub struct PluginManager {
     pending_actions: Vec<(String, String, serde_json::Value)>,
     spawn_errors: Vec<String>,
     active_theme: Option<String>,
+    /// Registered language providers, one per plugin declaration.
+    provider_registrations: Vec<LanguageProviderRegistration>,
 }
 
 impl PluginManager {
@@ -346,7 +388,33 @@ impl PluginManager {
             pending_actions: Vec::new(),
             spawn_errors: Vec::new(),
             active_theme: None,
+            provider_registrations: Vec::new(),
         }
+    }
+
+    /// Registers a language provider declaration.
+    ///
+    /// Re-registration from the same plugin is allowed; the prior entry is
+    /// replaced so a plugin can update its extension list at runtime.
+    pub fn register_provider(&mut self, reg: LanguageProviderRegistration) {
+        self.provider_registrations
+            .retain(|r| r.plugin_name != reg.plugin_name);
+        self.provider_registrations.push(reg);
+    }
+
+    /// Returns the first registered provider whose extensions include `ext`
+    /// (case-insensitive) and whose capabilities include `cap`, if any.
+    /// Reserved for LSP routing in 0.9; not yet called in production paths.
+    #[allow(dead_code)]
+    pub fn provider_for(
+        &self,
+        ext: &str,
+        cap: &Capability,
+    ) -> Option<&LanguageProviderRegistration> {
+        let ext_lower = ext.to_ascii_lowercase();
+        self.provider_registrations
+            .iter()
+            .find(|r| r.extensions.iter().any(|e| e == &ext_lower) && r.capabilities.contains(cap))
     }
 
     /// Spawns all enabled *process* plugins and sends them the `init` event.

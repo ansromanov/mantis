@@ -377,3 +377,71 @@ fn activate_one_is_noop_when_already_running() {
     );
     mgr.deactivate_all();
 }
+
+// -- Language provider registration -------------------------------------------
+
+fn make_reg(name: &str, exts: &[&str], caps: &[Capability]) -> LanguageProviderRegistration {
+    LanguageProviderRegistration {
+        plugin_name: name.to_string(),
+        extensions: exts.iter().map(|e| e.to_string()).collect(),
+        capabilities: caps.iter().cloned().collect(),
+    }
+}
+
+#[test]
+fn register_provider_and_provider_for_found() {
+    let mut mgr = PluginManager::new(vec![]);
+    mgr.register_provider(make_reg("lang", &["rs"], &[Capability::Fold]));
+    let result = mgr.provider_for("rs", &Capability::Fold);
+    assert!(
+        result.is_some(),
+        "provider must be found for registered ext"
+    );
+    assert_eq!(result.unwrap().plugin_name, "lang");
+}
+
+#[test]
+fn provider_for_case_insensitive() {
+    let mut mgr = PluginManager::new(vec![]);
+    mgr.register_provider(make_reg("lang", &["rs"], &[Capability::Highlight]));
+    assert!(
+        mgr.provider_for("RS", &Capability::Highlight).is_some(),
+        "lookup must be case-insensitive"
+    );
+}
+
+#[test]
+fn provider_for_wrong_capability_returns_none() {
+    let mut mgr = PluginManager::new(vec![]);
+    mgr.register_provider(make_reg("lang", &["rs"], &[Capability::Highlight]));
+    assert!(
+        mgr.provider_for("rs", &Capability::Fold).is_none(),
+        "provider must not match when capability is absent"
+    );
+}
+
+#[test]
+fn provider_for_unregistered_ext_returns_none() {
+    let mut mgr = PluginManager::new(vec![]);
+    mgr.register_provider(make_reg("lang", &["rs"], &[Capability::Fold]));
+    assert!(
+        mgr.provider_for("py", &Capability::Fold).is_none(),
+        "unregistered extension must return None"
+    );
+}
+
+#[test]
+fn register_provider_overwrites_same_plugin() {
+    let mut mgr = PluginManager::new(vec![]);
+    mgr.register_provider(make_reg("lang", &["rs"], &[Capability::Fold]));
+    mgr.register_provider(make_reg("lang", &["py"], &[Capability::Fold]));
+    // Old extension gone, new one present.
+    assert!(
+        mgr.provider_for("py", &Capability::Fold).is_some(),
+        "re-registered extension must be present"
+    );
+    assert!(
+        mgr.provider_for("rs", &Capability::Fold).is_none(),
+        "old extension must be gone after re-registration"
+    );
+}

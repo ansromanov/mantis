@@ -272,8 +272,9 @@ fn create_base_app() -> App {
         scrollbar_drag: false,
         splitter_drag: false,
         needs_clear: false,
-        yaml_fold_regions: Vec::new(),
-        yaml_folded: HashSet::new(),
+        fold_regions: Vec::new(),
+        folded: HashSet::new(),
+        plugin_fold_regions: HashMap::new(),
         fold_display_map: Vec::new(),
         fold_gutter_rows: Vec::new(),
         yaml_error: None,
@@ -296,6 +297,108 @@ fn create_base_app() -> App {
     }
 }
 
+// -- language provider protocol tests -----------------------------------------
+
+#[test]
+fn register_language_provider_stores_registration() {
+    let mut app = create_base_app();
+    app.drain_plugin_actions_for_test(
+        "my-lang-plugin",
+        "register_language_provider",
+        serde_json::json!({
+            "extensions": ["rs", "rlib"],
+            "capabilities": ["highlight", "fold"]
+        }),
+    );
+    let cap = crate::plugin::Capability::Fold;
+    assert!(
+        app.plugin_manager.provider_for("rs", &cap).is_some(),
+        "provider must be stored for 'rs' extension with Fold capability"
+    );
+    assert!(
+        app.plugin_manager.provider_for("rlib", &cap).is_some(),
+        "provider must be stored for 'rlib' extension"
+    );
+    assert!(
+        app.plugin_manager.provider_for("py", &cap).is_none(),
+        "unregistered extension must return None"
+    );
+}
+
+#[test]
+fn register_language_provider_overwrites_prior() {
+    let mut app = create_base_app();
+    app.drain_plugin_actions_for_test(
+        "my-lang-plugin",
+        "register_language_provider",
+        serde_json::json!({"extensions": ["rs"], "capabilities": ["fold"]}),
+    );
+    // Re-register with different extensions.
+    app.drain_plugin_actions_for_test(
+        "my-lang-plugin",
+        "register_language_provider",
+        serde_json::json!({"extensions": ["py"], "capabilities": ["fold"]}),
+    );
+    let cap = crate::plugin::Capability::Fold;
+    assert!(
+        app.plugin_manager.provider_for("py", &cap).is_some(),
+        "new extension must be registered"
+    );
+    assert!(
+        app.plugin_manager.provider_for("rs", &cap).is_none(),
+        "old extension must no longer be registered after re-registration"
+    );
+}
+
+#[test]
+fn set_fold_regions_applies_to_current_file() {
+    let mut app = create_base_app();
+    let path = std::path::PathBuf::from("/some/file.py");
+    app.current_file = Some(path.clone());
+    // Provide 3 lines of content so the display map has something to work with.
+    app.content = vec!["a".into(), "  b".into(), "  c".into()];
+
+    app.drain_plugin_actions_for_test(
+        "lang-plugin",
+        "set_fold_regions",
+        serde_json::json!({
+            "path": "/some/file.py",
+            "regions": [[0, 2]]
+        }),
+    );
+
+    assert_eq!(
+        app.fold_regions.len(),
+        1,
+        "fold_regions must be updated for the current file"
+    );
+    assert_eq!(app.fold_regions[0].start, 0);
+    assert_eq!(app.fold_regions[0].end, 2);
+}
+
+#[test]
+fn set_fold_regions_stores_for_future_open() {
+    let mut app = create_base_app();
+    let path = std::path::PathBuf::from("/other/file.py");
+    // current_file is None — the file is not yet open.
+    app.current_file = None;
+
+    app.drain_plugin_actions_for_test(
+        "lang-plugin",
+        "set_fold_regions",
+        serde_json::json!({
+            "path": "/other/file.py",
+            "regions": [[1, 5], [10, 20]]
+        }),
+    );
+
+    let stored = app.plugin_fold_regions.get(&path);
+    assert!(stored.is_some(), "regions must be cached for future open");
+    assert_eq!(stored.unwrap().len(), 2);
+    // fold_regions on App should be untouched (no current file match).
+    assert!(app.fold_regions.is_empty());
+}
+
 /// Extension trait to call the private `drain_plugin_actions` with a synthetic action.
 trait DrainPluginActionsForTest {
     fn drain_plugin_actions_for_test(
@@ -309,31 +412,83 @@ trait DrainPluginActionsForTest {
 impl DrainPluginActionsForTest for App {
     fn drain_plugin_actions_for_test(
         &mut self,
-        _name: &str,
-        _action: &str,
-        _params: serde_json::Value,
+        name: &str,
+        action: &str,
+        params: serde_json::Value,
     ) {
-        // Replicate the logic from drain_plugin_actions for the set_icon_map case.
-        if _action == "set_icon_map" {
-            if let Some(obj) = _params.as_object() {
-                if let Some(icons) = obj.get("icons").and_then(|v| v.as_object()) {
-                    for (ext, glyph) in icons {
-                        if let Some(g) = glyph.as_str() {
-                            self.icon_map
-                                .insert(ext.to_ascii_lowercase(), g.to_string());
+        match action {
+            "set_icon_map" => {
+                if let Some(obj) = params.as_object() {
+                    if let Some(icons) = obj.get("icons").and_then(|v| v.as_object()) {
+                        for (ext, glyph) in icons {
+                            if let Some(g) = glyph.as_str() {
+                                self.icon_map
+                                    .insert(ext.to_ascii_lowercase(), g.to_string());
+                            }
                         }
                     }
-                }
-                if let Some(open) = obj.get("dir_open").and_then(|v| v.as_str()) {
-                    self.icon_dir_open = open.to_string();
-                }
-                if let Some(closed) = obj.get("dir_closed").and_then(|v| v.as_str()) {
-                    self.icon_dir_closed = closed.to_string();
-                }
-                if let Some(fallback) = obj.get("fallback").and_then(|v| v.as_str()) {
-                    self.icon_fallback = fallback.to_string();
+                    if let Some(open) = obj.get("dir_open").and_then(|v| v.as_str()) {
+                        self.icon_dir_open = open.to_string();
+                    }
+                    if let Some(closed) = obj.get("dir_closed").and_then(|v| v.as_str()) {
+                        self.icon_dir_closed = closed.to_string();
+                    }
+                    if let Some(fallback) = obj.get("fallback").and_then(|v| v.as_str()) {
+                        self.icon_fallback = fallback.to_string();
+                    }
                 }
             }
+            "register_language_provider" => {
+                let extensions: Vec<String> = params
+                    .get("extensions")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(str::to_ascii_lowercase))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                let capabilities: std::collections::HashSet<crate::plugin::Capability> = params
+                    .get("capabilities")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| serde_json::from_value(v.clone()).ok())
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                let reg = crate::plugin::LanguageProviderRegistration {
+                    plugin_name: name.to_string(),
+                    extensions,
+                    capabilities,
+                };
+                self.plugin_manager.register_provider(reg);
+            }
+            "set_fold_regions" => {
+                let path = match params.get("path").and_then(|v| v.as_str()) {
+                    Some(p) => std::path::PathBuf::from(p),
+                    None => return,
+                };
+                let regions: Vec<crate::fold::FoldRegion> = params
+                    .get("regions")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|r| {
+                                let pair = r.as_array()?;
+                                let start = pair.first()?.as_i64()? as usize;
+                                let end = pair.get(1)?.as_i64()? as usize;
+                                Some(crate::fold::FoldRegion { start, end })
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                self.plugin_fold_regions.insert(path.clone(), regions);
+                if self.current_file.as_deref() == Some(&path) {
+                    self.apply_plugin_fold_regions(&path);
+                }
+            }
+            _ => {}
         }
     }
 }

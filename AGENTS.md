@@ -38,7 +38,7 @@ src/
 │   ├── mouse_handlers.rs           # Mouse event dispatch and click hit-testing
 │   ├── navigation.rs               # Tree cursor movement helpers
 │   ├── refresh.rs                  # Per-frame tick: drain loads, watcher, debounced search
-│   ├── yaml_fold.rs                # YAML fold-region detection (re-export shim)
+│   ├── fold.rs                     # Fold state management (generic regions + language-provider override)
 │   └── *_test.rs                   # Co-located tests
 ├── ui/
 │   ├── mod.rs                      # ratatui rendering orchestration (draw entry point)
@@ -84,7 +84,8 @@ src/
 ├── theme.rs                        # Theme struct, color roles, presets, parse_color
 ├── tree.rs                         # TreeNode, build_visible (flat Vec from ignore::WalkBuilder)
 ├── virtual_file.rs                 # Memory-mapped lazily-indexed file (VirtualFile)
-└── yaml_fold.rs                    # FoldRegion detection and display-map builder
+├── fold.rs                         # Generic FoldRegion data model + display-map builder
+└── yaml_fold.rs                    # YAML-specific fold-region detection (indentation-based)
 ```
 
 Files grow into the module-directory pattern (`src/app/`, `src/ui/`, `src/config/`)
@@ -157,7 +158,9 @@ Quick lookup: type/function → file. Use this before grepping.
 | `Highlighter` | `src/highlight.rs:30` | syntect → ratatui styles |
 | `DiffRow` / `parse_side_by_side` | `src/diff.rs` | Diff parse/render types |
 | `GitRepoInfo` / `GitStatus` / `Commit` / `BlameLine` | `src/git.rs` | Git shell-out types |
-| `FoldRegion` / `detect_fold_regions` | `src/yaml_fold.rs` | YAML fold regions |
+| `FoldRegion` / `build_display_map` | `src/fold.rs` | Generic fold data model and display-map computation |
+| `detect_fold_regions` / `count_anchors_aliases` | `src/yaml_fold.rs` | YAML-specific fold-region detection |
+| `Capability` / `LanguageProviderRegistration` | `src/plugin/mod.rs` | Language provider protocol types |
 | `Plugin` / `PluginManager` / `PluginKind` | `src/plugin/mod.rs` | Plugin subprocess IPC |
 | `ExtraSyntax` / `PluginEntry` | `src/plugin/mod.rs` | Plugin-registered syntaxes |
 | `ReleaseInfo` / `RELEASE` | `src/release_info.rs` | Embedded release metadata |

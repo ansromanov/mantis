@@ -243,10 +243,10 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
         segs.push((Span::styled(format!(" [YAML: {label}]"), err_style), P_ERR));
     }
 
-    // -- Priority 2: YAML fold stats --
-    if !app.yaml_fold_regions.is_empty() {
-        let folded_count = app.yaml_folded.len();
-        let total_regions = app.yaml_fold_regions.len();
+    // -- Priority 2: fold stats --
+    if !app.fold_regions.is_empty() {
+        let folded_count = app.folded.len();
+        let total_regions = app.fold_regions.len();
         let anchor_info = if app.yaml_anchor_count > 0 || app.yaml_alias_count > 0 {
             format!(" &{} *{}", app.yaml_anchor_count, app.yaml_alias_count)
         } else {

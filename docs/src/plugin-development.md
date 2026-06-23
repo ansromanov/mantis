@@ -182,6 +182,55 @@ Fields:
 - `dir_closed` — glyph for closed directories
 - `fallback` — glyph used when no extension key matches
 - `icons` — map of extension/filename → glyph
+
+## Language providers
+
+A process plugin can declare itself as a **language provider** by responding to
+the `init` event with a `register_language_provider` action. This tells `tv`
+which file extensions the plugin handles and what capabilities it provides.
+Both `highlight` and `fold` flow through a single provider protocol; future
+capabilities (`hover`, `diagnostics`, `definition`) will slot into the same
+surface in a later release without any protocol break.
+
+### `register_language_provider`
+
+Sent by the plugin immediately after receiving `init`. Declares the file
+extensions and capabilities the plugin provides. `tv` stores the registration
+and uses it to route the correct events and display-state updates for each open
+file. Unknown capability strings are silently ignored, so existing providers
+remain compatible with future protocol extensions.
+
+```json
+{"event":"action","action":"register_language_provider","params":{
+  "extensions": ["py", "pyi"],
+  "capabilities": ["fold"]
+}}
+```
+
+Fields:
+- `extensions` — lowercase file extensions (no leading dot) this provider handles.
+- `capabilities` — one or more of `"highlight"` or `"fold"`. Reserved for
+  future use: `"hover"`, `"diagnostics"`, `"definition"`.
+
+After registering, `tv` sends `on_file_open` whenever a matching file is
+opened. The plugin should respond with the appropriate action for each declared
+capability (e.g. `set_fold_regions` for `"fold"`).
+
+### `set_fold_regions`
+
+Provides fold regions for a file. Plugin-supplied regions override the
+built-in YAML indentation-based folding for that file. Each region is a
+`[start_line, end_line]` pair (0-indexed, inclusive). When the named file is
+currently open the regions are applied immediately; when it is not yet open
+they are cached and applied the next time the file is opened.
+
+```json
+{"event":"action","action":"set_fold_regions","params":{
+  "path": "/absolute/path/to/file",
+  "regions": [[0, 5], [10, 20]]
+}}
+```
+
 ## Rules
 
 - **One JSON object per line.** No pretty-printing, no multi-line objects.

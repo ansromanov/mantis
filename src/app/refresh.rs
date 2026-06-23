@@ -269,6 +269,56 @@ impl App {
                     self.content_scroll = 0;
                     self.content_hscroll = 0;
                 }
+                "register_language_provider" => {
+                    let extensions: Vec<String> = params
+                        .get("extensions")
+                        .and_then(|v| v.as_array())
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(|v| v.as_str().map(str::to_ascii_lowercase))
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    let capabilities: std::collections::HashSet<crate::plugin::Capability> = params
+                        .get("capabilities")
+                        .and_then(|v| v.as_array())
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(|v| serde_json::from_value(v.clone()).ok())
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    let reg = crate::plugin::LanguageProviderRegistration {
+                        plugin_name: name.clone(),
+                        extensions,
+                        capabilities,
+                    };
+                    self.plugin_manager.register_provider(reg);
+                }
+                "set_fold_regions" => {
+                    let path = match params.get("path").and_then(|v| v.as_str()) {
+                        Some(p) => std::path::PathBuf::from(p),
+                        None => continue,
+                    };
+                    let regions: Vec<crate::fold::FoldRegion> = params
+                        .get("regions")
+                        .and_then(|v| v.as_array())
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(|r| {
+                                    let pair = r.as_array()?;
+                                    let start = pair.first()?.as_i64()? as usize;
+                                    let end = pair.get(1)?.as_i64()? as usize;
+                                    Some(crate::fold::FoldRegion { start, end })
+                                })
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    self.plugin_fold_regions.insert(path.clone(), regions);
+                    if self.current_file.as_deref() == Some(&path) {
+                        self.apply_plugin_fold_regions(&path);
+                    }
+                }
                 _ => {}
             }
         }

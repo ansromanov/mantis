@@ -175,7 +175,7 @@ impl App {
         self.json_pretty_text = Vec::new();
         self.json_pretty_lines = Vec::new();
         self.is_diff = true;
-        self.clear_yaml_state();
+        self.clear_fold_state();
         self.file_encoding = None;
         self.file_line_ending = None;
         self.content_scroll = 0;
@@ -208,7 +208,7 @@ impl App {
         self.show_pretty_json = false;
         self.json_pretty_text = Vec::new();
         self.json_pretty_lines = Vec::new();
-        self.clear_yaml_state();
+        self.clear_fold_state();
         self.file_encoding = None;
         self.file_line_ending = None;
         self.virtual_file = None;
@@ -278,16 +278,18 @@ impl App {
         self.markdown_lines = load.markdown_lines;
         self.json_pretty_text = load.json_pretty_text;
         self.json_pretty_lines = load.json_pretty_lines;
-        self.clear_yaml_state();
+        self.clear_fold_state();
         self.virtual_file = load.virtual_file;
         self.content = load.content;
         self.highlighted = load.highlighted;
         if let Some(y) = load.yaml {
-            self.yaml_fold_regions = y.fold_regions;
+            self.fold_regions = y.fold_regions;
             self.yaml_error = y.error;
             self.yaml_anchor_count = y.anchor_count;
             self.yaml_alias_count = y.alias_count;
         }
+        // Language provider fold regions override built-in YAML regions.
+        self.apply_plugin_fold_regions(path);
 
         if load.ok {
             self.current_file = Some(path.to_path_buf());
@@ -391,7 +393,7 @@ impl App {
         self.json_pretty_text = Vec::new();
         self.json_pretty_lines = Vec::new();
         self.is_diff = true;
-        self.clear_yaml_state();
+        self.clear_fold_state();
         self.file_encoding = None;
         self.file_line_ending = None;
         self.content_scroll = 0;
