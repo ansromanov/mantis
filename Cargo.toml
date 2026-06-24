@@ -37,7 +37,7 @@ codegen-units = 1   # better optimization at the cost of build time
 panic = "abort"     # no unwinding tables; smaller binary
 
 [features]
-default = ["git-core", "markdown-core"]
+default = ["git-core"]
 git-core = []
 markdown-core = ["dep:pulldown-cmark"]
 

@@ -285,15 +285,23 @@ impl App {
                         .collect(),
                     None => return,
                 };
-                self.markdown_lines = lines
+                let path = match params.get("path").and_then(|v| v.as_str()) {
+                    Some(p) => std::path::PathBuf::from(p),
+                    None => return,
+                };
+                let rendered: Vec<Vec<(ratatui::style::Style, String)>> = lines
                     .iter()
                     .map(|l| crate::ansi::parse_ansi_line(l))
                     .collect();
-                if let Some(path_str) = params.get("path").and_then(|v| v.as_str()) {
-                    self.current_file = Some(std::path::PathBuf::from(path_str));
-                }
+                let text: Vec<String> = rendered
+                    .iter()
+                    .map(|spans| spans.iter().map(|(_, t)| t.as_str()).collect::<String>())
+                    .collect();
+                self.plugin_content_text.insert(path.clone(), text);
+                self.plugin_content.insert(path, rendered);
                 self.content_scroll = 0;
                 self.content_hscroll = 0;
+                self.plugin_content_active = true;
             }
             "register_language_provider" => {
                 let extensions: Vec<String> = params

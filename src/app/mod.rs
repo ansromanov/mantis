@@ -320,6 +320,11 @@ pub struct App {
     /// Plugin-rendered content keyed by file path. Populated by the `set_content`
     /// action; the content pane checks this before markdown/virtual-file rendering.
     pub plugin_content: HashMap<PathBuf, Vec<Vec<(ratatui::style::Style, String)>>>,
+    /// Plain text of plugin-provided content, keyed by file path (same keys as
+    /// `plugin_content`). Used for in-file search, selection, and blame display.
+    /// Stored separately because `plugin_content` holds styled spans whose text
+    /// would require joining on every access.
+    pub plugin_content_text: HashMap<PathBuf, Vec<String>>,
     /// Set to `true` when a plugin sends `set_content` for the current file and
     /// reset to `false` when `current_file` changes, so the `[rendering…]`
     /// placeholder only shows while the plugin is actively working on that file.

@@ -193,6 +193,7 @@ impl App {
         // Notify plugins so they can re-render content with matching colours.
         self.plugin_manager.on_theme_change(theme_name);
         self.plugin_content.clear();
+        self.plugin_content_text.clear();
         self.theme = theme;
         self.highlighter =
             Highlighter::with_extra_syntaxes(&self.theme.syntax, &self.extra_syntaxes);

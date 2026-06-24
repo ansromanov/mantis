@@ -17,6 +17,7 @@ fn plain_file_uses_virtual_file() {
     assert!(!load.is_markdown && !load.is_json);
 }
 
+#[cfg(feature = "markdown-core")]
 #[test]
 fn markdown_renders_lines() {
     let mut f = tempfile::NamedTempFile::with_suffix(".md").unwrap();
