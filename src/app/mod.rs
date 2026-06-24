@@ -402,6 +402,14 @@ impl App {
                 entry.enabled = false;
             }
             self.save_config();
+            // Clear icon state when the icon-providing plugin is disabled.
+            if !self.icon_map.is_empty() {
+                self.icons_enabled = false;
+                self.icon_map.clear();
+                self.icon_dir_open.clear();
+                self.icon_dir_closed.clear();
+                self.icon_fallback.clear();
+            }
         } else {
             // Ensure the plugin file is present on disk before spawning.
             plugin::install_bundled_plugins();
