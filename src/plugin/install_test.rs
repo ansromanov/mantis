@@ -1,0 +1,144 @@
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+use super::*;
+
+fn fresh_plugin_dir() -> PathBuf {
+    static COUNTER: AtomicUsize = AtomicUsize::new(0);
+    let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+    std::env::temp_dir().join(format!("tv_plugin_install_{}_{n}", std::process::id()))
+}
+
+#[test]
+#[cfg(not(windows))]
+fn default_plugin_dir_ends_with_suffix() {
+    let dir = default_plugin_dir();
+    let components: Vec<_> = dir.components().collect();
+    let last_two: Vec<_> = components.iter().rev().take(2).collect();
+    assert_eq!(
+        last_two[0],
+        &std::path::Component::Normal("plugins".as_ref())
+    );
+    assert_eq!(
+        last_two[1],
+        &std::path::Component::Normal("tree-viewer".as_ref())
+    );
+}
+
+#[test]
+#[cfg(not(windows))]
+fn default_plugin_dir_respects_xdg() {
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let old = std::env::var_os("XDG_CONFIG_HOME");
+    unsafe { std::env::set_var("XDG_CONFIG_HOME", "/tmp/custom_cfg") };
+    let dir = default_plugin_dir();
+    unsafe {
+        match old {
+            Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
+            None => std::env::remove_var("XDG_CONFIG_HOME"),
+        }
+    }
+    assert!(dir.starts_with("/tmp/custom_cfg/tree-viewer/plugins"));
+}
+
+#[test]
+fn bundled_plugin_entries_all_disabled_and_include_markdown() {
+    let entries = bundled_plugin_entries();
+    assert!(!entries.is_empty(), "must have at least one bundled plugin");
+    for (_, entry) in &entries {
+        assert!(
+            !entry.enabled,
+            "bundled entries must default to enabled=false"
+        );
+        assert_eq!(
+            entry.kind,
+            PluginKind::Process,
+            "all bundled entries are process plugins"
+        );
+    }
+    let names: Vec<&str> = entries.iter().map(|(n, _)| n.as_str()).collect();
+    assert!(
+        names.contains(&"markdown"),
+        "markdown plugin must be listed"
+    );
+    assert!(names.contains(&"iconize"), "iconize plugin must be listed");
+    assert!(
+        names.contains(&"git-plugin"),
+        "git-plugin plugin must be listed"
+    );
+}
+
+#[test]
+fn bundled_plugin_entries_no_duplicates() {
+    let entries = bundled_plugin_entries();
+    let mut seen = std::collections::HashSet::new();
+    for (name, _) in &entries {
+        assert!(seen.insert(name.as_str()), "duplicate entry: {name}");
+    }
+}
+
+#[test]
+fn install_bundled_plugins_creates_iconize_binary() {
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let tmp = fresh_plugin_dir();
+    std::fs::create_dir_all(&tmp).unwrap();
+    let old = std::env::var_os("XDG_CONFIG_HOME");
+    unsafe { std::env::set_var("XDG_CONFIG_HOME", &tmp) };
+
+    install_bundled_plugins();
+
+    unsafe {
+        match old {
+            Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
+            None => std::env::remove_var("XDG_CONFIG_HOME"),
+        }
+    }
+
+    let plugins_dir = tmp.join("tree-viewer").join("plugins");
+    assert!(plugins_dir.is_dir(), "plugins directory should be created");
+    assert!(
+        plugins_dir.join("syntaxes").is_dir(),
+        "syntaxes subdirectory should be created"
+    );
+    assert!(
+        plugins_dir
+            .join("syntaxes")
+            .join("terraform.sublime-syntax")
+            .exists(),
+        "terraform.sublime-syntax must be installed"
+    );
+    std::fs::remove_dir_all(&tmp).ok();
+}
+
+#[test]
+fn install_bundled_plugins_creates_plugin_dir_and_syntaxes() {
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let tmp = fresh_plugin_dir();
+    std::fs::create_dir_all(&tmp).unwrap();
+    let old = std::env::var_os("XDG_CONFIG_HOME");
+    unsafe { std::env::set_var("XDG_CONFIG_HOME", &tmp) };
+
+    install_bundled_plugins();
+
+    unsafe {
+        match old {
+            Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
+            None => std::env::remove_var("XDG_CONFIG_HOME"),
+        }
+    }
+
+    let plugins_dir = tmp.join("tree-viewer").join("plugins");
+    assert!(plugins_dir.is_dir(), "plugins directory should be created");
+    assert!(
+        plugins_dir.join("syntaxes").is_dir(),
+        "syntaxes subdirectory should be created"
+    );
+    assert!(
+        plugins_dir
+            .join("syntaxes")
+            .join("terraform.sublime-syntax")
+            .exists(),
+        "terraform.sublime-syntax must be installed"
+    );
+    std::fs::remove_dir_all(&tmp).ok();
+}

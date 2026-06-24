@@ -241,10 +241,11 @@ Key pages to consider when changing code:
 
 ## File size limit
 
-Keep every file under **600 lines** (code and tests alike). When a source file
-approaches the limit, split it into focused submodules using the module-directory
-pattern (`src/app/`, `src/ui/`). When a `_test.rs` approaches it, split by area into
-multiple sibling `_test.rs` files.
+- **Code files** — ideally under **700 lines**. When a source file approaches the
+  limit, split it into focused submodules using the module-directory pattern
+  (`src/app/`, `src/ui/`).
+- **Test files** — no hard limit, but if a code file is split, its related tests
+  in the `_test.rs` companion should be split into sibling `_test.rs` files too.
 
 ---
 

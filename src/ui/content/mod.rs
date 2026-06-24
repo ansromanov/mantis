@@ -11,6 +11,7 @@
 
 mod diff;
 mod draw;
+mod draw_text;
 mod scrollbar;
 mod search;
 mod selection;
