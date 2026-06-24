@@ -13,7 +13,6 @@ use crate::plugin::types::{PluginEntry, PluginKind};
 /// each pre-set to `enabled = false` so they appear in the palette without
 /// being spawned automatically.
 pub(crate) fn bundled_plugin_entries() -> Vec<(String, PluginEntry)> {
-    let plugin_dir = default_plugin_dir();
     let mut entries = Vec::new();
     for (name, binary_name) in BUNDLED_PLUGINS {
         let filename = if cfg!(windows) {
@@ -21,10 +20,15 @@ pub(crate) fn bundled_plugin_entries() -> Vec<(String, PluginEntry)> {
         } else {
             binary_name.to_string()
         };
+        // Store the path relative to `default_plugin_dir()` (resolved at spawn
+        // time in `PluginManager::activate_all`). An absolute path here would be
+        // serialised verbatim into the user's `tv.toml` on the first plugin
+        // toggle, pinning a machine-specific home directory into a config that is
+        // meant to be portable.
         entries.push((
             name.to_string(),
             PluginEntry {
-                path: plugin_dir.join(&filename),
+                path: PathBuf::from(filename),
                 enabled: false,
                 kind: PluginKind::Process,
                 extensions: Vec::new(),
@@ -37,7 +41,7 @@ pub(crate) fn bundled_plugin_entries() -> Vec<(String, PluginEntry)> {
         entries.push((
             name.to_string(),
             PluginEntry {
-                path: plugin_dir.join(syntax_rel_path),
+                path: PathBuf::from(syntax_rel_path),
                 enabled: false,
                 kind: PluginKind::Syntax,
                 extensions,

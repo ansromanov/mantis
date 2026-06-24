@@ -88,6 +88,22 @@ fn bundled_plugin_entries_all_disabled_and_include_markdown_and_terraform() {
 }
 
 #[test]
+fn bundled_plugin_entries_use_relative_paths() {
+    // Regression: bundled entries land in `app.config.plugins` and get
+    // serialised into the user's `tv.toml` on the first plugin toggle. Absolute
+    // paths would pin a machine-specific home directory into a portable config,
+    // so every bundled `path` must be relative (resolved against the plugin dir
+    // at spawn time).
+    for (name, entry) in bundled_plugin_entries() {
+        assert!(
+            entry.path.is_relative(),
+            "bundled plugin {name} path must be relative, got {:?}",
+            entry.path
+        );
+    }
+}
+
+#[test]
 fn bundled_plugin_entries_no_duplicates() {
     let entries = bundled_plugin_entries();
     let mut seen = std::collections::HashSet::new();
