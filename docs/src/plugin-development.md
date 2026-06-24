@@ -21,7 +21,7 @@ version = "0.1.0"                    # Required: semver recommended
 description = "git diff on open"     # Optional: one-line description
 author = "ansromanov"                # Optional: author name/handle
 entry = "run.sh"                     # Required: executable relative to this dir
-tv_protocol = "1"                    # Required: IPC protocol version
+tv_protocol = "2"                    # Required: IPC protocol version
 platforms = ["linux", "macos"]       # Optional: OS filter (default: all)
 events = ["on_file_open"]            # Optional: handled events (advisory)
 permissions = ["run_git"]            # Optional: required permissions (advisory)
@@ -36,10 +36,22 @@ Fields:
 | `description` | No | One-line description displayed in the picker. |
 | `author` | No | Author name or handle. |
 | `entry` | Yes | Path to the executable, relative to this manifest's directory. |
-| `tv_protocol` | Yes | IPC protocol version (`"1"` for the current protocol). |
+| `tv_protocol` | Yes | IPC protocol version (`"2"` for the current protocol). Plugins declaring a different version are skipped. |
 | `platforms` | No | OS filter: list of `"linux"`, `"macos"`, `"windows"`. Absent = all. |
 | `events` | No | Events the plugin handles (advisory, not enforced). |
 | `permissions` | No | Permissions the plugin needs (advisory, shown at install). |
+
+### Protocol version
+
+The `tv_protocol` field must match the host's expected protocol version.
+Plugins declaring a mismatched version are silently skipped during discovery.
+The host protocol version is also sent to each plugin on the `init` event (see
+below) so the plugin can verify compatibility dynamically.
+
+| Version | Release | Changes |
+|---|---|---|
+| `"1"` | 0.7.x | Initial protocol. Events: init, on_file_open, on_keypress, on_selection_change, on_theme_change, on_quit, shutdown. Actions: show_message, open_file, set_content, set_file_statuses, set_blame_data, set_status_bar_git_info, set_icon_map. |
+| `"2"` | 0.8.x | Language providers (register_language_provider, set_fold_regions), event subscription (`events` field in manifest), protocol hardening (bounded queues, line caps), `protocol_version` field on init event. |
 
 ### Discovery
 
@@ -77,11 +89,16 @@ Each event is one JSON object on a single line. Unknown fields are ignored.
 
 ### `init`
 
-Sent once immediately after spawn, before any user interaction.
+Sent once immediately after spawn, before any user interaction. Includes the
+host protocol version so the plugin can verify it is compatible.
 
 ```json
-{"event":"init","theme":"default"}
+{"event":"init","theme":"default","protocol_version":"2"}
 ```
+
+The `protocol_version` field is present only on `init`. If the value does
+not match what the plugin expects, the plugin should exit gracefully or
+fall back to a compatible subset of features.
 
 ### `on_file_open`
 
@@ -239,13 +256,47 @@ Both `highlight` and `fold` flow through a single provider protocol; future
 capabilities (`hover`, `diagnostics`, `definition`) will slot into the same
 surface in a later release without any protocol break.
 
+### Provider contract
+
+The language provider contract between `tv` and a plugin follows a strict
+lifecycle:
+
+1. **Registration.** Immediately after receiving `init`, the plugin sends
+   `register_language_provider` to declare its extensions and capabilities.
+   Registration is expected once per plugin — re-registration overwrites
+   the previous registration entirely.
+
+2. **File routing.** When the user opens a file whose extension matches a
+   registered provider, `tv` routes relevant events (`on_file_open`,
+   `on_selection_change`) and capability-driven state requests to that
+   provider. Only the first provider whose extensions match the file's
+   extension receives these events for that file. Currently only `fold`
+   capability drives backend state (fold regions); `highlight` is reserved
+   for future use.
+
+3. **Response.** For each declared capability, the plugin should respond to
+   file-related events with the corresponding action:
+   - `fold` → respond with `set_fold_regions` when a matching file is opened
+      (see below).
+   - `highlight` → reserved for future use.
+
+4. **Lifetime.** Provider registrations persist for the entire plugin session.
+   When a plugin exits or is deactivated, its registrations are removed. If
+   the plugin sends `set_fold_regions` for a file before it is opened, `tv`
+   caches the regions and applies them when the file is opened later.
+
+5. **Capability gating.** `tv` enforces capability checks at runtime. For
+   example, `set_fold_regions` is only accepted when the sender has a
+   registered provider with the `fold` capability for that file's extension.
+   Unknown capability strings are silently ignored, so existing providers
+   remain compatible with future protocol extensions.
+
 ### `register_language_provider`
 
 Sent by the plugin immediately after receiving `init`. Declares the file
 extensions and capabilities the plugin provides. `tv` stores the registration
 and uses it to route the correct events and display-state updates for each open
-file. Unknown capability strings are silently ignored, so existing providers
-remain compatible with future protocol extensions.
+file.
 
 ```json
 {"event":"action","action":"register_language_provider","params":{
@@ -271,6 +322,11 @@ for that file. Each region is a `[start_line, end_line]` pair (0-indexed,
 inclusive). When the named file is currently open the regions are applied
 immediately; when it is not yet open they are cached and applied the next
 time the file is opened.
+
+Fold regions from a plugin are only accepted when `tv` has a registered
+language provider with the `fold` capability for the file's extension.
+Regions from unregistered plugins or for unmatched extensions are silently
+discarded.
 
 ```json
 {"event":"action","action":"set_fold_regions","params":{

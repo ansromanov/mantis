@@ -134,6 +134,55 @@ fn activate_one_is_noop_when_already_running() {
 }
 
 #[test]
+#[cfg(unix)]
+fn activate_one_sends_init_with_protocol_version() {
+    use std::io::Write as _;
+    use std::os::unix::fs::PermissionsExt;
+    use std::time::{Duration, Instant};
+
+    let dir = std::env::temp_dir().join(format!("tv_mgr_init_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let out = dir.join("recv.txt");
+
+    // Recording stub: copies everything on stdin to a file, exits on EOF.
+    let script = dir.join("rec.sh");
+    let mut f = std::fs::File::create(&script).unwrap();
+    write!(f, "#!/bin/sh\ncat > \"{}\"\n", out.display()).unwrap();
+    drop(f);
+    std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+    let entry = PluginEntry {
+        path: script.clone(),
+        enabled: false,
+        ..Default::default()
+    };
+    let mut mgr = PluginManager::new(vec![("rec".to_string(), entry)]);
+    mgr.activate_one("rec", None).expect("spawn rec.sh");
+    // Closing stdin lets the stub flush and exit.
+    mgr.deactivate_one("rec");
+
+    let deadline = Instant::now() + Duration::from_secs(3);
+    let contents = loop {
+        if let Ok(s) = std::fs::read_to_string(&out) {
+            if !s.is_empty() {
+                break s;
+            }
+        }
+        assert!(Instant::now() < deadline, "plugin never received init");
+        std::thread::sleep(Duration::from_millis(25));
+    };
+    let init_line = contents
+        .lines()
+        .find(|l| l.contains(r#""event":"init""#))
+        .expect("init event must be sent");
+    assert!(
+        init_line.contains(r#""protocol_version":"2""#),
+        "init must carry host protocol version, got: {init_line}"
+    );
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
 fn register_provider_and_provider_for_found() {
     let mut mgr = PluginManager::new(vec![]);
     mgr.register_provider(make_reg("lang", &["rs"], &[Capability::Fold]));

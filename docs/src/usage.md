@@ -42,7 +42,10 @@ These work no matter which panel is focused.
 | `Alt+.`        | Toggle hidden files     |
 | `H`            | Git history of current file |
 | `Ctrl+O`       | Recent files (jump to a recently opened file) |
+| `p`            | Plugin palette (enable/disable plugins) |
+| `:`            | Go to line              |
 | `b`            | Toggle git blame        |
+| `B`            | Blame the active line   |
 | `V`            | Visual-line mode (select lines; `b` blames the range) |
 | `t`            | Theme picker            |
 | `Ctrl+G`       | Toggle git mode (changed files + diffs) |
@@ -55,6 +58,7 @@ These work no matter which panel is focused.
 | `Up`/`k`, `Down`/`j` | Move selection               |
 | `Enter`/`Right`/`l`  | Expand directory / open file |
 | `Left`/`h`           | Collapse directory / go up   |
+| `-`/`=`              | Collapse all / expand all    |
 | `g`/`Home`, `G`/`End` | Jump to first / last entry  |
 
 ## Content panel
@@ -68,10 +72,14 @@ These work no matter which panel is focused.
 | `0`            | Reset horizontal scroll      |
 | `z`            | Toggle word wrap             |
 | `L`            | Toggle line numbers          |
+| `Space`        | Toggle fold at cursor        |
+| `:`            | Go to line                   |
 | `M`            | Toggle raw / rendered markdown |
 | `J`            | Toggle JSON pretty-print     |
+| `B`            | Blame the active line        |
 | `V`            | Visual-line mode: select lines, `b` blames the range, `Esc` exits |
 | `D`            | Toggle side-by-side diff (in a diff) |
+| `S`            | Toggle staged diff (in a diff) |
 | `n`/`N`        | Next / previous hunk (in a diff) |
 
 ## Search popup
@@ -115,6 +123,15 @@ about the open file:
   scrolled.
 - **Encoding and line endings** — shown when `I` (file info) is toggled on.
 
+## Code folding
+
+Press `Space` to fold or unfold the block at the cursor. A fold gutter appears
+in the content pane when foldable regions are detected, and the status bar shows
+fold stats. Fold regions come from two sources: a built-in YAML indentation
+detector, and language plugins that supply per-file-type regions over the
+[plugin protocol](plugins.md). Plugin regions override the built-in output for
+their file extension.
+
 ## JSON pretty-printing
 
 Viewing a JSON file? Press `J` to reformat it with indentation for easier
@@ -124,6 +141,7 @@ reading, and `J` again to return to the raw text. Handy for minified `.json`.
 
 - **Click** a tree row to select it — opens a file, or folds/unfolds a
   directory.
+- **Double-click** a directory to make it the new tree root.
 - **Click** a pane to focus it.
 - **Scroll wheel** scrolls whichever pane is under the cursor.
 - In the search and history popups, **single-click** selects an entry and

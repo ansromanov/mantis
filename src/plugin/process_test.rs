@@ -38,6 +38,7 @@ fn send_is_noop_when_no_writer() {
         path: None,
         key: None,
         theme: None,
+        protocol_version: None,
     });
 }
 

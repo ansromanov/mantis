@@ -13,9 +13,9 @@ irm https://raw.githubusercontent.com/ansromanov/tree-viewer/main/install.ps1 | 
 ```
 
 `tv` is a fast, lightweight file tree viewer with syntax highlighting, markdown
-rendering, fuzzy search, and first-class git tooling (diff, blame, history). One
-small binary, no config required, no plugins to wire up. Built with
-[ratatui](https://ratatui.rs).
+rendering, fuzzy search, code folding, and first-class git tooling (diff, blame,
+history). One small binary, no config required — with an optional plugin system
+when you want to extend it. Built with [ratatui](https://ratatui.rs).
 
 <p align="center">
   <img src="media/intro.png" alt="tree-viewer" width="800">
@@ -62,16 +62,26 @@ the moment you actually need to change something.
 - **Git status indicators** — tree entries colored by git status (new, modified,
   deleted, ignored)
 - **Syntax highlighting** via [syntect](https://github.com/trishume/syntect)
+- **Code folding** (`Space`) — collapse/expand blocks; per-file-type fold regions
+  supplied by language plugins, with built-in YAML indentation folding
 - **Markdown rendering** — headings, tables, task lists, code blocks,
   blockquotes, and more (press `M` to toggle the raw source)
 - **JSON pretty-printing** (`J`) — reformat minified JSON for readable browsing
+- **Go to line** (`:`) — jump straight to a line number
+- **Status bar** — active line number, detected language, scroll position, and
+  (toggleable) encoding/line endings
 - **Command palette** (`Ctrl+P`) — fuzzy-find every action and see its keybinding
+- **Plugins** (`p`) — opt-in process and syntax plugins, with a git-backed
+  registry; enable/disable from a palette, state persists across restarts
+- **Session persistence** — expanded dirs, last open file, scroll position, and
+  git mode restored on restart (cached outside the repo)
+- **Recent files** (`Ctrl+O`) and **copy path** (`y` / `Y`)
 - **Open in your editor** (`e`) — jump to the current file in `$VISUAL`/`$EDITOR`,
   then drop back into `tv` when you're done
 - **Themes** — built-in presets (monokai, solarized, catppuccin, synthwave84),
   switchable live, with configurable panel background and terminal transparency
 - **Mouse support** — click to select, fold/unfold directories, switch panes,
-  and scroll
+  scroll, and double-click a directory to change root
 - **Configurable** layout, behavior, and keybindings via a simple TOML file
 
 ## Install
@@ -107,21 +117,24 @@ binding. The essentials:
 | --- | --- |
 | `q`, `Ctrl+c` | Quit |
 | `?` | Toggle help |
-| `Ctrl+P` | Command palette |
+| `Ctrl+P` · `p` | Command palette · plugin palette |
 | `Tab` | Switch panel |
 | `/` · `f` | Fuzzy file search · full-text content search |
 | `r` · `e` | Reload tree · open current file in `$EDITOR` |
+| `Ctrl+O` · `y` · `Y` | Recent files · copy absolute path · copy relative path |
+| `Space` · `:` | Toggle fold at cursor · go to line |
 | `Alt+.` | Toggle hidden files |
-| `H` · `b` | Git history · toggle git blame |
+| `H` · `b` · `B` | Git history · toggle git blame · blame the active line |
 | `V` | Visual-line mode (select lines; `b` blames the range) |
 | `Ctrl+G` · `Alt+G` | Toggle git mode · flat/tree view in git mode |
 | `t` | Theme picker |
 
 **Navigation** — `Up`/`k`, `Down`/`j` move or scroll; `Enter`/`Right`/`l` expand
-a directory or open a file; `Left`/`h` collapse or go up. In the content panel,
-`PageUp`/`PageDown` page, `g`/`G` jump to top/bottom, `0` resets horizontal
-scroll, `z` toggles word wrap, `L` toggles line numbers, `M` toggles
-raw/rendered markdown, `J` toggles JSON pretty-print.
+a directory or open a file; `Left`/`h` collapse or go up; `-`/`=` collapse/expand
+the whole tree. In the content panel, `PageUp`/`PageDown` page, `g`/`G` jump to
+top/bottom, `0` resets horizontal scroll, `z` toggles word wrap, `L` toggles line
+numbers, `Space` toggles a fold, `M` toggles raw/rendered markdown, `J` toggles
+JSON pretty-print.
 
 **Search popup** — type to filter, `Up`/`Down` to navigate, `Tab` to switch
 files ↔ content mode, `Enter` to open, `Esc` to close.
@@ -135,8 +148,8 @@ selects and double-click activates.
 - **History** (`H`) — fzf-style list of commits that touched the open file. Type
   to filter, `Enter`/double-click to load that revision's diff against your
   working tree (additions green, deletions red).
-- **Blame** (`b`) — toggle an inline gutter with short hash, author, and date per
-  line. Unavailable while viewing a diff.
+- **Blame** (`b`, `B`) — `b` toggles an inline gutter with short hash, author, and
+  date per line; `B` blames just the active line. Unavailable while viewing a diff.
 - **Visual-line blame** (`V`) — enter visual-line mode, extend the selection with
   `j`/`k` (or `g`/`G`), then press `b` to open a panel showing the short hash,
   author, relative date, and content for every line in the range. `Esc` exits.
@@ -144,6 +157,8 @@ selects and double-click activates.
   one shows its working-tree diff. `Alt+G` toggles between tree and a flat list
   of changed files. Directories with changes auto-expand; diffs refresh on the
   30-second auto-reload tick and on manual `r`.
+- **Diff view** — while viewing a diff, `D` toggles side-by-side, `S` toggles
+  the staged diff, and `n`/`N` jump to the next/previous hunk.
 
 All require `git` on your `PATH` and a tracked file/repository. Configure via
 `tv.toml`:
@@ -154,6 +169,29 @@ git_mode_flat = false    # start in flat list view (default: false)
 git_status = true        # colour tree entries by git status (default: true)
 git_show_deleted = false # show ghost nodes for deleted tracked files (default: false)
 ```
+
+## Plugins
+
+`tv` works fully without plugins, but a plugin system is there when you want to
+extend it. Two kinds:
+
+- **Process plugins** — standalone executables that hook into app events and send
+  actions back over newline-delimited JSON on stdin/stdout. They can add language
+  providers (syntax highlighting + per-file-type fold regions), file-tree icons,
+  git overlays, and more. A plugin can be any executable — a compiled binary, a
+  script, anything that reads stdin and writes stdout.
+- **Syntax plugins** — `.sublime-syntax` files loaded into the syntect highlighter
+  at startup to add new file types without rebuilding `tv`.
+
+Press `p` for the plugin palette to enable/disable plugins; the choice persists
+across restarts (under `[plugins]` in `tv.toml`). Bundled plugins auto-register
+and install on first enable, and a git-backed registry (`index.json`) lets `tv`
+discover and fetch community plugins.
+
+See the [Plugins guide](https://ansromanov.github.io/tree-viewer/plugins.html),
+[Plugin Registry](https://ansromanov.github.io/tree-viewer/plugin-registry.html),
+and [Plugin Development](https://ansromanov.github.io/tree-viewer/plugin-development.html)
+docs for the full protocol and manifest (`plugin.toml`) format.
 
 ## Configuration
 
@@ -170,6 +208,10 @@ tree_width = 28           # tree panel width, as a percent of the terminal
 tree_independent_scroll = false  # PageUp/PageDown & Home/End scroll the tree
                                  # viewport without moving the selection
 word_wrap = false         # wrap long lines in the content panel
+indent_guides = true      # draw indent guides in the tree
+icons = false             # Nerd Font file-type icons (icon map from a plugin)
+show_file_info = true     # encoding + line endings in the status bar
+recent_files_count = 10   # how many entries the recent-files list (Ctrl+O) keeps
 
 # Every keybinding is remappable under [keys]. Each action takes a list of
 # key specs — a single character ("q", "?", "0") or a named key (Up, Enter,

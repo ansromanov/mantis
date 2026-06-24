@@ -15,7 +15,7 @@
 //! description = "git diff on open, git log on H"
 //! author = "ansromanov"
 //! entry = "run.sh"
-//! tv_protocol = "1"
+//! tv_protocol = "2"
 //! platforms = ["linux", "macos"]
 //! events = ["on_file_open", "on_keypress"]
 //! permissions = ["run_git", "read_files"]
@@ -26,6 +26,10 @@
 //! systems using Rust's `std::env::consts::OS` naming. `events` is enforced:
 //! a plugin only receives the events it lists (empty = all events). `permissions`
 //! is advisory-only in this phase and not enforced.
+//!
+//! The `tv_protocol` field is validated against the host's
+//! [`PROTOCOL_VERSION`] at discovery time. Plugins declaring a mismatched
+//! version are silently skipped to prevent protocol mismatches.
 
 use std::path::{Path, PathBuf};
 
@@ -105,6 +109,9 @@ pub fn discover(plugin_dir: &Path) -> Vec<(String, PluginEntry)> {
             continue;
         };
         if !is_safe_name(&manifest.name) || !is_safe_entry(&manifest.entry) {
+            continue;
+        }
+        if manifest.tv_protocol != crate::plugin::PROTOCOL_VERSION {
             continue;
         }
         if let Some(ref platforms) = manifest.platforms {
