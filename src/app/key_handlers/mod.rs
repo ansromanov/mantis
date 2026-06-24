@@ -37,10 +37,9 @@ impl App {
         if key.kind == KeyEventKind::Release {
             return;
         }
-        // Notify plugins of every keypress so they can react (e.g. custom
-        // keybindings, macros). Plugins receive the key as a readable string:
-        // "q", "ctrl+c", "Enter", etc.
-        self.plugin_manager.on_keypress(&key);
+        // Notify plugins of each keypress *only* in normal mode (no overlay
+        // active) so search/picker input is not broadcast. Plugins receive
+        // the key as a readable string: "q", "ctrl+c", "Enter", etc.
         if self.show_about {
             match key.code {
                 crossterm::event::KeyCode::Char('?')
@@ -85,6 +84,7 @@ impl App {
         } else if self.goto_line.is_some() {
             self.handle_goto_line_key(key);
         } else {
+            self.plugin_manager.on_keypress(&key);
             self.handle_normal_key(key);
         }
     }

@@ -33,6 +33,7 @@ pub(crate) fn bundled_plugin_entries() -> Vec<(String, PluginEntry)> {
                 kind: PluginKind::Process,
                 extensions: Vec::new(),
                 syntax_file: None,
+                events: Vec::new(),
             },
         ));
     }
@@ -46,6 +47,7 @@ pub(crate) fn bundled_plugin_entries() -> Vec<(String, PluginEntry)> {
                 kind: PluginKind::Syntax,
                 extensions,
                 syntax_file: Some(PathBuf::from(syntax_rel_path)),
+                events: Vec::new(),
             },
         ));
     }

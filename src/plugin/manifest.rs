@@ -119,6 +119,7 @@ pub fn discover(plugin_dir: &Path) -> Vec<(String, PluginEntry)> {
                 kind: PluginKind::Process,
                 extensions: Vec::new(),
                 syntax_file: None,
+                events: manifest.events.unwrap_or_default(),
             },
         ));
     }

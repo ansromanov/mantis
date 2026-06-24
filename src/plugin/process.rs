@@ -4,35 +4,47 @@
 //! handle plus background reader (stdout → action channel) and writer (send
 //! queue → stdin) threads.
 
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, Write};
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
-use std::sync::mpsc::Sender;
 use std::time::{Duration, Instant};
 
 use crate::plugin::types::{FromPlugin, ToPlugin};
 
+/// Maximum line length from a plugin's stdout (64 KB). Lines exceeding this
+/// are discarded and the reader continues.
+const MAX_LINE_LEN: usize = 65536;
+
 /// A single running plugin subprocess with background reader and writer threads.
 pub(crate) struct Plugin {
     pub(crate) name: String,
+    /// Events this plugin subscribes to. Empty = all events (backward compat).
+    subscribed_events: Vec<String>,
     child: Option<Child>,
     /// Sends serialised JSON lines to the plugin's stdin via the writer thread.
-    write_tx: Option<Sender<String>>,
+    write_tx: Option<std::sync::mpsc::SyncSender<String>>,
     action_rx: Option<std::sync::mpsc::Receiver<(String, serde_json::Value)>>,
     _reader_thread: Option<std::thread::JoinHandle<()>>,
     _writer_thread: Option<std::thread::JoinHandle<()>>,
 }
 
 impl Plugin {
-    pub(crate) fn new(name: String) -> Self {
+    pub(crate) fn new(name: String, subscribed_events: Vec<String>) -> Self {
         Plugin {
             name,
+            subscribed_events,
             child: None,
             write_tx: None,
             action_rx: None,
             _reader_thread: None,
             _writer_thread: None,
         }
+    }
+
+    /// Returns `true` if this plugin has subscribed to the given event.
+    /// Empty subscription list means all events are accepted (backward compat).
+    pub(crate) fn subscribes_to(&self, event: &str) -> bool {
+        self.subscribed_events.is_empty() || self.subscribed_events.iter().any(|e| e == event)
     }
 
     pub(crate) fn spawn(&mut self, path: &Path) -> Result<(), String> {
@@ -57,29 +69,39 @@ impl Plugin {
         let read_handle = std::thread::Builder::new()
             .name(format!("plugin-reader-{}", name_for_reader))
             .spawn(move || {
-                let reader = BufReader::new(stdout);
-                for line in reader.lines() {
-                    match line {
-                        Ok(line) => {
-                            let trimmed = line.trim();
-                            if trimmed.is_empty() {
-                                continue;
-                            }
-                            if let Ok(msg) = serde_json::from_str::<FromPlugin>(trimmed) {
-                                if msg.event == "action" {
-                                    if let Some(action) = msg.action {
-                                        let _ = read_tx.try_send((action, msg.params));
-                                    }
-                                }
+                let mut reader = std::io::BufReader::new(stdout);
+                let mut line_buf: Vec<u8> = Vec::with_capacity(1024);
+                loop {
+                    line_buf.clear();
+                    // Read up to MAX_LINE_LEN bytes looking for '\n'
+                    let got_newline = read_capped_line(&mut reader, &mut line_buf);
+                    if line_buf.is_empty() {
+                        break;
+                    }
+                    // Discard lines exceeding the cap (no newline at MAX_LINE_LEN)
+                    if !got_newline {
+                        drain_rest_of_line(&mut reader);
+                        continue;
+                    }
+                    if line_buf.ends_with(b"\n") {
+                        line_buf.pop();
+                    }
+                    let trimmed = String::from_utf8_lossy(&line_buf).trim().to_string();
+                    if trimmed.is_empty() {
+                        continue;
+                    }
+                    if let Ok(msg) = serde_json::from_str::<FromPlugin>(&trimmed) {
+                        if msg.event == "action" {
+                            if let Some(action) = msg.action {
+                                let _ = read_tx.try_send((action, msg.params));
                             }
                         }
-                        Err(_) => break,
                     }
                 }
             })
             .map_err(|e| format!("failed to spawn reader thread: {e}"))?;
 
-        let (write_tx, write_rx) = std::sync::mpsc::channel::<String>();
+        let (write_tx, write_rx) = std::sync::mpsc::sync_channel::<String>(1024);
         let name_for_writer = self.name.clone();
         let write_handle = std::thread::Builder::new()
             .name(format!("plugin-writer-{}", name_for_writer))
@@ -102,7 +124,7 @@ impl Plugin {
         Ok(())
     }
 
-    /// Enqueues a message for the writer thread; never blocks the caller.
+    /// Enqueues a message for the writer thread; drops on full (never blocks).
     pub(crate) fn send(&mut self, msg: &ToPlugin) {
         let Some(ref write_tx) = self.write_tx else {
             return;
@@ -110,7 +132,7 @@ impl Plugin {
         let Ok(json) = serde_json::to_string(msg) else {
             return;
         };
-        let _ = write_tx.send(json);
+        let _ = write_tx.try_send(json);
     }
 
     pub(crate) fn drain_actions(&mut self) -> Vec<(String, serde_json::Value)> {
@@ -183,6 +205,61 @@ impl Plugin {
                     let _ = c.wait();
                 }
             }
+        }
+    }
+}
+
+/// Reads up to `MAX_LINE_LEN` bytes from `reader` into `buf`, stopping at the
+/// first `\n`. Returns `true` if a newline was found within the limit, `false`
+/// if the line was truncated or EOF was reached without a newline.
+fn read_capped_line(
+    reader: &mut std::io::BufReader<std::process::ChildStdout>,
+    buf: &mut Vec<u8>,
+) -> bool {
+    loop {
+        let (available_len, has_newline) = {
+            let available = match reader.fill_buf() {
+                Ok([]) => return !buf.is_empty(),
+                Ok(b) => b,
+                Err(_) => return !buf.is_empty(),
+            };
+            let remaining = MAX_LINE_LEN.saturating_sub(buf.len());
+            if remaining == 0 {
+                return false;
+            }
+            let newline_pos = available.iter().position(|&b| b == b'\n');
+            let to_read = match newline_pos {
+                Some(pos) => pos + 1,
+                None => available.len().min(remaining),
+            };
+            buf.extend_from_slice(&available[..to_read]);
+            (to_read, newline_pos.is_some())
+        };
+        reader.consume(available_len);
+        if has_newline {
+            return true;
+        }
+    }
+}
+
+/// Advances `reader` past any remaining bytes in the current line (everything
+/// up to and including the next `\n`, or EOF).
+fn drain_rest_of_line(reader: &mut std::io::BufReader<std::process::ChildStdout>) {
+    loop {
+        let consume = {
+            let available = match reader.fill_buf() {
+                Ok([]) => return,
+                Ok(b) => b,
+                Err(_) => return,
+            };
+            match available.iter().position(|&b| b == b'\n') {
+                Some(pos) => pos + 1,
+                None => available.len(),
+            }
+        };
+        reader.consume(consume);
+        if consume == 0 {
+            return;
         }
     }
 }

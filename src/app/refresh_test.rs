@@ -365,6 +365,7 @@ fn create_base_app() -> App {
         load_seq: 0,
         loading: false,
         plugin_manager: PluginManager::new(Vec::new()),
+        plugin_is_opening_file: false,
         plugin_message: None,
         plugin_blame: HashMap::new(),
         plugin_git_info: None,

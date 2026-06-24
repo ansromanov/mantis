@@ -68,7 +68,8 @@ impl PluginManager {
             } else {
                 entry.path.clone()
             };
-            let mut plugin = Plugin::new(name.clone());
+            let events = entry.events.clone();
+            let mut plugin = Plugin::new(name.clone(), events);
             if let Err(e) = plugin.spawn(&path) {
                 self.spawn_errors.push(e);
                 continue;
@@ -105,10 +106,13 @@ impl PluginManager {
         }
     }
 
-    /// Sends `on_file_open` to all active plugins.
+    /// Sends `on_file_open` to all subscribed active plugins.
     pub(crate) fn on_file_open(&mut self, path: &Path) {
         let path_s = path.to_string_lossy().into_owned();
         for plugin in &mut self.plugins {
+            if !plugin.subscribes_to("on_file_open") {
+                continue;
+            }
             plugin.send(&ToPlugin {
                 event: "on_file_open".into(),
                 path: Some(path_s.clone()),
@@ -118,10 +122,13 @@ impl PluginManager {
         }
     }
 
-    /// Sends `on_keypress` to all active plugins with a human-readable key.
+    /// Sends `on_keypress` to all subscribed active plugins with a human-readable key.
     pub(crate) fn on_keypress(&mut self, key: &crossterm::event::KeyEvent) {
         let key_str = super::key_event_to_string(key);
         for plugin in &mut self.plugins {
+            if !plugin.subscribes_to("on_keypress") {
+                continue;
+            }
             plugin.send(&ToPlugin {
                 event: "on_keypress".into(),
                 path: None,
@@ -131,10 +138,13 @@ impl PluginManager {
         }
     }
 
-    /// Sends `on_theme_change` to all active plugins with the new theme name.
+    /// Sends `on_theme_change` to all subscribed active plugins with the new theme name.
     pub(crate) fn on_theme_change(&mut self, theme: &str) {
         self.active_theme = Some(theme.to_string());
         for plugin in &mut self.plugins {
+            if !plugin.subscribes_to("on_theme_change") {
+                continue;
+            }
             plugin.send(&ToPlugin {
                 event: "on_theme_change".into(),
                 path: None,
@@ -144,10 +154,13 @@ impl PluginManager {
         }
     }
 
-    /// Sends `on_selection_change` to all active plugins.
+    /// Sends `on_selection_change` to all subscribed active plugins.
     pub(crate) fn on_selection_change(&mut self, path: Option<&Path>) {
         let path_s = path.map(|p| p.to_string_lossy().into_owned());
         for plugin in &mut self.plugins {
+            if !plugin.subscribes_to("on_selection_change") {
+                continue;
+            }
             plugin.send(&ToPlugin {
                 event: "on_selection_change".into(),
                 path: path_s.clone(),
@@ -157,10 +170,13 @@ impl PluginManager {
         }
     }
 
-    /// Sends `on_quit` to all active plugins (graceful shutdown notice).
+    /// Sends `on_quit` to all subscribed active plugins (graceful shutdown notice).
     #[allow(dead_code)]
     pub(crate) fn on_quit(&mut self) {
         for plugin in &mut self.plugins {
+            if !plugin.subscribes_to("on_quit") {
+                continue;
+            }
             plugin.send(&ToPlugin {
                 event: "on_quit".into(),
                 path: None,
@@ -247,7 +263,8 @@ impl PluginManager {
         } else {
             entry.path.clone()
         };
-        let mut plugin = Plugin::new(name.to_string());
+        let events = entry.events.clone();
+        let mut plugin = Plugin::new(name.to_string(), events);
         plugin.spawn(&path)?;
         plugin.send(&ToPlugin {
             event: "init".into(),
