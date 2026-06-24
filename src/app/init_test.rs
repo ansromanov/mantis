@@ -74,6 +74,24 @@ fn app_new_show_hidden_includes_dotfiles() {
 }
 
 #[test]
+fn app_new_registers_syntax_plugins_in_manager_for_palette() {
+    // init.rs hands *all* plugin entries (including syntax-kind) to the
+    // PluginManager so they surface in the plugin palette; the bundled
+    // terraform syntax plugin is seeded into the config by default.
+    let root = temp_dir();
+    let app = new_app(&root, Config::default());
+    let entries = app.plugin_manager.plugin_entries();
+    assert!(
+        entries
+            .iter()
+            .any(|(_, _, kind)| *kind == crate::plugin::PluginKind::Syntax),
+        "a syntax plugin must be registered in the manager so it appears in the \
+         plugin palette; got {entries:?}"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn app_new_preserves_root_path() {
     let root = temp_dir();
     let app = new_app(&root, Config::default());

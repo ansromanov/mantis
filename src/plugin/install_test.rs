@@ -42,18 +42,13 @@ fn default_plugin_dir_respects_xdg() {
 }
 
 #[test]
-fn bundled_plugin_entries_all_disabled_and_include_markdown() {
+fn bundled_plugin_entries_all_disabled_and_include_markdown_and_terraform() {
     let entries = bundled_plugin_entries();
     assert!(!entries.is_empty(), "must have at least one bundled plugin");
     for (_, entry) in &entries {
         assert!(
             !entry.enabled,
             "bundled entries must default to enabled=false"
-        );
-        assert_eq!(
-            entry.kind,
-            PluginKind::Process,
-            "all bundled entries are process plugins"
         );
     }
     let names: Vec<&str> = entries.iter().map(|(n, _)| n.as_str()).collect();
@@ -66,6 +61,30 @@ fn bundled_plugin_entries_all_disabled_and_include_markdown() {
         names.contains(&"git-plugin"),
         "git-plugin plugin must be listed"
     );
+    assert!(
+        names.contains(&"terraform"),
+        "terraform syntax plugin must be listed"
+    );
+    // Process entries
+    for (name, entry) in &entries {
+        if name == "terraform" {
+            assert_eq!(
+                entry.kind,
+                PluginKind::Syntax,
+                "terraform must be a syntax plugin"
+            );
+            assert!(
+                entry.syntax_file.is_some(),
+                "terraform must have syntax_file set"
+            );
+        } else {
+            assert_eq!(
+                entry.kind,
+                PluginKind::Process,
+                "all other bundled entries must be process plugins"
+            );
+        }
+    }
 }
 
 #[test]

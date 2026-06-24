@@ -88,12 +88,10 @@ impl App {
         let highlighter = Highlighter::with_extra_syntaxes(&theme.syntax, &extra_syntaxes);
         let loader = Loader::new(&theme, extra_syntaxes.clone());
 
-        // Syntax plugins go to the highlighter, not the subprocess manager.
-        let process_entries: Vec<_> = plugin_entries
-            .into_iter()
-            .filter(|(_, e)| e.kind != plugin::PluginKind::Syntax)
-            .collect();
-        let mut plugin_manager = PluginManager::new(process_entries);
+        // Syntax plugins go to the highlighter AND the manager (so they appear
+        // in the plugin palette). The manager skips non-Process entries in
+        // activate_all/activate_one.
+        let mut plugin_manager = PluginManager::new(plugin_entries);
         plugin_manager.activate_all(cfg.theme.name.as_deref());
         let plugin_spawn_error = plugin_manager
             .take_spawn_errors()

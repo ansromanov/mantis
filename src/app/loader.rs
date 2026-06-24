@@ -252,6 +252,8 @@ pub(super) enum LoadRequest {
     },
     /// Rebuild the worker's highlighter/theme after a theme change.
     SetTheme(Box<Theme>),
+    /// Rebuild the worker's highlighter with updated syntax definitions.
+    SetExtraSyntaxes(Vec<ExtraSyntax>),
     /// Stop the worker (sent on `Loader` drop).
     Shutdown,
 }
@@ -283,9 +285,8 @@ impl Loader {
     pub fn new(theme: &Theme, extra_syntaxes: Vec<ExtraSyntax>) -> Self {
         let (req_tx, req_rx) = std::sync::mpsc::channel::<LoadRequest>();
         let (res_tx, res_rx) = std::sync::mpsc::channel::<LoadResponse>();
-        let extra = Arc::new(extra_syntaxes);
+        let mut extra_for_thread = Arc::new(extra_syntaxes);
         let mut theme = theme.clone();
-        let extra_for_thread = Arc::clone(&extra);
         let handle = std::thread::spawn(move || {
             let mut hl = Highlighter::with_extra_syntaxes(&theme.syntax, &extra_for_thread);
             while let Ok(req) = req_rx.recv() {
@@ -293,6 +294,10 @@ impl Loader {
                     LoadRequest::Shutdown => break,
                     LoadRequest::SetTheme(t) => {
                         theme = *t;
+                        hl = Highlighter::with_extra_syntaxes(&theme.syntax, &extra_for_thread);
+                    }
+                    LoadRequest::SetExtraSyntaxes(extra) => {
+                        extra_for_thread = Arc::new(extra);
                         hl = Highlighter::with_extra_syntaxes(&theme.syntax, &extra_for_thread);
                     }
                     LoadRequest::File { seq, path } => {

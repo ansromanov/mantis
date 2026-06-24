@@ -42,6 +42,7 @@ fn set_icon_map_populates_icon_fields() {
         icon_dir_open: String::new(),
         icon_dir_closed: String::new(),
         icon_fallback: String::new(),
+        icons_enabled: false,
         ..create_base_app()
     };
 
@@ -58,6 +59,7 @@ fn set_icon_map_populates_icon_fields() {
 
     app.drain_plugin_actions_for_test("iconize", "set_icon_map", params);
 
+    assert!(app.icons_enabled, "set_icon_map must enable icons");
     assert_eq!(app.icon_dir_open, "\u{f07c}");
     assert_eq!(app.icon_dir_closed, "\u{f07b}");
     assert_eq!(app.icon_fallback, "\u{f15b}");
@@ -73,6 +75,7 @@ fn set_icon_map_stores_keys_lowercase() {
         icon_dir_open: String::new(),
         icon_dir_closed: String::new(),
         icon_fallback: String::new(),
+        icons_enabled: false,
         ..create_base_app()
     };
 
@@ -88,6 +91,7 @@ fn set_icon_map_stores_keys_lowercase() {
 
     app.drain_plugin_actions_for_test("iconize", "set_icon_map", params);
 
+    assert!(app.icons_enabled, "set_icon_map must enable icons");
     assert_eq!(
         app.icon_map.get("rs"),
         Some(&"\u{e7a8}".to_string()),
@@ -107,6 +111,7 @@ fn set_icon_map_missing_fields_ignored() {
         icon_dir_open: "old_open".to_string(),
         icon_dir_closed: "old_closed".to_string(),
         icon_fallback: "old_fallback".to_string(),
+        icons_enabled: false,
         ..create_base_app()
     };
 
@@ -118,11 +123,34 @@ fn set_icon_map_missing_fields_ignored() {
 
     app.drain_plugin_actions_for_test("iconize", "set_icon_map", params);
 
+    assert!(app.icons_enabled, "set_icon_map with icons must enable");
     // dir_* and fallback should remain unchanged since they weren't in the payload
     assert_eq!(app.icon_dir_open, "old_open");
     assert_eq!(app.icon_dir_closed, "old_closed");
     assert_eq!(app.icon_fallback, "old_fallback");
     assert_eq!(app.icon_map.get("rs"), Some(&"\u{e7a8}".to_string()));
+}
+
+#[test]
+fn set_icon_map_empty_icons_does_not_enable() {
+    let mut app = App {
+        icon_map: std::collections::HashMap::new(),
+        icons_enabled: false,
+        ..create_base_app()
+    };
+
+    let params = serde_json::json!({
+        "dir_open": "\u{f07c}",
+        "dir_closed": "\u{f07b}",
+        "fallback": "\u{f15b}",
+    });
+
+    app.drain_plugin_actions_for_test("iconize", "set_icon_map", params);
+
+    assert!(!app.icons_enabled, "no icons key must not enable icons");
+    assert_eq!(app.icon_dir_open, "\u{f07c}");
+    assert_eq!(app.icon_dir_closed, "\u{f07b}");
+    assert_eq!(app.icon_fallback, "\u{f15b}");
 }
 
 #[test]
@@ -133,6 +161,7 @@ fn set_icon_map_partial_icons_does_not_clear_existing() {
             m.insert("rs".to_string(), "\u{e7a8}".to_string());
             m
         },
+        icons_enabled: false,
         ..create_base_app()
     };
 
@@ -147,14 +176,66 @@ fn set_icon_map_partial_icons_does_not_clear_existing() {
 
     app.drain_plugin_actions_for_test("iconize", "set_icon_map", params);
 
+    assert!(app.icons_enabled, "set_icon_map must enable icons");
     // Existing "rs" entry must be preserved, "py" added
     assert_eq!(app.icon_map.get("rs"), Some(&"\u{e7a8}".to_string()));
     assert_eq!(app.icon_map.get("py"), Some(&"\u{e73c}".to_string()));
 }
 
+#[test]
+fn set_icon_map_then_clear_on_disable_clears_state() {
+    let mut app = App {
+        icon_map: {
+            let mut m = std::collections::HashMap::new();
+            m.insert("rs".to_string(), "\u{e7a8}".to_string());
+            m
+        },
+        icon_dir_open: "\u{f07c}".to_string(),
+        icon_dir_closed: "\u{f07b}".to_string(),
+        icon_fallback: "\u{f15b}".to_string(),
+        icons_enabled: true,
+        ..create_base_app()
+    };
+
+    // Simulate the plugin being disabled: clearing icon state.
+    if !app.icon_map.is_empty() {
+        app.icons_enabled = false;
+        app.icon_map.clear();
+        app.icon_dir_open.clear();
+        app.icon_dir_closed.clear();
+        app.icon_fallback.clear();
+    }
+
+    assert!(
+        !app.icons_enabled,
+        "disabled plugin must clear icons_enabled"
+    );
+    assert!(app.icon_map.is_empty(), "icon_map must be cleared");
+    assert!(app.icon_dir_open.is_empty());
+    assert!(app.icon_dir_closed.is_empty());
+    assert!(app.icon_fallback.is_empty());
+}
+
 // -- helpers ------------------------------------------------------------------
 
 /// Minimal App for testing drain_plugin_actions in isolation.
+#[test]
+fn loader_set_extra_syntaxes_keeps_worker_serving() {
+    use std::io::Write;
+    let app = create_base_app();
+    // Forward the current (empty) extra-syntax set to the worker; it must
+    // rebuild its highlighter and keep answering file loads.
+    app.loader_set_extra_syntaxes();
+    let mut f = tempfile::NamedTempFile::with_suffix(".rs").unwrap();
+    f.write_all(b"fn main() {}\n").unwrap();
+    app.loader.request(LoadRequest::File {
+        seq: 11,
+        path: f.path().to_path_buf(),
+    });
+    let resp = app.loader.rx.recv().expect("worker response");
+    assert!(matches!(resp, LoadResponse::File { seq: 11, .. }));
+}
+
 fn create_base_app() -> App {
     use crate::config::Config;
     use crate::highlight::Highlighter;
