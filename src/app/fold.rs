@@ -6,9 +6,11 @@
 //! `fold_display_map` — the display-line to physical-line table the renderer
 //! and scroll math consult while folds are active. Toggling a fold here keeps
 //! that map and the recorded gutter click rows in sync, so mouse and keyboard
-//! fold operations always agree on what is visible. Language provider regions
-//! arrive via `apply_plugin_fold_regions` and override the built-in YAML
-//! detector output.
+//! fold operations always agree on what is visible. Regions can come from
+//! either the built-in YAML indentation detector (`yaml_fold`) or from a
+//! language provider registered via the plugin protocol; plugin-supplied
+//! regions arrive via `apply_plugin_fold_regions` and override the built-in
+//! output for the matching file extension.
 
 use super::App;
 

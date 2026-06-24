@@ -3763,7 +3763,7 @@ fn line_prefix_width_with_fold_gutter() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.content = vec!["hello".to_string(); 10];
-    // Simulate YAML fold regions
+    // Simulate fold regions
     app.fold_regions = vec![crate::fold::FoldRegion { start: 0, end: 5 }];
     // fold_gutter_width = 2, line_width = len("10") + 1 = 3, total = 2 + 3 = 5
     assert_eq!(app.line_prefix_width(), 5);
@@ -4120,7 +4120,7 @@ fn dispatch_command_toggle_diff_side_by_side_toggles() {
 }
 
 #[test]
-fn dispatch_command_yaml_unfold_all_works() {
+fn dispatch_command_unfold_all_works() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.content = vec![
@@ -4144,7 +4144,7 @@ fn dispatch_command_yaml_unfold_all_works() {
 }
 
 #[test]
-fn dispatch_command_yaml_fold_toggle_toggles() {
+fn dispatch_command_fold_toggle_toggles() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.content = vec!["header".to_string(), "  child".to_string()];
@@ -4202,7 +4202,7 @@ fn visual_line_enters_and_extends_selection() {
 }
 
 #[test]
-fn content_key_yaml_fold_toggle_toggles() {
+fn content_key_fold_toggle_toggles() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("a.txt"));
@@ -4210,7 +4210,7 @@ fn content_key_yaml_fold_toggle_toggles() {
     app.fold_regions = vec![FoldRegion { start: 0, end: 1 }];
     app.rebuild_fold_display_map();
     assert!(app.folded.is_empty());
-    // Space is the yaml_fold_toggle binding
+    // Space is the fold_toggle binding
     app.handle_key(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::empty()));
     assert!(app.folded.contains(&0));
     fs::remove_dir_all(&root).ok();

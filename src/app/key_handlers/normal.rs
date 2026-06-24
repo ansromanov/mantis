@@ -276,7 +276,7 @@ impl App {
             self.diff_next_hunk();
         } else if self.is_diff && pressed(&k.diff_hunk_prev, &key) {
             self.diff_prev_hunk();
-        } else if !self.fold_regions.is_empty() && pressed(&k.yaml_fold_toggle, &key) {
+        } else if !self.fold_regions.is_empty() && pressed(&k.fold_toggle, &key) {
             // Toggle the fold region whose header is at the current scroll position.
             let phys = self.display_to_physical(self.content_scroll);
             if let Some(ri) = self.region_idx_at(phys) {
