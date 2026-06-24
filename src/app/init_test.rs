@@ -92,6 +92,64 @@ fn app_new_registers_syntax_plugins_in_manager_for_palette() {
 }
 
 #[test]
+fn app_new_bundled_plugins_appear_in_config_plugins_map() {
+    // Regression: bundled/manifest plugins were seeded into `cfg.plugins` only
+    // *after* `saved_config = cfg.clone()`, so `self.config.plugins` was empty
+    // and `toggle_plugin_picker_selection` could never persist the enabled flag.
+    let root = temp_dir();
+    let app = new_app(&root, Config::default());
+    assert!(
+        !app.config.plugins.is_empty(),
+        "bundled plugins must appear in config.plugins; got empty map"
+    );
+    // At least one bundled entry should be present (e.g. the markdown plugin).
+    let bundled: Vec<String> = crate::plugin::bundled_plugin_entries()
+        .into_iter()
+        .map(|(n, _)| n)
+        .collect();
+    for name in &bundled {
+        assert!(
+            app.config.plugins.contains_key(name),
+            "bundled plugin {name} must appear in config.plugins"
+        );
+    }
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn app_new_bundled_plugin_toggle_flips_enabled_flag() {
+    // Toggling a bundled plugin's enabled flag via config.plugins.get_mut
+    // must succeed because the entry is present in self.config.plugins.
+    let root = temp_dir();
+    let mut app = new_app(&root, Config::default());
+    let bundled: Vec<String> = crate::plugin::bundled_plugin_entries()
+        .into_iter()
+        .map(|(n, _)| n)
+        .collect();
+    let name = bundled.first().expect("at least one bundled plugin");
+    let orig = app
+        .config
+        .plugins
+        .get(name)
+        .map(|e| e.enabled)
+        .unwrap_or(false);
+    if let Some(entry) = app.config.plugins.get_mut(name) {
+        entry.enabled = !orig;
+    }
+    let flipped = app
+        .config
+        .plugins
+        .get(name)
+        .map(|e| e.enabled)
+        .unwrap_or(orig);
+    assert_ne!(
+        orig, flipped,
+        "toggling bundled plugin {name}: enabled should have flipped from {orig}"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn app_new_preserves_root_path() {
     let root = temp_dir();
     let app = new_app(&root, Config::default());
