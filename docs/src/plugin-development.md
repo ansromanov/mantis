@@ -169,6 +169,53 @@ that generate rich output (e.g. markdown renderers, linters).
 {"event":"action","action":"set_content","params":{"lines":["\u001b[32mgreen line\u001b[0m","plain line"]}}
 ```
 
+### `set_file_statuses`
+
+Provides per-path git status information for tree coloring. The `params` object
+maps absolute file paths to status strings. Sent by the bundled `git-plugin` on
+`init` and `on_file_open` / `on_selection_change`.
+
+```json
+{"event":"action","action":"set_file_statuses","params":{
+  "/home/user/proj/src/main.rs": "modified",
+  "/home/user/proj/src/lib.rs": "added"
+}}
+```
+
+Status values: `"modified"`, `"renamed"`, `"conflict"`, `"added"`, `"untracked"`,
+`"deleted"`, `"ignored"`.
+
+### `set_blame_data`
+
+Provides per-line blame annotations for a file. Each entry in `lines` is a
+pre-formatted display string (hash + author + date) for the corresponding line
+(0-indexed). Sent by the bundled `git-plugin` on `b` keypress. When set, these
+annotations take precedence over the built-in `git::file_blame()` call in the
+content pane.
+
+```json
+{"event":"action","action":"set_blame_data","params":{
+  "path": "/home/user/proj/src/main.rs",
+  "lines": ["abc1234 (John Doe 2024-01-15) ", ...]
+}}
+```
+
+### `set_status_bar_git_info`
+
+Provides branch, HEAD, and dirty state for the status bar. When set, this takes
+precedence over the built-in `git_info`. Sent by the bundled `git-plugin` on
+`init` and `on_file_open`. The `state` field is one of `"clean"`, `"dirty"`,
+`"conflict"`, `"rebase"`, or `"merge"`.
+
+```json
+{"event":"action","action":"set_status_bar_git_info","params":{
+  "branch": "main",
+  "head": "abc1234",
+  "dirty": true,
+  "state": "dirty"
+}}
+```
+
 ### `set_icon_map`
 
 Sets the file-type icon glyphs used in the tree. Requires `icons = true` in `tv.toml` and a Nerd Font terminal. Keys in `icons` are file extensions (lowercase) or full filenames for extensionless files (e.g. `"dockerfile"`).
@@ -286,19 +333,21 @@ fn main() {
 
 ## Architecture notes
 
-- `src/plugin.rs` owns the subprocess lifecycle and the background reader
-  thread per plugin.
-- `PluginManager` collects events into an internal buffer; `App::tick()` drains
-  them via `drain_plugin_actions()` in `src/app/refresh.rs`.
+- `src/plugin/` owns the subprocess lifecycle, the background reader thread per
+  plugin, manifest parsing, binary install, and syntax discovery.
+- `PluginManager` (`src/plugin/manager.rs`) collects plugin actions into an
+  internal buffer; `App::tick()` drains them via `drain_plugin_actions()` in
+  `src/app/refresh.rs`.
 - Hook dispatch (`on_file_open`, `on_keypress`, `on_selection_change`) happens
   in `src/app/file_ops.rs`, `src/app/key_handlers/`, and `src/app/navigation.rs`
   respectively.
 - Plugin config deserialization lives in `src/config/mod.rs` under the
   `plugins` key.
-- Bundled plugins are declared in `BUNDLED_PLUGINS` (`src/plugin.rs`) as
-  `(name, binary_name)` pairs and built as workspace-member Rust crates under
-  `plugins/`. The `install_bundled_plugins()` function finds and copies
-  compiled binaries to the plugin directory on first run.
+- Bundled plugins are declared in `BUNDLED_PLUGINS`
+  (`src/plugin/install.rs`) as `(name, binary_name)` pairs and built as
+  workspace-member Rust crates under `plugins/`. The
+  `install_bundled_plugins()` function finds and copies compiled binaries to
+  the plugin directory on first run.
 
 ---
 
