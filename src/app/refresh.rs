@@ -237,6 +237,7 @@ impl App {
                                     .insert(ext.to_ascii_lowercase(), g.to_string());
                             }
                         }
+                        self.icons_enabled = true;
                     }
                     if let Some(open) = obj.get("dir_open").and_then(|v| v.as_str()) {
                         self.icon_dir_open = open.to_string();
