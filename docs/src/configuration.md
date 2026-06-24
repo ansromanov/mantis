@@ -41,6 +41,7 @@ line_numbers = true       # show the line-number gutter in the content panel
 show_file_info = true     # show encoding and line-ending info in the status bar
 recent_files_count = 10   # number of recently opened files to remember
 indent_guides = true      # draw indentation guide lines (│) in the tree pane
+icons = false             # Nerd Font file-type icons (icon map supplied by a plugin)
 ```
 
 ## Keybindings
@@ -69,6 +70,8 @@ open_in_editor = ["e"]
 copy_path = ["y"]
 copy_relative_path = ["Y"]
 toggle_blame = ["b"]
+blame_line = ["B"]
+go_to_line = [":"]
 visual_line_toggle = ["V"]
 visual_line_blame = ["b"]
 git_mode_toggle = ["ctrl+g"]
