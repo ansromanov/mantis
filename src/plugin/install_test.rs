@@ -159,6 +159,44 @@ fn install_bundled_plugins_creates_iconize_binary() {
 }
 
 #[test]
+fn install_bundles_terraform_syntax_content() {
+    // Guards the `include_str!` source path for the terraform syntax, which
+    // moved to plugins/terraform/syntaxes/. A wrong-but-existing path would
+    // bundle empty/garbage content while still compiling, so assert the
+    // installed file carries the real HCL grammar.
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let tmp = fresh_plugin_dir();
+    std::fs::create_dir_all(&tmp).unwrap();
+    let old = std::env::var_os("XDG_CONFIG_HOME");
+    unsafe { std::env::set_var("XDG_CONFIG_HOME", &tmp) };
+
+    install_bundled_plugins();
+
+    unsafe {
+        match old {
+            Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
+            None => std::env::remove_var("XDG_CONFIG_HOME"),
+        }
+    }
+
+    let syntax = tmp
+        .join("tree-viewer")
+        .join("plugins")
+        .join("syntaxes")
+        .join("terraform.sublime-syntax");
+    let content = std::fs::read_to_string(&syntax).expect("terraform syntax should be readable");
+    assert!(
+        content.contains("%YAML"),
+        "bundled terraform syntax must be a real .sublime-syntax document"
+    );
+    assert!(
+        content.to_lowercase().contains("terraform"),
+        "bundled terraform syntax must contain the HCL/Terraform grammar"
+    );
+    std::fs::remove_dir_all(&tmp).ok();
+}
+
+#[test]
 fn install_bundled_plugins_creates_plugin_dir_and_syntaxes() {
     let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let tmp = fresh_plugin_dir();
