@@ -354,6 +354,33 @@ fn descend_to_selected_clears_plugin_content() {
 }
 
 #[test]
+fn descend_to_selected_clears_plugin_contributions() {
+    // Root change must drop per-plugin contribution tracking for the old tree;
+    // otherwise teardown after a root switch would target stale paths.
+    use crate::plugin::PluginContributions;
+    let root = deep_tree();
+    let mut app = app_for(&root);
+    let mut contrib = PluginContributions::default();
+    contrib.content_paths.insert(root.join("top.txt"));
+    app.plugin_contributions
+        .insert("iconize".to_string(), contrib);
+
+    let sub1_idx = app
+        .nodes
+        .iter()
+        .position(|n| n.is_dir && n.path == root.join("sub1"))
+        .expect("sub1 dir should exist");
+    app.tree_selected = sub1_idx;
+    app.descend_to_selected();
+
+    assert!(
+        app.plugin_contributions.is_empty(),
+        "plugin_contributions must clear on root change"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn descend_to_selected_does_nothing_for_file() {
     let root = deep_tree();
     let mut app = app_for(&root);

@@ -41,6 +41,22 @@ fn app_new_builds_visible_root_tree() {
 }
 
 #[test]
+fn app_new_starts_with_no_plugin_contributions() {
+    // A freshly constructed App has produced no plugin output yet, so the
+    // per-plugin contribution tracker must be empty.
+    let root = temp_dir();
+    fs::write(root.join("a.txt"), "one\n").unwrap();
+
+    let app = new_app(&root, Config::default());
+
+    assert!(
+        app.plugin_contributions.is_empty(),
+        "new App must have no plugin contributions"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn app_new_plugin_open_guard_defaults_false() {
     // The re-entrancy guard that suppresses `on_file_open` re-emission for
     // plugin-originated opens must start cleared.
