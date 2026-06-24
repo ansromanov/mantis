@@ -176,6 +176,17 @@ fn provider_for_unregistered_ext_returns_none() {
 }
 
 #[test]
+fn event_dispatch_with_no_active_plugins_is_noop() {
+    // The per-event `subscribes_to` gate runs inside a loop over active
+    // plugins; with none spawned every dispatch must be a harmless noop.
+    let mut mgr = PluginManager::new(vec![]);
+    mgr.on_file_open(std::path::Path::new("/tmp/x.rs"));
+    mgr.on_theme_change("dark");
+    mgr.on_selection_change(Some(std::path::Path::new("/tmp/x.rs")));
+    mgr.on_quit();
+}
+
+#[test]
 fn register_provider_overwrites_same_plugin() {
     let mut mgr = PluginManager::new(vec![]);
     mgr.register_provider(make_reg("lang", &["rs"], &[Capability::Fold]));
