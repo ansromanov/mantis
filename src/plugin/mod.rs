@@ -34,6 +34,18 @@
 //!    a `syntax_file` path.  Additionally, any `.sublime-syntax` file placed
 //!    in `{plugin_dir}/syntaxes/` is auto-discovered.
 
+/// Current plugin IPC protocol version.
+///
+/// Bumped on incompatible protocol changes. Plugins declare their protocol
+/// version in `plugin.toml` via the `tv_protocol` field. Plugins whose
+/// declared version does not match this constant are silently skipped during
+/// discovery to prevent miscommunication.
+///
+/// History:
+/// - `"1"` — initial protocol (0.7.x releases)
+/// - `"2"` — language providers, event subscriptions, protocol hardening (0.8.x)
+pub(crate) const PROTOCOL_VERSION: &str = "2";
+
 pub mod install;
 pub mod manifest;
 pub mod registry;

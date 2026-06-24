@@ -25,6 +25,10 @@
 //! `platforms` field, when present, restricts the plugin to specific operating
 //! systems using Rust's `std::env::consts::OS` naming. `events` and
 //! `permissions` are advisory-only in this phase and not enforced.
+//!
+//! The `tv_protocol` field is validated against the host's
+//! [`PROTOCOL_VERSION`] at discovery time. Plugins declaring a mismatched
+//! version are silently skipped to prevent protocol mismatches.
 
 use std::path::{Path, PathBuf};
 
@@ -103,6 +107,9 @@ pub fn discover(plugin_dir: &Path) -> Vec<(String, PluginEntry)> {
             continue;
         };
         if !is_safe_name(&manifest.name) || !is_safe_entry(&manifest.entry) {
+            continue;
+        }
+        if manifest.tv_protocol != crate::plugin::PROTOCOL_VERSION {
             continue;
         }
         if let Some(ref platforms) = manifest.platforms {

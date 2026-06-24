@@ -78,6 +78,7 @@ impl PluginManager {
                 path: None,
                 key: None,
                 theme: self.active_theme.clone(),
+                protocol_version: Some(crate::plugin::PROTOCOL_VERSION.into()),
             });
             self.plugins.push(plugin);
         }
@@ -98,6 +99,7 @@ impl PluginManager {
                 path: None,
                 key: None,
                 theme: None,
+                protocol_version: None,
             });
         }
         for mut plugin in self.plugins.drain(..) {
@@ -114,6 +116,7 @@ impl PluginManager {
                 path: Some(path_s.clone()),
                 key: None,
                 theme: None,
+                protocol_version: None,
             });
         }
     }
@@ -127,6 +130,7 @@ impl PluginManager {
                 path: None,
                 key: Some(key_str.clone()),
                 theme: None,
+                protocol_version: None,
             });
         }
     }
@@ -140,6 +144,7 @@ impl PluginManager {
                 path: None,
                 key: None,
                 theme: Some(theme.into()),
+                protocol_version: None,
             });
         }
     }
@@ -153,6 +158,7 @@ impl PluginManager {
                 path: path_s.clone(),
                 key: None,
                 theme: None,
+                protocol_version: None,
             });
         }
     }
@@ -166,6 +172,7 @@ impl PluginManager {
                 path: None,
                 key: None,
                 theme: None,
+                protocol_version: None,
             });
         }
     }
@@ -254,6 +261,7 @@ impl PluginManager {
             path: None,
             key: None,
             theme: self.active_theme.clone(),
+            protocol_version: Some(crate::plugin::PROTOCOL_VERSION.into()),
         });
         if let Some(file) = current_file {
             let path_s = file.to_string_lossy().into_owned();
@@ -262,12 +270,14 @@ impl PluginManager {
                 path: Some(path_s.clone()),
                 key: None,
                 theme: None,
+                protocol_version: None,
             });
             plugin.send(&ToPlugin {
                 event: "on_selection_change".into(),
                 path: Some(path_s),
                 key: None,
                 theme: None,
+                protocol_version: None,
             });
         }
         self.plugins.push(plugin);
@@ -286,6 +296,7 @@ impl PluginManager {
             path: None,
             key: None,
             theme: None,
+            protocol_version: None,
         });
         plugin.close_in_background();
     }
