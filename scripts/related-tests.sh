@@ -22,7 +22,12 @@ unit_preds=()
 bin_preds=()
 declare -A seen_unit=() seen_bin=()
 
-add_unit() { local m=$1; [[ -n ${seen_unit[$m]:-} ]] && return 0; seen_unit[$m]=1; unit_preds+=("test(/^${m}(::|\$)/)"); }
+# The trailing `(_tests?)?` tolerates the sibling-test-module convention where
+# `src/foo.rs`'s tests are declared as `mod foo_tests` (or `foo_test`) in the
+# parent mod.rs, giving test paths like `plugin::install_tests::…` rather than
+# `plugin::install::…`. Without it those tests never match and nextest aborts
+# with "no tests to run".
+add_unit() { local m=$1; [[ -n ${seen_unit[$m]:-} ]] && return 0; seen_unit[$m]=1; unit_preds+=("test(/^${m}(_tests?)?(::|\$)/)"); }
 add_bin()  { local b=$1; [[ -n ${seen_bin[$b]:-} ]] && return 0; seen_bin[$b]=1; bin_preds+=("binary(${b})"); }
 
 while IFS= read -r f; do
