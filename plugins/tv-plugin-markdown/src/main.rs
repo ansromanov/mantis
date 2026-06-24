@@ -234,8 +234,16 @@ fn render_to_ansi(src: &str, theme: &ThemeColors) -> Vec<String> {
                 table_rows.clear();
                 table_aligns.clear();
             }
-            Event::Start(Tag::TableHead) => in_table_header = true,
-            Event::End(Tag::TableHead) => in_table_header = false,
+            Event::Start(Tag::TableHead) => {
+                in_table_header = true;
+                table_row_cells.clear();
+            }
+            Event::End(Tag::TableHead) => {
+                in_table_header = false;
+                if !table_row_cells.is_empty() {
+                    table_rows.push((true, std::mem::take(&mut table_row_cells)));
+                }
+            }
             Event::Start(Tag::TableRow) => table_row_cells.clear(),
             Event::End(Tag::TableRow) => {
                 table_rows.push((in_table_header, std::mem::take(&mut table_row_cells)));
@@ -530,3 +538,7 @@ fn pad_width(text: &str, width: usize, align: Alignment) -> String {
 fn visible_width(s: &str) -> usize {
     UnicodeWidthStr::width(s)
 }
+
+#[cfg(test)]
+#[path = "main_test.rs"]
+mod tests;

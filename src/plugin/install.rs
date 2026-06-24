@@ -104,7 +104,7 @@ const BUNDLED_PLUGINS: &[(&str, &str)] = &[
 /// List of (filename, content) for each bundled syntax definition.
 const BUNDLED_SYNTAX_PLUGINS: &[(&str, &str)] = &[(
     "terraform.sublime-syntax",
-    include_str!("../../plugins/terraform.sublime-syntax"),
+    include_str!("../../plugins/terraform/syntaxes/terraform.sublime-syntax"),
 )];
 
 /// List of (name, syntax_rel_path, extensions) for syntax plugin [plugins] entries.
