@@ -13,7 +13,7 @@ use crate::plugin::types::{FromPlugin, ToPlugin};
 
 /// Maximum line length from a plugin's stdout (64 KB). Lines exceeding this
 /// are discarded and the reader continues.
-const MAX_LINE_LEN: usize = 65536;
+pub(crate) const MAX_LINE_LEN: usize = 65536;
 
 /// A single running plugin subprocess with background reader and writer threads.
 pub(crate) struct Plugin {
@@ -215,10 +215,7 @@ impl Plugin {
 /// already buffered (the final unterminated line). Returns `false` only when
 /// the line was truncated at `MAX_LINE_LEN` without a newline, or nothing was
 /// read before EOF.
-fn read_capped_line(
-    reader: &mut std::io::BufReader<std::process::ChildStdout>,
-    buf: &mut Vec<u8>,
-) -> bool {
+pub(crate) fn read_capped_line<R: BufRead>(reader: &mut R, buf: &mut Vec<u8>) -> bool {
     loop {
         let (available_len, has_newline) = {
             let available = match reader.fill_buf() {
@@ -231,12 +228,22 @@ fn read_capped_line(
                 return false;
             }
             let newline_pos = available.iter().position(|&b| b == b'\n');
-            let to_read = match newline_pos {
-                Some(pos) => pos + 1,
-                None => available.len().min(remaining),
-            };
-            buf.extend_from_slice(&available[..to_read]);
-            (to_read, newline_pos.is_some())
+            match newline_pos {
+                // Newline lies within the cap: take the full line incl. '\n'.
+                Some(pos) if pos < remaining => {
+                    buf.extend_from_slice(&available[..pos + 1]);
+                    (pos + 1, true)
+                }
+                // No newline within the cap window (either none in this chunk,
+                // or it sits beyond `remaining`): take only what fits and keep
+                // reading. The cap is enforced by `remaining == 0` above, which
+                // returns `false` so the caller drains the rest of the line.
+                _ => {
+                    let to_read = available.len().min(remaining);
+                    buf.extend_from_slice(&available[..to_read]);
+                    (to_read, false)
+                }
+            }
         };
         reader.consume(available_len);
         if has_newline {
@@ -247,21 +254,24 @@ fn read_capped_line(
 
 /// Advances `reader` past any remaining bytes in the current line (everything
 /// up to and including the next `\n`, or EOF).
-fn drain_rest_of_line(reader: &mut std::io::BufReader<std::process::ChildStdout>) {
+pub(crate) fn drain_rest_of_line<R: BufRead>(reader: &mut R) {
     loop {
-        let consume = {
+        let (consume, found_newline) = {
             let available = match reader.fill_buf() {
                 Ok([]) => return,
                 Ok(b) => b,
                 Err(_) => return,
             };
             match available.iter().position(|&b| b == b'\n') {
-                Some(pos) => pos + 1,
-                None => available.len(),
+                // Consume up to and including the newline, then stop — the next
+                // line must be left intact for the reader loop.
+                Some(pos) => (pos + 1, true),
+                // No newline yet: consume the chunk and keep reading.
+                None => (available.len(), false),
             }
         };
         reader.consume(consume);
-        if consume == 0 {
+        if found_newline {
             return;
         }
     }

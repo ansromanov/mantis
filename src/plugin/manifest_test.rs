@@ -107,6 +107,37 @@ tv_protocol = "1"
 }
 
 #[test]
+fn discover_populates_events_from_manifest() {
+    let dir = std::env::temp_dir().join(format!("tv_discover_events_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+
+    // Plugin declaring an events subscription.
+    let sub = dir.join("evented");
+    std::fs::create_dir_all(&sub).unwrap();
+    std::fs::write(
+        sub.join("plugin.toml"),
+        "name = \"evented\"\nversion = \"0.1.0\"\nentry = \"run.sh\"\ntv_protocol = \"1\"\nevents = [\"on_file_open\", \"on_keypress\"]\n",
+    )
+    .unwrap();
+
+    // Plugin without an events field => empty (all events).
+    let sub2 = dir.join("all-events");
+    std::fs::create_dir_all(&sub2).unwrap();
+    std::fs::write(
+        sub2.join("plugin.toml"),
+        "name = \"all-events\"\nversion = \"0.1.0\"\nentry = \"run.sh\"\ntv_protocol = \"1\"\n",
+    )
+    .unwrap();
+
+    let entries = crate::plugin::manifest::discover(&dir);
+    let evented = entries.iter().find(|(n, _)| n == "evented").unwrap();
+    assert_eq!(evented.1.events, vec!["on_file_open", "on_keypress"]);
+    let all = entries.iter().find(|(n, _)| n == "all-events").unwrap();
+    assert!(all.1.events.is_empty());
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
 fn discover_skips_dirs_without_plugin_toml() {
     let dir = std::env::temp_dir().join(format!("tv_discover_skip_{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
