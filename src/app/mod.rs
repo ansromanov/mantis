@@ -402,8 +402,9 @@ impl App {
                 entry.enabled = false;
             }
             self.save_config();
-            // Clear icon state when the icon-providing plugin is disabled.
-            if !self.icon_map.is_empty() {
+            // Clear icon state only when the icon-providing plugin is disabled,
+            // so disabling an unrelated running plugin leaves icons intact.
+            if name == "iconize" && !self.icon_map.is_empty() {
                 self.icons_enabled = false;
                 self.icon_map.clear();
                 self.icon_dir_open.clear();
