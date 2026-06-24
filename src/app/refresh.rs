@@ -326,7 +326,7 @@ impl App {
                     Some(p) => std::path::PathBuf::from(p),
                     None => return,
                 };
-                // Only honor fold regions from a provider that registered the
+                // Only accept fold regions from a provider that registered the
                 // file's extension with the Fold capability.
                 let ext = path
                     .extension()

@@ -123,10 +123,7 @@ pub(crate) fn draw_help(f: &mut Frame, app: &App, area: Rect) {
             key("  /          "),
             desc("find in file (in-file search)"),
         ]),
-        Line::from(vec![
-            key("  Space      "),
-            desc("toggle YAML fold at cursor"),
-        ]),
+        Line::from(vec![key("  Space      "), desc("toggle fold at cursor")]),
         gap.clone(),
         section("Visual-line mode"),
         Line::from(vec![key("  j/k / ↑↓   "), desc("extend selection")]),

@@ -266,10 +266,11 @@ capability (e.g. `set_fold_regions` for `"fold"`).
 ### `set_fold_regions`
 
 Provides fold regions for a file. Plugin-supplied regions override the
-built-in YAML indentation-based folding for that file. Each region is a
-`[start_line, end_line]` pair (0-indexed, inclusive). When the named file is
-currently open the regions are applied immediately; when it is not yet open
-they are cached and applied the next time the file is opened.
+built-in YAML indentation-based folding (the reference implementation)
+for that file. Each region is a `[start_line, end_line]` pair (0-indexed,
+inclusive). When the named file is currently open the regions are applied
+immediately; when it is not yet open they are cached and applied the next
+time the file is opened.
 
 ```json
 {"event":"action","action":"set_fold_regions","params":{

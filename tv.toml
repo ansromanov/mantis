@@ -47,6 +47,7 @@ open_in_editor = ["e"]
 copy_path = ["y"]
 copy_relative_path = ["Y"]
 toggle_watch = ["W"]
+fold_toggle = ["Space"]
 
 # Navigation (shared by tree and content panels)
 nav_up = ["Up", "k"]

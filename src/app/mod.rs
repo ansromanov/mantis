@@ -8,7 +8,7 @@
 //! root, loads git status, and opens the first file; `reload`/`tick` keep the
 //! view in sync with the filesystem via a debounced watcher with a periodic
 //! fallback. Behaviour is split across sibling submodules (key/mouse handlers,
-//! navigation, file_ops, loader, refresh, content/diff/yaml helpers); this file
+//! navigation, file_ops, loader, refresh, content/diff/fold helpers); this file
 //! owns the struct, its fields, and a few shared free functions.
 //!
 //! The `DiffMode` enum governs which diff variant is shown in the content pane
@@ -290,7 +290,7 @@ pub struct App {
     /// (screen_y, region_idx) pairs recorded during the last render, used for
     /// fold-gutter mouse click detection.
     pub fold_gutter_rows: Vec<(u16, usize)>,
-    /// YAML parse error message, if any (set when opening a `.yaml`/`.yml` file).
+    /// YAML parse error message, if any; only set for `.yaml`/`.yml` files.
     pub yaml_error: Option<String>,
     /// Number of YAML anchors (`&name`) found in the current file.
     pub yaml_anchor_count: usize,

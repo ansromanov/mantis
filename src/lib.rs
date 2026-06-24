@@ -5,7 +5,7 @@
 //! architecture: `app` owns the central state machine and input handling, `ui`
 //! owns ratatui rendering, and `config` parses `tv.toml`. The remaining leaf
 //! modules (`tree`, `git`, `highlight`, `markdown`, `search`, `diff`,
-//! `selection`, `session`, `theme`, `virtual_file`, `yaml_fold`, `file`,
+//! `selection`, `session`, `theme`, `virtual_file`, `fold`, `yaml_fold`, `file`,
 //! `command_palette`, `release_info`, `ansi`) each provide one focused
 //! capability consumed by `app`/`ui`. Keep this list in sync with the directory
 //! structure documented in AGENTS.md.
