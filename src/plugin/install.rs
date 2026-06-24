@@ -32,6 +32,19 @@ pub(crate) fn bundled_plugin_entries() -> Vec<(String, PluginEntry)> {
             },
         ));
     }
+    for (name, syntax_rel_path, extensions) in BUNDLED_SYNTAX_PLUGIN_ENTRIES {
+        let extensions: Vec<String> = extensions.iter().map(|s| s.to_string()).collect();
+        entries.push((
+            name.to_string(),
+            PluginEntry {
+                path: plugin_dir.join(syntax_rel_path),
+                enabled: false,
+                kind: PluginKind::Syntax,
+                extensions,
+                syntax_file: Some(PathBuf::from(syntax_rel_path)),
+            },
+        ));
+    }
     entries
 }
 
@@ -86,6 +99,14 @@ const BUNDLED_PLUGINS: &[(&str, &str)] = &[
 const BUNDLED_SYNTAX_PLUGINS: &[(&str, &str)] = &[(
     "terraform.sublime-syntax",
     include_str!("../../plugins/terraform.sublime-syntax"),
+)];
+
+/// List of (name, syntax_rel_path, extensions) for syntax plugin [plugins] entries.
+/// Seeded into the config so syntax plugins appear in the plugin palette.
+const BUNDLED_SYNTAX_PLUGIN_ENTRIES: &[(&str, &str, &[&str])] = &[(
+    "terraform",
+    "syntaxes/terraform.sublime-syntax",
+    &["tf", "tfvars"],
 )];
 
 /// Copies every bundled plugin to the plugin directory if it doesn't already

@@ -31,6 +31,34 @@ fn plugin_entries_shows_registered_plugins_as_not_running() {
 }
 
 #[test]
+fn plugin_entries_reports_syntax_active_from_enabled_flag() {
+    let entry = PluginEntry {
+        kind: PluginKind::Syntax,
+        enabled: false,
+        ..Default::default()
+    };
+    let mut mgr = PluginManager::new(vec![("terraform".to_string(), entry)]);
+
+    // Syntax plugins never spawn a subprocess; the checkbox follows `enabled`.
+    assert!(
+        !mgr.plugin_entries()[0].1,
+        "disabled syntax plugin must show as off"
+    );
+
+    mgr.set_enabled("terraform", true);
+    assert!(
+        mgr.plugin_entries()[0].1,
+        "enabled syntax plugin must show as on"
+    );
+
+    mgr.set_enabled("terraform", false);
+    assert!(
+        !mgr.plugin_entries()[0].1,
+        "re-disabled syntax plugin must show as off"
+    );
+}
+
+#[test]
 fn activate_one_errors_on_unknown_name() {
     let mut mgr = PluginManager::new(vec![]);
     assert!(mgr.activate_one("ghost", None).is_err());

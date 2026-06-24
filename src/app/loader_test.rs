@@ -136,6 +136,29 @@ fn worker_round_trip_returns_matching_seq() {
 }
 
 #[test]
+fn worker_rebuilds_highlighter_on_set_extra_syntaxes_and_keeps_serving() {
+    let mut f = tempfile::NamedTempFile::with_suffix(".rs").unwrap();
+    use std::io::Write;
+    f.write_all(b"let x = 1;\n").unwrap();
+    let loader = Loader::new(&Theme::default(), Vec::new());
+    // Push an updated syntax set; the worker must rebuild its highlighter and
+    // continue to process file loads (the SetExtraSyntaxes match arm).
+    loader.request(LoadRequest::SetExtraSyntaxes(Vec::new()));
+    loader.request(LoadRequest::File {
+        seq: 9,
+        path: f.path().to_path_buf(),
+    });
+    let resp = loader.rx.recv().expect("worker response");
+    match resp {
+        LoadResponse::File { seq, load, .. } => {
+            assert_eq!(seq, 9);
+            assert!(load.ok);
+        }
+        _ => panic!("expected File response"),
+    }
+}
+
+#[test]
 fn compute_file_load_sets_syntax_name_for_rust_file() {
     let mut f = tempfile::NamedTempFile::with_suffix(".rs").unwrap();
     use std::io::Write;
