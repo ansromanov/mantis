@@ -210,8 +210,11 @@ impl Plugin {
 }
 
 /// Reads up to `MAX_LINE_LEN` bytes from `reader` into `buf`, stopping at the
-/// first `\n`. Returns `true` if a newline was found within the limit, `false`
-/// if the line was truncated or EOF was reached without a newline.
+/// first `\n`. Returns `true` if `buf` holds a complete line to process — i.e.
+/// a newline was found within the limit, or EOF/error was reached with bytes
+/// already buffered (the final unterminated line). Returns `false` only when
+/// the line was truncated at `MAX_LINE_LEN` without a newline, or nothing was
+/// read before EOF.
 fn read_capped_line(
     reader: &mut std::io::BufReader<std::process::ChildStdout>,
     buf: &mut Vec<u8>,
