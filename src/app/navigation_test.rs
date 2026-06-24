@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::app::App;
 use crate::config::Config;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use ratatui::layout::Rect;
 
 fn temp_tree() -> PathBuf {
     static COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -365,6 +366,44 @@ fn navigate_to_breadcrumb_preserves_other_expansions() {
     assert!(
         app.expanded.contains(&root.join("sub1").join("sub2")),
         "nested unrelated expansions should be preserved"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn rebuild_scrolls_restored_selection_into_view() {
+    let root = temp_tree();
+    // Enough files to overflow a short viewport.
+    for i in 0..20 {
+        fs::write(root.join(format!("f{i:02}.txt")), "").unwrap();
+    }
+    let mut app = app_for(&root);
+    assert!(!app.tree_independent_scroll, "default mode under test");
+    app.tree_area = Rect {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 3,
+    };
+    assert!(app.nodes.len() > 5, "tree must overflow the viewport");
+
+    // Select the bottom node, then force the viewport back to the top.
+    let last = app.nodes.len() - 1;
+    app.tree_selected = last;
+    app.tree_scroll = 0;
+    let sel_path = app.nodes[last].path.clone();
+
+    app.rebuild();
+
+    // Selection preserved by path, viewport nudged so it stays visible.
+    assert_eq!(app.nodes[app.tree_selected].path, sel_path);
+    let h = app.tree_area.height as usize;
+    assert!(
+        app.tree_selected >= app.tree_scroll && app.tree_selected < app.tree_scroll + h,
+        "restored selection {} must be within viewport [{}, {})",
+        app.tree_selected,
+        app.tree_scroll,
+        app.tree_scroll + h
     );
     fs::remove_dir_all(&root).ok();
 }

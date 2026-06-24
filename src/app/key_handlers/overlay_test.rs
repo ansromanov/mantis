@@ -1,7 +1,8 @@
 use crate::app::{App, Focus};
 use crate::config::Config;
-use crate::search::GotoLineState;
+use crate::search::{GotoLineState, TreeFilter};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use ratatui::layout::Rect;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -48,5 +49,44 @@ fn handle_goto_line_key_esc_closes_dialog() {
     app.goto_line = Some(GotoLineState::new());
     app.handle_goto_line_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
     assert!(app.goto_line.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_filter_jump_scrolls_match_into_view() {
+    let root = temp_tree();
+    // Many files so the only match sits well below a short viewport.
+    for i in 0..20 {
+        fs::write(root.join(format!("f{i:02}.txt")), "").unwrap();
+    }
+    fs::write(root.join("zzz_target.txt"), "").unwrap();
+    let mut app = app_for(&root);
+    assert!(!app.tree_independent_scroll, "default mode under test");
+    app.tree_area = Rect {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 3,
+    };
+    app.tree_filter = Some(TreeFilter::new());
+
+    // Type a query matching only the far-down file.
+    for c in "zzz".chars() {
+        app.handle_tree_filter_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::empty()));
+    }
+
+    let sel = app.nodes[app.tree_selected].path.clone();
+    assert!(
+        sel.ends_with("zzz_target.txt"),
+        "filter must select the matching node, got {sel:?}"
+    );
+    let h = app.tree_area.height as usize;
+    assert!(
+        app.tree_selected >= app.tree_scroll && app.tree_selected < app.tree_scroll + h,
+        "filtered match {} must be within viewport [{}, {})",
+        app.tree_selected,
+        app.tree_scroll,
+        app.tree_scroll + h
+    );
     fs::remove_dir_all(&root).ok();
 }

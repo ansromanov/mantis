@@ -260,9 +260,8 @@ fn draw_tree_independent_scroll_preserves_scroll_position() {
 }
 
 #[test]
-fn draw_tree_auto_scroll_keeps_selected_in_view() {
+fn tree_auto_scroll_brings_selection_into_view() {
     let mut app = make_app(false, HashMap::new());
-    app.tree_independent_scroll = false;
     app.nodes = (0..20)
         .map(|i| {
             let mut n = make_node(&format!("file{i}.rs"), false, false);
@@ -272,12 +271,17 @@ fn draw_tree_auto_scroll_keeps_selected_in_view() {
         .collect();
     app.tree_selected = 15;
     app.tree_scroll = 0;
-    // height=6 → view_height=3 (breadcrumb takes 1 of the 4 inner rows);
-    // selection=15 must scroll into view
-    render_tree(&mut app, 40, 6);
-    // After render, scroll must bring row 15 into the 3-row viewport
+    app.tree_area = Rect {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 4,
+    };
+    // scroll_tree_into_view is called by keyboard Up/Down handlers;
+    // it must nudge tree_scroll so the selected row fits the viewport.
+    app.scroll_tree_into_view();
     assert!(app.tree_scroll <= 15);
-    assert!(app.tree_scroll + 3 > 15);
+    assert!(app.tree_scroll + 4 > 15);
 }
 
 #[test]

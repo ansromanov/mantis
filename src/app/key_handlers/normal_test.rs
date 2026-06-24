@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use ratatui::layout::Rect;
 
 use crate::app::{App, Focus};
 use crate::config::Config;
@@ -200,5 +201,45 @@ fn goto_line_keybinding_is_noop_with_tree_focus() {
     app.focus = Focus::Tree;
     app.handle_key(key(KeyCode::Char(':')));
     assert!(app.goto_line.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- tree Home/End scroll selection into view (default, non-independent) ------
+
+#[test]
+fn tree_end_then_home_keeps_selection_in_view() {
+    let root = temp_tree();
+    // Enough files to overflow a short viewport.
+    for i in 0..20 {
+        fs::write(root.join(format!("f{i:02}.txt")), "").unwrap();
+    }
+    let mut app = app_for(&root);
+    app.focus = Focus::Tree;
+    assert!(!app.tree_independent_scroll, "default mode under test");
+    app.tree_area = Rect {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 3,
+    };
+    assert!(app.nodes.len() > 3, "tree must overflow the viewport");
+
+    // End jumps to the last node; the viewport must follow so it stays visible.
+    app.handle_key(key(KeyCode::End));
+    let last = app.nodes.len() - 1;
+    assert_eq!(app.tree_selected, last);
+    let h = app.tree_area.height as usize;
+    assert!(
+        app.tree_selected >= app.tree_scroll && app.tree_selected < app.tree_scroll + h,
+        "End selection {} must be within viewport [{}, {})",
+        app.tree_selected,
+        app.tree_scroll,
+        app.tree_scroll + h
+    );
+
+    // Home returns to the top and resets the viewport.
+    app.handle_key(key(KeyCode::Home));
+    assert_eq!(app.tree_selected, 0);
+    assert_eq!(app.tree_scroll, 0);
     fs::remove_dir_all(&root).ok();
 }

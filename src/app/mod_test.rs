@@ -362,10 +362,15 @@ fn click_below_last_node_is_ignored() {
 }
 
 #[test]
-fn scroll_wheel_moves_tree_selection() {
+fn scroll_wheel_scrolls_tree_viewport() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.tree_area = full_rect();
+    app.tree_area = Rect {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 1,
+    };
     app.content_area = Rect {
         x: 100,
         y: 0,
@@ -373,11 +378,22 @@ fn scroll_wheel_moves_tree_selection() {
         height: 20,
     };
     app.tree_selected = 0;
+    app.tree_scroll = 0;
 
-    app.handle_mouse(mouse(MouseEventKind::ScrollDown, 1, 1));
-    assert_eq!(app.tree_selected, 1);
-    app.handle_mouse(mouse(MouseEventKind::ScrollUp, 1, 1));
-    assert_eq!(app.tree_selected, 0);
+    app.handle_mouse(mouse(MouseEventKind::ScrollDown, 1, 0));
+    assert_eq!(app.tree_selected, 0, "wheel must not move the selection");
+    assert!(app.tree_scroll > 0, "wheel must scroll the tree viewport");
+
+    let scrolled = app.tree_scroll;
+    app.handle_mouse(mouse(MouseEventKind::ScrollUp, 1, 0));
+    assert!(
+        app.tree_scroll < scrolled,
+        "scroll up must reduce tree_scroll"
+    );
+    assert_eq!(
+        app.tree_selected, 0,
+        "selection must not change when scrolling up"
+    );
     fs::remove_dir_all(&root).ok();
 }
 

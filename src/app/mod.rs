@@ -115,9 +115,9 @@ pub struct App {
     pub nodes: Vec<TreeNode>,
     pub expanded: HashSet<PathBuf>,
     pub tree_selected: usize,
-    /// Viewport top offset for the tree panel. Only used when
-    /// `tree_independent_scroll` is enabled; otherwise the tree auto-scrolls to
-    /// keep `tree_selected` visible and this stays in sync with that.
+    /// Viewport top offset for the tree panel. The renderer always uses this
+    /// as the first visible row; keyboard cursor movement calls
+    /// `scroll_tree_into_view` to keep the selection visible.
     pub tree_scroll: usize,
     /// When `true`, PageUp/PageDown and Home/End scroll the tree viewport
     /// without moving the selection (cursor). Up/Down still move the cursor.

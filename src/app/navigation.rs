@@ -62,10 +62,12 @@ impl App {
         if let Some(p) = prev {
             if let Some(i) = self.nodes.iter().position(|n| n.path == p) {
                 self.tree_selected = i;
+                self.scroll_tree_into_view();
                 return;
             }
         }
         self.tree_selected = self.tree_selected.min(self.nodes.len().saturating_sub(1));
+        self.scroll_tree_into_view();
     }
 
     /// Produces a flat list of all changed (non-ignored) files with depth 0
