@@ -41,6 +41,23 @@ fn app_new_builds_visible_root_tree() {
 }
 
 #[test]
+fn app_new_starts_with_empty_plugin_content() {
+    // Fresh App must have no plugin-provided content cached, neither the styled
+    // spans nor the parallel plain-text store.
+    let root = temp_dir();
+    let app = new_app(&root, Config::default());
+    assert!(
+        app.plugin_content.is_empty(),
+        "plugin_content must start empty"
+    );
+    assert!(
+        app.plugin_content_text.is_empty(),
+        "plugin_content_text must start empty"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn app_new_hides_dotfiles_by_default() {
     let root = temp_dir();
     fs::write(root.join("visible.txt"), "x\n").unwrap();
