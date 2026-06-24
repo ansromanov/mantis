@@ -3,7 +3,7 @@
 //! These two branches of `draw_content` share the same structure (display_phys
 //! mapping, fold markers, blame/line-number gutters) and are the longest arms
 //! of the main content-render match. Extracting them here keeps `draw.rs`
-//! under 600 lines.
+//! under 700 lines.
 
 use ratatui::{
     layout::Rect,
@@ -350,3 +350,7 @@ pub(crate) fn render_inline_fallback<'a>(
         inline_fold_gutter_rows,
     )
 }
+
+#[cfg(test)]
+#[path = "draw_text_test.rs"]
+mod draw_text_tests;

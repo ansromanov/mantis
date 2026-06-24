@@ -296,3 +296,7 @@ impl App {
         Ok(app)
     }
 }
+
+#[cfg(test)]
+#[path = "init_test.rs"]
+mod init_tests;
