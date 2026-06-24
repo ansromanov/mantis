@@ -155,6 +155,23 @@ fn set_icon_map_partial_icons_does_not_clear_existing() {
 // -- helpers ------------------------------------------------------------------
 
 /// Minimal App for testing drain_plugin_actions in isolation.
+#[test]
+fn loader_set_extra_syntaxes_keeps_worker_serving() {
+    use std::io::Write;
+    let app = create_base_app();
+    // Forward the current (empty) extra-syntax set to the worker; it must
+    // rebuild its highlighter and keep answering file loads.
+    app.loader_set_extra_syntaxes();
+    let mut f = tempfile::NamedTempFile::with_suffix(".rs").unwrap();
+    f.write_all(b"fn main() {}\n").unwrap();
+    app.loader.request(LoadRequest::File {
+        seq: 11,
+        path: f.path().to_path_buf(),
+    });
+    let resp = app.loader.rx.recv().expect("worker response");
+    assert!(matches!(resp, LoadResponse::File { seq: 11, .. }));
+}
+
 fn create_base_app() -> App {
     use crate::config::Config;
     use crate::highlight::Highlighter;
