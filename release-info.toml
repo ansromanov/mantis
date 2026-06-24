@@ -1,26 +1,4 @@
-version = "0.7.0"
-date = "2026-06-21"
-whats_new = """- Add inline tree filter with `/` keybinding (#232)
-- feat: file-type icons in the tree via iconize plugin (#197) (#225)
-- feat: cycle diff modes (unstaged/staged/all) with S keybinding (#231)
-- refactor: extract git module into bundled plugin with feature gate (#226)
-- feat: plugin protocol on_theme_change + set_content, ANSI parser, extract markdown to bundled plugin (#227)
-- docs+build: faster agent orientation — symbol index, accurate file tree, targeted test runs (#230)
-- perf: skip SyntaxSet builder round-trip when no extra syntaxes (#228)
-- ci: speed up PR checks; full suite + Windows on main only (#229)
-- feat: plugin set_content action with ANSI SGR support (#186) (#217)
-- plugin protocol: add set_file_statuses, set_blame_data, set_status_bar_git_info actions (#216)
-- feat: Terraform syntax highlighting via plugin system (#151) (#208)
-- feat: add collapse-all / expand-all tree actions (closes #156) (#196)
-- feat: plugin manager overlay (runtime enable/disable) (#194)
-- feat: indentation guides in tree pane (#195)
-- Claude/tree viewer issue 190 ijwwzx (#193)
-- feat: copy file path to clipboard (#97) (#192)
-- Show ahead/behind upstream counts in the status bar (#190)
-- feat: recent files quick switcher (Ctrl+O) (#191)
-- feat: bundle git diff and file log as bundled plugins (#183) (#188)
-- feat: detect file encoding and line endings in statusbar (#189)
-- feat: add breadcrumb path bar to tree panel (#69) (#182)
-- feat: add subprocess-based plugin system (#88) (#181)
-- chore: add changelog to release info [skip ci]"""
-release_url = "https://github.com/ansromanov/tree-viewer/releases/tag/v0.7.0"
+version = "0.8.0"
+date = "2026-06-24"
+whats_new = ""
+release_url = "https://github.com/ansromanov/tree-viewer/releases/tag/v0.8.0"
