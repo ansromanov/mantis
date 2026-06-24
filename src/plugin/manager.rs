@@ -191,15 +191,31 @@ impl PluginManager {
         self.plugins.is_empty()
     }
 
-    /// Returns every registered plugin as `(name, is_running, kind)`, in order.
+    /// Returns every registered plugin as `(name, is_active, kind)`, in order.
+    /// For process plugins "active" means a running subprocess; syntax plugins
+    /// have no subprocess, so their `enabled` flag stands in (it drives the
+    /// palette checkbox and is kept current via [`set_enabled`]).
     pub(crate) fn plugin_entries(&self) -> Vec<(String, bool, PluginKind)> {
         self.entries
             .iter()
             .map(|(name, entry)| {
-                let running = self.plugins.iter().any(|p| p.name == *name);
-                (name.clone(), running, entry.kind.clone())
+                let active = if entry.kind == PluginKind::Syntax {
+                    entry.enabled
+                } else {
+                    self.plugins.iter().any(|p| p.name == *name)
+                };
+                (name.clone(), active, entry.kind.clone())
             })
             .collect()
+    }
+
+    /// Updates the stored `enabled` flag for a registered plugin. Used for
+    /// syntax plugins, whose enabled state (not a subprocess) drives the
+    /// palette checkbox returned by [`plugin_entries`].
+    pub(crate) fn set_enabled(&mut self, name: &str, enabled: bool) {
+        if let Some((_, entry)) = self.entries.iter_mut().find(|(n, _)| n == name) {
+            entry.enabled = enabled;
+        }
     }
 
     /// Spawns a single registered plugin by name, sends it `init`, and

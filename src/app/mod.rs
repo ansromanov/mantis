@@ -392,6 +392,7 @@ impl App {
             if let Some(entry) = self.config.plugins.get_mut(&name) {
                 entry.enabled = !was_enabled;
             }
+            self.plugin_manager.set_enabled(&name, !was_enabled);
             self.save_config();
             self.rebuild_extra_syntaxes();
             self.reload_content();
