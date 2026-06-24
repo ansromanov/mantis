@@ -64,7 +64,6 @@ impl App {
             &deleted,
         );
         let theme = cfg.theme.resolve();
-        let saved_config = cfg.clone();
 
         // Seed bundled plugins into the config map (insert-if-absent) so the
         // plugin palette shows them even when tv.toml has no [plugins] section.
@@ -78,6 +77,8 @@ impl App {
         for (name, entry) in plugin::manifest::discover(&plugin::default_plugin_dir()) {
             cfg.plugins.entry(name).or_insert(entry);
         }
+
+        let saved_config = cfg.clone();
 
         // Collect extra syntax definitions from plugins before constructing
         // the highlighter and loader (they need them at creation time).
