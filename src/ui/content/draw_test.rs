@@ -8,9 +8,11 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use ratatui::backend::TestBackend;
 
 use crate::app::{App, Focus};
 use crate::config::Config;
+use crate::ui::content::draw_content;
 
 static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -58,5 +60,48 @@ fn active_line_highlight_guard_skipped_in_diff_mode() {
     app.is_diff = true;
     assert!(app.is_diff);
     assert_eq!(app.active_line, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+/// Renders `draw_content` into an 80x24 backend and reports whether any cell
+/// carries the `selection_bg` background — the marker left by the active-line
+/// tint.
+fn renders_active_line_tint(app: &mut App) -> bool {
+    let sel_bg = app.theme.selection_bg;
+    let backend = TestBackend::new(80, 24);
+    let mut terminal = ratatui::Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| draw_content(frame, app, frame.area()))
+        .unwrap();
+    terminal
+        .backend()
+        .buffer()
+        .content()
+        .iter()
+        .any(|c| c.bg == sel_bg)
+}
+
+#[test]
+fn active_line_tint_painted_for_normal_file() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    assert!(
+        renders_active_line_tint(&mut app),
+        "active line should be tinted with selection_bg"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn active_line_tint_absent_in_diff_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.is_diff = true;
+    assert!(
+        !renders_active_line_tint(&mut app),
+        "diff mode must skip the active-line tint"
+    );
     fs::remove_dir_all(&root).ok();
 }

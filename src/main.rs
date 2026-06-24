@@ -270,3 +270,7 @@ fn dispatch_event(app: &mut App, event: Event) {
 #[cfg(test)]
 #[path = "main_test.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "main_draw_test.rs"]
+mod draw_tests;
