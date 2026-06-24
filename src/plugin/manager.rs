@@ -204,7 +204,8 @@ impl PluginManager {
 
     /// Spawns a single registered plugin by name, sends it `init`, and
     /// optionally follows up with `on_file_open` + `on_selection_change`.
-    /// No-op if already running.
+    /// No-op if already running. Syntax-kind plugins are rejected (they have
+    /// no subprocess to spawn).
     pub(crate) fn activate_one(
         &mut self,
         name: &str,
@@ -219,6 +220,11 @@ impl PluginManager {
             .find(|(n, _)| n == name)
             .map(|(_, e)| e.clone())
             .ok_or_else(|| format!("plugin '{name}' not registered"))?;
+        if entry.kind != PluginKind::Process {
+            return Err(format!(
+                "cannot activate a non-process plugin ('{name}') as a subprocess"
+            ));
+        }
         let plugin_dir = default_plugin_dir();
         let path = if entry.path.is_relative() {
             plugin_dir.join(&entry.path)

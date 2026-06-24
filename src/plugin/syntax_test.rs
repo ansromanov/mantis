@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use super::*;
 use crate::plugin::syntax::{collect_syntax_plugins, discover_syntax_plugins};
 
@@ -66,7 +68,7 @@ fn discover_syntax_plugins_finds_sublime_files() {
     std::fs::write(syntax_dir.join("terraform.sublime-syntax"), "content").unwrap();
     std::fs::write(syntax_dir.join("readme.txt"), "not a syntax file").unwrap();
 
-    let result = discover_syntax_plugins();
+    let result = discover_syntax_plugins(&[]);
 
     unsafe {
         match old {
@@ -84,13 +86,60 @@ fn discover_syntax_plugins_finds_sublime_files() {
 }
 
 #[test]
+fn discover_syntax_plugins_skips_managed_files() {
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let tmp = std::env::temp_dir().join(format!("tv_syntax_managed_{}", std::process::id()));
+    let old = std::env::var_os("XDG_CONFIG_HOME");
+    unsafe { std::env::set_var("XDG_CONFIG_HOME", &tmp) };
+
+    let syntax_dir = default_plugin_dir().join("syntaxes");
+    std::fs::create_dir_all(&syntax_dir).unwrap();
+    std::fs::write(syntax_dir.join("terraform.sublime-syntax"), "content").unwrap();
+    std::fs::write(syntax_dir.join("other.sublime-syntax"), "content2").unwrap();
+
+    // A config entry manages terraform.sublime-syntax
+    let entries: Vec<(String, PluginEntry)> = vec![(
+        "terraform".into(),
+        PluginEntry {
+            kind: PluginKind::Syntax,
+            enabled: false,
+            syntax_file: Some(PathBuf::from("syntaxes/terraform.sublime-syntax")),
+            ..Default::default()
+        },
+    )];
+
+    let result = discover_syntax_plugins(&entries);
+
+    unsafe {
+        match old {
+            Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
+            None => std::env::remove_var("XDG_CONFIG_HOME"),
+        }
+    }
+
+    assert_eq!(
+        result.len(),
+        1,
+        "only the unmanaged syntax file should be discovered"
+    );
+    assert!(
+        result[0]
+            .syntax_path
+            .to_string_lossy()
+            .ends_with("other.sublime-syntax"),
+        "the managed terraform file must be skipped"
+    );
+    std::fs::remove_dir_all(&tmp).ok();
+}
+
+#[test]
 fn discover_syntax_plugins_returns_empty_when_no_syntaxes_dir() {
     let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let tmp = std::env::temp_dir().join(format!("tv_no_syntaxes_{}", std::process::id()));
     let old = std::env::var_os("XDG_CONFIG_HOME");
     unsafe { std::env::set_var("XDG_CONFIG_HOME", &tmp) };
 
-    let result = discover_syntax_plugins();
+    let result = discover_syntax_plugins(&[]);
 
     unsafe {
         match old {

@@ -160,6 +160,12 @@ impl App {
             .request(LoadRequest::SetTheme(Box::new(self.theme.clone())));
     }
 
+    /// Tells the worker to rebuild its highlighter with updated syntax definitions.
+    pub(super) fn loader_set_extra_syntaxes(&self) {
+        self.loader
+            .request(LoadRequest::SetExtraSyntaxes(self.extra_syntaxes.clone()));
+    }
+
     /// Drains pending plugin actions and handles known action types.
     fn drain_plugin_actions(&mut self) {
         if self.plugin_manager.is_empty() {
