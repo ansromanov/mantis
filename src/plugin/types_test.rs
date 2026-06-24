@@ -1,4 +1,5 @@
 use super::*;
+use crate::plugin::types::ToPlugin;
 
 #[test]
 fn plugin_entry_default_is_enabled_process() {
@@ -41,6 +42,39 @@ fn language_provider_registration_holds_fields() {
     assert_eq!(reg.extensions.len(), 2);
     assert!(reg.capabilities.contains(&Capability::Highlight));
     assert!(reg.capabilities.contains(&Capability::Fold));
+}
+
+#[test]
+fn to_plugin_init_serializes_protocol_version() {
+    let msg = ToPlugin {
+        event: "init".into(),
+        path: None,
+        key: None,
+        theme: Some("default".into()),
+        protocol_version: Some("2".into()),
+    };
+    let json = serde_json::to_string(&msg).unwrap();
+    assert!(json.contains(r#""event":"init""#));
+    assert!(json.contains(r#""protocol_version":"2""#));
+    // None fields are omitted.
+    assert!(!json.contains(r#""path""#));
+    assert!(!json.contains(r#""key""#));
+}
+
+#[test]
+fn to_plugin_omits_protocol_version_when_none() {
+    let msg = ToPlugin {
+        event: "on_file_open".into(),
+        path: Some("/a/b.rs".into()),
+        key: None,
+        theme: None,
+        protocol_version: None,
+    };
+    let json = serde_json::to_string(&msg).unwrap();
+    assert!(
+        !json.contains("protocol_version"),
+        "non-init events must not carry protocol_version"
+    );
 }
 
 #[test]
