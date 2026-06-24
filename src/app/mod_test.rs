@@ -294,6 +294,9 @@ fn left_click_on_dir_toggles_expand() {
     assert!(app.expanded.contains(&dir_path));
     assert!(app.nodes.len() > before, "child should become visible");
 
+    // Clear last_click so the next click is a fresh single-click (collapse),
+    // not a double-click (which descends the root via the #273 feature).
+    app.last_click = None;
     app.handle_mouse(click(1, dir_idx as u16));
     assert!(!app.expanded.contains(&dir_path));
     assert_eq!(app.nodes.len(), before);
