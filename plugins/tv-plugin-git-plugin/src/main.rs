@@ -44,10 +44,8 @@ fn main() {
             "init" => {
                 // Determine repo root from CWD so the status bar shows
                 // branch info immediately on startup, before any file open.
-                let cwd = std::env::current_dir().ok();
-                if let Some(ref dir) = cwd {
-                    let mut out = io::stdout().lock();
-                    handle_init(dir, &mut out);
+                if let Ok(dir) = std::env::current_dir() {
+                    handle_init(&dir, &mut io::stdout().lock());
                 }
             }
             "on_file_open" => {
