@@ -170,6 +170,7 @@ impl App {
                 self.tree_scroll = 0;
             } else if self.tree_selected != 0 {
                 self.tree_selected = 0;
+                self.scroll_tree_into_view();
                 self.try_open_selected();
             }
         } else if pressed(&k.content_bottom, &key) {
@@ -179,6 +180,7 @@ impl App {
                 let last = self.nodes.len().saturating_sub(1);
                 if self.tree_selected != last {
                     self.tree_selected = last;
+                    self.scroll_tree_into_view();
                     self.try_open_selected();
                 }
             }
