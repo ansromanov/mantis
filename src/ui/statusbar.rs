@@ -248,7 +248,7 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
         let folded_count = app.folded.len();
         let total_regions = app.fold_regions.len();
         let yaml_suffix = if app.yaml_anchor_count > 0 || app.yaml_alias_count > 0 {
-            format!(" &{} *{}", app.yaml_anchor_count, app.yaml_alias_count)
+            format!("&{} *{} ", app.yaml_anchor_count, app.yaml_alias_count)
         } else {
             String::new()
         };

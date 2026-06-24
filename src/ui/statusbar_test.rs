@@ -633,6 +633,34 @@ fn fit_segments_zero_max_width() {
 }
 
 #[test]
+fn fold_stats_without_anchors() {
+    let mut app = make_app();
+    app.focus = Focus::Content;
+    app.fold_regions = vec![
+        crate::fold::FoldRegion { start: 0, end: 3 },
+        crate::fold::FoldRegion { start: 5, end: 8 },
+    ];
+    app.folded.insert(0);
+    let text = render_bar(&app);
+    assert!(text.contains("[1/2]"), "expected [1/2] in {text:?}");
+}
+
+#[test]
+fn fold_stats_with_yaml_anchors() {
+    let mut app = make_app();
+    app.focus = Focus::Content;
+    app.fold_regions = vec![crate::fold::FoldRegion { start: 0, end: 3 }];
+    app.yaml_anchor_count = 2;
+    app.yaml_alias_count = 1;
+    let text = render_bar(&app);
+    // Anchor suffix must be separated from the fold count.
+    assert!(
+        text.contains("[&2 *1 0/1]"),
+        "expected [&2 *1 0/1] in {text:?}"
+    );
+}
+
+#[test]
 fn bar_never_overflows_various_widths() {
     let mut app = make_app();
     app.show_hidden = true;
