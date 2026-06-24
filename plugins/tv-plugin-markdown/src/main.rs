@@ -453,7 +453,7 @@ fn send_set_content(lines: &[String], path: &str, out: &mut impl Write) {
     let _ = out.flush();
 }
 
-/// ─── Table Rendering ───────────────────────────────────────────────────────
+// ─── Table Rendering ───────────────────────────────────────────────────────
 
 fn render_table_ansi(
     rows: &[(bool, Vec<String>)],
