@@ -225,6 +225,7 @@ impl App {
             plugin_blame: HashMap::new(),
             plugin_git_info: None,
             plugin_content: HashMap::new(),
+            plugin_content_text: HashMap::new(),
             plugin_content_active: false,
             status_message: None,
             breadcrumb_areas: Vec::new(),

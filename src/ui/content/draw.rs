@@ -74,6 +74,19 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         return;
     }
 
+    // Rendered-content source: plugin takes precedence over core markdown.
+    let render_lines: Option<&Vec<Vec<(ratatui::style::Style, String)>>> = app
+        .current_file
+        .as_ref()
+        .and_then(|p| app.plugin_content.get(p))
+        .or({
+            if app.is_markdown && !app.show_raw_markdown && !app.markdown_lines.is_empty() {
+                Some(&app.markdown_lines)
+            } else {
+                None
+            }
+        });
+
     let view_height = inner.height as usize;
     let total_lines = app.display_line_count();
     let scroll = app.content_scroll.min(total_lines.saturating_sub(1));
@@ -209,8 +222,9 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
             })
             .collect();
         (ln_w, gutters, lines, vec![])
-    } else if app.is_markdown && !app.show_raw_markdown && !app.markdown_lines.is_empty() {
-        // Markdown: iterate only the visible window of pre-rendered lines.
+    } else if let Some(md_lines) = render_lines {
+        // Rendered content (plugin or core markdown): iterate only the visible
+        // window of pre-rendered lines.
         let ln_style = Style::default().fg(app.theme.dim);
         let lw = app.line_count().to_string().len().max(1);
         let ln_w = if show_ln { lw + 1 } else { 0 };
@@ -233,7 +247,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                 Line::from(spans)
             })
             .collect();
-        let lines: Vec<Line> = app.markdown_lines[scroll..visible_end]
+        let lines: Vec<Line> = md_lines[scroll..visible_end]
             .iter()
             .enumerate()
             .map(|(offset, spans)| {

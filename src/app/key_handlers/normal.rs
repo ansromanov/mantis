@@ -170,6 +170,7 @@ impl App {
                 self.tree_scroll = 0;
             } else if self.tree_selected != 0 {
                 self.tree_selected = 0;
+                self.scroll_tree_into_view();
                 self.try_open_selected();
             }
         } else if pressed(&k.content_bottom, &key) {
@@ -179,6 +180,7 @@ impl App {
                 let last = self.nodes.len().saturating_sub(1);
                 if self.tree_selected != last {
                     self.tree_selected = last;
+                    self.scroll_tree_into_view();
                     self.try_open_selected();
                 }
             }
@@ -223,13 +225,9 @@ impl App {
         self.nodes.len().saturating_sub(self.tree_page_size())
     }
 
-    /// When independent tree scrolling is enabled, nudges `tree_scroll` so the
-    /// current selection stays within the viewport after a cursor move. A no-op
-    /// otherwise, since the list widget auto-scrolls to the selection.
+    /// Nudges `tree_scroll` so the current selection stays within the viewport
+    /// after a cursor move.
     pub(crate) fn scroll_tree_into_view(&mut self) {
-        if !self.tree_independent_scroll {
-            return;
-        }
         let height = self.tree_page_size();
         if self.tree_selected < self.tree_scroll {
             self.tree_scroll = self.tree_selected;
@@ -276,7 +274,7 @@ impl App {
             self.diff_next_hunk();
         } else if self.is_diff && pressed(&k.diff_hunk_prev, &key) {
             self.diff_prev_hunk();
-        } else if !self.fold_regions.is_empty() && pressed(&k.yaml_fold_toggle, &key) {
+        } else if !self.fold_regions.is_empty() && pressed(&k.fold_toggle, &key) {
             // Toggle the fold region whose header is at the current scroll position.
             let phys = self.display_to_physical(self.content_scroll);
             if let Some(ri) = self.region_idx_at(phys) {

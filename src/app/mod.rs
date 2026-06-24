@@ -8,7 +8,7 @@
 //! root, loads git status, and opens the first file; `reload`/`tick` keep the
 //! view in sync with the filesystem via a debounced watcher with a periodic
 //! fallback. Behaviour is split across sibling submodules (key/mouse handlers,
-//! navigation, file_ops, loader, refresh, content/diff/yaml helpers); this file
+//! navigation, file_ops, loader, refresh, content/diff/fold helpers); this file
 //! owns the struct, its fields, and a few shared free functions.
 //!
 //! The `DiffMode` enum governs which diff variant is shown in the content pane
@@ -115,9 +115,9 @@ pub struct App {
     pub nodes: Vec<TreeNode>,
     pub expanded: HashSet<PathBuf>,
     pub tree_selected: usize,
-    /// Viewport top offset for the tree panel. Only used when
-    /// `tree_independent_scroll` is enabled; otherwise the tree auto-scrolls to
-    /// keep `tree_selected` visible and this stays in sync with that.
+    /// Viewport top offset for the tree panel. The renderer always uses this
+    /// as the first visible row; keyboard cursor movement calls
+    /// `scroll_tree_into_view` to keep the selection visible.
     pub tree_scroll: usize,
     /// When `true`, PageUp/PageDown and Home/End scroll the tree viewport
     /// without moving the selection (cursor). Up/Down still move the cursor.
@@ -290,7 +290,7 @@ pub struct App {
     /// (screen_y, region_idx) pairs recorded during the last render, used for
     /// fold-gutter mouse click detection.
     pub fold_gutter_rows: Vec<(u16, usize)>,
-    /// YAML parse error message, if any (set when opening a `.yaml`/`.yml` file).
+    /// YAML parse error message, if any; only set for `.yaml`/`.yml` files.
     pub yaml_error: Option<String>,
     /// Number of YAML anchors (`&name`) found in the current file.
     pub yaml_anchor_count: usize,
@@ -324,6 +324,11 @@ pub struct App {
     /// Plugin-rendered content keyed by file path. Populated by the `set_content`
     /// action; the content pane checks this before markdown/virtual-file rendering.
     pub plugin_content: HashMap<PathBuf, Vec<Vec<(ratatui::style::Style, String)>>>,
+    /// Plain text of plugin-provided content, keyed by file path (same keys as
+    /// `plugin_content`). Used for in-file search, selection, and blame display.
+    /// Stored separately because `plugin_content` holds styled spans whose text
+    /// would require joining on every access.
+    pub plugin_content_text: HashMap<PathBuf, Vec<String>>,
     /// Set to `true` when a plugin sends `set_content` for the current file and
     /// reset to `false` when `current_file` changes, so the `[rendering…]`
     /// placeholder only shows while the plugin is actively working on that file.

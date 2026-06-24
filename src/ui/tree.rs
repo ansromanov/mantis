@@ -143,20 +143,9 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
         .position(|&i| i == app.tree_selected)
         .unwrap_or(0);
 
-    let offset = if app.tree_independent_scroll {
-        let max_scroll = n.saturating_sub(view_height);
-        app.tree_scroll = app.tree_scroll.min(max_scroll);
-        app.tree_scroll
-    } else {
-        let sel = if n > 0 { sel_in_view.min(n - 1) } else { 0 };
-        if sel < app.tree_scroll {
-            sel
-        } else if sel >= app.tree_scroll + view_height {
-            sel + 1 - view_height
-        } else {
-            app.tree_scroll
-        }
-    };
+    let max_scroll = n.saturating_sub(view_height);
+    app.tree_scroll = app.tree_scroll.min(max_scroll);
+    let offset = app.tree_scroll;
 
     // Precompute indent guide masks via a right-to-left pass over the full node
     // list. pending[lvl] = true means a node at depth `lvl` has been seen
@@ -267,15 +256,8 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
     );
 
     let mut state = ListState::default();
-    if app.tree_independent_scroll {
-        if n > 0 && sel_in_view >= offset && sel_in_view < end {
-            state.select(Some(sel_in_view - offset));
-        }
-    } else if n > 0 {
-        let sel = sel_in_view.min(n - 1);
-        if sel >= offset && sel < end {
-            state.select(Some(sel - offset));
-        }
+    if n > 0 && sel_in_view >= offset && sel_in_view < end {
+        state.select(Some(sel_in_view - offset));
     }
 
     f.render_stateful_widget(list, list_area, &mut state);

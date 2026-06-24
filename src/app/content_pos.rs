@@ -15,6 +15,43 @@ use unicode_width::UnicodeWidthStr;
 
 use super::App;
 
+/// Extract the selected text from styled span lines (plugin content or rendered
+/// markdown share the same `Vec<Vec<(Style, String)>>` shape). `start`/`end` are
+/// the normalized selection bounds in (line, char-column) space.
+fn spans_selection_text(
+    lines: &[Vec<(ratatui::style::Style, String)>],
+    start_line: usize,
+    start_col: usize,
+    end_line: usize,
+    end_col: usize,
+) -> String {
+    if start_line >= lines.len() {
+        return String::new();
+    }
+    let mut result = String::new();
+    let last = end_line.min(lines.len().saturating_sub(1));
+    for (line_idx, spans) in lines
+        .iter()
+        .enumerate()
+        .skip(start_line)
+        .take(last - start_line + 1)
+    {
+        let line_text: String = spans.iter().map(|(_, t)| t.as_str()).collect();
+        let chars: Vec<char> = line_text.chars().collect();
+        let col_start = if line_idx == start_line { start_col } else { 0 };
+        let col_end = if line_idx == end_line {
+            end_col.min(chars.len())
+        } else {
+            chars.len()
+        };
+        if !result.is_empty() {
+            result.push('\n');
+        }
+        result.extend(&chars[col_start.min(chars.len())..col_end]);
+    }
+    result
+}
+
 impl App {
     /// Maximum valid content_scroll so the last line sits at the bottom edge,
     /// not the top. Falls back to `total - 1` before the first render (height 0).
@@ -26,16 +63,23 @@ impl App {
 
     /// Width of the line-number gutter (fold marker + digits + space), or 0.
     pub fn line_prefix_width(&self) -> usize {
-        if self.is_diff || (self.is_markdown && !self.show_raw_markdown) {
-            0
-        } else {
-            let ln = if self.show_line_numbers {
-                self.line_count().to_string().len().max(1) + 1
-            } else {
-                0
-            };
-            self.fold_gutter_width() + ln
+        if self.is_diff {
+            return 0;
         }
+        if self.is_markdown && !self.show_raw_markdown && !self.markdown_lines.is_empty() {
+            return 0;
+        }
+        if let Some(path) = &self.current_file {
+            if self.plugin_content.contains_key(path) {
+                return 0;
+            }
+        }
+        let ln = if self.show_line_numbers {
+            self.line_count().to_string().len().max(1) + 1
+        } else {
+            0
+        };
+        self.fold_gutter_width() + ln
     }
 
     /// Convert a terminal cell inside `content_area` to a `(buffer_line, buffer_col)` position.
@@ -53,12 +97,25 @@ impl App {
             let raw_wrap = (ca.width as usize).saturating_sub(prefix);
             if let Some(wrap_nz) = NonZeroUsize::new(raw_wrap) {
                 let wrap_width = wrap_nz.get();
-                let is_md = self.is_markdown && !self.show_raw_markdown;
                 let display_total = self.display_line_count();
                 let mut visual_remaining = rel_row;
                 for display_idx in self.content_scroll..display_total {
                     let physical_idx = self.display_to_physical(display_idx);
-                    let display_width: usize = if is_md {
+                    let display_width: usize = if let Some(ref path) = self.current_file {
+                        if let Some(plugin_lines) = self.plugin_content.get(path) {
+                            plugin_lines
+                                .get(physical_idx)
+                                .map(|spans| spans.iter().map(|(_, t)| t.width()).sum())
+                                .unwrap_or(0)
+                        } else if self.is_markdown && !self.show_raw_markdown {
+                            self.markdown_lines
+                                .get(physical_idx)
+                                .map(|spans| spans.iter().map(|(_, t)| t.width()).sum())
+                                .unwrap_or(0)
+                        } else {
+                            self.line_width(physical_idx).unwrap_or(0)
+                        }
+                    } else if self.is_markdown && !self.show_raw_markdown {
                         self.markdown_lines
                             .get(physical_idx)
                             .map(|spans| spans.iter().map(|(_, t)| t.width()).sum())
@@ -95,33 +152,26 @@ impl App {
         let ((start_line, start_col), (end_line, end_col)) = sel.normalized();
         let total = self.line_count();
 
-        if self.is_markdown && !self.show_raw_markdown {
-            if start_line >= self.markdown_lines.len() {
-                return String::new();
+        // Plugin-rendered content: extract text from styled spans.
+        if let Some(path) = &self.current_file {
+            if let Some(plugin_lines) = self.plugin_content.get(path) {
+                return spans_selection_text(
+                    plugin_lines,
+                    start_line,
+                    start_col,
+                    end_line,
+                    end_col,
+                );
             }
-            let mut result = String::new();
-            let last = end_line.min(self.markdown_lines.len().saturating_sub(1));
-            for (line_idx, spans) in self
-                .markdown_lines
-                .iter()
-                .enumerate()
-                .skip(start_line)
-                .take(last - start_line + 1)
-            {
-                let line_text: String = spans.iter().map(|(_, t)| t.as_str()).collect();
-                let chars: Vec<char> = line_text.chars().collect();
-                let col_start = if line_idx == start_line { start_col } else { 0 };
-                let col_end = if line_idx == end_line {
-                    end_col.min(chars.len())
-                } else {
-                    chars.len()
-                };
-                if !result.is_empty() {
-                    result.push('\n');
-                }
-                result.extend(&chars[col_start.min(chars.len())..col_end]);
-            }
-            return result;
+        }
+        if self.is_markdown && !self.show_raw_markdown && !self.markdown_lines.is_empty() {
+            return spans_selection_text(
+                &self.markdown_lines,
+                start_line,
+                start_col,
+                end_line,
+                end_col,
+            );
         }
         if self.is_json && self.show_pretty_json && !self.json_pretty_text.is_empty() {
             let lines = &self.json_pretty_text;
@@ -209,3 +259,7 @@ impl App {
         self.drag_start = None;
     }
 }
+
+#[cfg(test)]
+#[path = "content_pos_test.rs"]
+mod content_pos_test;

@@ -76,6 +76,37 @@ fn commands_blame_line_has_expected_name() {
 }
 
 #[test]
+fn apply_theme_clears_plugin_content() {
+    // Switching theme asks plugins to re-render, so stale plugin content (spans
+    // and the parallel text store) must be dropped to avoid colour desync.
+    use crate::search::ThemePicker;
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let path = root.join("a.txt");
+    app.plugin_content.insert(
+        path.clone(),
+        vec![vec![(ratatui::style::Style::default(), "x".to_string())]],
+    );
+    app.plugin_content_text.insert(path, vec!["x".to_string()]);
+
+    let mut picker = ThemePicker::default();
+    for c in "default".chars() {
+        picker.push(c);
+    }
+    // Only run the assertion if a "default" theme is discoverable on this host.
+    if picker.selected_name() == Some("default") {
+        app.theme_picker = Some(picker);
+        app.apply_selected_theme();
+        assert!(app.plugin_content.is_empty(), "plugin_content must clear");
+        assert!(
+            app.plugin_content_text.is_empty(),
+            "plugin_content_text must clear"
+        );
+    }
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn go_to_line_command_opens_dialog_when_content_focused() {
     let root = temp_tree();
     let mut app = app_for(&root);

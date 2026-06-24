@@ -20,7 +20,7 @@ impl App {
                 return lines.len();
             }
         }
-        if self.is_markdown && !self.show_raw_markdown {
+        if self.is_markdown && !self.show_raw_markdown && !self.markdown_lines.is_empty() {
             self.markdown_lines.len()
         } else if self.is_json && self.show_pretty_json && !self.json_pretty_lines.is_empty() {
             self.json_pretty_lines.len()
@@ -32,8 +32,13 @@ impl App {
     }
 
     /// Returns the text of the 0-indexed line, consulting the active content
-    /// source: pretty JSON, virtual file, or raw content vec.
+    /// source: plugin content, pretty JSON, virtual file, or raw content vec.
     pub fn line_text(&self, index: usize) -> Option<&str> {
+        if let Some(path) = &self.current_file {
+            if let Some(lines) = self.plugin_content_text.get(path) {
+                return lines.get(index).map(|s| s.as_str());
+            }
+        }
         if self.is_json && self.show_pretty_json && !self.json_pretty_text.is_empty() {
             self.json_pretty_text.get(index).map(|s| s.as_str())
         } else if let Some(vf) = &self.virtual_file {
@@ -110,3 +115,7 @@ impl App {
             .unwrap_or(self.fold_display_map.len().saturating_sub(1))
     }
 }
+
+#[cfg(test)]
+#[path = "content_query_test.rs"]
+mod content_query_test;

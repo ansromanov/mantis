@@ -362,10 +362,15 @@ fn click_below_last_node_is_ignored() {
 }
 
 #[test]
-fn scroll_wheel_moves_tree_selection() {
+fn scroll_wheel_scrolls_tree_viewport() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.tree_area = full_rect();
+    app.tree_area = Rect {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 1,
+    };
     app.content_area = Rect {
         x: 100,
         y: 0,
@@ -373,11 +378,22 @@ fn scroll_wheel_moves_tree_selection() {
         height: 20,
     };
     app.tree_selected = 0;
+    app.tree_scroll = 0;
 
-    app.handle_mouse(mouse(MouseEventKind::ScrollDown, 1, 1));
-    assert_eq!(app.tree_selected, 1);
-    app.handle_mouse(mouse(MouseEventKind::ScrollUp, 1, 1));
-    assert_eq!(app.tree_selected, 0);
+    app.handle_mouse(mouse(MouseEventKind::ScrollDown, 1, 0));
+    assert_eq!(app.tree_selected, 0, "wheel must not move the selection");
+    assert!(app.tree_scroll > 0, "wheel must scroll the tree viewport");
+
+    let scrolled = app.tree_scroll;
+    app.handle_mouse(mouse(MouseEventKind::ScrollUp, 1, 0));
+    assert!(
+        app.tree_scroll < scrolled,
+        "scroll up must reduce tree_scroll"
+    );
+    assert_eq!(
+        app.tree_selected, 0,
+        "selection must not change when scrolling up"
+    );
     fs::remove_dir_all(&root).ok();
 }
 
@@ -950,6 +966,7 @@ fn reopen_file_preserves_scroll_and_raw_markdown() {
 
 // -- content_line_count ----------------------------------------------------
 
+#[cfg(feature = "markdown-core")]
 #[test]
 fn content_line_count_markdown_rendered() {
     let root = temp_tree();
@@ -991,6 +1008,7 @@ fn line_prefix_width_zero_for_diff_and_markdown() {
     app.is_diff = false;
     app.is_markdown = true;
     app.show_raw_markdown = false;
+    app.markdown_lines = vec![vec![(ratatui::style::Style::default(), "x".to_string())]];
     assert_eq!(app.line_prefix_width(), 0);
     fs::remove_dir_all(&root).ok();
 }
@@ -3763,7 +3781,7 @@ fn line_prefix_width_with_fold_gutter() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.content = vec!["hello".to_string(); 10];
-    // Simulate YAML fold regions
+    // Simulate fold regions
     app.fold_regions = vec![crate::fold::FoldRegion { start: 0, end: 5 }];
     // fold_gutter_width = 2, line_width = len("10") + 1 = 3, total = 2 + 3 = 5
     assert_eq!(app.line_prefix_width(), 5);
@@ -4120,7 +4138,7 @@ fn dispatch_command_toggle_diff_side_by_side_toggles() {
 }
 
 #[test]
-fn dispatch_command_yaml_unfold_all_works() {
+fn dispatch_command_unfold_all_works() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.content = vec![
@@ -4144,7 +4162,7 @@ fn dispatch_command_yaml_unfold_all_works() {
 }
 
 #[test]
-fn dispatch_command_yaml_fold_toggle_toggles() {
+fn dispatch_command_fold_toggle_toggles() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.content = vec!["header".to_string(), "  child".to_string()];
@@ -4202,7 +4220,7 @@ fn visual_line_enters_and_extends_selection() {
 }
 
 #[test]
-fn content_key_yaml_fold_toggle_toggles() {
+fn content_key_fold_toggle_toggles() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("a.txt"));
@@ -4210,7 +4228,7 @@ fn content_key_yaml_fold_toggle_toggles() {
     app.fold_regions = vec![FoldRegion { start: 0, end: 1 }];
     app.rebuild_fold_display_map();
     assert!(app.folded.is_empty());
-    // Space is the yaml_fold_toggle binding
+    // Space is the fold_toggle binding
     app.handle_key(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::empty()));
     assert!(app.folded.contains(&0));
     fs::remove_dir_all(&root).ok();

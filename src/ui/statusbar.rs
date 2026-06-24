@@ -10,7 +10,7 @@
 //!
 //! On narrow terminals the bar elides low-priority segments so it never
 //! overflows `area.width`. Keybinding hints are dropped first, then plugin
-//! and status messages (`P_META`), then YAML fold stats, badges, and file
+//! and status messages (`P_META`), then fold stats, badges, and file
 //! info (`P_INFO`), then git info; error indicators and the version string
 //! are always shown.
 
@@ -28,7 +28,7 @@ use crate::git::{GitHead, GitRepoInfo};
 /// Priority levels for status-bar segments (higher = kept when eliding).
 const P_HINT: u8 = 0; // keybinding hints
 const P_META: u8 = 1; // plugin/status messages
-const P_INFO: u8 = 2; // YAML fold stats, badges, scroll %, file encoding
+const P_INFO: u8 = 2; // fold stats, badges, scroll %, file encoding
 const P_GIT: u8 = 3; // git branch info
 const P_ERR: u8 = 4; // error indicators
 const P_VER: u8 = 5; // version string
@@ -247,14 +247,14 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
     if !app.fold_regions.is_empty() {
         let folded_count = app.folded.len();
         let total_regions = app.fold_regions.len();
-        let anchor_info = if app.yaml_anchor_count > 0 || app.yaml_alias_count > 0 {
-            format!(" &{} *{}", app.yaml_anchor_count, app.yaml_alias_count)
+        let yaml_suffix = if app.yaml_anchor_count > 0 || app.yaml_alias_count > 0 {
+            format!("&{} *{} ", app.yaml_anchor_count, app.yaml_alias_count)
         } else {
             String::new()
         };
         segs.push((
             Span::styled(
-                format!(" [Y{anchor_info} {folded_count}/{total_regions}]"),
+                format!(" [{yaml_suffix}{folded_count}/{total_regions}]"),
                 base.fg(app.theme.accent),
             ),
             P_INFO,
