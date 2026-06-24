@@ -180,24 +180,14 @@ impl App {
                 if rect_contains(self.content_area, ev.column, ev.row) {
                     self.content_scroll = (self.content_scroll + 3).min(self.content_scroll_max());
                 } else if rect_contains(self.tree_area, ev.column, ev.row) {
-                    if self.tree_independent_scroll {
-                        self.tree_scroll = (self.tree_scroll + 3).min(self.tree_scroll_max());
-                    } else if self.tree_selected + 1 < self.nodes.len() {
-                        self.tree_selected += 1;
-                        self.try_open_selected();
-                    }
+                    self.tree_scroll = (self.tree_scroll + 3).min(self.tree_scroll_max());
                 }
             }
             MouseEventKind::ScrollUp => {
                 if rect_contains(self.content_area, ev.column, ev.row) {
                     self.content_scroll = self.content_scroll.saturating_sub(3);
                 } else if rect_contains(self.tree_area, ev.column, ev.row) {
-                    if self.tree_independent_scroll {
-                        self.tree_scroll = self.tree_scroll.saturating_sub(3);
-                    } else if self.tree_selected > 0 {
-                        self.tree_selected -= 1;
-                        self.try_open_selected();
-                    }
+                    self.tree_scroll = self.tree_scroll.saturating_sub(3);
                 }
             }
             _ => {}

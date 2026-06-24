@@ -75,7 +75,6 @@ fn scroll_outside_content_does_not_mark_dirty() {
         width: 40,
         height: 10,
     };
-    app.tree_independent_scroll = true;
     app.session_dirty = false;
     // Scroll over the tree pane: content_scroll is untouched, so no session write.
     app.handle_mouse(scroll_down_at(5, 5));
@@ -83,6 +82,55 @@ fn scroll_outside_content_does_not_mark_dirty() {
     assert!(
         !app.session_dirty,
         "scrolling outside the content pane must not mark the session dirty"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn wheel_over_tree_scrolls_without_moving_cursor() {
+    let root = temp_tree();
+    // Create enough files so the tree overflows a 1-row viewport.
+    for i in 0..10 {
+        fs::write(root.join(format!("extra{i}.txt")), "").unwrap();
+    }
+    let mut app = app_for(&root);
+    assert!(!app.tree_independent_scroll); // default is false
+    assert!(
+        app.nodes.len() > 2,
+        "temp_tree must have >2 nodes for this test; got {}",
+        app.nodes.len()
+    );
+    app.content_area = Rect {
+        x: 40,
+        y: 0,
+        width: 40,
+        height: 10,
+    };
+    app.tree_area = Rect {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 1,
+    };
+    let selected_before = app.tree_selected;
+    let scroll_before = app.tree_scroll;
+    let max_scroll = app.tree_scroll_max();
+    assert!(
+        max_scroll > 0,
+        "precondition: tree_scroll_max() must be > 0 (nodes={}, height={})",
+        app.nodes.len(),
+        app.tree_area.height
+    );
+
+    app.handle_mouse(scroll_down_at(5, 0));
+
+    assert_eq!(
+        app.tree_selected, selected_before,
+        "mouse wheel must not move the selection"
+    );
+    assert!(
+        app.tree_scroll > scroll_before,
+        "mouse wheel must scroll the tree viewport"
     );
     fs::remove_dir_all(&root).ok();
 }

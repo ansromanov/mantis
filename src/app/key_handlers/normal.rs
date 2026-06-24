@@ -223,13 +223,9 @@ impl App {
         self.nodes.len().saturating_sub(self.tree_page_size())
     }
 
-    /// When independent tree scrolling is enabled, nudges `tree_scroll` so the
-    /// current selection stays within the viewport after a cursor move. A no-op
-    /// otherwise, since the list widget auto-scrolls to the selection.
+    /// Nudges `tree_scroll` so the current selection stays within the viewport
+    /// after a cursor move.
     pub(crate) fn scroll_tree_into_view(&mut self) {
-        if !self.tree_independent_scroll {
-            return;
-        }
         let height = self.tree_page_size();
         if self.tree_selected < self.tree_scroll {
             self.tree_scroll = self.tree_selected;
