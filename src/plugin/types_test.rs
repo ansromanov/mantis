@@ -8,6 +8,21 @@ fn plugin_entry_default_is_enabled_process() {
     assert!(entry.path.as_os_str().is_empty());
     assert!(entry.extensions.is_empty());
     assert!(entry.syntax_file.is_none());
+    assert!(entry.events.is_empty());
+}
+
+#[test]
+fn plugin_entry_events_deserialize_and_default_empty() {
+    // `events` is optional in tv.toml: absent => empty (all events).
+    let without: PluginEntry =
+        toml::from_str("path = \"p/run.sh\"\nenabled = true\n").expect("parse");
+    assert!(without.events.is_empty());
+
+    let with: PluginEntry = toml::from_str(
+        "path = \"p/run.sh\"\nenabled = true\nevents = [\"on_file_open\", \"on_keypress\"]\n",
+    )
+    .expect("parse");
+    assert_eq!(with.events, vec!["on_file_open", "on_keypress"]);
 }
 
 #[test]

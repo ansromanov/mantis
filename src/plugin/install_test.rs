@@ -104,6 +104,19 @@ fn bundled_plugin_entries_use_relative_paths() {
 }
 
 #[test]
+fn bundled_plugin_entries_have_empty_events() {
+    // Bundled entries declare no event subscription, so they receive all
+    // events (empty = all, backward compat). Manifest-discovered plugins are
+    // the ones that opt into a subset.
+    for (name, entry) in bundled_plugin_entries() {
+        assert!(
+            entry.events.is_empty(),
+            "bundled plugin {name} must not pin an events subscription"
+        );
+    }
+}
+
+#[test]
 fn bundled_plugin_entries_no_duplicates() {
     let entries = bundled_plugin_entries();
     let mut seen = std::collections::HashSet::new();

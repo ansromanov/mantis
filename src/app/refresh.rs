@@ -193,7 +193,9 @@ impl App {
             }
             "open_file" => {
                 if let Some(path_str) = params.get("path").and_then(|v| v.as_str()) {
+                    self.plugin_is_opening_file = true;
                     self.open_and_reveal(std::path::Path::new(path_str));
+                    self.plugin_is_opening_file = false;
                 }
             }
             "set_file_statuses" => {

@@ -308,6 +308,10 @@ pub struct App {
     pub loading: bool,
     /// Plugin subprocess manager. Spawned at startup, deactivated on quit.
     pub(crate) plugin_manager: PluginManager,
+    /// Set to `true` while handling a plugin-originated `open_file` action, so
+    /// `apply_file_load` / `apply_diff_load` can suppress the re-emission of
+    /// `on_file_open` back to plugins (breaking the recursion loop).
+    plugin_is_opening_file: bool,
     /// Most recent plugin message, shown in the status bar.
     pub plugin_message: Option<String>,
     /// Per-file blame annotations provided by a plugin, keyed by absolute path.

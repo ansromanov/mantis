@@ -41,6 +41,16 @@ fn app_new_builds_visible_root_tree() {
 }
 
 #[test]
+fn app_new_plugin_open_guard_defaults_false() {
+    // The re-entrancy guard that suppresses `on_file_open` re-emission for
+    // plugin-originated opens must start cleared.
+    let root = temp_dir();
+    let app = new_app(&root, Config::default());
+    assert!(!app.plugin_is_opening_file);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn app_new_starts_with_empty_plugin_content() {
     // Fresh App must have no plugin-provided content cached, neither the styled
     // spans nor the parallel plain-text store.

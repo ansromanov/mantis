@@ -190,7 +190,9 @@ impl App {
         self.diff_rows = load.diff_rows;
         self.content = load.content;
         self.set_file_watch(Some(path));
-        self.plugin_manager.on_file_open(path);
+        if !self.plugin_is_opening_file {
+            self.plugin_manager.on_file_open(path);
+        }
     }
 
     /// Shows a "[deleted]" placeholder for a file that was removed from the
@@ -299,7 +301,9 @@ impl App {
             self.mark_session_dirty();
             self.plugin_content_active = false;
             self.set_file_watch(Some(path));
-            self.plugin_manager.on_file_open(path);
+            if !self.plugin_is_opening_file {
+                self.plugin_manager.on_file_open(path);
+            }
             if is_new_file {
                 self.push_recent(path.to_path_buf());
             }
