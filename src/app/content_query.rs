@@ -115,3 +115,7 @@ impl App {
             .unwrap_or(self.fold_display_map.len().saturating_sub(1))
     }
 }
+
+#[cfg(test)]
+#[path = "content_query_test.rs"]
+mod content_query_test;

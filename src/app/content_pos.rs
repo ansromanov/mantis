@@ -15,6 +15,43 @@ use unicode_width::UnicodeWidthStr;
 
 use super::App;
 
+/// Extract the selected text from styled span lines (plugin content or rendered
+/// markdown share the same `Vec<Vec<(Style, String)>>` shape). `start`/`end` are
+/// the normalized selection bounds in (line, char-column) space.
+fn spans_selection_text(
+    lines: &[Vec<(ratatui::style::Style, String)>],
+    start_line: usize,
+    start_col: usize,
+    end_line: usize,
+    end_col: usize,
+) -> String {
+    if start_line >= lines.len() {
+        return String::new();
+    }
+    let mut result = String::new();
+    let last = end_line.min(lines.len().saturating_sub(1));
+    for (line_idx, spans) in lines
+        .iter()
+        .enumerate()
+        .skip(start_line)
+        .take(last - start_line + 1)
+    {
+        let line_text: String = spans.iter().map(|(_, t)| t.as_str()).collect();
+        let chars: Vec<char> = line_text.chars().collect();
+        let col_start = if line_idx == start_line { start_col } else { 0 };
+        let col_end = if line_idx == end_line {
+            end_col.min(chars.len())
+        } else {
+            chars.len()
+        };
+        if !result.is_empty() {
+            result.push('\n');
+        }
+        result.extend(&chars[col_start.min(chars.len())..col_end]);
+    }
+    result
+}
+
 impl App {
     /// Maximum valid content_scroll so the last line sits at the bottom edge,
     /// not the top. Falls back to `total - 1` before the first render (height 0).
@@ -118,60 +155,23 @@ impl App {
         // Plugin-rendered content: extract text from styled spans.
         if let Some(path) = &self.current_file {
             if let Some(plugin_lines) = self.plugin_content.get(path) {
-                if start_line >= plugin_lines.len() {
-                    return String::new();
-                }
-                let mut result = String::new();
-                let last = end_line.min(plugin_lines.len().saturating_sub(1));
-                for (line_idx, spans) in plugin_lines
-                    .iter()
-                    .enumerate()
-                    .skip(start_line)
-                    .take(last - start_line + 1)
-                {
-                    let line_text: String = spans.iter().map(|(_, t)| t.as_str()).collect();
-                    let chars: Vec<char> = line_text.chars().collect();
-                    let col_start = if line_idx == start_line { start_col } else { 0 };
-                    let col_end = if line_idx == end_line {
-                        end_col.min(chars.len())
-                    } else {
-                        chars.len()
-                    };
-                    if !result.is_empty() {
-                        result.push('\n');
-                    }
-                    result.extend(&chars[col_start.min(chars.len())..col_end]);
-                }
-                return result;
+                return spans_selection_text(
+                    plugin_lines,
+                    start_line,
+                    start_col,
+                    end_line,
+                    end_col,
+                );
             }
         }
         if self.is_markdown && !self.show_raw_markdown && !self.markdown_lines.is_empty() {
-            if start_line >= self.markdown_lines.len() {
-                return String::new();
-            }
-            let mut result = String::new();
-            let last = end_line.min(self.markdown_lines.len().saturating_sub(1));
-            for (line_idx, spans) in self
-                .markdown_lines
-                .iter()
-                .enumerate()
-                .skip(start_line)
-                .take(last - start_line + 1)
-            {
-                let line_text: String = spans.iter().map(|(_, t)| t.as_str()).collect();
-                let chars: Vec<char> = line_text.chars().collect();
-                let col_start = if line_idx == start_line { start_col } else { 0 };
-                let col_end = if line_idx == end_line {
-                    end_col.min(chars.len())
-                } else {
-                    chars.len()
-                };
-                if !result.is_empty() {
-                    result.push('\n');
-                }
-                result.extend(&chars[col_start.min(chars.len())..col_end]);
-            }
-            return result;
+            return spans_selection_text(
+                &self.markdown_lines,
+                start_line,
+                start_col,
+                end_line,
+                end_col,
+            );
         }
         if self.is_json && self.show_pretty_json && !self.json_pretty_text.is_empty() {
             let lines = &self.json_pretty_text;
@@ -259,3 +259,7 @@ impl App {
         self.drag_start = None;
     }
 }
+
+#[cfg(test)]
+#[path = "content_pos_test.rs"]
+mod content_pos_test;

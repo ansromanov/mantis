@@ -297,11 +297,17 @@ impl App {
                     .iter()
                     .map(|spans| spans.iter().map(|(_, t)| t.as_str()).collect::<String>())
                     .collect();
+                // Only reset scroll / mark active when the render targets the
+                // file currently on screen; a plugin rendering a background path
+                // must not yank the viewport of the file the user is reading.
+                let is_current = self.current_file.as_deref() == Some(path.as_path());
                 self.plugin_content_text.insert(path.clone(), text);
                 self.plugin_content.insert(path, rendered);
-                self.content_scroll = 0;
-                self.content_hscroll = 0;
-                self.plugin_content_active = true;
+                if is_current {
+                    self.content_scroll = 0;
+                    self.content_hscroll = 0;
+                    self.plugin_content_active = true;
+                }
             }
             "register_language_provider" => {
                 let extensions: Vec<String> = params

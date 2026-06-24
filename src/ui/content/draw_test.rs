@@ -105,3 +105,42 @@ fn active_line_tint_absent_in_diff_mode() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+/// Renders `draw_content` and returns the flattened text of the buffer.
+fn render_to_string(app: &mut App) -> String {
+    let backend = TestBackend::new(80, 24);
+    let mut terminal = ratatui::Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| draw_content(frame, app, frame.area()))
+        .unwrap();
+    terminal
+        .backend()
+        .buffer()
+        .content()
+        .iter()
+        .map(|c| c.symbol())
+        .collect()
+}
+
+#[test]
+fn plugin_content_is_rendered_for_current_file() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let path = root.join("long.txt");
+    app.open_file(&path);
+    app.plugin_content.insert(
+        path.clone(),
+        vec![vec![(
+            ratatui::style::Style::default(),
+            "PLUGIN_RENDERED_MARKER".to_string(),
+        )]],
+    );
+    app.plugin_content_text
+        .insert(path, vec!["PLUGIN_RENDERED_MARKER".to_string()]);
+    let out = render_to_string(&mut app);
+    assert!(
+        out.contains("PLUGIN_RENDERED_MARKER"),
+        "plugin content must take precedence in the content pane"
+    );
+    fs::remove_dir_all(&root).ok();
+}

@@ -324,6 +324,35 @@ fn descend_to_selected_changes_root_for_dir() {
 }
 
 #[test]
+fn descend_to_selected_clears_plugin_content() {
+    // Root change must drop cached plugin content for the previous tree, both
+    // the styled spans and the parallel plain-text store.
+    let root = deep_tree();
+    let mut app = app_for(&root);
+    let path = root.join("top.txt");
+    app.plugin_content.insert(
+        path.clone(),
+        vec![vec![(ratatui::style::Style::default(), "x".to_string())]],
+    );
+    app.plugin_content_text.insert(path, vec!["x".to_string()]);
+
+    let sub1_idx = app
+        .nodes
+        .iter()
+        .position(|n| n.is_dir && n.path == root.join("sub1"))
+        .expect("sub1 dir should exist");
+    app.tree_selected = sub1_idx;
+    app.descend_to_selected();
+
+    assert!(app.plugin_content.is_empty(), "plugin_content must clear");
+    assert!(
+        app.plugin_content_text.is_empty(),
+        "plugin_content_text must clear"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn descend_to_selected_does_nothing_for_file() {
     let root = deep_tree();
     let mut app = app_for(&root);
