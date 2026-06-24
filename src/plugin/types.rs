@@ -111,6 +111,10 @@ pub(crate) struct ToPlugin {
     pub(crate) key: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) theme: Option<String>,
+    /// Protocol version spoken by the host. Present only on the `init` event
+    /// so the plugin can verify compatibility.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) protocol_version: Option<String>,
 }
 
 /// Message received from a plugin (on its stdout).

@@ -95,10 +95,26 @@ Plugins receive lifecycle and hook events from `tv` and can respond with
 Each action has specific parameters; see [Plugin Development](plugin-development.md)
 for the full protocol reference.
 
+## Protocol version
+
+`tv` and plugins communicate over an IPC protocol identified by a version
+string. Each plugin declares its protocol version in `plugin.toml` via the
+`tv_protocol` field. At startup `tv` validates that every discovered plugin
+matches the host protocol version — plugins with a mismatched version are
+silently skipped. The `init` event sent to each plugin includes the host
+protocol version so the plugin can verify compatibility dynamically.
+
+Current protocol version: **`"2"`** (bumped from `"1"` for the 0.8 release).
+
+> **Upgrading from 0.7:** Plugins written for protocol `"1"` must update
+> `tv_protocol = "2"` in their `plugin.toml` and handle the new
+> `protocol_version` field on the `init` event to remain compatible with 0.8+.
+
 ## Lifecycle
 
 1. `tv` starts, reads `[plugins]` from config, and spawns each enabled plugin.
-2. Each plugin receives an `init` event (with the active theme name).
+2. Each plugin receives an `init` event (with the active theme name and host
+   protocol version).
 3. As you use `tv`, plugins receive hook events (`on_file_open`,
    `on_keypress`, `on_selection_change`, `on_theme_change`).
 4. When you quit, each plugin receives `on_quit` then `shutdown`, and `tv`

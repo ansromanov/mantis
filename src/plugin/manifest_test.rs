@@ -12,7 +12,7 @@ version = "0.1.0"
 description = "A test plugin"
 author = "test"
 entry = "run.sh"
-tv_protocol = "1"
+tv_protocol = "2"
 "#;
     std::fs::write(dir.join("plugin.toml"), toml).unwrap();
     let manifest = crate::plugin::manifest::load(&dir).unwrap();
@@ -21,7 +21,7 @@ tv_protocol = "1"
     assert_eq!(manifest.description.as_deref(), Some("A test plugin"));
     assert_eq!(manifest.author.as_deref(), Some("test"));
     assert_eq!(manifest.entry, "run.sh");
-    assert_eq!(manifest.tv_protocol, "1");
+    assert_eq!(manifest.tv_protocol, "2");
     assert!(manifest.platforms.is_none());
     assert!(manifest.events.is_none());
     assert!(manifest.permissions.is_none());
@@ -38,7 +38,7 @@ version = "2.0.0"
 description = "Full plugin"
 author = "author"
 entry = "main.py"
-tv_protocol = "1"
+tv_protocol = "2"
 platforms = ["linux", "macos"]
 events = ["on_file_open", "on_keypress"]
 permissions = ["read_files"]
@@ -88,7 +88,7 @@ version = "0.1.0"
 description = "My plugin"
 author = "me"
 entry = "run.sh"
-tv_protocol = "1"
+tv_protocol = "2"
 "#;
     std::fs::write(sub.join("plugin.toml"), toml).unwrap();
 
@@ -116,7 +116,7 @@ fn discover_populates_events_from_manifest() {
     std::fs::create_dir_all(&sub).unwrap();
     std::fs::write(
         sub.join("plugin.toml"),
-        "name = \"evented\"\nversion = \"0.1.0\"\nentry = \"run.sh\"\ntv_protocol = \"1\"\nevents = [\"on_file_open\", \"on_keypress\"]\n",
+        "name = \"evented\"\nversion = \"0.1.0\"\nentry = \"run.sh\"\ntv_protocol = \"2\"\nevents = [\"on_file_open\", \"on_keypress\"]\n",
     )
     .unwrap();
 
@@ -125,7 +125,7 @@ fn discover_populates_events_from_manifest() {
     std::fs::create_dir_all(&sub2).unwrap();
     std::fs::write(
         sub2.join("plugin.toml"),
-        "name = \"all-events\"\nversion = \"0.1.0\"\nentry = \"run.sh\"\ntv_protocol = \"1\"\n",
+        "name = \"all-events\"\nversion = \"0.1.0\"\nentry = \"run.sh\"\ntv_protocol = \"2\"\n",
     )
     .unwrap();
 
@@ -167,7 +167,7 @@ fn discover_filters_by_platform() {
 name = "windows-only"
 version = "0.1.0"
 entry = "tool.exe"
-tv_protocol = "1"
+tv_protocol = "2"
 platforms = ["windows"]
 "#;
     std::fs::write(sub.join("plugin.toml"), toml).unwrap();
@@ -179,7 +179,7 @@ platforms = ["windows"]
 name = "cross-platform"
 version = "0.1.0"
 entry = "tool.sh"
-tv_protocol = "1"
+tv_protocol = "2"
 "#;
     std::fs::write(sub2.join("plugin.toml"), toml2).unwrap();
 
@@ -209,7 +209,7 @@ fn discover_sorts_entries_by_name() {
 name = "{name}"
 version = "0.1.0"
 entry = "run.sh"
-tv_protocol = "1"
+tv_protocol = "2"
 "#
         );
         std::fs::write(sub.join("plugin.toml"), toml).unwrap();
@@ -242,7 +242,7 @@ fn discover_multi_plugin_dir() {
 name = "{name}"
 version = "0.1.0"
 entry = "{entry}"
-tv_protocol = "1"
+tv_protocol = "2"
 "#
         );
         std::fs::write(sub.join("plugin.toml"), toml).unwrap();
@@ -271,7 +271,70 @@ fn discover_skips_manifest_with_unsafe_name() {
 name = "../escape"
 version = "0.1.0"
 entry = "run.sh"
+tv_protocol = "2"
+"#;
+    std::fs::write(sub.join("plugin.toml"), toml).unwrap();
+
+    assert!(crate::plugin::manifest::discover(&dir).is_empty());
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn discover_skips_plugin_with_wrong_protocol_version() {
+    let dir = std::env::temp_dir().join(format!("tv_discover_badver_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+
+    // Current-version plugin (should be discovered)
+    let sub = dir.join("good-v2");
+    std::fs::create_dir_all(&sub).unwrap();
+    let toml = r#"
+name = "good-v2"
+version = "0.1.0"
+entry = "run.sh"
+tv_protocol = "2"
+"#;
+    std::fs::write(sub.join("plugin.toml"), toml).unwrap();
+
+    // Old-version plugin (should be skipped)
+    let sub2 = dir.join("old-v1");
+    std::fs::create_dir_all(&sub2).unwrap();
+    let toml2 = r#"
+name = "old-v1"
+version = "0.1.0"
+entry = "run.sh"
 tv_protocol = "1"
+"#;
+    std::fs::write(sub2.join("plugin.toml"), toml2).unwrap();
+
+    // Future-version plugin (should be skipped)
+    let sub3 = dir.join("future-v3");
+    std::fs::create_dir_all(&sub3).unwrap();
+    let toml3 = r#"
+name = "future-v3"
+version = "0.2.0"
+entry = "run.sh"
+tv_protocol = "3"
+"#;
+    std::fs::write(sub3.join("plugin.toml"), toml3).unwrap();
+
+    let entries = crate::plugin::manifest::discover(&dir);
+    assert_eq!(entries.len(), 1, "only the v2 plugin must be discovered");
+    assert_eq!(entries[0].0, "good-v2");
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn discover_skips_plugin_with_empty_protocol_version() {
+    let dir = std::env::temp_dir().join(format!("tv_discover_emptyver_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+
+    let sub = dir.join("no-version");
+    std::fs::create_dir_all(&sub).unwrap();
+    // Missing tv_protocol field — toml fails to deserialize PluginManifest
+    let toml = r#"
+name = "no-version"
+version = "0.1.0"
+entry = "run.sh"
 "#;
     std::fs::write(sub.join("plugin.toml"), toml).unwrap();
 
@@ -294,7 +357,7 @@ fn discover_platform_match_is_case_insensitive() {
 name = "case-plugin"
 version = "0.1.0"
 entry = "run.sh"
-tv_protocol = "1"
+tv_protocol = "2"
 platforms = ["{os_upper}"]
 "#
     );
