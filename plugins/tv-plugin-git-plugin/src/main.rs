@@ -41,7 +41,15 @@ fn main() {
             Err(_) => continue,
         };
         match msg["event"].as_str().unwrap_or("") {
-            "init" => {}
+            "init" => {
+                // Determine repo root from CWD so the status bar shows
+                // branch info immediately on startup, before any file open.
+                let cwd = std::env::current_dir().ok();
+                if let Some(ref dir) = cwd {
+                    let mut out = io::stdout().lock();
+                    handle_init(dir, &mut out);
+                }
+            }
             "on_file_open" => {
                 if let Some(path_str) = msg["path"].as_str() {
                     state.last_file = Some(path_str.to_string());
@@ -355,6 +363,13 @@ fn send_set_content(lines: &[String], path: &str, out: &mut impl Write) {
     });
     let _ = writeln!(out, "{}", serde_json::to_string(&msg).unwrap());
     let _ = out.flush();
+}
+
+/// Handles the `init` event: sends repo info and file statuses so the status
+/// bar shows branch info and tree coloring works immediately on startup.
+fn handle_init(dir: &std::path::Path, out: &mut impl Write) {
+    send_repo_info(&dir.to_string_lossy(), out);
+    send_file_statuses(&dir.to_string_lossy(), out);
 }
 
 #[cfg(test)]
