@@ -369,6 +369,7 @@ fn create_base_app() -> App {
         plugin_blame: HashMap::new(),
         plugin_git_info: None,
         plugin_content: HashMap::new(),
+        plugin_content_text: HashMap::new(),
         plugin_content_active: false,
         status_message: None,
         breadcrumb_areas: Vec::new(),
@@ -379,6 +380,80 @@ fn create_base_app() -> App {
         goto_line: None,
         tree_filter: None,
     }
+}
+
+// -- set_content tests --------------------------------------------------------
+
+#[test]
+fn set_content_stores_spans_and_text_for_path() {
+    let mut app = create_base_app();
+    let path = std::path::PathBuf::from("/tmp/doc.md");
+    app.drain_plugin_actions_for_test(
+        "md-plugin",
+        "set_content",
+        serde_json::json!({
+            "path": path.to_str().unwrap(),
+            "lines": ["hello", "world"],
+        }),
+    );
+    assert_eq!(app.plugin_content.get(&path).map(|l| l.len()), Some(2));
+    assert_eq!(
+        app.plugin_content_text.get(&path),
+        Some(&vec!["hello".to_string(), "world".to_string()])
+    );
+}
+
+#[test]
+fn set_content_for_current_file_resets_scroll_and_marks_active() {
+    let mut app = create_base_app();
+    let path = std::path::PathBuf::from("/tmp/doc.md");
+    app.current_file = Some(path.clone());
+    app.content_scroll = 7;
+    app.content_hscroll = 3;
+    app.plugin_content_active = false;
+    app.drain_plugin_actions_for_test(
+        "md-plugin",
+        "set_content",
+        serde_json::json!({"path": path.to_str().unwrap(), "lines": ["x"]}),
+    );
+    assert_eq!(app.content_scroll, 0, "current-file render resets vscroll");
+    assert_eq!(app.content_hscroll, 0, "current-file render resets hscroll");
+    assert!(
+        app.plugin_content_active,
+        "current-file render marks active"
+    );
+}
+
+#[test]
+fn set_content_for_background_file_preserves_viewport() {
+    // A plugin rendering a path other than the open file must not yank the
+    // viewport of the file the user is currently reading.
+    let mut app = create_base_app();
+    app.current_file = Some(std::path::PathBuf::from("/tmp/open.md"));
+    app.content_scroll = 7;
+    app.content_hscroll = 3;
+    app.plugin_content_active = false;
+    app.drain_plugin_actions_for_test(
+        "md-plugin",
+        "set_content",
+        serde_json::json!({"path": "/tmp/background.md", "lines": ["x"]}),
+    );
+    assert_eq!(
+        app.content_scroll, 7,
+        "background render must not reset vscroll"
+    );
+    assert_eq!(
+        app.content_hscroll, 3,
+        "background render must not reset hscroll"
+    );
+    assert!(
+        !app.plugin_content_active,
+        "background render must not mark active"
+    );
+    // Content is still stored for later use, keyed by its own path.
+    assert!(app
+        .plugin_content
+        .contains_key(&std::path::PathBuf::from("/tmp/background.md")));
 }
 
 // -- language provider protocol tests -----------------------------------------

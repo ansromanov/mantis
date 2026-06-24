@@ -104,6 +104,7 @@ impl FileLoad {
 /// content. Plain files use a memory-mapped [`VirtualFile`] (highlighted lazily
 /// in the UI); markdown/JSON/YAML are read fully and rendered here. This is the
 /// single source of truth shared by the synchronous and worker code paths.
+#[allow(unused_variables)]
 pub(super) fn compute_file_load(path: &Path, theme: &Theme, hl: &Highlighter) -> FileLoad {
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
     let is_markdown = matches!(ext, "md" | "markdown");

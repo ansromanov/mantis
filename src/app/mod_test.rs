@@ -966,6 +966,7 @@ fn reopen_file_preserves_scroll_and_raw_markdown() {
 
 // -- content_line_count ----------------------------------------------------
 
+#[cfg(feature = "markdown-core")]
 #[test]
 fn content_line_count_markdown_rendered() {
     let root = temp_tree();
@@ -1007,6 +1008,7 @@ fn line_prefix_width_zero_for_diff_and_markdown() {
     app.is_diff = false;
     app.is_markdown = true;
     app.show_raw_markdown = false;
+    app.markdown_lines = vec![vec![(ratatui::style::Style::default(), "x".to_string())]];
     assert_eq!(app.line_prefix_width(), 0);
     fs::remove_dir_all(&root).ok();
 }

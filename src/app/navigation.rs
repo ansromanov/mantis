@@ -323,6 +323,7 @@ impl App {
         self.in_file_search = None;
         self.plugin_content_active = false;
         self.plugin_content.clear();
+        self.plugin_content_text.clear();
         self.plugin_blame.clear();
         self.plugin_git_info = None;
         self.load_seq = self.load_seq.wrapping_add(1);

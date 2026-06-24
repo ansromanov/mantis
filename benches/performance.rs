@@ -7,8 +7,10 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use tree_viewer::highlight::Highlighter;
+#[cfg(feature = "markdown-core")]
 use tree_viewer::markdown;
 use tree_viewer::search::SearchState;
+#[cfg(feature = "markdown-core")]
 use tree_viewer::theme::Theme;
 use tree_viewer::tree::{build_visible, collect_all_files};
 use tree_viewer::virtual_file::VirtualFile;
@@ -73,6 +75,7 @@ fn generate_deep_tree(dir: &Path, depth: usize) {
 
 /// A large markdown file with headings, tables, code blocks, lists, etc.
 /// Produces a file with exactly `line_count` lines (counted by `\n`).
+#[cfg(feature = "markdown-core")]
 fn generate_large_markdown(path: &Path, line_count: usize) {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).unwrap();
@@ -146,6 +149,7 @@ fn highlighter() -> Highlighter {
     Highlighter::with_extra_syntaxes("base16-ocean.dark", &[])
 }
 
+#[cfg(feature = "markdown-core")]
 fn theme() -> Theme {
     Theme::default()
 }
@@ -326,6 +330,7 @@ fn bench_highlight(c: &mut Criterion) {
 // Benchmark: markdown render
 // ---------------------------------------------------------------------------
 
+#[cfg(feature = "markdown-core")]
 fn bench_markdown_render(c: &mut Criterion) {
     let mut group = c.benchmark_group("markdown_render");
     let t = theme();
@@ -403,6 +408,7 @@ fn bench_scroll_redraw(c: &mut Criterion) {
 // Criterion entry point
 // ---------------------------------------------------------------------------
 
+#[cfg(feature = "markdown-core")]
 criterion_group!(
     benches,
     bench_tree_walk,
@@ -410,6 +416,16 @@ criterion_group!(
     bench_file_open,
     bench_highlight,
     bench_markdown_render,
+    bench_scroll_redraw,
+);
+
+#[cfg(not(feature = "markdown-core"))]
+criterion_group!(
+    benches,
+    bench_tree_walk,
+    bench_content_search,
+    bench_file_open,
+    bench_highlight,
     bench_scroll_redraw,
 );
 
