@@ -301,6 +301,7 @@ impl App {
         };
         if filter.is_empty() {
             self.tree_selected = 0;
+            self.scroll_tree_into_view();
             return;
         }
         let q = filter.query.to_lowercase();
@@ -309,6 +310,7 @@ impl App {
             .iter()
             .position(|n| n.name.to_lowercase().contains(&q));
         self.tree_selected = first_match.unwrap_or(0);
+        self.scroll_tree_into_view();
     }
 
     /// Handles keyboard input while the command palette is open: typing
