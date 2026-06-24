@@ -146,6 +146,23 @@ fn open_file_resets_active_line_and_blame_popup() {
 }
 
 #[test]
+fn open_file_keeps_plugin_open_guard_false() {
+    // A user-initiated open must leave `plugin_is_opening_file` cleared so the
+    // `on_file_open` notification is still emitted to plugins. The guard is set
+    // only around plugin-originated opens (see refresh.rs).
+    let root = temp_dir();
+    let f = root.join("a.txt");
+    fs::write(&f, "line1\n").unwrap();
+    let mut app = app_for(&root);
+    app.open_file(&f);
+    assert!(
+        !app.plugin_is_opening_file,
+        "guard must stay false after a normal open_file"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn open_file_sets_current_syntax_from_load() {
     let root = temp_dir();
     let f = root.join("main.rs");

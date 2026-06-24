@@ -15,7 +15,7 @@
 //! description = "git diff on open, git log on H"
 //! author = "ansromanov"
 //! entry = "run.sh"
-//! tv_protocol = "1"
+//! tv_protocol = "2"
 //! platforms = ["linux", "macos"]
 //! events = ["on_file_open", "on_keypress"]
 //! permissions = ["run_git", "read_files"]
@@ -23,8 +23,9 @@
 //!
 //! The `entry` path is resolved relative to the plugin's subdirectory. The
 //! `platforms` field, when present, restricts the plugin to specific operating
-//! systems using Rust's `std::env::consts::OS` naming. `events` and
-//! `permissions` are advisory-only in this phase and not enforced.
+//! systems using Rust's `std::env::consts::OS` naming. `events` is enforced:
+//! a plugin only receives the events it lists (empty = all events). `permissions`
+//! is advisory-only in this phase and not enforced.
 //!
 //! The `tv_protocol` field is validated against the host's
 //! [`PROTOCOL_VERSION`] at discovery time. Plugins declaring a mismatched
@@ -60,7 +61,8 @@ pub struct PluginManifest {
     /// conventions: `"linux"`, `"macos"`, `"windows"`.
     #[serde(default)]
     pub platforms: Option<Vec<String>>,
-    /// Events this plugin handles (advisory only, not enforced).
+    /// Events this plugin subscribes to. Enforced at dispatch: a plugin only
+    /// receives events in this list. Absent or empty means all events are sent.
     #[serde(default)]
     pub events: Option<Vec<String>>,
     /// Permissions this plugin requires (advisory only, not enforced).
@@ -126,6 +128,7 @@ pub fn discover(plugin_dir: &Path) -> Vec<(String, PluginEntry)> {
                 kind: PluginKind::Process,
                 extensions: Vec::new(),
                 syntax_file: None,
+                events: manifest.events.unwrap_or_default(),
             },
         ));
     }

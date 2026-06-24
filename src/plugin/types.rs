@@ -51,6 +51,10 @@ pub struct PluginEntry {
     /// `kind = "syntax"`. Relative paths are resolved against the plugin dir.
     #[serde(default)]
     pub syntax_file: Option<PathBuf>,
+    /// Events this plugin subscribes to from the manifest `events` field.
+    /// Empty means all events are sent (backward compat).
+    #[serde(default)]
+    pub events: Vec<String>,
 }
 
 impl Default for PluginEntry {
@@ -61,6 +65,7 @@ impl Default for PluginEntry {
             kind: PluginKind::Process,
             extensions: Vec::new(),
             syntax_file: None,
+            events: Vec::new(),
         }
     }
 }

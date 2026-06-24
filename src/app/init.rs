@@ -220,6 +220,7 @@ impl App {
             load_seq: 0,
             loading: false,
             plugin_manager,
+            plugin_is_opening_file: false,
             plugin_message: plugin_spawn_error,
             plugin_blame: HashMap::new(),
             plugin_git_info: None,
