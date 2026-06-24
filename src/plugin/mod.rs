@@ -112,3 +112,15 @@ mod manager_tests;
 #[cfg(test)]
 #[path = "manifest_test.rs"]
 mod manifest_tests;
+
+#[cfg(test)]
+#[path = "process_test.rs"]
+mod process_tests;
+
+#[cfg(test)]
+#[path = "syntax_test.rs"]
+mod syntax_tests;
+
+#[cfg(test)]
+#[path = "types_test.rs"]
+mod types_tests;
