@@ -290,6 +290,37 @@ time the file is opened.
 - **No blocking.** Actions are drained non-blockingly every tick. Sending many
   actions in rapid succession is fine; they are buffered and processed in order.
 
+## State teardown contract
+
+Every `set_*` action a plugin sends **registers a contribution** in the host's
+`plugin_contributions` map (`HashMap<String, PluginContributions>`). When the
+plugin is disabled via the plugin picker or its process exits unexpectedly,
+the host automatically tears down all state that plugin produced — no per-plugin
+special cases needed.
+
+**What gets torn down:**
+
+| Action | State cleared |
+|---|---|
+| `set_content` | `plugin_content` / `plugin_content_text` entries for contributed paths |
+| `set_blame_data` | `plugin_blame` entries for contributed paths |
+| `set_file_statuses` | `git_status_map` entries for contributed paths |
+| `set_status_bar_git_info` | `plugin_git_info` (status bar override) |
+| `set_icon_map` | `icon_map`, `icons_enabled`, `icon_dir_open/closed`, `icon_fallback` |
+| `set_fold_regions` | `plugin_fold_regions` entries for contributed paths; active fold state reset |
+| `register_language_provider` | Provider registration removed |
+
+After clearing, if the disabled plugin had rendered content for the current
+file, the file is reloaded from disk and falls back to core rendering
+(markdown, JSON pretty-print, or plain-text with syntax highlighting).
+
+**Plugin authors:** There is nothing you need to do to opt in — registration
+is automatic. If you write a new `set_*` action in the host code, you must
+also stamp it in `PluginContributions` (in `src/plugin/types.rs`) and handle
+its teardown in `App::teardown_plugin_contributions` (in `src/app/mod.rs`).
+Without this, the disabled plugin's output would persist on screen,
+violating the invariant: **disabled plugin = zero observable effect**.
+
 ## Minimal Rust example
 
 All bundled plugins are Rust crates under `plugins/`. The simplest possible

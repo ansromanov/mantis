@@ -367,6 +367,7 @@ fn create_base_app() -> App {
         plugin_manager: PluginManager::new(Vec::new()),
         plugin_is_opening_file: false,
         plugin_message: None,
+        plugin_contributions: HashMap::new(),
         plugin_blame: HashMap::new(),
         plugin_git_info: None,
         plugin_content: HashMap::new(),
@@ -595,6 +596,320 @@ fn set_fold_regions_ignored_without_registered_provider() {
         app.fold_regions.is_empty(),
         "unregistered provider must not affect fold_regions"
     );
+}
+
+// -- plugin contribution tracking tests ---------------------------------------
+
+#[test]
+fn set_content_stamps_contribution() {
+    let mut app = create_base_app();
+    let path = std::path::PathBuf::from("/tmp/doc.md");
+    app.drain_plugin_actions_for_test(
+        "md-plugin",
+        "set_content",
+        serde_json::json!({"path": "/tmp/doc.md", "lines": ["hello"]}),
+    );
+    let contrib = app.plugin_contributions.get("md-plugin").unwrap();
+    assert!(
+        contrib.content_paths.contains(&path),
+        "content_paths must track the path"
+    );
+}
+
+#[test]
+fn set_blame_data_stamps_contribution() {
+    let mut app = create_base_app();
+    app.drain_plugin_actions_for_test(
+        "blame-plugin",
+        "set_blame_data",
+        serde_json::json!({"path": "/tmp/doc.md", "lines": ["author A"]}),
+    );
+    let contrib = app.plugin_contributions.get("blame-plugin").unwrap();
+    assert!(
+        contrib
+            .blame_paths
+            .contains(&std::path::PathBuf::from("/tmp/doc.md")),
+        "blame_paths must track the path"
+    );
+}
+
+#[test]
+fn set_icon_map_stamps_contribution() {
+    let mut app = create_base_app();
+    app.drain_plugin_actions_for_test(
+        "iconize",
+        "set_icon_map",
+        serde_json::json!({"icons": {"rs": "\u{e7a8}"}, "dir_open": "", "dir_closed": "", "fallback": ""}),
+    );
+    let contrib = app.plugin_contributions.get("iconize").unwrap();
+    assert!(contrib.has_icon_map, "has_icon_map must be true");
+}
+
+#[test]
+fn set_status_bar_git_info_stamps_contribution() {
+    let mut app = create_base_app();
+    app.drain_plugin_actions_for_test(
+        "git-plugin",
+        "set_status_bar_git_info",
+        serde_json::json!({"branch": "main", "head": "abc123", "dirty": false, "state": "clean"}),
+    );
+    let contrib = app.plugin_contributions.get("git-plugin").unwrap();
+    assert!(contrib.has_git_info, "has_git_info must be true");
+}
+
+#[test]
+fn set_file_statuses_stamps_contribution() {
+    let mut app = create_base_app();
+    app.drain_plugin_actions_for_test(
+        "status-plugin",
+        "set_file_statuses",
+        serde_json::json!({"/tmp/file.txt": "modified", "/tmp/new.txt": "added"}),
+    );
+    let contrib = app.plugin_contributions.get("status-plugin").unwrap();
+    assert!(contrib
+        .status_paths
+        .contains(&std::path::PathBuf::from("/tmp/file.txt")));
+    assert!(contrib
+        .status_paths
+        .contains(&std::path::PathBuf::from("/tmp/new.txt")));
+}
+
+#[test]
+fn set_fold_regions_stamps_contribution() {
+    let mut app = create_base_app();
+    app.drain_plugin_actions_for_test(
+        "lang-plugin",
+        "register_language_provider",
+        serde_json::json!({"extensions": ["py"], "capabilities": ["fold"]}),
+    );
+    app.drain_plugin_actions_for_test(
+        "lang-plugin",
+        "set_fold_regions",
+        serde_json::json!({"path": "/tmp/doc.py", "regions": [[0, 2]]}),
+    );
+    let contrib = app.plugin_contributions.get("lang-plugin").unwrap();
+    assert!(
+        contrib
+            .fold_region_paths
+            .contains(&std::path::PathBuf::from("/tmp/doc.py")),
+        "fold_region_paths must track the path"
+    );
+}
+
+// -- teardown_plugin_contributions tests ---------------------------------------
+
+#[test]
+fn teardown_clears_content_state() {
+    let mut app = create_base_app();
+    let path = std::path::PathBuf::from("/tmp/doc.md");
+    app.current_file = Some(path.clone());
+    app.drain_plugin_actions_for_test(
+        "md-plugin",
+        "set_content",
+        serde_json::json!({"path": "/tmp/doc.md", "lines": ["hello", "world"]}),
+    );
+    assert!(
+        app.plugin_content_active,
+        "content must be active for current file"
+    );
+    assert!(app.plugin_content.contains_key(&path));
+
+    app.teardown_plugin_contributions("md-plugin");
+
+    assert!(
+        !app.plugin_content.contains_key(&path),
+        "content must be removed"
+    );
+    assert!(
+        !app.plugin_content_text.contains_key(&path),
+        "text must be removed"
+    );
+    assert!(!app.plugin_content_active, "content active must be cleared");
+    assert!(
+        app.plugin_contributions.is_empty(),
+        "contributions entry must be removed"
+    );
+}
+
+#[test]
+fn teardown_clears_blame_state() {
+    let mut app = create_base_app();
+    let path = std::path::PathBuf::from("/tmp/doc.md");
+    app.drain_plugin_actions_for_test(
+        "blame-plugin",
+        "set_blame_data",
+        serde_json::json!({"path": "/tmp/doc.md", "lines": ["author A"]}),
+    );
+    assert!(app.plugin_blame.contains_key(&path));
+
+    app.teardown_plugin_contributions("blame-plugin");
+
+    assert!(
+        !app.plugin_blame.contains_key(&path),
+        "blame must be removed"
+    );
+}
+
+#[test]
+fn teardown_clears_icon_state() {
+    let mut app = App {
+        icons_enabled: true,
+        icon_map: {
+            let mut m = std::collections::HashMap::new();
+            m.insert("rs".to_string(), "\u{e7a8}".to_string());
+            m
+        },
+        icon_dir_open: "\u{f07c}".to_string(),
+        icon_dir_closed: "\u{f07b}".to_string(),
+        icon_fallback: "\u{f15b}".to_string(),
+        plugin_contributions: {
+            let mut m = std::collections::HashMap::new();
+            m.insert(
+                "iconize".to_string(),
+                crate::plugin::PluginContributions {
+                    has_icon_map: true,
+                    ..Default::default()
+                },
+            );
+            m
+        },
+        ..create_base_app()
+    };
+
+    app.teardown_plugin_contributions("iconize");
+
+    assert!(!app.icons_enabled, "icons_enabled must be cleared");
+    assert!(app.icon_map.is_empty(), "icon_map must be cleared");
+    assert!(app.icon_dir_open.is_empty());
+    assert!(app.icon_dir_closed.is_empty());
+    assert!(app.icon_fallback.is_empty());
+}
+
+#[test]
+fn teardown_clears_git_info() {
+    let mut app = App {
+        plugin_git_info: Some(crate::app::PluginGitInfo {
+            branch: "main".into(),
+            head: "abc".into(),
+            dirty: false,
+            state: "clean".into(),
+        }),
+        plugin_contributions: {
+            let mut m = std::collections::HashMap::new();
+            m.insert(
+                "git-plugin".to_string(),
+                crate::plugin::PluginContributions {
+                    has_git_info: true,
+                    ..Default::default()
+                },
+            );
+            m
+        },
+        ..create_base_app()
+    };
+
+    app.teardown_plugin_contributions("git-plugin");
+
+    assert!(app.plugin_git_info.is_none(), "git info must be cleared");
+}
+
+#[test]
+fn teardown_clears_status_paths() {
+    let mut app = create_base_app();
+    let path = std::path::PathBuf::from("/tmp/file.txt");
+    app.git_status_map
+        .insert(path.clone(), crate::git::GitStatus::Modified);
+    app.plugin_contributions.insert(
+        "status-plugin".to_string(),
+        crate::plugin::PluginContributions {
+            status_paths: {
+                let mut s = std::collections::HashSet::new();
+                s.insert(path.clone());
+                s
+            },
+            ..Default::default()
+        },
+    );
+
+    app.teardown_plugin_contributions("status-plugin");
+
+    assert!(
+        !app.git_status_map.contains_key(&path),
+        "status entry must be removed"
+    );
+}
+
+#[test]
+fn teardown_clears_fold_regions() {
+    let mut app = create_base_app();
+    let path = std::path::PathBuf::from("/tmp/doc.py");
+    app.current_file = Some(path.clone());
+    app.plugin_fold_regions.insert(
+        path.clone(),
+        vec![crate::fold::FoldRegion { start: 0, end: 2 }],
+    );
+    app.fold_regions = vec![crate::fold::FoldRegion { start: 0, end: 2 }];
+    app.plugin_contributions.insert(
+        "lang-plugin".to_string(),
+        crate::plugin::PluginContributions {
+            fold_region_paths: {
+                let mut s = std::collections::HashSet::new();
+                s.insert(path.clone());
+                s
+            },
+            ..Default::default()
+        },
+    );
+
+    app.teardown_plugin_contributions("lang-plugin");
+
+    assert!(
+        !app.plugin_fold_regions.contains_key(&path),
+        "fold regions must be removed"
+    );
+    assert!(
+        app.fold_regions.is_empty(),
+        "active fold state must be cleared"
+    );
+}
+
+#[test]
+fn teardown_removes_provider_registrations() {
+    let mut app = create_base_app();
+    app.drain_plugin_actions_for_test(
+        "lang-plugin",
+        "register_language_provider",
+        serde_json::json!({"extensions": ["py"], "capabilities": ["fold"]}),
+    );
+    // Also stamp the contribution so teardown finds something.
+    app.drain_plugin_actions_for_test(
+        "lang-plugin",
+        "set_fold_regions",
+        serde_json::json!({"path": "/tmp/doc.py", "regions": [[0, 2]]}),
+    );
+    assert!(
+        app.plugin_manager
+            .provider_for("py", &crate::plugin::Capability::Fold)
+            .is_some(),
+        "provider must be registered before teardown"
+    );
+
+    app.teardown_plugin_contributions("lang-plugin");
+
+    assert!(
+        app.plugin_manager
+            .provider_for("py", &crate::plugin::Capability::Fold)
+            .is_none(),
+        "provider registration must be removed"
+    );
+}
+
+#[test]
+fn teardown_noop_for_unknown_plugin() {
+    let mut app = create_base_app();
+    app.plugin_contributions.clear();
+    // Must not panic.
+    app.teardown_plugin_contributions("nonexistent");
 }
 
 /// Extension trait to drive the production `handle_plugin_action` with a
