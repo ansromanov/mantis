@@ -175,6 +175,13 @@ impl App {
         for (name, action, params) in self.plugin_manager.take_actions() {
             self.handle_plugin_action(&name, &action, &params);
         }
+        // Tear down contributions of any plugins that exited or crashed.
+        for name in self.plugin_manager.take_dead_plugins() {
+            self.plugin_message = Some(format!(
+                "Plugin '{name}' exited unexpectedly; tearing down its state."
+            ));
+            self.teardown_plugin_contributions(&name);
+        }
     }
 
     /// Handles a single plugin action. Extracted from the drain loop so tests
@@ -211,8 +218,13 @@ impl App {
                             "ignored" => crate::git::GitStatus::Ignored,
                             _ => continue,
                         };
-                        self.git_status_map
-                            .insert(std::path::PathBuf::from(path_str), git_status);
+                        let path = std::path::PathBuf::from(path_str);
+                        self.git_status_map.insert(path.clone(), git_status);
+                        self.plugin_contributions
+                            .entry(name.to_string())
+                            .or_default()
+                            .status_paths
+                            .insert(path);
                     }
                 }
             }
@@ -228,7 +240,12 @@ impl App {
                         .collect(),
                     None => return,
                 };
-                self.plugin_blame.insert(path, lines);
+                self.plugin_blame.insert(path.clone(), lines);
+                self.plugin_contributions
+                    .entry(name.to_string())
+                    .or_default()
+                    .blame_paths
+                    .insert(path);
             }
             "set_icon_map" => {
                 if let Some(obj) = params.as_object() {
@@ -250,6 +267,10 @@ impl App {
                     if let Some(fallback) = obj.get("fallback").and_then(|v| v.as_str()) {
                         self.icon_fallback = fallback.to_string();
                     }
+                    self.plugin_contributions
+                        .entry(name.to_string())
+                        .or_default()
+                        .has_icon_map = true;
                 }
             }
             "set_status_bar_git_info" => {
@@ -278,6 +299,10 @@ impl App {
                     dirty,
                     state,
                 });
+                self.plugin_contributions
+                    .entry(name.to_string())
+                    .or_default()
+                    .has_git_info = true;
             }
             "set_content" => {
                 let lines: Vec<String> = match params.get("lines").and_then(|v| v.as_array()) {
@@ -304,7 +329,12 @@ impl App {
                 // must not yank the viewport of the file the user is reading.
                 let is_current = self.current_file.as_deref() == Some(path.as_path());
                 self.plugin_content_text.insert(path.clone(), text);
-                self.plugin_content.insert(path, rendered);
+                self.plugin_content.insert(path.clone(), rendered);
+                self.plugin_contributions
+                    .entry(name.to_string())
+                    .or_default()
+                    .content_paths
+                    .insert(path);
                 if is_current {
                     self.content_scroll = 0;
                     self.content_hscroll = 0;
@@ -370,6 +400,11 @@ impl App {
                     })
                     .unwrap_or_default();
                 self.plugin_fold_regions.insert(path.clone(), regions);
+                self.plugin_contributions
+                    .entry(name.to_string())
+                    .or_default()
+                    .fold_region_paths
+                    .insert(path.clone());
                 if self.current_file.as_deref() == Some(&path) {
                     self.apply_plugin_fold_regions(&path);
                 }

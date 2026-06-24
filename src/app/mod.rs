@@ -29,7 +29,7 @@ use crate::config::{self, Config, Keymap};
 use crate::fold::FoldRegion;
 use crate::git::GitStatus;
 use crate::highlight::Highlighter;
-use crate::plugin::{self, ExtraSyntax, PluginManager};
+use crate::plugin::{self, ExtraSyntax, PluginContributions, PluginManager};
 use crate::search::{
     CommandPalette, GotoLineState, HistoryState, InFileSearch, PluginPicker, RecentFilesState,
     SearchState, ThemePicker, TreeFilter,
@@ -314,6 +314,11 @@ pub struct App {
     plugin_is_opening_file: bool,
     /// Most recent plugin message, shown in the status bar.
     pub plugin_message: Option<String>,
+    /// Tracks what application state each plugin has contributed so that
+    /// disabling or crashing the plugin tears down exactly its output.
+    /// Populated by `handle_plugin_action` and consumed by
+    /// `teardown_plugin_contributions`.
+    pub(crate) plugin_contributions: HashMap<String, PluginContributions>,
     /// Per-file blame annotations provided by a plugin, keyed by absolute path.
     /// Each entry is a Vec of formatted blame strings (one per line, 0-indexed).
     /// Checked before the live `git::file_blame()` call in the content pane.
@@ -378,6 +383,73 @@ impl App {
         self.session_last_save = self.now();
     }
 
+    /// Tears down all application state produced by the named plugin.
+    ///
+    /// Removes content, blame, file-status, fold-region, git-info, and icon-map
+    /// contributions, clears the plugin's provider registrations, and reloads
+    /// the current file if the plugin had rendered content for it — so the
+    /// display falls back to core rendering (markdown, JSON, or plain text).
+    pub(crate) fn teardown_plugin_contributions(&mut self, name: &str) {
+        let Some(contrib) = self.plugin_contributions.remove(name) else {
+            return;
+        };
+
+        // Content — clear plugin-rendered lines for contributed paths.
+        for path in &contrib.content_paths {
+            self.plugin_content.remove(path);
+            self.plugin_content_text.remove(path);
+        }
+        let had_current_content = contrib
+            .content_paths
+            .iter()
+            .any(|p| self.current_file.as_deref() == Some(p));
+
+        // Blame data.
+        for path in &contrib.blame_paths {
+            self.plugin_blame.remove(path);
+        }
+
+        // File statuses — remove only the paths this plugin contributed.
+        for path in &contrib.status_paths {
+            self.git_status_map.remove(path);
+        }
+
+        // Fold regions.
+        for path in &contrib.fold_region_paths {
+            self.plugin_fold_regions.remove(path);
+        }
+        if contrib
+            .fold_region_paths
+            .iter()
+            .any(|p| self.current_file.as_deref() == Some(p))
+        {
+            self.clear_fold_state();
+        }
+
+        // Git info (status bar override).
+        if contrib.has_git_info {
+            self.plugin_git_info = None;
+        }
+
+        // Icon map (Nerd Font glyphs).
+        if contrib.has_icon_map {
+            self.icons_enabled = false;
+            self.icon_map.clear();
+            self.icon_dir_open.clear();
+            self.icon_dir_closed.clear();
+            self.icon_fallback.clear();
+        }
+
+        // Provider registrations (language / fold / etc.).
+        self.plugin_manager.remove_provider_registrations(name);
+
+        // Re-render the current file without plugin content.
+        if had_current_content {
+            self.plugin_content_active = false;
+            self.reload_content();
+        }
+    }
+
     /// Toggles the currently highlighted plugin in the picker: spawns it if
     /// stopped, kills it if running, or flips the enabled flag for syntax
     /// plugins and reloads syntax definitions so the change takes effect
@@ -411,15 +483,10 @@ impl App {
                 entry.enabled = false;
             }
             self.save_config();
-            // Clear icon state only when the icon-providing plugin is disabled,
-            // so disabling an unrelated running plugin leaves icons intact.
-            if name == "iconize" && !self.icon_map.is_empty() {
-                self.icons_enabled = false;
-                self.icon_map.clear();
-                self.icon_dir_open.clear();
-                self.icon_dir_closed.clear();
-                self.icon_fallback.clear();
-            }
+            // Tear down all state this plugin produced, then re-render the
+            // current file without plugin content. This replaces the former
+            // per-plugin-name special case (e.g. `if name == "iconize"`).
+            self.teardown_plugin_contributions(&name);
         } else {
             // Ensure the plugin file is present on disk before spawning.
             plugin::install_bundled_plugins();

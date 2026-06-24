@@ -25,7 +25,9 @@ fn plugin_new_empty_events_subscribes_to_all() {
 #[test]
 fn drain_actions_returns_empty_when_no_reader() {
     let mut p = Plugin::new("no-reader".into(), vec![]);
-    assert!(p.drain_actions().is_empty());
+    let (actions, is_dead) = p.drain_actions();
+    assert!(actions.is_empty());
+    assert!(is_dead, "no reader channel means the plugin is dead");
 }
 
 #[test]

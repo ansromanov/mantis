@@ -249,3 +249,41 @@ fn register_provider_overwrites_same_plugin() {
         "old extension must be gone after re-registration"
     );
 }
+
+#[test]
+fn take_dead_plugins_empty_by_default() {
+    let mut mgr = PluginManager::new(vec![]);
+    assert!(
+        mgr.take_dead_plugins().is_empty(),
+        "no plugins have died on a fresh manager"
+    );
+}
+
+#[test]
+fn remove_provider_registrations_removes_only_named_plugin() {
+    let mut mgr = PluginManager::new(vec![]);
+    mgr.register_provider(make_reg("keep", &["rs"], &[Capability::Fold]));
+    mgr.register_provider(make_reg("drop", &["py"], &[Capability::Fold]));
+
+    mgr.remove_provider_registrations("drop");
+
+    assert!(
+        mgr.provider_for("rs", &Capability::Fold).is_some(),
+        "untouched plugin's registration must remain"
+    );
+    assert!(
+        mgr.provider_for("py", &Capability::Fold).is_none(),
+        "removed plugin's registration must be gone"
+    );
+}
+
+#[test]
+fn remove_provider_registrations_unknown_name_is_noop() {
+    let mut mgr = PluginManager::new(vec![]);
+    mgr.register_provider(make_reg("keep", &["rs"], &[Capability::Fold]));
+    mgr.remove_provider_registrations("never-registered");
+    assert!(
+        mgr.provider_for("rs", &Capability::Fold).is_some(),
+        "removing an unknown plugin must not drop other registrations"
+    );
+}

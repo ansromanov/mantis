@@ -326,6 +326,7 @@ impl App {
         self.plugin_content_text.clear();
         self.plugin_blame.clear();
         self.plugin_git_info = None;
+        self.plugin_contributions.clear();
         self.load_seq = self.load_seq.wrapping_add(1);
         #[cfg(feature = "git-core")]
         if self.git_status_enabled {

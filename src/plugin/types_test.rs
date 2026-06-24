@@ -60,6 +60,29 @@ fn language_provider_registration_holds_fields() {
 }
 
 #[test]
+fn plugin_contributions_default_is_empty() {
+    let c = PluginContributions::default();
+    assert!(c.content_paths.is_empty());
+    assert!(c.blame_paths.is_empty());
+    assert!(c.status_paths.is_empty());
+    assert!(c.fold_region_paths.is_empty());
+    assert!(!c.has_git_info);
+    assert!(!c.has_icon_map);
+}
+
+#[test]
+fn plugin_contributions_tracks_inserted_paths() {
+    let mut c = PluginContributions::default();
+    let p = std::path::PathBuf::from("/tmp/file.rs");
+    c.content_paths.insert(p.clone());
+    c.has_icon_map = true;
+    assert!(c.content_paths.contains(&p));
+    assert!(c.has_icon_map);
+    // Independent sets stay empty.
+    assert!(c.blame_paths.is_empty());
+}
+
+#[test]
 fn to_plugin_init_serializes_protocol_version() {
     let msg = ToPlugin {
         event: "init".into(),

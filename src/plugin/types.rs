@@ -4,6 +4,7 @@
 //! config entries, language provider registrations, and the JSON-line protocol
 //! messages exchanged between `tv` and plugin subprocesses.
 
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -125,4 +126,29 @@ pub(crate) struct FromPlugin {
     pub(crate) action: Option<String>,
     #[serde(default)]
     pub(crate) params: serde_json::Value,
+}
+
+/// Tracks what application state a plugin has contributed so that disabling
+/// or crashing the plugin tears down exactly its output without affecting
+/// other plugins' state. One entry per running plugin.
+///
+/// Every `set_*` action handler in `App::handle_plugin_action` must stamp
+/// the originating plugin's contribution here. The teardown method
+/// (`App::teardown_plugin_contributions`) reads this map to know which
+/// fields to clear, replacing the former per-plugin-name special cases
+/// (e.g. the old `if name == "iconize"` branch).
+#[derive(Clone, Debug, Default)]
+pub(crate) struct PluginContributions {
+    /// Paths in `plugin_content` / `plugin_content_text` rendered by this plugin.
+    pub(crate) content_paths: HashSet<PathBuf>,
+    /// Paths in `plugin_blame` provided by this plugin.
+    pub(crate) blame_paths: HashSet<PathBuf>,
+    /// Paths this plugin contributed to `git_status_map` via `set_file_statuses`.
+    pub(crate) status_paths: HashSet<PathBuf>,
+    /// Paths in `plugin_fold_regions` registered by this plugin.
+    pub(crate) fold_region_paths: HashSet<PathBuf>,
+    /// Whether this plugin set `plugin_git_info` via `set_status_bar_git_info`.
+    pub(crate) has_git_info: bool,
+    /// Whether this plugin set the icon map / icon fields via `set_icon_map`.
+    pub(crate) has_icon_map: bool,
 }

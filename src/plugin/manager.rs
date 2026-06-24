@@ -18,6 +18,7 @@ pub(crate) struct PluginManager {
     entries: Vec<(String, PluginEntry)>,
     plugins: Vec<Plugin>,
     pending_actions: Vec<(String, String, serde_json::Value)>,
+    dead_plugins: Vec<String>,
     spawn_errors: Vec<String>,
     active_theme: Option<String>,
     provider_registrations: Vec<LanguageProviderRegistration>,
@@ -29,6 +30,7 @@ impl PluginManager {
             entries,
             plugins: Vec::new(),
             pending_actions: Vec::new(),
+            dead_plugins: Vec::new(),
             spawn_errors: Vec::new(),
             active_theme: None,
             provider_registrations: Vec::new(),
@@ -195,13 +197,37 @@ impl PluginManager {
 
     /// Non-blockingly drains pending actions from every plugin's reader channel
     /// into an internal buffer. Call `take_actions` to collect them.
+    ///
+    /// Plugins whose reader channel has disconnected (process exited / crashed)
+    /// are removed from `self.plugins` and their names are added to
+    /// `dead_plugins` so the caller can tear down their contributions.
     pub(crate) fn drain_actions(&mut self) {
+        let mut dead = Vec::new();
         for plugin in &mut self.plugins {
-            for (action, params) in plugin.drain_actions() {
+            let (actions, is_dead) = plugin.drain_actions();
+            if is_dead {
+                dead.push(plugin.name.clone());
+            }
+            for (action, params) in actions {
                 self.pending_actions
                     .push((plugin.name.clone(), action, params));
             }
         }
+        // Remove dead plugins and track their names.
+        self.plugins.retain(|p| !dead.contains(&p.name));
+        self.dead_plugins.extend(dead);
+    }
+
+    /// Returns the names of plugins detected as dead since the last call.
+    /// Dead means the reader channel disconnected (process exited or crashed).
+    pub(crate) fn take_dead_plugins(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.dead_plugins)
+    }
+
+    /// Removes all provider registrations owned by the named plugin.
+    pub(crate) fn remove_provider_registrations(&mut self, name: &str) {
+        self.provider_registrations
+            .retain(|r| r.plugin_name != name);
     }
 
     /// Consumes and returns all buffered plugin actions since the last call.

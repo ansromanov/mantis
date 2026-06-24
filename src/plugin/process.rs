@@ -135,15 +135,26 @@ impl Plugin {
         let _ = write_tx.try_send(json);
     }
 
-    pub(crate) fn drain_actions(&mut self) -> Vec<(String, serde_json::Value)> {
+    /// Drains buffered actions from the reader channel.
+    ///
+    /// Returns `(actions, is_dead)`. `is_dead` is `true` when the reader
+    /// channel has been disconnected (the plugin process exited or its
+    /// stdout closed), signalling the caller to tear down the plugin.
+    pub(crate) fn drain_actions(&mut self) -> (Vec<(String, serde_json::Value)>, bool) {
         let mut actions = Vec::new();
         let Some(ref rx) = self.action_rx else {
-            return actions;
+            return (actions, true);
         };
-        while let Ok((action, params)) = rx.try_recv() {
-            actions.push((action, params));
+        loop {
+            match rx.try_recv() {
+                Ok((action, params)) => actions.push((action, params)),
+                Err(std::sync::mpsc::TryRecvError::Empty) => break,
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    return (actions, true);
+                }
+            }
         }
-        actions
+        (actions, false)
     }
 
     /// Drops the write channel (so the writer thread flushes and exits), then

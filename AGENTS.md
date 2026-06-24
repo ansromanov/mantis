@@ -123,6 +123,10 @@ once they get large: a thin `mod.rs` re-exports focused submodules.
 10. **Plugin IPC.** Plugins are external processes communicating over stdin/stdout
     JSON lines (`plugin/mod.rs`). `PluginManager` spawns, kills, and routes actions;
     the content pane can be taken over by plugin-provided ANSI text (`ansi.rs`).
+    State teardown is structural: every `set_*` action stamps its originating plugin
+    in `plugin_contributions`, and on disable/crash the host clears exactly that
+    plugin's output. **Adding a new `set_*` action requires recording it in
+    `PluginContributions` and handling teardown in `teardown_plugin_contributions`.**
 
 ---
 
@@ -135,6 +139,8 @@ Quick lookup: type/function → file. Use this before grepping.
 | `App` | `src/app/mod.rs:74` | Central state struct |
 | `Focus` | `src/app/mod.rs:51` | `Tree` / `Content` enum |
 | `PluginGitInfo` | `src/app/mod.rs:60` | Plugin-supplied git status |
+| `PluginContributions` | `src/plugin/types.rs` | Plugin contribution tracking for teardown |
+| `App::teardown_plugin_contributions` | `src/app/mod.rs` | Clears all state produced by a plugin |
 | `App::tick` | `src/app/refresh.rs` | Per-frame update |
 | `App::handle_key` | `src/app/key_handlers/mod.rs` | Top-level key dispatch |
 | `App::handle_mouse` | `src/app/mouse_handlers.rs` | Mouse event dispatch |
