@@ -407,6 +407,20 @@ impl App {
         }
     }
 
+    /// Changes the viewer root to the currently selected node if it is a
+    /// directory. Called when the user double-clicks a directory in the tree
+    /// to descend into it as if `tv` were launched there.
+    pub(super) fn descend_to_selected(&mut self) {
+        let path = self
+            .nodes
+            .get(self.tree_selected)
+            .filter(|n| n.is_dir)
+            .map(|n| n.path.clone());
+        if let Some(p) = path {
+            self.set_root(&p);
+        }
+    }
+
     /// Opens the currently selected search result and closes the overlay.
     /// Shared by the Enter key and a mouse click in the results list.
     pub(super) fn activate_search_selection(&mut self) {

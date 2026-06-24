@@ -99,3 +99,36 @@ fn send_log_does_not_panic_on_nonexistent_file() {
     let mut buf = Vec::new();
     send_log("/nonexistent/path/file.txt", &mut buf);
 }
+
+#[test]
+fn handle_init_produces_no_output_outside_repo() {
+    let tmp = std::env::temp_dir().join("tv-handle-init-test-nonexistent-dir");
+    let mut buf = Vec::new();
+    handle_init(&tmp, &mut buf);
+    // No output expected because /tmp/... is not a git repo
+    let output = String::from_utf8(buf).unwrap();
+    assert!(output.is_empty(), "expected no output outside a git repo");
+}
+
+#[test]
+fn handle_init_produces_valid_repo_info_in_repo() {
+    // If the test itself runs inside the tv3 repo, handle_init should produce
+    // valid set_status_bar_git_info and set_file_statuses actions.
+    let cwd = std::env::current_dir().unwrap();
+    let mut buf = Vec::new();
+    handle_init(&cwd, &mut buf);
+    let output = String::from_utf8(buf).unwrap();
+    if output.is_empty() {
+        // Not in a git repo — nothing to assert; skip.
+        return;
+    }
+    for line in output.lines() {
+        let parsed: serde_json::Value = serde_json::from_str(line.trim()).unwrap();
+        assert_eq!(parsed["event"], "action");
+        let action = parsed["action"].as_str().unwrap();
+        assert!(
+            action == "set_status_bar_git_info" || action == "set_file_statuses",
+            "unexpected action: {action}"
+        );
+    }
+}

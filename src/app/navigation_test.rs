@@ -304,6 +304,45 @@ fn navigate_to_breadcrumb_outside_root_changes_root() {
 }
 
 #[test]
+fn descend_to_selected_changes_root_for_dir() {
+    let root = deep_tree();
+    let mut app = app_for(&root);
+
+    let sub1_idx = app
+        .nodes
+        .iter()
+        .position(|n| n.is_dir && n.path == root.join("sub1"))
+        .expect("sub1 dir should exist");
+    app.tree_selected = sub1_idx;
+
+    app.descend_to_selected();
+
+    assert_eq!(app.root, root.join("sub1"), "root should change to sub1");
+    assert!(app.expanded.is_empty(), "expanded should be cleared");
+    assert!(app.current_file.is_none(), "current file should be cleared");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn descend_to_selected_does_nothing_for_file() {
+    let root = deep_tree();
+    let mut app = app_for(&root);
+    let orig_root = root.clone();
+
+    let top_idx = app
+        .nodes
+        .iter()
+        .position(|n| !n.is_dir && n.path == root.join("top.txt"))
+        .expect("top.txt should exist");
+    app.tree_selected = top_idx;
+
+    app.descend_to_selected();
+
+    assert_eq!(app.root, orig_root, "root should not change for a file");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn navigate_to_breadcrumb_preserves_other_expansions() {
     let root = deep_tree();
     let mut app = app_for(&root);

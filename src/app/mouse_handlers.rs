@@ -89,7 +89,21 @@ impl App {
                         }
                     } else if index < self.nodes.len() {
                         self.tree_selected = index;
-                        self.activate_selected();
+                        let now = Instant::now();
+                        let is_dir = self.nodes[index].is_dir;
+                        let double = matches!(
+                            self.last_click,
+                            Some((t, i))
+                                if i == index
+                                    && now.duration_since(t) < Duration::from_millis(400)
+                        );
+                        if double && is_dir {
+                            self.last_click = None;
+                            self.descend_to_selected();
+                        } else {
+                            self.last_click = Some((now, index));
+                            self.activate_selected();
+                        }
                     }
                 } else if rect_contains(self.content_area, ev.column, ev.row) {
                     self.focus = Focus::Content;

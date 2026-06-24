@@ -81,14 +81,19 @@ Plugins receive lifecycle and hook events from `tv` and can respond with
 **actions**:
 
 | Action | Effect |
-|---|---|
+|---|---|---|
 | `show_message` | Displays a message in the status bar |
 | `open_file` | Opens a file in the content panel |
 | `set_content` | Replaces content panel with ANSI-escaped lines |
+| `set_file_statuses` | Provides per-path git status for tree coloring |
+| `set_blame_data` | Provides per-line blame annotations for the content pane |
+| `set_status_bar_git_info` | Provides branch/HEAD/dirty state for the status bar |
+| `set_icon_map` | Sets file-type icon glyphs (requires Nerd Font) |
+| `register_language_provider` | Declares file extensions and capabilities |
+| `set_fold_regions` | Provides fold regions for a file |
 
-The `show_message` action accepts a `message` parameter; `open_file` accepts a
-`path` parameter pointing to an existing file; `set_content` accepts a `lines`
-parameter — an array of strings that may contain ANSI escape codes.
+Each action has specific parameters; see [Plugin Development](plugin-development.md)
+for the full protocol reference.
 
 ## Lifecycle
 
@@ -151,15 +156,14 @@ iconize    = { path = "tv-plugin-iconize" }
 markdown   = { path = "tv-plugin-markdown" }
 ```
 
-> **Note:** The bundled plugins provide a simpler implementation than the
-> built-in core features:
-> - `git-plugin` uses git's ANSI colouring rather than tv's theme-aware
->   `diff_line_style` / side-by-side rendering.
-> - `git-plugin` shows the log as static content; it does not have the
->   interactive commit-selection popup that the built-in `H` key provides.
->
-> The core git diff and log code paths remain active as a fallback when the
-> plugins are not enabled.
+> **Note:** The plugin and native git code paths coexist:
+> - Plugin data (file statuses, blame, git info) takes precedence over native
+>   equivalents when the plugin is enabled.
+> - `git-plugin` uses git's ANSI colouring for diffs and logs rather than tv's
+>   theme-aware `diff_line_style` / side-by-side rendering.
+> - The interactive commit-selection popup (built-in `H` key) and side-by-side
+>   diff view remain native-only; the plugin shows log/diff as static ANSI
+>   content via `set_content`.
 >
 > **Key conflict:** `H` is also the default binding for the built-in
 > `file_history` picker. Enabling `git-plugin` without clearing that binding
