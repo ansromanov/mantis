@@ -367,8 +367,12 @@ impl App {
     }
 
     pub(crate) fn copy_path_to_clipboard(&mut self, relative: bool) {
-        let Some(path) = self.current_file.as_ref() else {
-            self.status_message = Some("no file selected".into());
+        let path = match self.focus {
+            Focus::Tree => self.nodes.get(self.tree_selected).map(|n| n.path.clone()),
+            Focus::Content => self.current_file.clone(),
+        };
+        let Some(path) = path else {
+            self.status_message = Some("nothing selected".into());
             return;
         };
         let text = if relative {
