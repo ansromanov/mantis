@@ -243,3 +243,24 @@ fn tree_end_then_home_keeps_selection_in_view() {
     assert_eq!(app.tree_scroll, 0);
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn backspace_in_tree_calls_tree_up_dir() {
+    let root = temp_tree();
+    let orig_root = root.clone();
+    let mut app = app_for(&root);
+    app.focus = Focus::Tree;
+    let file_idx = app
+        .nodes
+        .iter()
+        .position(|n| n.path == root.join("long.txt"))
+        .expect("long.txt");
+    app.tree_selected = file_idx;
+    let parent = root.parent().expect("root has parent").to_path_buf();
+    app.handle_key(key(KeyCode::Backspace));
+    assert_eq!(
+        app.root, parent,
+        "Backspace must call tree_up_dir and change root"
+    );
+    fs::remove_dir_all(&orig_root).ok();
+}

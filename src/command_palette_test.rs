@@ -95,3 +95,21 @@ fn go_to_line_command_is_searchable_by_name() {
     let cmd = p.selected_command().unwrap();
     assert_eq!(cmd.action_id, "go_to_line");
 }
+
+#[test]
+fn tree_up_dir_command_is_registered() {
+    assert!(
+        COMMANDS.iter().any(|c| c.action_id == "tree_up_dir"),
+        "tree_up_dir must be in COMMANDS"
+    );
+}
+
+#[test]
+fn tree_up_dir_command_is_searchable_by_name() {
+    let mut p = CommandPalette::default();
+    for c in "Go up one directory".chars() {
+        p.push(c);
+    }
+    let cmd = p.selected_command().unwrap();
+    assert_eq!(cmd.action_id, "tree_up_dir");
+}

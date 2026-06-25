@@ -45,3 +45,7 @@ mod tests;
 #[cfg(test)]
 #[path = "popups_plugin_test.rs"]
 mod plugin_tests;
+
+#[cfg(test)]
+#[path = "help_test.rs"]
+mod help_tests;
