@@ -393,10 +393,22 @@ fn compute_breadcrumb(app: &App) -> Vec<(String, PathBuf)> {
     segments
 }
 
+/// Represents a single item in the compact breadcrumb display.
+#[derive(Debug, Clone)]
+enum BreadcrumbItem {
+    /// Index into the original `segments` slice.
+    Real(usize),
+    /// The ".." marker standing in for collapsed ancestors.
+    /// The `PathBuf` is the target directory that clicking ".." navigates to
+    /// (the parent of the first kept real segment).
+    ParentUp(PathBuf),
+}
+
 /// Renders the breadcrumb path bar as a styled line of clickable segments with
-/// " / " separators. Truncates middle segments with "…" when the path is wider
-/// than the available area. Records each visible segment's `Rect` onto
-/// `app.breadcrumb_areas` for mouse hit-testing.
+/// " / " separators. Compacts deep paths by collapsing leading ancestors into
+/// a single ".." segment when the path is wider than the available area.
+/// Records each visible segment's `Rect` onto `app.breadcrumb_areas` for mouse
+/// hit-testing.
 fn render_breadcrumb(f: &mut Frame, app: &mut App, area: Rect, segments: &[(String, PathBuf)]) {
     let theme = &app.theme;
     let avail = area.width as usize;
@@ -412,11 +424,11 @@ fn render_breadcrumb(f: &mut Frame, app: &mut App, area: Rect, segments: &[(Stri
         .sum();
     let total_len = names_len + segments.len().saturating_sub(1) * sep_len;
 
-    // Pick which segment indices to show (indices into `segments`).
-    let show_indices: Vec<usize> = if total_len <= avail {
-        (0..segments.len()).collect()
+    // Pick which items to show (indices or compact markers).
+    let items: Vec<BreadcrumbItem> = if total_len <= avail {
+        (0..segments.len()).map(BreadcrumbItem::Real).collect()
     } else {
-        truncate_segments(segments, avail, sep_len)
+        compact_segments(segments, avail, sep_len)
     };
 
     let dim_style = Style::default().fg(theme.dim).bg(theme.breadcrumb_bg);
@@ -428,37 +440,44 @@ fn render_breadcrumb(f: &mut Frame, app: &mut App, area: Rect, segments: &[(Stri
     let mut spans: Vec<Span> = Vec::new();
     let mut col = area.x;
 
-    for (pos, &idx) in show_indices.iter().enumerate() {
-        if idx >= segments.len() {
-            // Out-of-bounds sentinel pushed by truncate_segments to mark the
-            // position of the "…" ellipsis between kept and dropped segments.
-            // "…" is a single terminal cell despite being 3 UTF-8 bytes.
-            spans.push(Span::styled("…", dim_style));
-            col += 1;
-            continue;
+    for (pos, item) in items.iter().enumerate() {
+        match item {
+            BreadcrumbItem::ParentUp(target) => {
+                // ".." marker: collapsed ancestors, shown first (no separator before).
+                // Style it dim to distinguish from real segments.
+                spans.push(Span::styled("..", dim_style));
+                let rect = Rect {
+                    x: col,
+                    y: area.y,
+                    width: 2,
+                    height: 1,
+                };
+                app.breadcrumb_areas.push((target.clone(), rect));
+                col += 2;
+            }
+            BreadcrumbItem::Real(idx) => {
+                // Separator before each real segment except the first visible item.
+                if pos > 0 {
+                    spans.push(Span::styled(sep, dim_style));
+                    col += sep_len as u16;
+                }
+
+                let is_last = pos == items.len() - 1;
+                let style = if is_last { last_style } else { fg_style };
+                let text = &segments[*idx].0;
+                spans.push(Span::styled(text.clone(), style));
+
+                let text_w = UnicodeWidthStr::width(text.as_str()) as u16;
+                let rect = Rect {
+                    x: col,
+                    y: area.y,
+                    width: text_w,
+                    height: 1,
+                };
+                app.breadcrumb_areas.push((segments[*idx].1.clone(), rect));
+                col += text_w;
+            }
         }
-
-        // Separator before each segment except the first.
-        if pos > 0 {
-            spans.push(Span::styled(sep, dim_style));
-            col += sep_len as u16;
-        }
-
-        let is_last = pos == show_indices.len() - 1;
-        let style = if is_last { last_style } else { fg_style };
-        let text = &segments[idx].0;
-        spans.push(Span::styled(text.clone(), style));
-
-        let text_w = UnicodeWidthStr::width(text.as_str()) as u16;
-        // Record clickable area for this segment.
-        let rect = Rect {
-            x: col,
-            y: area.y,
-            width: text_w,
-            height: 1,
-        };
-        app.breadcrumb_areas.push((segments[idx].1.clone(), rect));
-        col += text_w;
     }
 
     let line = Line::from(spans);
@@ -466,57 +485,61 @@ fn render_breadcrumb(f: &mut Frame, app: &mut App, area: Rect, segments: &[(Stri
     f.render_widget(para, area);
 }
 
-/// Picks which segment indices to display when the full breadcrumb exceeds
-/// available width. Always keeps the first and last segments; fills as many
-/// middle segments as fit, inserting a "…" marker for any that are dropped.
-fn truncate_segments(segments: &[(String, PathBuf)], avail: usize, sep_len: usize) -> Vec<usize> {
+/// Decides which breadcrumb items to display when the full path exceeds
+/// available width. Replaces the leading run of ancestor segments with a
+/// single ".." marker (whose click target is the parent of the first kept
+/// segment), showing as many trailing segments as fit. The current directory
+/// (last segment) is always visible.
+fn compact_segments(
+    segments: &[(String, PathBuf)],
+    avail: usize,
+    sep_len: usize,
+) -> Vec<BreadcrumbItem> {
     if segments.len() <= 2 {
-        // With only 2 segments (root + one dir), we can't usefully truncate.
-        return (0..segments.len()).collect();
+        return (0..segments.len()).map(BreadcrumbItem::Real).collect();
     }
 
-    // Start with first and last, then try to fit as many middle as possible.
-    let first = &segments[0];
-    let last = &segments[segments.len() - 1];
-    let mut used = UnicodeWidthStr::width(first.0.as_str())
-        + sep_len
-        + UnicodeWidthStr::width(last.0.as_str());
-    let mut mid_indices: Vec<usize> = Vec::new();
+    let seg_widths: Vec<usize> = segments
+        .iter()
+        .map(|(n, _)| UnicodeWidthStr::width(n.as_str()))
+        .collect();
 
-    // Count how many middle segments fit.
-    let mut dropped = false;
-    for (i, seg) in segments.iter().enumerate().skip(1).take(segments.len() - 2) {
-        let addition = sep_len + UnicodeWidthStr::width(seg.0.as_str());
-        // Reserve 1 cell for the "…" ellipsis that signals truncation.
-        if used + addition < avail {
-            mid_indices.push(i);
-            used += addition;
-        } else {
-            dropped = true;
-            break;
+    // Try keeping as many suffix segments as possible.
+    // `first_kept` is the index of the first segment we keep (non-compacted);
+    // smaller first_kept → more segments shown. We iterate forward so the
+    // first fit keeps the most segments.
+    for first_kept in 1..segments.len() {
+        let kept_count = segments.len() - first_kept;
+        let names: usize = seg_widths[first_kept..].iter().sum();
+        let seps = kept_count.saturating_sub(1) * sep_len;
+        let compact_prefix = 2 + sep_len;
+        let total = compact_prefix + names + seps;
+
+        if total <= avail {
+            let target = segments[first_kept]
+                .1
+                .parent()
+                .map(|p| p.to_path_buf())
+                .unwrap_or_else(|| segments[0].1.clone());
+            let mut result = Vec::new();
+            result.push(BreadcrumbItem::ParentUp(target));
+            for i in first_kept..segments.len() {
+                result.push(BreadcrumbItem::Real(i));
+            }
+            return result;
         }
     }
 
-    let mut result = Vec::new();
-    result.push(0);
-    if dropped && !mid_indices.is_empty() {
-        // If we dropped some but kept others, we need "…" to signal the gap.
-        // Remove the last kept middle segment if it doesn't fit with "…".
-        // Actually we already reserved 2 chars for the ellipsis above. The middle
-        // indices we kept already account for this.
-        result.extend(mid_indices);
-        // Out-of-bounds sentinel: the renderer treats idx >= segments.len()
-        // as an ellipsis placeholder.
-        result.push(segments.len());
-    } else if dropped && mid_indices.is_empty() {
-        // All middle segments dropped; just show first, "…", last.
-        result.push(segments.len());
-    } else {
-        result.extend(mid_indices);
-    }
-    result.push(segments.len() - 1);
-
-    result
+    // Fallback: only ".." + last segment fit (always at least 2).
+    let target = segments[segments.len() - 1]
+        .1
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| segments[0].1.clone());
+    vec![
+        BreadcrumbItem::ParentUp(target),
+        BreadcrumbItem::Real(segments.len() - 1),
+    ]
 }
 
 /// Returns the foreground color and modifier for a tree node based on its

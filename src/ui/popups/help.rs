@@ -84,6 +84,7 @@ pub(crate) fn draw_help(f: &mut Frame, app: &App, area: Rect) {
         Line::from(vec![key("  j/k / ↑↓   "), desc("move up / down")]),
         Line::from(vec![key("  Enter/l/→  "), desc("expand dir / open file")]),
         Line::from(vec![key("  h/←        "), desc("collapse dir")]),
+        Line::from(vec![key("  Backspace  "), desc("go up one directory")]),
         Line::from(vec![key("  -          "), desc("collapse all directories")]),
         Line::from(vec![key("  =          "), desc("expand all directories")]),
         Line::from(vec![key("  /          "), desc("fuzzy file search")]),

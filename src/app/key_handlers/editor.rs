@@ -144,6 +144,7 @@ impl App {
             Some("copy_relative_path") => self.copy_path_to_clipboard(true),
             Some("tree_collapse_all") => self.collapse_all(),
             Some("tree_expand_all") => self.expand_all(),
+            Some("tree_up_dir") => self.tree_up_dir(),
             Some("go_to_line") if self.focus == Focus::Content => {
                 self.goto_line = Some(GotoLineState::new());
             }

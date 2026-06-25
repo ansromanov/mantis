@@ -463,3 +463,97 @@ fn rebuild_scrolls_restored_selection_into_view() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn tree_up_dir_from_top_level_file_changes_root() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let orig_root = root.clone();
+    // Select a.txt (directly in root)
+    let file_idx = app
+        .nodes
+        .iter()
+        .position(|n| n.path == root.join("a.txt"))
+        .expect("a.txt node");
+    app.tree_selected = file_idx;
+    let parent = root.parent().expect("root has a parent").to_path_buf();
+    app.tree_up_dir();
+    // A file at root level: up goes to root's parent (changes root)
+    assert_eq!(
+        app.root, parent,
+        "tree_up_dir from top-level file should change root to parent, got {:?}",
+        app.root
+    );
+    fs::remove_dir_all(&orig_root).ok();
+}
+
+#[test]
+fn tree_up_dir_from_nested_dir_changes_root() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let orig_root = root.clone();
+    // "sub" is a dir directly in root → parent is root → change root
+    let sub_idx = app
+        .nodes
+        .iter()
+        .position(|n| n.path == root.join("sub"))
+        .expect("sub dir node");
+    app.tree_selected = sub_idx;
+    let parent = root.parent().expect("root has a parent").to_path_buf();
+    app.tree_up_dir();
+    // Sub's parent is root → set_root to root's parent
+    assert_eq!(
+        app.root, parent,
+        "tree_up_dir from sub should change root to parent"
+    );
+    fs::remove_dir_all(&orig_root).ok();
+}
+
+#[test]
+fn tree_up_dir_from_nested_selection_goes_to_ancestor_then_root() {
+    let root = deep_tree();
+    let mut app = app_for(&root);
+    let orig_root = root.clone();
+    // Expand sub1 → sub2 → sub3 so deepest.txt is visible
+    let sub1 = root.join("sub1");
+    let sub2 = sub1.join("sub2");
+    let sub3 = sub2.join("sub3");
+    app.expanded.insert(sub1.clone());
+    app.expanded.insert(sub2.clone());
+    app.expanded.insert(sub3.clone());
+    app.rebuild();
+    // Select deepest.txt at root/sub1/sub2/sub3/deepest.txt
+    let deep = sub3.join("deepest.txt");
+    let deep_idx = app
+        .nodes
+        .iter()
+        .position(|n| n.path == deep)
+        .expect("deepest.txt");
+    app.tree_selected = deep_idx;
+    // Go up: containing dir is sub3 → parent is sub2 → select sub2
+    app.tree_up_dir();
+    assert!(
+        app.nodes
+            .get(app.tree_selected)
+            .is_some_and(|n| n.path == sub2),
+        "first up: should select sub2, got {:?}",
+        app.nodes.get(app.tree_selected).map(|n| &n.path)
+    );
+    // Go up: containing dir is sub2 → parent is sub1 → select sub1
+    app.tree_up_dir();
+    assert!(
+        app.nodes
+            .get(app.tree_selected)
+            .is_some_and(|n| n.path == sub1),
+        "second up: should select sub1, got {:?}",
+        app.nodes.get(app.tree_selected).map(|n| &n.path)
+    );
+    // Go up: containing dir is sub1 → parent is root → change root to root's parent
+    let parent = root.parent().expect("root has a parent").to_path_buf();
+    app.tree_up_dir();
+    assert_eq!(
+        app.root, parent,
+        "third up: should change root to root's parent"
+    );
+    fs::remove_dir_all(&orig_root).ok();
+}

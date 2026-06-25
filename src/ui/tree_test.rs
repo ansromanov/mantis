@@ -347,11 +347,15 @@ fn breadcrumb_areas_match_rendered_columns() {
     assert_eq!(src_rect.x, root_rect.x + root_rect.width + 3);
 }
 
+fn breadcrumb_text_for(app: &mut App, width: u16) -> String {
+    let rows = render_tree(app, width, 6);
+    rows[1].trim().to_string()
+}
+
 #[test]
 fn render_breadcrumb_truncation_does_not_panic() {
-    // Regression: truncate_segments used segments.len() as an out-of-bounds
-    // sentinel; render_breadcrumb previously would panic when accessing
-    // segments[idx] for that sentinel value.
+    // Regression: old truncate_segments used segments.len() as an out-of-bounds
+    // sentinel; compact_segments must never produce that.
     let mut app = make_app(false, HashMap::new());
     app.root = PathBuf::from("/r");
     app.nodes = vec![TreeNode {
@@ -362,13 +366,123 @@ fn render_breadcrumb_truncation_does_not_panic() {
         deleted: false,
     }];
     app.tree_selected = 0;
-    // Width 20 → inner 18; breadcrumb "r / a / b / c / d / e" = 21 chars,
-    // triggering truncation and the ellipsis sentinel code path.
     render_tree(&mut app, 20, 6);
-    // Breadcrumb areas must contain only real segments — never the sentinel.
+    // Breadcrumb areas must contain only real segments — never a sentinel.
     for (path, _rect) in &app.breadcrumb_areas {
         assert!(!path.as_os_str().is_empty());
     }
+}
+
+#[test]
+fn compact_breadcrumb_collapses_ancestors_to_dotdot() {
+    let mut app = make_app(false, HashMap::new());
+    app.root = PathBuf::from("/root");
+    app.nodes = vec![TreeNode {
+        path: PathBuf::from("/root/a/b/c/d/e"),
+        name: "e".to_string(),
+        depth: 5,
+        is_dir: true,
+        deleted: false,
+    }];
+    app.tree_selected = 0;
+    // Narrow width forces compact mode: leading segments become "..".
+    let text = breadcrumb_text_for(&mut app, 29);
+    assert!(
+        text.contains(".."),
+        "compact breadcrumb should contain '..', got: {text:?}"
+    );
+    assert!(
+        text.contains('e'),
+        "current dir 'e' must be visible, got: {text:?}"
+    );
+    // In compact mode the first breadcrumb_area is the ".." click target —
+    // it must be a proper ancestor of the leaf path, not the leaf itself.
+    let leaf = PathBuf::from("/root/a/b/c/d/e");
+    assert!(
+        app.breadcrumb_areas
+            .first()
+            .is_some_and(|(p, _)| leaf.starts_with(p) && *p != leaf),
+        ".. target must be a proper ancestor of the leaf path, got: {:?}",
+        app.breadcrumb_areas.first().map(|(p, _)| p)
+    );
+}
+
+#[test]
+fn compact_breadcrumb_keeps_current_dir_always() {
+    let mut app = make_app(false, HashMap::new());
+    app.root = PathBuf::from("/verylongrootname");
+    app.nodes = vec![TreeNode {
+        path: PathBuf::from("/verylongrootname/a/deeply/nested"),
+        name: "nested".to_string(),
+        depth: 3,
+        is_dir: true,
+        deleted: false,
+    }];
+    app.tree_selected = 0;
+    // Very narrow width — only ".. / nested" should fit.
+    let text = breadcrumb_text_for(&mut app, 16);
+    assert!(
+        text.contains("nested"),
+        "current dir must always be visible, got: {text:?}"
+    );
+}
+
+#[test]
+fn compact_breadcrumb_dotdot_target_is_parent_of_first_kept() {
+    let mut app = make_app(false, HashMap::new());
+    app.root = PathBuf::from("/r");
+    app.nodes = vec![TreeNode {
+        path: PathBuf::from("/r/a/b/c"),
+        name: "c".to_string(),
+        depth: 3,
+        is_dir: true,
+        deleted: false,
+    }];
+    app.tree_selected = 0;
+    // Use enough width to show ".. / b / c".
+    let text = breadcrumb_text_for(&mut app, 14);
+    assert!(text.contains(".."), "should have .. marker: {text:?}");
+    assert!(text.contains("b"), "parent b should be visible: {text:?}");
+    assert!(text.contains("c"), "current c should be visible: {text:?}");
+    // With 7 segments and width 14 (inner=12), forward iteration picks
+    // first_kept=3, keeping "b" and "c". The ".." target is the parent of
+    // the first kept segment "b", i.e. /r/a.
+    let dotdot_target =
+        app.breadcrumb_areas.iter().find_map(
+            |(p, r)| {
+                if r.width == 2 {
+                    Some(p.clone())
+                } else {
+                    None
+                }
+            },
+        );
+    assert_eq!(
+        dotdot_target,
+        Some(PathBuf::from("/r/a")),
+        ".. should navigate to parent of first kept segment"
+    );
+}
+
+#[test]
+fn compact_breadcrumb_fits_all_when_wide_enough() {
+    let mut app = make_app(false, HashMap::new());
+    app.root = PathBuf::from("/r");
+    app.nodes = vec![TreeNode {
+        path: PathBuf::from("/r/a/b"),
+        name: "b".to_string(),
+        depth: 2,
+        is_dir: true,
+        deleted: false,
+    }];
+    app.tree_selected = 0;
+    // Wide enough for all three segments "/ / r / a / b".
+    let text = breadcrumb_text_for(&mut app, 40);
+    assert!(
+        !text.contains(".."),
+        "full-width breadcrumb should not compact, got: {text:?}"
+    );
+    assert!(text.contains('b'), "current dir must appear, got: {text:?}");
 }
 
 // -- icon rendering -----------------------------------------------------------
@@ -484,7 +598,7 @@ fn draw_tree_icon_looks_up_extensionless_file_by_name() {
 }
 
 #[test]
-fn render_breadcrumb_truncation_shows_ellipsis() {
+fn render_breadcrumb_truncation_shows_compact_dotdot() {
     let mut app = make_app(false, HashMap::new());
     app.root = PathBuf::from("/r");
     app.nodes = vec![TreeNode {
@@ -498,15 +612,11 @@ fn render_breadcrumb_truncation_shows_ellipsis() {
     let rows = render_tree(&mut app, 20, 6);
     let breadcrumb_row = &rows[1];
     assert!(
-        breadcrumb_row.contains('…'),
-        "truncated breadcrumb must show ellipsis, got: {:?}",
+        breadcrumb_row.contains(".."),
+        "truncated breadcrumb must show '..', got: {:?}",
         breadcrumb_row
     );
-    // First segment ("/") and last segment ("e") must always be present.
-    assert!(
-        breadcrumb_row.contains('/'),
-        "first segment must be visible"
-    );
+    // Last segment ("e") must always be visible.
     assert!(breadcrumb_row.contains('e'), "last segment must be visible");
 }
 

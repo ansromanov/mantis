@@ -127,3 +127,24 @@ fn go_to_line_command_no_op_when_tree_focused() {
     assert!(app.goto_line.is_none());
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn tree_up_dir_command_changes_root_for_top_level_file() {
+    let root = temp_tree();
+    let orig_root = root.clone();
+    let mut app = app_for(&root);
+    let file_idx = app
+        .nodes
+        .iter()
+        .position(|n| n.path == root.join("a.txt"))
+        .expect("a.txt");
+    app.tree_selected = file_idx;
+    app.command_palette = Some(palette_with_query("Go up one"));
+    app.dispatch_command();
+    let parent = root.parent().expect("root has parent").to_path_buf();
+    assert_eq!(
+        app.root, parent,
+        "tree_up_dir via command palette must change root"
+    );
+    fs::remove_dir_all(&orig_root).ok();
+}
