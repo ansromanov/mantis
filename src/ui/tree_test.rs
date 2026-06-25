@@ -395,12 +395,16 @@ fn compact_breadcrumb_collapses_ancestors_to_dotdot() {
         text.contains('e'),
         "current dir 'e' must be visible, got: {text:?}"
     );
-    // The ".." segment must be clickable with a valid target path.
-    let has_dotdot = app
-        .breadcrumb_areas
-        .iter()
-        .any(|(p, _)| p.as_os_str() == ".." || p.to_string_lossy().contains("/"));
-    assert!(has_dotdot, ".. target path must exist in breadcrumb_areas");
+    // In compact mode the first breadcrumb_area is the ".." click target —
+    // it must be a proper ancestor of the leaf path, not the leaf itself.
+    let leaf = PathBuf::from("/root/a/b/c/d/e");
+    assert!(
+        app.breadcrumb_areas
+            .first()
+            .is_some_and(|(p, _)| leaf.starts_with(p) && *p != leaf),
+        ".. target must be a proper ancestor of the leaf path, got: {:?}",
+        app.breadcrumb_areas.first().map(|(p, _)| p)
+    );
 }
 
 #[test]

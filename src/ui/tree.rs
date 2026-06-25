@@ -520,7 +520,7 @@ fn compact_segments(
                 .1
                 .parent()
                 .map(|p| p.to_path_buf())
-                .unwrap_or_else(|| PathBuf::from("/"));
+                .unwrap_or_else(|| segments[0].1.clone());
             let mut result = Vec::new();
             result.push(BreadcrumbItem::ParentUp(target));
             for i in first_kept..segments.len() {
@@ -535,7 +535,7 @@ fn compact_segments(
         .1
         .parent()
         .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| PathBuf::from("/"));
+        .unwrap_or_else(|| segments[0].1.clone());
     vec![
         BreadcrumbItem::ParentUp(target),
         BreadcrumbItem::Real(segments.len() - 1),
