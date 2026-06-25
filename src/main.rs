@@ -28,6 +28,8 @@ mod app;
 mod command_palette;
 mod config;
 mod diff;
+#[cfg(unix)]
+mod event_source;
 mod file;
 mod fold;
 mod git;
@@ -154,6 +156,13 @@ impl EventSource for CrosstermEvents {
     }
 }
 
+#[cfg(unix)]
+impl EventSource for event_source::RawEventSource {
+    fn next_event(&mut self) -> anyhow::Result<Option<Event>> {
+        self.next_raw_event().map_err(Into::into)
+    }
+}
+
 fn main() -> anyhow::Result<()> {
     match plan_startup(parse_args())? {
         Startup::Print(message) => {
@@ -164,20 +173,41 @@ fn main() -> anyhow::Result<()> {
     }
 }
 
-/// Puts the terminal into raw/alternate-screen mode, runs the app to completion,
-/// then restores the terminal regardless of how the app exited. This is the only
-/// part of startup that touches the real terminal, so it is not unit-tested.
+/// Puts the terminal into raw/alternate-screen mode, optionally enables the
+/// kitty keyboard protocol, runs the app to completion, then restores the
+/// terminal regardless of how the app exited. This is the only part of startup
+/// that touches the real terminal, so it is not unit-tested.
 fn launch_tui(root: PathBuf, file: Option<PathBuf>) -> anyhow::Result<()> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+
+    // Enable kitty keyboard protocol on terminals that support it.
+    #[cfg(unix)]
+    let keyboard_enhanced = event_source::push_keyboard_enhancement_flags().unwrap_or(false);
+
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
     terminal.hide_cursor()?;
 
-    let mut events = CrosstermEvents;
-    let result = run_app(&mut terminal, root, file, &mut events);
+    // Use a trait-object event source so we can swap between the kitty-aware
+    // raw parser (on Unix) and the regular crossterm source.
+    #[cfg(unix)]
+    let mut events: Box<dyn EventSource> = if keyboard_enhanced {
+        Box::new(event_source::RawEventSource::new())
+    } else {
+        Box::new(CrosstermEvents)
+    };
+    #[cfg(not(unix))]
+    let mut events: Box<dyn EventSource> = Box::new(CrosstermEvents);
 
+    let result = run_app(&mut terminal, root, file, events.as_mut());
+
+    // Teardown: reverse order from setup.
+    #[cfg(unix)]
+    {
+        let _ = event_source::pop_keyboard_enhancement_flags();
+    }
     disable_raw_mode()?;
     execute!(
         terminal.backend_mut(),
@@ -196,7 +226,7 @@ fn run_app(
     terminal: &mut Terminal<impl Backend>,
     root: PathBuf,
     file: Option<PathBuf>,
-    events: &mut impl EventSource,
+    events: &mut dyn EventSource,
 ) -> anyhow::Result<()> {
     let (cfg, cfg_path, cfg_error) = config::load(&root);
     let mut app = App::new(root, cfg, cfg_path, cfg_error)?;
@@ -229,7 +259,7 @@ fn run_app(
 fn run_event_loop(
     terminal: &mut Terminal<impl Backend>,
     app: &mut App,
-    events: &mut impl EventSource,
+    events: &mut dyn EventSource,
 ) -> anyhow::Result<()> {
     loop {
         render_frame(terminal, app)?;

@@ -52,6 +52,15 @@ action can have several shortcuts. A spec is a single character (`"q"`, `"?"`,
 `Backspace`, `PageUp`, `PageDown`, `Home`, `End`, `Space`), optionally prefixed
 with modifiers: `"ctrl+c"`, `"alt+."`.
 
+> **Keyboard layouts.** Keybinding specs are written with Latin characters
+> (e.g. `"ctrl+p"`). On terminals that support the [kitty keyboard
+> protocol](https://sw.kovidgoyal.net/kitty/keyboard-protocol/) (kitty, WezTerm,
+> foot, ghostty, and others), `tv` automatically uses the physical key position
+> instead of the layout-translated character, so `ctrl+p` works correctly even on
+> non-Latin layouts (Russian, Hebrew, etc.). Terminals without kitty protocol
+> fall back to the logical character — bindings may not trigger as expected on
+> non-Latin layouts in those terminals.
+
 ```toml
 [keys]
 quit = ["q", "ctrl+c"]
