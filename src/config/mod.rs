@@ -185,6 +185,7 @@ impl Keymap {
             "tree_expand_all" => &self.tree_expand_all,
             "go_to_line" => &self.goto_line,
             "blame_line" => &self.blame_line,
+            "tree_up_dir" => &self.tree_up_dir,
             _ => return String::new(),
         };
         bindings.first().map(|b| b.display()).unwrap_or_default()
@@ -244,6 +245,7 @@ pub struct Keymap {
     pub copy_relative_path: Vec<KeyBinding>,
     pub plugin_picker: Vec<KeyBinding>,
     pub goto_line: Vec<KeyBinding>,
+    pub tree_up_dir: Vec<KeyBinding>,
 }
 
 impl Default for Keymap {
@@ -294,6 +296,7 @@ impl Default for Keymap {
             copy_relative_path: bind(&["Y"]),
             plugin_picker: bind(&["p"]),
             goto_line: bind(&[":"]),
+            tree_up_dir: bind(&["Backspace"]),
         }
     }
 }

@@ -409,6 +409,51 @@ impl App {
         }
     }
 
+    /// Moves the tree selection "up" one directory level: navigates to the
+    /// parent of the selected item's containing directory, changing the tree
+    /// root when that parent lies at or above the current root.
+    /// Bound to `Backspace` by default.
+    pub(super) fn tree_up_dir(&mut self) {
+        let Some(node) = self.nodes.get(self.tree_selected) else {
+            return;
+        };
+
+        let dir_path = if node.is_dir {
+            node.path.clone()
+        } else {
+            match node.path.parent() {
+                Some(p) => p.to_path_buf(),
+                None => return,
+            }
+        };
+
+        // Target is the parent of the containing directory.
+        let Some(target) = dir_path.parent().map(|p| p.to_path_buf()) else {
+            return;
+        };
+
+        if target == self.root {
+            // Already at root level → go up to root's parent.
+            let Some(grandparent) = self.root.parent().map(|p| p.to_path_buf()) else {
+                return;
+            };
+            self.set_root(&grandparent);
+            return;
+        }
+
+        if !target.starts_with(&self.root) {
+            // Target is outside root → change root.
+            self.set_root(&target);
+            return;
+        }
+
+        // Target is within root → find and select its node.
+        if let Some(i) = self.nodes.iter().position(|n| n.path == target && n.is_dir) {
+            self.tree_selected = i;
+            self.scroll_tree_into_view();
+        }
+    }
+
     /// Changes the viewer root to the currently selected node if it is a
     /// directory. Called when the user double-clicks a directory in the tree
     /// to descend into it as if `tv` were launched there.

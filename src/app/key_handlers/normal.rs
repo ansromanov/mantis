@@ -210,6 +210,8 @@ impl App {
             self.collapse_all();
         } else if pressed(&k.tree_expand_all, &key) {
             self.expand_all();
+        } else if pressed(&k.tree_up_dir, &key) {
+            self.tree_up_dir();
         }
     }
 

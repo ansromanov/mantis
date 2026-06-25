@@ -82,6 +82,7 @@ nav_down = ["Down", "j"]
 
 tree_expand = ["Enter", "Right", "l"]
 tree_collapse = ["Left", "h"]
+tree_up_dir = ["Backspace"]
 tree_collapse_all = ["-"]
 tree_expand_all = ["="]
 
