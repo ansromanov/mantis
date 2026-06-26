@@ -324,7 +324,7 @@ fn git_mode_flat_toggle_noop_outside_git_mode() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.git_mode = false;
-    app.handle_key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::ALT));
+    app.handle_key(key(KeyCode::Char('F')));
     assert_eq!(
         app.status_message.as_ref().map(|sm| sm.text.as_str()),
         Some("flat view: only in git mode (Ctrl+G)")
@@ -377,6 +377,18 @@ fn toggle_blame_noop_in_diff() {
         Some("blame: not available in a diff")
     );
     assert!(!app.show_blame);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn git_mode_flat_toggle_status_clears_on_valid_keypress() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.git_mode = false;
+    app.handle_key(key(KeyCode::Char('F')));
+    assert!(app.status_message.is_some());
+    app.handle_key(key(KeyCode::Char('j')));
+    assert!(app.status_message.is_none());
     fs::remove_dir_all(&root).ok();
 }
 

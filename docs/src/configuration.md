@@ -69,7 +69,7 @@ with modifiers: `"ctrl+c"`.
 [keys]
 quit = ["q", "ctrl+c"]
 help = ["?"]
-toggle_hidden = ["ctrl+h"]
+toggle_hidden = ["."]
 search_files = ["/"]
 search_content = ["f"]
 reload = ["r"]
@@ -86,9 +86,7 @@ toggle_blame = ["b"]
 blame_line = ["B"]
 go_to_line = [":"]
 git_mode_toggle = ["ctrl+g"]
-# git_mode_flat_toggle has no default binding (alt keybindings conflict with
-# terminal-level key processing)
-# git_mode_flat_toggle = ["alt+g"]
+git_mode_flat_toggle = ["F"]
 
 nav_up = ["Up", "k"]
 nav_down = ["Down", "j"]

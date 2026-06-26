@@ -39,7 +39,7 @@ These work no matter which panel is focused.
 | `e`            | Open current file in `$EDITOR` |
 | `y`            | Copy absolute path to clipboard |
 | `Y`            | Copy path relative to tree root to clipboard |
-| `Alt+.`        | Toggle hidden files     |
+| `.`            | Toggle hidden files     |
 | `H`            | Git history of current file |
 | `Ctrl+O`       | Recent files (jump to a recently opened file) |
 | `p`            | Plugin palette (enable/disable plugins) |
@@ -48,7 +48,7 @@ These work no matter which panel is focused.
 | `B`            | Blame the active line   |
 | `t`            | Theme picker            |
 | `Ctrl+G`       | Toggle git mode (changed files + diffs) |
-| `Alt+G`        | Toggle flat / tree view in git mode |
+| `F`            | Toggle flat / tree view in git mode |
 
 ## Tree panel
 

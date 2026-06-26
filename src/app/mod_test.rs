@@ -597,6 +597,10 @@ fn ctrl_g() -> KeyEvent {
     KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL)
 }
 
+fn flat_key() -> KeyEvent {
+    KeyEvent::new(KeyCode::Char('F'), KeyModifiers::empty())
+}
+
 #[test]
 fn git_mode_filters_tree_to_changed_files() {
     let root = temp_git_with_changes();
@@ -712,9 +716,7 @@ fn git_mode_flat_shows_depth_zero_files() {
     let mut app = app_for(&root);
 
     app.handle_key(ctrl_g());
-    app.git_mode_flat = true;
-    app.config.git_mode_flat = true;
-    app.rebuild(true);
+    app.handle_key(flat_key());
 
     assert!(app.git_mode_flat);
     assert!(
@@ -735,13 +737,8 @@ fn git_mode_flat_toggle_returns_to_tree_view() {
     let mut app = app_for(&root);
 
     app.handle_key(ctrl_g());
-    app.git_mode_flat = true;
-    app.config.git_mode_flat = true;
-    app.rebuild(true);
-    // Now toggle flat off via the toggle action
-    app.git_mode_flat = false;
-    app.config.git_mode_flat = false;
-    app.rebuild(true);
+    app.handle_key(flat_key()); // flat
+    app.handle_key(flat_key()); // back to tree
 
     assert!(app.git_mode);
     assert!(!app.git_mode_flat);
@@ -758,20 +755,12 @@ fn git_mode_flat_key_is_noop_outside_git_mode() {
     let mut app = app_for(&root);
     let count = app.nodes.len();
 
-    // git_mode_flat_toggle has no default binding; simulate by verifying the
-    // toggle action itself is a no-op outside git mode.
     assert!(!app.git_mode);
-    let was_flat = app.git_mode_flat;
-    app.git_mode_flat = !was_flat;
-    app.config.git_mode_flat = app.git_mode_flat;
-    app.rebuild(true);
-    assert_eq!(
-        app.nodes.len(),
-        count,
-        "tree must be unchanged outside git mode even when flat flag flips"
-    );
-    app.git_mode_flat = was_flat;
-    app.config.git_mode_flat = was_flat;
+    app.handle_key(flat_key());
+
+    assert!(!app.git_mode_flat);
+    assert!(!app.git_mode);
+    assert_eq!(app.nodes.len(), count, "tree must be unchanged");
     fs::remove_dir_all(&root).ok();
 }
 
@@ -1081,7 +1070,7 @@ fn normal_key_toggle_hidden_reloads() {
     let root = temp_tree();
     let mut app = app_for(&root);
     let before = app.show_hidden;
-    app.handle_key(KeyEvent::new(KeyCode::Char('h'), KeyModifiers::CONTROL));
+    app.handle_key(KeyEvent::new(KeyCode::Char('.'), KeyModifiers::empty()));
     assert_ne!(app.show_hidden, before);
     fs::remove_dir_all(&root).ok();
 }

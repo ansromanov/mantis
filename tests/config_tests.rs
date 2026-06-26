@@ -27,7 +27,7 @@ fn default_keymap_has_expected_bindings() {
     ));
     assert!(pressed(
         &km.toggle_hidden,
-        &ev(KeyCode::Char('h'), KeyModifiers::CONTROL)
+        &ev(KeyCode::Char('.'), KeyModifiers::empty())
     ));
 }
 

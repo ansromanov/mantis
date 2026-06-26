@@ -58,7 +58,7 @@ pub(crate) fn draw_help(f: &mut Frame, app: &App, area: Rect) {
         Line::from(vec![key("  ?          "), desc("toggle this help")]),
         Line::from(vec![key("  Tab        "), desc("switch panel")]),
         Line::from(vec![key("  q / Ctrl+C "), desc("quit")]),
-        Line::from(vec![key("  Ctrl+H     "), desc("toggle hidden files")]),
+        Line::from(vec![key("  .          "), desc("toggle hidden files")]),
         Line::from(vec![key("  t          "), desc("pick a theme")]),
         Line::from(vec![key("  p          "), desc("plugin manager")]),
         Line::from(vec![
@@ -75,12 +75,10 @@ pub(crate) fn draw_help(f: &mut Frame, app: &App, area: Rect) {
             desc("copy path relative to tree root to clipboard"),
         ]),
         Line::from(vec![key("  Ctrl+O     "), desc("recent files picker")]),
-        // git_mode_flat_toggle has no default binding (was alt+g; removed due to
-        // alt keybinding conflicts with terminal-level key processing).
-        // Line::from(vec![
-        //     key("  Alt+G      "),
-        //     desc("toggle git flat/tree view (in git mode)"),
-        // ]),
+        Line::from(vec![
+            key("  F          "),
+            desc("toggle git flat/tree view (in git mode)"),
+        ]),
         gap.clone(),
         section("Tree panel"),
         Line::from(vec![key("  j/k / ↑↓   "), desc("move up / down")]),
