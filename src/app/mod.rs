@@ -123,7 +123,7 @@ impl StatusMessage {
         }
     }
 
-    /// Returns `true` when the message has been alive longer than `ttl`.
+    /// Returns `true` when the message has been alive for at least `ttl`.
     pub fn expired(&self, ttl: Duration) -> bool {
         self.set_at.elapsed() >= ttl
     }
