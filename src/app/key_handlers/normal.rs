@@ -295,7 +295,6 @@ impl App {
             self.save_config();
         } else if !self.is_diff && pressed(&k.nav_up, &key) {
             // Move active line up (non-diff content).
-            self.show_line_blame = false;
             if self.active_line > 0 {
                 self.active_line -= 1;
                 self.scroll_active_line_into_view();
@@ -303,7 +302,6 @@ impl App {
             }
         } else if !self.is_diff && pressed(&k.nav_down, &key) {
             // Move active line down (non-diff content).
-            self.show_line_blame = false;
             let max = self.display_line_count().saturating_sub(1);
             if self.active_line < max {
                 self.active_line += 1;
@@ -320,13 +318,11 @@ impl App {
                 self.content_scroll += 1;
             }
         } else if pressed(&k.content_top, &key) {
-            self.show_line_blame = false;
             if !self.is_diff {
                 self.active_line = 0;
             }
             self.content_scroll = 0;
         } else if pressed(&k.content_bottom, &key) {
-            self.show_line_blame = false;
             if !self.is_diff {
                 self.active_line = self.display_line_count().saturating_sub(1);
                 self.scroll_active_line_into_view();

@@ -126,7 +126,7 @@ fn open_recent_files_opens_overlay_with_non_current_paths() {
 // -- active_line / show_line_blame reset on navigation ----------------------
 
 #[test]
-fn open_file_resets_active_line_and_blame_popup() {
+fn open_different_file_resets_active_line_and_blame_popup() {
     let root = temp_dir();
     let a = root.join("a.txt");
     let b = root.join("b.txt");
@@ -140,7 +140,25 @@ fn open_file_resets_active_line_and_blame_popup() {
     assert_eq!(app.active_line, 0, "active_line must reset on file open");
     assert!(
         !app.show_line_blame,
-        "show_line_blame must close on file open"
+        "show_line_blame must close on different file open"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn reopen_same_file_preserves_blame_popup() {
+    let root = temp_dir();
+    let f = root.join("same.txt");
+    fs::write(&f, "line1\nline2\nline3\n").unwrap();
+    let mut app = app_for(&root);
+    app.open_file(&f);
+    app.active_line = 1;
+    app.show_line_blame = true;
+    // Simulate a same-file reload (e.g. watcher tick -> reopen_file).
+    app.open_file(&f);
+    assert!(
+        app.show_line_blame,
+        "blame popup stays open when reloading the same file"
     );
     fs::remove_dir_all(&root).ok();
 }

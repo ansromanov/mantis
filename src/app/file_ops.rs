@@ -162,6 +162,10 @@ impl App {
     /// Applies a computed working-tree diff to the content panel. Shared by the
     /// synchronous and worker-thread code paths.
     pub(super) fn apply_diff_load(&mut self, path: &Path, load: DiffLoad) {
+        // Capture whether this is a genuine file switch before we overwrite
+        // current_file with the new path.
+        let is_new_file = self.current_file.as_deref() != Some(path);
+
         self.in_file_search = None;
         self.virtual_file = None;
         self.current_file = Some(path.to_path_buf());
@@ -182,9 +186,13 @@ impl App {
         self.content_scroll = 0;
         self.content_hscroll = 0;
         self.active_line = 0;
-        self.show_line_blame = false;
         self.clear_selection();
-        self.exit_visual_line();
+        // Drop blame popup and visual-line mode only when switching to a
+        // different file's diff; a same-file reload in git mode preserves both.
+        if is_new_file {
+            self.show_line_blame = false;
+            self.exit_visual_line();
+        }
         self.content_title = Some(load.content_title);
         self.highlighted = load.highlighted;
         self.diff_rows = load.diff_rows;
@@ -264,12 +272,13 @@ impl App {
         self.content_scroll = 0;
         self.content_hscroll = 0;
         self.active_line = 0;
-        self.show_line_blame = false;
         self.clear_selection();
-        // Drop visual-line mode only when navigating to a different file; a same
-        // -file reopen (reload / external edit) keeps the selection in place.
+        // Drop visual-line mode and blame popup only when navigating to a
+        // different file; a same-file reopen (reload / external edit) preserves
+        // both.
         let is_new_file = self.current_file.as_deref() != Some(path);
         if is_new_file {
+            self.show_line_blame = false;
             self.exit_visual_line();
         }
 

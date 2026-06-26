@@ -155,10 +155,10 @@ fn esc_closes_line_blame_first() {
     fs::remove_dir_all(&root).ok();
 }
 
-// -- navigation clears blame popup ------------------------------------------
+// -- navigation preserves blame popup ---------------------------------------
 
 #[test]
-fn nav_up_clears_line_blame() {
+fn nav_up_keeps_line_blame_and_updates_line() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
@@ -166,19 +166,52 @@ fn nav_up_clears_line_blame() {
     app.active_line = 5;
     app.show_line_blame = true;
     app.handle_key(key(KeyCode::Char('k')));
-    assert!(!app.show_line_blame);
+    assert!(app.show_line_blame, "blame popup stays open on nav up");
+    assert_eq!(app.active_line, 4, "active line moves up");
     fs::remove_dir_all(&root).ok();
 }
 
 #[test]
-fn nav_down_clears_line_blame() {
+fn nav_down_keeps_line_blame_and_updates_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.active_line = 5;
+    app.show_line_blame = true;
+    app.handle_key(key(KeyCode::Char('j')));
+    assert!(app.show_line_blame, "blame popup stays open on nav down");
+    assert_eq!(app.active_line, 6, "active line moves down");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_gg_keeps_line_blame_and_resets_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.active_line = 10;
+    app.show_line_blame = true;
+    app.handle_key(key(KeyCode::Char('g')));
+    app.handle_key(key(KeyCode::Char('g')));
+    assert!(app.show_line_blame, "blame popup stays open on gg");
+    assert_eq!(app.active_line, 0, "active line resets to top");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+#[allow(non_snake_case)]
+fn content_G_keeps_line_blame_and_moves_to_last_line() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
     app.focus = Focus::Content;
     app.show_line_blame = true;
-    app.handle_key(key(KeyCode::Char('j')));
-    assert!(!app.show_line_blame);
+    app.handle_key(key(KeyCode::Char('G')));
+    assert!(app.show_line_blame, "blame popup stays open on G");
+    let last = app.display_line_count().saturating_sub(1);
+    assert_eq!(app.active_line, last, "active line moves to last");
     fs::remove_dir_all(&root).ok();
 }
 
