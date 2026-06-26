@@ -109,7 +109,7 @@ pub struct PluginGitInfo {
 }
 
 /// A transient status message with a timestamp so it can auto-expire.
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct StatusMessage {
     pub text: String,
     pub set_at: Instant,
