@@ -2,12 +2,12 @@
 //!
 //! A remote registry is a git repository containing an `index.json` file that
 //! lists available plugins with their repo URL and tag. The registry is cloned
-//! into `~/.config/tree-viewer/registry/` (or `$XDG_CONFIG_HOME/tree-viewer/registry/`)
+//! into `~/.config/mantis/registry/` (or `$XDG_CONFIG_HOME/mantis/registry/`)
 //! and refreshed via `git pull`. No HTTP crate is used — all communication with
 //! the registry happens through the `git` CLI.
 //!
 //! The default registry URL is a GitHub repo, overridable via the
-//! `TV_PLUGIN_REGISTRY` environment variable.
+//! `MANTIS_PLUGIN_REGISTRY` environment variable.
 //!
 //! # Public items
 //!
@@ -31,8 +31,8 @@ use serde::{Deserialize, Serialize};
 
 /// Default remote registry repository URL.
 ///
-/// Override by setting the `TV_PLUGIN_REGISTRY` environment variable.
-pub const DEFAULT_REGISTRY_REPO: &str = "https://github.com/ansromanov/tree-viewer-plugins";
+/// Override by setting the `MANTIS_PLUGIN_REGISTRY` environment variable.
+pub const DEFAULT_REGISTRY_REPO: &str = "https://github.com/ansromanov/mantis-plugins";
 
 /// A single plugin entry in the registry index.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -51,13 +51,13 @@ pub struct RegistryIndex {
 
 /// Returns the path to the local registry cache directory.
 ///
-/// Uses the same config-directory resolution as the rest of `tv`:
-/// - `$TV_PLUGIN_REGISTRY_DIR` env var (absolute override)
-/// - `$XDG_CONFIG_HOME/tree-viewer/registry/` (Linux/macOS)
-/// - `~/.config/tree-viewer/registry/` (fallback)
-/// - `%APPDATA%\tree-viewer\registry\` (Windows)
+/// Uses the same config-directory resolution as the rest of `mantis`:
+/// - `$MANTIS_PLUGIN_REGISTRY_DIR` env var (absolute override)
+/// - `$XDG_CONFIG_HOME/mantis/registry/` (Linux/macOS)
+/// - `~/.config/mantis/registry/` (fallback)
+/// - `%APPDATA%\mantis\registry\` (Windows)
 pub fn registry_dir() -> PathBuf {
-    if let Some(dir) = std::env::var_os("TV_PLUGIN_REGISTRY_DIR") {
+    if let Some(dir) = std::env::var_os("MANTIS_PLUGIN_REGISTRY_DIR") {
         return PathBuf::from(dir);
     }
     config_dir().join("registry")
@@ -67,7 +67,7 @@ fn config_dir() -> PathBuf {
     #[cfg(windows)]
     {
         std::env::var_os("APPDATA")
-            .map(|p| PathBuf::from(p).join("tree-viewer"))
+            .map(|p| PathBuf::from(p).join("mantis"))
             .unwrap_or_else(|| PathBuf::from("."))
     }
     #[cfg(not(windows))]
@@ -75,14 +75,14 @@ fn config_dir() -> PathBuf {
         std::env::var_os("XDG_CONFIG_HOME")
             .map(PathBuf::from)
             .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
-            .map(|base| base.join("tree-viewer"))
+            .map(|base| base.join("mantis"))
             .unwrap_or_else(|| PathBuf::from("."))
     }
 }
 
-/// Returns the registry repo URL, respecting the `TV_PLUGIN_REGISTRY` override.
+/// Returns the registry repo URL, respecting the `MANTIS_PLUGIN_REGISTRY` override.
 fn registry_repo() -> String {
-    std::env::var("TV_PLUGIN_REGISTRY").unwrap_or_else(|_| DEFAULT_REGISTRY_REPO.to_string())
+    std::env::var("MANTIS_PLUGIN_REGISTRY").unwrap_or_else(|_| DEFAULT_REGISTRY_REPO.to_string())
 }
 
 /// Ensures the local registry cache exists and is up to date.

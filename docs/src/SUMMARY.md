@@ -1,10 +1,10 @@
 # Summary
 
-[Welcome to tree-viewer](introduction.md)
+[Welcome to mantis](introduction.md)
 
 # Getting Started
 
-- [Why tree-viewer?](why.md)
+- [Why mantis?](why.md)
 - [Installation](installation.md)
 - [Quick Start](quickstart.md)
 

@@ -1,9 +1,9 @@
-//! Crate root for the `tv` terminal file viewer library.
+//! Crate root for the `mantis` terminal file viewer library.
 //!
 //! Declares every top-level module; the binary (`main.rs`) and the integration
 //! tests both depend on this crate. The module layout mirrors the runtime
 //! architecture: `app` owns the central state machine and input handling, `ui`
-//! owns ratatui rendering, and `config` parses `tv.toml`. The remaining leaf
+//! owns ratatui rendering, and `config` parses `mantis.toml`. The remaining leaf
 //! modules (`tree`, `git`, `highlight`, `markdown`, `search`, `diff`,
 //! `selection`, `session`, `theme`, `virtual_file`, `fold`, `yaml_fold`, `file`,
 //! `command_palette`, `release_info`, `ansi`) each provide one focused

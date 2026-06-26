@@ -455,7 +455,7 @@ impl App {
 
     /// Changes the viewer root to the currently selected node if it is a
     /// directory. Called when the user double-clicks a directory in the tree
-    /// to descend into it as if `tv` were launched there.
+    /// to descend into it as if `mantis` were launched there.
     pub(super) fn descend_to_selected(&mut self) {
         let path = self
             .nodes

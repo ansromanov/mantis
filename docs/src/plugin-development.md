@@ -1,6 +1,6 @@
 # Plugin Development
 
-This page describes how to write both kinds of `tv` plugins: **process
+This page describes how to write both kinds of `mantis` plugins: **process
 plugins** (subprocess-based) and **syntax plugins** (`.sublime-syntax` files).
 See [Plugins](plugins.md) for how to install and configure plugins.
 
@@ -10,7 +10,7 @@ See [Plugins](plugins.md) for how to install and configure plugins.
 
 Every plugin **must** have a `plugin.toml` manifest file in its own subdirectory
 of the plugin directory (see [Plugins](plugins.md) for where that is). The
-manifest is how `tv` discovers the plugin and learns its entry point, version,
+manifest is how `mantis` discovers the plugin and learns its entry point, version,
 and other metadata.
 
 ### Schema
@@ -55,12 +55,12 @@ below) so the plugin can verify compatibility dynamically.
 
 ### Discovery
 
-On startup `tv` scans every subdirectory of the plugin directory for
+On startup `mantis` scans every subdirectory of the plugin directory for
 `plugin.toml`. Each discovered manifest produces a `(name, PluginEntry)` pair
 that appears in the plugin picker. **Discovered plugins default to disabled**
-— no code runs without explicit user opt-in via the picker or `tv.toml`.
+— no code runs without explicit user opt-in via the picker or `mantis.toml`.
 
-If a plugin is also declared in `[plugins]` in `tv.toml`, the explicit config
+If a plugin is also declared in `[plugins]` in `mantis.toml`, the explicit config
 entry takes precedence (allowing the user to override the entry path, enable
 it, or set its kind).
 
@@ -74,14 +74,14 @@ The protocol for subprocess-based plugins.
 
 A process plugin is any executable that:
 
-1. Reads newline-delimited JSON objects from **stdin** (events from `tv`).
-2. Writes newline-delimited JSON objects to **stdout** (actions back to `tv`).
+1. Reads newline-delimited JSON objects from **stdin** (events from `mantis`).
+2. Writes newline-delimited JSON objects to **stdout** (actions back to `mantis`).
 3. Exits cleanly when it receives `shutdown` (or when stdin closes).
 
-`tv` spawns each plugin as a subprocess with `stdin` and `stdout` piped and
+`mantis` spawns each plugin as a subprocess with `stdin` and `stdout` piped and
 `stderr` discarded (redirected to `/dev/null`). A background reader thread
 drains each plugin's stdout and a background writer thread handles stdin so the
-`tv` event loop never blocks on plugin I/O.
+`mantis` event loop never blocks on plugin I/O.
 
 ## Events: tv → plugin (stdin)
 
@@ -146,7 +146,7 @@ final work before the process is torn down.
 
 ### `shutdown`
 
-Sent as the final event. `tv` closes stdin immediately after sending this.
+Sent as the final event. `mantis` closes stdin immediately after sending this.
 Exit cleanly in response.
 
 ```json
@@ -161,7 +161,7 @@ ignored.
 
 ### `show_message`
 
-Displays a message in the `tv` status bar.
+Displays a message in the `mantis` status bar.
 
 ```json
 {"event":"action","action":"show_message","params":{"message":"hello from plugin"}}
@@ -178,7 +178,7 @@ Opens a file in the content panel.
 ### `set_content`
 
 Replaces the content panel with the given lines. Each line is a string that may
-contain ANSI escape codes for colour and styling. `tv` parses the ANSI codes
+contain ANSI escape codes for colour and styling. `mantis` parses the ANSI codes
 with its built-in parser and displays them as styled text. Handy for plugins
 that generate rich output (e.g. markdown renderers, linters).
 
@@ -235,7 +235,7 @@ precedence over the built-in `git_info`. Sent by the bundled `git-plugin` on
 
 ### `set_icon_map`
 
-Sets the file-type icon glyphs used in the tree. Requires `icons = true` in `tv.toml` and a Nerd Font terminal. Keys in `icons` are file extensions (lowercase) or full filenames for extensionless files (e.g. `"dockerfile"`).
+Sets the file-type icon glyphs used in the tree. Requires `icons = true` in `mantis.toml` and a Nerd Font terminal. Keys in `icons` are file extensions (lowercase) or full filenames for extensionless files (e.g. `"dockerfile"`).
 
 ```json
 {"event":"action","action":"set_icon_map","params":{"dir_open":"","dir_closed":"","fallback":"","icons":{"rs":"","py":"","dockerfile":""}}}
@@ -250,7 +250,7 @@ Fields:
 ## Language providers
 
 A process plugin can declare itself as a **language provider** by responding to
-the `init` event with a `register_language_provider` action. This tells `tv`
+the `init` event with a `register_language_provider` action. This tells `mantis`
 which file extensions the plugin handles and what capabilities it provides.
 Both `highlight` and `fold` flow through a single provider protocol; future
 capabilities (`hover`, `diagnostics`, `definition`) will slot into the same
@@ -258,7 +258,7 @@ surface in a later release without any protocol break.
 
 ### Provider contract
 
-The language provider contract between `tv` and a plugin follows a strict
+The language provider contract between `mantis` and a plugin follows a strict
 lifecycle:
 
 1. **Registration.** Immediately after receiving `init`, the plugin sends
@@ -267,7 +267,7 @@ lifecycle:
    the previous registration entirely.
 
 2. **File routing.** When the user opens a file whose extension matches a
-   registered provider, `tv` routes relevant events (`on_file_open`,
+   registered provider, `mantis` routes relevant events (`on_file_open`,
    `on_selection_change`) and capability-driven state requests to that
    provider. Only the first provider whose extensions match the file's
    extension receives these events for that file. Currently only `fold`
@@ -282,10 +282,10 @@ lifecycle:
 
 4. **Lifetime.** Provider registrations persist for the entire plugin session.
    When a plugin exits or is deactivated, its registrations are removed. If
-   the plugin sends `set_fold_regions` for a file before it is opened, `tv`
+   the plugin sends `set_fold_regions` for a file before it is opened, `mantis`
    caches the regions and applies them when the file is opened later.
 
-5. **Capability gating.** `tv` enforces capability checks at runtime. For
+5. **Capability gating.** `mantis` enforces capability checks at runtime. For
    example, `set_fold_regions` is only accepted when the sender has a
    registered provider with the `fold` capability for that file's extension.
    Unknown capability strings are silently ignored, so existing providers
@@ -294,7 +294,7 @@ lifecycle:
 ### `register_language_provider`
 
 Sent by the plugin immediately after receiving `init`. Declares the file
-extensions and capabilities the plugin provides. `tv` stores the registration
+extensions and capabilities the plugin provides. `mantis` stores the registration
 and uses it to route the correct events and display-state updates for each open
 file.
 
@@ -310,7 +310,7 @@ Fields:
 - `capabilities` — one or more of `"highlight"` or `"fold"`. Reserved for
   future use: `"hover"`, `"diagnostics"`, `"definition"`.
 
-After registering, `tv` sends `on_file_open` whenever a matching file is
+After registering, `mantis` sends `on_file_open` whenever a matching file is
 opened. The plugin should respond with the appropriate action for each declared
 capability (e.g. `set_fold_regions` for `"fold"`).
 
@@ -323,7 +323,7 @@ inclusive). When the named file is currently open the regions are applied
 immediately; when it is not yet open they are cached and applied the next
 time the file is opened.
 
-Fold regions from a plugin are only accepted when `tv` has a registered
+Fold regions from a plugin are only accepted when `mantis` has a registered
 language provider with the `fold` capability for the file's extension.
 Regions from unregistered plugins or for unmatched extensions are silently
 discarded.
@@ -341,7 +341,7 @@ discarded.
 - **Stdout is for actions only.** Plugin stderr is discarded; write debug output to a log file instead.
 - **Exit on shutdown.** When stdin closes or you receive `shutdown`, exit.
   Do not loop forever waiting for more input.
-- **Idempotent reads.** `tv` may send multiple `on_file_open` events for the
+- **Idempotent reads.** `mantis` may send multiple `on_file_open` events for the
   same path if the user reopens a file.
 - **No blocking.** Actions are drained non-blockingly every tick. Sending many
   actions in rapid succession is fine; they are buffered and processed in order.
@@ -422,20 +422,21 @@ fn main() {
 ## Architecture notes
 
 - `src/plugin/` owns the subprocess lifecycle, the background reader thread per
-  plugin, manifest parsing, binary install, and syntax discovery.
+   plugin, manifest parsing, binary install, and syntax discovery.
 - `PluginManager` (`src/plugin/manager.rs`) collects plugin actions into an
-  internal buffer; `App::tick()` drains them via `drain_plugin_actions()` in
-  `src/app/refresh.rs`.
+   internal buffer; `App::tick()` drains them via `drain_plugin_actions()` in
+   `src/app/refresh.rs`.
 - Hook dispatch (`on_file_open`, `on_keypress`, `on_selection_change`) happens
-  in `src/app/file_ops.rs`, `src/app/key_handlers/`, and `src/app/navigation.rs`
-  respectively.
+   in `src/app/file_ops.rs`, `src/app/key_handlers/`, and `src/app/navigation.rs`
+   respectively.
 - Plugin config deserialization lives in `src/config/mod.rs` under the
-  `plugins` key.
+   `plugins` key.
 - Bundled plugins are declared in `BUNDLED_PLUGINS`
-  (`src/plugin/install.rs`) as `(name, binary_name)` pairs and built as
-  workspace-member Rust crates under `plugins/`. The
-  `install_bundled_plugins()` function finds and copies compiled binaries to
-  the plugin directory on first run.
+   (`src/plugin/install.rs`) as `(name, binary_name)` pairs and built as
+   workspace-member Rust crates under `plugins/`. The
+   `install_bundled_plugins()` function finds and copies compiled binaries to
+   the plugin directory on first run.
+
 
 ---
 
@@ -481,7 +482,7 @@ define the matching rules.
 
 ### Bundled syntax plugins
 
-`tv` ships with a `terraform.sublime-syntax` file that is automatically
+`mantis` ships with a `terraform.sublime-syntax` file that is automatically
 installed to `{plugin_dir}/syntaxes/` on first run. It provides syntax
 highlighting for `.tf` and `.tfvars` files (Terraform / HCL). Enable it by:
 

@@ -5,7 +5,7 @@
 //! version, entry point, and optional metadata. This module parses those
 //! manifests and discovers all plugins available in the plugin directory at
 //! startup, so the UI can show them in the plugin picker without requiring an
-//! explicit `[plugins]` entry in `tv.toml`.
+//! explicit `[plugins]` entry in `mantis.toml`.
 //!
 //! # Schema
 //!

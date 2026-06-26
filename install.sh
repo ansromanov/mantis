@@ -1,23 +1,23 @@
 #!/bin/sh
-# tree-viewer (tv) installer.
+# mantis installer.
 #
-# Downloads the prebuilt `tv` binary for your OS/arch from GitHub Releases,
+# Downloads the prebuilt `mantis` binary for your OS/arch from GitHub Releases,
 # verifies its SHA-256 checksum, and installs it onto your PATH.
 # Supports Linux, macOS, and Windows (Git Bash / MSYS2 / Cygwin).
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/ansromanov/tree-viewer/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/ansromanov/mantis/main/install.sh | sh
 #
 # Environment overrides:
-#   TV_VERSION       release tag to install (default: latest), e.g. v0.2.0
-#   TV_INSTALL_DIR   directory to install into (default: auto-detected PATH dir)
+#   MANTIS_VERSION       release tag to install (default: latest), e.g. v0.2.0
+#   MANTIS_INSTALL_DIR   directory to install into (default: auto-detected PATH dir)
 
 set -eu
 
-REPO="ansromanov/tree-viewer"
-BIN="tv"
-VERSION="${TV_VERSION:-latest}"
-INSTALL_DIR="${TV_INSTALL_DIR:-}"
+REPO="ansromanov/mantis"
+BIN="mantis"
+VERSION="${MANTIS_VERSION:-latest}"
+INSTALL_DIR="${MANTIS_INSTALL_DIR:-}"
 
 # --- pretty output --------------------------------------------------------
 if [ -t 2 ]; then
@@ -42,7 +42,7 @@ case "$os" in
   Linux)                         os_part="linux";   exe="" ;;
   Darwin)                        os_part="macos";   exe="" ;;
   CYGWIN* | MINGW* | MSYS*)     os_part="windows"; exe=".exe" ;;
-  *) error "unsupported OS: $os (use 'cargo install tree-viewer')" ;;
+  *) error "unsupported OS: $os (use 'cargo install mantis')" ;;
 esac
 
 case "$arch" in
@@ -70,7 +70,7 @@ fi
 
 # --- choose install dir ---------------------------------------------------
 if [ -z "$INSTALL_DIR" ]; then
-  : "${HOME:?HOME is unset; set TV_INSTALL_DIR to specify install location}"
+  : "${HOME:?HOME is unset; set MANTIS_INSTALL_DIR to specify install location}"
   # Pick a writable directory that is on PATH
   for _dir in "/usr/local/bin" "${HOME}/.local/bin"; do
     case ":${PATH}:" in
@@ -96,7 +96,7 @@ fi
 if [ -z "$INSTALL_DIR" ]; then
   INSTALL_DIR="${HOME}/.local/bin"
   mkdir -p "$INSTALL_DIR" 2>/dev/null || true
-  warn "installing to ${INSTALL_DIR} (not on PATH; set TV_INSTALL_DIR to override)"
+  warn "installing to ${INSTALL_DIR} (not on PATH; set MANTIS_INSTALL_DIR to override)"
 fi
 
 
@@ -133,7 +133,7 @@ if ! mkdir -p "$INSTALL_DIR" 2>/dev/null; then
     warn "could not create ${INSTALL_DIR}; using sudo"
     sudo mkdir -p "$INSTALL_DIR"
   else
-    error "could not create ${INSTALL_DIR} and sudo is unavailable; set TV_INSTALL_DIR to a writable directory"
+    error "could not create ${INSTALL_DIR} and sudo is unavailable; set MANTIS_INSTALL_DIR to a writable directory"
   fi
 fi
 chmod +x "${tmp}/${asset}"
@@ -144,14 +144,14 @@ elif command -v sudo >/dev/null 2>&1; then
   warn "${INSTALL_DIR} is not writable; using sudo"
   sudo mv "${tmp}/${asset}" "${INSTALL_DIR}/${BIN}${exe}"
 else
-  error "${INSTALL_DIR} is not writable and sudo is unavailable; set TV_INSTALL_DIR to a writable directory"
+  error "${INSTALL_DIR} is not writable and sudo is unavailable; set MANTIS_INSTALL_DIR to a writable directory"
 fi
 
 info "${GREEN}Installed${RESET} ${BIN} to ${BOLD}${INSTALL_DIR}/${BIN}${exe}${RESET}"
 
 # --- PATH hint ------------------------------------------------------------
 case ":${PATH}:" in
-  *":${INSTALL_DIR}:"*) ;;
+  *":${INSTALL_DIR}"*) ;;
   *) warn "${INSTALL_DIR} is not on your PATH. Add it, e.g.:
     export PATH=\"${INSTALL_DIR}:\$PATH\"" ;;
 esac

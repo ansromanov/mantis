@@ -1,32 +1,32 @@
 # Configuration
 
-> 💡 **Configuration is optional.** `tv` works great with no config at all. Come
+> 💡 **Configuration is optional.** `mantis` works great with no config at all. Come
 > here when you want to change colors, remap a key, or set a default behavior.
 
-`tv` reads a `tv.toml` file. It first looks for one in the directory being
+`mantis` reads a `mantis.toml` file. It first looks for one in the directory being
 viewed (and its ancestors), then falls back to the global config at
-`$XDG_CONFIG_HOME/tv.toml` (or `~/.config/tv.toml`). A project-local file
+`$XDG_CONFIG_HOME/mantis/mantis.toml` (or `~/.config/mantis/mantis.toml`). A project-local file
 overrides the global one, so a repository can ship its own defaults.
 
 ## Defaults vs. your config
 
 Configuration has two layers:
 
-- **Built-in defaults** ship inside `tv` and supply every value. You don't have
+- **Built-in defaults** ship inside `mantis` and supply every value. You don't have
   to set anything.
-- **Your `tv.toml`** overrides only the keys you set; everything else falls
+- **Your `mantis.toml`** overrides only the keys you set; everything else falls
   through to the defaults.
 
-On first run `tv` creates a tiny stub `tv.toml` (just a header comment) next to a
-read-only **`tv.default.toml`** in your config directory. `tv.default.toml` lists
+On first run `mantis` creates a tiny stub `mantis.toml` (just a header comment) next to a
+read-only **`mantis.default.toml`** in your config directory. `mantis.default.toml` lists
 every option with comments and is **refreshed on every upgrade**, so it always
-documents the current set of options. Your own `tv.toml` is **never modified by an
+documents the current set of options. Your own `mantis.toml` is **never modified by an
 upgrade** — edit it freely.
 
-When you change a setting at runtime (e.g. switching theme), `tv` saves only the
-keys that differ from the defaults back to your `tv.toml`, keeping it small. To
-see all available options, open `tv.default.toml`; to change one, copy that line
-into your `tv.toml`.
+When you change a setting at runtime (e.g. switching theme), `mantis` saves only the
+keys that differ from the defaults back to your `mantis.toml`, keeping it small. To
+see all available options, open `mantis.default.toml`; to change one, copy that line
+into your `mantis.toml`.
 
 ## General options
 
@@ -59,13 +59,13 @@ action can have several shortcuts. A spec is a single character (`"q"`, `"?"`,
 with modifiers: `"ctrl+c"`.
 
 > **No Alt-modified defaults.** The Alt modifier conflicts with terminal-level key
-> processing and is unreliable across terminals. `tv` does not ship any default
-> `alt+` bindings. Users can still configure them in `tv.toml` at their own risk.
+> processing and is unreliable across terminals. `mantis` does not ship any default
+> `alt+` bindings. Users can still configure them in `mantis.toml` at their own risk.
 
 > **Keyboard layouts.** Keybinding specs are written with Latin characters
 > (e.g. `"ctrl+p"`). On terminals that support the [kitty keyboard
 > protocol](https://sw.kovidgoyal.net/kitty/keyboard-protocol/) (kitty, WezTerm,
-> foot, ghostty, and others), `tv` automatically uses the physical key position
+> foot, ghostty, and others), `mantis` automatically uses the physical key position
 > instead of the layout-translated character, so `ctrl+p` works correctly even on
 > non-Latin layouts (Russian, Hebrew, etc.). Terminals without kitty protocol
 > fall back to the logical character — bindings may not trigger as expected on

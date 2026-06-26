@@ -1,4 +1,4 @@
-use tree_viewer::file::is_binary_bytes;
+use mantis::file::is_binary_bytes;
 
 #[test]
 fn text_bytes_are_not_binary() {

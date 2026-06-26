@@ -1,5 +1,5 @@
-# tree-viewer configuration
-# To open this file for editing from within tv: Ctrl+P → "Open config in editor"
+# mantis configuration
+# To open this file for editing from within mantis: Ctrl+P → "Open config in editor"
 
 show_hidden = false
 ignore_gitignore = false
@@ -7,8 +7,8 @@ tree_width = 28
 word_wrap = false
 line_numbers = true  # show line-number gutter in the content pane (toggle at runtime with L)
 # tree_independent_scroll = false  # PageUp/PageDown and Home/End scroll the tree
-                                   # viewport without moving the selection;
-                                   # Up/Down still move the cursor (default: false)
+#                                    viewport without moving the selection;
+#                                    Up/Down still move the cursor (default: false)
 git_status = true
 git_show_deleted = false
 # git_show_untracked = true   # include untracked (??) files in git status/colors (default: true)
@@ -22,7 +22,7 @@ in_file_search = true
 # show_file_info = true      # show encoding and line-ending info in the status bar (default: true)
 indent_guides = true         # draw indentation guides (│) in the tree pane
 # icons = false               # show Nerd Font file-type icons in the tree (requires a
-                               # Nerd Font in your terminal and the iconize plugin enabled)
+                                # Nerd Font in your terminal and the iconize plugin enabled)
 
 # Keybindings. Each action takes a list of key specs. A spec is a single
 # character ("q", "?", "0") or a named key (Up, Down, Left, Right, Enter,
@@ -72,7 +72,7 @@ toggle_blame = ["b"]
 
 # Theme. Select a preset via the theme picker (press `t` or Ctrl+P).
 # Built-in presets: default, monokai, solarized, catppuccin, synthwave84.
-# Full theme files are in ~/.config/tree-viewer/themes/ — copy and edit one
+# Full theme files are in ~/.config/mantis/themes/ — copy and edit one
 # to create a custom theme. Each color accepts a name ("cyan", "reset") or
 # hex ("#aabbcc").
 # [theme]
@@ -96,19 +96,19 @@ toggle_blame = ["b"]
 #
 # Plugin system. Each entry registers a subprocess-based plugin executable.
 # Relative paths are resolved against the platform config directory:
-#   Linux/macOS: $XDG_CONFIG_HOME/tree-viewer/plugins/ (default: ~/.config/tree-viewer/plugins/)
-#   Windows:     %APPDATA%\tree-viewer\plugins\
+#   Linux/macOS: $XDG_CONFIG_HOME/mantis/plugins/ (default: ~/.config/mantis/plugins/)
+#   Windows:     %APPDATA%\mantis\plugins\
 # Plugins communicate via newline-delimited JSON on stdin/stdout. See
-# https://github.com/ansromanov/tree-viewer for protocol docs.
+# https://github.com/ansromanov/mantis for protocol docs.
 # [plugins]
 # my-plugin = { path = "my-plugin.sh", enabled = true }
 #
-# Bundled plugins (ship with tv, installed to the plugin directory on first
+# Bundled plugins (ship with mantis, installed to the plugin directory on first
 # run). Uncomment to enable:
 #   git-diff  = { path = "git-diff.sh" }
 #   git-log   = { path = "git-log.sh" }
 #   iconize   = { path = "iconize.sh" }  # file-type icons in the tree (requires icons = true)
-#   markdown  = { path = "tv-plugin-markdown" }
+#   markdown  = { path = "mantis-plugin-markdown" }
 # git-diff: shows the working-tree diff (with ANSI colours from git) when a
 #   tracked file is opened, replacing the file content.
 # git-log:  press H to view the file's git log (--oneline --color=always) as a
@@ -121,7 +121,7 @@ toggle_blame = ["b"]
 #
 # Syntax plugins register new syntax highlighting definitions. The highlighter
 # auto-discovers .sublime-syntax files in {plugin_dir}/syntaxes/ (installed
-# by tv on first run).  You can also add explicit entries:
+# by mantis on first run).  You can also add explicit entries:
 #   terraform = { kind = "syntax", syntax_file = "syntaxes/terraform.sublime-syntax",
 #                 extensions = ["tf", "tfvars"] }
 #

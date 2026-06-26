@@ -249,7 +249,7 @@ impl App {
         // Restore TUI
         let _ = execute!(std::io::stdout(), EnterAlternateScreen, EnableMouseCapture,);
         if let Err(e) = enable_raw_mode() {
-            eprintln!("tv: failed to restore raw mode after editor: {e}");
+            eprintln!("mantis: failed to restore raw mode after editor: {e}");
         }
 
         // Flag that the terminal was suspended so main.rs clears ratatui's
@@ -260,7 +260,7 @@ impl App {
         self.reload_content();
     }
 
-    /// Opens the global config file (`~/.config/tree-viewer/tv.toml`) in the
+    /// Opens the global config file (`~/.config/mantis/mantis.toml`) in the
     /// user's `$EDITOR`, using the same suspend/resume pattern as `open_in_editor`.
     fn open_config_in_editor(&mut self) {
         let Some(path) = self.config_path.clone() else {
@@ -290,7 +290,7 @@ impl App {
 
         let _ = execute!(std::io::stdout(), EnterAlternateScreen, EnableMouseCapture,);
         if let Err(e) = enable_raw_mode() {
-            eprintln!("tv: failed to restore raw mode after editor: {e}");
+            eprintln!("mantis: failed to restore raw mode after editor: {e}");
         }
 
         self.needs_clear = true;

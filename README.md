@@ -1,47 +1,47 @@
-# tree-viewer (`tv`)
+# mantis
 
 **Browse, read, and review code in your terminal — instantly.**
 
 **Linux / macOS:**
 ```sh
-curl -fsSL https://raw.githubusercontent.com/ansromanov/tree-viewer/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/ansromanov/mantis/main/install.sh | sh
 ```
 
 **Windows (PowerShell):**
 ```powershell
-irm https://raw.githubusercontent.com/ansromanov/tree-viewer/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/ansromanov/mantis/main/install.ps1 | iex
 ```
 
-`tv` is a fast, lightweight file tree viewer with syntax highlighting, markdown
+`mantis` is a fast, lightweight file tree viewer with syntax highlighting, markdown
 rendering, fuzzy search, code folding, and first-class git tooling (diff, blame,
 history). One small binary, no config required — with an optional plugin system
 when you want to extend it. Built with [ratatui](https://ratatui.rs).
 
 <p align="center">
-  <img src="media/intro.png" alt="tree-viewer" width="800">
+  <img src="media/intro.png" alt="mantis" width="800">
 </p>
 
 ```sh
-tv          # open the current directory and start browsing
+mantis      # open the current directory and start browsing
 ```
 
 That's it — no setup step. Press `?` for help, `q` to quit.
 
-## Why tree-viewer?
+## Why mantis?
 
-`tv` is built for one job and does it well: **moving through a codebase and
+`mantis` is built for one job and does it well: **moving through a codebase and
 reading it** — with git context one keystroke away. It is not a full editor, and
 that's the point.
 
-| | **tree-viewer** | **Vim / Neovim** | **VS Code** |
+| | **mantis** | **Vim / Neovim** | **VS Code** |
 | --- | --- | --- | --- |
 | Footprint | Single ~MB binary | Light core, heavy once configured | Electron, hundreds of MB + RAM |
-| Setup to be useful | **Zero** — just run `tv` | Hours of config & plugins | Install, extensions, indexing |
+| Setup to be useful | **Zero** — just run `mantis` | Hours of config & plugins | Install, extensions, indexing |
 | Git diff/blame/history | **Built in** | Needs fugitive/gitsigns/etc. | Needs extensions |
 | Fuzzy + full-text search | **Built in** | Needs telescope/fzf/ripgrep glue | Built in |
 | Starts in | Milliseconds | Fast (slower with a big config) | Seconds |
 
-Reach for `tv` when you want to **explore a repo, read a file, or check a diff**
+Reach for `mantis` when you want to **explore a repo, read a file, or check a diff**
 without spinning up a heavyweight editor. Hit `e` to jump into your `$EDITOR`
 the moment you actually need to change something.
 
@@ -77,7 +77,7 @@ the moment you actually need to change something.
   git mode restored on restart (cached outside the repo)
 - **Recent files** (`Ctrl+O`) and **copy path** (`y` / `Y`)
 - **Open in your editor** (`e`) — jump to the current file in `$VISUAL`/`$EDITOR`,
-  then drop back into `tv` when you're done
+  then drop back into `mantis` when you're done
 - **Themes** — built-in presets (monokai, solarized, catppuccin, synthwave84),
   switchable live, with configurable panel background and terminal transparency
 - **Mouse support** — click to select, fold/unfold directories, switch panes,
@@ -88,22 +88,22 @@ the moment you actually need to change something.
 
 The one-liners above (no Rust toolchain required) download the prebuilt binary
 for your platform, verify its checksum, and install it onto your `PATH`.
-With the Rust toolchain: `cargo install tree-viewer`. Or from source:
+With the Rust toolchain: `cargo install mantis`. Or from source:
 
 ```sh
-git clone https://github.com/ansromanov/tree-viewer.git
-cd tree-viewer && cargo build --release   # binary at target/release/tv
+git clone https://github.com/ansromanov/mantis.git
+cd mantis && cargo build --release   # binary at target/release/mantis
 ```
 
-See the [installation docs](https://ansromanov.github.io/tree-viewer/installation.html)
+See the [installation docs](https://ansromanov.github.io/mantis/installation.html)
 for prebuilt binaries, Windows, and checksum verification.
 
 ## Usage
 
 ```sh
-tv              # view the current directory
-tv path/to/dir  # view a specific directory
-tv file.md      # open a file directly
+mantis          # view the current directory
+mantis path/to/dir  # view a specific directory
+mantis file.md      # open a file directly
 ```
 
 Press `?` at any time for in-app help, and `q` to quit.
@@ -161,7 +161,7 @@ selects and double-click activates.
   the staged diff, and `n`/`N` jump to the next/previous hunk.
 
 All require `git` on your `PATH` and a tracked file/repository. Configure via
-`tv.toml`:
+`mantis.toml`:
 
 ```toml
 git_mode = false         # start in git mode (default: false)
@@ -172,7 +172,7 @@ git_show_deleted = false # show ghost nodes for deleted tracked files (default: 
 
 ## Plugins
 
-`tv` works fully without plugins, but a plugin system is there when you want to
+`mantis` works fully without plugins, but a plugin system is there when you want to
 extend it. Two kinds:
 
 - **Process plugins** — standalone executables that hook into app events and send
@@ -181,24 +181,24 @@ extend it. Two kinds:
   git overlays, and more. A plugin can be any executable — a compiled binary, a
   script, anything that reads stdin and writes stdout.
 - **Syntax plugins** — `.sublime-syntax` files loaded into the syntect highlighter
-  at startup to add new file types without rebuilding `tv`.
+  at startup to add new file types without rebuilding `mantis`.
 
 Press `p` for the plugin palette to enable/disable plugins; the choice persists
-across restarts (under `[plugins]` in `tv.toml`). Bundled plugins auto-register
-and install on first enable, and a git-backed registry (`index.json`) lets `tv`
-discover and fetch community plugins.
+across restarts (under `[plugins]` in `mantis.toml`). Bundled plugins auto-register
+and install on first enable, and a git-backed registry (`index.json`) lets
+`mantis` discover and fetch community plugins.
 
-See the [Plugins guide](https://ansromanov.github.io/tree-viewer/plugins.html),
-[Plugin Registry](https://ansromanov.github.io/tree-viewer/plugin-registry.html),
-and [Plugin Development](https://ansromanov.github.io/tree-viewer/plugin-development.html)
+See the [Plugins guide](https://ansromanov.github.io/mantis/plugins.html),
+[Plugin Registry](https://ansromanov.github.io/mantis/plugin-registry.html),
+and [Plugin Development](https://ansromanov.github.io/mantis/plugin-development.html)
 docs for the full protocol and manifest (`plugin.toml`) format.
 
 ## Configuration
 
-`tv` reads a `tv.toml` file. It first looks for one in the directory being
+`mantis` reads a `mantis.toml` file. It first looks for one in the directory being
 viewed (and its ancestors), then falls back to the global config:
-`$XDG_CONFIG_HOME/tv.toml` (or `~/.config/tv.toml`) on Linux/macOS,
-`%APPDATA%\tree-viewer\tv.toml` on Windows. A project-local file overrides
+`$XDG_CONFIG_HOME/mantis/mantis.toml` (or `~/.config/mantis/mantis.toml`) on Linux/macOS,
+`%APPDATA%\mantis\mantis.toml` on Windows. A project-local file overrides
 the global one, so a repository can ship its own defaults.
 
 ```toml

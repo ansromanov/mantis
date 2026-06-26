@@ -4,7 +4,7 @@
 //! each registered plugin's name and running state (`[✓]` / `[ ]`). The user
 //! navigates with Up/Down and toggles a plugin with Space or Enter; Esc closes
 //! the overlay without any extra action. Toggling immediately spawns or kills
-//! the plugin subprocess and persists the `enabled` flag back to `tv.toml`.
+//! the plugin subprocess and persists the `enabled` flag back to `mantis.toml`.
 //! State lives in `App::plugin_picker`; this module only draws it. A no-op
 //! when the picker is `None`.
 

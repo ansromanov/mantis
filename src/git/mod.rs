@@ -1,4 +1,4 @@
-//! Git integration for `tv`.
+//! Git integration for `mantis`.
 //!
 //! Types are always compiled; function implementations are behind the
 //! `git-core` feature flag (default on). When `git-core` is disabled the

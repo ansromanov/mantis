@@ -480,7 +480,7 @@ impl App {
     /// Toggles the currently highlighted plugin in the picker: spawns it if
     /// stopped, kills it if running, or flips the enabled flag for syntax
     /// plugins and reloads syntax definitions so the change takes effect
-    /// immediately. Updates `config.plugins[name].enabled` and writes `tv.toml`
+    /// immediately. Updates `config.plugins[name].enabled` and writes `mantis.toml`
     /// so the change persists across restarts.
     pub(crate) fn toggle_plugin_picker_selection(&mut self) {
         let Some(picker) = &self.plugin_picker else {

@@ -8,7 +8,7 @@ on:
       - 'tests/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
-      - 'tv.toml'
+      - 'mantis.toml'
   workflow_dispatch:
 
 jobs:
@@ -30,7 +30,7 @@ jobs:
           patch=$(echo "$current" | cut -d. -f3)
           new_version="${major}.${minor}.$((patch + 1))"
           sed -i "s/^version = \"${current}\"/version = \"${new_version}\"/" Cargo.toml
-          sed -i "/^name = \"tree-viewer\"/{n;s/version = \"${current}\"/version = \"${new_version}\"/}" Cargo.lock
+          sed -i "/^name = \"mantis\"/{n;s/version = \"${current}\"/version = \"${new_version}\"/}" Cargo.lock
           echo "version=${new_version}" >> "$GITHUB_OUTPUT"
 
       - name: Commit and push

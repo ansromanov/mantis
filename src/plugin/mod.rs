@@ -1,9 +1,9 @@
-//! Plugin system for `tv`.
+//! Plugin system for `mantis`.
 //!
 //! Two kinds of plugins exist:
 //!
 //! 1. **Process plugins** — standalone executables that communicate via
-//!    newline-delimited JSON on stdin/stdout. `tv` sends lifecycle and hook
+//!    newline-delimited JSON on stdin/stdout. `mantis` sends lifecycle and hook
 //!    events; plugins respond with action events. A reader thread per plugin
 //!    drains stdout non-blockingly over a channel so the event loop never
 //!    blocks on plugin I/O. A writer thread per plugin drains a send queue to
@@ -30,7 +30,7 @@
 //!
 //! 2. **Syntax plugins** — provide a `.sublime-syntax` file that is loaded
 //!    into the syntect highlighter at startup. No subprocess is spawned.
-//!    Syntax plugins are declared in `tv.toml` with `kind = "syntax"` and
+//!    Syntax plugins are declared in `mantis.toml` with `kind = "syntax"` and
 //!    a `syntax_file` path.  Additionally, any `.sublime-syntax` file placed
 //!    in `{plugin_dir}/syntaxes/` is auto-discovered.
 

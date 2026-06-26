@@ -14,7 +14,7 @@ fn plugin_entry_default_is_enabled_process() {
 
 #[test]
 fn plugin_entry_events_deserialize_and_default_empty() {
-    // `events` is optional in tv.toml: absent => empty (all events).
+    // `events` is optional in mantis.toml: absent => empty (all events).
     let without: PluginEntry =
         toml::from_str("path = \"p/run.sh\"\nenabled = true\n").expect("parse");
     assert!(without.events.is_empty());

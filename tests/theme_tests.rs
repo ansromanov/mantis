@@ -1,6 +1,6 @@
 use ratatui::style::Color;
 
-use tree_viewer::theme::{parse_color, Theme};
+use mantis::theme::{parse_color, Theme};
 
 #[test]
 fn parses_names_and_hex() {

@@ -1,7 +1,7 @@
 //! Plugin installation and default directory discovery.
 //!
 //! Locates the platform-specific plugin directory, finds bundled binary
-//! plugins next to the tv binary or in cargo target directories, and
+//! plugins next to the mantis binary or in cargo target directories, and
 //! installs syntax definitions into `{plugin_dir}/syntaxes/`.
 
 use std::path::{Path, PathBuf};
@@ -9,7 +9,7 @@ use std::process::Command;
 
 use crate::plugin::types::{PluginEntry, PluginKind};
 
-/// Returns `(name, PluginEntry)` pairs for every plugin that ships with `tv`,
+/// Returns `(name, PluginEntry)` pairs for every plugin that ships with `mantis`,
 /// each pre-set to `enabled = false` so they appear in the palette without
 /// being spawned automatically.
 pub(crate) fn bundled_plugin_entries() -> Vec<(String, PluginEntry)> {
@@ -22,7 +22,7 @@ pub(crate) fn bundled_plugin_entries() -> Vec<(String, PluginEntry)> {
         };
         // Store the path relative to `default_plugin_dir()` (resolved at spawn
         // time in `PluginManager::activate_all`). An absolute path here would be
-        // serialised verbatim into the user's `tv.toml` on the first plugin
+        // serialised verbatim into the user's `mantis.toml` on the first plugin
         // toggle, pinning a machine-specific home directory into a config that is
         // meant to be portable.
         entries.push((
@@ -56,9 +56,9 @@ pub(crate) fn bundled_plugin_entries() -> Vec<(String, PluginEntry)> {
 
 /// Default plugin discovery directory.
 ///
-/// - Linux/macOS: `$XDG_CONFIG_HOME/tree-viewer/plugins/` (falls back to
-///   `~/.config/tree-viewer/plugins/` when the variable is unset)
-/// - Windows:     `%APPDATA%\tree-viewer\plugins\`
+/// - Linux/macOS: `$XDG_CONFIG_HOME/mantis/plugins/` (falls back to
+///   `~/.config/mantis/plugins/` when the variable is unset)
+/// - Windows:     `%APPDATA%\mantis\plugins\`
 pub(crate) fn default_plugin_dir() -> PathBuf {
     dirs_next().unwrap_or_else(|| PathBuf::from("."))
 }
@@ -66,14 +66,14 @@ pub(crate) fn default_plugin_dir() -> PathBuf {
 fn dirs_next() -> Option<PathBuf> {
     #[cfg(windows)]
     {
-        std::env::var_os("APPDATA").map(|p| PathBuf::from(p).join("tree-viewer").join("plugins"))
+        std::env::var_os("APPDATA").map(|p| PathBuf::from(p).join("mantis").join("plugins"))
     }
     #[cfg(not(windows))]
     {
         std::env::var_os("XDG_CONFIG_HOME")
             .map(PathBuf::from)
             .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
-            .map(|base| base.join("tree-viewer").join("plugins"))
+            .map(|base| base.join("mantis").join("plugins"))
     }
 }
 
@@ -96,9 +96,9 @@ fn which_cargo() -> Option<String> {
 
 /// List of (user-facing_name, binary_name) for each bundled process plugin.
 const BUNDLED_PLUGINS: &[(&str, &str)] = &[
-    ("git-plugin", "tv-plugin-git-plugin"),
-    ("iconize", "tv-plugin-iconize"),
-    ("markdown", "tv-plugin-markdown"),
+    ("git-plugin", "mantis-plugin-git-plugin"),
+    ("iconize", "mantis-plugin-iconize"),
+    ("markdown", "mantis-plugin-markdown"),
 ];
 
 /// List of (filename, content) for each bundled syntax definition.
@@ -145,7 +145,7 @@ pub(crate) fn install_bundled_plugins() {
 }
 
 /// Searches for a compiled Rust binary and copies it to `dest`.
-/// Tries alongside the tv binary, then `target/debug/`, `target/release/`,
+/// Tries alongside the mantis binary, then `target/debug/`, `target/release/`,
 /// and finally builds from source in a background thread.
 fn install_one_binary(binary_name: &str, dest: &Path) {
     let platform_name = if cfg!(windows) {

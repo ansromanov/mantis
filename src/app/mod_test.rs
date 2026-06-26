@@ -4740,7 +4740,7 @@ fn plugin_picker_esc_closes_overlay() {
 
 #[test]
 fn plugin_picker_opens_empty_when_no_plugins_configured() {
-    // Even with an empty tv.toml, bundled plugins are seeded so the palette
+    // Even with an empty mantis.toml, bundled plugins are seeded so the palette
     // is not empty.
     let root = temp_tree();
     let mut app = app_for(&root);

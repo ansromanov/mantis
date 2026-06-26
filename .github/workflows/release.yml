@@ -35,7 +35,7 @@ jobs:
           minor=$(echo "$current" | cut -d. -f2)
           new_version="${major}.$((minor + 1)).0"
           sed -i "s/^version = \"${current}\"/version = \"${new_version}\"/" Cargo.toml
-          sed -i "/^name = \"tree-viewer\"/{n;s/version = \"${current}\"/version = \"${new_version}\"/}" Cargo.lock
+          sed -i "/^name = \"mantis\"/{n;s/version = \"${current}\"/version = \"${new_version}\"/}" Cargo.lock
           echo "version=${new_version}" >> "$GITHUB_OUTPUT"
 
       - name: Write release info
@@ -45,7 +45,7 @@ jobs:
           version = "${{ steps.bump.outputs.version }}"
           date = "$(date +%Y-%m-%d)"
           whats_new = ""
-          release_url = "https://github.com/ansromanov/tree-viewer/releases/tag/v${{ steps.bump.outputs.version }}"
+          release_url = "https://github.com/ansromanov/mantis/releases/tag/v${{ steps.bump.outputs.version }}"
           EOF
 
       - name: Commit and push
@@ -69,19 +69,19 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-musl
-            artifact: tv-linux-x86_64
+            artifact: mantis-linux-x86_64
           - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-musl
-            artifact: tv-linux-aarch64
+            artifact: mantis-linux-aarch64
           - os: macos-latest
             target: aarch64-apple-darwin
-            artifact: tv-macos-aarch64
+            artifact: mantis-macos-aarch64
           - os: macos-latest
             target: x86_64-apple-darwin
-            artifact: tv-macos-x86_64
+            artifact: mantis-macos-x86_64
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact: tv-windows-x86_64.exe
+            artifact: mantis-windows-x86_64.exe
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
@@ -106,7 +106,7 @@ jobs:
       - name: Stage artifact
         shell: bash
         run: |
-          src="target/${{ matrix.target }}/release/tv"
+          src="target/${{ matrix.target }}/release/mantis"
           [[ "${{ runner.os }}" == "Windows" ]] && src="${src}.exe"
           cp "$src" "${{ matrix.artifact }}"
 
@@ -151,7 +151,7 @@ jobs:
           version = "${{ needs.bump.outputs.version }}"
           date = "__RELEASE_DATE__"
           whats_new = """${{ steps.changelog.outputs.log }}"""
-          release_url = "https://github.com/ansromanov/tree-viewer/releases/tag/v${{ needs.bump.outputs.version }}"
+          release_url = "https://github.com/ansromanov/mantis/releases/tag/v${{ needs.bump.outputs.version }}"
           TOMLEOF
           sed -i "s/__RELEASE_DATE__/$(date +%Y-%m-%d)/" release-info.toml
           git add release-info.toml

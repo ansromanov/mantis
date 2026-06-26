@@ -1,0 +1,10 @@
+[package]
+name = "mantis-plugin-git-log"
+version = "0.1.0"
+edition = "2021"
+description = "Bundled git-log plugin for mantis. Shows git file log on H keypress."
+license = "GPL-3.0-or-later"
+repository = "https://github.com/ansromanov/mantis"
+
+[dependencies]
+serde_json = "1"

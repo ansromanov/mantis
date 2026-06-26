@@ -1,7 +1,7 @@
-//! Bundled iconize plugin for tree-viewer (tv).
+//! Bundled iconize plugin for mantis.
 //!
 //! On `init`, sends a `set_icon_map` action with Nerd Font glyphs for ~80
-//! file extensions. Requires `icons = true` in `tv.toml` and a Nerd Font
+//! file extensions. Requires `icons = true` in `mantis.toml` and a Nerd Font
 //! terminal. Exits cleanly on `shutdown`.
 
 use std::collections::BTreeMap;

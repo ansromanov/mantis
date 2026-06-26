@@ -26,7 +26,7 @@ pub(crate) fn draw_about(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(Clear, popup);
 
     let block = Block::default()
-        .title(" About tree-viewer — ? / Esc / q to close ")
+        .title(" About mantis — ? / Esc / q to close ")
         .borders(Borders::ALL)
         .style(Style::default().bg(theme.background))
         .border_style(Style::default().fg(theme.accent_alt));
@@ -60,7 +60,7 @@ pub(crate) fn draw_about(f: &mut Frame, app: &App, area: Rect) {
     let mut rows: Vec<Line> = vec![
         Line::from(""),
         Line::from(vec![Span::styled(
-            "  A fast terminal file tree viewer with",
+            "  A fast terminal file browser with",
             text_style,
         )]),
         Line::from(vec![Span::styled(

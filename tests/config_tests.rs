@@ -3,8 +3,8 @@ use std::time::SystemTime;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use tree_viewer::config::{self, pressed, Config, Keymap};
-use tree_viewer::theme::{Theme, ThemeConfig};
+use mantis::config::{self, pressed, Config, Keymap};
+use mantis::theme::{Theme, ThemeConfig};
 
 fn ev(code: KeyCode, mods: KeyModifiers) -> KeyEvent {
     KeyEvent::new(code, mods)
@@ -93,7 +93,7 @@ fn load_returns_path_of_loaded_file() {
             .subsec_nanos()
     ));
     fs::create_dir_all(&dir).unwrap();
-    let cfg_file = dir.join("tv.toml");
+    let cfg_file = dir.join("mantis.toml");
     fs::write(&cfg_file, "tree_width = 99\n").unwrap();
 
     let (cfg, path, err) = config::load(&dir);
@@ -115,7 +115,7 @@ fn save_and_reload_preserves_theme() {
             .subsec_nanos()
     ));
     fs::create_dir_all(&dir).unwrap();
-    fs::write(dir.join("tv.toml"), "tree_width = 30\n").unwrap();
+    fs::write(dir.join("mantis.toml"), "tree_width = 30\n").unwrap();
 
     let (mut cfg, path, _) = config::load(&dir);
     assert_eq!(cfg.tree_width, 30);

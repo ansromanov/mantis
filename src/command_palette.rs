@@ -89,7 +89,7 @@ pub static COMMANDS: &[CommandEntry] = &[
         action_id: "toggle_watch",
     },
     CommandEntry {
-        name: "About tree-viewer",
+        name: "About mantis",
         action_id: "show_about",
     },
     CommandEntry {

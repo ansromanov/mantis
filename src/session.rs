@@ -1,9 +1,9 @@
-//! Per-root workspace session persistence for `tv`.
+//! Per-root workspace session persistence for `mantis`.
 //!
 //! Persists and restores expanded directories, the last-opened file,
-//! scroll/active-line position, and git-mode state across `tv` restarts.
+//! scroll/active-line position, and git-mode state across `mantis` restarts.
 //! State is cached outside the working directory (under
-//! `$XDG_STATE_HOME/tree-viewer/` on Linux/macOS, `%APPDATA%\\tree-viewer\\`
+//! `$XDG_STATE_HOME/mantis/` on Linux/macOS, `%APPDATA%\\mantis\\`
 //! on Windows) so it survives re-clones and never litters the project tree.
 //!
 //! The on-disk format is a single `sessions.json` mapping canonical root paths
@@ -135,15 +135,15 @@ fn root_key(root: &Path) -> String {
 
 /// Platform-specific state directory.
 ///
-/// Override with the `TV_STATE_DIR` environment variable (used in tests to
+/// Override with the `MANTIS_STATE_DIR` environment variable (used in tests to
 /// isolate concurrent writers).
 fn state_dir_raw() -> Option<PathBuf> {
-    if let Some(val) = std::env::var_os("TV_STATE_DIR") {
+    if let Some(val) = std::env::var_os("MANTIS_STATE_DIR") {
         return Some(PathBuf::from(val));
     }
     #[cfg(windows)]
     {
-        std::env::var_os("APPDATA").map(|p| PathBuf::from(p).join("tree-viewer"))
+        std::env::var_os("APPDATA").map(|p| PathBuf::from(p).join("mantis"))
     }
     #[cfg(not(windows))]
     {
@@ -152,7 +152,7 @@ fn state_dir_raw() -> Option<PathBuf> {
             .or_else(|| {
                 std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local").join("state"))
             })
-            .map(|base| base.join("tree-viewer"))
+            .map(|base| base.join("mantis"))
     }
 }
 

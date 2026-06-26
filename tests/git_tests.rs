@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use tree_viewer::git::{file_diff, file_log, staged_diff, unstaged_diff, working_tree_diff};
+use mantis::git::{file_diff, file_log, staged_diff, unstaged_diff, working_tree_diff};
 
 fn git(dir: &Path, args: &[&str]) {
     let status = Command::new("git")

@@ -1,13 +1,13 @@
-//! Bundled markdown renderer plugin for tree-viewer (tv).
+//! Bundled markdown renderer plugin for mantis.
 //!
-//! Implements the tv plugin protocol to render `.md` files to ANSI escape
+//! Implements the mantis plugin protocol to render `.md` files to ANSI escape
 //! codes. On `on_file_open`, reads the file and sends `set_content` with
 //! rendered lines. Responds to `on_theme_change` to re-render with matching
 //! colours, and `on_keypress` for `M` (raw/rendered toggle).
 //!
 //! ## Theme colour mapping
 //!
-//! tv theme colours are mapped to ANSI 256-colour codes:
+//! mantis theme colours are mapped to ANSI 256-colour codes:
 //!
 //! | Role      | ANSI colour |
 //! |-----------|-------------|

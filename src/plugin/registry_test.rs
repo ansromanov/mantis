@@ -193,14 +193,14 @@ fn registry_dir_respects_env_override() {
     let _guard = crate::plugin::ENV_LOCK
         .lock()
         .unwrap_or_else(|e| e.into_inner());
-    let old = std::env::var_os("TV_PLUGIN_REGISTRY_DIR");
+    let old = std::env::var_os("MANTIS_PLUGIN_REGISTRY_DIR");
     // SAFETY: ENV_LOCK serialises all callers; no other thread mutates this var.
-    unsafe { std::env::set_var("TV_PLUGIN_REGISTRY_DIR", "/tmp/custom-registry") };
+    unsafe { std::env::set_var("MANTIS_PLUGIN_REGISTRY_DIR", "/tmp/custom-registry") };
     let dir = registry_dir();
     unsafe {
         match old {
-            Some(v) => std::env::set_var("TV_PLUGIN_REGISTRY_DIR", v),
-            None => std::env::remove_var("TV_PLUGIN_REGISTRY_DIR"),
+            Some(v) => std::env::set_var("MANTIS_PLUGIN_REGISTRY_DIR", v),
+            None => std::env::remove_var("MANTIS_PLUGIN_REGISTRY_DIR"),
         }
     }
     assert_eq!(dir, PathBuf::from("/tmp/custom-registry"));
@@ -216,7 +216,7 @@ fn clone_or_pull_initializes_bare_registry() {
         .unwrap_or_else(|e| e.into_inner());
 
     // Create a bare registry repo to serve as the remote.
-    let remote = std::env::temp_dir().join(format!("tv_reg_remote_{}", std::process::id()));
+    let remote = std::env::temp_dir().join(format!("mantis_reg_remote_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&remote);
     let status = Command::new("git")
         .args(["init", "-q", "--bare"])
@@ -226,7 +226,7 @@ fn clone_or_pull_initializes_bare_registry() {
     assert!(status.success());
 
     // Clone the bare repo, create index.json, push.
-    let work = std::env::temp_dir().join(format!("tv_reg_work_{}", std::process::id()));
+    let work = std::env::temp_dir().join(format!("mantis_reg_work_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&work);
     let status = Command::new("git")
         .args(["clone", "-q"])
@@ -274,13 +274,13 @@ fn clone_or_pull_initializes_bare_registry() {
     assert!(status.success());
 
     // Point the registry at our remote.
-    let old_repo = std::env::var_os("TV_PLUGIN_REGISTRY");
-    unsafe { std::env::set_var("TV_PLUGIN_REGISTRY", remote.to_str().unwrap()) };
+    let old_repo = std::env::var_os("MANTIS_PLUGIN_REGISTRY");
+    unsafe { std::env::set_var("MANTIS_PLUGIN_REGISTRY", remote.to_str().unwrap()) };
 
-    let old_dir = std::env::var_os("TV_PLUGIN_REGISTRY_DIR");
-    let cache = std::env::temp_dir().join(format!("tv_reg_cache_{}", std::process::id()));
+    let old_dir = std::env::var_os("MANTIS_PLUGIN_REGISTRY_DIR");
+    let cache = std::env::temp_dir().join(format!("mantis_reg_cache_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&cache);
-    unsafe { std::env::set_var("TV_PLUGIN_REGISTRY_DIR", cache.to_str().unwrap()) };
+    unsafe { std::env::set_var("MANTIS_PLUGIN_REGISTRY_DIR", cache.to_str().unwrap()) };
 
     let result = clone_or_pull();
     assert!(result.is_ok(), "clone should succeed: {:?}", result.err());
@@ -302,12 +302,12 @@ fn clone_or_pull_initializes_bare_registry() {
     let _ = std::fs::remove_dir_all(&cache);
     unsafe {
         match old_repo {
-            Some(v) => std::env::set_var("TV_PLUGIN_REGISTRY", v),
-            None => std::env::remove_var("TV_PLUGIN_REGISTRY"),
+            Some(v) => std::env::set_var("MANTIS_PLUGIN_REGISTRY", v),
+            None => std::env::remove_var("MANTIS_PLUGIN_REGISTRY"),
         }
         match old_dir {
-            Some(v) => std::env::set_var("TV_PLUGIN_REGISTRY_DIR", v),
-            None => std::env::remove_var("TV_PLUGIN_REGISTRY_DIR"),
+            Some(v) => std::env::set_var("MANTIS_PLUGIN_REGISTRY_DIR", v),
+            None => std::env::remove_var("MANTIS_PLUGIN_REGISTRY_DIR"),
         }
     }
 }
@@ -318,14 +318,14 @@ fn clone_or_pull_with_invalid_url_returns_error() {
         .lock()
         .unwrap_or_else(|e| e.into_inner());
 
-    let old_dir = std::env::var_os("TV_PLUGIN_REGISTRY_DIR");
-    let cache = std::env::temp_dir().join(format!("tv_reg_bad_{}", std::process::id()));
+    let old_dir = std::env::var_os("MANTIS_PLUGIN_REGISTRY_DIR");
+    let cache = std::env::temp_dir().join(format!("mantis_reg_bad_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&cache);
-    unsafe { std::env::set_var("TV_PLUGIN_REGISTRY_DIR", cache.to_str().unwrap()) };
-    let old_repo = std::env::var_os("TV_PLUGIN_REGISTRY");
+    unsafe { std::env::set_var("MANTIS_PLUGIN_REGISTRY_DIR", cache.to_str().unwrap()) };
+    let old_repo = std::env::var_os("MANTIS_PLUGIN_REGISTRY");
     unsafe {
         std::env::set_var(
-            "TV_PLUGIN_REGISTRY",
+            "MANTIS_PLUGIN_REGISTRY",
             "https://not-a-real-registry.local/test",
         )
     };
@@ -336,12 +336,12 @@ fn clone_or_pull_with_invalid_url_returns_error() {
     let _ = std::fs::remove_dir_all(&cache);
     unsafe {
         match old_repo {
-            Some(v) => std::env::set_var("TV_PLUGIN_REGISTRY", v),
-            None => std::env::remove_var("TV_PLUGIN_REGISTRY"),
+            Some(v) => std::env::set_var("MANTIS_PLUGIN_REGISTRY", v),
+            None => std::env::remove_var("MANTIS_PLUGIN_REGISTRY"),
         }
         match old_dir {
-            Some(v) => std::env::set_var("TV_PLUGIN_REGISTRY_DIR", v),
-            None => std::env::remove_var("TV_PLUGIN_REGISTRY_DIR"),
+            Some(v) => std::env::set_var("MANTIS_PLUGIN_REGISTRY_DIR", v),
+            None => std::env::remove_var("MANTIS_PLUGIN_REGISTRY_DIR"),
         }
     }
 }

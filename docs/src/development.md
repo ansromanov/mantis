@@ -42,7 +42,7 @@ src/
 ├── lib.rs              # Crate root, re-exports the modules below
 ├── app/                # App state and input handling
 │   ├── mod.rs          #   core App state + overlays
-│   ├── key_handlers.rs #   keyboard dispatch (incl. open-in-editor)
+│   ├── key_handlers/   #   keyboard dispatch (incl. open-in-editor)
 │   ├── mouse_handlers.rs #  click/scroll handling
 │   ├── navigation.rs   #   tree movement & expand/collapse
 │   ├── content_pos.rs  #   scroll / wrap position math
@@ -50,10 +50,10 @@ src/
 ├── ui/                 # ratatui rendering
 │   ├── mod.rs          #   layout & frame composition
 │   ├── tree.rs         #   tree panel
-│   ├── content.rs      #   content panel (incl. blame gutter, diffs)
-│   ├── popups.rs       #   search / history / palette / help popups
+│   ├── content/        #   content panel (incl. blame gutter, diffs)
+│   ├── popups/         #   search / history / palette / help popups
 │   └── statusbar.rs    #   status bar
-├── config/             # tv.toml deserialization, keybinding parsing
+├── config/             # mantis.toml deserialization, keybinding parsing
 ├── command_palette.rs  # Ctrl+P action list + fuzzy matching
 ├── search.rs           # fuzzy file + full-text content search
 ├── selection.rs        # text selection model

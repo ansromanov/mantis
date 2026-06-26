@@ -63,26 +63,26 @@ build:
 # build release binary (re-signs on macOS after strip invalidates the linker signature)
 release:
     cargo build --release
-    {{ if os() == "macos" { "codesign --force -s - target/release/tv" } else { "" } }}
+    {{ if os() == "macos" { "codesign --force -s - target/release/mantis" } else { "" } }}
 
 # run with optional args (e.g. just run /some/path)
 run *args:
     cargo run -- {{args}}
 
-# build release, copy tv to ~/.cargo/bin, and install default themes
+# build release, copy mantis to ~/.cargo/bin, and install default themes
 install: release
     #!/usr/bin/env sh
     set -e
     ext=""
-    themes_dir="${XDG_CONFIG_HOME:-$HOME/.config}/tree-viewer/themes"
+    themes_dir="${XDG_CONFIG_HOME:-$HOME/.config}/mantis/themes"
     case "$(uname -s 2>/dev/null)" in
         CYGWIN*|MINGW*|MSYS*)
             ext=".exe"
-            themes_dir="${APPDATA}/tree-viewer/themes"
+            themes_dir="${APPDATA}/mantis/themes"
             ;;
     esac
-    cp "target/release/tv${ext}" "${CARGO_HOME:-$HOME/.cargo}/bin/tv${ext}"
-    [ "$(uname -s 2>/dev/null)" = "Darwin" ] && codesign --force -s - "${CARGO_HOME:-$HOME/.cargo}/bin/tv"
+    cp "target/release/mantis${ext}" "${CARGO_HOME:-$HOME/.cargo}/bin/mantis${ext}"
+    [ "$(uname -s 2>/dev/null)" = "Darwin" ] && codesign --force -s - "${CARGO_HOME:-$HOME/.cargo}/bin/mantis"
     mkdir -p "${themes_dir}"
     cp themes/*.toml "${themes_dir}/"
 
