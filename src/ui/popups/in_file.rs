@@ -20,7 +20,9 @@ use crate::app::App;
 
 pub(crate) fn draw_in_file_search(f: &mut Frame, app: &mut App, area: Rect) {
     let theme = &app.theme;
-    let s = app.in_file_search.as_ref().unwrap();
+    let Some(s) = app.in_file_search.as_ref() else {
+        return;
+    };
     let bar_y = area.y + area.height.saturating_sub(2);
     let bar_rect = Rect {
         x: area.x + 1,
@@ -69,3 +71,7 @@ pub(crate) fn draw_in_file_search(f: &mut Frame, app: &mut App, area: Rect) {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "in_file_test.rs"]
+mod tests;

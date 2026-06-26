@@ -3,7 +3,7 @@ use ratatui::layout::Rect;
 use crate::ui::popups::util::centered_rect;
 use crate::ui::popups::{
     draw_about, draw_command_palette, draw_help, draw_history, draw_in_file_search, draw_recent,
-    draw_search, draw_theme,
+    draw_search, draw_theme, draw_tree_filter,
 };
 
 #[test]
@@ -64,6 +64,21 @@ fn centered_rect_non_zero_origin() {
     assert_eq!(result.height, 20);
     assert_eq!(result.x, 10 + 20);
     assert_eq!(result.y, 5 + 10);
+}
+
+// ── draw_search_none ─────────────────────────────────────────────────────
+
+#[test]
+fn draw_search_none_does_not_panic() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    app.search = None;
+
+    let backend = TestBackend::new(80, 30);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| draw_search(f, &mut app, f.area()))
+        .unwrap();
 }
 
 // ── draw_search ─────────────────────────────────────────────────────────
@@ -223,6 +238,21 @@ fn draw_search_select_highlight() {
     assert!(joined.contains("b.txt"));
 }
 
+// ── draw_history_none ────────────────────────────────────────────────────
+
+#[test]
+fn draw_history_none_does_not_panic() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    app.history = None;
+
+    let backend = TestBackend::new(80, 30);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| draw_history(f, &mut app, f.area()))
+        .unwrap();
+}
+
 // ── draw_history ────────────────────────────────────────────────────────
 
 #[test]
@@ -278,6 +308,21 @@ fn draw_history_empty_commits() {
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
     assert!(joined.contains("History:"));
+}
+
+// ── draw_theme_none ──────────────────────────────────────────────────────
+
+#[test]
+fn draw_theme_none_does_not_panic() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    app.theme_picker = None;
+
+    let backend = TestBackend::new(80, 30);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| draw_theme(f, &mut app, f.area()))
+        .unwrap();
 }
 
 // ── draw_theme ──────────────────────────────────────────────────────────
@@ -339,6 +384,27 @@ fn draw_help_all_sections() {
     assert!(joined.contains("toggle this help"));
     assert!(joined.contains("fuzzy file search"));
     assert!(joined.contains("toggle word wrap"));
+}
+
+// ── draw_in_file_search_none ─────────────────────────────────────────────
+
+#[test]
+fn draw_in_file_search_none_does_not_panic() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    app.in_file_search = None;
+
+    let area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 30,
+    };
+    let backend = TestBackend::new(80, 30);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| draw_in_file_search(f, &mut app, area))
+        .unwrap();
 }
 
 // ── draw_in_file_search ─────────────────────────────────────────────────
@@ -479,6 +545,69 @@ fn draw_command_palette_none_returns_early() {
         .unwrap();
 }
 
+// ── draw_tree_filter ─────────────────────────────────────────────────────
+
+#[test]
+fn draw_tree_filter_none_does_not_panic() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    app.tree_filter = None;
+
+    let area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 30,
+    };
+    let backend = TestBackend::new(80, 30);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| draw_tree_filter(f, &mut app, area))
+        .unwrap();
+}
+
+#[test]
+fn draw_tree_filter_with_query_does_not_panic() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    app.tree_filter = Some(crate::search::TreeFilter::new());
+    if let Some(ref mut f) = app.tree_filter {
+        f.push('r');
+        f.push('s');
+    }
+
+    let area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 30,
+    };
+    let backend = TestBackend::new(80, 30);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| draw_tree_filter(f, &mut app, area))
+        .unwrap();
+}
+
+#[test]
+fn draw_tree_filter_narrow_area_returns_early() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    app.tree_filter = Some(crate::search::TreeFilter::new());
+
+    let area = Rect {
+        x: 0,
+        y: 0,
+        width: 3,
+        height: 30,
+    };
+    let backend = TestBackend::new(3, 30);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| draw_tree_filter(f, &mut app, area))
+        .unwrap();
+}
+
 // ── draw_about ──────────────────────────────────────────────────────────
 
 #[test]
@@ -495,6 +624,21 @@ fn draw_about_shows_version() {
     assert!(joined.contains("Version:"));
     assert!(joined.contains("GPL-3.0"));
     assert!(joined.contains("tree viewer"));
+}
+
+// ── draw_recent_none ─────────────────────────────────────────────────────
+
+#[test]
+fn draw_recent_none_does_not_panic() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    app.recent_files = None;
+
+    let backend = TestBackend::new(80, 30);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| draw_recent(f, &mut app, f.area()))
+        .unwrap();
 }
 
 // ── draw_recent ─────────────────────────────────────────────────────────

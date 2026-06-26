@@ -22,7 +22,9 @@ use super::util::centered_rect;
 
 pub(crate) fn draw_theme(f: &mut Frame, app: &mut App, area: Rect) {
     let theme = &app.theme;
-    let picker = app.theme_picker.as_ref().unwrap();
+    let Some(picker) = app.theme_picker.as_ref() else {
+        return;
+    };
 
     let popup = centered_rect(44, 55, area);
     f.render_widget(Clear, popup);
@@ -87,3 +89,7 @@ pub(crate) fn draw_theme(f: &mut Frame, app: &mut App, area: Rect) {
     app.theme_area = parts[2];
     app.theme_offset = state.offset();
 }
+
+#[cfg(test)]
+#[path = "theme_test.rs"]
+mod tests;

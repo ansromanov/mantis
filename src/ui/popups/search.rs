@@ -24,7 +24,9 @@ use super::util::centered_rect;
 
 pub(crate) fn draw_search(f: &mut Frame, app: &mut App, area: Rect) {
     let theme = &app.theme;
-    let search = app.search.as_ref().unwrap();
+    let Some(search) = app.search.as_ref() else {
+        return;
+    };
 
     let popup = centered_rect(72, 75, area);
     f.render_widget(Clear, popup);
@@ -127,3 +129,7 @@ pub(crate) fn draw_search(f: &mut Frame, app: &mut App, area: Rect) {
     app.search_area = parts[2];
     app.search_offset = state.offset();
 }
+
+#[cfg(test)]
+#[path = "search_test.rs"]
+mod tests;
