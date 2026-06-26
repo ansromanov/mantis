@@ -243,3 +243,11 @@ fn app_new_viewing_revision_starts_none() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn app_new_git_seq_starts_zero() {
+    let root = temp_dir();
+    let app = new_app(&root, Config::default());
+    assert_eq!(app.git_seq, 0, "git_seq must be zero on construction");
+    fs::remove_dir_all(&root).ok();
+}
