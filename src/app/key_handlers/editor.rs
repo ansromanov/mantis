@@ -80,7 +80,6 @@ impl App {
             Some("toggle_git_flat") => {
                 if self.git_mode {
                     self.git_mode_flat = !self.git_mode_flat;
-                    self.config.git_mode_flat = self.git_mode_flat;
                     self.rebuild(true);
                     self.try_open_selected();
                     self.save_config();
@@ -317,10 +316,8 @@ impl App {
         self.tree_width = cfg.tree_width;
         self.tree_independent_scroll = cfg.tree_independent_scroll;
         self.word_wrap = cfg.word_wrap;
-        self.git_status_enabled = cfg.git_status || cfg.git_mode;
+        self.git_status_enabled = cfg.git_status;
         self.git_show_deleted = cfg.git_show_deleted;
-        self.git_mode = cfg.git_mode;
-        self.git_mode_flat = cfg.git_mode_flat;
         self.show_scrollbar = cfg.scrollbar;
         self.show_scroll_percentage = cfg.scroll_percentage;
         self.keys = cfg.keys.clone();

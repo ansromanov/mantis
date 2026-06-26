@@ -22,10 +22,6 @@ indent_guides = true         # draw indentation guides (│) in the tree pane
 # icons = false               # show Nerd Font file-type icons in the tree (requires a
                                # Nerd Font in your terminal and the iconize plugin enabled)
 
-# Git mode: show only changed files and their working-tree diffs.
-# git_mode = false       # start in git mode (default: false)
-# git_mode_flat = false  # start git mode in flat/plain list view (default: false)
-
 # Keybindings. Each action takes a list of key specs. A spec is a single
 # character ("q", "?", "0") or a named key (Up, Down, Left, Right, Enter,
 # Tab, Esc, Backspace, PageUp, PageDown, Home, End, Space), optionally

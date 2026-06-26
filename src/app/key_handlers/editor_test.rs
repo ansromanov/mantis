@@ -148,3 +148,14 @@ fn tree_up_dir_command_changes_root_for_top_level_file() {
     );
     fs::remove_dir_all(&orig_root).ok();
 }
+
+#[test]
+fn toggle_git_mode_command_flips_git_mode_flag() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    assert!(!app.git_mode);
+    app.command_palette = Some(palette_with_query("Toggle git mode"));
+    app.dispatch_command();
+    assert!(app.git_mode, "Toggle git mode command must enable git mode");
+    fs::remove_dir_all(&root).ok();
+}

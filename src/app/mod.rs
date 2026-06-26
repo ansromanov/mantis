@@ -391,7 +391,6 @@ impl App {
             current_file: self.current_file.clone(),
             content_scroll: self.content_scroll,
             active_line: self.active_line,
-            git_mode: self.git_mode,
         };
         crate::session::save(&self.root, &state);
         self.session_dirty = false;

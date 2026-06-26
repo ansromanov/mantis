@@ -45,7 +45,6 @@ fn round_trip_preserves_all_fields() {
         current_file: Some(env.root.join("f.txt")),
         content_scroll: 10,
         active_line: 12,
-        git_mode: true,
     };
 
     save(&env.root, &state);
@@ -62,7 +61,6 @@ fn save_and_load_empty_state() {
     let loaded = load(&env.root).unwrap();
     assert!(loaded.expanded.is_empty());
     assert!(loaded.current_file.is_none());
-    assert!(!loaded.git_mode);
 }
 
 #[test]
@@ -131,18 +129,18 @@ fn multiple_roots_are_independent() {
     fs::create_dir_all(&d2).unwrap();
 
     let s1 = SessionState {
-        git_mode: true,
+        content_scroll: 5,
         ..SessionState::default()
     };
     let s2 = SessionState {
-        git_mode: false,
+        content_scroll: 10,
         ..SessionState::default()
     };
     save(&d1, &s1);
     save(&d2, &s2);
 
-    assert!(load(&d1).unwrap().git_mode);
-    assert!(!load(&d2).unwrap().git_mode);
+    assert_eq!(load(&d1).unwrap().content_scroll, 5);
+    assert_eq!(load(&d2).unwrap().content_scroll, 10);
 }
 
 #[test]
@@ -151,7 +149,7 @@ fn root_key_normalises_trailing_separator() {
     let env = TestEnv::new("trail");
 
     let state = SessionState {
-        git_mode: true,
+        content_scroll: 7,
         ..SessionState::default()
     };
     save(&env.root, &state);
@@ -159,5 +157,5 @@ fn root_key_normalises_trailing_separator() {
     // Load with a trailing-slash variant of the same path
     let with_slash: PathBuf = format!("{}/", env.root.display()).into();
     let loaded = load(&with_slash);
-    assert!(loaded.unwrap().git_mode);
+    assert_eq!(loaded.unwrap().content_scroll, 7);
 }

@@ -781,22 +781,27 @@ fn git_mode_outside_repo_gives_empty_tree() {
 }
 
 #[test]
-fn git_mode_config_starts_enabled() {
+fn git_mode_starts_normal_despite_session() {
     let root = temp_git_with_changes();
-    let cfg = Config {
-        git_mode: true,
-        ..Config::default()
-    };
-    let app = App::new(root.to_path_buf(), cfg, None, None).unwrap();
-
-    assert!(app.git_mode);
-    assert!(
-        !app.nodes.iter().any(|n| n.name == "unchanged.txt"),
-        "unchanged file must be absent when starting in git mode"
+    // Simulate a session saved with git_mode=true — this field no longer exists
+    // in SessionState, but old JSON with it still parses and is ignored.
+    let old_style = r#"{"version":1,"sessions":{"#;
+    let key = root.to_string_lossy();
+    let old_style = format!(
+        r#"{}"{}":{{"expanded":[],"current_file":null,"content_scroll":0,"active_line":0,"git_mode":true}}}}"#,
+        old_style, key
     );
+    let session_file = crate::session::sessions_path().unwrap();
+    if let Some(parent) = session_file.parent() {
+        std::fs::create_dir_all(parent).unwrap();
+    }
+    std::fs::write(&session_file, &old_style).unwrap();
+
+    let app = App::new(root.to_path_buf(), Config::default(), None, None).unwrap();
+
     assert!(
-        app.nodes.iter().any(|n| n.name == "committed.txt"),
-        "changed file must be visible when starting in git mode"
+        !app.git_mode,
+        "must start in normal mode despite session git_mode"
     );
     fs::remove_dir_all(&root).ok();
 }

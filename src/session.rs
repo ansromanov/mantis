@@ -9,8 +9,7 @@
 //! The on-disk format is a single `sessions.json` mapping canonical root paths
 //! to per-root [`SessionState`] structs. Stale or corrupt entries are silently
 //! ignored on load. The entry is a JSON object keyed by root: each root maps
-//! to a state with `{ expanded, current_file, content_scroll, active_line,
-//! git_mode }`.
+//! to a state with `{ expanded, current_file, content_scroll, active_line }`.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -29,8 +28,6 @@ pub struct SessionState {
     pub content_scroll: usize,
     /// Active line (cursor) in the content pane.
     pub active_line: usize,
-    /// Whether git mode is active.
-    pub git_mode: bool,
 }
 
 /// On-disk collection of all persisted sessions.

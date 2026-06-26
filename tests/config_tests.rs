@@ -55,7 +55,6 @@ fn default_config_serializes_and_round_trips() {
     assert!(!toml_str.is_empty());
     let back: Config = toml::from_str(&toml_str).expect("serialized config must round-trip");
     assert_eq!(back.show_hidden, cfg.show_hidden);
-    assert_eq!(back.git_mode, cfg.git_mode);
     assert_eq!(back.tree_width, cfg.tree_width);
     assert!(pressed(
         &back.keys.quit,
