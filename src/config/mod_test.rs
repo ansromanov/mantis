@@ -124,6 +124,92 @@ fn malformed_local_config_reports_warning_and_falls_back() {
     fs::remove_dir_all(&dir).ok();
 }
 
+// ---- kitty keyboard protocol base-key matching ---------------------------
+
+#[cfg(unix)]
+use crate::event_source::CURRENT_BASE_KEY;
+
+/// Synthetic key event with explicit modifiers.
+fn evm(code: KeyCode, mods: KeyModifiers) -> KeyEvent {
+    KeyEvent::new(code, mods)
+}
+
+#[test]
+#[cfg(unix)]
+fn matches_uses_base_key_when_available_for_char_binding() {
+    let binding = parse_binding("ctrl+p").unwrap();
+
+    // A Russian-layout key event: physical P key produces 'з' (U+0437).
+    let event = evm(KeyCode::Char('з'), KeyModifiers::CONTROL);
+
+    // Without a base key, it should NOT match 'ctrl+p'.
+    CURRENT_BASE_KEY.with(|cell| cell.set(None));
+    assert!(!binding.matches(&event));
+
+    // With the base key set to 'p' (the US-layout physical key), it SHOULD match.
+    CURRENT_BASE_KEY.with(|cell| cell.set(Some(KeyCode::Char('p'))));
+    assert!(binding.matches(&event));
+
+    // Clean up.
+    CURRENT_BASE_KEY.with(|cell| cell.set(None));
+}
+
+#[test]
+#[cfg(unix)]
+fn base_key_does_not_affect_non_char_bindings() {
+    let binding = parse_binding("Enter").unwrap();
+    let event = evm(KeyCode::Enter, KeyModifiers::empty());
+
+    // Even with a stale base key, a non-Char binding matches against key.code.
+    CURRENT_BASE_KEY.with(|cell| cell.set(Some(KeyCode::Char('p'))));
+    assert!(binding.matches(&event));
+
+    CURRENT_BASE_KEY.with(|cell| cell.set(None));
+}
+
+#[test]
+#[cfg(unix)]
+fn base_key_does_not_substitute_for_wrong_modifiers() {
+    let binding = parse_binding("p").unwrap();
+    let event = evm(KeyCode::Char('з'), KeyModifiers::ALT);
+
+    // Base key is 'p' but event has Alt modifier — binding requires no modifier.
+    CURRENT_BASE_KEY.with(|cell| cell.set(Some(KeyCode::Char('p'))));
+    assert!(!binding.matches(&event));
+
+    CURRENT_BASE_KEY.with(|cell| cell.set(None));
+}
+
+#[test]
+#[cfg(unix)]
+fn base_key_does_not_break_binding_without_alternate() {
+    // When no base key is set, behaviour is identical to before.
+    let binding = parse_binding("g").unwrap();
+    let event = evm(KeyCode::Char('g'), KeyModifiers::empty());
+
+    CURRENT_BASE_KEY.with(|cell| cell.set(None));
+    assert!(binding.matches(&event));
+}
+
+#[test]
+#[cfg(unix)]
+fn pressed_honours_current_base_key() {
+    let bindings = bind(&["ctrl+p", "ctrl+g"]);
+    let event = evm(KeyCode::Char('з'), KeyModifiers::CONTROL);
+
+    // Without base key: no match (з != p, з != g).
+    CURRENT_BASE_KEY.with(|cell| cell.set(None));
+    assert!(!pressed(&bindings, &event));
+
+    // With base key 'p': ctrl+p matches.
+    CURRENT_BASE_KEY.with(|cell| cell.set(Some(KeyCode::Char('p'))));
+    assert!(pressed(&bindings, &event));
+
+    CURRENT_BASE_KEY.with(|cell| cell.set(None));
+}
+
+// ---- end kitty-protocol tests --------------------------------------------
+
 fn scratch_dir(tag: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!(
         "tv_cfg_{tag}_{}_{}",

@@ -43,7 +43,7 @@ fn draw_no_overlay() {
     // The version badge (P_VER, highest priority) fills the 80-char status bar;
     // the 92-char keybinding hint is correctly elided at this width.
     assert!(
-        rows[29].contains("v0.7"),
+        rows[29].contains(&format!("v{}", env!("CARGO_PKG_VERSION"))),
         "status bar should show version string"
     );
 }

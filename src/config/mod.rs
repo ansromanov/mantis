@@ -27,6 +27,9 @@ use std::path::{Path, PathBuf};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use serde::{Deserialize, Deserializer, Serialize};
 
+#[cfg(unix)]
+use crate::event_source::CURRENT_BASE_KEY;
+
 use crate::plugin::PluginEntry;
 use crate::theme::ThemeConfig;
 
@@ -110,8 +113,30 @@ pub struct KeyBinding {
 impl KeyBinding {
     /// Whether a key event matches this binding. Shift is intentionally
     /// ignored because crossterm already encodes it in the char case.
+    ///
+    /// On terminals that support the kitty keyboard protocol with
+    /// `REPORT_ALTERNATE_KEYS`, the event carries a *base key* — the
+    /// US-layout physical key. When it is available, `matches` prefers the
+    /// base key over `key.code` for `Char` bindings, so shortcuts work
+    /// regardless of the active keyboard layout.
     pub fn matches(&self, key: &KeyEvent) -> bool {
-        key.code == self.code
+        #[cfg(unix)]
+        let event_code = CURRENT_BASE_KEY
+            .with(|cell| cell.get())
+            .and_then(|bk| {
+                // Only substitute for Char bindings; layout-dependent keys
+                // (Enter, Space, Tab, arrows, …) are never affected.
+                if matches!(self.code, KeyCode::Char(_)) {
+                    Some(bk)
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(key.code);
+        #[cfg(not(unix))]
+        let event_code = key.code;
+
+        event_code == self.code
             && key.modifiers.contains(KeyModifiers::CONTROL) == self.ctrl
             && key.modifiers.contains(KeyModifiers::ALT) == self.alt
             && key.modifiers.contains(KeyModifiers::SUPER) == self.super_key
