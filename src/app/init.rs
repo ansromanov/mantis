@@ -269,7 +269,7 @@ impl App {
             app.expand_git_dirs();
         }
         if has_session_override || app.git_mode {
-            app.rebuild();
+            app.rebuild(true);
         }
 
         // If the session specifies a file, select it in the tree.

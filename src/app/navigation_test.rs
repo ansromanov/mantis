@@ -47,7 +47,7 @@ fn collapse_all_clears_expanded() {
     let mut app = app_for(&root);
 
     app.expanded.insert(root.join("sub"));
-    app.rebuild();
+    app.rebuild(true);
     assert!(!app.expanded.is_empty(), "sub should be expanded");
 
     app.collapse_all();
@@ -109,7 +109,7 @@ fn collapse_all_key_binding() {
     let mut app = app_for(&root);
 
     app.expanded.insert(root.join("sub"));
-    app.rebuild();
+    app.rebuild(true);
 
     app.handle_key(KeyEvent::new(KeyCode::Char('-'), KeyModifiers::empty()));
 
@@ -164,7 +164,7 @@ fn collapse_all_selects_nearest_ancestor_for_nested_selection() {
     let mut app = app_for(&root);
 
     app.expanded.insert(root.join("sub"));
-    app.rebuild();
+    app.rebuild(true);
     let nested_idx = app
         .nodes
         .iter()
@@ -192,7 +192,7 @@ fn navigate_to_breadcrumb_root_selects_index_zero() {
     app.expanded.insert(root.join("sub1").join("sub2"));
     app.expanded
         .insert(root.join("sub1").join("sub2").join("sub3"));
-    app.rebuild();
+    app.rebuild(true);
     let deepest = root
         .join("sub1")
         .join("sub2")
@@ -217,7 +217,7 @@ fn navigate_to_breadcrumb_selects_intermediate_dir() {
     app.expanded.insert(root.join("sub1").join("sub2"));
     app.expanded
         .insert(root.join("sub1").join("sub2").join("sub3"));
-    app.rebuild();
+    app.rebuild(true);
     let deepest = root
         .join("sub1")
         .join("sub2")
@@ -407,7 +407,7 @@ fn navigate_to_breadcrumb_preserves_other_expansions() {
     // Expand sub1 + sub1/sub2 and keep them open.
     app.expanded.insert(root.join("sub1"));
     app.expanded.insert(root.join("sub1").join("sub2"));
-    app.rebuild();
+    app.rebuild(true);
 
     let top = root.join("top.txt");
     app.tree_selected = app.nodes.iter().position(|n| n.path == top).unwrap();
@@ -449,7 +449,7 @@ fn rebuild_scrolls_restored_selection_into_view() {
     app.tree_scroll = 0;
     let sel_path = app.nodes[last].path.clone();
 
-    app.rebuild();
+    app.rebuild(true);
 
     // Selection preserved by path, viewport nudged so it stays visible.
     assert_eq!(app.nodes[app.tree_selected].path, sel_path);
@@ -521,7 +521,7 @@ fn tree_up_dir_from_nested_selection_goes_to_ancestor_then_root() {
     app.expanded.insert(sub1.clone());
     app.expanded.insert(sub2.clone());
     app.expanded.insert(sub3.clone());
-    app.rebuild();
+    app.rebuild(true);
     // Select deepest.txt at root/sub1/sub2/sub3/deepest.txt
     let deep = sub3.join("deepest.txt");
     let deep_idx = app
@@ -556,4 +556,98 @@ fn tree_up_dir_from_nested_selection_goes_to_ancestor_then_root() {
         "third up: should change root to root's parent"
     );
     fs::remove_dir_all(&orig_root).ok();
+}
+
+#[test]
+fn rebuild_false_preserves_scroll() {
+    let root = temp_tree();
+    // Enough files to overflow a short viewport.
+    for i in 0..20 {
+        fs::write(root.join(format!("f{i:02}.txt")), "").unwrap();
+    }
+    let mut app = app_for(&root);
+    app.tree_area = Rect {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 3,
+    };
+    assert!(app.nodes.len() > 5, "tree must overflow the viewport");
+
+    // Select the first node, then scroll the viewport far down.
+    let first_path = app.nodes[0].path.clone();
+    app.tree_selected = 0;
+    let scroll_target = app.tree_scroll_max().saturating_sub(1);
+    app.tree_scroll = scroll_target;
+
+    app.rebuild(false);
+
+    // Selection preserved by path (same node as before).
+    assert_eq!(app.nodes[app.tree_selected].path, first_path);
+    // Scroll unchanged (only clamped, which it shouldn't be here).
+    assert_eq!(
+        app.tree_scroll, scroll_target,
+        "tree_scroll must not change after rebuild(false)"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn rebuild_false_clamps_scroll_when_tree_shrinks() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.tree_area = Rect {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 3,
+    };
+    // Force a scroll past the tree's max (3 root-level nodes, height=3 → max=0).
+    app.tree_scroll = 999;
+    app.tree_selected = 0;
+
+    app.rebuild(false);
+
+    // tree_scroll should be clamped to the new max.
+    let max = app.tree_scroll_max();
+    assert!(
+        app.tree_scroll <= max,
+        "tree_scroll must be clamped to {} after rebuild(false), got {}",
+        max,
+        app.tree_scroll
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn rebuild_true_recenters_selection() {
+    let root = temp_tree();
+    for i in 0..20 {
+        fs::write(root.join(format!("f{i:02}.txt")), "").unwrap();
+    }
+    let mut app = app_for(&root);
+    app.tree_area = Rect {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 3,
+    };
+
+    // Select last node but force scroll to top.
+    let last = app.nodes.len() - 1;
+    app.tree_selected = last;
+    app.tree_scroll = 0;
+
+    app.rebuild(true);
+
+    // After recenter=true, selection must be visible in the viewport.
+    let h = app.tree_area.height as usize;
+    assert!(
+        app.tree_selected >= app.tree_scroll && app.tree_selected < app.tree_scroll + h,
+        "rebuild(true) must nudge viewport so selection {} is visible in [{}, {})",
+        app.tree_selected,
+        app.tree_scroll,
+        app.tree_scroll + h
+    );
+    fs::remove_dir_all(&root).ok();
 }
