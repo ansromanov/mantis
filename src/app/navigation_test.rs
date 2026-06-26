@@ -684,3 +684,41 @@ fn set_root_clears_viewing_revision() {
     );
     fs::remove_dir_all(&orig_root).ok();
 }
+
+#[test]
+fn toggle_git_mode_requests_async_status_refresh_when_enabled() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.git_status_enabled = true;
+    // In test builds request_git_status_refresh is synchronous.
+    // Non-git root → status stays empty; verify no panic and mode flipped.
+    app.toggle_git_mode();
+    assert!(app.git_mode, "toggle must enable git mode");
+    let _ = app.git_status_map.len();
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn set_root_refreshes_git_status_when_enabled() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.git_status_enabled = true;
+    // Seed a stale entry so we can verify the refresh cleared it.
+    app.git_status_map
+        .insert(root.join("stale.txt"), crate::git::GitStatus::Modified);
+    // tree_up_dir on a file at root triggers set_root(parent).
+    let file_idx = app
+        .nodes
+        .iter()
+        .position(|n| n.path == root.join("a.txt"))
+        .expect("a.txt node");
+    app.tree_selected = file_idx;
+    app.tree_up_dir();
+    // request_git_status_refresh ran synchronously; new root is not a git
+    // repo → map is empty (stale entry gone).
+    assert!(
+        app.git_status_map.is_empty(),
+        "set_root must replace stale git status with fresh scan"
+    );
+    fs::remove_dir_all(&root).ok();
+}

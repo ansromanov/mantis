@@ -10,7 +10,7 @@
 
 use std::time::Duration;
 
-use super::loader::{LoadRequest, LoadResponse};
+use super::loader::{GitStatusLoad, LoadRequest, LoadResponse};
 use super::App;
 
 impl App {
@@ -69,9 +69,9 @@ impl App {
         }
     }
 
-    /// Drains all pending worker responses, applying the one matching the most
-    /// recent `load_seq` and discarding superseded results. Returns `true` if a
-    /// load was applied (so the caller knows to redraw).
+    /// Drains all pending worker responses, applying those matching the most
+    /// recent sequence numbers and discarding superseded results. Returns
+    /// `true` if a file/diff load was applied (so the caller knows to redraw).
     pub(super) fn drain_loads(&mut self) -> bool {
         // Collect first so the immutable borrow of `self.loader` is released
         // before `apply_*` takes `&mut self`.
@@ -94,9 +94,26 @@ impl App {
                         applied = true;
                     }
                 }
+                LoadResponse::GitStatus { seq, root, load } => {
+                    if seq == self.git_seq && root == self.root {
+                        self.apply_git_status_load(*load);
+                    }
+                }
             }
         }
         applied
+    }
+
+    /// Applies a [`GitStatusLoad`] to the app state, updating the status map
+    /// and info. When in git mode, expand git dirs and rebuild the tree so
+    /// colors and filtering are current.
+    pub(super) fn apply_git_status_load(&mut self, load: GitStatusLoad) {
+        self.git_status_map = load.status_map;
+        self.git_info = load.info;
+        if self.git_mode {
+            self.expand_git_dirs();
+            self.rebuild(false);
+        }
     }
 
     /// Bumps the load sequence so any in-flight worker result is treated as
@@ -136,6 +153,30 @@ impl App {
                 root: self.root.clone(),
                 path: path.to_path_buf(),
                 diff_mode: self.diff_mode,
+            });
+        }
+    }
+
+    /// Enqueues a git-status refresh (production) or runs it synchronously
+    /// (tests). Bumps `git_seq` so earlier in-flight results are ignored.
+    pub(super) fn request_git_status_refresh(&mut self) {
+        if cfg!(test) {
+            #[cfg(feature = "git-core")]
+            {
+                self.git_status_map = crate::git::repo_status(&self.root, self.ignore_gitignore);
+                self.git_info = crate::git::repo_info(&self.root);
+            }
+            #[cfg(not(feature = "git-core"))]
+            {
+                self.git_status_map.clear();
+                self.git_info = None;
+            }
+        } else {
+            self.git_seq = self.git_seq.wrapping_add(1);
+            self.loader.request(LoadRequest::GitStatus {
+                seq: self.git_seq,
+                root: self.root.clone(),
+                ignore_gitignore: self.ignore_gitignore,
             });
         }
     }

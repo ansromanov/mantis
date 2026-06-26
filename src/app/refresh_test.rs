@@ -364,6 +364,7 @@ fn create_base_app() -> App {
         loader: crate::app::loader::Loader::new(&Theme::default(), Vec::new()),
         load_seq: 0,
         loading: false,
+        git_seq: 0,
         plugin_manager: PluginManager::new(Vec::new()),
         plugin_is_opening_file: false,
         plugin_message: None,
@@ -960,6 +961,96 @@ fn set_status_creates_message_with_timestamp() {
         "timestamp must be recent"
     );
 }
+
+// -- git status refresh tests -------------------------------------------------
+
+#[test]
+fn apply_git_status_load_updates_map_and_info() {
+    let mut app = create_base_app();
+    assert!(app.git_status_map.is_empty());
+    assert!(app.git_info.is_none());
+
+    let mut sm = std::collections::HashMap::new();
+    sm.insert(
+        std::path::PathBuf::from("/repo/file.txt"),
+        crate::git::GitStatus::Modified,
+    );
+    let info = crate::git::GitRepoInfo {
+        head: crate::git::GitHead::Branch("main".into()),
+        ahead: 0,
+        behind: 0,
+        total_changed: 1,
+        staged: 0,
+        untracked: 0,
+    };
+    let load = GitStatusLoad {
+        status_map: sm.clone(),
+        info: Some(info.clone()),
+    };
+    app.apply_git_status_load(load);
+
+    assert_eq!(
+        app.git_status_map
+            .get(&std::path::PathBuf::from("/repo/file.txt")),
+        Some(&crate::git::GitStatus::Modified)
+    );
+    assert_eq!(
+        app.git_info.as_ref().map(|i| &i.head),
+        Some(&crate::git::GitHead::Branch("main".into()))
+    );
+}
+
+#[test]
+fn apply_git_status_load_rebuilds_tree_in_git_mode() {
+    use std::io::Write;
+    let mut f = tempfile::NamedTempFile::with_suffix(".rs").unwrap();
+    f.write_all(b"fn main() {}\n").unwrap();
+    let dir = f.path().parent().unwrap().to_path_buf();
+
+    let mut app = App {
+        root: dir.clone(),
+        git_mode: true,
+        git_status_enabled: true,
+        git_seq: 0,
+        ..create_base_app()
+    };
+    // Build initial tree (empty status → all nodes shown in non-git mode).
+    // In git mode an empty map yields an empty filtered tree.
+    app.nodes = vec![crate::tree::TreeNode {
+        path: f.path().to_path_buf(),
+        name: "test.rs".into(),
+        depth: 0,
+        is_dir: false,
+        deleted: false,
+    }];
+    let load = GitStatusLoad {
+        status_map: std::collections::HashMap::new(),
+        info: None,
+    };
+    app.apply_git_status_load(load);
+    // Map is still empty, so git-mode filter removes the node.
+    assert!(
+        app.nodes.is_empty(),
+        "git mode with empty map must yield empty tree"
+    );
+}
+
+#[test]
+fn request_git_status_refresh_is_sync_in_tests() {
+    let mut app = create_base_app();
+    assert!(app.git_status_map.is_empty());
+    assert!(app.git_info.is_none());
+
+    app.request_git_status_refresh();
+
+    // In test builds request_git_status_refresh runs synchronously.
+    // For a non-git-repo root the map/info remain empty — the important
+    // thing is the call doesn't crash and the fields are accessible.
+    assert!(app.git_status_map.is_empty());
+    assert!(app.git_info.is_none());
+}
+
+// -- Extension trait ----------------------------------------------------------
 
 /// Extension trait to drive the production `handle_plugin_action` with a
 /// synthetic action, so tests exercise the real code path instead of a copy.

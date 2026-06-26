@@ -163,10 +163,10 @@ impl App {
         self.plugin_manager.on_selection_change(Some(path));
     }
 
-    /// Toggles git mode on/off. Enabling git mode fetches git status if needed,
-    /// auto-expands changed directories, rebuilds the tree, and shows the
-    /// working-tree diff for the selected file. Disabling restores the full
-    /// tree and re-opens the current file as plain content.
+    /// Toggles git mode on/off. Enabling git mode fetches git status (async in
+    /// production) if needed, auto-expands changed directories, rebuilds the
+    /// tree, and shows the working-tree diff for the selected file. Disabling
+    /// restores the full tree and re-opens the current file as plain content.
     pub(super) fn toggle_git_mode(&mut self) {
         self.git_mode = !self.git_mode;
         self.mark_session_dirty();
@@ -174,12 +174,7 @@ impl App {
             // Ensure git status is populated even if git_status was disabled.
             if !self.git_status_enabled {
                 self.git_status_enabled = true;
-                #[cfg(feature = "git-core")]
-                {
-                    self.git_status_map =
-                        crate::git::repo_status(&self.root, self.ignore_gitignore);
-                    self.git_info = crate::git::repo_info(&self.root);
-                }
+                self.request_git_status_refresh();
             }
             self.expand_git_dirs();
             self.rebuild(true);
@@ -340,15 +335,14 @@ impl App {
         self.plugin_git_info = None;
         self.plugin_contributions.clear();
         self.load_seq = self.load_seq.wrapping_add(1);
-        #[cfg(feature = "git-core")]
         if self.git_status_enabled {
-            self.git_status_map = crate::git::repo_status(&self.root, self.ignore_gitignore);
-            self.git_info = crate::git::repo_info(&self.root);
-        }
-        #[cfg(not(feature = "git-core"))]
-        {
-            self.git_status_map.clear();
-            self.git_info = None;
+            #[cfg(feature = "git-core")]
+            self.request_git_status_refresh();
+            #[cfg(not(feature = "git-core"))]
+            {
+                self.git_status_map.clear();
+                self.git_info = None;
+            }
         }
         if self.git_mode {
             self.expand_git_dirs();

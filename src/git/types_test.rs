@@ -116,3 +116,13 @@ fn blame_line_subject_roundtrips() {
     };
     assert_eq!(b.subject, msg);
 }
+
+// -- GitStatus Debug derive --------------------------------------------------
+
+#[test]
+fn git_status_derives_debug() {
+    assert_eq!(format!("{:?}", GitStatus::New), "New");
+    assert_eq!(format!("{:?}", GitStatus::Modified), "Modified");
+    assert_eq!(format!("{:?}", GitStatus::Deleted), "Deleted");
+    assert_eq!(format!("{:?}", GitStatus::Ignored), "Ignored");
+}

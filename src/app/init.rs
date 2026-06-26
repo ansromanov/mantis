@@ -217,6 +217,7 @@ impl App {
             loader,
             load_seq: 0,
             loading: false,
+            git_seq: 0,
             plugin_manager,
             plugin_is_opening_file: false,
             plugin_message: plugin_spawn_error,

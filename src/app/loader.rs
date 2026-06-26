@@ -16,6 +16,7 @@
 //! `compute_diff_load` accepts a [`crate::app::DiffMode`] parameter to choose
 //! between all-changes, staged, and unstaged diff variants.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Arc;
@@ -26,6 +27,7 @@ use ratatui::style::Style;
 use crate::app::DiffMode;
 use crate::file::{detect_encoding_prefix, detect_line_ending, is_binary_bytes};
 use crate::fold::FoldRegion;
+use crate::git::GitStatus;
 use crate::highlight::Highlighter;
 use crate::plugin::ExtraSyntax;
 use crate::theme::Theme;
@@ -77,6 +79,12 @@ pub(super) struct DiffLoad {
     pub highlighted: Spans,
     pub diff_rows: Vec<crate::diff::DiffRow>,
     pub content_title: String,
+}
+
+/// Computed result of a git status scan (status map + repo info).
+pub(super) struct GitStatusLoad {
+    pub status_map: HashMap<PathBuf, GitStatus>,
+    pub info: Option<crate::git::GitRepoInfo>,
 }
 
 impl FileLoad {
@@ -206,6 +214,24 @@ pub(super) fn compute_file_load(path: &Path, theme: &Theme, hl: &Highlighter) ->
     load
 }
 
+/// Runs `repo_status` + `repo_info` for `root` off the UI thread.
+pub(super) fn compute_git_status_load(root: &Path, ignore_gitignore: bool) -> GitStatusLoad {
+    #[cfg(feature = "git-core")]
+    {
+        let status_map = crate::git::repo_status(root, ignore_gitignore);
+        let info = crate::git::repo_info(root);
+        GitStatusLoad { status_map, info }
+    }
+    #[cfg(not(feature = "git-core"))]
+    {
+        let _ = ignore_gitignore;
+        GitStatusLoad {
+            status_map: HashMap::new(),
+            info: None,
+        }
+    }
+}
+
 /// Runs the appropriate `git diff` variant for `path` and parses it into
 /// renderable diff state. The `diff_mode` parameter selects between all changes
 /// vs HEAD, staged changes only, or unstaged changes only.
@@ -251,6 +277,12 @@ pub(super) enum LoadRequest {
         path: PathBuf,
         diff_mode: DiffMode,
     },
+    /// Fetch git status (`repo_status` + `repo_info`) for `root`.
+    GitStatus {
+        seq: u64,
+        root: PathBuf,
+        ignore_gitignore: bool,
+    },
     /// Rebuild the worker's highlighter/theme after a theme change.
     SetTheme(Box<Theme>),
     /// Rebuild the worker's highlighter with updated syntax definitions.
@@ -270,6 +302,11 @@ pub(super) enum LoadResponse {
         seq: u64,
         path: PathBuf,
         load: Box<DiffLoad>,
+    },
+    GitStatus {
+        seq: u64,
+        root: PathBuf,
+        load: Box<GitStatusLoad>,
     },
 }
 
@@ -304,6 +341,23 @@ impl Loader {
                     LoadRequest::File { seq, path } => {
                         let load = Box::new(compute_file_load(&path, &theme, &hl));
                         if res_tx.send(LoadResponse::File { seq, path, load }).is_err() {
+                            break;
+                        }
+                    }
+                    LoadRequest::GitStatus {
+                        seq,
+                        root,
+                        ignore_gitignore,
+                    } => {
+                        let load = Box::new(compute_git_status_load(&root, ignore_gitignore));
+                        if res_tx
+                            .send(LoadResponse::GitStatus {
+                                seq,
+                                root: root.clone(),
+                                load,
+                            })
+                            .is_err()
+                        {
                             break;
                         }
                     }
