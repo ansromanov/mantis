@@ -171,7 +171,11 @@ fn parse_repo_info(text: &str) -> GitRepoInfo {
 /// Builds an absolute-path → status map for the repository containing `dir`.
 /// Parent directories are included with their highest-priority child status so
 /// collapsed dirs can be colored when they contain changes.
-pub fn repo_status(dir: &Path, include_ignored: bool) -> HashMap<PathBuf, GitStatus> {
+pub fn repo_status(
+    dir: &Path,
+    include_untracked: bool,
+    include_ignored: bool,
+) -> HashMap<PathBuf, GitStatus> {
     let Some(root) = git_toplevel(dir) else {
         return HashMap::new();
     };
@@ -201,6 +205,13 @@ pub fn repo_status(dir: &Path, include_ignored: bool) -> HashMap<PathBuf, GitSta
             .map_or(path_str, |i| &path_str[i + 4..]);
         let path_str = path_str.trim_end_matches('/');
         if path_str.is_empty() {
+            continue;
+        }
+
+        if x == '?' && y == '?' && !include_untracked {
+            continue;
+        }
+        if x == '!' && y == '!' && !include_ignored {
             continue;
         }
 

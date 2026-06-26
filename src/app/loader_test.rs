@@ -174,7 +174,8 @@ fn git_status_worker_round_trip_returns_matching_seq() {
     loader.request(LoadRequest::GitStatus {
         seq: 42,
         root: std::path::PathBuf::from("/nonexistent"),
-        ignore_gitignore: false,
+        include_untracked: true,
+        include_ignored: false,
     });
     let resp = loader.rx.recv().expect("worker response");
     match resp {
@@ -191,7 +192,7 @@ fn git_status_worker_round_trip_returns_matching_seq() {
 
 #[test]
 fn compute_git_status_load_outside_repo() {
-    let load = compute_git_status_load(std::path::Path::new("/nonexistent"), false);
+    let load = compute_git_status_load(std::path::Path::new("/nonexistent"), true, false);
     assert!(load.status_map.is_empty());
     assert!(load.info.is_none());
 }

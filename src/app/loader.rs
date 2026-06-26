@@ -215,16 +215,20 @@ pub(super) fn compute_file_load(path: &Path, theme: &Theme, hl: &Highlighter) ->
 }
 
 /// Runs `repo_status` + `repo_info` for `root` off the UI thread.
-pub(super) fn compute_git_status_load(root: &Path, ignore_gitignore: bool) -> GitStatusLoad {
+pub(super) fn compute_git_status_load(
+    root: &Path,
+    include_untracked: bool,
+    include_ignored: bool,
+) -> GitStatusLoad {
     #[cfg(feature = "git-core")]
     {
-        let status_map = crate::git::repo_status(root, ignore_gitignore);
+        let status_map = crate::git::repo_status(root, include_untracked, include_ignored);
         let info = crate::git::repo_info(root);
         GitStatusLoad { status_map, info }
     }
     #[cfg(not(feature = "git-core"))]
     {
-        let _ = ignore_gitignore;
+        let _ = (include_untracked, include_ignored);
         GitStatusLoad {
             status_map: HashMap::new(),
             info: None,
@@ -281,7 +285,8 @@ pub(super) enum LoadRequest {
     GitStatus {
         seq: u64,
         root: PathBuf,
-        ignore_gitignore: bool,
+        include_untracked: bool,
+        include_ignored: bool,
     },
     /// Rebuild the worker's highlighter/theme after a theme change.
     SetTheme(Box<Theme>),
@@ -347,9 +352,14 @@ impl Loader {
                     LoadRequest::GitStatus {
                         seq,
                         root,
-                        ignore_gitignore,
+                        include_untracked,
+                        include_ignored,
                     } => {
-                        let load = Box::new(compute_git_status_load(&root, ignore_gitignore));
+                        let load = Box::new(compute_git_status_load(
+                            &root,
+                            include_untracked,
+                            include_ignored,
+                        ));
                         if res_tx
                             .send(LoadResponse::GitStatus {
                                 seq,

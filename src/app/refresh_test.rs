@@ -301,6 +301,8 @@ fn create_base_app() -> App {
         theme,
         git_status_enabled: false,
         git_show_deleted: false,
+        git_show_untracked: true,
+        git_show_ignored: false,
         git_info: None,
         git_status_map: HashMap::new(),
         git_mode: false,

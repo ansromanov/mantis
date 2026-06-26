@@ -320,6 +320,40 @@ fn config_paths_are_local_first_then_global() {
 use super::validate::validate_keys;
 
 #[test]
+fn git_show_untracked_defaults_to_true() {
+    let cfg = Config::default();
+    assert!(cfg.git_show_untracked);
+}
+
+#[test]
+fn git_show_untracked_round_trips_through_serde() {
+    let cfg = Config {
+        git_show_untracked: false,
+        ..Config::default()
+    };
+    let toml_str = toml::to_string_pretty(&cfg).unwrap();
+    let parsed: Config = toml::from_str(&toml_str).unwrap();
+    assert!(!parsed.git_show_untracked);
+}
+
+#[test]
+fn git_show_ignored_defaults_to_false() {
+    let cfg = Config::default();
+    assert!(!cfg.git_show_ignored);
+}
+
+#[test]
+fn git_show_ignored_round_trips_through_serde() {
+    let cfg = Config {
+        git_show_ignored: true,
+        ..Config::default()
+    };
+    let toml_str = toml::to_string_pretty(&cfg).unwrap();
+    let parsed: Config = toml::from_str(&toml_str).unwrap();
+    assert!(parsed.git_show_ignored);
+}
+
+#[test]
 fn validate_keys_accepts_full_default_template() {
     // The shipped template must validate cleanly against the schema.
     assert!(validate_keys(DEFAULT_CONFIG_TEMPLATE).is_empty());

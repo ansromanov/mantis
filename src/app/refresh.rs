@@ -163,7 +163,11 @@ impl App {
         if cfg!(test) {
             #[cfg(feature = "git-core")]
             {
-                self.git_status_map = crate::git::repo_status(&self.root, self.ignore_gitignore);
+                self.git_status_map = crate::git::repo_status(
+                    &self.root,
+                    self.git_show_untracked,
+                    self.git_show_ignored,
+                );
                 self.git_info = crate::git::repo_info(&self.root);
             }
             #[cfg(not(feature = "git-core"))]
@@ -176,7 +180,8 @@ impl App {
             self.loader.request(LoadRequest::GitStatus {
                 seq: self.git_seq,
                 root: self.root.clone(),
-                ignore_gitignore: self.ignore_gitignore,
+                include_untracked: self.git_show_untracked,
+                include_ignored: self.git_show_ignored,
             });
         }
     }

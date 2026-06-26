@@ -40,6 +40,12 @@ word_wrap = false         # wrap long lines in the content panel
 line_numbers = true       # show the line-number gutter in the content panel
 show_file_info = true     # show encoding and line-ending info in the status bar
 recent_files_count = 10   # number of recently opened files to remember
+
+# Git status — which working-tree changes appear in the changed-file list
+# and the tree status colors:
+# git_show_untracked = true   # include untracked (??) files (default: true)
+# git_show_ignored   = false  # include ignored (!!) files (default: false)
+# git_show_deleted   = false  # show ghost nodes for deleted tracked files (default: false)
 indent_guides = true      # draw indentation guide lines (│) in the tree pane
 icons = false             # Nerd Font file-type icons (icon map supplied by a plugin)
 ```
