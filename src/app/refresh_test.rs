@@ -347,8 +347,6 @@ fn create_base_app() -> App {
         tree_dirty: false,
         tree_dirty_at: None,
         selection: None,
-        visual_line: None,
-        blame_panel: false,
         drag_start: None,
         scrollbar_drag: false,
         splitter_drag: false,

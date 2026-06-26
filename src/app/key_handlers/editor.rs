@@ -113,10 +113,6 @@ impl App {
                 self.content_scroll = 0;
                 self.content_hscroll = 0;
             }
-            Some("toggle_visual_line") if !self.is_diff && self.current_file.is_some() => {
-                self.focus = Focus::Content;
-                self.enter_visual_line();
-            }
             Some("open_in_editor") => self.open_in_editor(),
             Some("open_config_in_editor") => self.open_config_in_editor(),
             Some("show_about") => self.show_about = !self.show_about,

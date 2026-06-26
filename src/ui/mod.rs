@@ -95,10 +95,6 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         popups::draw_recent(f, app, area);
     }
 
-    if app.blame_panel {
-        popups::draw_blame_panel(f, app, area);
-    }
-
     if app.show_line_blame {
         popups::draw_line_blame(f, app, area);
     }
