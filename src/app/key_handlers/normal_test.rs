@@ -234,6 +234,25 @@ fn goto_line_keybinding_is_noop_with_tree_focus() {
     app.focus = Focus::Tree;
     app.handle_key(key(KeyCode::Char(':')));
     assert!(app.goto_line.is_none());
+    assert_eq!(
+        app.status_message,
+        Some("go to line: switch to the content pane (Tab)".into())
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn goto_line_status_clears_on_valid_keypress() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Tree;
+    app.handle_key(key(KeyCode::Char(':')));
+    assert_eq!(
+        app.status_message,
+        Some("go to line: switch to the content pane (Tab)".into())
+    );
+    app.handle_key(key(KeyCode::Char('j')));
+    assert!(app.status_message.is_none());
     fs::remove_dir_all(&root).ok();
 }
 
@@ -296,4 +315,118 @@ fn backspace_in_tree_calls_tree_up_dir() {
         "Backspace must call tree_up_dir and change root"
     );
     fs::remove_dir_all(&orig_root).ok();
+}
+
+// -- context-locked key feedback ---------------------------------------------
+
+#[test]
+fn git_mode_flat_toggle_noop_outside_git_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.git_mode = false;
+    app.handle_key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::ALT));
+    assert_eq!(
+        app.status_message,
+        Some("flat view: only in git mode (Ctrl+G)".into())
+    );
+    assert!(!app.git_mode_flat);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn toggle_raw_markdown_noop_on_non_markdown() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    assert!(!app.is_markdown);
+    app.handle_key(key(KeyCode::Char('M')));
+    assert_eq!(
+        app.status_message,
+        Some("raw toggle: not a markdown file".into())
+    );
+    assert!(!app.show_raw_markdown);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn toggle_pretty_json_noop_on_non_json() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    assert!(!app.is_json);
+    app.handle_key(key(KeyCode::Char('J')));
+    assert_eq!(
+        app.status_message,
+        Some("pretty JSON: not a JSON file".into())
+    );
+    assert!(!app.show_pretty_json);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn toggle_blame_noop_in_diff() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.is_diff = true;
+    app.handle_key(key(KeyCode::Char('b')));
+    assert_eq!(
+        app.status_message,
+        Some("blame: not available in a diff".into())
+    );
+    assert!(!app.show_blame);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn git_mode_flat_toggle_status_clears_on_valid_keypress() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.git_mode = false;
+    app.handle_key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::ALT));
+    assert!(app.status_message.is_some());
+    app.handle_key(key(KeyCode::Char('j')));
+    assert!(app.status_message.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn toggle_raw_markdown_status_clears_on_valid_keypress() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.handle_key(key(KeyCode::Char('M')));
+    assert!(app.status_message.is_some());
+    app.handle_key(key(KeyCode::Char('j')));
+    assert!(app.status_message.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn toggle_pretty_json_status_clears_on_valid_keypress() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.handle_key(key(KeyCode::Char('J')));
+    assert!(app.status_message.is_some());
+    app.handle_key(key(KeyCode::Char('j')));
+    assert!(app.status_message.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn toggle_blame_status_clears_on_valid_keypress() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.is_diff = true;
+    app.handle_key(key(KeyCode::Char('b')));
+    assert!(app.status_message.is_some());
+    app.handle_key(key(KeyCode::Char('j')));
+    assert!(app.status_message.is_none());
+    fs::remove_dir_all(&root).ok();
 }

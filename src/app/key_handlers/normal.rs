@@ -118,6 +118,8 @@ impl App {
                 self.rebuild();
                 self.try_open_selected();
                 self.save_config();
+            } else {
+                self.status_message = Some("flat view: only in git mode (Ctrl+G)".into());
             }
         } else if pressed(&k.open_in_editor, &key) {
             self.open_in_editor();
@@ -132,6 +134,8 @@ impl App {
         } else if pressed(&k.goto_line, &key) {
             if self.focus == Focus::Content {
                 self.goto_line = Some(GotoLineState::new());
+            } else {
+                self.status_message = Some("go to line: switch to the content pane (Tab)".into());
             }
         } else {
             match self.focus {
@@ -245,19 +249,30 @@ impl App {
         let scroll_before = self.content_scroll;
         let hscroll_before = self.content_hscroll;
         let active_line_before = self.active_line;
-        if self.is_markdown && pressed(&k.toggle_raw_markdown, &key) {
-            self.show_raw_markdown = !self.show_raw_markdown;
-            self.content_scroll = 0;
-            self.content_hscroll = 0;
-        } else if self.is_json
-            && !self.json_pretty_lines.is_empty()
-            && pressed(&k.toggle_pretty_json, &key)
-        {
-            self.show_pretty_json = !self.show_pretty_json;
-            self.content_scroll = 0;
-            self.content_hscroll = 0;
-        } else if !self.is_diff && pressed(&k.toggle_blame, &key) {
-            self.show_blame = !self.show_blame;
+        if pressed(&k.toggle_raw_markdown, &key) {
+            if self.is_markdown {
+                self.show_raw_markdown = !self.show_raw_markdown;
+                self.content_scroll = 0;
+                self.content_hscroll = 0;
+            } else {
+                self.status_message = Some("raw toggle: not a markdown file".into());
+            }
+        } else if pressed(&k.toggle_pretty_json, &key) {
+            if self.is_json && !self.json_pretty_lines.is_empty() {
+                self.show_pretty_json = !self.show_pretty_json;
+                self.content_scroll = 0;
+                self.content_hscroll = 0;
+            } else if !self.is_json {
+                self.status_message = Some("pretty JSON: not a JSON file".into());
+            } else {
+                self.status_message = Some("pretty JSON: could not parse".into());
+            }
+        } else if pressed(&k.toggle_blame, &key) {
+            if !self.is_diff {
+                self.show_blame = !self.show_blame;
+            } else {
+                self.status_message = Some("blame: not available in a diff".into());
+            }
         } else if !self.is_diff
             && self.current_file.is_some()
             && pressed(&k.visual_line_toggle, &key)
