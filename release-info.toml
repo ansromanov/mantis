@@ -1,9 +1,7 @@
-version = "0.9.4"
+version = "0.9.6"
 date = "2026-06-26"
-whats_new = """- fix: preserve revision diffs in git mode (viewing_revision guard) (#326)
-- fix(event_source): correct 4 bugs in kitty keyboard protocol parser (#330)
-- ux: always start in normal mode (stop persisting git mode across restarts) (#325)
-- feat: make active line cursor visible with full-width highlight and gutter caret (#324)
-- feat: add pr-review skill and skip CI for agent-only changes (#329)
+whats_new = """- fix(event_source): correct modifier decode, SGR drag, and arrow key handling (#334)
+- perf: fetch git status off the UI thread (no block on toggle/root change) (#328)
+- chore: test-pr skips full suite on broad changes (#331)
 - chore: add changelog to release info [skip ci]"""
-release_url = "https://github.com/ansromanov/tree-viewer/releases/tag/v0.9.4"
+release_url = "https://github.com/ansromanov/tree-viewer/releases/tag/v0.9.6"
