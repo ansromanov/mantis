@@ -142,6 +142,7 @@ dir = "blue"               # directory entries in the tree
 file = "reset"             # file entries in the tree
 selection_bg = "darkgray"  # selected row / status bar background
 selection_fg = "yellow"    # selected row foreground in popups
+active_line_bg = "#3a5a5a" # active line cursor highlight (default: selection_bg)
 heading1 = "lightcyan"     # markdown H1 / table headers
 heading2 = "lightyellow"   # markdown H2
 heading3 = "lightgreen"    # markdown H3

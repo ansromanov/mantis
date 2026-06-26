@@ -63,9 +63,11 @@ These work no matter which panel is focused.
 
 ## Content panel
 
+The content pane has a **line cursor** (visible as a highlighted full-width row). Use `Up`/`Down` to move it, then press `B` to blame the highlighted line.
+
 | Key            | Action                       |
 | -------------- | ---------------------------- |
-| `Up`/`k`, `Down`/`j` | Scroll                 |
+| `Up`/`k`, `Down`/`j` | Scroll / move line cursor |
 | `PageUp`/`PageDown`  | Page up / down         |
 | `g`/`Home`, `G`/`End` | Jump to top / bottom   |
 | `Left`/`Right` | Horizontal scroll (when wrap off) |

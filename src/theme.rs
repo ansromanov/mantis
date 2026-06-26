@@ -23,28 +23,29 @@ use serde::{Deserialize, Serialize};
 /// original hardcoded look.
 #[derive(Clone)]
 pub struct Theme {
-    pub background: Color,    // panel background (Reset = terminal default)
-    pub accent: Color,        // focused borders, primary highlights
-    pub accent_alt: Color,    // popup chrome, keys, prompts
-    pub dim: Color,           // unfocused borders, gutters, hints, rules
-    pub text: Color,          // emphasized/default text
-    pub dir: Color,           // directory entries in the tree
-    pub file: Color,          // file entries in the tree
-    pub selection_bg: Color,  // selected row / status bar background
-    pub selection_fg: Color,  // selected row foreground in popups
-    pub heading1: Color,      // markdown H1 / table headers
-    pub heading2: Color,      // markdown H2
-    pub heading3: Color,      // markdown H3
-    pub code: Color,          // inline code / code blocks
-    pub diff_add: Color,      // added lines in a diff
-    pub diff_del: Color,      // removed lines in a diff
-    pub git_clean: Color,     // clean working-tree indicator
-    pub git_dirty: Color,     // dirty working-tree indicator
-    pub git_conflict: Color,  // conflict / detached HEAD indicator
-    pub git_progress: Color,  // rebase/merge in-progress indicator
-    pub breadcrumb_fg: Color, // breadcrumb path bar foreground
-    pub breadcrumb_bg: Color, // breadcrumb path bar background
-    pub syntax: String,       // syntect theme name for file contents
+    pub background: Color,     // panel background (Reset = terminal default)
+    pub accent: Color,         // focused borders, primary highlights
+    pub accent_alt: Color,     // popup chrome, keys, prompts
+    pub dim: Color,            // unfocused borders, gutters, hints, rules
+    pub text: Color,           // emphasized/default text
+    pub dir: Color,            // directory entries in the tree
+    pub file: Color,           // file entries in the tree
+    pub selection_bg: Color,   // selected row / status bar background
+    pub selection_fg: Color,   // selected row foreground in popups
+    pub heading1: Color,       // markdown H1 / table headers
+    pub heading2: Color,       // markdown H2
+    pub heading3: Color,       // markdown H3
+    pub code: Color,           // inline code / code blocks
+    pub diff_add: Color,       // added lines in a diff
+    pub diff_del: Color,       // removed lines in a diff
+    pub git_clean: Color,      // clean working-tree indicator
+    pub git_dirty: Color,      // dirty working-tree indicator
+    pub git_conflict: Color,   // conflict / detached HEAD indicator
+    pub git_progress: Color,   // rebase/merge in-progress indicator
+    pub breadcrumb_fg: Color,  // breadcrumb path bar foreground
+    pub breadcrumb_bg: Color,  // breadcrumb path bar background
+    pub active_line_bg: Color, // active line cursor highlight background
+    pub syntax: String,        // syntect theme name for file contents
 }
 
 impl Default for Theme {
@@ -81,6 +82,8 @@ struct ThemeToml {
     breadcrumb_fg: Option<String>,
     #[serde(default)]
     breadcrumb_bg: Option<String>,
+    #[serde(default)]
+    active_line_bg: Option<String>,
     syntax: String,
 }
 
@@ -93,6 +96,7 @@ impl Theme {
         let git_dirty = parse_color(&tf.git_dirty)?;
         let accent = parse_color(&tf.accent)?;
         let background = parse_color(&tf.background)?;
+        let selection_bg = parse_color(&tf.selection_bg)?;
         // New fields fall back to sensible existing roles so older theme files
         // (missing them) still parse: conflict reuses the theme's red, and an
         // in-progress rebase/merge reuses the dirty color.
@@ -116,6 +120,11 @@ impl Theme {
             .as_deref()
             .and_then(parse_color)
             .unwrap_or(background);
+        let active_line_bg = tf
+            .active_line_bg
+            .as_deref()
+            .and_then(parse_color)
+            .unwrap_or(selection_bg);
         Some(Theme {
             background,
             accent,
@@ -124,7 +133,7 @@ impl Theme {
             text: parse_color(&tf.text)?,
             dir: parse_color(&tf.dir)?,
             file: parse_color(&tf.file)?,
-            selection_bg: parse_color(&tf.selection_bg)?,
+            selection_bg,
             selection_fg: parse_color(&tf.selection_fg)?,
             heading1: parse_color(&tf.heading1)?,
             heading2: parse_color(&tf.heading2)?,
@@ -138,6 +147,7 @@ impl Theme {
             git_progress,
             breadcrumb_fg,
             breadcrumb_bg,
+            active_line_bg,
             syntax: tf.syntax,
         })
     }
@@ -312,6 +322,7 @@ pub struct ThemeConfig {
     pub git_progress: Option<String>,
     pub breadcrumb_fg: Option<String>,
     pub breadcrumb_bg: Option<String>,
+    pub active_line_bg: Option<String>,
     pub syntax: Option<String>,
 }
 
@@ -346,6 +357,7 @@ impl ThemeConfig {
             git_progress: Some(String::new()),
             breadcrumb_fg: Some(String::new()),
             breadcrumb_bg: Some(String::new()),
+            active_line_bg: Some(String::new()),
             syntax: Some(String::new()),
         }
     }
@@ -395,6 +407,7 @@ impl ThemeConfig {
             git_progress: col(&self.git_progress, d.git_progress),
             breadcrumb_fg: col(&self.breadcrumb_fg, d.breadcrumb_fg),
             breadcrumb_bg: col(&self.breadcrumb_bg, d.breadcrumb_bg),
+            active_line_bg: col(&self.active_line_bg, d.active_line_bg),
             syntax: self.syntax.clone().unwrap_or(d.syntax),
         }
     }
