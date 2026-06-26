@@ -253,3 +253,238 @@ fn open_file_clears_current_syntax_for_unknown_type() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+// -- viewing_revision --------------------------------------------------------
+
+/// Creates a temp git repo with two commits and a working-tree change on
+/// `tracked.txt` so file-history operations can be tested:
+///   commit 1: tracked.txt = "v1\n"
+///   commit 2: tracked.txt = "v2\n"
+///   working tree: tracked.txt = "v3\n"
+fn temp_git_with_history() -> PathBuf {
+    use std::process::Command;
+    static COUNTER: AtomicUsize = AtomicUsize::new(0);
+    let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+    let dir = std::env::temp_dir().join(format!("tv_viewing_revision_{}_{n}", std::process::id()));
+    fs::create_dir_all(&dir).unwrap();
+    let git = |args: &[&str]| {
+        Command::new("git")
+            .arg("-C")
+            .arg(&dir)
+            .args(["-c", "user.email=t@e.x", "-c", "user.name=T"])
+            .args(args)
+            .status()
+            .unwrap();
+    };
+    git(&["init", "-q"]);
+    fs::write(dir.join("tracked.txt"), "v1\n").unwrap();
+    git(&["add", "tracked.txt"]);
+    git(&["commit", "-q", "-m", "first"]);
+    fs::write(dir.join("tracked.txt"), "v2\n").unwrap();
+    git(&["add", "tracked.txt"]);
+    git(&["commit", "-q", "-m", "second"]);
+    fs::write(dir.join("tracked.txt"), "v3\n").unwrap();
+    dir.canonicalize().unwrap()
+}
+
+#[test]
+fn viewing_revision_persists_across_reload_content_in_git_mode() {
+    let root = temp_git_with_history();
+    let mut app = app_for(&root);
+
+    // Enter git mode and open tracked.txt.
+    app.git_mode = true;
+    app.open_file(&root.join("tracked.txt"));
+    app.show_working_tree_diff(&root.join("tracked.txt"));
+    assert!(app.is_diff);
+    assert!(
+        app.content_title
+            .as_deref()
+            .unwrap_or("")
+            .contains("working diff"),
+        "git mode starts with working-tree diff"
+    );
+
+    // Fetch commits via file_log and populate history manually.
+    let commits = crate::git::file_log(&root, &root.join("tracked.txt"));
+    assert!(commits.len() >= 2, "need at least 2 commits for this test");
+    let first_short = commits[0].short.clone();
+
+    app.history = Some(crate::search::HistoryState::new(
+        root.join("tracked.txt"),
+        commits,
+    ));
+    app.show_selected_revision();
+
+    assert!(
+        app.viewing_revision.is_some(),
+        "viewing_revision must be set after show_selected_revision"
+    );
+    assert_eq!(
+        app.viewing_revision.as_deref(),
+        Some(first_short.as_str()),
+        "viewing_revision should match the selected commit short hash"
+    );
+    let title_before = app.content_title.clone();
+    assert!(
+        title_before.as_deref().unwrap_or("").contains(&first_short),
+        "title before: {:?}",
+        title_before
+    );
+
+    // reload_content must NOT clobber the revision diff.
+    app.reload_content();
+
+    assert!(
+        app.viewing_revision.is_some(),
+        "viewing_revision must survive reload_content"
+    );
+    assert_eq!(
+        app.content_title, title_before,
+        "content title must not change after reload_content"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn viewing_revision_persists_across_reload_content_in_normal_mode() {
+    let root = temp_git_with_history();
+    let mut app = app_for(&root);
+
+    // Open file in normal mode.
+    app.open_file(&root.join("tracked.txt"));
+    assert!(!app.is_diff, "not a diff in normal mode");
+
+    // Fetch commits and populate history.
+    let commits = crate::git::file_log(&root, &root.join("tracked.txt"));
+    assert!(commits.len() >= 2, "need at least 2 commits");
+    let first_short = commits[0].short.clone();
+
+    app.history = Some(crate::search::HistoryState::new(
+        root.join("tracked.txt"),
+        commits,
+    ));
+    app.show_selected_revision();
+
+    assert!(app.viewing_revision.is_some());
+    assert_eq!(
+        app.viewing_revision.as_deref(),
+        Some(first_short.as_str()),
+        "viewing_revision should match the selected commit short hash"
+    );
+    let title_before = app.content_title.clone();
+
+    app.reload_content();
+
+    assert!(
+        app.viewing_revision.is_some(),
+        "viewing_revision must survive reload_content in normal mode"
+    );
+    assert_eq!(
+        app.content_title, title_before,
+        "content title must not change"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn viewing_revision_cleared_by_open_file() {
+    let root = temp_git_with_history();
+    let mut app = app_for(&root);
+    let other = root.join("other.txt");
+    fs::write(&other, "hello\n").unwrap();
+
+    // Set state as if a revision is being viewed.
+    app.viewing_revision = Some("abc1234".to_string());
+    app.open_file(&other);
+
+    assert!(
+        app.viewing_revision.is_none(),
+        "open_file must clear viewing_revision"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn viewing_revision_cleared_by_reload_key() {
+    let root = temp_git_with_history();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("tracked.txt"));
+
+    // Simulate viewing a revision.
+    app.viewing_revision = Some("abc1234".to_string());
+
+    // Press reload key (r).
+    app.handle_key(crossterm::event::KeyEvent::new(
+        crossterm::event::KeyCode::Char('r'),
+        crossterm::event::KeyModifiers::empty(),
+    ));
+
+    assert!(
+        app.viewing_revision.is_none(),
+        "reload key must clear viewing_revision"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn viewing_revision_cleared_by_esc_in_git_mode() {
+    let root = temp_git_with_history();
+    let mut app = app_for(&root);
+
+    // Enter git mode and show working-tree diff.
+    app.git_mode = true;
+    let file = root.join("tracked.txt");
+    app.open_file(&file);
+    app.show_working_tree_diff(&file);
+
+    // Simulate viewing a revision.
+    app.viewing_revision = Some("abc1234".to_string());
+    app.current_file = Some(file.clone());
+
+    // Press Esc.
+    app.handle_key(crossterm::event::KeyEvent::new(
+        crossterm::event::KeyCode::Esc,
+        crossterm::event::KeyModifiers::empty(),
+    ));
+
+    assert!(
+        app.viewing_revision.is_none(),
+        "Esc must clear viewing_revision in git mode"
+    );
+    assert!(
+        app.content_title
+            .as_deref()
+            .unwrap_or("")
+            .contains("working diff"),
+        "Esc should restore the working-tree diff in git mode"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn viewing_revision_cleared_by_esc_in_normal_mode() {
+    let root = temp_git_with_history();
+    let mut app = app_for(&root);
+    let file = root.join("tracked.txt");
+    app.open_file(&file);
+
+    // Simulate viewing a revision.
+    app.viewing_revision = Some("abc1234".to_string());
+
+    // Press Esc.
+    app.handle_key(crossterm::event::KeyEvent::new(
+        crossterm::event::KeyCode::Esc,
+        crossterm::event::KeyModifiers::empty(),
+    ));
+
+    assert!(
+        app.viewing_revision.is_none(),
+        "Esc must clear viewing_revision in normal mode"
+    );
+    assert!(
+        !app.is_diff,
+        "Esc should restore the file content view in normal mode"
+    );
+    fs::remove_dir_all(&root).ok();
+}

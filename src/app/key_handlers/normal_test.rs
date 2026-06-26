@@ -535,3 +535,50 @@ fn git_mode_flat_toggle_flips_flag_when_in_git_mode() {
     assert!(app.git_mode_flat, "F key must enable flat mode in git mode");
     fs::remove_dir_all(&root).ok();
 }
+
+// -- viewing_revision key handlers -------------------------------------------
+
+#[test]
+fn esc_clears_viewing_revision_in_normal_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.viewing_revision = Some("abc1234".to_string());
+    app.handle_key(key(KeyCode::Esc));
+    assert!(
+        app.viewing_revision.is_none(),
+        "Esc must clear viewing_revision"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn esc_clears_viewing_revision_in_git_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.git_mode = true;
+    app.viewing_revision = Some("abc1234".to_string());
+    app.handle_key(key(KeyCode::Esc));
+    assert!(
+        app.viewing_revision.is_none(),
+        "Esc in git mode must clear viewing_revision"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn r_key_clears_viewing_revision() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.viewing_revision = Some("abc1234".to_string());
+    app.handle_key(key(KeyCode::Char('r')));
+    assert!(
+        app.viewing_revision.is_none(),
+        "r (reload) must clear viewing_revision"
+    );
+    fs::remove_dir_all(&root).ok();
+}

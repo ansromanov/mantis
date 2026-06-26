@@ -232,3 +232,14 @@ fn app_new_session_git_mode_ignored() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn app_new_viewing_revision_starts_none() {
+    let root = temp_dir();
+    let app = new_app(&root, Config::default());
+    assert!(
+        app.viewing_revision.is_none(),
+        "App::new must initialize viewing_revision to None"
+    );
+    fs::remove_dir_all(&root).ok();
+}

@@ -173,6 +173,11 @@ pub struct App {
     pub diff_mode: DiffMode,
     /// When `true`, diffs render in a split old|new layout instead of unified.
     pub diff_side_by_side: bool,
+    /// When `Some(short_hash)`, the content pane shows an immutable historical
+    /// commit diff (from `show_selected_revision`/`H`). Guards `reload_content`
+    /// from replacing it with the live working-tree diff. Cleared when the user
+    /// returns to the live view (Esc, r, navigating to another file, etc.).
+    pub viewing_revision: Option<String>,
     /// Side-by-side rows parsed from the current diff; empty for non-diffs.
     pub diff_rows: Vec<crate::diff::DiffRow>,
     pub content_title: Option<String>,

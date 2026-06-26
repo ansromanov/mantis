@@ -21,9 +21,13 @@ use super::{diff_line_style, App, Focus};
 
 impl App {
     /// Re-reads the current file from disk and re-renders it into the content
-    /// buffer while preserving scroll position. No-op for commit diffs (which
-    /// are immutable), but refreshes working-tree diffs in git mode.
+    /// buffer while preserving scroll position. No-op for historical revision
+    /// diffs (which are immutable) and for normal-mode commit diffs, but
+    /// refreshes working-tree diffs in git mode.
     pub(super) fn reload_content(&mut self) {
+        if self.viewing_revision.is_some() {
+            return;
+        }
         if self.is_diff && !self.git_mode {
             return;
         }
@@ -166,6 +170,7 @@ impl App {
         // current_file with the new path.
         let is_new_file = self.current_file.as_deref() != Some(path);
 
+        self.viewing_revision = None;
         self.in_file_search = None;
         self.virtual_file = None;
         self.current_file = Some(path.to_path_buf());
@@ -206,6 +211,7 @@ impl App {
     /// working tree but is tracked by git.
     pub(super) fn show_deleted(&mut self, path: &Path) {
         self.invalidate_pending_load();
+        self.viewing_revision = None;
         self.in_file_search = None;
         self.current_file = Some(path.to_path_buf());
         self.current_syntax = None;
@@ -265,6 +271,7 @@ impl App {
     pub(super) fn apply_file_load(&mut self, path: &Path, load: FileLoad) {
         self.in_file_search = None;
         self.is_diff = false;
+        self.viewing_revision = None;
         self.diff_rows = Vec::new();
         self.content_title = None;
         self.content_scroll = 0;
@@ -413,6 +420,7 @@ impl App {
         self.json_pretty_text = Vec::new();
         self.json_pretty_lines = Vec::new();
         self.is_diff = true;
+        self.viewing_revision = Some(short.to_string());
         self.clear_fold_state();
         self.file_encoding = None;
         self.file_line_ending = None;

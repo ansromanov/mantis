@@ -102,6 +102,13 @@ its current keybinding. Type to fuzzy-filter (e.g. "blame", "theme", "json"),
 navigate with `Up`/`Down`, and press `Enter` to run the highlighted command.
 It's the fastest way to discover what `tv` can do without memorizing keys.
 
+## Git mode history
+
+`H` opens the file's git history in both normal and git mode. The diff of a
+selected commit stays on screen and won't be replaced by live file-watcher
+updates. Press `Esc` or `r` to return to the current file (or the working-tree
+diff in git mode).
+
 ## Open in your editor
 
 Press `e` with a file open to launch it in your editor. `tv` uses `$VISUAL`,
