@@ -283,13 +283,10 @@ fn parse_csi(bytes: &[u8]) -> io::Result<Option<(Event, usize)>> {
 
     match final_byte {
         b'u' => parse_csi_u(params_str, consumed),
-        // Only handle bare ESC[A/B/C/D (no params) as legacy arrow keys.
-        // When the kitty keyboard protocol is active the terminal sends these
-        // in disambiguated form (e.g. ESC[1;1A) *and* as CSI-u; ignoring the
-        b'A' => Ok(Some((key(KeyCode::Up), consumed))),
-        b'B' => Ok(Some((key(KeyCode::Down), consumed))),
-        b'C' => Ok(Some((key(KeyCode::Right), consumed))),
-        b'D' => Ok(Some((key(KeyCode::Left), consumed))),
+        b'A' => csi_arrow(KeyCode::Up, params_str, consumed),
+        b'B' => csi_arrow(KeyCode::Down, params_str, consumed),
+        b'C' => csi_arrow(KeyCode::Right, params_str, consumed),
+        b'D' => csi_arrow(KeyCode::Left, params_str, consumed),
         b'H' => Ok(Some((key(KeyCode::Home), consumed))),
         b'F' => Ok(Some((key(KeyCode::End), consumed))),
         b'Z' => Ok(Some((key(KeyCode::BackTab), consumed))),
@@ -647,6 +644,35 @@ fn decode_mouse_button(cb: u16) -> MouseButton {
 
 fn key(code: KeyCode) -> Event {
     Event::Key(KeyEvent::new(code, KeyModifiers::empty()))
+}
+
+/// Parse a legacy CSI arrow sequence (ESC[A/B/C/D).
+///
+/// With DISAMBIGUATE_ESCAPE_CODES + REPORT_EVENT_TYPES the terminal sends
+/// `ESC[1;<mod>[:<event_type>]X` for both press and release. Extract the event
+/// type so release events can be filtered by `handle_key`.
+fn csi_arrow(code: KeyCode, params: &str, consumed: usize) -> io::Result<Option<(Event, usize)>> {
+    let mut modifiers = KeyModifiers::empty();
+    let mut kind = KeyEventKind::Press;
+    if let Some(mod_field) = params.split(';').nth(1) {
+        let mut sub = mod_field.split(':');
+        let mask: u8 = sub.next().unwrap_or("0").parse().unwrap_or(0);
+        modifiers = decode_modifier_mask(mask);
+        kind = match sub.next() {
+            Some("2") => KeyEventKind::Repeat,
+            Some("3") => KeyEventKind::Release,
+            _ => KeyEventKind::Press,
+        };
+    }
+    Ok(Some((
+        Event::Key(KeyEvent::new_with_kind_and_state(
+            code,
+            modifiers,
+            kind,
+            KeyEventState::empty(),
+        )),
+        consumed,
+    )))
 }
 
 fn invalid(msg: &str) -> io::Error {
