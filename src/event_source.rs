@@ -634,3 +634,7 @@ fn key(code: KeyCode) -> Event {
 fn invalid(msg: &str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, msg)
 }
+
+#[cfg(test)]
+#[path = "event_source_test.rs"]
+mod tests;
