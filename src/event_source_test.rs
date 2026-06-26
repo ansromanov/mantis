@@ -280,15 +280,18 @@ fn sgr_motion_no_button_is_moved() {
 }
 
 // ---------------------------------------------------------------------------
-// CSI arrows: both bare and params-present forms must produce a key event.
+// CSI arrows: bare, disambiguated, and release forms.
 // REPORT_ALL_KEYS_AS_ESCAPE_CODES is not enabled; arrows come through the
 // legacy CSI path (ESC[A or ESC[1;1A via DISAMBIGUATE_ESCAPE_CODES).
+// With REPORT_EVENT_TYPES the terminal also sends ESC[1;1:3A on key release;
+// that must decode as Release so handle_key can filter it (no double move).
 // ---------------------------------------------------------------------------
 
 #[test]
 fn csi_bare_up_arrow() {
     let (ev, _) = parse_ok(b"\x1b[A");
     assert_eq!(key_event(&ev).code, KeyCode::Up);
+    assert_eq!(key_event(&ev).kind, KeyEventKind::Press);
 }
 
 #[test]
@@ -296,4 +299,14 @@ fn csi_disambiguated_up_arrow() {
     // ESC[1;1A = DISAMBIGUATE_ESCAPE_CODES form of plain Up (no modifiers).
     let (ev, _) = parse_ok(b"\x1b[1;1A");
     assert_eq!(key_event(&ev).code, KeyCode::Up);
+    assert_eq!(key_event(&ev).kind, KeyEventKind::Press);
+}
+
+#[test]
+fn csi_arrow_release_decodes_as_release() {
+    // ESC[1;1:3A = REPORT_EVENT_TYPES release event. Must be Release so
+    // handle_key ignores it and the key fires exactly once per physical press.
+    let (ev, _) = parse_ok(b"\x1b[1;1:3A");
+    assert_eq!(key_event(&ev).code, KeyCode::Up);
+    assert_eq!(key_event(&ev).kind, KeyEventKind::Release);
 }
