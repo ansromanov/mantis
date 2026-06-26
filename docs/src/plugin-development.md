@@ -111,7 +111,7 @@ Sent when the user opens a file in the content panel.
 ### `on_keypress`
 
 Sent on every keypress, including inside overlays. The `key` field uses
-human-readable notation: `"q"`, `"ctrl+c"`, `"Enter"`, `"alt+."`.
+human-readable notation: `"q"`, `"ctrl+c"`, `"Enter"`.
 
 ```json
 {"event":"on_keypress","key":"ctrl+p"}

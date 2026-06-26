@@ -50,7 +50,11 @@ Every keybinding is remappable. Each action takes a **list** of key specs, so an
 action can have several shortcuts. A spec is a single character (`"q"`, `"?"`,
 `"0"`) or a named key (`Up`, `Down`, `Left`, `Right`, `Enter`, `Tab`, `Esc`,
 `Backspace`, `PageUp`, `PageDown`, `Home`, `End`, `Space`), optionally prefixed
-with modifiers: `"ctrl+c"`, `"alt+."`.
+with modifiers: `"ctrl+c"`.
+
+> **No Alt-modified defaults.** The Alt modifier conflicts with terminal-level key
+> processing and is unreliable across terminals. `tv` does not ship any default
+> `alt+` bindings. Users can still configure them in `tv.toml` at their own risk.
 
 > **Keyboard layouts.** Keybinding specs are written with Latin characters
 > (e.g. `"ctrl+p"`). On terminals that support the [kitty keyboard
@@ -65,7 +69,7 @@ with modifiers: `"ctrl+c"`, `"alt+."`.
 [keys]
 quit = ["q", "ctrl+c"]
 help = ["?"]
-toggle_hidden = ["alt+."]
+toggle_hidden = ["ctrl+h"]
 search_files = ["/"]
 search_content = ["f"]
 reload = ["r"]
@@ -82,7 +86,9 @@ toggle_blame = ["b"]
 blame_line = ["B"]
 go_to_line = [":"]
 git_mode_toggle = ["ctrl+g"]
-git_mode_flat_toggle = ["alt+g"]
+# git_mode_flat_toggle has no default binding (alt keybindings conflict with
+# terminal-level key processing)
+# git_mode_flat_toggle = ["alt+g"]
 
 nav_up = ["Up", "k"]
 nav_down = ["Down", "j"]
