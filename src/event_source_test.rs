@@ -220,3 +220,112 @@ fn csi_u_release_event() {
     let k = key_event(&ev);
     assert_eq!(k.kind, KeyEventKind::Release);
 }
+
+// ---------------------------------------------------------------------------
+// decode_modifier_mask: kitty encodes as bitmask+1
+// ---------------------------------------------------------------------------
+
+#[test]
+fn csi_u_no_modifier_is_empty() {
+    // modifier=1 means "no modifier" in kitty (bitmask 0 + 1)
+    let seq = b"\x1b[107;1u"; // 'k', no modifier
+    let (ev, _) = parse_ok(seq);
+    let k = key_event(&ev);
+    assert_eq!(k.code, KeyCode::Char('k'));
+    assert!(
+        k.modifiers.is_empty(),
+        "modifier=1 must decode as empty, not SHIFT"
+    );
+}
+
+#[test]
+fn csi_u_shift_modifier_decodes_correctly() {
+    // modifier=2 means shift (bitmask 1 + 1). '?' = keycode 63.
+    let seq = b"\x1b[63;2u";
+    let (ev, _) = parse_ok(seq);
+    let k = key_event(&ev);
+    assert_eq!(k.code, KeyCode::Char('?'));
+    assert!(k.modifiers.contains(KeyModifiers::SHIFT));
+    assert!(!k.modifiers.contains(KeyModifiers::ALT));
+}
+
+#[test]
+fn csi_u_ctrl_modifier_decodes_correctly() {
+    // modifier=5 means ctrl (bitmask 4 + 1)
+    let seq = b"\x1b[112;5u"; // 'p' + ctrl
+    let (ev, _) = parse_ok(seq);
+    let k = key_event(&ev);
+    assert!(k.modifiers.contains(KeyModifiers::CONTROL));
+    assert!(!k.modifiers.contains(KeyModifiers::SHIFT));
+}
+
+// ---------------------------------------------------------------------------
+// SGR mouse drag vs moved
+// ---------------------------------------------------------------------------
+
+#[test]
+fn sgr_left_button_drag() {
+    // cb=32 (0x20): bit5=motion, bits0-1=0 (left button held) → Drag(Left)
+    let (ev, _) = parse_ok(&sgr_press(32, 10, 5));
+    let m = mouse_event(&ev);
+    assert_eq!(m.kind, MouseEventKind::Drag(MouseButton::Left));
+}
+
+#[test]
+fn sgr_motion_no_button_is_moved() {
+    // cb=35 (0x23): bit5=motion, bits0-1=3 (no button) → Moved
+    let (ev, _) = parse_ok(&sgr_press(35, 10, 5));
+    let m = mouse_event(&ev);
+    assert_eq!(m.kind, MouseEventKind::Moved);
+}
+
+// ---------------------------------------------------------------------------
+// Regular arrow codepoints (57350-57353)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn csi_u_regular_up_arrow() {
+    let seq = b"\x1b[57352;1u";
+    let (ev, _) = parse_ok(seq);
+    assert_eq!(key_event(&ev).code, KeyCode::Up);
+}
+
+#[test]
+fn csi_u_regular_down_arrow() {
+    let seq = b"\x1b[57353;1u";
+    let (ev, _) = parse_ok(seq);
+    assert_eq!(key_event(&ev).code, KeyCode::Down);
+}
+
+#[test]
+fn csi_u_regular_left_arrow() {
+    let seq = b"\x1b[57350;1u";
+    let (ev, _) = parse_ok(seq);
+    assert_eq!(key_event(&ev).code, KeyCode::Left);
+}
+
+#[test]
+fn csi_u_regular_right_arrow() {
+    let seq = b"\x1b[57351;1u";
+    let (ev, _) = parse_ok(seq);
+    assert_eq!(key_event(&ev).code, KeyCode::Right);
+}
+
+// ---------------------------------------------------------------------------
+// Double-movement prevention: params-present CSI arrows → Null
+// ---------------------------------------------------------------------------
+
+#[test]
+fn csi_arrow_with_params_produces_null() {
+    // ESC[1;1A = kitty DISAMBIGUATE_ESCAPE_CODES form of plain Up.
+    // Must produce Null (not Up) so the CSI-u form is the sole event.
+    let (ev, _) = parse_ok(b"\x1b[1;1A");
+    assert_eq!(key_event(&ev).code, KeyCode::Null);
+}
+
+#[test]
+fn csi_bare_up_arrow_still_works() {
+    // Plain ESC[A from legacy terminals (no params) must still fire.
+    let (ev, _) = parse_ok(b"\x1b[A");
+    assert_eq!(key_event(&ev).code, KeyCode::Up);
+}

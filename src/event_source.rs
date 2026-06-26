@@ -284,10 +284,15 @@ fn parse_csi(bytes: &[u8]) -> io::Result<Option<(Event, usize)>> {
 
     match final_byte {
         b'u' => parse_csi_u(params_str, consumed),
-        b'A' => Ok(Some((key(KeyCode::Up), consumed))),
-        b'B' => Ok(Some((key(KeyCode::Down), consumed))),
-        b'C' => Ok(Some((key(KeyCode::Right), consumed))),
-        b'D' => Ok(Some((key(KeyCode::Left), consumed))),
+        // Only handle bare ESC[A/B/C/D (no params) as legacy arrow keys.
+        // When the kitty keyboard protocol is active the terminal sends these
+        // in disambiguated form (e.g. ESC[1;1A) *and* as CSI-u; ignoring the
+        // params-present form prevents a double event that causes the cursor
+        // to move two rows per keypress.
+        b'A' if params_str.is_empty() => Ok(Some((key(KeyCode::Up), consumed))),
+        b'B' if params_str.is_empty() => Ok(Some((key(KeyCode::Down), consumed))),
+        b'C' if params_str.is_empty() => Ok(Some((key(KeyCode::Right), consumed))),
+        b'D' if params_str.is_empty() => Ok(Some((key(KeyCode::Left), consumed))),
         b'H' => Ok(Some((key(KeyCode::Home), consumed))),
         b'F' => Ok(Some((key(KeyCode::End), consumed))),
         b'Z' => Ok(Some((key(KeyCode::BackTab), consumed))),
@@ -396,6 +401,17 @@ fn u32_to_keycode(codepoint: u32) -> KeyCode {
 /// Map kitty-protocol functional key codes (mostly in the private-use area).
 fn translate_functional(codepoint: u32) -> Option<KeyCode> {
     match codepoint {
+        // Regular navigation keys (kitty private-use codepoints)
+        57348 => Some(KeyCode::Insert),
+        57349 => Some(KeyCode::Delete),
+        57350 => Some(KeyCode::Left),
+        57351 => Some(KeyCode::Right),
+        57352 => Some(KeyCode::Up),
+        57353 => Some(KeyCode::Down),
+        57354 => Some(KeyCode::PageUp),
+        57355 => Some(KeyCode::PageDown),
+        57356 => Some(KeyCode::Home),
+        57357 => Some(KeyCode::End),
         // Numpad
         57399..=57408 => {
             let digit = (codepoint - 57399) as u8;
@@ -494,19 +510,22 @@ fn translate_functional(codepoint: u32) -> Option<KeyCode> {
 
 /// Parse the kitty modifier bitmask into [`KeyModifiers`].
 ///
-/// Bits: 1=Shift, 2=Alt, 4=Ctrl, 8=Super, 16=Hyper, 32=Meta.
+/// Kitty encodes the modifier field as `bitmask + 1` so that the value 1
+/// means "no modifiers" (not absent) and 0 is never sent. Subtract 1 before
+/// decoding: bits: 0=Shift, 1=Alt, 2=Ctrl, 3=Super.
 fn decode_modifier_mask(mask: u8) -> KeyModifiers {
+    let bits = mask.saturating_sub(1);
     let mut m = KeyModifiers::empty();
-    if mask & 0x01 != 0 {
+    if bits & 0x01 != 0 {
         m |= KeyModifiers::SHIFT;
     }
-    if mask & 0x02 != 0 {
+    if bits & 0x02 != 0 {
         m |= KeyModifiers::ALT;
     }
-    if mask & 0x04 != 0 {
+    if bits & 0x04 != 0 {
         m |= KeyModifiers::CONTROL;
     }
-    if mask & 0x08 != 0 {
+    if bits & 0x08 != 0 {
         m |= KeyModifiers::SUPER;
     }
     m
@@ -592,7 +611,13 @@ fn parse_sgr_mouse(
             MouseEventKind::ScrollUp
         }
     } else if cb & 0x20 != 0 {
-        MouseEventKind::Moved
+        // Bit 5 set = motion event. Bits 0-1 encode which button is held:
+        // value 3 means no button (hover/move); anything else is a drag.
+        if cb & 0x03 == 3 {
+            MouseEventKind::Moved
+        } else {
+            MouseEventKind::Drag(decode_mouse_button(cb))
+        }
     } else {
         // In SGR mode press vs release is signaled by the final byte (M or m),
         // conveyed here via default_kind. Preserve the correct button from cb.
