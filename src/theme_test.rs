@@ -45,6 +45,53 @@ fn missing_git_state_fields_fall_back_to_existing_roles() {
 }
 
 #[test]
+fn default_theme_has_active_line_bg() {
+    let t = Theme::load("default").expect("default theme must load");
+    assert_ne!(t.active_line_bg, Color::Reset);
+    assert_eq!(t.active_line_bg, Color::Rgb(0x3a, 0x5a, 0x5a));
+}
+
+#[test]
+fn missing_active_line_bg_falls_back_to_selection_bg() {
+    let toml = r##"
+        background = "reset"
+        accent = "cyan"
+        accent_alt = "yellow"
+        dim = "darkgray"
+        text = "white"
+        dir = "blue"
+        file = "reset"
+        selection_bg = "#505050"
+        selection_fg = "yellow"
+        heading1 = "lightcyan"
+        heading2 = "lightyellow"
+        heading3 = "lightgreen"
+        code = "lightyellow"
+        diff_add = "green"
+        diff_del = "red"
+        git_clean = "green"
+        git_dirty = "yellow"
+        syntax = "base16-ocean.dark"
+    "##;
+    let t = Theme::from_toml(toml).expect("legacy theme (no active_line_bg) must parse");
+    assert_eq!(t.active_line_bg, t.selection_bg);
+    assert_eq!(t.active_line_bg, Color::Rgb(0x50, 0x50, 0x50));
+}
+
+#[test]
+fn active_line_bg_override_via_theme_config() {
+    let cfg = ThemeConfig {
+        name: Some("default".into()),
+        active_line_bg: Some("#ff0000".into()),
+        ..Default::default()
+    };
+    let t = cfg.resolve();
+    assert_eq!(t.active_line_bg, Color::Rgb(0xff, 0x00, 0x00));
+    // Other fields must still come from the base theme
+    assert_eq!(t.accent, Color::Cyan);
+}
+
+#[test]
 fn unknown_name_returns_none() {
     assert!(Theme::load("nonexistent-theme").is_none());
 }

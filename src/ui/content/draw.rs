@@ -16,6 +16,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame,
 };
+use unicode_width::UnicodeWidthStr;
 
 use crate::app::{App, Focus};
 
@@ -147,7 +148,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     let show_ln = app.show_line_numbers;
 
     // ln_width, ln_lines, content_lines, fold_gutter_rows
-    let (ln_width, ln_lines, mut content_lines, new_fold_gutter_rows) = if app.is_diff {
+    let (ln_width, mut ln_lines, mut content_lines, new_fold_gutter_rows) = if app.is_diff {
         // Diff view: iterate all highlighted lines (diffs are never large).
         let lines = app
             .highlighted
@@ -316,13 +317,31 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         )
     };
 
-    // Active-line highlight: tint the active cursor line with a subtle
-    // selection_bg tint across the full row width.
+    // Active-line highlight: full-width row background + gutter caret.
     if !app.is_diff && !app.diff_sbs_active() {
+        let active_bg = app.theme.active_line_bg;
+        let content_w = inner.width.saturating_sub(ln_width as u16) as usize;
         for (j, line) in content_lines.iter_mut().enumerate() {
+            if scroll + j != app.active_line {
+                continue;
+            }
+            // Full-width content highlight
+            for span in &mut line.spans {
+                span.style = span.style.bg(active_bg);
+            }
+            let text_w: usize = line.spans.iter().map(|s| s.content.as_ref().width()).sum();
+            if text_w < content_w {
+                line.spans.push(Span::styled(
+                    " ".repeat(content_w - text_w),
+                    Style::default().bg(active_bg),
+                ));
+            }
+        }
+        // Gutter caret: brighten the active line's gutter foreground
+        for (j, gutter) in ln_lines.iter_mut().enumerate() {
             if scroll + j == app.active_line {
-                for span in &mut line.spans {
-                    span.style = span.style.bg(sel_bg);
+                for span in &mut gutter.spans {
+                    span.style = span.style.bg(active_bg).fg(app.theme.accent);
                 }
             }
         }
