@@ -1,4 +1,14 @@
 version = "0.9.0"
 date = "2026-06-26"
-whats_new = ""
+whats_new = """- fix: remove alt-modified keybindings from defaults (#323)
+- fix: replace unwrap() with let-else early returns in popup draw paths (panic-safety) (#322)
+- ux: status messages now auto-expire after 3s TTL (#321)
+- ux: remove visual-line mode; keep simple active-line + B blame (#320)
+- fix: tree mouse-scroll no longer snaps back to selection on watcher refresh (#319)
+- fix: y/Y copy path for selected directories in tree (#317)
+- ux: show status feedback for context-locked keys (#318)
+- fix: line-blame popup closes on any navigation / background reload (#316)
+- fix: match keybindings by physical key position via kitty protocol (#312)
+- Compact breadcrumb (collapse ancestors to '..') + tree_up_dir (Backspace) (#289) (#306)
+- chore: add changelog to release info [skip ci]"""
 release_url = "https://github.com/ansromanov/tree-viewer/releases/tag/v0.9.0"
