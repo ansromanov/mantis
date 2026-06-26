@@ -524,3 +524,14 @@ fn copy_path_file_from_content_relative() {
     assert_eq!(cb.get_text().unwrap(), "long.txt");
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn git_mode_flat_toggle_flips_flag_when_in_git_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.git_mode = true;
+    assert!(!app.git_mode_flat);
+    app.handle_key(key(KeyCode::Char('F')));
+    assert!(app.git_mode_flat, "F key must enable flat mode in git mode");
+    fs::remove_dir_all(&root).ok();
+}
