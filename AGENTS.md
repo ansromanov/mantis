@@ -120,7 +120,11 @@ once they get large: a thin `mod.rs` re-exports focused submodules.
 9. **Content source abstraction.** `app/content_query.rs` hides whether the active
    content is a `VirtualFile`, `Vec<String>`, JSON pretty-print, or markdown spans;
    everything calls `app.line_count()` / `app.line_text(n)`.
-10. **Plugin IPC.** Plugins are external processes communicating over stdin/stdout
+10. **No alt-modified keybindings.** The Alt modifier conflicts with
+    terminal-level key processing and is unreliable across terminals. Every
+    default binding must use only Ctrl, Shift (via char case), or unmodified
+    keys. Never introduce a new `alt+` binding.
+11. **Plugin IPC.** Plugins are external processes communicating over stdin/stdout
     JSON lines (`plugin/mod.rs`). `PluginManager` spawns, kills, and routes actions;
     the content pane can be taken over by plugin-provided ANSI text (`ansi.rs`).
     State teardown is structural: every `set_*` action stamps its originating plugin

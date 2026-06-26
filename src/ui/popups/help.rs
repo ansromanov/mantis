@@ -58,7 +58,7 @@ pub(crate) fn draw_help(f: &mut Frame, app: &App, area: Rect) {
         Line::from(vec![key("  ?          "), desc("toggle this help")]),
         Line::from(vec![key("  Tab        "), desc("switch panel")]),
         Line::from(vec![key("  q / Ctrl+C "), desc("quit")]),
-        Line::from(vec![key("  Alt+.      "), desc("toggle hidden files")]),
+        Line::from(vec![key("  .          "), desc("toggle hidden files")]),
         Line::from(vec![key("  t          "), desc("pick a theme")]),
         Line::from(vec![key("  p          "), desc("plugin manager")]),
         Line::from(vec![
@@ -76,7 +76,7 @@ pub(crate) fn draw_help(f: &mut Frame, app: &App, area: Rect) {
         ]),
         Line::from(vec![key("  Ctrl+O     "), desc("recent files picker")]),
         Line::from(vec![
-            key("  Alt+G      "),
+            key("  F          "),
             desc("toggle git flat/tree view (in git mode)"),
         ]),
         gap.clone(),

@@ -597,8 +597,8 @@ fn ctrl_g() -> KeyEvent {
     KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL)
 }
 
-fn alt_g() -> KeyEvent {
-    KeyEvent::new(KeyCode::Char('g'), KeyModifiers::ALT)
+fn flat_key() -> KeyEvent {
+    KeyEvent::new(KeyCode::Char('F'), KeyModifiers::empty())
 }
 
 #[test]
@@ -716,7 +716,7 @@ fn git_mode_flat_shows_depth_zero_files() {
     let mut app = app_for(&root);
 
     app.handle_key(ctrl_g());
-    app.handle_key(alt_g());
+    app.handle_key(flat_key());
 
     assert!(app.git_mode_flat);
     assert!(
@@ -737,8 +737,8 @@ fn git_mode_flat_toggle_returns_to_tree_view() {
     let mut app = app_for(&root);
 
     app.handle_key(ctrl_g());
-    app.handle_key(alt_g()); // flat
-    app.handle_key(alt_g()); // back to tree
+    app.handle_key(flat_key()); // flat
+    app.handle_key(flat_key()); // back to tree
 
     assert!(app.git_mode);
     assert!(!app.git_mode_flat);
@@ -755,7 +755,8 @@ fn git_mode_flat_key_is_noop_outside_git_mode() {
     let mut app = app_for(&root);
     let count = app.nodes.len();
 
-    app.handle_key(alt_g());
+    assert!(!app.git_mode);
+    app.handle_key(flat_key());
 
     assert!(!app.git_mode_flat);
     assert!(!app.git_mode);
@@ -1069,7 +1070,7 @@ fn normal_key_toggle_hidden_reloads() {
     let root = temp_tree();
     let mut app = app_for(&root);
     let before = app.show_hidden;
-    app.handle_key(KeyEvent::new(KeyCode::Char('.'), KeyModifiers::ALT));
+    app.handle_key(KeyEvent::new(KeyCode::Char('.'), KeyModifiers::empty()));
     assert_ne!(app.show_hidden, before);
     fs::remove_dir_all(&root).ok();
 }

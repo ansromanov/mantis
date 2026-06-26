@@ -34,3 +34,33 @@ fn help_shows_backspace_tree_up_dir() {
         "help overlay must list 'go up one directory', got:\n{joined}"
     );
 }
+
+#[test]
+fn help_shows_dot_for_toggle_hidden() {
+    let dir = tempfile::tempdir().unwrap();
+    let app = make_app(dir.path());
+    let backend = TestBackend::new(80, 75);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|f| draw_help(f, &app, f.area())).unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(
+        joined.contains("toggle hidden files"),
+        "help overlay must list 'toggle hidden files', got:\n{joined}"
+    );
+}
+
+#[test]
+fn help_shows_f_for_git_flat_toggle() {
+    let dir = tempfile::tempdir().unwrap();
+    let app = make_app(dir.path());
+    let backend = TestBackend::new(80, 75);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|f| draw_help(f, &app, f.area())).unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(
+        joined.contains("toggle git flat/tree view"),
+        "help overlay must list 'toggle git flat/tree view', got:\n{joined}"
+    );
+}
