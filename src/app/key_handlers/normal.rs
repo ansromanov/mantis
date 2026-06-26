@@ -115,7 +115,7 @@ impl App {
                 self.try_open_selected();
                 self.save_config();
             } else {
-                self.status_message = Some("flat view: only in git mode (Ctrl+G)".into());
+                self.set_status("flat view: only in git mode (Ctrl+G)");
             }
         } else if pressed(&k.open_in_editor, &key) {
             self.open_in_editor();
@@ -131,7 +131,7 @@ impl App {
             if self.focus == Focus::Content {
                 self.goto_line = Some(GotoLineState::new());
             } else {
-                self.status_message = Some("go to line: switch to the content pane (Tab)".into());
+                self.set_status("go to line: switch to the content pane (Tab)");
             }
         } else {
             match self.focus {
@@ -251,7 +251,7 @@ impl App {
                 self.content_scroll = 0;
                 self.content_hscroll = 0;
             } else {
-                self.status_message = Some("raw toggle: not a markdown file".into());
+                self.set_status("raw toggle: not a markdown file");
             }
         } else if pressed(&k.toggle_pretty_json, &key) {
             if self.is_json && !self.json_pretty_lines.is_empty() {
@@ -259,15 +259,15 @@ impl App {
                 self.content_scroll = 0;
                 self.content_hscroll = 0;
             } else if !self.is_json {
-                self.status_message = Some("pretty JSON: not a JSON file".into());
+                self.set_status("pretty JSON: not a JSON file");
             } else {
-                self.status_message = Some("pretty JSON: could not parse".into());
+                self.set_status("pretty JSON: could not parse");
             }
         } else if pressed(&k.toggle_blame, &key) {
             if !self.is_diff {
                 self.show_blame = !self.show_blame;
             } else {
-                self.status_message = Some("blame: not available in a diff".into());
+                self.set_status("blame: not available in a diff");
             }
         } else if self.is_diff && pressed(&k.toggle_diff_side_by_side, &key) {
             self.diff_side_by_side = !self.diff_side_by_side;
@@ -363,7 +363,7 @@ impl App {
             Focus::Content => self.current_file.clone(),
         };
         let Some(path) = path else {
-            self.status_message = Some("nothing selected".into());
+            self.set_status("nothing selected");
             return;
         };
         let text = if relative {
@@ -376,13 +376,13 @@ impl App {
         let mut clipboard = match arboard::Clipboard::new() {
             Ok(cb) => cb,
             Err(e) => {
-                self.status_message = Some(format!("clipboard error: {e}"));
+                self.set_status(format!("clipboard error: {e}"));
                 return;
             }
         };
         match clipboard.set_text(text) {
-            Ok(()) => self.status_message = Some("path copied".into()),
-            Err(e) => self.status_message = Some(format!("clipboard error: {e}")),
+            Ok(()) => self.set_status("path copied"),
+            Err(e) => self.set_status(format!("clipboard error: {e}")),
         }
     }
 

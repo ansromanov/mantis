@@ -275,7 +275,7 @@ impl Default for Keymap {
         Keymap {
             quit: bind(&["q", "ctrl+c"]),
             help: bind(&["?"]),
-            toggle_hidden: bind(&["alt+."]),
+            toggle_hidden: bind(&[".", "alt+."]),
             search_files: bind(&["/"]),
             search_content: bind(&["f"]),
             reload: bind(&["r"]),
@@ -306,7 +306,7 @@ impl Default for Keymap {
             diff_hunk_next: bind(&["n"]),
             diff_hunk_prev: bind(&["N"]),
             git_mode_toggle: bind(&["ctrl+g"]),
-            git_mode_flat_toggle: bind(&["alt+g"]),
+            git_mode_flat_toggle: bind(&["F", "alt+g"]),
             command_palette: bind(&["ctrl+p"]),
             open_in_editor: bind(&["e"]),
             fold_toggle: bind(&["Space"]),

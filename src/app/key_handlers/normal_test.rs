@@ -235,8 +235,8 @@ fn goto_line_keybinding_is_noop_with_tree_focus() {
     app.handle_key(key(KeyCode::Char(':')));
     assert!(app.goto_line.is_none());
     assert_eq!(
-        app.status_message,
-        Some("go to line: switch to the content pane (Tab)".into())
+        app.status_message.as_ref().map(|sm| sm.text.as_str()),
+        Some("go to line: switch to the content pane (Tab)")
     );
     fs::remove_dir_all(&root).ok();
 }
@@ -248,8 +248,8 @@ fn goto_line_status_clears_on_valid_keypress() {
     app.focus = Focus::Tree;
     app.handle_key(key(KeyCode::Char(':')));
     assert_eq!(
-        app.status_message,
-        Some("go to line: switch to the content pane (Tab)".into())
+        app.status_message.as_ref().map(|sm| sm.text.as_str()),
+        Some("go to line: switch to the content pane (Tab)")
     );
     app.handle_key(key(KeyCode::Char('j')));
     assert!(app.status_message.is_none());
@@ -326,8 +326,8 @@ fn git_mode_flat_toggle_noop_outside_git_mode() {
     app.git_mode = false;
     app.handle_key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::ALT));
     assert_eq!(
-        app.status_message,
-        Some("flat view: only in git mode (Ctrl+G)".into())
+        app.status_message.as_ref().map(|sm| sm.text.as_str()),
+        Some("flat view: only in git mode (Ctrl+G)")
     );
     assert!(!app.git_mode_flat);
     fs::remove_dir_all(&root).ok();
@@ -342,8 +342,8 @@ fn toggle_raw_markdown_noop_on_non_markdown() {
     assert!(!app.is_markdown);
     app.handle_key(key(KeyCode::Char('M')));
     assert_eq!(
-        app.status_message,
-        Some("raw toggle: not a markdown file".into())
+        app.status_message.as_ref().map(|sm| sm.text.as_str()),
+        Some("raw toggle: not a markdown file")
     );
     assert!(!app.show_raw_markdown);
     fs::remove_dir_all(&root).ok();
@@ -358,8 +358,8 @@ fn toggle_pretty_json_noop_on_non_json() {
     assert!(!app.is_json);
     app.handle_key(key(KeyCode::Char('J')));
     assert_eq!(
-        app.status_message,
-        Some("pretty JSON: not a JSON file".into())
+        app.status_message.as_ref().map(|sm| sm.text.as_str()),
+        Some("pretty JSON: not a JSON file")
     );
     assert!(!app.show_pretty_json);
     fs::remove_dir_all(&root).ok();
@@ -373,8 +373,8 @@ fn toggle_blame_noop_in_diff() {
     app.is_diff = true;
     app.handle_key(key(KeyCode::Char('b')));
     assert_eq!(
-        app.status_message,
-        Some("blame: not available in a diff".into())
+        app.status_message.as_ref().map(|sm| sm.text.as_str()),
+        Some("blame: not available in a diff")
     );
     assert!(!app.show_blame);
     fs::remove_dir_all(&root).ok();
@@ -440,7 +440,10 @@ fn copy_path_nothing_selected() {
     app.current_file = None;
     app.focus = Focus::Content;
     app.copy_path_to_clipboard(false);
-    assert_eq!(app.status_message.as_deref(), Some("nothing selected"));
+    assert_eq!(
+        app.status_message.as_ref().map(|sm| sm.text.as_str()),
+        Some("nothing selected")
+    );
     fs::remove_dir_all(&root).ok();
 }
 
@@ -451,7 +454,10 @@ fn copy_path_nothing_selected_relative() {
     app.current_file = None;
     app.focus = Focus::Content;
     app.copy_path_to_clipboard(true);
-    assert_eq!(app.status_message.as_deref(), Some("nothing selected"));
+    assert_eq!(
+        app.status_message.as_ref().map(|sm| sm.text.as_str()),
+        Some("nothing selected")
+    );
     fs::remove_dir_all(&root).ok();
 }
 
