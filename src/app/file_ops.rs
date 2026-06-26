@@ -185,11 +185,11 @@ impl App {
         self.file_line_ending = None;
         self.content_scroll = 0;
         self.content_hscroll = 0;
-        self.active_line = 0;
         self.clear_selection();
-        // Drop blame popup and visual-line mode only when switching to a
-        // different file's diff; a same-file reload in git mode preserves both.
+        // Drop blame popup, active line, and visual-line mode only when
+        // switching to a different file's diff; a same-file reload preserves all.
         if is_new_file {
+            self.active_line = 0;
             self.show_line_blame = false;
             self.exit_visual_line();
         }
@@ -271,13 +271,13 @@ impl App {
         self.content_title = None;
         self.content_scroll = 0;
         self.content_hscroll = 0;
-        self.active_line = 0;
-        self.clear_selection();
-        // Drop visual-line mode and blame popup only when navigating to a
-        // different file; a same-file reopen (reload / external edit) preserves
-        // both.
+        // Drop blame popup, active line, and visual-line mode only when
+        // navigating to a different file; a same-file reopen (reload / external
+        // edit) preserves all.
         let is_new_file = self.current_file.as_deref() != Some(path);
+        self.clear_selection();
         if is_new_file {
+            self.active_line = 0;
             self.show_line_blame = false;
             self.exit_visual_line();
         }
@@ -317,7 +317,13 @@ impl App {
                 self.push_recent(path.to_path_buf());
             }
         } else {
-            self.current_file = None;
+            // Don't keep current_file pointing at a different file that is
+            // still displayed, but preserve it when the same file fails to
+            // reload so that the next successful reload sees is_new_file=false
+            // and correctly preserves blame/visual-line state.
+            if self.current_file.as_deref() != Some(path) {
+                self.current_file = None;
+            }
             self.current_syntax = None;
             self.mark_session_dirty();
             self.set_file_watch(None);

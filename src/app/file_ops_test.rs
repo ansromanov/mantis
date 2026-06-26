@@ -146,7 +146,7 @@ fn open_different_file_resets_active_line_and_blame_popup() {
 }
 
 #[test]
-fn reopen_same_file_preserves_blame_popup() {
+fn reopen_same_file_preserves_blame_popup_and_active_line() {
     let root = temp_dir();
     let f = root.join("same.txt");
     fs::write(&f, "line1\nline2\nline3\n").unwrap();
@@ -159,6 +159,32 @@ fn reopen_same_file_preserves_blame_popup() {
     assert!(
         app.show_line_blame,
         "blame popup stays open when reloading the same file"
+    );
+    assert_eq!(
+        app.active_line, 1,
+        "active_line must not reset on same-file reload (blame would show wrong line)"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn failed_reload_does_not_break_same_file_detection() {
+    // Sequence: open A, reload fails (file gone), reload succeeds → blame preserved.
+    let root = temp_dir();
+    let f = root.join("f.txt");
+    fs::write(&f, "line1\nline2\nline3\n").unwrap();
+    let mut app = app_for(&root);
+    app.open_file(&f);
+    app.active_line = 2;
+    app.show_line_blame = true;
+    // Simulate a failed reload: file is temporarily absent.
+    fs::remove_file(&f).unwrap();
+    app.open_file(&f); // load.ok=false → must not corrupt current_file
+    fs::write(&f, "line1\nline2\nline3\n").unwrap();
+    app.open_file(&f); // successful reload → is_new_file must be false
+    assert!(
+        app.show_line_blame,
+        "blame popup must survive failed-then-successful reload of same file"
     );
     fs::remove_dir_all(&root).ok();
 }
