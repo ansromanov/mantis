@@ -22,7 +22,9 @@ use super::util::centered_rect;
 
 pub(crate) fn draw_recent(f: &mut Frame, app: &mut App, area: Rect) {
     let theme = &app.theme;
-    let recent = app.recent_files.as_ref().unwrap();
+    let Some(recent) = app.recent_files.as_ref() else {
+        return;
+    };
 
     let popup = centered_rect(72, 75, area);
     f.render_widget(Clear, popup);
@@ -65,7 +67,6 @@ pub(crate) fn draw_recent(f: &mut Frame, app: &mut App, area: Rect) {
     );
 
     let root = &app.root;
-    let recent = app.recent_files.as_ref().unwrap();
     let items: Vec<ListItem> = recent
         .filtered
         .iter()
@@ -95,3 +96,7 @@ pub(crate) fn draw_recent(f: &mut Frame, app: &mut App, area: Rect) {
     app.recent_area = parts[2];
     app.recent_offset = state.offset();
 }
+
+#[cfg(test)]
+#[path = "recent_test.rs"]
+mod tests;

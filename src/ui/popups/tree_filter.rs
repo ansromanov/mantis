@@ -20,7 +20,9 @@ use crate::app::App;
 /// Called only when `app.tree_filter` is `Some`.
 pub(crate) fn draw_tree_filter(f: &mut Frame, app: &mut App, area: Rect) {
     let theme = &app.theme;
-    let filter = app.tree_filter.as_ref().unwrap();
+    let Some(filter) = app.tree_filter.as_ref() else {
+        return;
+    };
     let bar_y = area.y + area.height.saturating_sub(2);
     let bar_rect = Rect {
         x: area.x + 1,
@@ -50,3 +52,7 @@ pub(crate) fn draw_tree_filter(f: &mut Frame, app: &mut App, area: Rect) {
         bar_rect,
     );
 }
+
+#[cfg(test)]
+#[path = "tree_filter_test.rs"]
+mod tests;

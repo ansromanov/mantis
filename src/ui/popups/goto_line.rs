@@ -18,7 +18,9 @@ use crate::app::App;
 
 pub(crate) fn draw_goto_line(f: &mut Frame, app: &mut App, area: Rect) {
     let theme = &app.theme;
-    let s = app.goto_line.as_ref().unwrap();
+    let Some(s) = app.goto_line.as_ref() else {
+        return;
+    };
     let bar_y = area.y + area.height.saturating_sub(2);
     let bar_rect = Rect {
         x: area.x + 1,

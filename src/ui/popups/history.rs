@@ -22,7 +22,9 @@ use super::util::centered_rect;
 
 pub(crate) fn draw_history(f: &mut Frame, app: &mut App, area: Rect) {
     let theme = &app.theme;
-    let history = app.history.as_ref().unwrap();
+    let Some(history) = app.history.as_ref() else {
+        return;
+    };
 
     let popup = centered_rect(72, 75, area);
     f.render_widget(Clear, popup);
@@ -101,3 +103,7 @@ pub(crate) fn draw_history(f: &mut Frame, app: &mut App, area: Rect) {
     app.history_area = parts[2];
     app.history_offset = state.offset();
 }
+
+#[cfg(test)]
+#[path = "history_test.rs"]
+mod tests;
