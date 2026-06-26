@@ -26,10 +26,6 @@ impl App {
         // Clear transient status messages on the next handled keypress.
         self.status_message = None;
 
-        if self.visual_line.is_some() && self.focus == Focus::Content {
-            self.handle_visual_line_key(key);
-            return;
-        }
         if key.code == KeyCode::Esc {
             if self.show_line_blame {
                 self.show_line_blame = false;
@@ -273,11 +269,6 @@ impl App {
             } else {
                 self.status_message = Some("blame: not available in a diff".into());
             }
-        } else if !self.is_diff
-            && self.current_file.is_some()
-            && pressed(&k.visual_line_toggle, &key)
-        {
-            self.enter_visual_line();
         } else if self.is_diff && pressed(&k.toggle_diff_side_by_side, &key) {
             self.diff_side_by_side = !self.diff_side_by_side;
             self.content_scroll = 0;
