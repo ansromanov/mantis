@@ -35,8 +35,48 @@ jobs:
           echo "::error::PR body must close an issue (e.g. 'Closes #123') so it auto-closes on merge. Add the keyword or apply the 'no-issue' label."
           exit 1
 
+  # Detects whether the PR touches any Rust/config code that requires
+  # compilation, linting, and testing. Agent-only PRs (.agent/, .claude/,
+  # .opencode/, docs/, scripts/, .github/) set code=false and the pr job
+  # below is skipped entirely — no Rust toolchain is installed.
+  changes:
+    name: Detect code changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ steps.detect.outputs.code }}
+    steps:
+      - name: Check changed files
+        id: detect
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          changed=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files \
+            --paginate --jq '.[].filename')
+          if echo "$changed" | grep -qE '^(src/|tests/|benches/|Cargo\.(toml|lock)|tv\.toml)'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            echo "Code changes detected — pr job will run."
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+            echo "Agent/docs/config-only changes — pr job skipped."
+          fi
+          # Stash the changed-file list for the pr job's related-tests step.
+          printf '%s\n' "$changed" > changed_files.txt
+
+      - name: Upload changed-file list
+        if: steps.detect.outputs.code == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: changed-files
+          path: changed_files.txt
+          retention-days: 1
+
   pr:
     name: fmt, clippy, related tests (Linux)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -49,52 +89,35 @@ jobs:
         with:
           fetch-depth: 2
 
-      - name: Detect code changes
-        id: changes
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          changed=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files \
-            --paginate --jq '.[].filename')
-          if echo "$changed" | grep -qE '^(src/|tests/|benches/|Cargo\.(toml|lock)|tv\.toml)'; then
-            echo "code=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "code=false" >> "$GITHUB_OUTPUT"
-          fi
-          # Stash the changed-file list for the related-tests step.
-          printf '%s\n' "$changed" > changed_files.txt
+      - name: Download changed-file list
+        uses: actions/download-artifact@v4
+        with:
+          name: changed-files
 
       - name: Install lld
-        if: steps.changes.outputs.code == 'true'
         run: sudo apt-get update && sudo apt-get install -y lld
 
       - name: Install Rust toolchain
-        if: steps.changes.outputs.code == 'true'
         uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
 
       - name: Cache cargo
-        if: steps.changes.outputs.code == 'true'
         uses: Swatinem/rust-cache@v2
 
       - name: Install nextest
-        if: steps.changes.outputs.code == 'true'
         uses: taiki-e/install-action@v2
         with:
           tool: nextest
 
       - name: Format
-        if: steps.changes.outputs.code == 'true'
         run: cargo fmt --all -- --check
 
       - name: Clippy
-        if: steps.changes.outputs.code == 'true'
         # Skip benches (criterion) on PRs — they are compile-checked in main.yml.
         run: cargo clippy --lib --bins --tests -- -D warnings
 
       - name: Select related tests
-        if: steps.changes.outputs.code == 'true'
         id: select
         run: |
           filter=$(bash scripts/related-tests.sh < changed_files.txt)
@@ -104,7 +127,6 @@ jobs:
           echo "Selected filter: $filter"
 
       - name: Run related tests
-        if: steps.changes.outputs.code == 'true'
         run: |
           if [ "${{ steps.select.outputs.filter }}" = "__ALL__" ]; then
             echo "Running full suite (broad change detected)."
@@ -114,5 +136,4 @@ jobs:
           fi
 
       - name: Require sibling _test.rs (backstop for --no-verify)
-        if: steps.changes.outputs.code == 'true'
         run: bash scripts/require-tests.sh < changed_files.txt

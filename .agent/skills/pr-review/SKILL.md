@@ -1,0 +1,155 @@
+---
+name: pr-review
+description: Full PR review lifecycle — diff review, auto-fix, PR comment triage, conversation resolution, merge-conflict detection
+---
+
+Run the full PR review lifecycle in order. Do not skip phases.
+
+## Invocation
+
+```
+/pr-review          # reviews the current branch's open PR
+/pr-review <N>      # reviews PR #N (checks it out first)
+```
+
+## Phase 0 — Setup
+
+If a PR number is given, check it out:
+```bash
+just fix <N>
+```
+
+Identify the PR and repo:
+```bash
+PR=$(gh pr view --json number -q .number)
+REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+```
+
+Abort with a clear message if no open PR exists for the branch.
+
+## Phase 1 — Merge-conflict check
+
+```bash
+git fetch origin main
+git merge-base --is-ancestor origin/main HEAD || echo "DIVERGED"
+```
+
+Attempt a dry-run merge to surface conflicts without committing:
+```bash
+git merge --no-commit --no-ff origin/main 2>&1 || true
+git merge --abort 2>/dev/null || true
+```
+
+Report every conflicted file. If conflicts exist:
+- List each file and the nature of the conflict (both-modified, deleted-by-us, etc.)
+- Resolve the conflicts, then re-run `cargo fmt --all && cargo clippy --all-targets -- -D warnings` to confirm clean state
+- Commit the resolution
+
+## Phase 2 — Diff review
+
+Fetch the full PR diff:
+```bash
+gh pr diff
+```
+
+Review for:
+- Correctness bugs (logic errors, off-by-one, wrong types, unsafe unwraps in production paths)
+- AGENTS.md violations:
+  - `unwrap`/`expect` outside tests
+  - Alt-modifier keybindings
+  - Inline `#[cfg(test)] mod tests { ... }` (must be split → `_test.rs`)
+  - Missing `//!` module doc blocks on new `.rs` files
+  - New `set_*` plugin actions without `PluginContributions` entry
+  - Doc update missing for user-visible feature changes
+- Rust style: line length >100, wildcard imports (except `use super::*;` in tests), missing `.clone()` on non-Copy types
+
+For each finding output exactly:
+```
+path/to/file.rs:<line>: [SEVERITY] Problem. Fix.
+```
+Severity levels: `BUG` (must fix before merge) | `WARN` (should fix) | `STYLE` (optional).
+
+## Phase 3 — Auto-fix
+
+Apply all `BUG` and `WARN` findings automatically:
+1. Edit files to fix each issue
+2. After all edits: `cargo fmt --all`
+3. `cargo clippy --all-targets -- -D warnings`
+4. `just test-pr`
+5. Commit: `git add -p` each changed file, then commit with a message that lists what was fixed
+
+Do NOT auto-fix `STYLE` findings without explicit user approval.
+
+## Phase 4 — Address PR review comments
+
+Fetch all open (unresolved) review threads:
+```bash
+gh api graphql --paginate \
+  -F owner="${REPO%/*}" -F name="${REPO#*/}" -F pr="$PR" \
+  -f query='
+    query($owner:String!, $name:String!, $pr:Int!, $endCursor:String) {
+      repository(owner:$owner, name:$name) {
+        pullRequest(number:$pr) {
+          reviewThreads(first:100, after:$endCursor) {
+            pageInfo { hasNextPage endCursor }
+            nodes {
+              id
+              isResolved
+              comments(first:10) {
+                nodes { body author { login } path line }
+              }
+            }
+          }
+        }
+      }
+    }' \
+  --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved==false)'
+```
+
+For each unresolved thread:
+1. Read the comment(s) to understand what is requested
+2. Apply the fix (edit code, then fmt + clippy as above)
+3. Track which threads you addressed
+
+If a comment is ambiguous or contradicts AGENTS.md, note it and skip rather than guessing.
+
+## Phase 5 — Push + resolve threads
+
+```bash
+just pr                    # fetch, rebase onto origin/main, push --force-with-lease
+just resolve-threads       # mark addressed threads resolved via GraphQL
+```
+
+## Phase 6 — Summary
+
+Output a structured report:
+
+```
+## PR Review Summary — PR #<N>
+
+### Merge conflicts
+<none | list of files + resolution>
+
+### Diff findings applied
+<BUG/WARN findings fixed, one line each>
+
+### Diff findings (STYLE — not auto-applied)
+<style findings for human review>
+
+### PR comments addressed
+<thread summaries, one line each>
+
+### Push
+<commit SHA + branch>
+
+### Threads resolved
+<count resolved>
+```
+
+## Rules
+
+- Never skip `cargo fmt` / `cargo clippy` after editing code.
+- Never push without running `just test-pr` first.
+- Never resolve a thread you did not address in code.
+- Use `isolation: "worktree"` when spawning any subagent during this flow.
+- If `just test-pr` fails, fix the failure before pushing — do not push a broken branch.
