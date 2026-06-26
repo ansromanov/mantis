@@ -19,7 +19,7 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::mpsc::Receiver;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use notify::RecommendedWatcher;
 
@@ -106,6 +106,27 @@ pub struct PluginGitInfo {
     pub dirty: bool,
     /// State label: "clean", "dirty", "conflict", "rebase", or "merge".
     pub state: String,
+}
+
+/// A transient status message with a timestamp so it can auto-expire.
+#[derive(Debug, PartialEq)]
+pub struct StatusMessage {
+    pub text: String,
+    pub set_at: Instant,
+}
+
+impl StatusMessage {
+    pub fn new(text: impl Into<String>, now: Instant) -> Self {
+        Self {
+            text: text.into(),
+            set_at: now,
+        }
+    }
+
+    /// Returns `true` when the message has been alive longer than `ttl`.
+    pub fn expired(&self, ttl: Duration) -> bool {
+        self.set_at.elapsed() >= ttl
+    }
 }
 
 /// Central application state. Holds the file tree, content buffers, overlay
@@ -338,8 +359,9 @@ pub struct App {
     /// reset to `false` when `current_file` changes, so the `[rendering…]`
     /// placeholder only shows while the plugin is actively working on that file.
     pub plugin_content_active: bool,
-    /// Transient status message (e.g. "path copied"), shown until the next keypress.
-    pub status_message: Option<String>,
+    /// Transient status message (e.g. "path copied"), shown until the next keypress
+    /// or auto-expires after ~3 seconds.
+    pub status_message: Option<StatusMessage>,
     /// Breadcrumb segment areas recorded during the last render, used for mouse
     /// hit-testing. Each entry is (target_directory_path, clickable_rect).
     pub breadcrumb_areas: Vec<(std::path::PathBuf, Rect)>,
@@ -552,6 +574,12 @@ impl App {
     /// substitute a mock to avoid wall-clock waits.
     pub(crate) fn now(&self) -> Instant {
         Instant::now()
+    }
+
+    /// Sets a transient status message with an auto-expiry timestamp.
+    pub fn set_status(&mut self, msg: impl Into<String>) {
+        let sm = StatusMessage::new(msg, self.now());
+        self.status_message = Some(sm);
     }
 
     /// Records that the user scrolled the content, used to show a transient

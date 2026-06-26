@@ -1,5 +1,5 @@
 use super::*;
-use crate::app::{App, Focus};
+use crate::app::{App, Focus, StatusMessage};
 use crate::config::Config;
 use crate::git::{GitHead, GitRepoInfo};
 use crate::search::{GotoLineState, HistoryState, SearchState, ThemePicker};
@@ -587,7 +587,7 @@ fn narrow_keeps_config_error() {
 #[test]
 fn narrow_drops_meta_before_badges() {
     let mut app = make_app();
-    app.status_message = Some("hello".into());
+    app.status_message = Some(StatusMessage::new("hello", std::time::Instant::now()));
     app.show_hidden = true;
     // Total with all items: hint (~92) + [hidden] (9) + hello (6) + version (7) = 114.
     // At width 20: drop hint → 22 (still > 20), then drop hello (P_META=1) → 16 (≤20).

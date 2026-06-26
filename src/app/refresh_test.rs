@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::time::{Duration, Instant};
 
 use super::*;
+use crate::app::StatusMessage;
 
 // -- debounce / tick tests ----------------------------------------------------
 
@@ -910,6 +911,55 @@ fn teardown_noop_for_unknown_plugin() {
     app.plugin_contributions.clear();
     // Must not panic.
     app.teardown_plugin_contributions("nonexistent");
+}
+
+// -- status message TTL tests --------------------------------------------------
+
+#[test]
+fn status_message_expires_after_ttl() {
+    let mut app = create_base_app();
+    // Set a status message with a back-dated timestamp so it's expired.
+    app.status_message = Some(StatusMessage {
+        text: "old message".into(),
+        set_at: Instant::now() - Duration::from_secs(10),
+    });
+    app.tick();
+    assert!(
+        app.status_message.is_none(),
+        "expired status message must be cleared on tick"
+    );
+}
+
+#[test]
+fn status_message_survives_fresh_tick() {
+    let mut app = create_base_app();
+    app.status_message = Some(StatusMessage {
+        text: "recent message".into(),
+        set_at: Instant::now(),
+    });
+    app.tick();
+    assert!(
+        app.status_message.is_some(),
+        "fresh status message must survive a tick"
+    );
+    assert_eq!(
+        app.status_message.as_ref().unwrap().text,
+        "recent message",
+        "text must be preserved"
+    );
+}
+
+#[test]
+fn set_status_creates_message_with_timestamp() {
+    let mut app = create_base_app();
+    app.set_status("test message");
+    let sm = app.status_message.expect("message must be set");
+    assert_eq!(sm.text, "test message");
+    // The timestamp should be recent (within the last second).
+    assert!(
+        sm.set_at.elapsed() < Duration::from_secs(1),
+        "timestamp must be recent"
+    );
 }
 
 /// Extension trait to drive the production `handle_plugin_action` with a

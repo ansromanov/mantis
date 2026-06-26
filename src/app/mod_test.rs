@@ -4790,7 +4790,10 @@ fn copy_path_no_file_selected() {
     let mut app = app_for(&root);
     app.current_file = None;
     app.copy_path_to_clipboard(false);
-    assert_eq!(app.status_message.as_deref(), Some("no file selected"));
+    assert_eq!(
+        app.status_message.as_ref().map(|sm| sm.text.as_str()),
+        Some("no file selected")
+    );
     fs::remove_dir_all(&root).ok();
 }
 
@@ -4800,7 +4803,10 @@ fn copy_path_no_file_selected_relative() {
     let mut app = app_for(&root);
     app.current_file = None;
     app.copy_path_to_clipboard(true);
-    assert_eq!(app.status_message.as_deref(), Some("no file selected"));
+    assert_eq!(
+        app.status_message.as_ref().map(|sm| sm.text.as_str()),
+        Some("no file selected")
+    );
     fs::remove_dir_all(&root).ok();
 }
 

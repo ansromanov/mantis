@@ -268,9 +268,9 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
             P_META,
         ));
     }
-    if let Some(ref msg) = app.status_message {
+    if let Some(ref sm) = app.status_message {
         segs.push((
-            Span::styled(format!(" {msg}"), base.fg(app.theme.accent)),
+            Span::styled(format!(" {}", sm.text), base.fg(app.theme.accent)),
             P_META,
         ));
     }

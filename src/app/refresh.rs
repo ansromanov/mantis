@@ -14,6 +14,9 @@ use super::loader::{LoadRequest, LoadResponse};
 use super::App;
 
 impl App {
+    /// How long a status message lingers before auto-expiring (3 seconds).
+    const STATUS_TTL: Duration = Duration::from_secs(3);
+
     /// Per-frame update. Refreshes the open file from its watcher, advances the
     /// debounced content search, and drives the tree/git refresh: when the root
     /// watcher is installed this is event-driven (reload only after the tree has
@@ -40,6 +43,14 @@ impl App {
             if quiet {
                 self.save_session();
             }
+        }
+        // Auto-expire status message after TTL.
+        if self
+            .status_message
+            .as_ref()
+            .is_some_and(|sm| sm.expired(Self::STATUS_TTL))
+        {
+            self.status_message = None;
         }
         if self.tree_dirty {
             // Wait for the tree to go quiet before reloading so a burst of events
