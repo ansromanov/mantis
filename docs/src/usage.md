@@ -13,7 +13,7 @@ Press `?` at any time for in-app help, and `q` to quit.
 ## Session persistence
 
 `tv` automatically remembers your workspace state across restarts:
-expanded directories, the last open file, scroll position, and git mode.
+expanded directories, the last open file, and scroll position.
 State is cached outside the project tree (`~/.local/state/tree-viewer/`
 or `%APPDATA%\tree-viewer\`) so it survives re-clones and never writes
 dotfiles into the repository. To reset the session for a directory, quit

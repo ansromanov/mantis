@@ -67,11 +67,9 @@ intact) and a flat, depth-0 list of every changed file with relative paths. Pres
 All directories containing changes are auto-expanded when entering git mode.
 Diffs refresh on the 30-second auto-reload tick and on manual `r`.
 
-You can have `tv` start directly in git mode via `tv.toml`:
+`git_status` controls whether tree entries are coloured by git status at startup:
 
 ```toml
-git_mode = false         # start in git mode (default: false)
-git_mode_flat = false    # start in flat list view (default: false)
 git_status = true        # colour tree entries by git status (default: true)
 git_show_deleted = false # show ghost nodes for deleted tracked files (default: false)
 ```

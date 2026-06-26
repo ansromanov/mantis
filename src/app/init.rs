@@ -4,8 +4,8 @@
 //! resolving the theme, seeding bundled plugins, discovering plugin manifests,
 //! constructing the highlighter and loader, spawning the plugin subprocess
 //! manager, and applying any persisted session state on top of the config.
-//! This module isolates that ~280-line constructor so the main `App` struct
-//! definition in `mod.rs` stays focused on the data model.
+//! This module isolates the constructor so the main `App` struct definition
+//! in `mod.rs` stays focused on the data model.
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -28,8 +28,7 @@ impl App {
         config_error: Option<String>,
     ) -> anyhow::Result<Self> {
         let expanded = HashSet::new();
-        // git_mode requires status data even if git_status is disabled in config.
-        let git_status_enabled = cfg.git_status || cfg.git_mode;
+        let git_status_enabled = cfg.git_status;
         let git_show_deleted = cfg.git_show_deleted;
         let git_status_map = if git_status_enabled {
             #[cfg(feature = "git-core")]
@@ -156,8 +155,8 @@ impl App {
             git_show_deleted,
             git_info,
             git_status_map,
-            git_mode: cfg.git_mode,
-            git_mode_flat: cfg.git_mode_flat,
+            git_mode: false,
+            git_mode_flat: false,
             show_scrollbar: cfg.scrollbar,
             show_scroll_percentage: cfg.scroll_percentage,
             show_line_numbers: cfg.line_numbers,
@@ -243,30 +242,9 @@ impl App {
                     app.expanded.insert(dir.clone());
                 }
             }
-            // Restore git mode from session (overrides config default).
-            // Mirror toggle_git_mode: if git_status was disabled in config but
-            // the session had git_mode on, fetch git status so expand_git_dirs()
-            // has a non-empty map instead of producing an empty tree.
-            if s.git_mode && !app.git_mode {
-                app.git_mode = true;
-                if !app.git_status_enabled {
-                    app.git_status_enabled = true;
-                    #[cfg(feature = "git-core")]
-                    {
-                        app.git_status_map =
-                            crate::git::repo_status(&app.root, app.ignore_gitignore);
-                        app.git_info = crate::git::repo_info(&app.root);
-                    }
-                }
-            } else {
-                app.git_mode = s.git_mode;
-            }
         }
 
-        if app.git_mode {
-            app.expand_git_dirs();
-        }
-        if has_session_override || app.git_mode {
+        if has_session_override {
             app.rebuild(true);
         }
 

@@ -169,7 +169,6 @@ impl App {
     /// tree and re-opens the current file as plain content.
     pub(super) fn toggle_git_mode(&mut self) {
         self.git_mode = !self.git_mode;
-        self.config.git_mode = self.git_mode;
         self.mark_session_dirty();
         if self.git_mode {
             // Ensure git status is populated even if git_status was disabled.

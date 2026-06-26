@@ -110,7 +110,6 @@ impl App {
         } else if pressed(&k.git_mode_flat_toggle, &key) {
             if self.git_mode {
                 self.git_mode_flat = !self.git_mode_flat;
-                self.config.git_mode_flat = self.git_mode_flat;
                 self.rebuild(true);
                 self.try_open_selected();
                 self.save_config();

@@ -199,3 +199,36 @@ fn app_new_preserves_root_path() {
     assert_eq!(app.root, root);
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn app_new_starts_in_normal_mode() {
+    let root = temp_dir();
+    fs::write(root.join("f.txt"), "x\n").unwrap();
+    let app = new_app(&root, Config::default());
+    assert!(!app.git_mode, "App::new must always start in normal mode");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn app_new_session_git_mode_ignored() {
+    let root = temp_dir();
+    fs::write(root.join("f.txt"), "x\n").unwrap();
+    // Manually write a session file with old-format git_mode: true.
+    let key = root.to_string_lossy();
+    let old = format!(
+        r#"{{"version":1,"sessions":{{"{}":{{"expanded":[],"current_file":null,"content_scroll":0,"active_line":0,"git_mode":true}}}}}}"#,
+        key
+    );
+    if let Some(p) = crate::session::sessions_path() {
+        if let Some(parent) = p.parent() {
+            std::fs::create_dir_all(parent).unwrap();
+        }
+        std::fs::write(&p, &old).unwrap();
+    }
+    let app = new_app(&root, Config::default());
+    assert!(
+        !app.git_mode,
+        "must start in normal mode even when session has git_mode"
+    );
+    fs::remove_dir_all(&root).ok();
+}
