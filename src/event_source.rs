@@ -137,15 +137,13 @@ impl RawEventSource {
                 Ok(Some(event))
             }
             Ok(None) => {
-                // Incomplete sequence – skip it and wait for more data.
-                self.buf.clear();
-                self.pos = 0;
+                // Incomplete sequence — leave bytes in buffer for next fill().
                 Ok(None)
             }
-            Err(e) => {
-                // Unparseable: skip one byte and try again.
+            Err(_) => {
+                // Unparseable byte: skip it and signal no event (don't crash).
                 self.pos += 1;
-                Err(e)
+                Ok(None)
             }
         }
     }
@@ -168,7 +166,7 @@ fn parse_event(bytes: &[u8]) -> io::Result<Option<(Event, usize)>> {
         0x1B => parse_escape(bytes),
         // Ctrl+@ through Ctrl+_ (and DEL / Ctrl+?)
         // 0x09 = Tab, 0x0D = CR, 0x1B = ESC — handled individually below.
-        0x00..=0x06 | 0x08 | 0x0A | 0x0C | 0x0E..=0x1A | 0x1C..=0x1F => {
+        0x00..=0x08 | 0x0A | 0x0C | 0x0E..=0x1A | 0x1C..=0x1F => {
             let code = ctrl_byte_to_code(bytes[0]);
             Ok(Some((
                 Event::Key(KeyEvent::new(code, KeyModifiers::CONTROL)),
@@ -528,10 +526,10 @@ fn parse_csi_tilde(params: &str, consumed: usize) -> io::Result<Option<(Event, u
         4 | 10 => KeyCode::End,
         5 => KeyCode::PageUp,
         6 => KeyCode::PageDown,
-        11..=15 => KeyCode::F((num - 11 + 1) as u8),
-        17..=21 => KeyCode::F((num - 17 + 1) as u8),
-        23..=26 => KeyCode::F((num - 23 + 1) as u8),
-        28..=34 => KeyCode::F((num - 28 + 1) as u8),
+        11..=15 => KeyCode::F((num - 10) as u8), // F1-F5
+        17..=21 => KeyCode::F((num - 11) as u8), // F6-F10
+        23..=26 => KeyCode::F((num - 12) as u8), // F11-F14
+        28..=34 => KeyCode::F((num - 13) as u8), // F15-F21
         _ => KeyCode::Null,
     };
     Ok(Some((key(code), consumed)))
@@ -571,8 +569,10 @@ fn parse_ss3(bytes: &[u8]) -> io::Result<Option<(Event, usize)>> {
 fn parse_sgr_mouse(
     params: &str,
     consumed: usize,
-    _default_kind: MouseEventKind,
+    default_kind: MouseEventKind,
 ) -> io::Result<Option<(Event, usize)>> {
+    // SGR sequences include a leading '<' in the parameter string (ESC[<cb;col;rowM).
+    let params = params.strip_prefix('<').unwrap_or(params);
     let mut parts = params.split(';');
     let cb_str = parts.next().unwrap_or("0");
     let col_str = parts.next().unwrap_or("1");
@@ -582,7 +582,8 @@ fn parse_sgr_mouse(
     let col: u16 = col_str.parse().unwrap_or(0);
     let row: u16 = row_str.parse().unwrap_or(0);
 
-    // Button 0-2: press; 0x20: motion (drag); 0x40: scroll (wheel).
+    // Button 0-2: press/release determined by final byte (M/m) via default_kind;
+    // 0x20: motion (drag); 0x40: scroll (wheel).
     let kind = if cb & 0x40 != 0 {
         // Scroll event
         if cb & 0x01 != 0 {
@@ -592,13 +593,14 @@ fn parse_sgr_mouse(
         }
     } else if cb & 0x20 != 0 {
         MouseEventKind::Moved
-    } else if cb & 0x03 == 3 {
-        // No button (release in X10 mode)
-        MouseEventKind::Up(decode_mouse_button(cb))
-    } else if cb & 0x80 != 0 {
-        MouseEventKind::Up(decode_mouse_button(cb))
     } else {
-        MouseEventKind::Down(decode_mouse_button(cb))
+        // In SGR mode press vs release is signaled by the final byte (M or m),
+        // conveyed here via default_kind. Preserve the correct button from cb.
+        let button = decode_mouse_button(cb);
+        match default_kind {
+            MouseEventKind::Up(_) => MouseEventKind::Up(button),
+            _ => MouseEventKind::Down(button),
+        }
     };
 
     Ok(Some((

@@ -205,7 +205,7 @@ fn launch_tui(root: PathBuf, file: Option<PathBuf>) -> anyhow::Result<()> {
 
     // Teardown: reverse order from setup.
     #[cfg(unix)]
-    {
+    if keyboard_enhanced {
         let _ = event_source::pop_keyboard_enhancement_flags();
     }
     disable_raw_mode()?;
