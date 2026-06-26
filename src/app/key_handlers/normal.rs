@@ -115,7 +115,7 @@ impl App {
             if self.git_mode {
                 self.git_mode_flat = !self.git_mode_flat;
                 self.config.git_mode_flat = self.git_mode_flat;
-                self.rebuild();
+                self.rebuild(true);
                 self.try_open_selected();
                 self.save_config();
             } else {
@@ -197,7 +197,7 @@ impl App {
                 if is_dir && self.expanded.contains(&path) {
                     self.expanded.remove(&path);
                     self.mark_session_dirty();
-                    self.rebuild();
+                    self.rebuild(true);
                 } else if depth > 0 {
                     for i in (0..self.tree_selected).rev() {
                         if self.nodes[i].depth < depth {
@@ -367,8 +367,12 @@ impl App {
     }
 
     pub(crate) fn copy_path_to_clipboard(&mut self, relative: bool) {
-        let Some(path) = self.current_file.as_ref() else {
-            self.set_status("no file selected");
+        let path = match self.focus {
+            Focus::Tree => self.nodes.get(self.tree_selected).map(|n| n.path.clone()),
+            Focus::Content => self.current_file.clone(),
+        };
+        let Some(path) = path else {
+            self.set_status("nothing selected");
             return;
         };
         let text = if relative {

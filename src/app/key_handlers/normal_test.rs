@@ -430,3 +430,97 @@ fn toggle_blame_status_clears_on_valid_keypress() {
     assert!(app.status_message.is_none());
     fs::remove_dir_all(&root).ok();
 }
+
+// -- copy path ---------------------------------------------------------------
+
+#[test]
+fn copy_path_nothing_selected() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.current_file = None;
+    app.focus = Focus::Content;
+    app.copy_path_to_clipboard(false);
+    assert_eq!(
+        app.status_message.as_ref().map(|sm| sm.text.as_str()),
+        Some("nothing selected")
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn copy_path_nothing_selected_relative() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.current_file = None;
+    app.focus = Focus::Content;
+    app.copy_path_to_clipboard(true);
+    assert_eq!(
+        app.status_message.as_ref().map(|sm| sm.text.as_str()),
+        Some("nothing selected")
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn copy_path_directory_from_tree_absolute() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Tree;
+    let dir_path = app.nodes[0].path.clone();
+    app.copy_path_to_clipboard(false);
+    let Ok(mut cb) = arboard::Clipboard::new() else {
+        return;
+    };
+    assert_eq!(cb.get_text().unwrap(), dir_path.display().to_string());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn copy_path_directory_from_tree_relative() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Tree;
+    let rel = app.nodes[0]
+        .path
+        .strip_prefix(&app.root)
+        .unwrap()
+        .display()
+        .to_string();
+    app.copy_path_to_clipboard(true);
+    let Ok(mut cb) = arboard::Clipboard::new() else {
+        return;
+    };
+    assert_eq!(cb.get_text().unwrap(), rel);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn copy_path_file_from_content_still_works() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.copy_path_to_clipboard(false);
+    let Ok(mut cb) = arboard::Clipboard::new() else {
+        return;
+    };
+    assert_eq!(
+        cb.get_text().unwrap(),
+        root.join("long.txt").display().to_string()
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn copy_path_file_from_content_relative() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.copy_path_to_clipboard(true);
+    let Ok(mut cb) = arboard::Clipboard::new() else {
+        return;
+    };
+    assert_eq!(cb.get_text().unwrap(), "long.txt");
+    fs::remove_dir_all(&root).ok();
+}

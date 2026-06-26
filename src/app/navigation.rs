@@ -22,7 +22,13 @@ impl App {
     /// Rebuilds the visible node list from the filesystem. Preserves the
     /// currently selected item by path. In git mode, filters to changed files
     /// only. In flat git mode, produces a single-level file list.
-    pub(super) fn rebuild(&mut self) {
+    ///
+    /// When `recenter` is `true` the viewport is nudged to keep the selection
+    /// visible (keyboard-driven navigation). When `false` the scroll position
+    /// is preserved and only clamped to the new bounds — this prevents
+    /// watcher-driven refreshes from snapping the viewport back to the
+    /// selection after the user wheel-scrolled to a different part of the tree.
+    pub(super) fn rebuild(&mut self, recenter: bool) {
         let prev = self.nodes.get(self.tree_selected).map(|n| n.path.clone());
         let deleted = super::deleted_set(&self.git_status_map, self.git_show_deleted);
 
@@ -62,12 +68,20 @@ impl App {
         if let Some(p) = prev {
             if let Some(i) = self.nodes.iter().position(|n| n.path == p) {
                 self.tree_selected = i;
-                self.scroll_tree_into_view();
+                if recenter {
+                    self.scroll_tree_into_view();
+                } else {
+                    self.tree_scroll = self.tree_scroll.min(self.tree_scroll_max());
+                }
                 return;
             }
         }
         self.tree_selected = self.tree_selected.min(self.nodes.len().saturating_sub(1));
-        self.scroll_tree_into_view();
+        if recenter {
+            self.scroll_tree_into_view();
+        } else {
+            self.tree_scroll = self.tree_scroll.min(self.tree_scroll_max());
+        }
     }
 
     /// Produces a flat list of all changed (non-ignored) files with depth 0
@@ -169,10 +183,10 @@ impl App {
                 }
             }
             self.expand_git_dirs();
-            self.rebuild();
+            self.rebuild(true);
             self.try_open_selected();
         } else {
-            self.rebuild();
+            self.rebuild(true);
             // Re-open the current file as normal content instead of a diff.
             if let Some(path) = self.current_file.clone() {
                 if self.is_diff {
@@ -197,7 +211,7 @@ impl App {
                 self.expanded.insert(p);
             }
             self.mark_session_dirty();
-            self.rebuild();
+            self.rebuild(true);
         } else {
             let p = node.path.clone();
             let deleted = node.deleted;
@@ -227,7 +241,7 @@ impl App {
             }
             current = dir.parent();
         }
-        self.rebuild();
+        self.rebuild(false);
         if let Some(i) = self.nodes.iter().position(|n| n.path == path) {
             self.tree_selected = i;
             // Keep the viewport on the revealed node in independent-scroll mode;
@@ -270,7 +284,7 @@ impl App {
             current = dir.parent();
         }
         self.expanded.insert(path.to_path_buf());
-        self.rebuild();
+        self.rebuild(false);
         if let Some(i) = self.nodes.iter().position(|n| n.path == path) {
             self.tree_selected = i;
             self.scroll_tree_into_view();
@@ -341,7 +355,7 @@ impl App {
         if self.git_mode {
             self.expand_git_dirs();
         }
-        self.rebuild();
+        self.rebuild(false);
         self.tree_selected = 0;
         self.scroll_tree_into_view();
         if let Some(node) = self.nodes.get(self.tree_selected) {
@@ -358,7 +372,7 @@ impl App {
         let prev_path = self.nodes.get(self.tree_selected).map(|n| n.path.clone());
         self.expanded.clear();
         self.mark_session_dirty();
-        self.rebuild();
+        self.rebuild(false);
         // rebuild() preserves the selection when the path is still visible.
         // When the path is hidden (was nested), walk up to the nearest ancestor
         // that is now visible so the user lands on a related entry.
@@ -397,7 +411,7 @@ impl App {
             self.expanded.insert(dir);
         }
         self.mark_session_dirty();
-        self.rebuild();
+        self.rebuild(true);
         self.scroll_tree_into_view();
         if let Some(i) = self
             .nodes
