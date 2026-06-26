@@ -379,3 +379,54 @@ fn toggle_blame_noop_in_diff() {
     assert!(!app.show_blame);
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn git_mode_flat_toggle_status_clears_on_valid_keypress() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.git_mode = false;
+    app.handle_key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::ALT));
+    assert!(app.status_message.is_some());
+    app.handle_key(key(KeyCode::Char('j')));
+    assert!(app.status_message.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn toggle_raw_markdown_status_clears_on_valid_keypress() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.handle_key(key(KeyCode::Char('M')));
+    assert!(app.status_message.is_some());
+    app.handle_key(key(KeyCode::Char('j')));
+    assert!(app.status_message.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn toggle_pretty_json_status_clears_on_valid_keypress() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.handle_key(key(KeyCode::Char('J')));
+    assert!(app.status_message.is_some());
+    app.handle_key(key(KeyCode::Char('j')));
+    assert!(app.status_message.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn toggle_blame_status_clears_on_valid_keypress() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.is_diff = true;
+    app.handle_key(key(KeyCode::Char('b')));
+    assert!(app.status_message.is_some());
+    app.handle_key(key(KeyCode::Char('j')));
+    assert!(app.status_message.is_none());
+    fs::remove_dir_all(&root).ok();
+}

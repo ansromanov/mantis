@@ -264,6 +264,8 @@ impl App {
                 self.content_hscroll = 0;
             } else if !self.is_json {
                 self.status_message = Some("pretty JSON: not a JSON file".into());
+            } else {
+                self.status_message = Some("pretty JSON: could not parse".into());
             }
         } else if pressed(&k.toggle_blame, &key) {
             if !self.is_diff {
