@@ -45,7 +45,6 @@ pub fn push_keyboard_enhancement_flags() -> io::Result<bool> {
                 KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
                     | KeyboardEnhancementFlags::REPORT_EVENT_TYPES
                     | KeyboardEnhancementFlags::REPORT_ALTERNATE_KEYS
-                    | KeyboardEnhancementFlags::REPORT_ALL_KEYS_AS_ESCAPE_CODES
             )
         )?;
     }
@@ -287,12 +286,10 @@ fn parse_csi(bytes: &[u8]) -> io::Result<Option<(Event, usize)>> {
         // Only handle bare ESC[A/B/C/D (no params) as legacy arrow keys.
         // When the kitty keyboard protocol is active the terminal sends these
         // in disambiguated form (e.g. ESC[1;1A) *and* as CSI-u; ignoring the
-        // params-present form prevents a double event that causes the cursor
-        // to move two rows per keypress.
-        b'A' if params_str.is_empty() => Ok(Some((key(KeyCode::Up), consumed))),
-        b'B' if params_str.is_empty() => Ok(Some((key(KeyCode::Down), consumed))),
-        b'C' if params_str.is_empty() => Ok(Some((key(KeyCode::Right), consumed))),
-        b'D' if params_str.is_empty() => Ok(Some((key(KeyCode::Left), consumed))),
+        b'A' => Ok(Some((key(KeyCode::Up), consumed))),
+        b'B' => Ok(Some((key(KeyCode::Down), consumed))),
+        b'C' => Ok(Some((key(KeyCode::Right), consumed))),
+        b'D' => Ok(Some((key(KeyCode::Left), consumed))),
         b'H' => Ok(Some((key(KeyCode::Home), consumed))),
         b'F' => Ok(Some((key(KeyCode::End), consumed))),
         b'Z' => Ok(Some((key(KeyCode::BackTab), consumed))),
@@ -404,10 +401,6 @@ fn translate_functional(codepoint: u32) -> Option<KeyCode> {
         // Regular navigation keys (kitty private-use codepoints)
         57348 => Some(KeyCode::Insert),
         57349 => Some(KeyCode::Delete),
-        57350 => Some(KeyCode::Left),
-        57351 => Some(KeyCode::Right),
-        57352 => Some(KeyCode::Up),
-        57353 => Some(KeyCode::Down),
         57354 => Some(KeyCode::PageUp),
         57355 => Some(KeyCode::PageDown),
         57356 => Some(KeyCode::Home),

@@ -280,52 +280,20 @@ fn sgr_motion_no_button_is_moved() {
 }
 
 // ---------------------------------------------------------------------------
-// Regular arrow codepoints (57350-57353)
+// CSI arrows: both bare and params-present forms must produce a key event.
+// REPORT_ALL_KEYS_AS_ESCAPE_CODES is not enabled; arrows come through the
+// legacy CSI path (ESC[A or ESC[1;1A via DISAMBIGUATE_ESCAPE_CODES).
 // ---------------------------------------------------------------------------
 
 #[test]
-fn csi_u_regular_up_arrow() {
-    let seq = b"\x1b[57352;1u";
-    let (ev, _) = parse_ok(seq);
+fn csi_bare_up_arrow() {
+    let (ev, _) = parse_ok(b"\x1b[A");
     assert_eq!(key_event(&ev).code, KeyCode::Up);
 }
 
 #[test]
-fn csi_u_regular_down_arrow() {
-    let seq = b"\x1b[57353;1u";
-    let (ev, _) = parse_ok(seq);
-    assert_eq!(key_event(&ev).code, KeyCode::Down);
-}
-
-#[test]
-fn csi_u_regular_left_arrow() {
-    let seq = b"\x1b[57350;1u";
-    let (ev, _) = parse_ok(seq);
-    assert_eq!(key_event(&ev).code, KeyCode::Left);
-}
-
-#[test]
-fn csi_u_regular_right_arrow() {
-    let seq = b"\x1b[57351;1u";
-    let (ev, _) = parse_ok(seq);
-    assert_eq!(key_event(&ev).code, KeyCode::Right);
-}
-
-// ---------------------------------------------------------------------------
-// Double-movement prevention: params-present CSI arrows → Null
-// ---------------------------------------------------------------------------
-
-#[test]
-fn csi_arrow_with_params_produces_null() {
-    // ESC[1;1A = kitty DISAMBIGUATE_ESCAPE_CODES form of plain Up.
-    // Must produce Null (not Up) so the CSI-u form is the sole event.
+fn csi_disambiguated_up_arrow() {
+    // ESC[1;1A = DISAMBIGUATE_ESCAPE_CODES form of plain Up (no modifiers).
     let (ev, _) = parse_ok(b"\x1b[1;1A");
-    assert_eq!(key_event(&ev).code, KeyCode::Null);
-}
-
-#[test]
-fn csi_bare_up_arrow_still_works() {
-    // Plain ESC[A from legacy terminals (no params) must still fire.
-    let (ev, _) = parse_ok(b"\x1b[A");
     assert_eq!(key_event(&ev).code, KeyCode::Up);
 }
