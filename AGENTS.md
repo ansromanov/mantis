@@ -271,8 +271,8 @@ Key pages to consider when changing code:
 |---|---|
 | `cargo build` / `cargo build --release` | Debug / release build |
 | `cargo run -- [path]` | Run with optional path |
-| `just test-pr` | **Run only tests related to your changes** (default for PRs) |
-| `cargo nextest run` | Run full test suite (use only when `just test-pr` prints "broad change") |
+| `just test-pr` | **Run only tests related to your changes** (skips on broad changes — never runs full suite) |
+| `cargo nextest run` | Run full test suite (use manually when `just test-pr` skips due to broad change) |
 | `cargo nextest run -E 'test(foo)'` | Run tests matching a filter |
 | `cargo test` | Run full suite via built-in runner (fallback if nextest unavailable) |
 | `cargo check` | Type-check only |
@@ -366,7 +366,8 @@ leaves manual cleanup behind.
 `just test-pr` diffs your branch against `origin/main`, pipes the changed file
 list through `scripts/related-tests.sh`, and runs only the matching tests with
 `cargo nextest`. If the changes touch broad files (`Cargo.toml`, `src/lib.rs`,
-etc.) it automatically falls back to the full suite and prints a notice.
+etc.) it prints a notice and skips — run `cargo nextest run` manually if you
+need full coverage for those changes.
 
 Do **not** run `cargo nextest run` (full suite) or `cargo test` (full suite)
 as your default verification step — it wastes minutes and defeats the purpose
