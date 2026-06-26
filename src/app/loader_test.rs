@@ -169,6 +169,34 @@ fn compute_file_load_sets_syntax_name_for_rust_file() {
 }
 
 #[test]
+fn git_status_worker_round_trip_returns_matching_seq() {
+    let loader = Loader::new(&Theme::default(), Vec::new());
+    loader.request(LoadRequest::GitStatus {
+        seq: 42,
+        root: std::path::PathBuf::from("/nonexistent"),
+        ignore_gitignore: false,
+    });
+    let resp = loader.rx.recv().expect("worker response");
+    match resp {
+        LoadResponse::GitStatus { seq, root, load } => {
+            assert_eq!(seq, 42);
+            assert_eq!(root, std::path::PathBuf::from("/nonexistent"));
+            // Outside a git repo both should be empty.
+            assert!(load.status_map.is_empty());
+            assert!(load.info.is_none());
+        }
+        _ => panic!("expected GitStatus response"),
+    }
+}
+
+#[test]
+fn compute_git_status_load_outside_repo() {
+    let load = compute_git_status_load(std::path::Path::new("/nonexistent"), false);
+    assert!(load.status_map.is_empty());
+    assert!(load.info.is_none());
+}
+
+#[test]
 fn compute_file_load_sets_no_syntax_name_for_unknown_extension() {
     let mut f = tempfile::NamedTempFile::with_suffix(".zzunknown").unwrap();
     use std::io::Write;

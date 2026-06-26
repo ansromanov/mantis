@@ -326,6 +326,10 @@ pub struct App {
     /// Whether a background load is currently in flight; drives the "loading…"
     /// indicator in the content title.
     pub loading: bool,
+    /// Sequence number for the most recently dispatched git-status request.
+    /// Responses with a lower seq are stale and discarded, which coalesces
+    /// rapid root changes / toggles into one scan.
+    git_seq: u64,
     /// Plugin subprocess manager. Spawned at startup, deactivated on quit.
     pub(crate) plugin_manager: PluginManager,
     /// Set to `true` while handling a plugin-originated `open_file` action, so
@@ -545,18 +549,14 @@ impl App {
         self.loader_set_extra_syntaxes();
     }
 
-    /// Rebuilds the file tree, re-fetches git status, and reloads the current
-    /// file. Triggered explicitly by the reload key, by debounced filesystem
-    /// events from the root watcher, or by the periodic fallback timer when no
-    /// root watcher is installed.
+    /// Rebuilds the file tree, re-fetches git status (async), and reloads the
+    /// current file. Triggered explicitly by the reload key, by debounced
+    /// filesystem events from the root watcher, or by the periodic fallback
+    /// timer when no root watcher is installed.
     pub fn reload(&mut self) {
         self.last_refresh = self.now();
         if self.git_status_enabled {
-            #[cfg(feature = "git-core")]
-            {
-                self.git_status_map = crate::git::repo_status(&self.root, self.ignore_gitignore);
-                self.git_info = crate::git::repo_info(&self.root);
-            }
+            self.request_git_status_refresh();
         }
         let root = self.root.clone();
         let show_hidden = self.show_hidden;
