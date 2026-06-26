@@ -2523,7 +2523,7 @@ fn tree_key_left_jumps_to_parent() {
     // Expand sub/ so a.txt (depth 1) is visible and we can jump to root (depth 0)
     let sub_idx = app.nodes.iter().position(|n| n.is_dir).unwrap();
     app.expanded.insert(app.nodes[sub_idx].path.clone());
-    app.rebuild();
+    app.rebuild(true);
     // Pick a nested file after expansion
     let file_idx = app
         .nodes
@@ -4511,7 +4511,7 @@ fn breadcrumb_mouse_click_navigates_to_root() {
 
     // Expand sub/ and select a nested file so tree_selected is not root.
     app.expanded.insert(root.join("sub"));
-    app.rebuild();
+    app.rebuild(true);
     let nested = app
         .nodes
         .iter()
@@ -4553,7 +4553,7 @@ fn breadcrumb_mouse_click_navigates_to_intermediate_dir() {
 
     // Expand sub/ and select a nested file so breadcrumb shows root + "sub".
     app.expanded.insert(root.join("sub"));
-    app.rebuild();
+    app.rebuild(true);
     let nested = app
         .nodes
         .iter()
@@ -4605,7 +4605,7 @@ fn breadcrumb_mouse_click_parent_changes_root() {
 
     // Select a nested file.
     app.expanded.insert(root.join("sub"));
-    app.rebuild();
+    app.rebuild(true);
     let nested = app
         .nodes
         .iter()

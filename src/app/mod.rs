@@ -544,7 +544,7 @@ impl App {
         if let Some(s) = &mut self.search {
             s.reload_files(&root, show_hidden, ignore_gitignore);
         }
-        self.rebuild();
+        self.rebuild(false);
         self.reload_content();
     }
 

@@ -115,7 +115,7 @@ impl App {
             if self.git_mode {
                 self.git_mode_flat = !self.git_mode_flat;
                 self.config.git_mode_flat = self.git_mode_flat;
-                self.rebuild();
+                self.rebuild(true);
                 self.try_open_selected();
                 self.save_config();
             } else {
@@ -197,7 +197,7 @@ impl App {
                 if is_dir && self.expanded.contains(&path) {
                     self.expanded.remove(&path);
                     self.mark_session_dirty();
-                    self.rebuild();
+                    self.rebuild(true);
                 } else if depth > 0 {
                     for i in (0..self.tree_selected).rev() {
                         if self.nodes[i].depth < depth {
