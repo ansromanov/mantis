@@ -663,3 +663,24 @@ fn toggle_git_mode_key_flips_git_mode_flag() {
     assert!(!app.git_mode, "second Ctrl+G must disable git mode");
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn set_root_clears_viewing_revision() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let orig_root = root.clone();
+    // Select a.txt (directly at root) so tree_up_dir triggers set_root.
+    let file_idx = app
+        .nodes
+        .iter()
+        .position(|n| n.path == root.join("a.txt"))
+        .expect("a.txt node");
+    app.tree_selected = file_idx;
+    app.viewing_revision = Some("abc1234".to_string());
+    app.tree_up_dir();
+    assert!(
+        app.viewing_revision.is_none(),
+        "set_root (via tree_up_dir) must clear viewing_revision"
+    );
+    fs::remove_dir_all(&orig_root).ok();
+}
