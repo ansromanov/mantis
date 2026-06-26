@@ -99,27 +99,6 @@ fn tree_focus_git_flat() {
 }
 
 #[test]
-fn visual_line_hint_shown() {
-    let mut app = make_app();
-    app.focus = Focus::Content;
-    app.visual_line = Some(crate::selection::VisualLine::new(0));
-    let text = render_bar_width(&app, 120);
-    assert!(text.contains("VISUAL LINE"));
-    assert!(text.contains("b blame"));
-    assert!(text.contains("Esc exit"));
-}
-
-#[test]
-fn visual_line_hint_shows_hide_blame_when_panel_open() {
-    let mut app = make_app();
-    app.focus = Focus::Content;
-    app.visual_line = Some(crate::selection::VisualLine::new(0));
-    app.blame_panel = true;
-    let text = render_bar_width(&app, 120);
-    assert!(text.contains("b hide blame"));
-}
-
-#[test]
 fn content_focus_default() {
     let mut app = make_app();
     app.focus = Focus::Content;

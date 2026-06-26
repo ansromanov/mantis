@@ -316,36 +316,13 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         )
     };
 
-    // Visual-line mode: paint the whole-line background across the selected
-    // range. The j-th rendered line maps to display index `scroll + j` in every
-    // non-diff branch above, and visual-line mode is never active over a diff.
-    if let Some(v) = app.visual_line.as_ref() {
-        let (vstart, vend) = v.range();
+    // Active-line highlight: tint the active cursor line with a subtle
+    // selection_bg tint across the full row width.
+    if !app.is_diff && !app.diff_sbs_active() {
         for (j, line) in content_lines.iter_mut().enumerate() {
-            let disp = scroll + j;
-            if disp >= vstart && disp <= vend {
+            if scroll + j == app.active_line {
                 for span in &mut line.spans {
                     span.style = span.style.bg(sel_bg);
-                }
-            }
-        }
-    }
-
-    // Active-line highlight: tint the active cursor line with a subtle
-    // selection_bg tint across the full row width. Skip when visual-line mode
-    // already paints the same line to avoid double-tint.
-    if !app.is_diff && !app.diff_sbs_active() {
-        let active = app.active_line;
-        let already_painted = app.visual_line.as_ref().is_some_and(|v| {
-            let (vs, ve) = v.range();
-            vs <= active && active <= ve
-        });
-        if !already_painted {
-            for (j, line) in content_lines.iter_mut().enumerate() {
-                if scroll + j == active {
-                    for span in &mut line.spans {
-                        span.style = span.style.bg(sel_bg);
-                    }
                 }
             }
         }

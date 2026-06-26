@@ -50,27 +50,3 @@ fn is_empty_returns_false_when_different() {
     };
     assert!(!sel.is_empty());
 }
-
-#[test]
-fn visual_line_new_collapses_to_single_line() {
-    let v = VisualLine::new(7);
-    assert_eq!(v.range(), (7, 7));
-}
-
-#[test]
-fn visual_line_range_orders_downward_selection() {
-    let v = VisualLine {
-        anchor: 10,
-        cursor: 4,
-    };
-    assert_eq!(v.range(), (4, 10));
-}
-
-#[test]
-fn visual_line_range_orders_upward_selection() {
-    let v = VisualLine {
-        anchor: 4,
-        cursor: 10,
-    };
-    assert_eq!(v.range(), (4, 10));
-}

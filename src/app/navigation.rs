@@ -322,8 +322,6 @@ impl App {
         self.diff_rows = Vec::new();
         self.content_title = None;
         self.selection = None;
-        self.visual_line = None;
-        self.blame_panel = false;
         self.drag_start = None;
         self.fold_regions = Vec::new();
         self.folded = HashSet::new();

@@ -71,8 +71,6 @@ toggle_wrap = ["z"]
 toggle_raw_markdown = ["M"]
 toggle_pretty_json = ["J"]
 toggle_blame = ["b"]
-visual_line_toggle = ["V"]
-visual_line_blame = ["b"]
 
 # Theme. Select a preset via the theme picker (press `t` or Ctrl+P).
 # Built-in presets: default, monokai, solarized, catppuccin, synthwave84.

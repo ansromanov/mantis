@@ -7,13 +7,12 @@
 //! and only when none is active does control fall through to the normal
 //! tree/content handler. The actual handling lives in the sibling submodules
 //! wired up here: `normal` (no overlay), `overlay` (search/picker editing),
-//! `visual` (visual-line mode), and `editor` (command dispatch and
+//! and `editor` (command dispatch and
 //! external-editor suspend/resume).
 
 mod editor;
 mod normal;
 mod overlay;
-mod visual;
 
 #[cfg(test)]
 #[path = "editor_test.rs"]

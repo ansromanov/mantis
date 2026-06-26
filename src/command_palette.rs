@@ -73,10 +73,6 @@ pub static COMMANDS: &[CommandEntry] = &[
         action_id: "toggle_pretty_json",
     },
     CommandEntry {
-        name: "Visual line mode (select lines, blame)",
-        action_id: "toggle_visual_line",
-    },
-    CommandEntry {
         name: "Toggle side-by-side diff",
         action_id: "toggle_diff_side_by_side",
     },

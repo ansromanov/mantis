@@ -2,8 +2,8 @@ use ratatui::layout::Rect;
 
 use crate::ui::popups::util::centered_rect;
 use crate::ui::popups::{
-    draw_about, draw_blame_panel, draw_command_palette, draw_help, draw_history,
-    draw_in_file_search, draw_recent, draw_search, draw_theme,
+    draw_about, draw_command_palette, draw_help, draw_history, draw_in_file_search, draw_recent,
+    draw_search, draw_theme,
 };
 
 #[test]
@@ -476,38 +476,6 @@ fn draw_command_palette_none_returns_early() {
     let mut terminal = Terminal::new(backend).unwrap();
     terminal
         .draw(|f| draw_command_palette(f, &mut app, f.area()))
-        .unwrap();
-}
-
-// ── draw_blame_panel ────────────────────────────────────────────────────
-
-#[test]
-fn draw_blame_panel_untracked_file_shows_message() {
-    let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("a.txt"), "one\ntwo\nthree\n").unwrap();
-    let mut app = make_app(dir.path());
-    app.open_file(&dir.path().join("a.txt"));
-    app.visual_line = Some(crate::selection::VisualLine::new(0));
-
-    let backend = TestBackend::new(80, 30);
-    let mut terminal = Terminal::new(backend).unwrap();
-    terminal
-        .draw(|f| draw_blame_panel(f, &app, f.area()))
-        .unwrap();
-    let rows = buffer_rows(&terminal);
-    let joined = rows.join("\n");
-    assert!(joined.contains("Blame:"));
-    assert!(joined.contains("No blame available"));
-}
-
-#[test]
-fn draw_blame_panel_noop_without_visual_line() {
-    let dir = tempfile::tempdir().unwrap();
-    let app = make_app(dir.path());
-    let backend = TestBackend::new(80, 30);
-    let mut terminal = Terminal::new(backend).unwrap();
-    terminal
-        .draw(|f| draw_blame_panel(f, &app, f.area()))
         .unwrap();
 }
 

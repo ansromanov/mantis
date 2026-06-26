@@ -186,12 +186,11 @@ impl App {
         self.content_scroll = 0;
         self.content_hscroll = 0;
         self.clear_selection();
-        // Drop blame popup, active line, and visual-line mode only when
-        // switching to a different file's diff; a same-file reload preserves all.
+        // Drop blame popup and active line only when switching to a different
+        // file's diff; a same-file reload preserves all.
         if is_new_file {
             self.active_line = 0;
             self.show_line_blame = false;
-            self.exit_visual_line();
         }
         self.content_title = Some(load.content_title);
         self.highlighted = load.highlighted;
@@ -233,7 +232,6 @@ impl App {
         self.active_line = 0;
         self.show_line_blame = false;
         self.clear_selection();
-        self.exit_visual_line();
         self.set_file_watch(None);
     }
 
@@ -271,15 +269,13 @@ impl App {
         self.content_title = None;
         self.content_scroll = 0;
         self.content_hscroll = 0;
-        // Drop blame popup, active line, and visual-line mode only when
-        // navigating to a different file; a same-file reopen (reload / external
-        // edit) preserves all.
+        // Drop blame popup and active line only when navigating to a different
+        // file; a same-file reopen (reload / external edit) preserves all.
         let is_new_file = self.current_file.as_deref() != Some(path);
         self.clear_selection();
         if is_new_file {
             self.active_line = 0;
             self.show_line_blame = false;
-            self.exit_visual_line();
         }
 
         self.is_markdown = load.is_markdown;
@@ -425,7 +421,6 @@ impl App {
         self.active_line = 0;
         self.show_line_blame = false;
         self.clear_selection();
-        self.exit_visual_line();
         let rel = file.strip_prefix(&self.root).unwrap_or(file);
         self.content_title = Some(format!(" diff {} — {} ", short, rel.display()));
         self.highlighted = lines

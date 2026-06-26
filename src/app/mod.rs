@@ -34,7 +34,7 @@ use crate::search::{
     CommandPalette, GotoLineState, HistoryState, InFileSearch, PluginPicker, RecentFilesState,
     SearchState, ThemePicker, TreeFilter,
 };
-use crate::selection::{TextSelection, VisualLine};
+use crate::selection::TextSelection;
 use crate::theme::Theme;
 use crate::tree::TreeNode;
 use crate::virtual_file::VirtualFile;
@@ -288,12 +288,6 @@ pub struct App {
     /// build touching many files) into a single reload once the tree goes quiet.
     tree_dirty_at: Option<Instant>,
     pub selection: Option<TextSelection>,
-    /// Active visual-line selection in the content panel, if any. Whole lines
-    /// are selected and a scoped git-blame panel can be opened for the range.
-    pub visual_line: Option<VisualLine>,
-    /// Whether the selection-scoped git-blame panel is open. Only meaningful
-    /// while `visual_line` is `Some`.
-    pub blame_panel: bool,
     drag_start: Option<(usize, usize)>,
     scrollbar_drag: bool,
     splitter_drag: bool,

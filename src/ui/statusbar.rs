@@ -61,17 +61,6 @@ pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
             base,
             area.width,
         )
-    } else if app.visual_line.is_some() {
-        let blame = if app.blame_panel {
-            "  b hide blame"
-        } else {
-            "  b blame"
-        };
-        overlay_line(
-            &format!(" VISUAL LINE  j/k extend  g/G top/bot{blame}  Esc exit"),
-            base,
-            area.width,
-        )
     } else {
         build_normal_line(app, base, area.width)
     };

@@ -46,7 +46,6 @@ These work no matter which panel is focused.
 | `:`            | Go to line              |
 | `b`            | Toggle git blame        |
 | `B`            | Blame the active line   |
-| `V`            | Visual-line mode (select lines; `b` blames the range) |
 | `t`            | Theme picker            |
 | `Ctrl+G`       | Toggle git mode (changed files + diffs) |
 | `Alt+G`        | Toggle flat / tree view in git mode |
@@ -78,7 +77,6 @@ These work no matter which panel is focused.
 | `M`            | Toggle raw / rendered markdown |
 | `J`            | Toggle JSON pretty-print     |
 | `B`            | Blame the active line        |
-| `V`            | Visual-line mode: select lines, `b` blames the range, `Esc` exits |
 | `D`            | Toggle side-by-side diff (in a diff) |
 | `S`            | Toggle staged diff (in a diff) |
 | `n`/`N`        | Next / previous hunk (in a diff) |
