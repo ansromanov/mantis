@@ -35,6 +35,17 @@ impl App {
                 self.clear_selection();
                 return;
             }
+            if self.viewing_revision.is_some() {
+                self.viewing_revision = None;
+                if let Some(path) = self.current_file.clone() {
+                    if self.git_mode {
+                        self.show_working_tree_diff(&path);
+                    } else {
+                        self.reopen_file(&path);
+                    }
+                }
+                return;
+            }
         }
         let k = &self.keys;
         if pressed(&k.quit, &key) {
@@ -73,6 +84,7 @@ impl App {
                 self.search = Some(s);
             }
         } else if pressed(&k.reload, &key) {
+            self.viewing_revision = None;
             self.reload();
         } else if pressed(&k.search_content, &key) {
             let root = self.root.clone();

@@ -127,6 +127,7 @@ impl App {
             is_diff: false,
             diff_mode: DiffMode::default(),
             diff_side_by_side: false,
+            viewing_revision: None,
             diff_rows: Vec::new(),
             content_title: None,
             focus: Focus::Tree,
