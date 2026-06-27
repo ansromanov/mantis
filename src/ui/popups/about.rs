@@ -3,7 +3,7 @@
 //! `draw_about` renders a centered, bordered overlay showing the application
 //! name and version, a short description, and the current release's "what's new"
 //! notes pulled from `release_info::RELEASE`. When release metadata is present
-//! it also hints that Enter opens the release page in a browser. It is a
+//! it also hints that `o` opens the release page in a browser. It is a
 //! read-only view of `App` state (theme and release info) and draws nothing when
 //! invoked outside the overlay's active state; visibility is decided by the
 //! caller in the UI orchestrator based on `App::show_about`.
@@ -109,7 +109,7 @@ pub(crate) fn draw_about(f: &mut Frame, app: &App, area: Rect) {
     if has_url {
         rows.push(Line::from(""));
         rows.push(Line::from(vec![Span::styled(
-            "  Enter  open release in browser",
+            "  o  open release in browser     Enter/Esc/q  close",
             dim,
         )]));
     }
