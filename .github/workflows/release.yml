@@ -50,6 +50,7 @@ jobs:
             log=$(git log --pretty=format:"- %s" "${prev_tag}..HEAD")
           fi
           log=$(echo "$log" | grep -v "^- chore: bump version to v" || true)
+          log=$(echo "$log" | sed 's/"""/\\"\\"\\"/g')
           {
             echo "log<<EOF"
             echo "$log"
