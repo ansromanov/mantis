@@ -1,11 +1,19 @@
 use crate::app::App;
-use crate::config::Config;
+use crate::config::{bind, Config, Keymap};
 use crate::ui::popups::draw_help;
 use ratatui::backend::TestBackend;
 use ratatui::Terminal;
 
 fn make_app(root: &std::path::Path) -> App {
     App::new(root.to_path_buf(), Config::default(), None, None).unwrap()
+}
+
+fn make_app_with_keys(root: &std::path::Path, keys: Keymap) -> App {
+    let config = Config {
+        keys,
+        ..Config::default()
+    };
+    App::new(root.to_path_buf(), config, None, None).unwrap()
 }
 
 fn buffer_rows(terminal: &Terminal<TestBackend>) -> Vec<String> {
@@ -62,5 +70,61 @@ fn help_shows_f_for_git_flat_toggle() {
     assert!(
         joined.contains("toggle git flat/tree view"),
         "help overlay must list 'toggle git flat/tree view', got:\n{joined}"
+    );
+}
+
+/// When a key is remapped the help overlay shows the new binding.
+#[test]
+fn help_remapped_key_shows_new_binding() {
+    let keys = Keymap {
+        theme_picker: bind(&["ctrl+t"]),
+        ..Keymap::default()
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let app = make_app_with_keys(dir.path(), keys);
+    let backend = TestBackend::new(80, 75);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|f| draw_help(f, &app, f.area())).unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(
+        joined.contains("Ctrl+t"),
+        "help with remapped theme_picker to Ctrl+T should show 'Ctrl+t', got:\n{joined}"
+    );
+}
+
+/// Multi-binding actions show all bindings joined by ` / `.
+#[test]
+fn help_multi_binding_shows_joined() {
+    let dir = tempfile::tempdir().unwrap();
+    let app = make_app(dir.path());
+    let backend = TestBackend::new(80, 75);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|f| draw_help(f, &app, f.area())).unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(
+        joined.contains("q / Ctrl+c"),
+        "help should show 'q / Ctrl+c' for quit, got:\n{joined}"
+    );
+}
+
+/// Unbound actions show `—` instead of a key label.
+#[test]
+fn help_unbound_action_shows_dash() {
+    let keys = Keymap {
+        recent_files: vec![],
+        ..Keymap::default()
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let app = make_app_with_keys(dir.path(), keys);
+    let backend = TestBackend::new(80, 75);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|f| draw_help(f, &app, f.area())).unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(
+        joined.contains("—"),
+        "help with unbound recent_files should show '—', got:\n{joined}"
     );
 }
