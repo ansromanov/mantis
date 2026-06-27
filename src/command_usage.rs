@@ -1,10 +1,16 @@
 //! Global command-palette usage stats: how many times each action_id has been
-//! invoked, and which was invoked most recently. Used to rank the palette's
-//! empty-query view (pin most-recent + most-frequent on top). Persisted to
-//! `$STATE_DIR/command_usage.json` (same state dir as sessions; see `session.rs`).
+//! invoked, and which was invoked most recently. Used by [`crate::command_palette`]
+//! to rank the palette's empty-query view — the most-recently-used command is
+//! pinned at the top, followed by the most-frequently-used ones (controlled by
+//! `palette_pin_recent` and `palette_frequent_count` in [`crate::config::Config`]).
+//!
+//! Stats are persisted to `$STATE_DIR/command_usage.json` (same state directory as
+//! session history; see `session.rs`). Saves are atomic (temp-file + rename).
+//! Missing or corrupt files silently fall back to defaults — no usage data is ever
+//! required for the app to function.
 //!
 //! Public items:
-//! - [`UsageStats`] — the persisted stats structure with `load`, `record`,
+//! - [`UsageStats`] — persisted stats structure exposing `load`, `record`,
 //!   `last_used`, `top_used`, and `save`.
 
 use std::collections::HashMap;
