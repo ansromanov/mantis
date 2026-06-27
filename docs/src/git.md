@@ -64,6 +64,12 @@ Press `Alt+G` inside git mode to toggle between the tree view (directories
 intact) and a flat, depth-0 list of every changed file with relative paths. Press
 `Alt+G` again to return to the tree view (a no-op outside git mode).
 
+When the working tree is clean (no uncommitted changes), the tree panel shows a
+"Working tree clean" placeholder instead of an empty list, so you can tell at a
+glance that there is simply nothing to review. If the current directory is not a
+git repository, the placeholder says "Not a git repository" instead. Press
+`Ctrl+G` to exit git mode in either case.
+
 All directories containing changes are auto-expanded when entering git mode.
 Diffs refresh on the 30-second auto-reload tick and on manual `r`.
 

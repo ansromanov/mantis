@@ -3,12 +3,15 @@
 //! `draw_tree` renders the left-hand file tree from `App::nodes`: it draws each
 //! visible `TreeNode` with depth-based indentation, expand/collapse arrows for
 //! directories, and git-status coloring (new, modified, deleted, ignored) when
-//! status is enabled, marking deleted ghost nodes distinctly. When an inline tree
-//! filter (`App::tree_filter`) is active, only nodes whose names match the query
-//! (plus their ancestor directories) are rendered. The selected row is
-//! highlighted, and focus state controls the border style. At the top of the
-//! panel a breadcrumb path bar shows the current directory's ancestors (relative
-//! to root) with clickable segments. It records `tree_area`, `tree_offset`, and
+//! status is enabled, marking deleted ghost nodes distinctly. When in git mode
+//! with no changed files, a centered placeholder is rendered instead of the tree:
+//! a "+" icon with "Working tree clean" for a clean repo, or "!" with "Not a git
+//! repository" when no git info is available. When an inline tree filter
+//! (`App::tree_filter`) is active, only nodes whose names match the query (plus
+//! their ancestor directories) are rendered. The selected row is highlighted, and
+//! focus state controls the border style. At the top of the panel a breadcrumb
+//! path bar shows the current directory's ancestors (relative to root) with
+//! clickable segments. It records `tree_area`, `tree_offset`, and
 //! `breadcrumb_areas` back onto `App` so mouse handlers can map a click row to a
 //! node index or a breadcrumb segment to a directory. Rendering only - selection
 //! and expansion are driven by the navigation handlers.
@@ -17,7 +20,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
@@ -73,6 +76,51 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
     } else {
         inner
     };
+
+    // ── Empty git-mode placeholder ──────────────────────────────────────
+    if app.git_mode && app.nodes.is_empty() {
+        let is_repo = app.git_info.is_some();
+        let (icon, main, detail, color) = if is_repo {
+            (
+                "+",
+                " Working tree clean",
+                "No changes to show.",
+                app.theme.git_clean,
+            )
+        } else {
+            (
+                "!",
+                " Not a git repository",
+                "No git data available.",
+                app.theme.git_dirty,
+            )
+        };
+        let hint = app.keys().label_for_action("toggle_git_mode");
+        let hint_line = if hint.is_empty() {
+            Line::from("")
+        } else {
+            Line::from(Span::styled(
+                format!("{hint} to exit git mode"),
+                Style::default().fg(app.theme.dim),
+            ))
+        };
+        let lines = vec![
+            Line::from(vec![
+                Span::styled(icon, Style::default().fg(color)),
+                Span::styled(main, Style::default().fg(app.theme.text)),
+            ]),
+            Line::from(Span::styled(detail, Style::default().fg(app.theme.dim))),
+            hint_line,
+        ];
+        let placeholder = Paragraph::new(lines)
+            .alignment(Alignment::Center)
+            .style(Style::default());
+        f.render_widget(placeholder, list_area);
+        app.tree_area = list_area;
+        app.tree_offset = 0;
+        app.tree_visible_indices = Vec::new();
+        return;
+    }
 
     // ── Tree list ───────────────────────────────────────────────────────
     let theme = &app.theme;
