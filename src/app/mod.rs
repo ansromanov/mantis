@@ -195,6 +195,7 @@ pub struct App {
     pub viewing_revision: Option<String>,
     /// Side-by-side rows parsed from the current diff; empty for non-diffs.
     pub diff_rows: Vec<crate::diff::DiffRow>,
+    pub command_usage: crate::command_usage::UsageStats,
     pub content_title: Option<String>,
     pub focus: Focus,
     pub search: Option<SearchState>,

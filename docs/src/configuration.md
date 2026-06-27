@@ -117,6 +117,24 @@ toggle_raw_markdown = ["M"]
 toggle_pretty_json = ["J"]
 ```
 
+## Command palette ranking
+
+When you open the command palette with `ctrl+p` without typing a query, commands
+are ranked by recency and frequency rather than shown in a fixed order. The most
+recently used command is pinned at the top; the most frequently used commands
+follow it. Type any character to switch to the usual fuzzy search, which ignores
+this ordering.
+
+Two options control the ranking:
+
+```toml
+# palette_pin_recent = true   # pin the last-used command at the top (default: true)
+# palette_frequent_count = 3  # how many most-used commands to pin below it; 0 disables (default: 3)
+```
+
+Pinned entries are marked with a `★` prefix in the palette. Usage data is
+persisted across sessions in the state directory alongside session history.
+
 ## Theme
 
 Press `t` for an fzf-style picker to switch themes live, or set one in config.

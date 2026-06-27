@@ -20,6 +20,8 @@ in_file_search = true
 # keep_search_query = false  # restore last search query when reopening search (default: false)
 # watch = false              # auto-reload file content when the open file changes on disk (default: false)
 # show_file_info = true      # show encoding and line-ending info in the status bar (default: true)
+# palette_pin_recent = true   # pin the last-used command at the top of the Ctrl+P palette (default: true)
+# palette_frequent_count = 3  # how many most-used commands to pin below it; 0 disables (default: 3)
 indent_guides = true         # draw indentation guides (│) in the tree pane
 # icons = false               # show Nerd Font file-type icons in the tree (requires a
                                 # Nerd Font in your terminal and the iconize plugin enabled)

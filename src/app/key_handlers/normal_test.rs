@@ -582,3 +582,30 @@ fn r_key_clears_viewing_revision() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+// -- command palette ranking -------------------------------------------------
+
+#[test]
+fn ctrl_p_opens_palette_with_ranked_order_from_usage() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    // Pre-load usage so toggle_help (index 0) is the last-used command.
+    app.command_usage.record("toggle_help");
+    app.handle_key(KeyEvent::new(
+        KeyCode::Char('p'),
+        crossterm::event::KeyModifiers::CONTROL,
+    ));
+    let palette = app
+        .command_palette
+        .as_ref()
+        .expect("Ctrl+P must open command_palette");
+    assert!(
+        palette.base_pinned >= 1,
+        "palette must have at least one pinned entry when usage stats are set"
+    );
+    assert_eq!(
+        palette.base_order[0], 0,
+        "toggle_help (index 0) must be first in base_order as the last-used command"
+    );
+    fs::remove_dir_all(&root).ok();
+}

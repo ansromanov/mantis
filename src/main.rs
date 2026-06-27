@@ -26,6 +26,7 @@ use crate::app::App;
 mod ansi;
 mod app;
 mod command_palette;
+mod command_usage;
 mod config;
 mod diff;
 #[cfg(unix)]

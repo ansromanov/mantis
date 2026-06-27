@@ -29,6 +29,10 @@ impl App {
             .command_palette
             .as_ref()
             .and_then(|p| p.selected_command().map(|c| c.action_id));
+        if let Some(id) = action_id {
+            self.command_usage.record(id);
+            self.command_usage.save();
+        }
         self.command_palette = None;
         match action_id {
             Some("toggle_help") => self.show_help = !self.show_help,

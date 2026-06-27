@@ -111,7 +111,12 @@ impl App {
             self.plugin_picker = Some(PluginPicker::new(entries));
         } else if pressed(&k.command_palette, &key) {
             self.last_click = None;
-            self.command_palette = Some(CommandPalette::new(&self.keys));
+            let (base_order, base_pinned) = crate::command_palette::ranked_base_order(
+                &self.command_usage,
+                self.config.palette_pin_recent,
+                self.config.palette_frequent_count,
+            );
+            self.command_palette = Some(CommandPalette::new(&self.keys, base_order, base_pinned));
         } else if pressed(&k.switch_panel, &key) {
             self.focus = match self.focus {
                 Focus::Tree => Focus::Content,

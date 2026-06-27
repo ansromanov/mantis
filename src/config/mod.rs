@@ -66,6 +66,12 @@ pub struct Config {
     /// a plugin (e.g. the bundled iconize plugin). Off by default — requires a
     /// Nerd Font in your terminal.
     pub icons: bool,
+    /// Pin the most-recently-used command at the top of the command palette's
+    /// empty-query view. Default: true.
+    pub palette_pin_recent: bool,
+    /// Number of most-frequently-used commands to pin below the recent one in
+    /// the command palette's empty-query view. 0 disables. Default: 3.
+    pub palette_frequent_count: usize,
     /// Per-plugin entries registered in `[plugins]`.
     #[serde(default)]
     pub plugins: HashMap<String, PluginEntry>,
@@ -96,6 +102,8 @@ impl Default for Config {
             theme: ThemeConfig::default(),
             indent_guides: true,
             icons: false,
+            palette_pin_recent: true,
+            palette_frequent_count: 3,
             plugins: HashMap::new(),
         }
     }

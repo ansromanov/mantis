@@ -21,6 +21,10 @@ use crate::command_palette::COMMANDS;
 
 use super::util::centered_rect;
 
+#[cfg(test)]
+#[path = "command_test.rs"]
+mod tests;
+
 pub(crate) fn draw_command_palette(f: &mut Frame, app: &mut App, area: Rect) {
     let Some(picker) = app.command_palette.as_ref() else {
         return;
@@ -78,10 +82,18 @@ pub(crate) fn draw_command_palette(f: &mut Frame, app: &mut App, area: Rect) {
     let items: Vec<ListItem> = picker
         .filtered
         .iter()
-        .map(|&i| {
+        .enumerate()
+        .map(|(pos, &i)| {
             let cmd = &COMMANDS[i];
+            let is_pinned = pos < picker.base_pinned && picker.query.is_empty();
+            let prefix = if is_pinned {
+                Span::styled("★ ", Style::default().fg(theme.accent_alt))
+            } else {
+                Span::styled("  ", Style::default())
+            };
             ListItem::new(Line::from(vec![
-                Span::styled(format!(" {} ", cmd.name), Style::default().fg(theme.text)),
+                prefix,
+                Span::styled(format!("{} ", cmd.name), Style::default().fg(theme.text)),
                 if picker.binding_labels[i].is_empty() {
                     Span::raw("")
                 } else {
