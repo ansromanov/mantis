@@ -272,3 +272,14 @@ fn app_new_git_show_flags_reflect_config() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn app_new_last_breadcrumb_click_is_none() {
+    let root = temp_dir();
+    let app = new_app(&root, Config::default());
+    assert!(
+        app.last_breadcrumb_click.is_none(),
+        "last_breadcrumb_click must be None on construction"
+    );
+    fs::remove_dir_all(&root).ok();
+}

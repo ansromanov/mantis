@@ -4461,13 +4461,20 @@ fn breadcrumb_mouse_click_navigates_to_root() {
         },
     ));
 
-    // Click on the root breadcrumb segment.
+    // Single click must not navigate.
+    app.handle_mouse(mouse(MouseEventKind::Down(MouseButton::Left), 2, 1));
+    assert_eq!(
+        app.tree_selected, prev,
+        "single click must not navigate breadcrumb"
+    );
+
+    // Double click navigates to root.
     app.handle_mouse(mouse(MouseEventKind::Down(MouseButton::Left), 2, 1));
 
     assert_eq!(
         app.tree_selected,
         0,
-        "clicking root breadcrumb should select index 0, got {} (len={})",
+        "double-clicking root breadcrumb should select index 0, got {} (len={})",
         app.tree_selected,
         app.nodes.len(),
     );
@@ -4515,12 +4522,13 @@ fn breadcrumb_mouse_click_navigates_to_intermediate_dir() {
         },
     ));
 
-    // Click on the "sub" breadcrumb segment.
+    // Double-click on the "sub" breadcrumb segment.
+    app.handle_mouse(mouse(MouseEventKind::Down(MouseButton::Left), 10, 1));
     app.handle_mouse(mouse(MouseEventKind::Down(MouseButton::Left), 10, 1));
 
     assert_eq!(
         app.tree_selected, sub_idx,
-        "clicking sub breadcrumb should select sub directory"
+        "double-clicking sub breadcrumb should select sub directory"
     );
     fs::remove_dir_all(&root).ok();
 }
@@ -4562,12 +4570,13 @@ fn breadcrumb_mouse_click_parent_changes_root() {
         },
     ));
 
-    // Click on the parent directory breadcrumb segment.
+    // Double-click on the parent directory breadcrumb segment.
+    app.handle_mouse(mouse(MouseEventKind::Down(MouseButton::Left), 3, 1));
     app.handle_mouse(mouse(MouseEventKind::Down(MouseButton::Left), 3, 1));
 
     assert_eq!(
         app.root, parent,
-        "clicking parent breadcrumb should change root to parent"
+        "double-clicking parent breadcrumb should change root to parent"
     );
     assert!(
         !app.nodes.is_empty(),

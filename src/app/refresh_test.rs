@@ -339,6 +339,7 @@ fn create_base_app() -> App {
         theme_offset: 0,
         splitter_area: ratatui::layout::Rect::default(),
         last_click: None,
+        last_breadcrumb_click: None,
         content_scrolled_at: std::time::Instant::now() - std::time::Duration::from_secs(10),
         highlighter,
         extra_syntaxes: Vec::new(),

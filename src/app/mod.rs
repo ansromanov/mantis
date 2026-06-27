@@ -271,6 +271,7 @@ pub struct App {
     pub splitter_area: Rect,
     // Time and result index of the last search-result click, for double-click.
     last_click: Option<(Instant, usize)>,
+    last_breadcrumb_click: Option<(Instant, std::path::PathBuf)>,
     // When the user last scrolled the content panel. The scrollbar overlay is
     // visible for 2 s after this instant. Initialised 10 s in the past so the
     // scrollbar is hidden on first render.
