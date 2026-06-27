@@ -288,10 +288,18 @@ impl App {
         // preserves all.
         let is_new_file = self.current_file.as_deref() != Some(path);
         if is_new_file {
+            // Remember outgoing cursor, restore incoming cursor
+            if let Some(old) = self.current_file.clone() {
+                self.cursor_positions
+                    .insert(old, (self.active_line, self.content_scroll));
+            }
+            let (line, scroll) = self.cursor_positions.get(path).copied().unwrap_or((0, 0));
             self.in_file_search = None;
-            self.set_content_scroll(0);
+            // Assign raw: content not loaded yet, so content_scroll_max() is stale.
+            // The `if is_new_file && load.ok` block below clamps once content is in place.
+            self.content_scroll = scroll;
             self.content_hscroll = 0;
-            self.active_line = 0;
+            self.active_line = line;
             self.show_line_blame = false;
             self.clear_selection();
             self.plugin_content_active_path = None;
@@ -320,6 +328,13 @@ impl App {
         }
         // Language provider fold regions override built-in YAML regions.
         self.apply_plugin_fold_regions(path);
+
+        // Clamp restored cursor to current content bounds.
+        if is_new_file && load.ok {
+            let max_line = self.display_line_count().saturating_sub(1);
+            self.active_line = self.active_line.min(max_line);
+            self.clamp_content_scroll();
+        }
 
         if load.ok {
             self.current_file = Some(path.to_path_buf());

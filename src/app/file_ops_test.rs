@@ -735,3 +735,90 @@ fn same_diff_reload_clamps_scroll_when_diff_shrinks() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+// -- cursor_positions (per-file cursor/scroll restore) ----------------------
+
+#[test]
+fn cursor_position_restored_when_returning_to_file() {
+    let root = temp_dir();
+    let a = root.join("a.txt");
+    let b = root.join("b.txt");
+    fs::write(&a, "line1\nline2\nline3\nline4\nline5\nline6\n").unwrap();
+    fs::write(&b, "other\n").unwrap();
+    let mut app = app_for(&root);
+    // Open A, move cursor+scroll, open B, reopen A → position restored.
+    app.open_file(&a);
+    app.active_line = 4;
+    app.content_scroll = 2;
+    app.open_file(&b);
+    assert_eq!(app.active_line, 0, "first visit to B starts at line 0");
+    app.open_file(&a);
+    assert_eq!(app.active_line, 4, "active_line restored on return to A");
+    assert_eq!(
+        app.content_scroll, 2,
+        "content_scroll restored on return to A"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn first_file_visit_starts_at_zero() {
+    let root = temp_dir();
+    let a = root.join("a.txt");
+    fs::write(&a, "line1\nline2\n").unwrap();
+    let mut app = app_for(&root);
+    app.open_file(&a);
+    assert_eq!(app.active_line, 0, "first visit starts at line 0");
+    assert_eq!(app.content_scroll, 0, "first visit starts at scroll 0");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn restored_cursor_clamped_to_content_length() {
+    let root = temp_dir();
+    let a = root.join("a.txt");
+    // Write a short file
+    fs::write(&a, "line1\nline2\n").unwrap();
+    let mut app = app_for(&root);
+    app.open_file(&a);
+    // Manually store a cursor position past the end (simulate shorter file)
+    app.cursor_positions.insert(a.clone(), (999, 0));
+    // Reopen — should clamp
+    app.open_file(&a);
+    assert!(
+        app.active_line <= app.display_line_count().saturating_sub(1),
+        "active_line ({}) clamped to max {}",
+        app.active_line,
+        app.display_line_count().saturating_sub(1)
+    );
+    assert!(
+        app.content_scroll <= app.content_scroll_max(),
+        "content_scroll ({}) clamped to max {}",
+        app.content_scroll,
+        app.content_scroll_max()
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn same_file_reload_does_not_save_cursor_twice() {
+    let root = temp_dir();
+    let a = root.join("a.txt");
+    fs::write(&a, "line1\nline2\nline3\n").unwrap();
+    let mut app = app_for(&root);
+    app.open_file(&a);
+    app.active_line = 1;
+    let saved = app.cursor_positions.len();
+    // Same-file reload (e.g. watcher tick)
+    app.open_file(&a);
+    assert_eq!(
+        app.cursor_positions.len(),
+        saved,
+        "same-file reload must not add a cursor_positions entry"
+    );
+    assert_eq!(
+        app.active_line, 1,
+        "active_line preserved across same-file reload"
+    );
+    fs::remove_dir_all(&root).ok();
+}

@@ -383,6 +383,10 @@ pub struct App {
     /// Stored separately because `plugin_content` holds styled spans whose text
     /// would require joining on every access.
     pub plugin_content_text: HashMap<PathBuf, Vec<String>>,
+    /// Remembered cursor position per file (active_line, content_scroll), so
+    /// returning to a previously-viewed file restores where you left off. Session-
+    /// scoped (in memory); restart restore of the last file is handled by session.
+    pub cursor_positions: HashMap<PathBuf, (usize, usize)>,
     /// Set to `true` when a plugin sends `set_content` for the current file and
     /// reset to `false` when `current_file` changes, so the `[rendering…]`
     /// placeholder only shows while the plugin is actively working on that file.
