@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::{Duration, Instant};
 
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::Rect;
@@ -233,6 +234,92 @@ fn double_click_file_does_not_descend() {
     assert_eq!(
         app.root, orig_root,
         "double-click on a file must not change root"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn breadcrumb_single_click_does_not_navigate() {
+    let root = tree_with_dir();
+    let mut app = app_for(&root);
+
+    app.breadcrumb_areas.push((
+        root.clone(),
+        Rect {
+            x: 1,
+            y: 1,
+            width: 4,
+            height: 1,
+        },
+    ));
+
+    let prev = app.tree_selected;
+    app.handle_mouse(left_down_at(2, 1));
+
+    assert_eq!(
+        app.tree_selected, prev,
+        "single click on breadcrumb must not navigate"
+    );
+    assert!(
+        app.last_breadcrumb_click.is_some(),
+        "single click must store pending click"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn breadcrumb_double_click_navigates() {
+    let root = tree_with_dir();
+    let mut app = app_for(&root);
+
+    app.breadcrumb_areas.push((
+        root.clone(),
+        Rect {
+            x: 1,
+            y: 1,
+            width: 4,
+            height: 1,
+        },
+    ));
+
+    // Prime the first click manually so the second is within 400 ms.
+    app.last_breadcrumb_click = Some((Instant::now(), root.clone()));
+    app.handle_mouse(left_down_at(2, 1));
+
+    assert_eq!(
+        app.tree_selected, 0,
+        "double-click on root breadcrumb must select index 0"
+    );
+    assert!(
+        app.last_breadcrumb_click.is_none(),
+        "last_breadcrumb_click must be cleared after double-click"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn breadcrumb_double_click_expired_does_not_navigate() {
+    let root = tree_with_dir();
+    let mut app = app_for(&root);
+
+    app.breadcrumb_areas.push((
+        root.clone(),
+        Rect {
+            x: 1,
+            y: 1,
+            width: 4,
+            height: 1,
+        },
+    ));
+
+    let prev = app.tree_selected;
+    // Stale first click (600 ms ago — past the 400 ms window).
+    app.last_breadcrumb_click = Some((Instant::now() - Duration::from_millis(600), root.clone()));
+    app.handle_mouse(left_down_at(2, 1));
+
+    assert_eq!(
+        app.tree_selected, prev,
+        "expired double-click must not navigate"
     );
     fs::remove_dir_all(&root).ok();
 }
