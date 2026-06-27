@@ -44,7 +44,7 @@ These work no matter which panel is focused.
 | `Ctrl+O`       | Recent files (jump to a recently opened file) |
 | `p`            | Plugin palette (enable/disable plugins) |
 | `:`            | Go to line              |
-| `b`            | Toggle git blame        |
+| `b`            | Toggle git blame (shows author + commit subject inline) |
 | `B`            | Blame the active line   |
 | `t`            | Theme picker            |
 | `Ctrl+G`       | Toggle git mode (changed files + diffs; `/` and `f` search scope to changed files) |
@@ -64,6 +64,8 @@ These work no matter which panel is focused.
 ## Content panel
 
 The content pane has a **line cursor** (visible as a highlighted full-width row). Use `Up`/`Down` to move it, then press `B` to blame the highlighted line.
+
+When git blame is toggled on (`b`), a column appears on the left showing the author name and commit subject for each line. Clicking any cell in this column opens the line-blame popup for that line.
 
 | Key            | Action                       |
 | -------------- | ---------------------------- |
