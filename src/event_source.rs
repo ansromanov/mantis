@@ -83,21 +83,23 @@ impl RawEventSource {
         }
     }
 
-    /// Fill the internal buffer from stdin (non-blocking after a 16 ms poll).
-    fn fill(&mut self) -> io::Result<()> {
+    /// Fill the internal buffer from stdin with the given poll timeout (ms).
+    /// Use `timeout_ms = 16` for the blocking next-event path and `timeout_ms = 0`
+    /// for the non-blocking try-next-event path.
+    fn fill(&mut self, timeout_ms: libc::c_int) -> io::Result<()> {
         // Discard already-consumed bytes.
         if self.pos > 0 {
             self.buf.drain(..self.pos);
             self.pos = 0;
         }
 
-        // Poll for data on fd 0 with a 16 ms timeout.
+        // Poll for data on fd 0.
         let mut pfd = libc::pollfd {
             fd: 0,
             events: libc::POLLIN,
             revents: 0,
         };
-        let ret = unsafe { libc::poll(&mut pfd, 1, 16) };
+        let ret = unsafe { libc::poll(&mut pfd, 1, timeout_ms) };
         if ret <= 0 {
             return Ok(()); // timeout or error
         }
@@ -116,11 +118,7 @@ impl RawEventSource {
         Ok(())
     }
 
-    /// Parse and return the next event from the buffer, if one is available.
-    pub fn next_raw_event(&mut self) -> io::Result<Option<Event>> {
-        // No event carries a stale base key from a previous call.
-        CURRENT_BASE_KEY.with(|cell| cell.set(None));
-        self.fill()?;
+    fn parse_next(&mut self) -> io::Result<Option<Event>> {
         if self.pos >= self.buf.len() {
             return Ok(None);
         }
@@ -145,6 +143,22 @@ impl RawEventSource {
                 Ok(None)
             }
         }
+    }
+
+    /// Parse and return the next event from the buffer, blocking briefly (16 ms)
+    /// for data when the buffer is empty.
+    pub fn next_raw_event(&mut self) -> io::Result<Option<Event>> {
+        CURRENT_BASE_KEY.with(|cell| cell.set(None));
+        self.fill(16)?;
+        self.parse_next()
+    }
+
+    /// Try to return an already-buffered event without waiting.
+    /// Returns `None` when no event is immediately available.
+    pub fn try_next_raw_event(&mut self) -> io::Result<Option<Event>> {
+        CURRENT_BASE_KEY.with(|cell| cell.set(None));
+        self.fill(0)?;
+        self.parse_next()
     }
 }
 

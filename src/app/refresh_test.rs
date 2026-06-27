@@ -242,6 +242,7 @@ fn create_base_app() -> App {
     use crate::highlight::Highlighter;
     use crate::plugin::PluginManager;
     use crate::theme::Theme;
+    use std::cell::RefCell;
     use std::collections::HashMap;
     use std::path::PathBuf;
 
@@ -379,6 +380,7 @@ fn create_base_app() -> App {
         plugin_content_active: false,
         status_message: None,
         breadcrumb_areas: Vec::new(),
+        content_highlight_cache: RefCell::new(None),
         session_dirty: false,
         session_dirty_at: None,
         session_last_save: std::time::Instant::now(),

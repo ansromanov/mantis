@@ -16,6 +16,7 @@
 //! (`git diff --cached`), or `Unstaged` (`git diff`). The active mode is cycled
 //! with the `S` keybinding and is reflected in the content title badge.
 
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::mpsc::Receiver;
@@ -128,6 +129,20 @@ impl StatusMessage {
         self.set_at.elapsed() >= ttl
     }
 }
+
+/// Cache key for syntax-highlighted visible window. When all fields match the
+/// current rendering state the cached highlight spans can be reused without
+/// re-invoking syntect.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct HighlightCacheKey {
+    pub path: PathBuf,
+    pub scroll: usize,
+    pub visible_end: usize,
+    pub theme: String,
+    pub word_wrap: bool,
+}
+
+pub(crate) type HighlightCacheValue = Vec<Vec<(ratatui::style::Style, String)>>;
 
 /// Central application state. Holds the file tree, content buffers, overlay
 /// state, geometry captured during rendering, and configuration.
@@ -371,6 +386,9 @@ pub struct App {
     /// Breadcrumb segment areas recorded during the last render, used for mouse
     /// hit-testing. Each entry is (target_directory_path, clickable_rect).
     pub breadcrumb_areas: Vec<(std::path::PathBuf, Rect)>,
+    /// Cache of the most recently highlighted visible window, so consecutive
+    /// renders with the same scroll/theme/content skip re-highlighting.
+    pub(crate) content_highlight_cache: RefCell<Option<(HighlightCacheKey, HighlightCacheValue)>>,
     /// When `true`, the session cache needs to be re-written.
     session_dirty: bool,
     /// When the session was last dirtied, for debounced writes.

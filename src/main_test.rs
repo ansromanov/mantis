@@ -42,6 +42,11 @@ impl EventSource for ScriptedEvents {
             None => anyhow::bail!("scripted events exhausted without quitting"),
         }
     }
+
+    fn try_next_event(&mut self) -> anyhow::Result<Option<Event>> {
+        // Pop the next event without blocking; None when the queue is empty.
+        Ok(self.queue.pop_front())
+    }
 }
 
 fn key_event(c: char) -> Event {
@@ -79,6 +84,10 @@ impl EventSource for IdleThenQuit {
             return Ok(Some(key_event('q')));
         }
         anyhow::bail!("idle source exhausted without quitting")
+    }
+
+    fn try_next_event(&mut self) -> anyhow::Result<Option<Event>> {
+        Ok(None)
     }
 }
 
