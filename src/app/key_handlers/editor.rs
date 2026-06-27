@@ -7,13 +7,17 @@
 //! screen, runs the editor, then restores the terminal and flags `needs_clear`
 //! so the next frame repaints cleanly. Theme switching and the highlighter
 //! rebuild triggered from the palette live here too, alongside the related
-//! terminal-state bookkeeping.
+//! terminal-state bookkeeping. `open_release_url` is guarded by
+//! `should_open_browser`, which requires a non-empty URL and a TTY stdout so
+//! that browser focus-stealing does not occur in non-interactive environments.
 
 use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
 use crossterm::execute;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
+
+use std::io::IsTerminal;
 
 use crate::config;
 use crate::highlight::Highlighter;
@@ -162,7 +166,7 @@ impl App {
             return;
         };
         let url = release.release_url.clone();
-        if url.is_empty() {
+        if !should_open_browser(&url, std::io::stdout().is_terminal()) {
             return;
         }
         #[cfg(target_os = "macos")]
@@ -174,7 +178,15 @@ impl App {
         #[cfg(not(any(target_os = "macos", target_os = "windows")))]
         let _ = std::process::Command::new("xdg-open").arg(&url).spawn();
     }
+}
 
+/// Returns `true` when the browser should be launched for `url`:
+/// the URL is non-empty and stdout is connected to a terminal (interactive).
+pub(super) fn should_open_browser(url: &str, is_tty: bool) -> bool {
+    !url.is_empty() && is_tty
+}
+
+impl App {
     /// Applies the theme selected in the picker, saves it to config, and
     /// closes the overlay.
     pub(crate) fn apply_selected_theme(&mut self) {
