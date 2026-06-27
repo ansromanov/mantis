@@ -152,5 +152,6 @@ reading, and `J` again to return to the raw text. Handy for minified `.json`.
 - **Double-click** a directory to make it the new tree root.
 - **Click** a pane to focus it.
 - **Scroll wheel** scrolls whichever pane is under the cursor.
+- **Double-click** a breadcrumb segment to navigate to that directory.
 - In the search and history popups, **single-click** selects an entry and
   **double-click** activates it.
