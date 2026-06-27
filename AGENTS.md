@@ -203,6 +203,43 @@ Quick lookup: type/function → file. Use this before grepping.
 File and git errors degrade gracefully to UI messages — **no `unwrap`/`expect` in
 production paths** (tests may use them freely). Custom errors via `thiserror`.
 
+**No silently-swallowed user-visible failures.** Discarding an error with `let _ = …`
+is fine for best-effort *caches* (session, usage stats) but not for actions the user
+expects to take effect — a failed config save, a failed clipboard copy, a failed
+external launch must surface a status-bar message. If an operation can fail in a way
+the user would want to know about, report it; don't `let _ =` it away.
+
+## Consistency & performance
+
+These keep the app coherent and the render loop cheap. Reviewers enforce them.
+
+- **One method per behaviour — don't duplicate, share.** If two code paths do the
+  "same thing" (copy to clipboard, launch an editor/browser, handle a list-picker
+  overlay's keys, clamp a scroll offset), extract one helper and call it from both.
+  Divergent copies drift into inconsistent behaviour and bugs. Before adding a second
+  near-copy of an existing routine, factor the shared part out.
+- **Uniform interaction model.** Overlays/popups share their input handling and close
+  rules (Esc closes, empty-Backspace closes, click-outside closes). Scroll/cursor go
+  through the canonical helpers (`content_scroll_max`, a single clamp/`set_content_scroll`
+  path) — input and render must agree on the same bounds. Don't re-implement
+  "scroll-into-view" or "clamp selection" ad hoc.
+- **Per-frame work scales with what's visible, not with total data.** `draw_*` runs
+  every frame. Never allocate or compute `O(total_nodes)` / `O(total_lines)` when only
+  one screenful renders — bound the work (and allocations) to the visible window. Cache
+  results that don't change between frames (highlighting, filtered index sets) keyed by
+  a revision/query, and recompute only on change. Gate optional work behind its toggle
+  (e.g. skip indent-guide computation when guides are off).
+- **A reload/re-render must preserve view state for the same content.** Resetting scroll,
+  cursor, selection, or tearing down an open overlay is only correct on a genuine content
+  switch (different file/revision), not on a same-file reload, watcher tick, or plugin
+  re-render. Guard those resets on an "is this actually new?" check; clamp preserved
+  offsets to the new content length rather than zeroing them.
+- **Bounds-checked access.** Use `.get(i)` (with an early return) for any index that
+  isn't provably in range from a `0..len` loop — never raw `slice[i]` on a derived index
+  (hit-test rows, restored state). Keep selection clamped after any rebuild.
+- **Add a benchmark for new hot paths.** Render/parse/search code that runs per frame or
+  over large inputs gets a `benches/performance.rs` case so regressions are caught.
+
 ## Testing
 
 Tests are **co-located** with the module they cover, in a sibling `_test.rs` file —

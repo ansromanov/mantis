@@ -61,6 +61,22 @@ Review for:
   - Missing `//!` module doc blocks on new `.rs` files
   - New `set_*` plugin actions without `PluginContributions` entry
   - Doc update missing for user-visible feature changes
+- **Consistency (AGENTS.md → Consistency & performance):**
+  - Duplicated logic — a second near-copy of an existing routine (clipboard copy,
+    editor/browser launch, overlay key handling, scroll clamp) instead of a shared helper
+  - Ad-hoc scroll/cursor math instead of the canonical helpers (`content_scroll_max`,
+    single clamp path); input and render disagreeing on bounds
+  - Non-uniform overlay behaviour (missing Esc / empty-Backspace / click-outside close)
+  - Silently-swallowed user-visible failure (`let _ =` on a config save / clipboard /
+    external launch that should surface a status message)
+  - Raw `slice[i]` on a derived (non-loop-bounded) index instead of `.get(i)`; selection
+    not clamped after a rebuild
+- **Performance:**
+  - Per-frame `draw_*` doing `O(total)` work/allocation when only the visible window
+    renders (bound it to `view_height`); recompute that should be cached by revision/query
+  - A reload / watcher tick / plugin re-render that resets scroll/cursor/selection or tears
+    down an open overlay on the *same* content (must guard on a genuine content switch)
+  - New hot path (per-frame render, large-input parse/search) without a `benches/` case
 - Rust style: line length >100, wildcard imports (except `use super::*;` in tests), missing `.clone()` on non-Copy types
 
 For each finding output exactly:
