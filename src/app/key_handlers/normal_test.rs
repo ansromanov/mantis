@@ -570,6 +570,33 @@ fn esc_clears_viewing_revision_in_git_mode() {
 }
 
 #[test]
+fn f_key_scopes_content_search_in_git_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.git_mode = true;
+    app.focus = Focus::Content;
+    app.handle_key(key(KeyCode::Char('f')));
+    assert!(
+        app.search.as_ref().unwrap().scoped,
+        "content search must be scoped when git mode is active"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn f_key_not_scoped_outside_git_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.handle_key(key(KeyCode::Char('f')));
+    assert!(
+        !app.search.as_ref().unwrap().scoped,
+        "content search must not be scoped outside git mode"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn r_key_clears_viewing_revision() {
     let root = temp_tree();
     let mut app = app_for(&root);
