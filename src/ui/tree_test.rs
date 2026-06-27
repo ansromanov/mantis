@@ -905,7 +905,7 @@ fn draw_tree_filter_records_visible_indices() {
 
     render_tree(&mut app, 40, 10);
     // 'z' matches nothing, so visible_indices should be empty
-    assert!(app.tree_visible_indices.is_empty());
+    assert!(app.tree_visible_indices.as_ref().unwrap().is_empty());
 }
 
 #[test]

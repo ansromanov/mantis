@@ -317,6 +317,10 @@ impl HistoryState {
 /// navigable. An empty query means no filter is active.
 pub struct TreeFilter {
     pub query: String,
+    /// Cached visible indices for the current query + tree revision.
+    /// `None` when no cache is built yet or the query is empty.
+    /// `Some((query, revision, indices))` where revision matches `App::tree_revision`.
+    pub(crate) cached: Option<(String, u64, Vec<usize>)>,
 }
 
 impl TreeFilter {
@@ -324,17 +328,20 @@ impl TreeFilter {
     pub fn new() -> Self {
         TreeFilter {
             query: String::new(),
+            cached: None,
         }
     }
 
     /// Appends `c` to the query.
     pub fn push(&mut self, c: char) {
         self.query.push(c);
+        self.cached = None;
     }
 
     /// Removes the last character from the query.
     pub fn pop(&mut self) {
         self.query.pop();
+        self.cached = None;
     }
 
     /// Returns `true` when the query is empty (no filter applied).

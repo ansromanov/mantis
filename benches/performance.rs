@@ -6,6 +6,8 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use mantis::app::App;
+use mantis::config::Config;
 use mantis::highlight::Highlighter;
 #[cfg(feature = "markdown-core")]
 use mantis::markdown;
@@ -14,6 +16,9 @@ use mantis::search::SearchState;
 use mantis::theme::Theme;
 use mantis::tree::{build_visible, collect_all_files};
 use mantis::virtual_file::VirtualFile;
+use ratatui::backend::TestBackend;
+use ratatui::layout::Rect;
+use ratatui::Terminal;
 
 // ---------------------------------------------------------------------------
 // Counter for unique temp dir names
@@ -405,6 +410,88 @@ fn bench_scroll_redraw(c: &mut Criterion) {
 }
 
 // ---------------------------------------------------------------------------
+// Benchmark: tree redraw — draw_tree with guides on/off, filter active
+// ---------------------------------------------------------------------------
+
+fn bench_tree_redraw(c: &mut Criterion) {
+    let mut group = c.benchmark_group("tree_redraw");
+
+    for &node_count in &[1_000usize, 5_000] {
+        let dir = fixture_dir("tree_redraw");
+        generate_many_files(&dir, node_count);
+        let root = dir.canonicalize().unwrap();
+
+        let cfg = Config {
+            indent_guides: false,
+            icons: false,
+            scrollbar: false,
+            line_numbers: false,
+            show_hidden: false,
+            ..Config::default()
+        };
+        // generate_many_files creates a flat directory; App::new shows all files
+        // at depth 1 under the root (which is expanded by default).
+        let mut app = App::new(root.clone(), cfg, None, None).unwrap();
+
+        let mut terminal = Terminal::new(TestBackend::new(80, 40)).unwrap();
+        let area = Rect::new(0, 0, 25, 38);
+
+        // Guides off (most common case)
+        app.indent_guides = false;
+        group.bench_with_input(
+            BenchmarkId::new("draw/no_guides", node_count),
+            &(),
+            |b, _| {
+                b.iter(|| {
+                    terminal
+                        .draw(|f| mantis::ui::tree::draw_tree(f, &mut app, area))
+                        .unwrap();
+                    black_box(&app.tree_area);
+                })
+            },
+        );
+
+        // Guides on
+        app.indent_guides = true;
+        group.bench_with_input(
+            BenchmarkId::new("draw/with_guides", node_count),
+            &(),
+            |b, _| {
+                b.iter(|| {
+                    terminal
+                        .draw(|f| mantis::ui::tree::draw_tree(f, &mut app, area))
+                        .unwrap();
+                    black_box(&app.tree_area);
+                })
+            },
+        );
+
+        // Filter active (guides off)
+        app.indent_guides = false;
+        app.tree_filter = Some(mantis::search::TreeFilter::new());
+        app.tree_filter.as_mut().unwrap().push('f');
+        group.bench_with_input(
+            BenchmarkId::new("draw/with_filter", node_count),
+            &(),
+            |b, _| {
+                b.iter(|| {
+                    terminal
+                        .draw(|f| mantis::ui::tree::draw_tree(f, &mut app, area))
+                        .unwrap();
+                    black_box(&app.tree_area);
+                })
+            },
+        );
+
+        // Clean up fixture.
+        app.tree_filter = None;
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    group.finish();
+}
+
+// ---------------------------------------------------------------------------
 // Criterion entry point
 // ---------------------------------------------------------------------------
 
@@ -417,6 +504,7 @@ criterion_group!(
     bench_highlight,
     bench_markdown_render,
     bench_scroll_redraw,
+    bench_tree_redraw,
 );
 
 #[cfg(not(feature = "markdown-core"))]
@@ -427,6 +515,7 @@ criterion_group!(
     bench_file_open,
     bench_highlight,
     bench_scroll_redraw,
+    bench_tree_redraw,
 );
 
 criterion_main!(benches);

@@ -385,3 +385,25 @@ fn plugin_content_active_path_initialises_to_none() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn app_new_tree_revision_starts_at_zero() {
+    let root = temp_dir();
+    let app = new_app(&root, Config::default());
+    assert_eq!(
+        app.tree_revision, 0,
+        "tree_revision must be 0 at construction"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn app_new_tree_visible_indices_starts_none() {
+    let root = temp_dir();
+    let app = new_app(&root, Config::default());
+    assert!(
+        app.tree_visible_indices.is_none(),
+        "tree_visible_indices must be None when no filter is active"
+    );
+    fs::remove_dir_all(&root).ok();
+}

@@ -35,7 +35,7 @@ use crate::git::GitStatus;
 /// `app.nodes`, drawing indentation, expand/collapse arrows, and git-status
 /// coloring. Records `tree_area`, `tree_offset`, and `breadcrumb_areas` for
 /// mouse hit-testing.
-pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
+pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
     let focused = matches!(app.focus, Focus::Tree)
         && app.search.is_none()
         && app.history.is_none()
@@ -118,7 +118,7 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
         f.render_widget(placeholder, list_area);
         app.tree_area = list_area;
         app.tree_offset = 0;
-        app.tree_visible_indices = Vec::new();
+        app.tree_visible_indices = None;
         return;
     }
 
@@ -130,41 +130,58 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
     // When an inline tree filter is active, compute which node indices to show:
     // any node whose name contains the query (case-insensitive), plus all
     // ancestor directories of matching nodes so the tree remains navigable.
-    let visible_indices: Vec<usize> = if let Some(ref filter) = app.tree_filter {
-        if filter.is_empty() {
-            (0..total_nodes).collect()
-        } else {
-            let q: String = filter.query.to_lowercase();
-            // First pass: collect indices of nodes whose names match.
-            let matching: HashSet<usize> = (0..total_nodes)
-                .filter(|&i| app.nodes[i].name.to_lowercase().contains(&q))
-                .collect();
-            // Second pass: include ancestors of every match so the path from
-            // root to each match is visible. Ancestors are nodes at smaller
-            // depth that are prefix-paths of the matching node's path.
-            let mut include = matching.clone();
-            for &mi in &matching {
-                let match_path = &app.nodes[mi].path;
-                let match_depth = app.nodes[mi].depth;
-                // Walk backwards: direct parent dirs appear before `mi` in the
-                // flat vec and have smaller depth.
-                for j in (0..mi).rev() {
-                    let nd = &app.nodes[j];
-                    if nd.depth >= match_depth {
-                        continue;
+    // Results are cached on (query, tree_revision) so this only recomputes
+    // when the query changes or the tree rebuilds.
+    let mut visible_indices: Vec<usize> = (0..total_nodes).collect();
+    let mut cache_miss = false;
+    if let Some(ref filter) = app.tree_filter {
+        if !filter.is_empty() {
+            let use_cache = filter.cached.as_ref().and_then(|(q, rev, vis)| {
+                if q == &filter.query && *rev == app.tree_revision {
+                    Some(vis.clone())
+                } else {
+                    None
+                }
+            });
+            match use_cache {
+                Some(cached) => visible_indices = cached,
+                None => {
+                    cache_miss = true;
+                    let q: String = filter.query.to_lowercase();
+                    let matching: HashSet<usize> = (0..total_nodes)
+                        .filter(|&i| app.nodes[i].name.to_lowercase().contains(&q))
+                        .collect();
+                    let mut include = matching.clone();
+                    for &mi in &matching {
+                        let match_path = &app.nodes[mi].path;
+                        let match_depth = app.nodes[mi].depth;
+                        for j in (0..mi).rev() {
+                            let nd = &app.nodes[j];
+                            if nd.depth >= match_depth {
+                                continue;
+                            }
+                            if nd.is_dir && match_path.starts_with(&nd.path) {
+                                include.insert(j);
+                            }
+                        }
                     }
-                    if nd.is_dir && match_path.starts_with(&nd.path) {
-                        include.insert(j);
-                    }
+                    let mut sorted: Vec<usize> = include.into_iter().collect();
+                    sorted.sort_unstable();
+                    visible_indices = sorted;
                 }
             }
-            let mut sorted: Vec<usize> = include.into_iter().collect();
-            sorted.sort_unstable();
-            sorted
         }
-    } else {
-        (0..total_nodes).collect()
-    };
+    }
+
+    if cache_miss {
+        if let Some(ref mut filter) = app.tree_filter {
+            filter.cached = Some((
+                filter.query.clone(),
+                app.tree_revision,
+                visible_indices.clone(),
+            ));
+        }
+    }
 
     let n = visible_indices.len();
 
@@ -178,22 +195,32 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
     app.tree_scroll = app.tree_scroll.min(max_scroll);
     let offset = app.tree_scroll;
 
-    // Precompute indent guide masks via a right-to-left pass over the full node
-    // list. pending[lvl] = true means a node at depth `lvl` has been seen
-    // (right-to-left) without a shallower node closing it, so ancestors at that
-    // level still have siblings ahead — the guide line (│) should continue.
-    let max_depth = app.nodes.iter().map(|nd| nd.depth).max().unwrap_or(0);
-    let mut guide_masks: Vec<Vec<bool>> = vec![Vec::new(); total_nodes];
-    let mut pending = vec![false; max_depth + 1];
-    for i in (0..total_nodes).rev() {
-        let d = app.nodes[i].depth;
-        guide_masks[i] = (0..d).map(|lvl| pending[lvl]).collect();
-        pending[d] = true;
-        pending[(d + 1)..=max_depth].fill(false);
-    }
-
+    // Precompute indent guide masks only when guides are enabled, and only
+    // for nodes in the visible window. The right-to-left pending pass still
+    // visits all nodes (a row's guide depends on deeper siblings appearing
+    // later), but we only materialize a Vec<bool> for visible rows.
     let guide_style = Style::default().fg(theme.dim).add_modifier(Modifier::DIM);
     let end = (offset + view_height).min(n);
+    let guide_masks: std::collections::HashMap<usize, Vec<bool>> = if app.indent_guides
+        && !visible_indices.is_empty()
+    {
+        let visible_set: HashSet<usize> = visible_indices[offset..end].iter().copied().collect();
+        let max_depth = app.nodes.iter().map(|nd| nd.depth).max().unwrap_or(0);
+        let mut masks = std::collections::HashMap::new();
+        let mut pending = vec![false; max_depth + 1];
+        for i in (0..total_nodes).rev() {
+            let d = app.nodes[i].depth;
+            if visible_set.contains(&i) {
+                masks.insert(i, (0..d).map(|lvl| pending[lvl]).collect());
+            }
+            pending[d] = true;
+            pending[(d + 1)..=max_depth].fill(false);
+        }
+        masks
+    } else {
+        std::collections::HashMap::new()
+    };
+
     let items: Vec<ListItem> = visible_indices[offset..end]
         .iter()
         .map(|&global_i| {
@@ -203,9 +230,9 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
 
             let mut spans: Vec<Span> = Vec::new();
             if app.indent_guides {
-                let mask = &guide_masks[global_i];
+                let mask = guide_masks.get(&global_i);
                 for lvl in 0..node.depth {
-                    if mask.get(lvl).copied().unwrap_or(false) {
+                    if mask.is_some_and(|m| m.get(lvl).copied().unwrap_or(false)) {
                         spans.push(Span::styled("│  ", guide_style));
                     } else {
                         spans.push(Span::styled("   ", guide_style));
@@ -297,7 +324,13 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
     app.tree_area = list_area;
     app.tree_offset = offset + state.offset();
     app.tree_scroll = offset + state.offset();
-    app.tree_visible_indices = visible_indices;
+    // When no filter is active, set visible_indices to None (identity).
+    let has_filter = app.tree_filter.as_ref().is_some_and(|f| !f.is_empty());
+    app.tree_visible_indices = if has_filter {
+        Some(visible_indices)
+    } else {
+        None
+    };
 }
 
 /// Splits `name` into spans, highlighting substrings that match `query`

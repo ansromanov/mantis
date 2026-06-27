@@ -227,6 +227,9 @@ pub struct App {
     pub recent_offset: usize,
     pub show_hidden: bool,
     pub ignore_gitignore: bool,
+    /// Monotonically increasing counter bumped every time the tree is rebuilt.
+    /// Used to invalidate the tree-filter cache.
+    pub tree_revision: u64,
     pub tree_width: u16,
     pub show_help: bool,
     pub should_quit: bool,
@@ -275,7 +278,8 @@ pub struct App {
     /// The set of node indices (into `nodes`) that were visible during the last
     /// tree render. Populated by `draw_tree` when `tree_filter` is active so
     /// mouse handlers can map screen rows back to global indices.
-    pub tree_visible_indices: Vec<usize>,
+    /// `None` means identity mapping (no filter active), avoiding allocations.
+    pub tree_visible_indices: Option<Vec<usize>>,
     pub content_area: Rect,
     pub search_area: Rect,
     pub search_offset: usize,
