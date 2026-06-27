@@ -391,3 +391,56 @@ fn tree_click_with_no_filter_selects_node_directly() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+// -- set_scroll_from_mouse_y tests --
+// Note: app_for() auto-opens long.txt (200 lines) via open_selected_sync(),
+// so display_line_count() = 200 in all three tests below.
+
+#[test]
+fn scrollbar_drag_no_op_when_content_fits_viewport() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    // Viewport taller than the 200-line file → total (200) <= inner_h (201), early return.
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 201,
+    };
+    app.content_scroll = 0;
+    app.set_scroll_from_mouse_y(10);
+    assert_eq!(app.content_scroll, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn scrollbar_drag_maps_top_row_to_zero_scroll() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    // 200 lines, 10-row viewport. Row 0 (top of track) must yield scroll 0.
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 10,
+    };
+    app.set_scroll_from_mouse_y(0);
+    assert_eq!(app.content_scroll, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn scrollbar_drag_clamps_at_scroll_max() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    // 200 lines, 10-row viewport → scroll_max = 190. A row past the end must stay ≤ max.
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 10,
+    };
+    app.set_scroll_from_mouse_y(255);
+    assert!(app.content_scroll <= app.content_scroll_max());
+    fs::remove_dir_all(&root).ok();
+}

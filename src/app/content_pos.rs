@@ -284,7 +284,7 @@ impl App {
 
     /// Returns `true` when the content pane uses a text cursor (`active_line`)
     /// instead of raw scroll. Diff, rendered markdown, and plugin-rendered views
-    /// are cursorless — they scroll directly  without an active-line cursor.
+    /// are cursorless — they scroll directly without an active-line cursor.
     pub fn has_text_cursor(&self) -> bool {
         if self.is_diff {
             return false;

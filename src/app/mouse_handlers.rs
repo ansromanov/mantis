@@ -475,6 +475,6 @@ impl App {
         }
         let y = (row as usize).saturating_sub(self.content_area.y as usize);
         let y = y.min(track_range);
-        self.content_scroll = (y * scroll_range / track_range).min(scroll_range);
+        self.set_content_scroll(y * scroll_range / track_range);
     }
 }
