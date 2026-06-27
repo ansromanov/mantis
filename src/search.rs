@@ -51,6 +51,16 @@ pub struct SearchState {
     pub scoped: bool,
 }
 
+fn filter_changed_paths(paths: &HashSet<PathBuf>, root: &Path) -> Vec<PathBuf> {
+    let mut files: Vec<PathBuf> = paths
+        .iter()
+        .filter(|p| p.starts_with(root))
+        .cloned()
+        .collect();
+    files.sort();
+    files
+}
+
 impl SearchState {
     pub fn new(
         root: &Path,
@@ -60,15 +70,7 @@ impl SearchState {
         changed_only: Option<&HashSet<PathBuf>>,
     ) -> Self {
         let all_files = match changed_only {
-            Some(paths) => {
-                let mut files: Vec<PathBuf> = paths
-                    .iter()
-                    .filter(|p| p.starts_with(root))
-                    .cloned()
-                    .collect();
-                files.sort();
-                files
-            }
+            Some(paths) => filter_changed_paths(paths, root),
             None => collect_all_files(root, show_hidden, ignore_gitignore),
         };
         let file_results = all_files.clone();
@@ -141,15 +143,7 @@ impl SearchState {
         changed_only: Option<&HashSet<PathBuf>>,
     ) {
         self.all_files = match changed_only {
-            Some(paths) => {
-                let mut files: Vec<PathBuf> = paths
-                    .iter()
-                    .filter(|p| p.starts_with(root))
-                    .cloned()
-                    .collect();
-                files.sort();
-                files
-            }
+            Some(paths) => filter_changed_paths(paths, root),
             None => collect_all_files(root, show_hidden, ignore_gitignore),
         };
         self.scoped = changed_only.is_some();
