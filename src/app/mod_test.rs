@@ -5072,3 +5072,34 @@ fn s_key_outside_diff_view_is_noop() {
     assert!(!app.is_diff);
     fs::remove_dir_all(&root).ok();
 }
+
+// -- copy_to_clipboard -------------------------------------------------------
+
+#[test]
+fn copy_to_clipboard_empty_text_is_noop() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    assert!(app.status_message.is_none());
+    app.copy_to_clipboard(String::new(), "selection");
+    assert!(
+        app.status_message.is_none(),
+        "empty text must not set a status message"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn copy_to_clipboard_sets_status() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.copy_to_clipboard("hello".to_string(), "test");
+    let sm = app.status_message.as_ref().expect("status must be set");
+    // Either success or error — both produce a status message (old mouse
+    // path was silent on failure, new path always reports).
+    assert!(
+        sm.text.starts_with("copied ") || sm.text.starts_with("clipboard error:"),
+        "unexpected status text: {:?}",
+        sm.text
+    );
+    fs::remove_dir_all(&root).ok();
+}
