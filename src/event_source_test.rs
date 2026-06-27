@@ -325,8 +325,8 @@ fn sgr_motion_no_button_is_moved() {
 
 // ---------------------------------------------------------------------------
 // CSI arrows: bare, disambiguated, and release forms.
-// REPORT_ALL_KEYS_AS_ESCAPE_CODES is not enabled; arrows come through the
-// legacy CSI path (ESC[A or ESC[1;1A via DISAMBIGUATE_ESCAPE_CODES).
+// REPORT_ALL_KEYS_AS_ESCAPE_CODES only affects printable keys; arrows still
+// come through the legacy CSI path (ESC[A or ESC[1;1A via DISAMBIGUATE_ESCAPE_CODES).
 // With REPORT_EVENT_TYPES the terminal also sends ESC[1;1:3A on key release;
 // that must decode as Release so handle_key can filter it (no double move).
 // ---------------------------------------------------------------------------

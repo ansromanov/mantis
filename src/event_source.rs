@@ -53,6 +53,13 @@ pub fn push_keyboard_enhancement_flags() -> io::Result<bool> {
                 KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
                     | KeyboardEnhancementFlags::REPORT_EVENT_TYPES
                     | KeyboardEnhancementFlags::REPORT_ALTERNATE_KEYS
+                    // Without this, text-producing keys are sent as plain UTF-8
+                    // on press (e.g. Russian `и` for physical `b`), so the
+                    // base-layout alternate key never reaches the dispatcher and
+                    // layout-independent letter bindings fail. Forcing every key
+                    // to a CSI-u escape makes the base-layout field available on
+                    // press. See parse_csi_u / KeyBinding::matches.
+                    | KeyboardEnhancementFlags::REPORT_ALL_KEYS_AS_ESCAPE_CODES
             )
         )?;
     }
