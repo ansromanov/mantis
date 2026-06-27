@@ -158,6 +158,20 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
     if !app.plugin_manager.is_empty() {
         segs.push((Span::styled(" [plugin]", badge), P_INFO));
     }
+    if app.is_diff && app.git_mode {
+        let key = app.keys().label_for_action("toggle_diff_staged");
+        if key.is_empty() {
+            segs.push((
+                Span::styled(format!(" [diff: {}]", app.diff_mode.label()), badge),
+                P_INFO,
+            ));
+        } else {
+            segs.push((
+                Span::styled(format!(" [diff: {} · {key}]", app.diff_mode.label()), badge),
+                P_INFO,
+            ));
+        }
+    }
 
     // -- Priority 2: scroll percentage --
     if app.show_scroll_percentage && app.current_file.is_some() {

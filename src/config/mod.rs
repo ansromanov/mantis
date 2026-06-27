@@ -75,6 +75,8 @@ pub struct Config {
     /// Per-plugin entries registered in `[plugins]`.
     #[serde(default)]
     pub plugins: HashMap<String, PluginEntry>,
+    /// Default diff source for working-tree diffs: "all" (vs HEAD), "staged", "unstaged".
+    pub diff_mode: String,
 }
 
 impl Default for Config {
@@ -105,6 +107,7 @@ impl Default for Config {
             palette_pin_recent: true,
             palette_frequent_count: 3,
             plugins: HashMap::new(),
+            diff_mode: "all".to_string(),
         }
     }
 }

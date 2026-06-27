@@ -82,7 +82,7 @@ When git blame is toggled on (`b`), a column appears on the left showing the aut
 | `J`            | Toggle JSON pretty-print     |
 | `B`            | Blame the active line        |
 | `D`            | Toggle side-by-side diff (in a diff) |
-| `S`            | Toggle staged diff (in a diff) |
+| `S`            | Cycle diff source: all / staged / unstaged (in a diff) |
 | `n`/`N`        | Next / previous hunk (in a diff) |
 
 ## Search popup

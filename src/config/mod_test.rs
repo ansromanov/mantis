@@ -466,6 +466,34 @@ fn validate_keys_omits_hint_when_nothing_close() {
 }
 
 #[test]
+fn diff_mode_defaults_to_all() {
+    let cfg = Config::default();
+    assert_eq!(cfg.diff_mode, "all");
+}
+
+#[test]
+fn diff_mode_staged_round_trips_through_serde() {
+    let cfg = Config {
+        diff_mode: "staged".to_string(),
+        ..Config::default()
+    };
+    let toml_str = toml::to_string_pretty(&cfg).unwrap();
+    let parsed: Config = toml::from_str(&toml_str).unwrap();
+    assert_eq!(parsed.diff_mode, "staged");
+}
+
+#[test]
+fn diff_mode_unstaged_round_trips_through_serde() {
+    let cfg = Config {
+        diff_mode: "unstaged".to_string(),
+        ..Config::default()
+    };
+    let toml_str = toml::to_string_pretty(&cfg).unwrap();
+    let parsed: Config = toml::from_str(&toml_str).unwrap();
+    assert_eq!(parsed.diff_mode, "unstaged");
+}
+
+#[test]
 fn unknown_key_surfaces_as_warning_but_config_still_loads() {
     let dir = std::env::temp_dir().join(format!(
         "mantis_cfg_unknown_{}_{}",
