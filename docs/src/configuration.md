@@ -48,6 +48,8 @@ recent_files_count = 10   # number of recently opened files to remember
 # git_show_deleted   = false  # show ghost nodes for deleted tracked files (default: false)
 indent_guides = true      # draw indentation guide lines (│) in the tree pane
 icons = false             # Nerd Font file-type icons (icon map supplied by a plugin)
+
+# diff_mode = "all"       # default git diff source: "all" (vs HEAD), "staged", "unstaged"
 ```
 
 ## Keybindings

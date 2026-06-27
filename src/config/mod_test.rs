@@ -466,6 +466,60 @@ fn validate_keys_omits_hint_when_nothing_close() {
 }
 
 #[test]
+fn diff_mode_defaults_to_all() {
+    let cfg = Config::default();
+    assert_eq!(cfg.diff_mode, "all");
+}
+
+#[test]
+fn diff_mode_staged_round_trips_through_serde() {
+    let cfg = Config {
+        diff_mode: "staged".to_string(),
+        ..Config::default()
+    };
+    let toml_str = toml::to_string_pretty(&cfg).unwrap();
+    let parsed: Config = toml::from_str(&toml_str).unwrap();
+    assert_eq!(parsed.diff_mode, "staged");
+}
+
+#[test]
+fn diff_mode_unstaged_round_trips_through_serde() {
+    let cfg = Config {
+        diff_mode: "unstaged".to_string(),
+        ..Config::default()
+    };
+    let toml_str = toml::to_string_pretty(&cfg).unwrap();
+    let parsed: Config = toml::from_str(&toml_str).unwrap();
+    assert_eq!(parsed.diff_mode, "unstaged");
+}
+
+#[test]
+fn diff_mode_invalid_value_surfaces_as_warning_but_config_still_loads() {
+    let dir = std::env::temp_dir().join(format!(
+        "mantis_cfg_diff_mode_{}_{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0)
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(dir.join("mantis.toml"), "diff_mode = \"stagged\"\n").unwrap();
+
+    let (config, path, error) = load(&dir);
+    assert!(path.is_some());
+    // Falls back to "all" silently in App::new; raw config keeps the bad value.
+    assert_eq!(config.diff_mode, "stagged");
+    let msg = error.expect("invalid diff_mode should produce a warning");
+    assert!(
+        msg.contains("diff_mode") && msg.contains("stagged"),
+        "warning should name the field and the bad value: {msg}"
+    );
+
+    fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
 fn unknown_key_surfaces_as_warning_but_config_still_loads() {
     let dir = std::env::temp_dir().join(format!(
         "mantis_cfg_unknown_{}_{}",

@@ -297,6 +297,54 @@ fn app_new_highlight_cache_starts_empty() {
 }
 
 #[test]
+fn app_new_diff_mode_defaults_to_all() {
+    let root = temp_dir();
+    fs::write(root.join("f.txt"), "x\n").unwrap();
+    let app = new_app(&root, Config::default());
+    assert_eq!(app.diff_mode, DiffMode::All);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn app_new_diff_mode_honours_config_staged() {
+    let root = temp_dir();
+    fs::write(root.join("f.txt"), "x\n").unwrap();
+    let cfg = Config {
+        diff_mode: "staged".to_string(),
+        ..Config::default()
+    };
+    let app = new_app(&root, cfg);
+    assert_eq!(app.diff_mode, DiffMode::Staged);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn app_new_diff_mode_honours_config_unstaged() {
+    let root = temp_dir();
+    fs::write(root.join("f.txt"), "x\n").unwrap();
+    let cfg = Config {
+        diff_mode: "unstaged".to_string(),
+        ..Config::default()
+    };
+    let app = new_app(&root, cfg);
+    assert_eq!(app.diff_mode, DiffMode::Unstaged);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn app_new_diff_mode_invalid_falls_back_to_all() {
+    let root = temp_dir();
+    fs::write(root.join("f.txt"), "x\n").unwrap();
+    let cfg = Config {
+        diff_mode: "invalid".to_string(),
+        ..Config::default()
+    };
+    let app = new_app(&root, cfg);
+    assert_eq!(app.diff_mode, DiffMode::All);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn app_new_command_usage_starts_empty() {
     let root = temp_dir();
     // Point at a fresh temp dir so no on-disk usage data is loaded.

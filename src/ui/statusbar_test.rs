@@ -457,6 +457,59 @@ fn syntax_name_hidden_when_none() {
     assert!(!text.contains("plain")); // no "[plain]" badge
 }
 
+#[test]
+fn diff_mode_badge_shown_when_diff_and_git_mode() {
+    let mut app = make_app();
+    app.focus = Focus::Content;
+    app.is_diff = true;
+    app.git_mode = true;
+    app.diff_mode = crate::app::DiffMode::Staged;
+    let text = render_bar_width(&app, 120);
+    assert!(text.contains("[diff: staged"));
+}
+
+#[test]
+fn diff_mode_badge_uses_diff_mode_label() {
+    let mut app = make_app();
+    app.focus = Focus::Content;
+    app.is_diff = true;
+    app.git_mode = true;
+    app.diff_mode = crate::app::DiffMode::Unstaged;
+    let text = render_bar_width(&app, 120);
+    assert!(text.contains("[diff: unstaged"));
+}
+
+#[test]
+fn diff_mode_badge_hidden_when_not_diff() {
+    let mut app = make_app();
+    app.focus = Focus::Content;
+    app.is_diff = false;
+    app.git_mode = true;
+    app.diff_mode = crate::app::DiffMode::All;
+    let text = render_bar_width(&app, 120);
+    assert!(!text.contains("[diff:"));
+}
+
+#[test]
+fn diff_mode_badge_hidden_when_not_git_mode() {
+    let mut app = make_app();
+    app.focus = Focus::Content;
+    app.is_diff = true;
+    app.git_mode = false;
+    app.diff_mode = crate::app::DiffMode::All;
+    let text = render_bar_width(&app, 120);
+    assert!(!text.contains("[diff:"));
+}
+
+#[test]
+fn diff_mode_badge_hidden_when_neither_diff_nor_git_mode() {
+    let mut app = make_app();
+    app.is_diff = false;
+    app.git_mode = false;
+    let text = render_bar_width(&app, 120);
+    assert!(!text.contains("[diff:"));
+}
+
 // ── Narrow-terminal elision tests ────────────────────────────────────────
 
 #[test]

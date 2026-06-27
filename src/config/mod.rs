@@ -75,6 +75,8 @@ pub struct Config {
     /// Per-plugin entries registered in `[plugins]`.
     #[serde(default)]
     pub plugins: HashMap<String, PluginEntry>,
+    /// Default diff source for working-tree diffs: "all" (vs HEAD), "staged", "unstaged".
+    pub diff_mode: String,
 }
 
 impl Default for Config {
@@ -105,6 +107,7 @@ impl Default for Config {
             palette_pin_recent: true,
             palette_frequent_count: 3,
             plugins: HashMap::new(),
+            diff_mode: "all".to_string(),
         }
     }
 }
@@ -523,6 +526,15 @@ pub fn load(root: &Path) -> (Config, Option<PathBuf>, Option<String>) {
                     if !unknown.is_empty() {
                         error = Some(format!("{}: {}", path.display(), unknown.join("; ")));
                     }
+                }
+                if error.is_none()
+                    && !matches!(config.diff_mode.as_str(), "all" | "staged" | "unstaged")
+                {
+                    error = Some(format!(
+                        "{}: diff_mode {:?} is not valid — expected \"all\", \"staged\", or \"unstaged\"",
+                        path.display(),
+                        config.diff_mode,
+                    ));
                 }
                 return (config, Some(path), error);
             }

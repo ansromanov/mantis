@@ -128,7 +128,11 @@ impl App {
             current_file: None,
             current_syntax: None,
             is_diff: false,
-            diff_mode: DiffMode::default(),
+            diff_mode: match cfg.diff_mode.as_str() {
+                "staged" => DiffMode::Staged,
+                "unstaged" => DiffMode::Unstaged,
+                _ => DiffMode::All,
+            },
             diff_side_by_side: false,
             viewing_revision: None,
             diff_rows: Vec::new(),

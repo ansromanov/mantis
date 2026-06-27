@@ -2100,13 +2100,13 @@ fn handle_key_show_about_q_or_esc_closes() {
 }
 
 #[test]
-fn handle_key_show_about_enter_noop_when_no_release() {
+fn handle_key_show_about_enter_closes() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.show_about = true;
-    // Enter without a release URL: should be a no-op (not crash).
+    // Enter always closes the about popup (never opens browser).
     app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
-    assert!(app.show_about);
+    assert!(!app.show_about);
     fs::remove_dir_all(&root).ok();
 }
 
