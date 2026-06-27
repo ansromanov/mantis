@@ -9,7 +9,6 @@
 //! git-mode invariants stay consistent across keyboard and mouse input rather
 //! than being poked at from multiple call sites.
 
-use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use crate::git::GitStatus;
@@ -75,6 +74,12 @@ impl App {
             }
         }
         self.tree_selected = self.tree_selected.min(self.nodes.len().saturating_sub(1));
+        // When in git mode and no changed files remain (e.g. the working tree
+        // went clean or this isn't a git repo), clear the content pane so a
+        // stale diff doesn't linger (Issue #307).
+        if self.git_mode && self.nodes.is_empty() {
+            self.clear_content_state();
+        }
         if recenter {
             self.scroll_tree_into_view();
         } else {
@@ -290,43 +295,11 @@ impl App {
     fn set_root(&mut self, path: &std::path::Path) {
         self.root = path.to_path_buf();
         self.expanded.clear();
-        self.current_file = None;
-        self.content = Vec::new();
-        self.highlighted = Vec::new();
-        self.markdown_lines = Vec::new();
-        self.virtual_file = None;
-        self.is_markdown = false;
-        self.is_json = false;
-        self.file_encoding = None;
-        self.file_line_ending = None;
-        self.show_pretty_json = false;
-        self.json_pretty_text = Vec::new();
-        self.json_pretty_lines = Vec::new();
-        self.viewing_revision = None;
-        self.content_scroll = 0;
-        self.content_hscroll = 0;
-        self.is_diff = false;
-        self.diff_side_by_side = false;
-        self.diff_rows = Vec::new();
-        self.content_title = None;
-        self.selection = None;
-        self.drag_start = None;
-        self.fold_regions = Vec::new();
-        self.folded = HashSet::new();
-        self.fold_display_map = Vec::new();
-        self.yaml_error = None;
-        self.yaml_anchor_count = 0;
-        self.yaml_alias_count = 0;
+        self.clear_content_state();
         self.file_watcher = None;
         self.file_watch_rx = None;
         self.file_watch_path = None;
-        self.in_file_search = None;
-        self.plugin_content_active = false;
         self.plugin_content_active_path = None;
-        self.plugin_content.clear();
-        self.plugin_content_text.clear();
-        self.plugin_blame.clear();
-        self.plugin_git_info = None;
         self.plugin_contributions.clear();
         self.load_seq = self.load_seq.wrapping_add(1);
         if self.git_status_enabled {

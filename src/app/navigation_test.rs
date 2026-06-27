@@ -783,3 +783,145 @@ fn set_root_clears_plugin_content_active_path() {
     );
     fs::remove_dir_all(&orig_root).ok();
 }
+
+#[test]
+fn rebuild_empty_git_mode_clears_content() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    // Load content so current_file is set, then seed state manually.
+    app.open_file(&root.join("a.txt"));
+    assert!(app.current_file.is_some(), "content should be loaded");
+    app.virtual_file = None;
+    app.content = vec!["stale line".to_string()];
+    app.highlighted = vec![vec![]];
+    // Set non-default values that clear_content_state must reset.
+    app.is_diff = true;
+    app.diff_side_by_side = true;
+    app.active_line = 5;
+    app.content_scroll = 10;
+    app.content_title = Some("stale title".to_string());
+    app.selection = Some(crate::selection::TextSelection {
+        anchor: (0, 0),
+        active: (1, 1),
+    });
+    app.git_mode = true;
+    app.git_status_map.clear();
+    app.rebuild(false);
+    assert!(
+        app.nodes.is_empty(),
+        "git mode with no changes should yield empty nodes"
+    );
+    assert!(
+        app.current_file.is_none(),
+        "rebuild with empty git set must clear current_file"
+    );
+    assert!(
+        app.content.is_empty(),
+        "rebuild with empty git set must clear content buffer"
+    );
+    assert!(
+        !app.is_diff,
+        "rebuild with empty git set must clear is_diff flag"
+    );
+    assert!(
+        app.content_title.is_none(),
+        "rebuild with empty git set must clear content_title"
+    );
+    assert!(
+        app.highlighted.is_empty(),
+        "rebuild with empty git set must clear highlighted"
+    );
+    assert!(
+        app.diff_rows.is_empty(),
+        "rebuild with empty git set must clear diff_rows"
+    );
+    assert!(
+        app.fold_regions.is_empty(),
+        "rebuild with empty git set must clear fold_regions"
+    );
+    assert!(
+        app.selection.is_none(),
+        "rebuild with empty git set must clear selection"
+    );
+    assert_eq!(
+        app.content_scroll, 0,
+        "rebuild with empty git set must reset content_scroll"
+    );
+    assert_eq!(
+        app.active_line, 0,
+        "rebuild with empty git set must reset active_line"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn rebuild_non_empty_git_mode_keeps_content() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    // Load content and set up git mode with a changed file.
+    // Use open_file to set up a realistic current_file state, then seed
+    // content directly (open_file uses lazy VirtualFile for .txt).
+    app.open_file(&root.join("a.txt"));
+    assert!(app.current_file.is_some(), "content should be loaded");
+    app.virtual_file = None;
+    app.content = vec!["line1".to_string(), "line2".to_string()];
+    app.highlighted = vec![vec![]; 2];
+    app.git_mode = true;
+    app.git_status_map
+        .insert(root.join("a.txt"), crate::git::GitStatus::Modified);
+    app.rebuild(false);
+    assert!(
+        !app.nodes.is_empty(),
+        "git mode with changes should have nodes ({})",
+        app.nodes.len()
+    );
+    assert!(
+        !app.content.is_empty(),
+        "rebuild with non-empty git set must preserve content"
+    );
+    assert!(
+        app.current_file.is_some(),
+        "rebuild with non-empty git set must preserve current_file"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn rebuild_empty_git_mode_clears_plugin_content() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    // Simulate plugin rendering content for the current file.
+    let path = root.join("a.txt");
+    app.open_file(&path);
+    app.current_file = Some(path.clone());
+    app.content = vec!["original".to_string()];
+    app.plugin_content.insert(
+        path.clone(),
+        vec![vec![(
+            ratatui::style::Style::default(),
+            "plugin".to_string(),
+        )]],
+    );
+    app.plugin_content_text
+        .insert(path, vec!["plugin".to_string()]);
+    app.git_mode = true;
+    app.git_status_map.clear();
+    app.rebuild(false);
+    assert!(
+        app.plugin_content.is_empty(),
+        "rebuild with empty git set must clear plugin_content"
+    );
+    assert!(
+        app.plugin_content_text.is_empty(),
+        "rebuild with empty git set must clear plugin_content_text"
+    );
+    assert!(
+        app.plugin_blame.is_empty(),
+        "rebuild with empty git set must clear plugin_blame"
+    );
+    assert!(
+        app.plugin_git_info.is_none(),
+        "rebuild with empty git set must clear plugin_git_info"
+    );
+    fs::remove_dir_all(&root).ok();
+}

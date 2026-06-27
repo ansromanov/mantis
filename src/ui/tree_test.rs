@@ -185,6 +185,95 @@ fn draw_tree_git_mode_flat_shows_git_flat_label() {
 }
 
 #[test]
+fn draw_tree_git_mode_clean_shows_placeholder() {
+    use crate::git::GitHead;
+    let mut app = make_app(false, HashMap::new());
+    app.root = PathBuf::from("repo");
+    app.git_mode = true;
+    app.nodes = vec![];
+    app.git_info = Some(crate::git::GitRepoInfo {
+        head: GitHead::Branch("main".to_string()),
+        ahead: 0,
+        behind: 0,
+        total_changed: 0,
+        staged: 0,
+        untracked: 0,
+    });
+    let rows = render_tree(&mut app, 40, 5);
+    let text = all_text(&rows);
+    assert!(
+        text.contains("✓"),
+        "clean placeholder should show checkmark"
+    );
+    assert!(
+        text.contains("Working tree clean"),
+        "clean placeholder should show 'Working tree clean'"
+    );
+    assert!(
+        text.contains("No changes to show."),
+        "clean placeholder should show 'No changes to show.'"
+    );
+    assert!(
+        text.contains("Ctrl+g"),
+        "clean placeholder should show the exit binding"
+    );
+}
+
+#[test]
+fn draw_tree_git_mode_not_a_repo_shows_different_message() {
+    let mut app = make_app(false, HashMap::new());
+    app.root = PathBuf::from("repo");
+    app.git_mode = true;
+    app.nodes = vec![];
+    app.git_info = None;
+    let rows = render_tree(&mut app, 40, 5);
+    let text = all_text(&rows);
+    assert!(
+        text.contains("✗") || text.contains('X'),
+        "non-repo placeholder should show an error indicator"
+    );
+    assert!(
+        text.contains("Not a git repository"),
+        "non-repo placeholder should say 'Not a git repository'"
+    );
+    assert!(
+        text.contains("No git data available."),
+        "non-repo placeholder should say 'No git data available.'"
+    );
+}
+
+#[test]
+fn draw_tree_git_mode_with_nodes_no_placeholder() {
+    use crate::git::GitHead;
+    let mut app = make_app(false, HashMap::new());
+    app.root = PathBuf::from("repo");
+    app.git_mode = true;
+    app.nodes = vec![make_node("changed.rs", false, false)];
+    app.git_info = Some(crate::git::GitRepoInfo {
+        head: GitHead::Branch("main".to_string()),
+        ahead: 1,
+        behind: 0,
+        total_changed: 1,
+        staged: 1,
+        untracked: 0,
+    });
+    let rows = render_tree(&mut app, 40, 5);
+    let text = all_text(&rows);
+    assert!(
+        !text.contains("Working tree clean"),
+        "placeholder must not show when nodes are present"
+    );
+    assert!(
+        !text.contains("Not a git repository"),
+        "repo message must not show when nodes are present"
+    );
+    assert!(
+        text.contains("changed.rs"),
+        "file node should render instead of placeholder"
+    );
+}
+
+#[test]
 fn draw_tree_no_git_mode_shows_files_label() {
     let mut app = make_app(false, HashMap::new());
     app.root = PathBuf::from("repo");

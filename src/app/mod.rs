@@ -651,6 +651,50 @@ impl App {
             "Files"
         }
     }
+
+    /// Clears all content-pane state (file buffer, diff, highlights, rendered
+    /// markdown/JSON, scroll, selection, fold state, plugin content, etc.).
+    /// Called when the current file is no longer valid — git mode becomes clean
+    /// (no changed files) or the viewer root changes. Does NOT clear plugin
+    /// contributions or file watchers (those are managed at the call site).
+    fn clear_content_state(&mut self) {
+        self.current_file = None;
+        self.current_syntax = None;
+        self.content = Vec::new();
+        self.highlighted = Vec::new();
+        self.markdown_lines = Vec::new();
+        self.virtual_file = None;
+        self.is_markdown = false;
+        self.is_json = false;
+        self.file_encoding = None;
+        self.file_line_ending = None;
+        self.show_pretty_json = false;
+        self.json_pretty_text = Vec::new();
+        self.json_pretty_lines = Vec::new();
+        self.viewing_revision = None;
+        self.content_scroll = 0;
+        self.content_hscroll = 0;
+        self.active_line = 0;
+        self.show_line_blame = false;
+        self.is_diff = false;
+        self.diff_side_by_side = false;
+        self.diff_rows = Vec::new();
+        self.content_title = None;
+        self.selection = None;
+        self.drag_start = None;
+        self.fold_regions = Vec::new();
+        self.folded = HashSet::new();
+        self.fold_display_map = Vec::new();
+        self.yaml_error = None;
+        self.yaml_anchor_count = 0;
+        self.yaml_alias_count = 0;
+        self.in_file_search = None;
+        self.plugin_content_active = false;
+        self.plugin_content.clear();
+        self.plugin_content_text.clear();
+        self.plugin_blame.clear();
+        self.plugin_git_info = None;
+    }
 }
 
 /// Builds the set of absolute paths that should appear as ghost (deleted) nodes
