@@ -218,6 +218,27 @@ fn app_git_show_fields_default_matches_config() {
 }
 
 #[test]
+fn should_open_browser_rejects_empty_url() {
+    assert!(!super::editor::should_open_browser("", true));
+}
+
+#[test]
+fn should_open_browser_rejects_non_tty() {
+    assert!(!super::editor::should_open_browser(
+        "https://example.com",
+        false
+    ));
+}
+
+#[test]
+fn should_open_browser_allows_tty_with_url() {
+    assert!(super::editor::should_open_browser(
+        "https://example.com",
+        true
+    ));
+}
+
+#[test]
 fn dispatch_command_records_action_in_usage() {
     let root = temp_tree();
     let mut app = app_for(&root);
