@@ -592,6 +592,21 @@ impl App {
     pub fn keys(&self) -> &Keymap {
         &self.keys
     }
+
+    /// Human-readable label for the tree panel's current view mode, shown as the
+    /// panel's border title. Extends as new modes are added (blame, functions,
+    /// file structure, …); today it reflects only Files vs Git.
+    pub fn panel_mode_label(&self) -> &'static str {
+        if self.git_mode {
+            if self.git_mode_flat {
+                "Git · flat"
+            } else {
+                "Git"
+            }
+        } else {
+            "Files"
+        }
+    }
 }
 
 /// Builds the set of absolute paths that should appear as ghost (deleted) nodes
