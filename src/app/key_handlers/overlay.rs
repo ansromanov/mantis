@@ -1,95 +1,73 @@
 //! Key handling for the fuzzy-picker overlays.
 //!
-//! The search, history, theme-picker, recent-files, and command-palette overlays
-//! share a common interaction shape - type to filter, up/down to move the
-//! selection, Enter to act, Esc to close - and this module implements the key
-//! handling for each. `handle_search_key` and its siblings push/pop query
-//! characters and call the picker's `refresh()` to re-score the filtered list,
-//! toggle search mode with Tab where applicable, and on Enter hand off to the
-//! relevant `App` open action. Closing an overlay clears its state and returns
-//! focus to the underlying panel.
+//! Each overlay handler is a thin wrapper around the shared
+//! [`handle_list_picker_key`] dispatcher: handle extra keys first, then
+//! fall through to the dispatcher and map `Activate`/`Close` to the
+//! overlay-specific action.
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+use crate::list_picker::{handle_list_picker_key, OverlayKey};
 
 use super::super::App;
 
 impl App {
-    /// Handles keyboard input while the search overlay is open: typing
-    /// characters, backspace, up/down navigation, Tab to toggle mode,
-    /// Enter to open, Esc to close.
+    /// Handles keyboard input while the search overlay is open.
+    /// Extra keys: Tab toggles file/content mode.
     pub(super) fn handle_search_key(&mut self, key: KeyEvent) {
-        match key.code {
-            KeyCode::Esc => {
-                if let Some(s) = &self.search {
-                    self.last_search_query = s.query.clone();
-                }
+        // Extra keys first
+        if let KeyCode::Tab = key.code {
+            if let Some(s) = &mut self.search {
+                s.toggle_mode();
+            }
+            return;
+        }
+        let Some(ref mut s) = self.search else { return };
+        match handle_list_picker_key(s, &key) {
+            OverlayKey::Activate => self.activate_search_selection(),
+            OverlayKey::Close => {
+                self.last_search_query = s.query.clone();
                 self.search = None;
-            }
-            KeyCode::Tab => {
-                if let Some(s) = &mut self.search {
-                    s.toggle_mode();
-                }
-            }
-            KeyCode::Enter => self.activate_search_selection(),
-            KeyCode::Up => {
-                if let Some(s) = &mut self.search {
-                    s.selected = s.selected.saturating_sub(1);
-                }
-            }
-            KeyCode::Down => {
-                if let Some(s) = &mut self.search {
-                    if s.selected + 1 < s.results_len() {
-                        s.selected += 1;
-                    }
-                }
-            }
-            KeyCode::Backspace => {
-                if let Some(s) = &mut self.search {
-                    s.pop();
-                }
-            }
-            KeyCode::Char(c) => {
-                if let Some(s) = &mut self.search {
-                    s.push(c);
-                }
             }
             _ => {}
         }
     }
 
-    /// Handles keyboard input while in-file search is active: typing chars,
-    /// backspace, n/N for next/prev, Esc/Enter to close.
+    /// Handles keyboard input while in-file search is active.
+    /// Extra keys: n/N/Tab/BackTab/Ctrl-p/Up/Down navigate matches.
     pub(super) fn handle_in_file_search_key(&mut self, key: KeyEvent) {
+        // Extra keys first
         match key.code {
-            KeyCode::Esc | KeyCode::Enter => {
-                self.in_file_search = None;
-            }
             KeyCode::Char('n') => {
                 self.in_file_search_next();
+                return;
             }
             KeyCode::Char('N') | KeyCode::Char('P') => {
                 self.in_file_search_prev();
+                return;
             }
-            KeyCode::Tab => {
+            KeyCode::Tab | KeyCode::Down => {
                 self.in_file_search_next();
+                return;
             }
-            KeyCode::BackTab => {
+            KeyCode::BackTab | KeyCode::Up => {
                 self.in_file_search_prev();
+                return;
             }
             KeyCode::Char('p') if key.modifiers.intersects(KeyModifiers::CONTROL) => {
                 self.in_file_search_prev();
+                return;
             }
-            KeyCode::Backspace => {
-                if let Some(ref mut s) = self.in_file_search {
-                    s.pop();
-                }
-                self.refresh_in_file_search();
-                self.scroll_in_file_search_to_current();
+            _ => {}
+        }
+        let Some(ref mut s) = self.in_file_search else {
+            return;
+        };
+        match handle_list_picker_key(s, &key) {
+            OverlayKey::Activate | OverlayKey::Close => {
+                self.in_file_search = None;
             }
-            KeyCode::Char(c) => {
-                if let Some(ref mut s) = self.in_file_search {
-                    s.push(c);
-                }
+            OverlayKey::Handled => {
                 self.refresh_in_file_search();
                 self.scroll_in_file_search_to_current();
             }
@@ -147,140 +125,81 @@ impl App {
 
     /// Handles keyboard input while the git-history overlay is open.
     pub(super) fn handle_history_key(&mut self, key: KeyEvent) {
-        match key.code {
-            KeyCode::Esc => self.history = None,
-            KeyCode::Enter => self.show_selected_revision(),
-            KeyCode::Up => {
-                if let Some(h) = &mut self.history {
-                    h.selected = h.selected.saturating_sub(1);
-                }
-            }
-            KeyCode::Down => {
-                if let Some(h) = &mut self.history {
-                    if h.selected + 1 < h.results_len() {
-                        h.selected += 1;
-                    }
-                }
-            }
-            KeyCode::Backspace => {
-                if let Some(h) = &mut self.history {
-                    h.pop();
-                }
-            }
-            KeyCode::Char(c) => {
-                if let Some(h) = &mut self.history {
-                    h.push(c);
-                }
-            }
+        let Some(ref mut h) = self.history else {
+            return;
+        };
+        match handle_list_picker_key(h, &key) {
+            OverlayKey::Activate => self.show_selected_revision(),
+            OverlayKey::Close => self.history = None,
             _ => {}
         }
     }
 
     /// Handles keyboard input while the theme picker overlay is open.
     pub(super) fn handle_theme_key(&mut self, key: KeyEvent) {
-        match key.code {
-            KeyCode::Esc => self.theme_picker = None,
-            KeyCode::Enter => self.apply_selected_theme(),
-            KeyCode::Up => {
-                if let Some(p) = &mut self.theme_picker {
-                    p.selected = p.selected.saturating_sub(1);
-                }
-            }
-            KeyCode::Down => {
-                if let Some(p) = &mut self.theme_picker {
-                    if p.selected + 1 < p.results_len() {
-                        p.selected += 1;
-                    }
-                }
-            }
-            KeyCode::Backspace => {
-                if let Some(p) = &mut self.theme_picker {
-                    p.pop();
-                }
-            }
-            KeyCode::Char(c) => {
-                if let Some(p) = &mut self.theme_picker {
-                    p.push(c);
-                }
-            }
+        let Some(ref mut p) = self.theme_picker else {
+            return;
+        };
+        match handle_list_picker_key(p, &key) {
+            OverlayKey::Activate => self.apply_selected_theme(),
+            OverlayKey::Close => self.theme_picker = None,
             _ => {}
         }
     }
 
     /// Handles keyboard input while the recent-files overlay is open.
     pub(super) fn handle_recent_key(&mut self, key: KeyEvent) {
-        match key.code {
-            KeyCode::Esc => self.recent_files = None,
-            KeyCode::Enter => self.activate_recent_selection(),
-            KeyCode::Up => {
-                if let Some(r) = &mut self.recent_files {
-                    r.selected = r.selected.saturating_sub(1);
-                }
-            }
-            KeyCode::Down => {
-                if let Some(r) = &mut self.recent_files {
-                    if r.selected + 1 < r.results_len() {
-                        r.selected += 1;
-                    }
-                }
-            }
-            KeyCode::Backspace => {
-                if let Some(r) = &mut self.recent_files {
-                    r.pop();
-                }
-            }
-            KeyCode::Char(c) => {
-                if let Some(r) = &mut self.recent_files {
-                    r.push(c);
-                }
-            }
+        let Some(ref mut r) = self.recent_files else {
+            return;
+        };
+        match handle_list_picker_key(r, &key) {
+            OverlayKey::Activate => self.activate_recent_selection(),
+            OverlayKey::Close => self.recent_files = None,
             _ => {}
         }
     }
 
     /// Handles keyboard input while the plugin manager overlay is open.
-    /// Up/Down navigates the list; Space or Enter toggles the selected plugin;
-    /// Esc closes without any further action.
+    /// Extra keys: Space toggles; j/k navigate.
     pub(super) fn handle_plugin_key(&mut self, key: KeyEvent) {
+        let Some(ref mut p) = self.plugin_picker else {
+            return;
+        };
+        // Extra keys first
         match key.code {
-            KeyCode::Esc => self.plugin_picker = None,
-            KeyCode::Enter | KeyCode::Char(' ') => self.toggle_plugin_picker_selection(),
-            KeyCode::Up | KeyCode::Char('k') => {
-                if let Some(p) = &mut self.plugin_picker {
-                    p.selected = p.selected.saturating_sub(1);
-                }
+            KeyCode::Char(' ') => {
+                self.toggle_plugin_picker_selection();
+                return;
             }
-            KeyCode::Down | KeyCode::Char('j') => {
-                if let Some(p) = &mut self.plugin_picker {
-                    if p.selected + 1 < p.results_len() {
-                        p.selected += 1;
-                    }
-                }
+            KeyCode::Char('k') => {
+                p.selected = p.selected.saturating_sub(1);
+                return;
             }
+            KeyCode::Char('j') => {
+                if p.selected + 1 < p.results_len() {
+                    p.selected += 1;
+                }
+                return;
+            }
+            _ => {}
+        }
+        match handle_list_picker_key(p, &key) {
+            OverlayKey::Activate => self.toggle_plugin_picker_selection(),
+            OverlayKey::Close => self.plugin_picker = None,
             _ => {}
         }
     }
 
     /// Handles keyboard input while the inline tree filter is open.
-    ///
-    /// Typing characters narrows the tree to nodes whose names contain the
-    /// query (case-insensitive); Backspace removes the last character; Esc or
-    /// Enter dismisses the filter bar and accepts the current selection.
     pub(super) fn handle_tree_filter_key(&mut self, key: KeyEvent) {
-        match key.code {
-            KeyCode::Esc | KeyCode::Enter => {
+        let Some(ref mut f) = self.tree_filter else {
+            return;
+        };
+        match handle_list_picker_key(f, &key) {
+            OverlayKey::Activate | OverlayKey::Close => {
                 self.tree_filter = None;
             }
-            KeyCode::Backspace => {
-                if let Some(ref mut f) = self.tree_filter {
-                    f.pop();
-                }
-                self.move_tree_filter_selection_to_first_match();
-            }
-            KeyCode::Char(c) => {
-                if let Some(ref mut f) = self.tree_filter {
-                    f.push(c);
-                }
+            OverlayKey::Handled => {
                 self.move_tree_filter_selection_to_first_match();
             }
             _ => {}
@@ -308,51 +227,32 @@ impl App {
         self.scroll_tree_into_view();
     }
 
-    /// Handles keyboard input while the command palette is open: typing
-    /// characters, backspace, up/down navigation, Enter to execute, Esc to close.
+    /// Handles keyboard input while the command palette is open.
     pub(super) fn handle_command_key(&mut self, key: KeyEvent) {
-        match key.code {
-            KeyCode::Esc => {
-                self.command_palette = None;
-            }
-            KeyCode::Enter => self.dispatch_command(),
-            KeyCode::Up => {
-                if let Some(p) = &mut self.command_palette {
-                    p.selected = p.selected.saturating_sub(1);
-                }
-            }
-            KeyCode::Down => {
-                if let Some(p) = &mut self.command_palette {
-                    if p.selected + 1 < p.results_len() {
-                        p.selected += 1;
-                    }
-                }
-            }
-            KeyCode::Backspace => {
-                if let Some(p) = &mut self.command_palette {
-                    p.pop();
-                }
-            }
-            KeyCode::Char(c) => {
-                if let Some(p) = &mut self.command_palette {
-                    p.push(c);
-                }
-            }
+        let Some(ref mut p) = self.command_palette else {
+            return;
+        };
+        match handle_list_picker_key(p, &key) {
+            OverlayKey::Activate => self.dispatch_command(),
+            OverlayKey::Close => self.command_palette = None,
             _ => {}
         }
     }
 
     /// Handles keyboard input while the go-to-line dialog is open.
-    ///
-    /// Typing digits appends to the query; Backspace removes the last character;
-    /// Enter parses the query (supports absolute `42`, relative `+5` / `-3`) and
-    /// jumps; Esc closes without jumping.
+    /// Extra keys: filters out the open binding so it is not appended.
     pub(super) fn handle_goto_line_key(&mut self, key: KeyEvent) {
-        match key.code {
-            KeyCode::Esc => {
-                self.goto_line = None;
+        // Filter out the open binding key before passing to the shared dispatcher.
+        if let KeyCode::Char(_) = &key.code {
+            if crate::config::pressed(&self.config.keys.goto_line, &key) {
+                return;
             }
-            KeyCode::Enter => {
+        }
+        let Some(ref mut g) = self.goto_line else {
+            return;
+        };
+        match handle_list_picker_key(g, &key) {
+            OverlayKey::Activate => {
                 let target = self.goto_line.as_ref().and_then(|g| {
                     let q = g.query.as_str();
                     if q.is_empty() {
@@ -375,18 +275,8 @@ impl App {
                 }
                 self.goto_line = None;
             }
-            KeyCode::Backspace => {
-                if let Some(ref mut g) = self.goto_line {
-                    g.pop();
-                }
-            }
-            KeyCode::Char(c) => {
-                let is_open_binding = crate::config::pressed(&self.config.keys.goto_line, &key);
-                if !is_open_binding {
-                    if let Some(ref mut g) = self.goto_line {
-                        g.push(c);
-                    }
-                }
+            OverlayKey::Close => {
+                self.goto_line = None;
             }
             _ => {}
         }

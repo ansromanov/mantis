@@ -1,13 +1,13 @@
 //! Mouse event dispatch for `App`.
 //!
 //! `handle_mouse` mirrors the keyboard overlay precedence chain for pointer
-//! input: theme picker, command palette, history, recent files, and search
-//! overlays intercept clicks first, then events route to the tree or content
-//! panel by hit-testing the `Rect`s recorded during the last render. It handles
-//! left-click selection, drag-selection of text, splitter dragging to resize the
-//! tree pane, scrollbar dragging, wheel scrolling, and double-click to open a
-//! picker result. All coordinate math must account for the panels' scroll
-//! offsets, which are also captured at render time.
+//! input: theme picker, plugin picker, command palette, history, recent files,
+//! and search overlays intercept clicks first, then events route to the tree or
+//! content panel by hit-testing the `Rect`s recorded during the last render. It
+//! handles left-click selection, drag-selection of text, splitter dragging to
+//! resize the tree pane, scrollbar dragging, wheel scrolling, and double-click
+//! to open a picker result. All coordinate math must account for the panels'
+//! scroll offsets, which are also captured at render time.
 
 use std::time::{Duration, Instant};
 
@@ -24,16 +24,20 @@ use super::{rect_contains, App, Focus};
 mod tests;
 
 impl App {
-    /// Dispatches a mouse event. Overlays (theme, history, search) intercept
-    /// first; otherwise routes based on the click location (tree vs content
-    /// panel). Handles left-click, drag, scroll, and double-click for
-    /// search/history/theme results.
+    /// Dispatches a mouse event. Overlays (theme, plugin, command palette,
+    /// history, recent files, search) intercept first; otherwise routes based
+    /// on click location (tree vs content panel). Handles left-click, drag,
+    /// scroll, and double-click for search/history/theme results.
     pub fn handle_mouse(&mut self, ev: MouseEvent) {
         if self.show_help {
             return;
         }
         if self.theme_picker.is_some() {
             self.handle_theme_mouse(ev);
+            return;
+        }
+        if self.plugin_picker.is_some() {
+            self.handle_plugin_mouse(ev);
             return;
         }
         if self.command_palette.is_some() {
@@ -272,10 +276,12 @@ impl App {
 
     /// Handles mouse events on the git-history overlay: click to select,
     /// double-click to open the diff, scroll to navigate.
+    /// Close on click outside the popup area.
     fn handle_history_mouse(&mut self, ev: MouseEvent) {
         match ev.kind {
             MouseEventKind::Down(MouseButton::Left) => {
                 if !rect_contains(self.history_area, ev.column, ev.row) {
+                    self.history = None;
                     return;
                 }
                 let index = self.history_offset + (ev.row - self.history_area.y) as usize;
@@ -319,10 +325,12 @@ impl App {
 
     /// Handles mouse events on the theme picker overlay: click to select,
     /// double-click to apply, scroll to navigate.
+    /// Close on click outside the popup area.
     fn handle_theme_mouse(&mut self, ev: MouseEvent) {
         match ev.kind {
             MouseEventKind::Down(MouseButton::Left) => {
                 if !rect_contains(self.theme_area, ev.column, ev.row) {
+                    self.theme_picker = None;
                     return;
                 }
                 let index = self.theme_offset + (ev.row - self.theme_area.y) as usize;
@@ -366,10 +374,12 @@ impl App {
 
     /// Handles mouse events on the command palette overlay: click to select,
     /// double-click to execute, scroll to navigate.
+    /// Close on click outside the popup area.
     fn handle_command_palette_mouse(&mut self, ev: MouseEvent) {
         match ev.kind {
             MouseEventKind::Down(MouseButton::Left) => {
                 if !rect_contains(self.command_palette_area, ev.column, ev.row) {
+                    self.command_palette = None;
                     return;
                 }
                 let index =
@@ -412,12 +422,24 @@ impl App {
         }
     }
 
+    /// Handles mouse events on the plugin picker overlay: close on click
+    /// outside the popup area.
+    fn handle_plugin_mouse(&mut self, ev: MouseEvent) {
+        if let MouseEventKind::Down(MouseButton::Left) = ev.kind {
+            if !rect_contains(self.plugin_picker_area, ev.column, ev.row) {
+                self.plugin_picker = None;
+            }
+        }
+    }
+
     /// Handles mouse events on the search overlay: click to select,
     /// double-click to open the result, scroll to navigate.
+    /// Close on click outside the popup area.
     fn handle_search_mouse(&mut self, ev: MouseEvent) {
         match ev.kind {
             MouseEventKind::Down(MouseButton::Left) => {
                 if !rect_contains(self.search_area, ev.column, ev.row) {
+                    self.search = None;
                     return;
                 }
                 let index = self.search_offset + (ev.row - self.search_area.y) as usize;

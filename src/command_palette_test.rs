@@ -229,3 +229,25 @@ fn is_permutation(order: &[usize]) -> bool {
     sorted.sort_unstable();
     sorted.iter().copied().eq(0..COMMANDS.len())
 }
+
+#[test]
+fn command_palette_list_picker_impl_delegates() {
+    use crate::list_picker::ListPicker;
+    let usage = crate::command_usage::UsageStats::default();
+    let (base, _) = ranked_base_order(&usage, true, 0);
+    let mut p = CommandPalette::new(&Keymap::default(), base, 0);
+    assert!(ListPicker::query_is_empty(&p));
+    assert_eq!(ListPicker::selected(&p), 0);
+    ListPicker::set_selected(&mut p, 1);
+    assert_eq!(p.selected, 1);
+    ListPicker::query_push(&mut p, 'g');
+    assert!(!ListPicker::query_is_empty(&p));
+    let len_after_push = ListPicker::results_len(&p);
+    assert!(
+        len_after_push < COMMANDS.len(),
+        "push should filter results"
+    );
+    ListPicker::query_pop(&mut p);
+    assert!(ListPicker::query_is_empty(&p));
+    assert_eq!(ListPicker::results_len(&p), COMMANDS.len());
+}

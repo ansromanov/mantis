@@ -13,6 +13,7 @@
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 
 use crate::config::Keymap;
+use crate::list_picker::ListPicker;
 
 pub struct CommandEntry {
     pub name: &'static str,
@@ -279,6 +280,27 @@ pub fn ranked_base_order(
         push(i, false);
     }
     (order, pinned)
+}
+
+impl ListPicker for CommandPalette {
+    fn query_push(&mut self, c: char) {
+        self.push(c);
+    }
+    fn query_pop(&mut self) {
+        self.pop();
+    }
+    fn query_is_empty(&self) -> bool {
+        self.query.is_empty()
+    }
+    fn results_len(&self) -> usize {
+        self.results_len()
+    }
+    fn selected(&self) -> usize {
+        self.selected
+    }
+    fn set_selected(&mut self, i: usize) {
+        self.selected = i;
+    }
 }
 
 #[cfg(test)]

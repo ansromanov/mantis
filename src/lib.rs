@@ -22,6 +22,7 @@ pub mod file;
 pub mod fold;
 pub mod git;
 pub mod highlight;
+pub mod list_picker;
 #[cfg(feature = "markdown-core")]
 pub mod markdown;
 pub mod plugin;

@@ -614,6 +614,172 @@ impl PluginPicker {
 
 pub use crate::command_palette::CommandPalette;
 
+// ---------------------------------------------------------------------------
+// ListPicker implementations
+// ---------------------------------------------------------------------------
+
+use crate::list_picker::ListPicker;
+
+impl ListPicker for SearchState {
+    fn query_push(&mut self, c: char) {
+        self.push(c);
+    }
+    fn query_pop(&mut self) {
+        self.pop();
+    }
+    fn query_is_empty(&self) -> bool {
+        self.query.is_empty()
+    }
+    fn results_len(&self) -> usize {
+        self.results_len()
+    }
+    fn selected(&self) -> usize {
+        self.selected
+    }
+    fn set_selected(&mut self, i: usize) {
+        self.selected = i;
+    }
+}
+
+impl ListPicker for HistoryState {
+    fn query_push(&mut self, c: char) {
+        self.push(c);
+    }
+    fn query_pop(&mut self) {
+        self.pop();
+    }
+    fn query_is_empty(&self) -> bool {
+        self.query.is_empty()
+    }
+    fn results_len(&self) -> usize {
+        self.results_len()
+    }
+    fn selected(&self) -> usize {
+        self.selected
+    }
+    fn set_selected(&mut self, i: usize) {
+        self.selected = i;
+    }
+}
+
+impl ListPicker for ThemePicker {
+    fn query_push(&mut self, c: char) {
+        self.push(c);
+    }
+    fn query_pop(&mut self) {
+        self.pop();
+    }
+    fn query_is_empty(&self) -> bool {
+        self.query.is_empty()
+    }
+    fn results_len(&self) -> usize {
+        self.results_len()
+    }
+    fn selected(&self) -> usize {
+        self.selected
+    }
+    fn set_selected(&mut self, i: usize) {
+        self.selected = i;
+    }
+}
+
+impl ListPicker for RecentFilesState {
+    fn query_push(&mut self, c: char) {
+        self.push(c);
+    }
+    fn query_pop(&mut self) {
+        self.pop();
+    }
+    fn query_is_empty(&self) -> bool {
+        self.query.is_empty()
+    }
+    fn results_len(&self) -> usize {
+        self.results_len()
+    }
+    fn selected(&self) -> usize {
+        self.selected
+    }
+    fn set_selected(&mut self, i: usize) {
+        self.selected = i;
+    }
+}
+
+impl ListPicker for PluginPicker {
+    fn query_push(&mut self, _c: char) {}
+    fn query_pop(&mut self) {}
+    fn query_is_empty(&self) -> bool {
+        true
+    }
+    fn results_len(&self) -> usize {
+        self.results_len()
+    }
+    fn selected(&self) -> usize {
+        self.selected
+    }
+    fn set_selected(&mut self, i: usize) {
+        self.selected = i;
+    }
+}
+
+impl ListPicker for TreeFilter {
+    fn query_push(&mut self, c: char) {
+        self.push(c);
+    }
+    fn query_pop(&mut self) {
+        self.pop();
+    }
+    fn query_is_empty(&self) -> bool {
+        self.is_empty()
+    }
+    fn results_len(&self) -> usize {
+        0
+    }
+    fn selected(&self) -> usize {
+        0
+    }
+    fn set_selected(&mut self, _i: usize) {}
+}
+
+impl ListPicker for InFileSearch {
+    fn query_push(&mut self, c: char) {
+        self.push(c);
+    }
+    fn query_pop(&mut self) {
+        self.pop();
+    }
+    fn query_is_empty(&self) -> bool {
+        self.query.is_empty()
+    }
+    fn results_len(&self) -> usize {
+        self.matches.len()
+    }
+    fn selected(&self) -> usize {
+        self.current
+    }
+    fn set_selected(&mut self, i: usize) {
+        self.current = i;
+    }
+}
+
+impl ListPicker for GotoLineState {
+    fn query_push(&mut self, c: char) {
+        self.push(c);
+    }
+    fn query_pop(&mut self) {
+        self.pop();
+    }
+    fn query_is_empty(&self) -> bool {
+        self.query.is_empty()
+    }
+    fn results_len(&self) -> usize {
+        0
+    }
+    fn selected(&self) -> usize {
+        0
+    }
+    fn set_selected(&mut self, _i: usize) {}
+}
+
 #[cfg(test)]
 #[path = "search_test.rs"]
 mod tests;
