@@ -175,3 +175,19 @@ fn app_git_show_fields_default_matches_config() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn dispatch_command_records_action_in_usage() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    // Force a known prior state so we can assert the change regardless of on-disk data.
+    app.command_usage.record("reload");
+    app.command_palette = Some(palette_with_query("Toggle help"));
+    app.dispatch_command();
+    assert_eq!(
+        app.command_usage.last_used(),
+        Some("toggle_help"),
+        "dispatch_command must update last_used to the dispatched action_id"
+    );
+    fs::remove_dir_all(&root).ok();
+}

@@ -21,6 +21,10 @@ use crate::command_palette::COMMANDS;
 
 use super::util::centered_rect;
 
+#[cfg(test)]
+#[path = "command_test.rs"]
+mod tests;
+
 pub(crate) fn draw_command_palette(f: &mut Frame, app: &mut App, area: Rect) {
     let Some(picker) = app.command_palette.as_ref() else {
         return;

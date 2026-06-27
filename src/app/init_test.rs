@@ -295,3 +295,23 @@ fn app_new_highlight_cache_starts_empty() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn app_new_command_usage_starts_empty() {
+    let root = temp_dir();
+    // Point at a fresh temp dir so no on-disk usage data is loaded.
+    let state_dir = temp_dir();
+    std::env::set_var("MANTIS_STATE_DIR", &state_dir);
+    let app = new_app(&root, Config::default());
+    std::env::remove_var("MANTIS_STATE_DIR");
+    assert!(
+        app.command_usage.last_used().is_none(),
+        "command_usage.last_used must be None when state dir is empty"
+    );
+    assert!(
+        app.command_usage.top_used(1).is_empty(),
+        "command_usage must have no recorded commands when state dir is empty"
+    );
+    fs::remove_dir_all(&root).ok();
+    fs::remove_dir_all(&state_dir).ok();
+}
