@@ -694,7 +694,7 @@ side_by_side = true
 }
 
 #[test]
-fn new_git_table_wins_over_legacy_when_both_present() {
+fn legacy_key_wins_when_both_present() {
     // When both new [git] and legacy flat key exist, migrate folds last so
     // legacy overwrites. Legacy key must come before [git] header in TOML
     // to be at the top level (otherwise it's inside [git]).

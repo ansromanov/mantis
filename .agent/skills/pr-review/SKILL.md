@@ -86,6 +86,7 @@ Review for:
   - Trusting plugin JSON without validating fields/bounds; unbounded reads from a plugin pipe
   - Any hardcoded secret/credential
 - Rust style: line length >100, wildcard imports (except `use super::*;` in tests), missing `.clone()` on non-Copy types
+- **Test hygiene:** test function name contradicts what the test actually asserts (e.g. name says "X wins" but assertion says Y wins); assertion message contradicts the function name
 
 **Delegate, don't re-implement.** If the `ponytail` plugin is installed, run
 `/ponytail-review` for the over-engineering/over-complexity pass and fold its findings in.
