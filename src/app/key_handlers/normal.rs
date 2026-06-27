@@ -393,17 +393,7 @@ impl App {
         } else {
             path.display().to_string()
         };
-        let mut clipboard = match arboard::Clipboard::new() {
-            Ok(cb) => cb,
-            Err(e) => {
-                self.set_status(format!("clipboard error: {e}"));
-                return;
-            }
-        };
-        match clipboard.set_text(text) {
-            Ok(()) => self.set_status("path copied"),
-            Err(e) => self.set_status(format!("clipboard error: {e}")),
-        }
+        self.copy_to_clipboard(text, if relative { "relative path" } else { "path" });
     }
 
     /// Nudges `content_scroll` so `active_line` stays within the visible

@@ -620,6 +620,18 @@ impl App {
         self.status_message = Some(sm);
     }
 
+    /// Copies `text` to the system clipboard, reporting success or failure in the
+    /// status bar. Single source of truth for clipboard writes.
+    pub(crate) fn copy_to_clipboard(&mut self, text: String, label: &str) {
+        if text.is_empty() {
+            return;
+        }
+        match arboard::Clipboard::new().and_then(|mut cb| cb.set_text(text)) {
+            Ok(()) => self.set_status(format!("copied {label}")),
+            Err(e) => self.set_status(format!("clipboard error: {e}")),
+        }
+    }
+
     /// Returns the set of changed file paths (not directories) when in git mode,
     /// or `None` when git mode is inactive. Used to scope the search index to
     /// changed files only.

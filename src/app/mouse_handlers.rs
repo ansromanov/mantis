@@ -11,7 +11,6 @@
 
 use std::time::{Duration, Instant};
 
-use arboard::Clipboard;
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 
 use crate::selection::TextSelection;
@@ -205,9 +204,7 @@ impl App {
                         if !sel.is_empty() {
                             let text = self.selection_text();
                             if !text.is_empty() {
-                                if let Ok(mut cb) = Clipboard::new() {
-                                    let _ = cb.set_text(text);
-                                }
+                                self.copy_to_clipboard(text, "selection");
                             }
                         }
                     }
