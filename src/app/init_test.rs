@@ -407,3 +407,14 @@ fn app_new_tree_visible_indices_starts_none() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn app_new_cursor_positions_starts_empty() {
+    let root = temp_dir();
+    let app = new_app(&root, Config::default());
+    assert!(
+        app.cursor_positions.is_empty(),
+        "cursor_positions must start empty"
+    );
+    fs::remove_dir_all(&root).ok();
+}

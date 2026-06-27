@@ -379,6 +379,7 @@ fn create_base_app() -> App {
         plugin_git_info: None,
         plugin_content: HashMap::new(),
         plugin_content_text: HashMap::new(),
+        cursor_positions: HashMap::new(),
         plugin_content_active: false,
         plugin_content_active_path: None,
         status_message: None,
