@@ -379,6 +379,7 @@ fn create_base_app() -> App {
         plugin_content: HashMap::new(),
         plugin_content_text: HashMap::new(),
         plugin_content_active: false,
+        plugin_content_active_path: None,
         status_message: None,
         breadcrumb_areas: Vec::new(),
         content_highlight_cache: RefCell::new(None),
@@ -464,6 +465,116 @@ fn set_content_for_background_file_preserves_viewport() {
     assert!(app
         .plugin_content
         .contains_key(&std::path::PathBuf::from("/tmp/background.md")));
+}
+
+#[test]
+fn set_content_preserves_scroll_on_same_path_re_render() {
+    let mut app = create_base_app();
+    let path = std::path::PathBuf::from("/tmp/doc.md");
+    app.current_file = Some(path.clone());
+    // Set a content area so content_scroll_max() is meaningful
+    app.content_area = ratatui::layout::Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 10,
+    };
+    app.content_scroll = 7;
+    app.content_hscroll = 3;
+    app.plugin_content_active = false;
+    // First render resets scroll
+    let many_lines: Vec<String> = (0..30).map(|i| format!("line{i}")).collect();
+    app.drain_plugin_actions_for_test(
+        "md-plugin",
+        "set_content",
+        serde_json::json!({"path": path.to_str().unwrap(), "lines": many_lines}),
+    );
+    assert_eq!(app.content_scroll, 0, "first render resets vscroll");
+    assert_eq!(app.content_hscroll, 0, "first render resets hscroll");
+    assert!(app.plugin_content_active, "first render marks active");
+    // Set new scroll position
+    app.content_scroll = 20;
+    app.content_hscroll = 2;
+    // Second render of same path must preserve scroll
+    let many_lines: Vec<String> = (0..30).map(|i| format!("line{i}")).collect();
+    app.drain_plugin_actions_for_test(
+        "md-plugin",
+        "set_content",
+        serde_json::json!({"path": path.to_str().unwrap(), "lines": many_lines}),
+    );
+    assert_eq!(
+        app.content_scroll, 20,
+        "re-render of same path must preserve vscroll"
+    );
+    assert_eq!(
+        app.content_hscroll, 2,
+        "re-render of same path must preserve hscroll"
+    );
+}
+
+#[test]
+fn set_content_switching_path_resets_scroll() {
+    let mut app = create_base_app();
+    let first = std::path::PathBuf::from("/tmp/first.md");
+    let second = std::path::PathBuf::from("/tmp/second.md");
+    app.current_file = Some(first.clone());
+    app.content_scroll = 7;
+    app.plugin_content_active = false;
+    // Render first file — resets scroll
+    app.drain_plugin_actions_for_test(
+        "md-plugin",
+        "set_content",
+        serde_json::json!({"path": "/tmp/first.md", "lines": ["a"]}),
+    );
+    assert_eq!(app.content_scroll, 0, "first render resets scroll");
+    // Switch current file
+    app.current_file = Some(second.clone());
+    app.content_scroll = 3;
+    app.plugin_content_active = false;
+    // Render second file — resets scroll (different path from previous render)
+    app.drain_plugin_actions_for_test(
+        "md-plugin",
+        "set_content",
+        serde_json::json!({"path": "/tmp/second.md", "lines": ["b"]}),
+    );
+    assert_eq!(app.content_scroll, 0, "new current file resets scroll");
+}
+
+#[test]
+fn set_content_same_path_preserves_scroll_after_file_reopen() {
+    // When the file is re-opened (apply_file_load sets
+    // plugin_content_active_path = None for new files), the next
+    // set_content should be treated as a first render and reset scroll.
+    let mut app = create_base_app();
+    let path = std::path::PathBuf::from("/tmp/doc.md");
+    app.current_file = Some(path.clone());
+    app.content_area = ratatui::layout::Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 10,
+    };
+    let many_lines: Vec<String> = (0..30).map(|i| format!("line{i}")).collect();
+    // First render
+    app.drain_plugin_actions_for_test(
+        "md-plugin",
+        "set_content",
+        serde_json::json!({"path": "/tmp/doc.md", "lines": many_lines}),
+    );
+    app.content_scroll = 20;
+    // Simulate a same-file reload (apply_file_load preserves
+    // plugin_content_active_path since same-file reload doesn't clear it)
+    // The path remains current.
+    let many_lines_b: Vec<String> = (0..30).map(|i| format!("other{i}")).collect();
+    app.drain_plugin_actions_for_test(
+        "md-plugin",
+        "set_content",
+        serde_json::json!({"path": "/tmp/doc.md", "lines": many_lines_b}),
+    );
+    assert_eq!(
+        app.content_scroll, 20,
+        "re-render preserves scroll after same-file reload"
+    );
 }
 
 // -- language provider protocol tests -----------------------------------------

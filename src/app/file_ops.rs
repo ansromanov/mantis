@@ -172,7 +172,6 @@ impl App {
         let is_new_file = self.current_file.as_deref() != Some(path);
 
         self.viewing_revision = None;
-        self.in_file_search = None;
         self.virtual_file = None;
         self.current_file = Some(path.to_path_buf());
         self.current_syntax = None;
@@ -189,19 +188,28 @@ impl App {
         self.clear_fold_state();
         self.file_encoding = None;
         self.file_line_ending = None;
-        self.content_scroll = 0;
-        self.content_hscroll = 0;
-        self.clear_selection();
-        // Drop blame popup and active line only when switching to a different
-        // file's diff; a same-file reload preserves all.
         if is_new_file {
+            self.in_file_search = None;
+            self.content_scroll = 0;
+            self.content_hscroll = 0;
             self.active_line = 0;
             self.show_line_blame = false;
+            self.clear_selection();
+            self.plugin_content_active_path = None;
+        } else {
+            self.clear_selection();
         }
         self.content_title = Some(load.content_title);
         self.highlighted = load.highlighted;
         self.diff_rows = load.diff_rows;
         self.content = load.content;
+        if !is_new_file {
+            // Same-file reload: clamp scroll and refresh in-file search.
+            self.content_scroll = self.content_scroll.min(self.content_scroll_max());
+            if self.in_file_search.is_some() {
+                self.refresh_in_file_search();
+            }
+        }
         self.set_file_watch(Some(path));
         if !self.plugin_is_opening_file {
             self.plugin_manager.on_file_open(path);
@@ -218,6 +226,7 @@ impl App {
         self.current_syntax = None;
         self.mark_session_dirty();
         self.plugin_content_active = false;
+        self.plugin_content_active_path = None;
         self.is_diff = false;
         self.diff_rows = Vec::new();
         self.is_markdown = false;
@@ -270,20 +279,24 @@ impl App {
     /// selection, then installs the rendered content/highlighting/markdown/JSON/
     /// YAML state. Shared by the synchronous and worker-thread code paths.
     pub(super) fn apply_file_load(&mut self, path: &Path, load: FileLoad) {
-        self.in_file_search = None;
         self.is_diff = false;
         self.viewing_revision = None;
         self.diff_rows = Vec::new();
         self.content_title = None;
-        self.content_scroll = 0;
-        self.content_hscroll = 0;
-        // Drop blame popup and active line only when navigating to a different
-        // file; a same-file reopen (reload / external edit) preserves all.
+        // Drop blame popup, active line, scroll, search only when navigating
+        // to a different file; a same-file reopen (reload / external edit)
+        // preserves all.
         let is_new_file = self.current_file.as_deref() != Some(path);
-        self.clear_selection();
         if is_new_file {
+            self.in_file_search = None;
+            self.content_scroll = 0;
+            self.content_hscroll = 0;
             self.active_line = 0;
             self.show_line_blame = false;
+            self.clear_selection();
+            self.plugin_content_active_path = None;
+        } else {
+            self.clear_selection();
         }
 
         self.is_markdown = load.is_markdown;
@@ -319,6 +332,12 @@ impl App {
             }
             if is_new_file {
                 self.push_recent(path.to_path_buf());
+            } else {
+                // Same-file reload: clamp scroll and refresh in-file search.
+                self.content_scroll = self.content_scroll.min(self.content_scroll_max());
+                if self.in_file_search.is_some() {
+                    self.refresh_in_file_search();
+                }
             }
         } else {
             // Don't keep current_file pointing at a different file that is
@@ -413,6 +432,7 @@ impl App {
         self.current_file = Some(file.to_path_buf());
         self.mark_session_dirty();
         self.plugin_content_active = false;
+        self.plugin_content_active_path = None;
         self.is_markdown = false;
         self.show_raw_markdown = false;
         self.markdown_lines = Vec::new();

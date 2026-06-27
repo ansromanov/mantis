@@ -239,6 +239,7 @@ impl App {
             plugin_content: HashMap::new(),
             plugin_content_text: HashMap::new(),
             plugin_content_active: false,
+            plugin_content_active_path: None,
             status_message: None,
             breadcrumb_areas: Vec::new(),
             content_highlight_cache: RefCell::new(None),
