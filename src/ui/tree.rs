@@ -42,28 +42,11 @@ pub(super) fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
     } else {
         Style::default().fg(app.theme.dim)
     };
-    // `border_style`, `focused`, and `git_suffix` / `title` are Copy values or
-    // owned Strings, so the short immutable borrows of `app` for them are done.
-    // Defer `let theme = &app.theme` until after breadcrumb rendering, which
-    // needs a mutable borrow of `app`.
+    // `border_style` and `focused` are Copy values, so the short immutable
+    // borrows of `app` for them are done. Defer `let theme = &app.theme` until
+    // after breadcrumb rendering, which needs a mutable borrow of `app`.
 
-    let git_suffix = if app.git_mode {
-        if app.git_mode_flat {
-            " [git:flat]"
-        } else {
-            " [git]"
-        }
-    } else {
-        ""
-    };
-    let title = format!(
-        " {}{} ",
-        app.root
-            .file_name()
-            .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_else(|| "/".to_string()),
-        git_suffix
-    );
+    let title = format!(" {} ", app.panel_mode_label());
 
     let block = Block::default()
         .title(title)

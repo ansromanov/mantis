@@ -4814,6 +4814,37 @@ fn plugin_picker_command_palette_entry_exists() {
     );
 }
 
+// -- panel_mode_label ---------------------------------------------------------
+
+#[test]
+fn panel_mode_label_normal_returns_files() {
+    let root = temp_tree();
+    let app = app_for(&root);
+    assert!(!app.git_mode);
+    assert_eq!(app.panel_mode_label(), "Files");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn panel_mode_label_git_mode_returns_git() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.git_mode = true;
+    assert!(!app.git_mode_flat);
+    assert_eq!(app.panel_mode_label(), "Git");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn panel_mode_label_git_mode_flat_returns_git_flat() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.git_mode = true;
+    app.git_mode_flat = true;
+    assert_eq!(app.panel_mode_label(), "Git · flat");
+    fs::remove_dir_all(&root).ok();
+}
+
 // -- DiffMode -----------------------------------------------------------------
 
 #[test]

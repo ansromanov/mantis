@@ -134,43 +134,71 @@ fn all_text(rows: &[String]) -> String {
 }
 
 #[test]
-fn draw_tree_title_shows_root_file_name() {
+fn draw_tree_title_shows_files_label() {
     let mut app = make_app(false, HashMap::new());
     app.root = PathBuf::from("myroot");
     app.nodes = vec![];
     let rows = render_tree(&mut app, 40, 5);
-    assert!(all_text(&rows).contains("myroot"));
+    assert!(
+        all_text(&rows).contains("Files"),
+        "title should show 'Files' mode label"
+    );
+    assert!(
+        !all_text(&rows).contains("myroot"),
+        "title must not contain root dir name"
+    );
 }
 
 #[test]
-fn draw_tree_git_mode_shows_git_suffix() {
+fn draw_tree_git_mode_shows_git_label() {
     let mut app = make_app(false, HashMap::new());
     app.root = PathBuf::from("repo");
     app.git_mode = true;
     app.nodes = vec![];
     let rows = render_tree(&mut app, 40, 5);
-    assert!(all_text(&rows).contains("[git]"));
+    assert!(
+        all_text(&rows).contains("Git"),
+        "title should show 'Git' in git mode"
+    );
+    assert!(
+        !all_text(&rows).contains("[git]"),
+        "title must not use old [git] badge"
+    );
 }
 
 #[test]
-fn draw_tree_git_mode_flat_shows_flat_suffix() {
+fn draw_tree_git_mode_flat_shows_git_flat_label() {
     let mut app = make_app(false, HashMap::new());
     app.root = PathBuf::from("repo");
     app.git_mode = true;
     app.git_mode_flat = true;
     app.nodes = vec![];
     let rows = render_tree(&mut app, 40, 5);
-    assert!(all_text(&rows).contains("[git:flat]"));
+    assert!(
+        all_text(&rows).contains("Git · flat"),
+        "title should show 'Git · flat' in flat mode"
+    );
+    assert!(
+        !all_text(&rows).contains("[git:flat]"),
+        "title must not use old [git:flat] badge"
+    );
 }
 
 #[test]
-fn draw_tree_no_git_mode_omits_git_suffix() {
+fn draw_tree_no_git_mode_shows_files_label() {
     let mut app = make_app(false, HashMap::new());
     app.root = PathBuf::from("repo");
     app.git_mode = false;
     app.nodes = vec![];
     let rows = render_tree(&mut app, 40, 5);
-    assert!(!all_text(&rows).contains("[git]"));
+    assert!(
+        all_text(&rows).contains("Files"),
+        "title should show 'Files' in normal mode"
+    );
+    assert!(
+        !all_text(&rows).contains("Git"),
+        "title must not show 'Git' in normal mode"
+    );
 }
 
 #[test]
