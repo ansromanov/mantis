@@ -11,7 +11,10 @@ use std::path::{Path, PathBuf};
 
 fn make_app() -> App {
     let cfg = Config {
-        git_status: false,
+        git: crate::config::GitConfig {
+            status: false,
+            ..Default::default()
+        },
         ..Config::default()
     };
     App::new(PathBuf::from("."), cfg, None, None).unwrap()

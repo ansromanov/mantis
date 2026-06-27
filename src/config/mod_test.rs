@@ -362,35 +362,41 @@ use super::validate::validate_keys;
 #[test]
 fn git_show_untracked_defaults_to_true() {
     let cfg = Config::default();
-    assert!(cfg.git_show_untracked);
+    assert!(cfg.git.show_untracked);
 }
 
 #[test]
 fn git_show_untracked_round_trips_through_serde() {
     let cfg = Config {
-        git_show_untracked: false,
+        git: GitConfig {
+            show_untracked: false,
+            ..Default::default()
+        },
         ..Config::default()
     };
     let toml_str = toml::to_string_pretty(&cfg).unwrap();
     let parsed: Config = toml::from_str(&toml_str).unwrap();
-    assert!(!parsed.git_show_untracked);
+    assert!(!parsed.git.show_untracked);
 }
 
 #[test]
 fn git_show_ignored_defaults_to_false() {
     let cfg = Config::default();
-    assert!(!cfg.git_show_ignored);
+    assert!(!cfg.git.show_ignored);
 }
 
 #[test]
 fn git_show_ignored_round_trips_through_serde() {
     let cfg = Config {
-        git_show_ignored: true,
+        git: GitConfig {
+            show_ignored: true,
+            ..Default::default()
+        },
         ..Config::default()
     };
     let toml_str = toml::to_string_pretty(&cfg).unwrap();
     let parsed: Config = toml::from_str(&toml_str).unwrap();
-    assert!(parsed.git_show_ignored);
+    assert!(parsed.git.show_ignored);
 }
 
 #[test]
@@ -468,33 +474,45 @@ fn validate_keys_omits_hint_when_nothing_close() {
 #[test]
 fn diff_mode_defaults_to_all() {
     let cfg = Config::default();
-    assert_eq!(cfg.diff_mode, "all");
+    assert_eq!(cfg.git.diff.mode, crate::app::DiffMode::All);
 }
 
 #[test]
 fn diff_mode_staged_round_trips_through_serde() {
     let cfg = Config {
-        diff_mode: "staged".to_string(),
+        git: GitConfig {
+            diff: GitDiffConfig {
+                mode: crate::app::DiffMode::Staged,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
         ..Config::default()
     };
     let toml_str = toml::to_string_pretty(&cfg).unwrap();
     let parsed: Config = toml::from_str(&toml_str).unwrap();
-    assert_eq!(parsed.diff_mode, "staged");
+    assert_eq!(parsed.git.diff.mode, crate::app::DiffMode::Staged);
 }
 
 #[test]
 fn diff_mode_unstaged_round_trips_through_serde() {
     let cfg = Config {
-        diff_mode: "unstaged".to_string(),
+        git: GitConfig {
+            diff: GitDiffConfig {
+                mode: crate::app::DiffMode::Unstaged,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
         ..Config::default()
     };
     let toml_str = toml::to_string_pretty(&cfg).unwrap();
     let parsed: Config = toml::from_str(&toml_str).unwrap();
-    assert_eq!(parsed.diff_mode, "unstaged");
+    assert_eq!(parsed.git.diff.mode, crate::app::DiffMode::Unstaged);
 }
 
 #[test]
-fn diff_mode_invalid_value_surfaces_as_warning_but_config_still_loads() {
+fn deprecated_diff_mode_is_silently_folded_to_default() {
     let dir = std::env::temp_dir().join(format!(
         "mantis_cfg_diff_mode_{}_{}",
         std::process::id(),
@@ -504,16 +522,18 @@ fn diff_mode_invalid_value_surfaces_as_warning_but_config_still_loads() {
             .unwrap_or(0)
     ));
     fs::create_dir_all(&dir).unwrap();
+    // Old flat diff_mode key; "stagged" is invalid, so migration falls back to All.
     fs::write(dir.join("mantis.toml"), "diff_mode = \"stagged\"\n").unwrap();
 
     let (config, path, error) = load(&dir);
     assert!(path.is_some());
-    // Falls back to "all" silently in App::new; raw config keeps the bad value.
-    assert_eq!(config.diff_mode, "stagged");
-    let msg = error.expect("invalid diff_mode should produce a warning");
+    // After migrate_legacy_git_fields, the invalid value is silently replaced
+    // by the default (All). No warning because diff_mode is a known deprecated key.
+    assert_eq!(config.git.diff.mode, crate::app::DiffMode::All);
     assert!(
-        msg.contains("diff_mode") && msg.contains("stagged"),
-        "warning should name the field and the bad value: {msg}"
+        error.is_none(),
+        "deprecated key should not produce a warning: {:?}",
+        error
     );
 
     fs::remove_dir_all(&dir).ok();
@@ -624,4 +644,133 @@ fn migrate_no_op_when_old_dir_absent() {
         "nothing created when old dir absent"
     );
     fs::remove_dir_all(&tmp).ok();
+}
+
+#[test]
+fn legacy_flat_git_keys_fold_into_git_config() {
+    let toml_str = r#"
+git_status = false
+ignore_gitignore = true
+git_show_deleted = true
+git_show_untracked = false
+"#;
+    let mut cfg: Config = toml::from_str(toml_str).unwrap();
+    cfg.migrate_legacy_git_fields();
+    assert!(!cfg.git.status, "legacy git_status=false should fold");
+    assert!(
+        cfg.git.ignore_gitignore,
+        "legacy ignore_gitignore=true should fold"
+    );
+    assert!(
+        cfg.git.show_deleted,
+        "legacy git_show_deleted=true should fold"
+    );
+    assert!(
+        !cfg.git.show_untracked,
+        "legacy git_show_untracked=false should fold"
+    );
+}
+
+#[test]
+fn new_git_table_populates_fields() {
+    let toml_str = r#"
+[git]
+status = false
+ignore_gitignore = true
+show_deleted = true
+show_untracked = false
+
+[git.diff]
+mode = "staged"
+side_by_side = true
+"#;
+    let cfg: Config = toml::from_str(toml_str).unwrap();
+    assert!(!cfg.git.status);
+    assert!(cfg.git.ignore_gitignore);
+    assert!(cfg.git.show_deleted);
+    assert!(!cfg.git.show_untracked);
+    assert_eq!(cfg.git.diff.mode, crate::app::DiffMode::Staged);
+    assert!(cfg.git.diff.side_by_side);
+}
+
+#[test]
+fn new_git_table_wins_over_legacy_when_both_present() {
+    // When both new [git] and legacy flat key exist, migrate folds last so
+    // legacy overwrites. Legacy key must come before [git] header in TOML
+    // to be at the top level (otherwise it's inside [git]).
+    let toml_str = r#"
+git_status = true
+
+[git]
+status = false
+"#;
+    let mut cfg: Config = toml::from_str(toml_str).unwrap();
+    cfg.migrate_legacy_git_fields();
+    // Legacy runs last, so git_status=true overwrites the [git] status=false.
+    assert!(
+        cfg.git.status,
+        "legacy git_status should win over [git] status"
+    );
+}
+
+#[test]
+fn legacy_keys_produce_no_validate_warnings() {
+    let warnings =
+        validate_keys("git_status = false\nignore_gitignore = true\ndiff_mode = \"all\"\n");
+    assert!(
+        warnings.is_empty(),
+        "deprecated keys should not produce warnings: {:?}",
+        warnings
+    );
+}
+
+#[test]
+fn unknown_key_still_warns_even_alongside_deprecated_keys() {
+    let warnings = validate_keys("git_staus = true\n");
+    assert!(
+        warnings.iter().any(|w| w.contains("git_staus")),
+        "typo on deprecated key should still warn: {:?}",
+        warnings
+    );
+}
+
+#[test]
+fn diff_mode_serde_round_trips() {
+    #[derive(Serialize, Deserialize)]
+    struct Wrap {
+        m: crate::app::DiffMode,
+    }
+    let cases = [
+        (crate::app::DiffMode::All, "m = \"all\""),
+        (crate::app::DiffMode::Staged, "m = \"staged\""),
+        (crate::app::DiffMode::Unstaged, "m = \"unstaged\""),
+    ];
+    for (mode, expected_str) in &cases {
+        let toml_str = toml::to_string_pretty(&Wrap { m: *mode }).unwrap();
+        assert!(toml_str.contains(expected_str), "got: {toml_str:?}");
+        let wrap: Wrap = toml::from_str(expected_str).unwrap();
+        assert_eq!(wrap.m, *mode);
+    }
+}
+
+#[test]
+fn sparse_toml_emits_nested_git_form_not_flat_keys() {
+    let mut cfg = Config::default();
+    cfg.git.status = false;
+    cfg.git.show_untracked = false;
+    let out = sparse_toml(&cfg);
+    // Should NOT contain the legacy flat key names.
+    assert!(!out.contains("git_status"), "flat key leaked: {out}");
+    // Should contain the new nested form.
+    assert!(out.contains("[git]"), "missing [git] section: {out}");
+    assert!(
+        out.contains("status = false"),
+        "missing status override: {out}"
+    );
+    // Round-trips: re-parsing yields the same effective values.
+    let reparsed: Config = toml::from_str(&out).unwrap();
+    assert!(!reparsed.git.status);
+    assert!(!reparsed.git.show_untracked);
+    // Defaults not in the output still resolve correctly.
+    assert!(reparsed.git.show_deleted == Config::default().git.show_deleted);
 }

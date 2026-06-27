@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use super::*;
+use crate::app::DiffMode;
 use crate::config::Config;
 
 fn temp_dir() -> PathBuf {
@@ -257,8 +258,11 @@ fn app_new_git_show_flags_reflect_config() {
     let root = temp_dir();
     fs::write(root.join("f.txt"), "x\n").unwrap();
     let cfg = Config {
-        git_show_untracked: false,
-        git_show_ignored: true,
+        git: crate::config::GitConfig {
+            show_untracked: false,
+            show_ignored: true,
+            ..Default::default()
+        },
         ..Config::default()
     };
     let app = new_app(&root, cfg);
@@ -310,7 +314,13 @@ fn app_new_diff_mode_honours_config_staged() {
     let root = temp_dir();
     fs::write(root.join("f.txt"), "x\n").unwrap();
     let cfg = Config {
-        diff_mode: "staged".to_string(),
+        git: crate::config::GitConfig {
+            diff: crate::config::GitDiffConfig {
+                mode: crate::app::DiffMode::Staged,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
         ..Config::default()
     };
     let app = new_app(&root, cfg);
@@ -323,7 +333,13 @@ fn app_new_diff_mode_honours_config_unstaged() {
     let root = temp_dir();
     fs::write(root.join("f.txt"), "x\n").unwrap();
     let cfg = Config {
-        diff_mode: "unstaged".to_string(),
+        git: crate::config::GitConfig {
+            diff: crate::config::GitDiffConfig {
+                mode: crate::app::DiffMode::Unstaged,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
         ..Config::default()
     };
     let app = new_app(&root, cfg);
@@ -336,7 +352,7 @@ fn app_new_diff_mode_invalid_falls_back_to_all() {
     let root = temp_dir();
     fs::write(root.join("f.txt"), "x\n").unwrap();
     let cfg = Config {
-        diff_mode: "invalid".to_string(),
+        legacy_diff_mode: Some("invalid".to_string()),
         ..Config::default()
     };
     let app = new_app(&root, cfg);

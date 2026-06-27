@@ -30,22 +30,59 @@ use serde::{Deserialize, Deserializer, Serialize};
 #[cfg(unix)]
 use crate::event_source::CURRENT_ALT_KEYS;
 
+use crate::app::DiffMode;
 use crate::plugin::PluginEntry;
 use crate::theme::ThemeConfig;
+
+/// Git-related configuration, grouped under `[git]` in the TOML.
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[serde(default)]
+pub struct GitConfig {
+    /// Show git status colours/markers in the tree.
+    pub status: bool,
+    /// Include deleted files in git status.
+    pub show_deleted: bool,
+    /// Include untracked (??) files in git status/colours.
+    pub show_untracked: bool,
+    /// Include ignored (!!) files in git status/colours.
+    pub show_ignored: bool,
+    /// Respect .gitignore when listing files (was top-level `ignore_gitignore`).
+    pub ignore_gitignore: bool,
+    /// Diff-view defaults.
+    pub diff: GitDiffConfig,
+}
+
+impl Default for GitConfig {
+    fn default() -> Self {
+        GitConfig {
+            status: true,
+            show_deleted: false,
+            show_untracked: true,
+            show_ignored: false,
+            ignore_gitignore: false,
+            diff: GitDiffConfig::default(),
+        }
+    }
+}
+
+/// Defaults for the built-in diff view, nested under `[git.diff]`.
+#[derive(Default, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(default)]
+pub struct GitDiffConfig {
+    /// Default active diff source: `"all"` | `"staged"` | `"unstaged"`.
+    pub mode: DiffMode,
+    /// Start the diff view in side-by-side layout.
+    pub side_by_side: bool,
+}
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(default)]
 pub struct Config {
     pub show_hidden: bool,
-    pub ignore_gitignore: bool,
     pub tree_width: u16,
     pub tree_independent_scroll: bool,
     pub word_wrap: bool,
     pub line_numbers: bool,
-    pub git_status: bool,
-    pub git_show_deleted: bool,
-    pub git_show_untracked: bool,
-    pub git_show_ignored: bool,
     pub scrollbar: bool,
     pub scroll_percentage: bool,
     pub in_file_search: bool,
@@ -75,23 +112,32 @@ pub struct Config {
     /// Per-plugin entries registered in `[plugins]`.
     #[serde(default)]
     pub plugins: HashMap<String, PluginEntry>,
-    /// Default diff source for working-tree diffs: "all" (vs HEAD), "staged", "unstaged".
-    pub diff_mode: String,
+    /// Grouped git settings.
+    pub git: GitConfig,
+
+    // --- deprecated flat keys (read for backward-compat; never written) ---
+    #[serde(default, skip_serializing, rename = "git_status")]
+    pub legacy_git_status: Option<bool>,
+    #[serde(default, skip_serializing, rename = "git_show_deleted")]
+    pub legacy_git_show_deleted: Option<bool>,
+    #[serde(default, skip_serializing, rename = "git_show_untracked")]
+    pub legacy_git_show_untracked: Option<bool>,
+    #[serde(default, skip_serializing, rename = "git_show_ignored")]
+    pub legacy_git_show_ignored: Option<bool>,
+    #[serde(default, skip_serializing, rename = "ignore_gitignore")]
+    pub legacy_ignore_gitignore: Option<bool>,
+    #[serde(default, skip_serializing, rename = "diff_mode")]
+    pub legacy_diff_mode: Option<String>,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Config {
             show_hidden: false,
-            ignore_gitignore: false,
             tree_width: 28,
             tree_independent_scroll: false,
             word_wrap: false,
             line_numbers: true,
-            git_status: true,
-            git_show_deleted: false,
-            git_show_untracked: true,
-            git_show_ignored: false,
             scrollbar: true,
             scroll_percentage: true,
             in_file_search: true,
@@ -107,7 +153,45 @@ impl Default for Config {
             palette_pin_recent: true,
             palette_frequent_count: 3,
             plugins: HashMap::new(),
-            diff_mode: "all".to_string(),
+            git: GitConfig::default(),
+            legacy_git_status: None,
+            legacy_git_show_deleted: None,
+            legacy_git_show_untracked: None,
+            legacy_git_show_ignored: None,
+            legacy_ignore_gitignore: None,
+            legacy_diff_mode: None,
+        }
+    }
+}
+
+impl Config {
+    /// Folds any set legacy top-level git keys into `self.git`, then clears them
+    /// so they are never re-serialized. New `[git]` keys win only when the legacy
+    /// key is absent (old files keep their meaning until the user re-saves).
+    pub fn migrate_legacy_git_fields(&mut self) {
+        if let Some(v) = self.legacy_git_status.take() {
+            self.git.status = v;
+        }
+        if let Some(v) = self.legacy_git_show_deleted.take() {
+            self.git.show_deleted = v;
+        }
+        if let Some(v) = self.legacy_git_show_untracked.take() {
+            self.git.show_untracked = v;
+        }
+        if let Some(v) = self.legacy_git_show_ignored.take() {
+            self.git.show_ignored = v;
+        }
+        if let Some(v) = self.legacy_ignore_gitignore.take() {
+            self.git.ignore_gitignore = v;
+        }
+        if let Some(v) = self.legacy_diff_mode.take() {
+            // Attempt to parse legacy diff_mode string into DiffMode.
+            // If it doesn't match, serde would reject it; fall back to default.
+            match v.as_str() {
+                "staged" => self.git.diff.mode = DiffMode::Staged,
+                "unstaged" => self.git.diff.mode = DiffMode::Unstaged,
+                _ => {}
+            }
         }
     }
 }
@@ -516,7 +600,8 @@ pub fn load(root: &Path) -> (Config, Option<PathBuf>, Option<String>) {
             continue; // missing or unreadable: try the next candidate
         };
         match toml::from_str::<Config>(&s) {
-            Ok(config) => {
+            Ok(mut config) => {
+                config.migrate_legacy_git_fields();
                 // The config parsed, but `#[serde(default)]` silently ignores
                 // unknown keys. Flag them (with nearest-match hints) so typos
                 // don't get dropped without a word. A higher-precedence parse
@@ -526,15 +611,6 @@ pub fn load(root: &Path) -> (Config, Option<PathBuf>, Option<String>) {
                     if !unknown.is_empty() {
                         error = Some(format!("{}: {}", path.display(), unknown.join("; ")));
                     }
-                }
-                if error.is_none()
-                    && !matches!(config.diff_mode.as_str(), "all" | "staged" | "unstaged")
-                {
-                    error = Some(format!(
-                        "{}: diff_mode {:?} is not valid — expected \"all\", \"staged\", or \"unstaged\"",
-                        path.display(),
-                        config.diff_mode,
-                    ));
                 }
                 return (config, Some(path), error);
             }

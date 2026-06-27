@@ -117,6 +117,8 @@ impl App {
             }
             Some("toggle_diff_side_by_side") if self.is_diff => {
                 self.diff_side_by_side = !self.diff_side_by_side;
+                self.config.git.diff.side_by_side = self.diff_side_by_side;
+                self.save_config();
                 self.set_content_scroll(0);
                 self.content_hscroll = 0;
             }
@@ -315,19 +317,20 @@ impl App {
         let Ok(s) = std::fs::read_to_string(&path) else {
             return;
         };
-        let Ok(cfg) = toml::from_str::<config::Config>(&s) else {
+        let Ok(mut cfg) = toml::from_str::<config::Config>(&s) else {
             return;
         };
+        cfg.migrate_legacy_git_fields();
 
         self.show_hidden = cfg.show_hidden;
-        self.ignore_gitignore = cfg.ignore_gitignore;
+        self.ignore_gitignore = cfg.git.ignore_gitignore;
         self.tree_width = cfg.tree_width;
         self.tree_independent_scroll = cfg.tree_independent_scroll;
         self.word_wrap = cfg.word_wrap;
-        self.git_status_enabled = cfg.git_status;
-        self.git_show_deleted = cfg.git_show_deleted;
-        self.git_show_untracked = cfg.git_show_untracked;
-        self.git_show_ignored = cfg.git_show_ignored;
+        self.git_status_enabled = cfg.git.status;
+        self.git_show_deleted = cfg.git.show_deleted;
+        self.git_show_untracked = cfg.git.show_untracked;
+        self.git_show_ignored = cfg.git.show_ignored;
         self.show_scrollbar = cfg.scrollbar;
         self.show_scroll_percentage = cfg.scroll_percentage;
         self.keys = cfg.keys.clone();

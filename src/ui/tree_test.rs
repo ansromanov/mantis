@@ -23,7 +23,10 @@ fn make_node(name: &str, is_dir: bool, deleted: bool) -> TreeNode {
 
 fn make_app(git_status_enabled: bool, status_map: HashMap<PathBuf, GitStatus>) -> App {
     let cfg = Config {
-        git_status: false,
+        git: crate::config::GitConfig {
+            status: false,
+            ..Default::default()
+        },
         ..Config::default()
     };
     let mut app = App::new(PathBuf::from("."), cfg, None, None).unwrap();

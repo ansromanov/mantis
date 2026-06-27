@@ -13,6 +13,17 @@
 use super::Config;
 use crate::theme::ThemeConfig;
 
+/// Old top-level keys that moved into `[git]`. Still accepted (folded by
+/// `migrate_legacy_git_fields`) so existing configs don't warn.
+const DEPRECATED_TOP_LEVEL_KEYS: &[&str] = &[
+    "git_status",
+    "git_show_deleted",
+    "git_show_untracked",
+    "git_show_ignored",
+    "ignore_gitignore",
+    "diff_mode",
+];
+
 /// Validates the raw TOML against the config schema, returning a message for
 /// every unrecognized key (with a nearest-match suggestion where one is close
 /// enough). Keys are reported by full path, e.g. `keys.qiut` or `theme.acent`.
@@ -54,6 +65,10 @@ fn collect_unknown(
         };
         match schema.get(key) {
             None => {
+                // Skip known-deprecated top-level keys that migrated into [git].
+                if prefix.is_empty() && DEPRECATED_TOP_LEVEL_KEYS.contains(&key.as_str()) {
+                    continue;
+                }
                 let names: Vec<&str> = schema.keys().map(String::as_str).collect();
                 let hint = nearest_match(key, &names)
                     .map(|m| format!(" (did you mean '{m}'?)"))
@@ -99,3 +114,7 @@ fn levenshtein(a: &str, b: &str) -> usize {
     }
     prev[b.len()]
 }
+
+#[cfg(test)]
+#[path = "validate_test.rs"]
+mod tests;

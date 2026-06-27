@@ -64,7 +64,8 @@ pub enum Focus {
 }
 
 /// Which git diff view is active in the content pane.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum DiffMode {
     /// All changes vs HEAD (`git diff HEAD`) — the default.
     #[default]
