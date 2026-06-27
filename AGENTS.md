@@ -372,9 +372,14 @@ leaves manual cleanup behind.
 
 1. `cargo fmt --all` — formatting clean (enforced by pre-commit)
 2. `cargo clippy --all-targets -- -D warnings` — no warnings (enforced by pre-commit)
-3. `just test-pr` — related tests pass (**never run the full suite for a single PR**)
+3. `just test-pr` — related tests pass (**never run the full suite for a single PR**).
+   It first runs `scripts/require-tests.sh`, which **fails** if any changed
+   `src/**.rs` module has no sibling `_test.rs` in the diff — so a missing test file
+   is caught here, in your own ship loop, not just at commit-time or in CI.
 4. `cargo check` — no type errors (enforced by pre-commit)
-5. Every changed module has accompanying test changes — no untested diffs
+5. Every changed module has an accompanying sibling `_test.rs` change — no untested
+   diffs. Genuinely untestable (UI-paint-only) changes need `[skip-tests: <reason>]`
+   in a commit message. Enforced by `just test-pr`, pre-commit, and CI.
 6. No debug `println!`, `dbg!`, or commented-out code
 7. No hardcoded secrets or credentials
 

@@ -112,6 +112,10 @@ test-pr:
     #!/usr/bin/env bash
     set -euo pipefail
     changed=$( { git diff --name-only origin/main...HEAD; git diff --name-only; git diff --name-only --cached; } | sort -u )
+    # Gate first: every changed source module needs a sibling _test.rs in the diff
+    # (escape hatch: "[skip-tests: <reason>]" in a commit message). Fails here, in
+    # the agent's own ship loop, instead of only at commit-time or in CI.
+    echo "$changed" | bash scripts/require-tests.sh
     filterset=$(echo "$changed" | bash scripts/related-tests.sh)
     if [[ "$filterset" == "__ALL__" ]]; then
         echo "[test-pr] broad change detected — skipping (run 'cargo nextest run' manually if needed)"
