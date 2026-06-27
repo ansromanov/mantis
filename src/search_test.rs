@@ -463,3 +463,28 @@ fn goto_line_state_default_is_empty() {
     let s = GotoLineState::default();
     assert!(s.query.is_empty());
 }
+
+// -- TreeFilter --------------------------------------------------------------
+
+#[test]
+fn tree_filter_new_has_no_cache() {
+    let f = TreeFilter::new();
+    assert!(f.cached.is_none());
+}
+
+#[test]
+fn tree_filter_push_invalidates_cache() {
+    let mut f = TreeFilter::new();
+    f.cached = Some(("a".to_string(), 0, vec![1, 2, 3]));
+    f.push('b');
+    assert!(f.cached.is_none(), "push must clear the filter cache");
+}
+
+#[test]
+fn tree_filter_pop_invalidates_cache() {
+    let mut f = TreeFilter::new();
+    f.push('a');
+    f.cached = Some(("a".to_string(), 0, vec![1, 2, 3]));
+    f.pop();
+    assert!(f.cached.is_none(), "pop must clear the filter cache");
+}

@@ -925,3 +925,17 @@ fn rebuild_empty_git_mode_clears_plugin_content() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn rebuild_increments_tree_revision() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let before = app.tree_revision;
+    app.rebuild(false);
+    assert_eq!(
+        app.tree_revision,
+        before + 1,
+        "rebuild must bump tree_revision by 1"
+    );
+    fs::remove_dir_all(&root).ok();
+}

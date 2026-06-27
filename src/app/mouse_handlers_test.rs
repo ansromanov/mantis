@@ -369,3 +369,25 @@ fn click_past_blame_column_does_not_open_line_blame() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn tree_click_with_no_filter_selects_node_directly() {
+    let root = tree_with_dir();
+    let mut app = app_for(&root);
+    // tree_visible_indices is None (no filter) by default.
+    assert!(app.tree_visible_indices.is_none());
+    app.tree_area = Rect {
+        x: 0,
+        y: 2,
+        width: 20,
+        height: 20,
+    };
+    app.tree_offset = 0;
+    // Click on the second row (index 1).
+    app.handle_mouse(left_down_at(1, 3));
+    assert_eq!(
+        app.tree_selected, 1,
+        "click on row 1 with no filter must select node index 1 directly"
+    );
+    fs::remove_dir_all(&root).ok();
+}
