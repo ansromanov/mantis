@@ -383,6 +383,11 @@ pub struct App {
     /// reset to `false` when `current_file` changes, so the `[rendering…]`
     /// placeholder only shows while the plugin is actively working on that file.
     pub plugin_content_active: bool,
+    /// The last path for which a plugin sent `set_content` while it was the
+    /// current file. Used to detect re-renders of the same file vs. first-time
+    /// renders of a newly opened file, so scroll position is preserved across
+    /// plugin re-render ticks.
+    pub(super) plugin_content_active_path: Option<PathBuf>,
     /// Transient status message (e.g. "path copied"), shown until the next keypress
     /// or auto-expires after ~3 seconds.
     pub status_message: Option<StatusMessage>,
@@ -494,6 +499,7 @@ impl App {
         // Re-render the current file without plugin content.
         if had_current_content {
             self.plugin_content_active = false;
+            self.plugin_content_active_path = None;
             self.reload_content();
         }
     }

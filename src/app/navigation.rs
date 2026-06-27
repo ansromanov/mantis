@@ -322,6 +322,7 @@ impl App {
         self.file_watch_path = None;
         self.in_file_search = None;
         self.plugin_content_active = false;
+        self.plugin_content_active_path = None;
         self.plugin_content.clear();
         self.plugin_content_text.clear();
         self.plugin_blame.clear();

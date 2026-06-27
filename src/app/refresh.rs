@@ -393,8 +393,18 @@ impl App {
                     .content_paths
                     .insert(path);
                 if is_current {
-                    self.content_scroll = 0;
-                    self.content_hscroll = 0;
+                    // First render of this file by a plugin resets the viewport;
+                    // subsequent re-renders preserve scroll (clamped) so that
+                    // periodic plugin updates don't yank the user's position.
+                    let first_render =
+                        self.plugin_content_active_path.as_deref() != self.current_file.as_deref();
+                    self.plugin_content_active_path = self.current_file.clone();
+                    if first_render {
+                        self.content_scroll = 0;
+                        self.content_hscroll = 0;
+                    } else {
+                        self.content_scroll = self.content_scroll.min(self.content_scroll_max());
+                    }
                     self.plugin_content_active = true;
                 }
             }

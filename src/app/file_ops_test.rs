@@ -4,6 +4,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::app::App;
 use crate::config::Config;
+use crate::search::InFileSearch;
 
 static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -519,6 +520,218 @@ fn reload_content_clears_highlight_cache() {
     assert!(
         app.content_highlight_cache.borrow().is_none(),
         "reload_content must clear the highlight cache"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- same-file reload preserves scroll and in-file search --------------------
+
+#[test]
+fn same_file_reload_preserves_scroll_and_in_file_search() {
+    let root = temp_dir();
+    let f = root.join("f.txt");
+    fs::write(&f, "line1\nline2\nline3\nline4\nline5\n").unwrap();
+    let mut app = app_for(&root);
+    app.open_file(&f);
+    app.content_scroll = 2;
+    app.content_hscroll = 1;
+    app.in_file_search = Some(InFileSearch::new());
+    // Re-open the same file (simulating a reload)
+    app.open_file(&f);
+    assert_eq!(
+        app.content_scroll, 2,
+        "scroll must be preserved on same-file reload"
+    );
+    assert_eq!(
+        app.content_hscroll, 1,
+        "hscroll must be preserved on same-file reload"
+    );
+    assert!(
+        app.in_file_search.is_some(),
+        "in-file search must survive same-file reload"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn same_file_reload_clamps_scroll_when_file_shrinks() {
+    let root = temp_dir();
+    let f = root.join("f.txt");
+    // Start with 10 lines
+    let many_lines: String = (0..10).map(|i| format!("line{i}\n")).collect();
+    fs::write(&f, many_lines).unwrap();
+    let mut app = app_for(&root);
+    app.open_file(&f);
+    app.content_area = ratatui::layout::Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 5,
+    };
+    let max_scroll = app.content_scroll_max(); // 10 - 5 = 5
+    app.content_scroll = max_scroll; // scroll to bottom
+                                     // Shrink the file to 3 lines
+    fs::write(&f, "a\nb\nc\n").unwrap();
+    app.open_file(&f);
+    let new_max = app.content_scroll_max(); // 3 - 5 = 0 (clamped at 0)
+    assert_eq!(
+        app.content_scroll, new_max,
+        "scroll must be clamped to new max on shrink"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn different_file_resets_scroll_and_in_file_search() {
+    let root = temp_dir();
+    let a = root.join("a.txt");
+    let b = root.join("b.txt");
+    fs::write(&a, "line1\nline2\n").unwrap();
+    fs::write(&b, "other\n").unwrap();
+    let mut app = app_for(&root);
+    app.open_file(&a);
+    app.content_scroll = 1;
+    app.in_file_search = Some(InFileSearch::new());
+    app.open_file(&b);
+    assert_eq!(
+        app.content_scroll, 0,
+        "scroll must reset on different-file open"
+    );
+    assert!(
+        app.in_file_search.is_none(),
+        "in-file search must clear on different-file open"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn same_file_reload_refreshes_in_file_search_matches() {
+    let root = temp_dir();
+    let f = root.join("f.txt");
+    fs::write(&f, "hello\nworld\n").unwrap();
+    let mut app = app_for(&root);
+    app.open_file(&f);
+    app.in_file_search = Some(InFileSearch::new());
+    app.in_file_search.as_mut().unwrap().push('o');
+    app.refresh_in_file_search();
+    let matches_before = app.in_file_search.as_ref().unwrap().matches.len();
+    assert_eq!(
+        matches_before, 2,
+        "precondition: 'o' matches 'hello' and 'world'"
+    );
+    // Change file content: remove the 'o' matches
+    fs::write(&f, "hi\nthere\n").unwrap();
+    app.open_file(&f);
+    assert!(
+        app.in_file_search.is_some(),
+        "in-file search must survive reload"
+    );
+    let matches_after = app.in_file_search.as_ref().unwrap().matches.len();
+    assert_eq!(
+        matches_after, 0,
+        "matches must be refreshed against new content"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- same-diff reload preserves scroll and in-file search --------------------
+
+#[test]
+fn same_diff_reload_preserves_scroll_and_in_file_search() {
+    let root = temp_git_with_history();
+    let f = root.join("tracked.txt");
+    let mut app = app_for(&root);
+    app.git_mode = true;
+    app.open_file(&f);
+    app.show_working_tree_diff(&f);
+    assert!(app.is_diff, "precondition: must be showing a diff");
+    app.content_scroll = 1;
+    app.in_file_search = Some(InFileSearch::new());
+    // Simulate a same-diff reload
+    app.show_working_tree_diff(&f);
+    assert_eq!(
+        app.content_scroll, 1,
+        "scroll must be preserved on same-diff reload"
+    );
+    assert!(
+        app.in_file_search.is_some(),
+        "in-file search must survive same-diff reload"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn different_diff_resets_scroll_and_in_file_search() {
+    let root = temp_git_with_history();
+    let a = root.join("tracked.txt");
+    let b = root.join("other_diff.txt");
+    fs::write(&b, "content\n").unwrap();
+    let mut app = app_for(&root);
+    app.git_mode = true;
+    app.show_working_tree_diff(&a);
+    app.content_scroll = 1;
+    app.in_file_search = Some(InFileSearch::new());
+    app.show_working_tree_diff(&b);
+    assert_eq!(
+        app.content_scroll, 0,
+        "scroll must reset on different-diff open"
+    );
+    assert!(
+        app.in_file_search.is_none(),
+        "in-file search must clear on different-diff open"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn same_diff_reload_clamps_scroll_when_diff_shrinks() {
+    // Open a git diff of a small file, set scroll to max, then make the file
+    // smaller (fewer changed lines) and re-diff — scroll must clamp.
+    let root = temp_dir();
+    // We'll use a git repo so show_working_tree_diff produces a diff
+    use std::process::Command;
+    let git = |args: &[&str]| {
+        Command::new("git")
+            .arg("-C")
+            .arg(&root)
+            .args(["-c", "user.email=t@e.x", "-c", "user.name=T"])
+            .args(args)
+            .status()
+            .unwrap();
+    };
+    git(&["init", "-q"]);
+    let f = root.join("f.txt");
+    fs::write(&f, "a\nb\nc\nd\ne\nf\ng\nh\ni\nj\n").unwrap();
+    git(&["add", "f.txt"]);
+    git(&["commit", "-q", "-m", "initial"]);
+
+    let mut app = app_for(&root);
+    app.git_mode = true;
+    app.show_working_tree_diff(&f);
+    // Now modify the file to create diff lines
+    fs::write(&f, "x\nb\nc\nd\ne\nf\ng\nh\ni\ny\n").unwrap();
+    app.show_working_tree_diff(&f);
+    app.content_area = ratatui::layout::Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 5,
+    };
+    assert!(
+        app.content_scroll_max() > 0,
+        "precondition: scroll should be available with 10-line changes and 5-row viewport"
+    );
+    // Now make the file have almost no changes so the diff is tiny
+    fs::write(&f, "a\nb\nc\n").unwrap();
+    app.show_working_tree_diff(&f);
+    // Even though we set scroll to a large value before, the new small diff
+    // should clamp it to the new content_scroll_max.
+    let max = app.content_scroll_max();
+    assert!(
+        app.content_scroll <= max,
+        "scroll must be clamped to {} on smaller diff, was {}",
+        max,
+        app.content_scroll
     );
     fs::remove_dir_all(&root).ok();
 }
