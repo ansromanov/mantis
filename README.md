@@ -33,13 +33,21 @@ That's it — no setup step. Press `?` for help, `q` to quit.
 milliseconds, needs zero config, and stays out of your way. It is *not* an editor —
 when you want to change something, press `e` to jump into your `$EDITOR`.
 
-| | **mantis** | **Vim / Neovim** | **VS Code** |
-| --- | --- | --- | --- |
-| Footprint | Single ~MB binary | Light core, heavy once configured | Electron, hundreds of MB + RAM |
-| Setup to be useful | **Zero** — just run `mantis` | Hours of config & plugins | Install, extensions, indexing |
-| Starts in | Milliseconds | Fast (slower with a big config) | Seconds |
-| Fuzzy + full-text search | **Built in** | Needs telescope/fzf/ripgrep glue | Built in |
-| Edit code | No — hands off to `$EDITOR` | Yes | Yes |
+| | **mantis** | **Vim / Neovim** | **VS Code** | **Zed** | **Sublime Text** |
+| --- | --- | --- | --- | --- | --- |
+| Interface | Terminal (TUI) | Terminal (TUI) | GUI (Electron) | GUI (native/GPU) | GUI (native) |
+| Runs over plain SSH | **Yes** | Yes | Remote extension | Remote dev | No |
+| Footprint | Single ~MB binary | Light core | Hundreds of MB + RAM | Native app (tens of MB) | Native app (tens of MB) |
+| Setup to be useful | **Zero** — just run `mantis` | Hours of config & plugins | Install + extensions + indexing | Minimal | Minimal |
+| Starts in | Milliseconds | Fast (slower with a big config) | Seconds | Fast | Fast |
+| Fuzzy + full-text search | Built in | Plugins (fzf/telescope) | Built in | Built in | Built in |
+| Syntax highlighting | Built in | Built in | Built in | Built in | Built in |
+| Edit code | **No** — hands off to `$EDITOR` | Yes | Yes | Yes | Yes |
+| LSP / IntelliSense | **No** | Built-in client (Neovim) | Built in | Built in | Via package |
+| Price | Free / OSS | Free / OSS | Free | Free / OSS | Paid (free eval) |
+
+mantis is the only row that's a read-only viewer — that's the whole pitch. Where the
+editors edit, mantis just gets you in, around, and back out fast, in any terminal.
 
 ### What mantis is *not*
 
