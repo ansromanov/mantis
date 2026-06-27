@@ -320,8 +320,15 @@ Or the manual path:
 
 ```bash
 just pr            # fetch origin/main, rebase, push --force-with-lease
-gh pr create       # open the PR (rebase fails loudly on conflicts so you can resolve)
+gh pr create --title "<summary>" --body "<what + why>
+
+Closes #<n>"        # open the PR directly (not draft) with a real body
 ```
+
+Never run a bare `gh pr create` / `gh pr create --fill` that leaves the body empty
+or as the auto-generated stub. The rebase step is not optional: both `just ship`
+and `just pr` fetch and rebase onto fresh `origin/main` before pushing, and rebase
+fails loudly on conflicts so you resolve them before the PR opens.
 
 > **macOS credential helper note:** If `git push` fails with `Device not configured`,
 > the macOS keychain isn't available (e.g. in SSH sessions). Workaround:
@@ -331,7 +338,7 @@ gh pr create       # open the PR (rebase fails loudly on conflicts so you can re
 
 ## PR lifecycle rules (mandatory)
 
-These four are non-negotiable — CI enforces #1, and `just` recipes make the rest
+These are non-negotiable — CI enforces #1, and `just` recipes make the rest
 a single command. They are the difference between a PR that lands clean and one that
 leaves manual cleanup behind.
 
@@ -350,6 +357,16 @@ leaves manual cleanup behind.
    the reviewer still sees an open thread until it's resolved. Run
    `just resolve-threads` (or `just ship`, which resolves automatically when updating
    an existing PR) after pushing the fixes.
+5. **Always rebase onto fresh `origin/main` before pushing or opening a PR.** Never
+   push a branch built on stale main. `just ship` and `just pr` run
+   `git fetch origin && git rebase origin/main` for you; if you push by hand, run
+   `just pr` first. Resolve rebase conflicts before the PR opens — never open a PR
+   that needs a merge from main to be reviewable.
+6. **Every PR has a descriptive body, opened directly (not draft).** The body must
+   say *what changed and why*, not just the close directive, and never be empty or
+   the bare auto-stub. `just ship <n>` derives one bullet per branch commit and
+   appends `Closes #<n>`; for a written summary pass `PR_BODY="…" just ship <n>`.
+   PRs open ready for review — never as drafts.
 
 ## Before committing
 
