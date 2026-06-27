@@ -7,6 +7,7 @@
 //! This module isolates the constructor so the main `App` struct definition
 //! in `mod.rs` stays focused on the data model.
 
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::time::Instant;
@@ -234,6 +235,7 @@ impl App {
             plugin_content_active: false,
             status_message: None,
             breadcrumb_areas: Vec::new(),
+            content_highlight_cache: RefCell::new(None),
             session_dirty: false,
             session_dirty_at: None,
             session_last_save: Instant::now(),

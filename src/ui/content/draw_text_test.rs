@@ -82,3 +82,41 @@ fn render_inline_fallback_empty_does_not_panic() {
     });
     assert!(!screen.is_empty());
 }
+
+#[test]
+fn highlight_cache_populated_after_first_render() {
+    let (mut app, dir) = render_app();
+    app.open_file(&dir.path().join("f.txt"));
+    assert!(app.virtual_file.is_some());
+    assert!(
+        app.content_highlight_cache.borrow().is_none(),
+        "cache must be empty before any render"
+    );
+    render(&mut app, |_| {});
+    assert!(
+        app.content_highlight_cache.borrow().is_some(),
+        "cache must be populated after rendering a virtual file"
+    );
+}
+
+#[test]
+fn highlight_cache_key_stable_on_identical_render() {
+    let (mut app, dir) = render_app();
+    app.open_file(&dir.path().join("f.txt"));
+    render(&mut app, |_| {});
+    let key_after_first = app
+        .content_highlight_cache
+        .borrow()
+        .as_ref()
+        .map(|(k, _)| (k.scroll, k.visible_end));
+    render(&mut app, |_| {});
+    let key_after_second = app
+        .content_highlight_cache
+        .borrow()
+        .as_ref()
+        .map(|(k, _)| (k.scroll, k.visible_end));
+    assert_eq!(
+        key_after_first, key_after_second,
+        "cache key must be stable across identical renders"
+    );
+}

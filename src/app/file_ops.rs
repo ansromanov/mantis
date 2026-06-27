@@ -32,6 +32,7 @@ impl App {
             return;
         }
         if let Some(path) = self.current_file.clone() {
+            *self.content_highlight_cache.borrow_mut() = None;
             if self.git_mode {
                 self.preserving_scroll(|s| s.show_working_tree_diff(&path));
             } else {

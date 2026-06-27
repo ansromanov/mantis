@@ -139,8 +139,12 @@ fn plan_startup(arg: Option<PathBuf>) -> anyhow::Result<Startup> {
 /// A source of input events for the event loop. Abstracted so the loop can be
 /// driven by a real terminal in production and a scripted queue in tests.
 trait EventSource {
-    /// Returns the next available event, or `None` if none arrived in time.
+    /// Waits briefly (≈16 ms) for the next event. Returns `None` on timeout.
     fn next_event(&mut self) -> anyhow::Result<Option<Event>>;
+
+    /// Returns an already-buffered event without waiting. `None` when none is
+    /// immediately available. Never blocks.
+    fn try_next_event(&mut self) -> anyhow::Result<Option<Event>>;
 }
 
 /// Production event source backed by crossterm's terminal event queue.
@@ -154,12 +158,24 @@ impl EventSource for CrosstermEvents {
             Ok(None)
         }
     }
+
+    fn try_next_event(&mut self) -> anyhow::Result<Option<Event>> {
+        if crossterm::event::poll(Duration::ZERO)? {
+            Ok(Some(crossterm::event::read()?))
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 #[cfg(unix)]
 impl EventSource for event_source::RawEventSource {
     fn next_event(&mut self) -> anyhow::Result<Option<Event>> {
         self.next_raw_event().map_err(Into::into)
+    }
+
+    fn try_next_event(&mut self) -> anyhow::Result<Option<Event>> {
+        self.try_next_raw_event().map_err(Into::into)
     }
 }
 
@@ -256,6 +272,9 @@ fn run_app(
 
 /// Drives the event loop: renders the UI, pulls the next event from `events`,
 /// dispatches it to the app, and calls `tick()` every frame.
+///
+/// When multiple events are buffered (e.g. a mouse-wheel burst), they are all
+/// drained before the next render so the burst collapses into a single frame.
 fn run_event_loop(
     terminal: &mut Terminal<impl Backend>,
     app: &mut App,
@@ -266,6 +285,15 @@ fn run_event_loop(
 
         if let Some(event) = events.next_event()? {
             dispatch_event(app, event);
+            // Drain a burst (e.g. mouse-wheel) so it applies in one frame.
+            let mut drained = 0;
+            while let Some(event) = events.try_next_event()? {
+                dispatch_event(app, event);
+                drained += 1;
+                if drained >= 256 {
+                    break; // safety cap: never starve the render
+                }
+            }
         }
 
         if app.should_quit {

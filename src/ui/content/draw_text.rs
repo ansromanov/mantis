@@ -5,6 +5,8 @@
 //! of the main content-render match. Extracting them here keeps `draw.rs`
 //! under 700 lines.
 
+use std::path::PathBuf;
+
 use ratatui::{
     layout::Rect,
     style::Style,
@@ -47,21 +49,52 @@ pub(crate) fn render_virtual_file<'a>(
         .map(|d| app.display_to_physical(d))
         .collect();
 
-    let highlight = || -> Vec<Vec<(Style, String)>> {
-        let path = match &app.current_file {
-            Some(p) => p.as_path(),
-            None => return Vec::new(),
+    let highlighted = {
+        let path_buf = match &app.current_file {
+            Some(p) => p.clone(),
+            None => PathBuf::new(),
         };
-        let lines: Vec<&str> = display_phys
-            .iter()
-            .filter_map(|&i| vf.line_text(i))
-            .collect();
-        if lines.is_empty() {
-            return Vec::new();
+        if path_buf.as_os_str().is_empty() {
+            Vec::new()
+        } else {
+            let lines: Vec<&str> = display_phys
+                .iter()
+                .filter_map(|&i| vf.line_text(i))
+                .collect();
+            if lines.is_empty() {
+                Vec::new()
+            } else {
+                let cache_key = crate::app::HighlightCacheKey {
+                    path: path_buf.clone(),
+                    scroll,
+                    visible_end,
+                    theme: app.theme.syntax.clone(),
+                    word_wrap: app.word_wrap,
+                };
+                // Check cache (immutable borrow, released before compute path).
+                let cached =
+                    app.content_highlight_cache
+                        .borrow()
+                        .as_ref()
+                        .and_then(|(key, cached)| {
+                            if key == &cache_key {
+                                Some(cached.clone())
+                            } else {
+                                None
+                            }
+                        });
+                match cached {
+                    Some(spans) => spans,
+                    None => {
+                        let result = app.highlight_lines(&path_buf, &lines);
+                        *app.content_highlight_cache.borrow_mut() =
+                            Some((cache_key, result.clone()));
+                        result
+                    }
+                }
+            }
         }
-        app.highlight_lines(path, &lines)
     };
-    let highlighted = highlight();
     let has_highlight = !highlighted.is_empty();
 
     let mut new_fold_gutter_rows: Vec<(u16, usize)> = Vec::new();

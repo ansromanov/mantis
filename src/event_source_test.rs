@@ -310,3 +310,26 @@ fn csi_arrow_release_decodes_as_release() {
     assert_eq!(key_event(&ev).code, KeyCode::Up);
     assert_eq!(key_event(&ev).kind, KeyEventKind::Release);
 }
+
+// ---------------------------------------------------------------------------
+// try_next_raw_event: non-blocking path
+// ---------------------------------------------------------------------------
+
+#[test]
+fn try_next_raw_event_returns_buffered_event() {
+    let mut src = RawEventSource::new();
+    src.buf.extend_from_slice(b"q");
+    let ev = src.try_next_raw_event().expect("must not error");
+    assert!(
+        ev.is_some(),
+        "pre-buffered event must be returned immediately"
+    );
+}
+
+#[test]
+fn try_next_raw_event_returns_none_when_buffer_empty() {
+    let mut src = RawEventSource::new();
+    // poll(fd=0, timeout=0) returns immediately when stdin has no data.
+    let ev = src.try_next_raw_event().expect("must not error");
+    assert!(ev.is_none());
+}
