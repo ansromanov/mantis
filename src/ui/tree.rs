@@ -118,7 +118,7 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
         f.render_widget(placeholder, list_area);
         app.tree_area = list_area;
         app.tree_offset = 0;
-        app.tree_visible_indices = Some(Vec::new());
+        app.tree_visible_indices = None;
         return;
     }
 
