@@ -13,7 +13,7 @@ use ratatui::{
     layout::Rect,
     style::Style,
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, Paragraph, Wrap},
     Frame,
 };
 use unicode_width::UnicodeWidthStr;
@@ -410,7 +410,13 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     // vertical scroll is 0. Horizontal scroll is still applied.
     let cx = inner.x + ln_width as u16;
     let cw = inner.width.saturating_sub(ln_width as u16);
-    let para = Paragraph::new(content_lines).scroll((0, hscroll));
+    // When there is no gutter (ln_width == 0) but word-wrap is on, fall back to
+    // ratatui's built-in Wrap — there is no drift risk without a parallel gutter
+    // paragraph, so the pre-expansion path is skipped and ratatui handles it.
+    let mut para = Paragraph::new(content_lines).scroll((0, hscroll));
+    if app.word_wrap && ln_width == 0 {
+        para = para.wrap(Wrap { trim: false });
+    }
     f.render_widget(
         para,
         Rect {
