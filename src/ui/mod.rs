@@ -21,7 +21,7 @@ use crate::app::App;
 mod content;
 mod popups;
 mod statusbar;
-mod tree;
+pub mod tree;
 
 pub fn draw(f: &mut Frame, app: &mut App) {
     let area = f.area();

@@ -27,7 +27,8 @@ impl App {
     /// is preserved and only clamped to the new bounds — this prevents
     /// watcher-driven refreshes from snapping the viewport back to the
     /// selection after the user wheel-scrolled to a different part of the tree.
-    pub(super) fn rebuild(&mut self, recenter: bool) {
+    pub(crate) fn rebuild(&mut self, recenter: bool) {
+        self.tree_revision += 1;
         let prev = self.nodes.get(self.tree_selected).map(|n| n.path.clone());
         let deleted = super::deleted_set(&self.git_status_map, self.git_show_deleted);
 

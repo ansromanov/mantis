@@ -330,7 +330,7 @@ fn tree_filter_mouse_click_maps_through_visible_indices_and_closes() {
         .filter(|&i| app.nodes[i].name.to_lowercase().contains("long"))
         .collect();
     assert!(!matching.is_empty(), "long.txt should match");
-    app.tree_visible_indices = matching.clone();
+    app.tree_visible_indices = Some(matching.clone());
     app.tree_area = full_rect();
     app.tree_offset = 0;
 
