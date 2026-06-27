@@ -527,6 +527,15 @@ pub fn load(root: &Path) -> (Config, Option<PathBuf>, Option<String>) {
                         error = Some(format!("{}: {}", path.display(), unknown.join("; ")));
                     }
                 }
+                if error.is_none()
+                    && !matches!(config.diff_mode.as_str(), "all" | "staged" | "unstaged")
+                {
+                    error = Some(format!(
+                        "{}: diff_mode {:?} is not valid — expected \"all\", \"staged\", or \"unstaged\"",
+                        path.display(),
+                        config.diff_mode,
+                    ));
+                }
                 return (config, Some(path), error);
             }
             // Record the first malformed config but keep falling back so a valid
