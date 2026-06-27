@@ -40,11 +40,13 @@ impl App {
             }
             Some("open_file_search") => {
                 let root = self.root.clone();
+                let changed = self.git_changed_files_set();
                 let mut s = SearchState::new(
                     &root,
                     self.show_hidden,
                     self.ignore_gitignore,
                     self.config.search_context_lines,
+                    changed.as_ref(),
                 );
                 if self.config.keep_search_query && !self.last_search_query.is_empty() {
                     s.query = self.last_search_query.clone();
@@ -54,11 +56,13 @@ impl App {
             }
             Some("open_content_search") => {
                 let root = self.root.clone();
+                let changed = self.git_changed_files_set();
                 let mut s = SearchState::new(
                     &root,
                     self.show_hidden,
                     self.ignore_gitignore,
                     self.config.search_context_lines,
+                    changed.as_ref(),
                 );
                 s.toggle_mode();
                 if self.config.keep_search_query && !self.last_search_query.is_empty() {

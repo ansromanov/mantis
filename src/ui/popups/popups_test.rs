@@ -115,7 +115,13 @@ fn draw_search_files_mode() {
     std::fs::write(dir.path().join("alpha.txt"), "").unwrap();
     std::fs::write(dir.path().join("beta.txt"), "").unwrap();
     let mut app = make_app(dir.path());
-    app.search = Some(crate::search::SearchState::new(dir.path(), false, true, 0));
+    app.search = Some(crate::search::SearchState::new(
+        dir.path(),
+        false,
+        true,
+        0,
+        None,
+    ));
 
     let backend = TestBackend::new(80, 30);
     let mut terminal = Terminal::new(backend).unwrap();
@@ -137,7 +143,13 @@ fn draw_search_files_filtered() {
     std::fs::write(&one, "").unwrap();
     std::fs::write(&two, "").unwrap();
     let mut app = make_app(dir.path());
-    app.search = Some(crate::search::SearchState::new(dir.path(), false, true, 0));
+    app.search = Some(crate::search::SearchState::new(
+        dir.path(),
+        false,
+        true,
+        0,
+        None,
+    ));
     for c in "111111".chars() {
         app.search.as_mut().unwrap().push(c);
     }
@@ -159,7 +171,7 @@ fn draw_search_content_mode() {
     std::fs::write(dir.path().join("hello.txt"), "hello world\nfoo bar\n").unwrap();
     std::fs::write(dir.path().join("other.txt"), "no match").unwrap();
     let mut app = make_app(dir.path());
-    let mut search = crate::search::SearchState::new(dir.path(), false, true, 0);
+    let mut search = crate::search::SearchState::new(dir.path(), false, true, 0, None);
     search.toggle_mode();
     search.push('h');
     search.push('e');
@@ -182,7 +194,7 @@ fn draw_search_content_mode() {
 fn draw_search_content_short_query_hint() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());
-    let mut search = crate::search::SearchState::new(dir.path(), false, true, 0);
+    let mut search = crate::search::SearchState::new(dir.path(), false, true, 0, None);
     search.toggle_mode();
     search.push('x');
     app.search = Some(search);
@@ -201,7 +213,7 @@ fn draw_search_content_short_query_hint() {
 fn draw_search_content_query_two_chars_hides_hint() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());
-    let mut search = crate::search::SearchState::new(dir.path(), false, true, 0);
+    let mut search = crate::search::SearchState::new(dir.path(), false, true, 0, None);
     search.toggle_mode();
     search.push('x');
     search.push('y');
@@ -224,7 +236,7 @@ fn draw_search_select_highlight() {
     std::fs::write(dir.path().join("a.txt"), "").unwrap();
     std::fs::write(dir.path().join("b.txt"), "").unwrap();
     let mut app = make_app(dir.path());
-    let mut search = crate::search::SearchState::new(dir.path(), false, true, 0);
+    let mut search = crate::search::SearchState::new(dir.path(), false, true, 0, None);
     search.selected = 1;
     app.search = Some(search);
 

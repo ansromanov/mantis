@@ -10,7 +10,7 @@
 //! and the go-to-line dialog (`GotoLineState`), all defined here. Results sort by
 //! descending fuzzy score; binary files are skipped via `is_binary_bytes`.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -46,6 +46,9 @@ pub struct SearchState {
     content_cache_dirty: bool,
     pending_refresh: Option<Instant>,
     context_lines: usize,
+    /// When `true`, the search index is scoped to a subset of files (e.g. git
+    /// mode's changed files). Displayed as "(changed files)" in the overlay title.
+    pub scoped: bool,
 }
 
 impl SearchState {
@@ -54,8 +57,20 @@ impl SearchState {
         show_hidden: bool,
         ignore_gitignore: bool,
         context_lines: usize,
+        changed_only: Option<&HashSet<PathBuf>>,
     ) -> Self {
-        let all_files = collect_all_files(root, show_hidden, ignore_gitignore);
+        let all_files = match changed_only {
+            Some(paths) => {
+                let mut files: Vec<PathBuf> = paths
+                    .iter()
+                    .filter(|p| p.starts_with(root))
+                    .cloned()
+                    .collect();
+                files.sort();
+                files
+            }
+            None => collect_all_files(root, show_hidden, ignore_gitignore),
+        };
         let file_results = all_files.clone();
         SearchState {
             query: String::new(),
@@ -69,6 +84,7 @@ impl SearchState {
             content_cache_dirty: true,
             pending_refresh: None,
             context_lines,
+            scoped: changed_only.is_some(),
         }
     }
 
@@ -117,8 +133,26 @@ impl SearchState {
         }
     }
 
-    pub fn reload_files(&mut self, root: &Path, show_hidden: bool, ignore_gitignore: bool) {
-        self.all_files = collect_all_files(root, show_hidden, ignore_gitignore);
+    pub fn reload_files(
+        &mut self,
+        root: &Path,
+        show_hidden: bool,
+        ignore_gitignore: bool,
+        changed_only: Option<&HashSet<PathBuf>>,
+    ) {
+        self.all_files = match changed_only {
+            Some(paths) => {
+                let mut files: Vec<PathBuf> = paths
+                    .iter()
+                    .filter(|p| p.starts_with(root))
+                    .cloned()
+                    .collect();
+                files.sort();
+                files
+            }
+            None => collect_all_files(root, show_hidden, ignore_gitignore),
+        };
+        self.scoped = changed_only.is_some();
         self.content_cache.clear();
         self.content_cache_dirty = true;
         self.pending_refresh = None;

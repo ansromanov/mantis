@@ -582,8 +582,9 @@ impl App {
         let root = self.root.clone();
         let show_hidden = self.show_hidden;
         let ignore_gitignore = self.ignore_gitignore;
+        let changed = self.git_changed_files_set();
         if let Some(s) = &mut self.search {
-            s.reload_files(&root, show_hidden, ignore_gitignore);
+            s.reload_files(&root, show_hidden, ignore_gitignore, changed.as_ref());
         }
         self.rebuild(false);
         self.reload_content();
@@ -599,6 +600,22 @@ impl App {
     pub fn set_status(&mut self, msg: impl Into<String>) {
         let sm = StatusMessage::new(msg, self.now());
         self.status_message = Some(sm);
+    }
+
+    /// Returns the set of changed file paths (not directories) when in git mode,
+    /// or `None` when git mode is inactive. Used to scope the search index to
+    /// changed files only.
+    pub(crate) fn git_changed_files_set(&self) -> Option<HashSet<PathBuf>> {
+        if !self.git_mode {
+            return None;
+        }
+        let files: HashSet<PathBuf> = self
+            .git_status_map
+            .iter()
+            .filter(|(path, _)| path.starts_with(&self.root) && !path.is_dir())
+            .map(|(path, _)| path.clone())
+            .collect();
+        Some(files)
     }
 
     /// Records that the user scrolled the content, used to show a transient
