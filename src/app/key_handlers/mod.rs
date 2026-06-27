@@ -18,6 +18,9 @@ mod overlay;
 #[path = "editor_test.rs"]
 mod editor_tests;
 #[cfg(test)]
+#[path = "mod_test.rs"]
+mod mod_tests;
+#[cfg(test)]
 #[path = "normal_test.rs"]
 mod normal_tests;
 
@@ -43,11 +46,12 @@ impl App {
             match key.code {
                 crossterm::event::KeyCode::Char('?')
                 | crossterm::event::KeyCode::Esc
-                | crossterm::event::KeyCode::Char('q') => {
-                    self.show_about = false;
+                | crossterm::event::KeyCode::Char('q')
+                | crossterm::event::KeyCode::Enter => {
+                    self.show_about = false; // Enter now just closes, never opens browser
                 }
-                crossterm::event::KeyCode::Enter => {
-                    self.open_release_url();
+                crossterm::event::KeyCode::Char('o') => {
+                    self.open_release_url(); // deliberate, explicit open
                 }
                 _ => {}
             }
