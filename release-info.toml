@@ -1,5 +1,4 @@
-version = "0.9.7"
-date = "2026-06-26"
-whats_new = """- fix(event_source): decode arrow key release events to stop double movement (#337)
-- chore: add changelog to release info [skip ci]"""
-release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.9.7"
+version = "0.10.0"
+date = "2026-06-27"
+whats_new = ""
+release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.10.0"
