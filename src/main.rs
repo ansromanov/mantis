@@ -35,6 +35,7 @@ mod file;
 mod fold;
 mod git;
 mod highlight;
+mod list_picker;
 #[cfg(feature = "markdown-core")]
 mod markdown;
 mod plugin;

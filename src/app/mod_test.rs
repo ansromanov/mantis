@@ -3395,7 +3395,7 @@ fn mouse_drag_without_start_is_noop_during_drag() {
 // -- history mouse events --------------------------------------------------
 
 #[test]
-fn history_mouse_click_outside_area_is_noop() {
+fn history_mouse_click_outside_area_closes() {
     let root = temp_git_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("tracked.txt"));
@@ -3406,9 +3406,8 @@ fn history_mouse_click_outside_area_is_noop() {
         width: 30,
         height: 10,
     };
-    let selected_before = app.history.as_ref().unwrap().selected;
-    app.handle_mouse(click(1, 1)); // outside area
-    assert_eq!(app.history.as_ref().unwrap().selected, selected_before);
+    app.handle_mouse(click(1, 1)); // outside area -> closes
+    assert!(app.history.is_none());
     fs::remove_dir_all(&root).ok();
 }
 
@@ -3454,7 +3453,7 @@ fn history_mouse_single_then_double_click_opens() {
 // -- theme mouse events ----------------------------------------------------
 
 #[test]
-fn theme_mouse_click_outside_area_is_noop() {
+fn theme_mouse_click_outside_area_closes() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::empty()));
@@ -3464,9 +3463,8 @@ fn theme_mouse_click_outside_area_is_noop() {
         width: 30,
         height: 10,
     };
-    let selected_before = app.theme_picker.as_ref().unwrap().selected;
-    app.handle_mouse(click(1, 1));
-    assert_eq!(app.theme_picker.as_ref().unwrap().selected, selected_before);
+    app.handle_mouse(click(1, 1)); // outside area -> closes
+    assert!(app.theme_picker.is_none());
     fs::remove_dir_all(&root).ok();
 }
 
@@ -3494,7 +3492,7 @@ fn theme_mouse_single_then_double_click_opens() {
 // -- command palette mouse events ------------------------------------------
 
 #[test]
-fn command_palette_mouse_click_outside_area_is_noop() {
+fn command_palette_mouse_click_outside_area_closes() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL));
@@ -3504,12 +3502,8 @@ fn command_palette_mouse_click_outside_area_is_noop() {
         width: 30,
         height: 10,
     };
-    let selected_before = app.command_palette.as_ref().unwrap().selected;
-    app.handle_mouse(click(1, 1));
-    assert_eq!(
-        app.command_palette.as_ref().unwrap().selected,
-        selected_before
-    );
+    app.handle_mouse(click(1, 1)); // outside area -> closes
+    assert!(app.command_palette.is_none());
     fs::remove_dir_all(&root).ok();
 }
 
@@ -3543,7 +3537,7 @@ fn command_palette_mouse_single_then_double_click_executes() {
 // -- search mouse events ---------------------------------------------------
 
 #[test]
-fn search_mouse_click_outside_area_is_noop() {
+fn search_mouse_click_outside_area_closes() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.focus = Focus::Content;
@@ -3555,9 +3549,8 @@ fn search_mouse_click_outside_area_is_noop() {
         width: 30,
         height: 10,
     };
-    let selected_before = app.search.as_ref().unwrap().selected;
-    app.handle_mouse(click(1, 1));
-    assert_eq!(app.search.as_ref().unwrap().selected, selected_before);
+    app.handle_mouse(click(1, 1)); // outside area -> closes
+    assert!(app.search.is_none());
     fs::remove_dir_all(&root).ok();
 }
 
@@ -3572,11 +3565,11 @@ fn search_mouse_click_out_of_range_index_noop() {
         x: 0,
         y: 0,
         width: 30,
-        height: 10,
+        height: 20,
     };
+    app.search_offset = 100; // offset past results -> index out of range
     let selected_before = app.search.as_ref().unwrap().selected;
-    // Row 99 will be well past the last result
-    app.handle_mouse(click(1, 99));
+    app.handle_mouse(click(1, 5)); // within area, but index = 100 + 5 = 105
     assert_eq!(app.search.as_ref().unwrap().selected, selected_before);
     fs::remove_dir_all(&root).ok();
 }
