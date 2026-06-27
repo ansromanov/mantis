@@ -7,7 +7,9 @@
 //! screen, runs the editor, then restores the terminal and flags `needs_clear`
 //! so the next frame repaints cleanly. Theme switching and the highlighter
 //! rebuild triggered from the palette live here too, alongside the related
-//! terminal-state bookkeeping.
+//! terminal-state bookkeeping. `open_release_url` is guarded by
+//! `should_open_browser`, which requires a non-empty URL and a TTY stdout so
+//! that browser focus-stealing does not occur in non-interactive environments.
 
 use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
 use crossterm::execute;
