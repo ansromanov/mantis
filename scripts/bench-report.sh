@@ -3,7 +3,7 @@
 # Usage: ./scripts/bench-report.sh [cargo bench args...]
 set -euo pipefail
 
-OUT_DIR="${TV_BENCH_DIR:-bench-results}"
+OUT_DIR="${MANTIS_BENCH_DIR:-bench-results}"
 mkdir -p "$OUT_DIR"
 
 TIMESTAMP=$(date -u +"%Y%m%dT%H%M%SZ")
@@ -29,7 +29,7 @@ OUT_FILE="$OUT_DIR/bench-${GIT_COMMIT:0:8}-${TIMESTAMP}.txt"
 
 {
     echo "============================================================"
-    echo " tree-viewer benchmark report"
+    echo " mantis benchmark report"
     echo "============================================================"
     printf " %-20s %s\\n" "Date:"       "$(date -u)"
     printf " %-20s %s\\n" "Git commit:" "$GIT_COMMIT"

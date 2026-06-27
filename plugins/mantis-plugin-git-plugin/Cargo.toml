@@ -1,0 +1,10 @@
+[package]
+name = "mantis-plugin-git-plugin"
+version = "0.1.0"
+edition = "2021"
+description = "Bundled comprehensive git plugin for mantis. Provides repo info, file statuses, diff, log, and blame."
+license = "GPL-3.0-or-later"
+repository = "https://github.com/ansromanov/mantis"
+
+[dependencies]
+serde_json = "1"

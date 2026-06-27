@@ -1,4 +1,4 @@
-# AGENTS.md — tree-viewer (tv)
+# AGENTS.md — mantis
 
 > Canonical instructions for this repo, read by both Claude Code and opencode.
 > Agent assets live in **`.agent/`**, which is symlinked as both `.claude/` and
@@ -14,7 +14,7 @@ preview files with syntax highlighting (`syntect`), render markdown
 
 # 1. Project Structure
 
-Single crate, no workspace. Library code in `src/lib.rs`; the `tv` binary in
+Single crate, no workspace. Library code in `src/lib.rs`; the `mantis` binary in
 `src/main.rs`. Tests are co-located in `_test.rs` files (see Rust Guidelines →
 Testing).
 
@@ -66,7 +66,7 @@ src/
 │   ├── tree.rs                     # Tree panel rendering
 │   └── *_test.rs                   # Co-located tests
 ├── config/
-│   ├── mod.rs                      # tv.toml deserialization, keybinding parsing
+│   ├── mod.rs                      # mantis.toml deserialization, keybinding parsing
 │   └── validate.rs                 # Config validation
 ├── ansi.rs                         # ANSI SGR parser → ratatui Style/Span (for plugin content)
 ├── command_palette.rs              # CommandPalette + CommandEntry structs and COMMANDS table
@@ -112,7 +112,7 @@ once they get large: a thin `mod.rs` re-exports focused submodules.
    catppuccin, synthwave84) live in `themes/` plus user overrides; `apply_theme()`
    re-opens the current file after a switch.
 6. **Keybinding abstraction.** All actions bind through a `Keymap`; `pressed()`
-   checks binding lists. Fully remappable via `tv.toml` `[keys]`.
+    checks binding lists. Fully remappable via `mantis.toml` `[keys]`.
 7. **Git via shell-out.** `git.rs` runs `git log` / `git diff` / `git blame` rather
    than linking a Rust git library, with graceful fallback on failure.
 8. **Sync event loop.** `crossterm::event::poll()` with a 16ms timeout — no async
@@ -175,7 +175,7 @@ Quick lookup: type/function → file. Use this before grepping.
 | `ExtraSyntax` / `PluginEntry` | `src/plugin/mod.rs` | Plugin-registered syntaxes |
 | `ReleaseInfo` / `RELEASE` | `src/release_info.rs` | Embedded release metadata |
 | `parse_ansi_line` | `src/ansi.rs` | ANSI SGR → ratatui Span |
-| `Config` / `Keymap` | `src/config/mod.rs` | tv.toml deserialization |
+| `Config` / `Keymap` | `src/config/mod.rs` | mantis.toml deserialization |
 | `draw` | `src/ui/mod.rs:26` | Main ratatui draw entry point |
 
 ---
@@ -246,7 +246,7 @@ Key pages to consider when changing code:
 - Plugin system (`src/plugin/mod.rs`, `src/config/mod.rs`) → `docs/src/plugins.md`,
   `docs/src/plugin-development.md`
 - Config options (`src/config/`) → `docs/src/configuration.md`
-- Keybindings (`src/config/mod.rs`, `tv.toml`) → `docs/src/configuration.md`
+- Keybindings (`src/config/mod.rs`, `mantis.toml`) → `docs/src/configuration.md`
 - New UI features → `docs/src/usage.md` or a new page added to `docs/src/SUMMARY.md`
 
 ## File size limit

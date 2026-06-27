@@ -1,7 +1,7 @@
 # Markdown Feature Showcase
 
-This document demonstrates the markdown elements that **tree-viewer** renders.
-Open it in `tv` and press `M` to toggle between the rendered and raw views.
+This document demonstrates the markdown elements that **mantis** renders.
+Open it in `mantis` and press `M` to toggle between the rendered and raw views.
 Each section below focuses on one family of elements so you can compare the
 source against the rendered output side by side.
 
@@ -66,7 +66,7 @@ lists, and they can nest to arbitrary depth.
 2. Build the project:
    1. Run `cargo build` for a debug binary
    2. Run `cargo build --release` for an optimized one
-3. Launch the viewer with `tv .`
+3. Launch the viewer with `mantis .`
 4. Press `?` at any time to open the in-app help
 
 ## Blockquotes
@@ -90,7 +90,7 @@ they stand out from prose. Here is a small Rust program:
 
 ```rust
 fn main() {
-    let greeting = "Hello, tree-viewer!";
+    let greeting = "Hello, mantis!";
     // Split on whitespace and print each word on its own line.
     for (index, word) in greeting.split_whitespace().enumerate() {
         println!("{index}: {word}");
@@ -116,8 +116,8 @@ And a shell snippet showing typical usage:
 
 ```sh
 # View the current directory, then a specific file
-tv .
-tv example.md
+mantis .
+mantis example.md
 ```
 
 ## Table
@@ -154,8 +154,8 @@ unchecked items with an empty one (☐), making a roadmap easy to scan.
 ## Links and Images
 
 Links keep references close to the text that needs them. Visit the
-[project repository](https://example.com/tree-viewer) for source and issues,
-or read the [configuration guide](https://example.com/tree-viewer/config) for
+[project repository](https://example.com/mantis) for source and issues,
+or read the [configuration guide](https://example.com/mantis/config) for
 the full list of options. The rendered view shows the link text; the raw view
 reveals the underlying URL.
 

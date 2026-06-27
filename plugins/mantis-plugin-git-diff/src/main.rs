@@ -1,20 +1,14 @@
-//! Bundled git-log plugin for tree-viewer (tv).
+//! Bundled git-diff plugin for mantis.
 //!
-//! Tracks the last-opened file via `on_file_open` events. On `on_keypress`
-//! with key `"H"`, runs `git log --oneline --color=always` and sends the
-//! output as ANSI-escaped content via `set_content`. Exits cleanly on
-//! `shutdown`.
+//! On `on_file_open`, if the file is tracked by git, runs
+//! `git diff --color=always HEAD` and sends the output as ANSI-escaped
+//! content via `set_content`. Exits cleanly on `shutdown`.
 
 use std::io::{self, BufRead, Write};
 use std::path::Path;
 use std::process::Command;
 
-struct PluginState {
-    last_file: Option<String>,
-}
-
 fn main() {
-    let mut state = PluginState { last_file: None };
     let stdin = io::stdin();
 
     for line in stdin.lock().lines() {
@@ -33,19 +27,7 @@ fn main() {
         match msg["event"].as_str().unwrap_or("") {
             "on_file_open" => {
                 if let Some(path_str) = msg["path"].as_str() {
-                    // Skip temp files created by this or other plugins
-                    if !path_str.contains("/tv-git-log-") && !path_str.contains("/tv-git-diff-") {
-                        state.last_file = Some(path_str.to_string());
-                    }
-                }
-            }
-            "on_keypress" => {
-                if let Some(key) = msg["key"].as_str() {
-                    if key == "H" {
-                        if let Some(ref last) = state.last_file {
-                            handle_log(last, &mut io::stdout().lock());
-                        }
-                    }
+                    handle_open(path_str, &mut io::stdout().lock());
                 }
             }
             "shutdown" => break,
@@ -54,8 +36,11 @@ fn main() {
     }
 }
 
-fn handle_log(path_str: &str, out: &mut impl Write) {
+fn handle_open(path_str: &str, out: &mut impl Write) {
     let file_path = Path::new(path_str);
+    if !file_path.is_file() {
+        return;
+    }
     let dir = match file_path.parent() {
         Some(d) => d,
         None => return,
@@ -64,19 +49,19 @@ fn handle_log(path_str: &str, out: &mut impl Write) {
         Some(r) => r,
         None => return,
     };
-    let log_output = match Command::new("git")
-        .args(["log", "--oneline", "--color=always", "--", path_str])
+    let diff = match Command::new("git")
+        .args(["diff", "--color=always", "HEAD", "--", path_str])
         .current_dir(&repo)
         .output()
     {
         Ok(output) if output.status.success() => output.stdout,
         Ok(_) | Err(_) => return,
     };
-    let log_str = String::from_utf8_lossy(&log_output);
-    if log_str.trim().is_empty() {
+    let diff_str = String::from_utf8_lossy(&diff);
+    if diff_str.trim().is_empty() {
         return;
     }
-    let lines: Vec<String> = log_str.lines().map(|l| l.to_string()).collect();
+    let lines: Vec<String> = diff_str.lines().map(|l| l.to_string()).collect();
     send_set_content(&lines, path_str, out);
 }
 

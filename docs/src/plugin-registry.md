@@ -1,15 +1,15 @@
 # Plugin Registry
 
-`tv` supports a **git-backed plugin registry** for discovering and installing
+`mantis` supports a **git-backed plugin registry** for discovering and installing
 third-party plugins. The registry is a plain git repository containing an
-`index.json` file that lists available plugins. No HTTP library is used — `tv`
+`index.json` file that lists available plugins. No HTTP library is used — `mantis`
 uses `git clone` and `git pull` to sync the registry.
 
 ## How it works
 
-1. On first access, `tv` clones the registry repository into the local cache at
-   `~/.config/tree-viewer/registry/`.
-2. On subsequent access, `tv` refreshes the cache with `git pull --ff-only`.
+1. On first access, `mantis` clones the registry repository into the local cache at
+   `~/.config/mantis/registry/`.
+2. On subsequent access, `mantis` refreshes the cache with `git pull --ff-only`.
 3. The `index.json` file is parsed to build the list of available plugins.
 
 ## Default registry
@@ -17,13 +17,13 @@ uses `git clone` and `git pull` to sync the registry.
 The default registry is hosted at:
 
 ```
-https://github.com/ansromanov/tree-viewer-plugins
+https://github.com/ansromanov/mantis-plugins
 ```
 
-To use a different registry, set the `TV_PLUGIN_REGISTRY` environment variable:
+To use a different registry, set the `MANTIS_PLUGIN_REGISTRY` environment variable:
 
 ```bash
-export TV_PLUGIN_REGISTRY="https://github.com/your-org/your-plugin-registry"
+export MANTIS_PLUGIN_REGISTRY="https://github.com/your-org/your-plugin-registry"
 ```
 
 ## Cache location
@@ -32,13 +32,13 @@ The registry cache lives at:
 
 | Platform | Path |
 |---|---|
-| Linux / macOS | `~/.config/tree-viewer/registry/` (or `$XDG_CONFIG_HOME/tree-viewer/registry/`) |
-| Windows | `%APPDATA%\tree-viewer\registry\` |
+| Linux / macOS | `~/.config/mantis/registry/` (or `$XDG_CONFIG_HOME/mantis/registry/`) |
+| Windows | `%APPDATA%\mantis\registry\` |
 
-Override with the `TV_PLUGIN_REGISTRY_DIR` environment variable:
+Override with the `MANTIS_PLUGIN_REGISTRY_DIR` environment variable:
 
 ```bash
-export TV_PLUGIN_REGISTRY_DIR="/custom/path/to/registry"
+export MANTIS_PLUGIN_REGISTRY_DIR="/custom/path/to/registry"
 ```
 
 ## index.json format
@@ -76,13 +76,13 @@ following structure:
 
 ## Searching
 
-Use the plugin picker in `tv` (accessible via the plugin overlay) to search the
+Use the plugin picker in `mantis` (accessible via the plugin overlay) to search the
 registry by name or description. The search is case-insensitive and matches
 substrings in both `name` and `description` fields.
 
 ## Resolution
 
-To look up a specific plugin by name (e.g. for installation), `tv` uses exact
+To look up a specific plugin by name (e.g. for installation), `mantis` uses exact
 case-sensitive matching against the `name` field in `index.json`.
 
 ## Hosting your own registry
@@ -92,7 +92,7 @@ To create your own plugin registry:
 1. Create a new git repository.
 2. Add an `index.json` file following the format above.
 3. Push to a git remote (GitHub, GitLab, self-hosted, etc.).
-4. Set `TV_PLUGIN_REGISTRY` to your repository URL.
+4. Set `MANTIS_PLUGIN_REGISTRY` to your repository URL.
 
 Example — create a minimal registry:
 
@@ -105,8 +105,8 @@ cat > index.json << 'EOF'
   "plugins": [
     {
       "name": "my-plugin",
-      "description": "My custom tv plugin",
-      "repo": "https://github.com/me/tv-my-plugin",
+      "description": "My custom mantis plugin",
+      "repo": "https://github.com/me/mantis-my-plugin",
       "tag": "v1.0.0"
     }
   ]
@@ -118,11 +118,11 @@ git remote add origin https://github.com/me/my-plugin-registry
 git push -u origin main
 ```
 
-Then point `tv` at it:
+Then point `mantis` at it:
 
 ```bash
-export TV_PLUGIN_REGISTRY="https://github.com/me/my-plugin-registry"
+export MANTIS_PLUGIN_REGISTRY="https://github.com/me/my-plugin-registry"
 ```
 
 > **Tip:** Make sure the repository is accessible without authentication for
-> `tv` to clone it. Public GitHub repos work out of the box.
+> `mantis` to clone it. Public GitHub repos work out of the box.

@@ -623,7 +623,7 @@ fn draw_about_shows_version() {
     assert!(joined.contains("About"));
     assert!(joined.contains("Version:"));
     assert!(joined.contains("GPL-3.0"));
-    assert!(joined.contains("tree viewer"));
+    assert!(joined.contains("mantis"));
 }
 
 // ── draw_recent_none ─────────────────────────────────────────────────────

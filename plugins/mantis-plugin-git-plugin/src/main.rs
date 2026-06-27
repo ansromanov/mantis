@@ -1,4 +1,4 @@
-//! Bundled comprehensive git plugin for tree-viewer (tv).
+//! Bundled comprehensive git plugin for mantis.
 //!
 //! Handles all git sub-systems that were previously shell scripts:
 //! - git status (file statuses for tree coloring)

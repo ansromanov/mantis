@@ -2,7 +2,7 @@
 //!
 //! Shared data structures for the plugin system: process vs syntax plugin kinds,
 //! config entries, language provider registrations, and the JSON-line protocol
-//! messages exchanged between `tv` and plugin subprocesses.
+//! messages exchanged between `mantis` and plugin subprocesses.
 
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -32,7 +32,7 @@ pub struct ExtraSyntax {
     pub extensions: Vec<String>,
 }
 
-/// Per-plugin entry in the `[plugins]` section of `tv.toml`.
+/// Per-plugin entry in the `[plugins]` section of `mantis.toml`.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(default)]
 pub struct PluginEntry {
@@ -102,7 +102,7 @@ pub struct LanguageProviderRegistration {
     pub capabilities: std::collections::HashSet<Capability>,
 }
 
-/// Message sent from `tv` to a plugin (on its stdin).
+/// Message sent from `mantis` to a plugin (on its stdin).
 #[derive(Serialize)]
 pub(crate) struct ToPlugin {
     pub(crate) event: String,

@@ -1,6 +1,6 @@
 # Quick Start
 
-This page walks you through your first few minutes with `tv`. No prior terminal
+This page walks you through your first few minutes with `mantis`. No prior terminal
 expertise required — if you can run one command and press arrow keys, you're set.
 
 > 📦 Don't have it yet? See [Installation](installation.md) first, then come back.
@@ -10,14 +10,14 @@ expertise required — if you can run one command and press arrow keys, you're s
 Open the folder you're currently in:
 
 ```sh
-tv
+mantis
 ```
 
 Or point it at a folder or a single file:
 
 ```sh
-tv ~/projects/my-app   # a directory
-tv README.md           # one file
+mantis ~/projects/my-app   # a directory
+mantis README.md           # one file
 ```
 
 You'll see two panels: the **file tree** on the left, and the **content** of the
@@ -73,7 +73,7 @@ You never have to memorize the keymap:
 
 - Press `t` to switch **themes** live (monokai, solarized, catppuccin, and more).
 - Want different colors or keybindings permanently? That all lives in a small
-  `tv.toml` file — see [Configuration](configuration.md).
+  `mantis.toml` file — see [Configuration](configuration.md).
 
 ---
 

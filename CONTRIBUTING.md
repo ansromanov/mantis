@@ -1,9 +1,9 @@
-# Contributing to tree-viewer (`tv`)
+# Contributing to mantis
 
-Thanks for your interest in improving `tv`! This guide walks you through everything
+Thanks for your interest in improving `mantis`! This guide walks you through everything
 you need to build the project, run the tests, and get your first pull request merged.
 
-`tv` is a single-crate Rust project — a fast terminal file tree viewer built with
+`mantis` is a single-crate Rust project — a fast terminal file tree viewer built with
 [ratatui](https://ratatui.rs). If anything here is unclear, please open an issue.
 
 > **Conventions live in [AGENTS.md](AGENTS.md).** That file is the single source of
@@ -22,23 +22,23 @@ you need to build the project, run the tests, and get your first pull request me
 - **[`pre-commit`](https://pre-commit.com)** — runs formatting, type-check, and lint
   hooks before each commit. Install with `pipx install pre-commit` (or `pip install`),
   then run `just setup` once after cloning to wire up the git hook.
-- **`git`** on your `PATH` — `tv`'s git features (diff, blame, history) shell out to it.
+- **`git`** on your `PATH` — `mantis`'s git features (diff, blame, history) shell out to it.
 - **Platform notes** — no platform-specific system libraries are needed. On macOS the
   release build re-signs the binary automatically (`codesign`), handled by `just`.
 
 Clone and bootstrap:
 
 ```sh
-git clone https://github.com/ansromanov/tree-viewer.git
-cd tree-viewer
+git clone https://github.com/ansromanov/mantis.git
+cd mantis
 just setup        # install the pre-commit git hook
 ```
 
 ## Building
 
 ```sh
-just build        # debug build  (cargo build)        -> target/debug/tv
-just release      # release build (cargo build --release) -> target/release/tv
+just build        # debug build  (cargo build)        -> target/debug/mantis
+just release      # release build (cargo build --release) -> target/release/mantis
 ```
 
 The release profile strips symbols and enables LTO for a small, fast binary; use the
@@ -147,7 +147,7 @@ All jobs must be green before a PR is merged.
 
 ## Issue etiquette
 
-- **Search first** — check [open issues](https://github.com/ansromanov/tree-viewer/issues)
+- **Search first** — check [open issues](https://github.com/ansromanov/mantis/issues)
   for an existing report before filing a new one.
 - **Label appropriately** — use the existing labels: `bug`, `enhancement`,
   `performance`, `ux`, `refactor`, `documentation`.
@@ -159,7 +159,7 @@ All jobs must be green before a PR is merged.
 
 We are rolling out a convention where every source file under `src/` carries a short
 (≈10–15 line) header comment describing its responsibility within the crate (tracked in
-issue [#174](https://github.com/ansromanov/tree-viewer/issues/174)). When you add a new
+issue [#174](https://github.com/ansromanov/mantis/issues/174)). When you add a new
 file, write its description; when you change a file's purpose, keep its description
 current. This keeps the codebase navigable for newcomers and agents alike.
 

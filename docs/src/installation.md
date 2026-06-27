@@ -4,26 +4,26 @@
 
 ### Linux / macOS
 
-The fastest way to get `tv` — no Rust toolchain required — is the install
+The fastest way to get `mantis` — no Rust toolchain required — is the install
 script. It detects your OS/arch, downloads the matching prebuilt binary,
 verifies its SHA-256 checksum, and installs it onto your `PATH`:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/ansromanov/tree-viewer/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/ansromanov/mantis/main/install.sh | sh
 ```
 
 You can tweak the install with environment variables:
 
 ```sh
 # install a specific release instead of the latest
-TV_VERSION=v0.2.0 curl -fsSL https://raw.githubusercontent.com/ansromanov/tree-viewer/main/install.sh | sh
+MANTIS_VERSION=v0.2.0 curl -fsSL https://raw.githubusercontent.com/ansromanov/mantis/main/install.sh | sh
 
 # install into a directory of your choice
-TV_INSTALL_DIR="$HOME/bin" curl -fsSL https://raw.githubusercontent.com/ansromanov/tree-viewer/main/install.sh | sh
+MANTIS_INSTALL_DIR="$HOME/bin" curl -fsSL https://raw.githubusercontent.com/ansromanov/mantis/main/install.sh | sh
 ```
 
 > Prefer to read before piping to a shell? Download
-> [`install.sh`](https://raw.githubusercontent.com/ansromanov/tree-viewer/main/install.sh),
+> [`install.sh`](https://raw.githubusercontent.com/ansromanov/mantis/main/install.sh),
 > inspect it, then run `sh install.sh`.
 
 ### Windows (PowerShell)
@@ -32,56 +32,56 @@ Run this in a PowerShell window — `curl` is not needed, `Invoke-WebRequest`
 (`irm`) is built into PowerShell:
 
 ```powershell
-irm https://raw.githubusercontent.com/ansromanov/tree-viewer/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/ansromanov/mantis/main/install.ps1 | iex
 ```
 
 From **cmd.exe**:
 
 ```cmd
-powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/ansromanov/tree-viewer/main/install.ps1 | iex"
+powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/ansromanov/mantis/main/install.ps1 | iex"
 ```
 
-The script downloads `tv.exe`, verifies its SHA-256 checksum, installs it to
-`%CARGO_HOME%\bin` (if Rust is present) or `%LOCALAPPDATA%\Programs\tree-viewer`,
+The script downloads `mantis.exe`, verifies its SHA-256 checksum, installs it to
+`%CARGO_HOME%\bin` (if Rust is present) or `%LOCALAPPDATA%\Programs\mantis`,
 and adds the directory to your user `PATH`.
 
 You can override the install location:
 
 ```powershell
-$env:TV_VERSION    = 'v0.2.0'          # install a specific version
-$env:TV_INSTALL_DIR = "$HOME\bin"       # install to a custom directory
-irm https://raw.githubusercontent.com/ansromanov/tree-viewer/main/install.ps1 | iex
+$env:MANTIS_VERSION    = 'v0.2.0'          # install a specific version
+$env:MANTIS_INSTALL_DIR = "$HOME\bin"       # install to a custom directory
+irm https://raw.githubusercontent.com/ansromanov/mantis/main/install.ps1 | iex
 ```
 
 ## Via cargo install
 
-If you have the Rust toolchain installed, the simplest way to install `tv` is:
+If you have the Rust toolchain installed, the simplest way to install `mantis` is:
 
 ```sh
-cargo install tree-viewer
+cargo install mantis
 ```
 
-This compiles and places the `tv` binary in `~/.cargo/bin` (which should already be on your `PATH` after a standard `rustup` install).
+This compiles and places the `mantis` binary in `~/.cargo/bin` (which should already be on your `PATH` after a standard `rustup` install).
 
 To install directly from the git repository without a crates.io release:
 
 ```sh
-cargo install --git https://github.com/ansromanov/tree-viewer
+cargo install --git https://github.com/ansromanov/mantis
 ```
 
 ## From source (Rust toolchain required)
 
 ```sh
-git clone https://github.com/ansromanov/tree-viewer.git
-cd tree-viewer
+git clone https://github.com/ansromanov/mantis.git
+cd mantis
 cargo build --release
-# binary is at target/release/tv
+# binary is at target/release/mantis
 ```
 
 Or, if you have [`just`](https://github.com/casey/just):
 
 ```sh
-just install   # builds --release and copies tv to ~/.cargo/bin
+just install   # builds --release and copies mantis to ~/.cargo/bin
 ```
 
 ### Prerequisites
@@ -92,15 +92,15 @@ just install   # builds --release and copies tv to ~/.cargo/bin
 ## Prebuilt binaries
 
 If you'd rather not use the install script, prebuilt binaries are attached to
-every [release](https://github.com/ansromanov/tree-viewer/releases):
+every [release](https://github.com/ansromanov/mantis/releases):
 
 | Platform        | Architecture    | File                          |
 | --------------- | --------------- | ----------------------------- |
-| Linux (musl)    | x86_64          | `tv-linux-x86_64`             |
-| Linux (musl)    | arm64 / aarch64 | `tv-linux-aarch64`            |
-| macOS           | Apple Silicon   | `tv-macos-aarch64`            |
-| macOS           | Intel           | `tv-macos-x86_64`             |
-| Windows         | x86_64          | `tv-windows-x86_64.exe`       |
+| Linux (musl)    | x86_64          | `mantis-linux-x86_64`         |
+| Linux (musl)    | arm64 / aarch64 | `mantis-linux-aarch64`        |
+| macOS           | Apple Silicon   | `mantis-macos-aarch64`        |
+| macOS           | Intel           | `mantis-macos-x86_64`         |
+| Windows         | x86_64          | `mantis-windows-x86_64.exe`   |
 
 Download the appropriate binary for your platform from the latest release,
 make it executable (`chmod +x` on Linux/macOS), and place it somewhere on

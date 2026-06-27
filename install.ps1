@@ -1,26 +1,26 @@
 #!/usr/bin/env pwsh
-# tree-viewer (tv) installer for Windows.
+# mantis installer for Windows.
 #
-# Downloads the prebuilt tv.exe from GitHub Releases, verifies its SHA-256
+# Downloads the prebuilt mantis.exe from GitHub Releases, verifies its SHA-256
 # checksum, and installs it on your PATH.
 #
 # Usage (PowerShell):
-#   irm https://raw.githubusercontent.com/ansromanov/tree-viewer/main/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/ansromanov/mantis/main/install.ps1 | iex
 #
 # From cmd.exe:
-#   powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/ansromanov/tree-viewer/main/install.ps1 | iex"
+#   powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/ansromanov/mantis/main/install.ps1 | iex"
 #
 # Environment overrides:
-#   $env:TV_VERSION      release tag to install (default: latest), e.g. "v0.2.0"
-#   $env:TV_INSTALL_DIR  directory to install into (default: auto-detected)
+#   $env:MANTIS_VERSION      release tag to install (default: latest), e.g. "v0.2.0"
+#   $env:MANTIS_INSTALL_DIR  directory to install into (default: auto-detected)
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference    = 'SilentlyContinue'   # suppresses slow Invoke-WebRequest progress bar
 
-$Repo    = 'ansromanov/tree-viewer'
-$BinName = 'tv'
-$Version    = if ($env:TV_VERSION)    { $env:TV_VERSION }    else { 'latest' }
-$InstallDir = if ($env:TV_INSTALL_DIR){ $env:TV_INSTALL_DIR } else { $null }
+$Repo    = 'ansromanov/mantis'
+$BinName = 'mantis'
+$Version    = if ($env:MANTIS_VERSION)    { $env:MANTIS_VERSION }    else { 'latest' }
+$InstallDir = if ($env:MANTIS_INSTALL_DIR){ $env:MANTIS_INSTALL_DIR } else { $null }
 
 function Write-Step { Write-Host "==> $args" }
 function Write-Warn { Write-Host "warning: $args" -ForegroundColor Yellow }
@@ -30,7 +30,7 @@ $cpu = $env:PROCESSOR_ARCHITECTURE
 if ($cpu -notin @('AMD64', 'x86_64')) {
     Write-Error ("Unsupported CPU architecture: $cpu. " +
                  "Only x86_64 Windows is supported. " +
-                 "Use 'cargo install tree-viewer' instead.")
+                 "Use 'cargo install mantis' instead.")
     exit 1
 }
 $Asset = "${BinName}-windows-x86_64.exe"
@@ -49,7 +49,7 @@ if (-not $InstallDir) {
     if (Test-Path $CargoBin) {
         $InstallDir = $CargoBin
     } else {
-        $InstallDir = Join-Path $env:LOCALAPPDATA 'Programs\tree-viewer'
+        $InstallDir = Join-Path $env:LOCALAPPDATA 'Programs\mantis'
     }
 }
 

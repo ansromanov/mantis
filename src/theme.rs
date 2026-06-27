@@ -5,7 +5,7 @@
 //! theme, so a single struct remaps the entire UI without touching call sites.
 //! Built-in presets (default, monokai, solarized, catppuccin, synthwave84) live
 //! in `PRESETS`; `ThemeConfig` captures the user's choice and per-role overrides
-//! from `tv.toml`, which `resolve()` merges onto a base preset. Colors are
+//! from `mantis.toml`, which `resolve()` merges onto a base preset. Colors are
 //! parsed from names or hex strings into `ratatui::style::Color`. Switching the
 //! active theme reopens the current file so highlighting picks up the new syntax
 //! theme.
@@ -260,14 +260,14 @@ fn all_embedded() -> &'static HashMap<&'static str, Theme> {
 fn user_themes_dir() -> Option<PathBuf> {
     #[cfg(windows)]
     {
-        std::env::var_os("APPDATA").map(|p| PathBuf::from(p).join("tree-viewer").join("themes"))
+        std::env::var_os("APPDATA").map(|p| PathBuf::from(p).join("mantis").join("themes"))
     }
     #[cfg(not(windows))]
     {
         let base = std::env::var_os("XDG_CONFIG_HOME")
             .map(PathBuf::from)
             .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))?;
-        Some(base.join("tree-viewer").join("themes"))
+        Some(base.join("mantis").join("themes"))
     }
 }
 
@@ -287,10 +287,10 @@ pub fn install_embedded_themes() {
 }
 
 // ---------------------------------------------------------------------------
-// ThemeConfig – user overrides from tv.toml
+// ThemeConfig – user overrides from mantis.toml
 // ---------------------------------------------------------------------------
 
-/// `[theme]` overrides from tv.toml. `name` selects a theme from the
+/// `[theme]` overrides from mantis.toml. `name` selects a theme from the
 /// discovered set (bundled or user-installed); any other field overrides
 /// that base. Unset fields keep the base value.
 /// Colors accept names ("cyan", "lightyellow", "reset") or hex ("#aabbcc");

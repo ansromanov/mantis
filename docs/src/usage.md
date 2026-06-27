@@ -3,25 +3,25 @@
 ## Basic usage
 
 ```sh
-tv              # view the current directory
-tv path/to/dir  # view a specific directory
-tv file.md      # open a single file directly
+mantis          # view the current directory
+mantis path/to/dir  # view a specific directory
+mantis file.md      # open a single file directly
 ```
 
 Press `?` at any time for in-app help, and `q` to quit.
 
 ## Session persistence
 
-`tv` automatically remembers your workspace state across restarts:
-expanded directories, the last open file, and scroll position.
-State is cached outside the project tree (`~/.local/state/tree-viewer/`
-or `%APPDATA%\tree-viewer\`) so it survives re-clones and never writes
+`mantis` automatically remembers your workspace state across restarts:
+expanded directories, the last open file, scroll position, and git mode.
+State is cached outside the project tree (`~/.local/state/mantis/`
+or `%APPDATA%\mantis\`) so it survives re-clones and never writes
 dotfiles into the repository. To reset the session for a directory, quit
 and delete the `sessions.json` file from the state directory.
 
 > 💡 **Can't remember a key?** Press `?` for the help overlay, or `Ctrl+P` to
 > open the command palette and search for an action by name — it shows you the
-> shortcut too. New to `tv`? Start with the [Quick Start](quickstart.md).
+> shortcut too. New to `mantis`? Start with the [Quick Start](quickstart.md).
 
 ## Global
 
@@ -100,7 +100,7 @@ Open with `/` (file names) or `f` (file contents). Just start typing to filter.
 Press `Ctrl+P` to open a searchable list of **every** action, each shown next to
 its current keybinding. Type to fuzzy-filter (e.g. "blame", "theme", "json"),
 navigate with `Up`/`Down`, and press `Enter` to run the highlighted command.
-It's the fastest way to discover what `tv` can do without memorizing keys.
+It's the fastest way to discover what `mantis` can do without memorizing keys.
 
 ## Git mode history
 
@@ -111,7 +111,7 @@ diff in git mode).
 
 ## Open in your editor
 
-Press `e` with a file open to launch it in your editor. `tv` uses `$VISUAL`,
+Press `e` with a file open to launch it in your editor. `mantis` uses `$VISUAL`,
 then `$EDITOR`, falling back to `vim`. The TUI suspends while the editor runs and
 resumes when you exit; the file is reloaded afterwards so you see your changes.
 

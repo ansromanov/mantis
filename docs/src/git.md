@@ -1,6 +1,6 @@
 # Git Features
 
-`tv` has comprehensive git support built in. Inside any git repository you get
+`mantis` has comprehensive git support built in. Inside any git repository you get
 status colors, blame, file history, and a dedicated diff-review mode out of the
 box.
 
@@ -14,7 +14,7 @@ the equivalent native implementations as a compile-time fallback.
 
 ## Git status colors
 
-Whenever `tv` can read `git status`, tree entries are tinted by their state — new,
+Whenever `mantis` can read `git status`, tree entries are tinted by their state — new,
 modified, deleted, or ignored — so you can see at a glance what's changed without
 doing anything. Control this with `git_status` in your config (see
 [Configuration](configuration.md)).

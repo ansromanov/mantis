@@ -11,7 +11,7 @@ use crate::config::Config;
 fn temp_dir() -> PathBuf {
     static COUNTER: AtomicUsize = AtomicUsize::new(0);
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-    let dir = std::env::temp_dir().join(format!("tv_main_{}_{n}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("mantis_main_{}_{n}", std::process::id()));
     fs::create_dir_all(&dir).unwrap();
     dir.canonicalize().unwrap()
 }
@@ -206,7 +206,7 @@ fn meta_action_none_for_path_or_missing() {
 
 #[test]
 fn meta_action_messages_have_expected_content() {
-    assert!(MetaAction::Help.message().contains("Usage: tv"));
+    assert!(MetaAction::Help.message().contains("Usage: mantis"));
     let version = MetaAction::Version.message();
     assert!(version.starts_with('v'));
     assert!(version.contains(env!("CARGO_PKG_VERSION")));
@@ -337,7 +337,7 @@ fn run_app_opens_and_reveals_file() {
 #[test]
 fn run_app_surfaces_config_error_without_failing() {
     let dir = temp_dir();
-    fs::write(dir.join("tv.toml"), "garbage [[[ = 1").unwrap();
+    fs::write(dir.join("mantis.toml"), "garbage [[[ = 1").unwrap();
     fs::write(dir.join("a.txt"), "hello\n").unwrap();
     let backend = TestBackend::new(80, 30);
     let mut terminal = ratatui::Terminal::new(backend).unwrap();
@@ -387,7 +387,7 @@ fn crossterm_events_polls_without_panicking() {
 fn plan_startup_help_returns_print() {
     let startup = plan_startup(Some(PathBuf::from("--help"))).unwrap();
     match startup {
-        Startup::Print(msg) => assert!(msg.contains("Usage: tv")),
+        Startup::Print(msg) => assert!(msg.contains("Usage: mantis")),
         Startup::Launch { .. } => panic!("expected Print for --help"),
     }
 }
@@ -441,9 +441,9 @@ fn plan_startup_missing_path_errors() {
 #[test]
 fn config_error_surfaces_from_invalid_toml() {
     let dir = temp_dir();
-    fs::write(dir.join("tv.toml"), "garbage [[[ = 1").unwrap();
+    fs::write(dir.join("mantis.toml"), "garbage [[[ = 1").unwrap();
     let (_cfg, _path, err) = crate::config::load(&dir);
     assert!(err.is_some());
-    assert!(err.unwrap().contains("tv.toml"));
+    assert!(err.unwrap().contains("mantis.toml"));
     fs::remove_dir_all(&dir).ok();
 }

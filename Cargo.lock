@@ -825,6 +825,67 @@ dependencies = [
 ]
 
 [[package]]
+name = "mantis"
+version = "0.9.9"
+dependencies = [
+ "anyhow",
+ "arboard",
+ "criterion",
+ "crossterm",
+ "fuzzy-matcher",
+ "ignore",
+ "libc",
+ "memmap2",
+ "notify",
+ "pulldown-cmark",
+ "ratatui",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "syntect",
+ "tempfile",
+ "toml",
+ "unicode-width 0.2.2",
+]
+
+[[package]]
+name = "mantis-plugin-git-diff"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
+name = "mantis-plugin-git-log"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
+name = "mantis-plugin-git-plugin"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
+name = "mantis-plugin-iconize"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
+name = "mantis-plugin-markdown"
+version = "0.1.0"
+dependencies = [
+ "pulldown-cmark",
+ "serde_json",
+ "unicode-width 0.2.2",
+]
+
+[[package]]
 name = "memchr"
 version = "2.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1658,67 +1719,6 @@ name = "toml_write"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d99f8c9a7727884afe522e9bd5edbfc91a3312b36a77b5fb8926e4c31a41801"
-
-[[package]]
-name = "tree-viewer"
-version = "0.9.9"
-dependencies = [
- "anyhow",
- "arboard",
- "criterion",
- "crossterm",
- "fuzzy-matcher",
- "ignore",
- "libc",
- "memmap2",
- "notify",
- "pulldown-cmark",
- "ratatui",
- "serde",
- "serde_json",
- "serde_yaml",
- "syntect",
- "tempfile",
- "toml",
- "unicode-width 0.2.2",
-]
-
-[[package]]
-name = "tv-plugin-git-diff"
-version = "0.1.0"
-dependencies = [
- "serde_json",
-]
-
-[[package]]
-name = "tv-plugin-git-log"
-version = "0.1.0"
-dependencies = [
- "serde_json",
-]
-
-[[package]]
-name = "tv-plugin-git-plugin"
-version = "0.1.0"
-dependencies = [
- "serde_json",
-]
-
-[[package]]
-name = "tv-plugin-iconize"
-version = "0.1.0"
-dependencies = [
- "serde_json",
-]
-
-[[package]]
-name = "tv-plugin-markdown"
-version = "0.1.0"
-dependencies = [
- "pulldown-cmark",
- "serde_json",
- "unicode-width 0.2.2",
-]
 
 [[package]]
 name = "unicase"

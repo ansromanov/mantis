@@ -1,28 +1,28 @@
 [workspace]
 members = [
-    "plugins/tv-plugin-markdown",
-    "plugins/tv-plugin-git-diff",
-    "plugins/tv-plugin-git-log",
-    "plugins/tv-plugin-git-plugin",
-    "plugins/tv-plugin-iconize",
+    "plugins/mantis-plugin-markdown",
+    "plugins/mantis-plugin-git-diff",
+    "plugins/mantis-plugin-git-log",
+    "plugins/mantis-plugin-git-plugin",
+    "plugins/mantis-plugin-iconize",
 ]
 resolver = "2"
 
 [package]
-name = "tree-viewer"
+name = "mantis"
 version = "0.9.9"
 edition = "2021"
 description = "A fast terminal file tree viewer with syntax highlighting, markdown rendering, fuzzy search, and mouse support."
 license = "GPL-3.0-or-later"
 readme = "README.md"
-repository = "https://github.com/ansromanov/tree-viewer"
+repository = "https://github.com/ansromanov/mantis"
 
 [lib]
-name = "tree_viewer"
+name = "mantis"
 path = "src/lib.rs"
 
 [[bin]]
-name = "tv"
+name = "mantis"
 path = "src/main.rs"
 
 [profile.dev]

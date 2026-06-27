@@ -307,7 +307,7 @@ fn with_isolated_config_home<F: FnOnce(&std::path::Path)>(f: F) {
 fn install_embedded_themes_creates_theme_files() {
     with_isolated_config_home(|tmp| {
         install_embedded_themes();
-        let themes_dir = tmp.join("tree-viewer").join("themes");
+        let themes_dir = tmp.join("mantis").join("themes");
         assert!(themes_dir.is_dir(), "themes directory should be created");
         assert!(
             themes_dir.join("default.toml").exists(),
@@ -335,7 +335,7 @@ fn discover_all_with_existing_user_dir_covers_user_theme_loop() {
 #[test]
 fn discover_all_user_theme_extends_list() {
     with_isolated_config_home(|tmp| {
-        let themes_dir = tmp.join("tree-viewer").join("themes");
+        let themes_dir = tmp.join("mantis").join("themes");
         std::fs::create_dir_all(&themes_dir).unwrap();
         let test_name = "custom-test-theme";
         std::fs::write(

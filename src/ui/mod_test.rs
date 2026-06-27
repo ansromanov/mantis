@@ -39,7 +39,7 @@ fn draw_no_overlay() {
     let mut app = make_app();
     let rows = render(&mut app);
     let joined = rows.join("\n");
-    assert!(joined.contains("tv") || joined.contains("tree-viewer"));
+    assert!(joined.contains("mantis"));
     // The version badge (P_VER, highest priority) fills the 80-char status bar;
     // the 92-char keybinding hint is correctly elided at this width.
     assert!(

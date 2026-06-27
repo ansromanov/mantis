@@ -33,7 +33,7 @@ add_bin()  { local b=$1; [[ -n ${seen_bin[$b]:-} ]] && return 0; seen_bin[$b]=1;
 while IFS= read -r f; do
   [[ -z $f ]] && continue
   case "$f" in
-    Cargo.toml|Cargo.lock|tv.toml|.cargo/config.toml|.github/workflows/*) echo __ALL__; exit 0 ;;
+    Cargo.toml|Cargo.lock|mantis.toml|.cargo/config.toml|.github/workflows/*) echo __ALL__; exit 0 ;;
     src/lib.rs|src/main.rs) echo __ALL__; exit 0 ;;
     src/*.rs)
       m=${f#src/}; m=${m%.rs}
@@ -62,7 +62,7 @@ done
 
 preds=()
 if ((${#unit_preds[@]})); then
-  preds+=("binary(tree_viewer) & ( $(join_by ' + ' "${unit_preds[@]}") )")
+  preds+=("binary(mantis) & ( $(join_by ' + ' "${unit_preds[@]}") )")
 fi
 if ((${#bin_preds[@]})); then
   preds+=("$(join_by ' + ' "${bin_preds[@]}")")

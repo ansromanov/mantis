@@ -1,11 +1,11 @@
-//! Loading, parsing, and saving of the `tv.toml` configuration.
+//! Loading, parsing, and saving of the `mantis.toml` configuration.
 //!
-//! Two layers: the **embedded defaults** (the fully-commented `tv.toml` template
-//! baked into the binary) supply every value, and the user's `tv.toml` overrides
+//! Two layers: the **embedded defaults** (the fully-commented `mantis.toml` template
+//! baked into the binary) supply every value, and the user's `mantis.toml` overrides
 //! only the keys it sets — serde's `#[serde(default)]` merges the two. On launch
-//! a read-only `tv.default.toml` reference is (re)written next to the user config
+//! a read-only `mantis.default.toml` reference is (re)written next to the user config
 //! whenever it is missing or stale, so an upgrade always refreshes the documented
-//! option catalogue without ever touching the user's own file. The user `tv.toml`
+//! option catalogue without ever touching the user's own file. The user `mantis.toml`
 //! is created once as a minimal stub and from then on is only written by `save`,
 //! which emits a *sparse* override file (changed-from-default keys only).
 //!
@@ -425,16 +425,17 @@ impl Serialize for KeyBinding {
     }
 }
 
-/// Loads config for the given view root. A project-local `tv.toml` found in
+/// Loads config for the given view root. A project-local `mantis.toml` found in
 /// the root or any ancestor takes precedence over the global config; this lets
 /// a repo ship its own defaults. On first run it seeds a minimal user config and
-/// the bundled themes/plugins, and on every run refreshes the `tv.default.toml`
+/// the bundled themes/plugins, and on every run refreshes the `mantis.default.toml`
 /// reference; it never overwrites an existing user config. Returns the loaded
 /// config, the path it was loaded from
 /// (so that live changes are saved back to the same file), and a warning
 /// describing the first malformed config encountered, if any, so the caller can
 /// tell the user their config was ignored instead of failing silently.
 pub fn load(root: &Path) -> (Config, Option<PathBuf>, Option<String>) {
+    migrate_legacy_config();
     let global = global_config_path();
     if let Some(ref path) = global {
         init_config_dir(path);
@@ -478,7 +479,7 @@ pub fn save(config: &Config, path: &Path) {
 }
 
 /// Serialises `config` keeping only the top-level keys whose value differs from
-/// `Config::default()`. This keeps the user's `tv.toml` a minimal override file:
+/// `Config::default()`. This keeps the user's `mantis.toml` a minimal override file:
 /// untouched settings fall through to the embedded defaults rather than being
 /// pinned to their current value (which would also mask future default changes).
 pub fn sparse_toml(config: &Config) -> String {
@@ -499,9 +500,9 @@ pub fn sparse_toml(config: &Config) -> String {
 }
 
 /// Prepares the global config directory on launch. The fully-commented default
-/// reference (`tv.default.toml`) is refreshed whenever it is missing or stale
+/// reference (`mantis.default.toml`) is refreshed whenever it is missing or stale
 /// (i.e. after an upgrade), so users always have an up-to-date catalogue of every
-/// option. The user's own `tv.toml` is **never** overwritten: it is created once,
+/// option. The user's own `mantis.toml` is **never** overwritten: it is created once,
 /// as a minimal stub, only when absent. Bundled themes and plugins are seeded on
 /// that same first run.
 fn init_config_dir(user_path: &Path) {
@@ -517,10 +518,10 @@ fn init_config_dir(user_path: &Path) {
     }
 }
 
-/// Writes the embedded fully-commented template to `{dir}/tv.default.toml`, but
+/// Writes the embedded fully-commented template to `{dir}/mantis.default.toml`, but
 /// only when the file is missing or its contents differ from the embedded
 /// version (the upgrade case). Returns whether the file was (re)written. This is
-/// a read-only reference for users; `tv` itself reads values from the embedded
+/// a read-only reference for users; `mantis` itself reads values from the embedded
 /// defaults, never from this file.
 fn refresh_default_reference(dir: &Path) -> bool {
     let path = dir.join(DEFAULT_REFERENCE_NAME);
@@ -531,28 +532,28 @@ fn refresh_default_reference(dir: &Path) -> bool {
 }
 
 /// The embedded, fully-commented default configuration. Source of truth for both
-/// default values and the on-disk `tv.default.toml` reference.
-const DEFAULT_CONFIG_TEMPLATE: &str = include_str!("../../tv.toml");
+/// default values and the on-disk `mantis.default.toml` reference.
+const DEFAULT_CONFIG_TEMPLATE: &str = include_str!("../../mantis.toml");
 
 /// Filename of the read-only default reference written next to the user config.
-const DEFAULT_REFERENCE_NAME: &str = "tv.default.toml";
+const DEFAULT_REFERENCE_NAME: &str = "mantis.default.toml";
 
 /// Minimal first-run user config. Kept deliberately tiny: the user adds only the
-/// overrides they want, and consults `tv.default.toml` for the full option list.
+/// overrides they want, and consults `mantis.default.toml` for the full option list.
 const USER_CONFIG_STUB: &str = "\
-# tv user config -- your overrides only.
+# mantis user config -- your overrides only.
 #
 # This file is never modified by upgrades. Add only the settings you want to
 # change; everything else falls back to the built-in defaults.
 #
-# See tv.default.toml in this directory (refreshed on every upgrade) for the
+# See mantis.default.toml in this directory (refreshed on every upgrade) for the
 # full, commented list of available options.
 ";
 
-/// Candidate config paths in precedence order: project-local (`tv.toml` in the
+/// Candidate config paths in precedence order: project-local (`mantis.toml` in the
 /// root and each ancestor), then the global config.
 fn config_paths(root: &Path) -> Vec<PathBuf> {
-    let mut paths: Vec<PathBuf> = root.ancestors().map(|d| d.join("tv.toml")).collect();
+    let mut paths: Vec<PathBuf> = root.ancestors().map(|d| d.join("mantis.toml")).collect();
     if let Some(global) = global_config_path() {
         paths.push(global);
     }
@@ -560,10 +561,56 @@ fn config_paths(root: &Path) -> Vec<PathBuf> {
 }
 
 fn global_config_path() -> Option<PathBuf> {
-    dirs_next()?.join("tv.toml").into()
+    dirs_next()?.join("mantis.toml").into()
 }
 
 fn dirs_next() -> Option<PathBuf> {
+    #[cfg(windows)]
+    {
+        std::env::var_os("APPDATA").map(|p| PathBuf::from(p).join("mantis"))
+    }
+    #[cfg(not(windows))]
+    {
+        std::env::var_os("XDG_CONFIG_HOME")
+            .map(PathBuf::from)
+            .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
+            .map(|base| base.join("mantis"))
+    }
+}
+
+/// One-time migration from the legacy `tree-viewer` config directory to `mantis`.
+/// Called once at startup before any config resolution. If the new directory
+/// (`~/.config/mantis/`) does not exist but the old (`~/.config/tree-viewer/`)
+/// does, the old directory is renamed to the new name. Inside it, `tv.toml` is
+/// renamed to `mantis.toml` and `tv.default.toml` to `mantis.default.toml`.
+/// Best-effort: never destroys data on failure.
+fn migrate_legacy_config() {
+    let old_dir = legacy_dirs_next();
+    let new_dir = dirs_next();
+    let (Some(old), Some(new)) = (old_dir, new_dir) else {
+        return;
+    };
+    if new.exists() || !old.exists() {
+        return;
+    }
+    // Rename config files inside the old directory before moving the dir.
+    for (old_name, new_name) in [
+        ("tv.toml", "mantis.toml"),
+        ("tv.default.toml", "mantis.default.toml"),
+    ] {
+        let old_file = old.join(old_name);
+        let new_file = old.join(new_name);
+        if old_file.exists() {
+            let _ = fs::rename(&old_file, &new_file);
+        }
+    }
+    // Rename the entire directory.
+    let _ = fs::rename(&old, &new);
+}
+
+/// Returns the legacy config directory path (`tree-viewer`). Used only for
+/// one-time migration.
+fn legacy_dirs_next() -> Option<PathBuf> {
     #[cfg(windows)]
     {
         std::env::var_os("APPDATA").map(|p| PathBuf::from(p).join("tree-viewer"))

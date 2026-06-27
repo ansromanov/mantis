@@ -101,7 +101,7 @@ fn pressed_matches_any_in_list() {
 #[test]
 fn malformed_local_config_reports_warning_and_falls_back() {
     let dir = std::env::temp_dir().join(format!(
-        "tv_cfg_bad_{}_{}",
+        "mantis_cfg_bad_{}_{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -110,14 +110,14 @@ fn malformed_local_config_reports_warning_and_falls_back() {
     ));
     fs::create_dir_all(&dir).unwrap();
     // `tree_width` expects an integer; a string makes parsing fail.
-    fs::write(dir.join("tv.toml"), "tree_width = \"oops\"\n").unwrap();
+    fs::write(dir.join("mantis.toml"), "tree_width = \"oops\"\n").unwrap();
 
     let (_config, _path, error) = load(&dir);
     // The malformed file is ignored (the loader falls back to a valid
     // lower-precedence config or defaults) but the warning is still surfaced.
     let msg = error.expect("malformed config should produce a warning");
     assert!(
-        msg.contains("tv.toml"),
+        msg.contains("mantis.toml"),
         "warning should name the file: {msg}"
     );
 
@@ -212,7 +212,7 @@ fn pressed_honours_current_base_key() {
 
 fn scratch_dir(tag: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!(
-        "tv_cfg_{tag}_{}_{}",
+        "mantis_cfg_{tag}_{}_{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -226,7 +226,7 @@ fn scratch_dir(tag: &str) -> PathBuf {
 #[test]
 fn init_writes_stub_user_config_and_default_reference() {
     let dir = scratch_dir("init");
-    let user = dir.join("tv.toml");
+    let user = dir.join("mantis.toml");
     init_config_dir(&user);
 
     // User config is a minimal stub, not the full template.
@@ -237,7 +237,7 @@ fn init_writes_stub_user_config_and_default_reference() {
         "user config must not be the full template"
     );
     // The fully-commented reference is written separately and parses as Config.
-    let reference = fs::read_to_string(dir.join("tv.default.toml")).unwrap();
+    let reference = fs::read_to_string(dir.join("mantis.default.toml")).unwrap();
     assert!(reference.contains("Open config in editor"));
     let cfg: Config = toml::from_str(&reference).expect("default reference should parse");
     assert_eq!(cfg.tree_width, 28);
@@ -248,7 +248,7 @@ fn init_writes_stub_user_config_and_default_reference() {
 #[test]
 fn init_never_overwrites_existing_user_config() {
     let dir = scratch_dir("noclobber");
-    let user = dir.join("tv.toml");
+    let user = dir.join("mantis.toml");
     fs::write(&user, "tree_width = 99\n").unwrap();
     init_config_dir(&user);
     // Upgrade path must leave the user's file byte-for-byte untouched.
@@ -264,10 +264,10 @@ fn refresh_default_reference_rewrites_only_when_stale() {
     // Identical -> skipped.
     assert!(!refresh_default_reference(&dir));
     // Stale (simulating an old version) -> rewritten to the current template.
-    fs::write(dir.join("tv.default.toml"), "# outdated\n").unwrap();
+    fs::write(dir.join("mantis.default.toml"), "# outdated\n").unwrap();
     assert!(refresh_default_reference(&dir));
     assert_eq!(
-        fs::read_to_string(dir.join("tv.default.toml")).unwrap(),
+        fs::read_to_string(dir.join("mantis.default.toml")).unwrap(),
         DEFAULT_CONFIG_TEMPLATE
     );
     fs::remove_dir_all(&dir).ok();
@@ -306,10 +306,10 @@ fn config_paths_are_local_first_then_global() {
     let root = Path::new("/a/b/c");
     let paths = config_paths(root);
     // Project-local: root first, then each ancestor.
-    assert_eq!(paths[0], PathBuf::from("/a/b/c/tv.toml"));
-    assert_eq!(paths[1], PathBuf::from("/a/b/tv.toml"));
-    assert_eq!(paths[2], PathBuf::from("/a/tv.toml"));
-    assert_eq!(paths[3], PathBuf::from("/tv.toml"));
+    assert_eq!(paths[0], PathBuf::from("/a/b/c/mantis.toml"));
+    assert_eq!(paths[1], PathBuf::from("/a/b/mantis.toml"));
+    assert_eq!(paths[2], PathBuf::from("/a/mantis.toml"));
+    assert_eq!(paths[3], PathBuf::from("/mantis.toml"));
     // Global config (if resolvable) comes after all local candidates.
     if let Some(global) = global_config_path() {
         assert_eq!(*paths.last().unwrap(), global);
@@ -428,7 +428,7 @@ fn validate_keys_omits_hint_when_nothing_close() {
 #[test]
 fn unknown_key_surfaces_as_warning_but_config_still_loads() {
     let dir = std::env::temp_dir().join(format!(
-        "tv_cfg_unknown_{}_{}",
+        "mantis_cfg_unknown_{}_{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -437,7 +437,7 @@ fn unknown_key_surfaces_as_warning_but_config_still_loads() {
     ));
     fs::create_dir_all(&dir).unwrap();
     // Valid TOML, valid value, but a typo'd key name.
-    fs::write(dir.join("tv.toml"), "tree_widht = 40\n").unwrap();
+    fs::write(dir.join("mantis.toml"), "tree_widht = 40\n").unwrap();
 
     let (config, path, error) = load(&dir);
     // The config still loads (the typo'd key is simply ignored)...
@@ -451,4 +451,83 @@ fn unknown_key_surfaces_as_warning_but_config_still_loads() {
     );
 
     fs::remove_dir_all(&dir).ok();
+}
+
+// Serialize env-var manipulation across parallel tests.
+static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+fn unique_migrate_tmp(label: &str) -> std::path::PathBuf {
+    std::env::temp_dir().join(format!(
+        "mantis_migrate_{}_{}_{label}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0),
+    ))
+}
+
+#[test]
+#[cfg(not(windows))]
+fn migrate_renames_old_dir_to_new() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let tmp = unique_migrate_tmp("a");
+    let old_dir = tmp.join("tree-viewer");
+    let new_dir = tmp.join("mantis");
+    fs::create_dir_all(&old_dir).unwrap();
+    fs::write(old_dir.join("tv.toml"), b"# config").unwrap();
+    fs::write(old_dir.join("tv.default.toml"), b"# default").unwrap();
+
+    std::env::set_var("XDG_CONFIG_HOME", &tmp);
+    migrate_legacy_config();
+    std::env::remove_var("XDG_CONFIG_HOME");
+
+    assert!(new_dir.exists(), "new dir created");
+    assert!(!old_dir.exists(), "old dir renamed away");
+    assert!(new_dir.join("mantis.toml").exists(), "tv.toml renamed");
+    assert!(
+        new_dir.join("mantis.default.toml").exists(),
+        "tv.default.toml renamed"
+    );
+    fs::remove_dir_all(&tmp).ok();
+}
+
+#[test]
+#[cfg(not(windows))]
+fn migrate_skips_when_new_dir_exists() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let tmp = unique_migrate_tmp("b");
+    let old_dir = tmp.join("tree-viewer");
+    let new_dir = tmp.join("mantis");
+    fs::create_dir_all(&old_dir).unwrap();
+    fs::write(old_dir.join("tv.toml"), b"# config").unwrap();
+    fs::create_dir_all(&new_dir).unwrap();
+
+    std::env::set_var("XDG_CONFIG_HOME", &tmp);
+    migrate_legacy_config();
+    std::env::remove_var("XDG_CONFIG_HOME");
+
+    assert!(
+        old_dir.exists(),
+        "old dir untouched when new dir already exists"
+    );
+    fs::remove_dir_all(&tmp).ok();
+}
+
+#[test]
+#[cfg(not(windows))]
+fn migrate_no_op_when_old_dir_absent() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let tmp = unique_migrate_tmp("c");
+    fs::create_dir_all(&tmp).unwrap();
+
+    std::env::set_var("XDG_CONFIG_HOME", &tmp);
+    migrate_legacy_config();
+    std::env::remove_var("XDG_CONFIG_HOME");
+
+    assert!(
+        !tmp.join("mantis").exists(),
+        "nothing created when old dir absent"
+    );
+    fs::remove_dir_all(&tmp).ok();
 }

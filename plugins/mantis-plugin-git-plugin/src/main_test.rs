@@ -102,7 +102,7 @@ fn send_log_does_not_panic_on_nonexistent_file() {
 
 #[test]
 fn handle_init_produces_no_output_outside_repo() {
-    let tmp = std::env::temp_dir().join("tv-handle-init-test-nonexistent-dir");
+    let tmp = std::env::temp_dir().join("mantis-handle-init-test-nonexistent-dir");
     let mut buf = Vec::new();
     handle_init(&tmp, &mut buf);
     // No output expected because /tmp/... is not a git repo

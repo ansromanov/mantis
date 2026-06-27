@@ -1,4 +1,4 @@
-//! Binary entry point for `tv`.
+//! Binary entry point for `mantis`.
 //!
 //! Handles the command-line surface (`--help`/`--version` and an optional
 //! file-or-directory path argument), then sets up the terminal: enables raw
@@ -84,7 +84,7 @@ impl MetaAction {
     /// The text printed to stdout for this action.
     fn message(&self) -> String {
         match self {
-            MetaAction::Help => "Usage: tv [<path>]\n  \
+            MetaAction::Help => "Usage: mantis [<path>]\n  \
                  <path>  File or directory to open (default: current dir)\n\n\
                  Options:\n  \
                  -h, --help, /?    Print this help\n  \
@@ -248,7 +248,7 @@ fn run_app(
     loop_result?;
 
     if let Some(err) = &app.config_error {
-        eprintln!("tv: ignoring invalid config: {err}");
+        eprintln!("mantis: ignoring invalid config: {err}");
     }
 
     Ok(())

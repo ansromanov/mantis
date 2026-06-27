@@ -67,13 +67,13 @@ impl App {
         let theme = cfg.theme.resolve();
 
         // Seed bundled plugins into the config map (insert-if-absent) so the
-        // plugin palette shows them even when tv.toml has no [plugins] section.
+        // plugin palette shows them even when mantis.toml has no [plugins] section.
         for (name, entry) in plugin::bundled_plugin_entries() {
             cfg.plugins.entry(name).or_insert(entry);
         }
 
         // Discover plugins from the plugin directory via plugin.toml manifests.
-        // Explicit tv.toml entries win on name collision; discovered plugins
+        // Explicit mantis.toml entries win on name collision; discovered plugins
         // default to disabled so no freshly fetched code runs without user opt-in.
         for (name, entry) in plugin::manifest::discover(&plugin::default_plugin_dir()) {
             cfg.plugins.entry(name).or_insert(entry);

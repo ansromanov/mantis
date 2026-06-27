@@ -6,7 +6,7 @@ use super::*;
 fn fresh_plugin_dir() -> PathBuf {
     static COUNTER: AtomicUsize = AtomicUsize::new(0);
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-    std::env::temp_dir().join(format!("tv_plugin_install_{}_{n}", std::process::id()))
+    std::env::temp_dir().join(format!("mantis_plugin_install_{}_{n}", std::process::id()))
 }
 
 #[test]
@@ -21,7 +21,7 @@ fn default_plugin_dir_ends_with_suffix() {
     );
     assert_eq!(
         last_two[1],
-        &std::path::Component::Normal("tree-viewer".as_ref())
+        &std::path::Component::Normal("mantis".as_ref())
     );
 }
 
@@ -38,7 +38,7 @@ fn default_plugin_dir_respects_xdg() {
             None => std::env::remove_var("XDG_CONFIG_HOME"),
         }
     }
-    assert!(dir.starts_with("/tmp/custom_cfg/tree-viewer/plugins"));
+    assert!(dir.starts_with("/tmp/custom_cfg/mantis/plugins"));
 }
 
 #[test]
@@ -142,7 +142,7 @@ fn install_bundled_plugins_creates_iconize_binary() {
         }
     }
 
-    let plugins_dir = tmp.join("tree-viewer").join("plugins");
+    let plugins_dir = tmp.join("mantis").join("plugins");
     assert!(plugins_dir.is_dir(), "plugins directory should be created");
     assert!(
         plugins_dir.join("syntaxes").is_dir(),
@@ -180,7 +180,7 @@ fn install_bundles_terraform_syntax_content() {
     }
 
     let syntax = tmp
-        .join("tree-viewer")
+        .join("mantis")
         .join("plugins")
         .join("syntaxes")
         .join("terraform.sublime-syntax");
@@ -213,7 +213,7 @@ fn install_bundled_plugins_creates_plugin_dir_and_syntaxes() {
         }
     }
 
-    let plugins_dir = tmp.join("tree-viewer").join("plugins");
+    let plugins_dir = tmp.join("mantis").join("plugins");
     assert!(plugins_dir.is_dir(), "plugins directory should be created");
     assert!(
         plugins_dir.join("syntaxes").is_dir(),

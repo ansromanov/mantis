@@ -1,11 +1,11 @@
-# Welcome to tree-viewer
+# Welcome to mantis
 
-**tree-viewer** (`tv`) lets you **browse, read, and review a codebase right in
+**mantis** lets you **browse, read, and review a codebase right in
 your terminal** — instantly. Point it at a folder and start moving through your
 files with the arrow keys (or your mouse), with syntax highlighting, rendered
 markdown, fuzzy search, and git diff/blame/history always one keystroke away.
 
-![tree-viewer screenshot](../media/intro.png)
+![mantis screenshot](../media/intro.png)
 
 > 💡 **New here?** You only need two things to get started: the
 > [Installation](installation.md) page, then the [Quick Start](quickstart.md).
@@ -30,9 +30,9 @@ markdown, fuzzy search, and git diff/blame/history always one keystroke away.
 ## Try it in five seconds
 
 ```sh
-tv              # open the current directory
-tv path/to/dir  # open a specific directory
-tv file.md      # open a single file directly
+mantis          # open the current directory
+mantis path/to/dir  # open a specific directory
+mantis file.md      # open a single file directly
 ```
 
 Press `?` any time for in-app help, and `q` to quit.
@@ -41,7 +41,7 @@ Press `?` any time for in-app help, and `q` to quit.
 
 | If you want to… | Read |
 | --- | --- |
-| Understand when to reach for `tv` | [Why tree-viewer?](why.md) |
+| Understand when to reach for `mantis` | [Why mantis?](why.md) |
 | Get it installed | [Installation](installation.md) |
 | Learn the basics in 5 minutes | [Quick Start](quickstart.md) |
 | See every key and what it does | [Usage & Keybindings](usage.md) |

@@ -6,14 +6,14 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use tree_viewer::highlight::Highlighter;
+use mantis::highlight::Highlighter;
 #[cfg(feature = "markdown-core")]
-use tree_viewer::markdown;
-use tree_viewer::search::SearchState;
+use mantis::markdown;
+use mantis::search::SearchState;
 #[cfg(feature = "markdown-core")]
-use tree_viewer::theme::Theme;
-use tree_viewer::tree::{build_visible, collect_all_files};
-use tree_viewer::virtual_file::VirtualFile;
+use mantis::theme::Theme;
+use mantis::tree::{build_visible, collect_all_files};
+use mantis::virtual_file::VirtualFile;
 
 // ---------------------------------------------------------------------------
 // Counter for unique temp dir names
@@ -23,7 +23,7 @@ static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 fn fixture_dir(label: &str) -> PathBuf {
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-    let dir = std::env::temp_dir().join(format!("tv_bench_{}_{}", label, n));
+    let dir = std::env::temp_dir().join(format!("mantis_bench_{}_{}", label, n));
     if dir.exists() {
         fs::remove_dir_all(&dir).unwrap();
     }
