@@ -251,3 +251,24 @@ fn app_new_git_seq_starts_zero() {
     assert_eq!(app.git_seq, 0, "git_seq must be zero on construction");
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn app_new_git_show_flags_reflect_config() {
+    let root = temp_dir();
+    fs::write(root.join("f.txt"), "x\n").unwrap();
+    let cfg = Config {
+        git_show_untracked: false,
+        git_show_ignored: true,
+        ..Config::default()
+    };
+    let app = new_app(&root, cfg);
+    assert!(
+        !app.git_show_untracked,
+        "git_show_untracked must come from config"
+    );
+    assert!(
+        app.git_show_ignored,
+        "git_show_ignored must come from config"
+    );
+    fs::remove_dir_all(&root).ok();
+}

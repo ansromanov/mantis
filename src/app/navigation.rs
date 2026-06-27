@@ -48,9 +48,7 @@ impl App {
                 let map = &self.git_status_map;
                 self.nodes = all
                     .into_iter()
-                    .filter(|n| {
-                        n.deleted || map.get(&n.path).is_some_and(|&s| s != GitStatus::Ignored)
-                    })
+                    .filter(|n| n.deleted || map.contains_key(&n.path))
                     .collect();
             }
         } else {
@@ -90,9 +88,7 @@ impl App {
         let mut entries: Vec<(PathBuf, bool)> = self
             .git_status_map
             .iter()
-            .filter(|(path, &status)| {
-                status != GitStatus::Ignored && path.starts_with(&self.root) && !path.is_dir()
-            })
+            .filter(|(path, _)| path.starts_with(&self.root) && !path.is_dir())
             .map(|(path, &status)| {
                 let deleted = status == GitStatus::Deleted && !path.exists();
                 (path.clone(), deleted)
@@ -124,11 +120,8 @@ impl App {
         let dirs: Vec<PathBuf> = self
             .git_status_map
             .iter()
-            .filter(|(path, &status)| {
-                status != GitStatus::Ignored
-                    && path.is_dir()
-                    && path.starts_with(&self.root)
-                    && **path != self.root
+            .filter(|(path, _)| {
+                path.is_dir() && path.starts_with(&self.root) && **path != self.root
             })
             .map(|(p, _)| p.clone())
             .collect();

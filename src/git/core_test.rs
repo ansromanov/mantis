@@ -182,3 +182,94 @@ fn blame_porcelain_missing_summary_gives_empty_subject() {
     assert_eq!(result.len(), 1);
     assert_eq!(result[0].subject, "");
 }
+
+// -- repo_status ------------------------------------------------------------
+
+fn init_repo_with_gitignore(dir: &Path) {
+    git(dir, &["init", "-q"]);
+    // Tracked file.
+    fs::write(dir.join("tracked.txt"), "hello\n").unwrap();
+    git(dir, &["add", "tracked.txt"]);
+    git(dir, &["commit", "-q", "-m", "init"]);
+    // Untracked file.
+    fs::write(dir.join("untracked.txt"), "new\n").unwrap();
+    // Ignored file.
+    fs::write(dir.join(".gitignore"), "*.log\n").unwrap();
+    git(dir, &["add", ".gitignore"]);
+    git(dir, &["commit", "-q", "-m", "add gitignore"]);
+    fs::write(dir.join("build.log"), "log\n").unwrap();
+}
+
+/// Canonicalized root that `repo_status` uses internally. tempdir returns
+/// paths via `/tmp` which on macOS is a symlink to `/private/tmp`; the
+/// function's internal `git_toplevel` canonicalizes, so we must compare
+/// against canonical paths.
+fn repo_root(dir: &Path) -> PathBuf {
+    dir.canonicalize().unwrap_or_else(|_| dir.to_path_buf())
+}
+
+#[test]
+fn repo_status_default_untracked_shown_ignored_hidden() {
+    let dir = tempfile::tempdir().unwrap();
+    init_repo_with_gitignore(dir.path());
+    let map = repo_status(dir.path(), true, false);
+    let root = repo_root(dir.path());
+    assert!(
+        map.contains_key(&root.join("untracked.txt")),
+        "untracked should be included by default"
+    );
+    assert_eq!(map.get(&root.join("untracked.txt")), Some(&GitStatus::New));
+    assert!(
+        !map.contains_key(&root.join("build.log")),
+        "ignored should be excluded by default"
+    );
+}
+
+#[test]
+fn repo_status_untracked_excluded() {
+    let dir = tempfile::tempdir().unwrap();
+    init_repo_with_gitignore(dir.path());
+    let map = repo_status(dir.path(), false, false);
+    let root = repo_root(dir.path());
+    assert!(
+        !map.contains_key(&root.join("untracked.txt")),
+        "untracked should be excluded when include_untracked is false"
+    );
+}
+
+#[test]
+fn repo_status_ignored_included() {
+    let dir = tempfile::tempdir().unwrap();
+    init_repo_with_gitignore(dir.path());
+    let map = repo_status(dir.path(), true, true);
+    let root = repo_root(dir.path());
+    assert!(
+        map.contains_key(&root.join("build.log")),
+        "ignored should be included when include_ignored is true"
+    );
+    assert_eq!(map.get(&root.join("build.log")), Some(&GitStatus::Ignored));
+}
+
+#[test]
+fn repo_status_both_excluded() {
+    let dir = tempfile::tempdir().unwrap();
+    init_repo_with_gitignore(dir.path());
+    let map = repo_status(dir.path(), false, false);
+    let root = repo_root(dir.path());
+    assert!(
+        !map.contains_key(&root.join("untracked.txt")),
+        "untracked excluded"
+    );
+    assert!(
+        !map.contains_key(&root.join("build.log")),
+        "ignored excluded"
+    );
+    // Tracked file is not modified, so map should be empty.
+    for (path, status) in &map {
+        assert_ne!(
+            path.file_name().map(|n| n.to_string_lossy()),
+            Some("tracked.txt".into()),
+            "tracked.txt should not appear (it's unchanged): {status:?}"
+        );
+    }
+}

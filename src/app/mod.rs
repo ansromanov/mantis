@@ -217,6 +217,8 @@ pub struct App {
     pub theme: Theme,
     pub git_status_enabled: bool,
     pub git_show_deleted: bool,
+    pub git_show_untracked: bool,
+    pub git_show_ignored: bool,
     pub git_info: Option<crate::git::GitRepoInfo>,
     pub git_status_map: HashMap<PathBuf, GitStatus>,
     pub git_mode: bool,

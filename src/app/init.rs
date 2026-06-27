@@ -30,10 +30,12 @@ impl App {
         let expanded = HashSet::new();
         let git_status_enabled = cfg.git_status;
         let git_show_deleted = cfg.git_show_deleted;
+        let git_show_untracked = cfg.git_show_untracked;
+        let git_show_ignored = cfg.git_show_ignored;
         let git_status_map = if git_status_enabled {
             #[cfg(feature = "git-core")]
             {
-                crate::git::repo_status(&root, cfg.ignore_gitignore)
+                crate::git::repo_status(&root, cfg.git_show_untracked, cfg.git_show_ignored)
             }
             #[cfg(not(feature = "git-core"))]
             {
@@ -154,6 +156,8 @@ impl App {
             theme,
             git_status_enabled,
             git_show_deleted,
+            git_show_untracked,
+            git_show_ignored,
             git_info,
             git_status_map,
             git_mode: false,

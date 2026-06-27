@@ -318,6 +318,8 @@ impl App {
         self.word_wrap = cfg.word_wrap;
         self.git_status_enabled = cfg.git_status;
         self.git_show_deleted = cfg.git_show_deleted;
+        self.git_show_untracked = cfg.git_show_untracked;
+        self.git_show_ignored = cfg.git_show_ignored;
         self.show_scrollbar = cfg.scrollbar;
         self.show_scroll_percentage = cfg.scroll_percentage;
         self.keys = cfg.keys.clone();
