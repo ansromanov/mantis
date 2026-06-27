@@ -40,12 +40,19 @@ pr:
 resolve-threads:
     ./scripts/resolve-threads.sh
 
-# end-to-end ship of the current branch: fmt, related tests, push, then open a
-# PR that closes the given issue (or update the existing PR + resolve threads).
+# end-to-end ship of the current branch: rebase onto fresh main, fmt, related
+# tests, push, then open a PR that closes the given issue (or update the existing
+# PR + resolve threads).
 # usage: just ship 239
+# PR body: defaults to one bullet per branch commit + the Closes directive.
+# Override with a written summary:  PR_BODY="Why + what." just ship 239
 ship issue:
     #!/usr/bin/env bash
     set -euo pipefail
+    # 1. ALWAYS rebase onto fresh origin/main before anything else. Tests then run
+    #    against the rebased tree; rebase fails loudly on conflicts so you resolve.
+    git fetch origin
+    git rebase origin/main
     cargo fmt --all
     just test-pr
     git push -u origin HEAD --force-with-lease
@@ -53,7 +60,16 @@ ship issue:
         echo "[ship] existing PR updated; resolving addressed review threads"
         ./scripts/resolve-threads.sh || true
     else
-        gh pr create --title "$(git log -1 --format=%s)" --body "Closes #{{issue}}"
+        # 2. ALWAYS open the PR with a descriptive body. Prefer a written summary
+        #    via PR_BODY; otherwise derive one bullet per commit on the branch.
+        summary="${PR_BODY:-$(git log origin/main..HEAD --reverse --format='- %s')}"
+        if [[ -z "${summary//[[:space:]]/}" ]]; then
+            echo "[ship] ABORT: empty PR body. Set PR_BODY=\"...\" or add commits." >&2
+            exit 1
+        fi
+        gh pr create \
+            --title "$(git log -1 --format=%s)" \
+            --body "$(printf '%s\n\nCloses #%s\n' "$summary" "{{issue}}")"
     fi
 
 # build debug binary
