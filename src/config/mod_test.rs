@@ -124,88 +124,128 @@ fn malformed_local_config_reports_warning_and_falls_back() {
     fs::remove_dir_all(&dir).ok();
 }
 
-// ---- kitty keyboard protocol base-key matching ---------------------------
+// ---- kitty keyboard protocol alternate-key matching -----------------------
 
 #[cfg(unix)]
-use crate::event_source::CURRENT_BASE_KEY;
+use crate::event_source::{AltKeys, CURRENT_ALT_KEYS};
 
 /// Synthetic key event with explicit modifiers.
 fn evm(code: KeyCode, mods: KeyModifiers) -> KeyEvent {
     KeyEvent::new(code, mods)
 }
 
-#[test]
-#[cfg(unix)]
-fn matches_uses_base_key_when_available_for_char_binding() {
-    let binding = parse_binding("ctrl+p").unwrap();
+fn set_alt(shifted: Option<char>, base: Option<char>) {
+    CURRENT_ALT_KEYS.with(|c| c.set(AltKeys { shifted, base }));
+}
 
-    // A Russian-layout key event: physical P key produces 'з' (U+0437).
-    let event = evm(KeyCode::Char('з'), KeyModifiers::CONTROL);
-
-    // Without a base key, it should NOT match 'ctrl+p'.
-    CURRENT_BASE_KEY.with(|cell| cell.set(None));
-    assert!(!binding.matches(&event));
-
-    // With the base key set to 'p' (the US-layout physical key), it SHOULD match.
-    CURRENT_BASE_KEY.with(|cell| cell.set(Some(KeyCode::Char('p'))));
-    assert!(binding.matches(&event));
-
-    // Clean up.
-    CURRENT_BASE_KEY.with(|cell| cell.set(None));
+fn reset_alt() {
+    set_alt(None, None);
 }
 
 #[test]
 #[cfg(unix)]
-fn base_key_does_not_affect_non_char_bindings() {
+fn matches_uses_base_key_for_alphabetic_binding() {
+    let binding = parse_binding("p").unwrap();
+
+    // A Russian-layout key event: physical P key produces 'з' (U+0437).
+    let event = evm(KeyCode::Char('з'), KeyModifiers::empty());
+
+    // Without base key: no match.
+    reset_alt();
+    assert!(!binding.matches(&event));
+
+    // With base key 'p': matches.
+    set_alt(Some('З'), Some('p'));
+    assert!(binding.matches(&event));
+
+    reset_alt();
+}
+
+#[test]
+#[cfg(unix)]
+fn matches_uses_base_key_with_shift_for_capital_binding() {
+    let binding = parse_binding("G").unwrap();
+
+    // Russian Shift+G (physical 'y' on US → 'Н' in Russian).
+    let event = evm(KeyCode::Char('Н'), KeyModifiers::SHIFT);
+
+    // Base 'y' + Shift → 'Y' → does NOT match 'G'.
+    set_alt(Some('Н'), Some('y'));
+    assert!(!binding.matches(&event));
+
+    // Base 'g' + Shift → 'G' → matches.
+    set_alt(Some('Г'), Some('g'));
+    assert!(binding.matches(&event));
+
+    reset_alt();
+}
+
+#[test]
+#[cfg(unix)]
+fn matches_uses_shifted_key_for_symbol_binding() {
+    let binding = parse_binding("?").unwrap();
+
+    // US Shift+/ produces '?'. Kitty sends 47:63 (primary='/', shifted='?').
+    let event = evm(KeyCode::Char('/'), KeyModifiers::SHIFT);
+
+    // No base-layout key (2-field form), shifted = Some('?').
+    set_alt(Some('?'), None);
+    assert!(binding.matches(&event));
+
+    reset_alt();
+}
+
+#[test]
+#[cfg(unix)]
+fn matches_alt_keys_does_not_affect_non_char_bindings() {
     let binding = parse_binding("Enter").unwrap();
     let event = evm(KeyCode::Enter, KeyModifiers::empty());
 
-    // Even with a stale base key, a non-Char binding matches against key.code.
-    CURRENT_BASE_KEY.with(|cell| cell.set(Some(KeyCode::Char('p'))));
+    // Even with stale alternate keys, a non-Char binding matches against key.code.
+    set_alt(Some('З'), Some('p'));
     assert!(binding.matches(&event));
 
-    CURRENT_BASE_KEY.with(|cell| cell.set(None));
+    reset_alt();
 }
 
 #[test]
 #[cfg(unix)]
-fn base_key_does_not_substitute_for_wrong_modifiers() {
+fn matches_alt_keys_does_not_substitute_for_wrong_modifiers() {
     let binding = parse_binding("p").unwrap();
     let event = evm(KeyCode::Char('з'), KeyModifiers::ALT);
 
     // Base key is 'p' but event has Alt modifier — binding requires no modifier.
-    CURRENT_BASE_KEY.with(|cell| cell.set(Some(KeyCode::Char('p'))));
+    set_alt(Some('З'), Some('p'));
     assert!(!binding.matches(&event));
 
-    CURRENT_BASE_KEY.with(|cell| cell.set(None));
+    reset_alt();
 }
 
 #[test]
 #[cfg(unix)]
-fn base_key_does_not_break_binding_without_alternate() {
-    // When no base key is set, behaviour is identical to before.
+fn matches_alt_keys_falls_back_to_key_code_when_no_alternates() {
     let binding = parse_binding("g").unwrap();
     let event = evm(KeyCode::Char('g'), KeyModifiers::empty());
 
-    CURRENT_BASE_KEY.with(|cell| cell.set(None));
+    reset_alt();
     assert!(binding.matches(&event));
 }
 
 #[test]
 #[cfg(unix)]
-fn pressed_honours_current_base_key() {
+fn pressed_honours_current_alt_keys() {
     let bindings = bind(&["ctrl+p", "ctrl+g"]);
     let event = evm(KeyCode::Char('з'), KeyModifiers::CONTROL);
 
     // Without base key: no match (з != p, з != g).
-    CURRENT_BASE_KEY.with(|cell| cell.set(None));
+    reset_alt();
     assert!(!pressed(&bindings, &event));
 
     // With base key 'p': ctrl+p matches.
-    CURRENT_BASE_KEY.with(|cell| cell.set(Some(KeyCode::Char('p'))));
+    set_alt(Some('З'), Some('p'));
     assert!(pressed(&bindings, &event));
 
-    CURRENT_BASE_KEY.with(|cell| cell.set(None));
+    reset_alt();
 }
 
 // ---- end kitty-protocol tests --------------------------------------------
