@@ -1,6 +1,6 @@
 # mantis
 
-**Browse, read, and review code in your terminal — instantly.**
+**An instant terminal code browser.**
 
 **Linux / macOS:**
 ```sh
@@ -12,10 +12,10 @@ curl -fsSL https://raw.githubusercontent.com/ansromanov/mantis/main/install.sh |
 irm https://raw.githubusercontent.com/ansromanov/mantis/main/install.ps1 | iex
 ```
 
-`mantis` is a fast, lightweight file tree viewer with syntax highlighting, markdown
-rendering, fuzzy search, code folding, and first-class git tooling (diff, blame,
-history). One small binary, no config required — with an optional plugin system
-when you want to extend it. Built with [ratatui](https://ratatui.rs).
+`mantis` is a fast, lightweight tree viewer for reading code in your terminal:
+syntax highlighting, markdown rendering, fuzzy search, and code folding in one
+small binary. No config required, with an optional plugin system when you want
+more. Built with [ratatui](https://ratatui.rs).
 
 <p align="center">
   <img src="media/intro.png" alt="mantis" width="800">
@@ -29,66 +29,76 @@ That's it — no setup step. Press `?` for help, `q` to quit.
 
 ## Why mantis?
 
-`mantis` is built for one job and does it well: **moving through a codebase and
-reading it** — with git context one keystroke away. It is not a full editor, and
-that's the point.
+`mantis` does one job: **move through a codebase and read it, fast**. It opens in
+milliseconds, needs zero config, and stays out of your way. It is *not* an editor —
+when you want to change something, press `e` to jump into your `$EDITOR`.
 
-| | **mantis** | **Vim / Neovim** | **VS Code** |
-| --- | --- | --- | --- |
-| Footprint | Single ~MB binary | Light core, heavy once configured | Electron, hundreds of MB + RAM |
-| Setup to be useful | **Zero** — just run `mantis` | Hours of config & plugins | Install, extensions, indexing |
-| Git diff/blame/history | **Built in** | Needs fugitive/gitsigns/etc. | Needs extensions |
-| Fuzzy + full-text search | **Built in** | Needs telescope/fzf/ripgrep glue | Built in |
-| Starts in | Milliseconds | Fast (slower with a big config) | Seconds |
+| | **mantis** | **Vim / Neovim** | **VS Code** | **Zed** | **Sublime Text** |
+| --- | --- | --- | --- | --- | --- |
+| Interface | Terminal (TUI) | Terminal (TUI) | GUI (Electron) | GUI (native/GPU) | GUI (native) |
+| Footprint | Single ~MB binary | Light core | Hundreds of MB + RAM | Native app (tens of MB) | Native app (tens of MB) |
+| Setup to be useful | **Zero** — just run `mantis` | Hours of config & plugins | Install + extensions + indexing | Minimal | Minimal |
+| Starts in | Milliseconds | Fast (slower with a big config) | Seconds | Fast | Fast |
+| Fuzzy + full-text search | Built in | Plugins (fzf/telescope) | Built in | Built in | Built in |
+| Syntax highlighting | Built in | Built in | Built in | Built in | Built in |
+| Price | Free / OSS | Free / OSS | Free | Free / OSS | Paid (free eval) |
 
-Reach for `mantis` when you want to **explore a repo, read a file, or check a diff**
-without spinning up a heavyweight editor. Hit `e` to jump into your `$EDITOR`
-the moment you actually need to change something.
+mantis is the only row that's a read-only viewer — that's the whole pitch. Where the
+editors edit, mantis just gets you in, around, and back out fast, in any terminal.
+
+### What mantis is *not*
+
+Be clear about the trade-offs before you install:
+
+- **Not an editor.** No insert mode, no buffers, no saving — it reads, it doesn't
+  write. Editing means handing the file to `$EDITOR`.
+- **No LSP / IntelliSense.** No autocomplete, go-to-definition, diagnostics, or
+  refactoring. It highlights syntax; it doesn't understand your code.
+- **No integrated terminal, debugger, or task runner.** It's a viewer, not an IDE.
+- **Batteries are opt-in.** Anything beyond the core (icons, extra languages, custom
+  overlays) comes from plugins you enable yourself — less out-of-the-box than VS Code.
+- **Terminal-bound.** A TUI in your terminal, not a GUI; icons need a Nerd Font.
+
+If you want a fast, throwaway way to **explore a repo, read a file, or skim a
+project** without launching a heavyweight editor, that's exactly the gap `mantis`
+fills.
 
 ## Features
 
-- **Lightweight & instant** — a single small binary, no runtime dependencies or
-  config needed to start
-- **Tree navigation** with keyboard or mouse, respecting `.gitignore`
-- **Fuzzy search** (`/`) over file names, or full-text search (`f`) across file
-  contents — fzf-style, as-you-type
-- **Git mode** (`Ctrl+G`) — show only changed files with working-tree diffs;
-  `Alt+G` toggles between tree and flat list views
-- **Git blame** (`b`) — inline per-line author, short hash, and date
-- **Visual-line mode** (`V`) — vim-style whole-line selection; press `b` to open
-  a blame panel scoped to the selected range
-- **Git file history** (`H`) — pick a past revision from an fzf-style list and
-  view its diff against your working tree, with red/green coloring
-- **Git status indicators** — tree entries colored by git status (new, modified,
-  deleted, ignored)
-- **Syntax highlighting** via [syntect](https://github.com/trishume/syntect)
-- **Code folding** (`Space`) — collapse/expand blocks; per-file-type fold regions
-  supplied by language plugins, with built-in YAML indentation folding
-- **Markdown rendering** — headings, tables, task lists, code blocks,
-  blockquotes, and more (press `M` to toggle the raw source)
-- **JSON pretty-printing** (`J`) — reformat minified JSON for readable browsing
-- **Go to line** (`:`) — jump straight to a line number
-- **Status bar** — active line number, detected language, scroll position, and
-  (toggleable) encoding/line endings
-- **Command palette** (`Ctrl+P`) — fuzzy-find every action and see its keybinding
-- **Plugins** (`p`) — opt-in process and syntax plugins, with a git-backed
-  registry; enable/disable from a palette, state persists across restarts
-- **Session persistence** — expanded dirs, last open file, scroll position, and
-  git mode restored on restart (cached outside the repo)
-- **Recent files** (`Ctrl+O`) and **copy path** (`y` / `Y`)
-- **Open in your editor** (`e`) — jump to the current file in `$VISUAL`/`$EDITOR`,
-  then drop back into `mantis` when you're done
-- **Themes** — built-in presets (monokai, solarized, catppuccin, synthwave84),
-  switchable live, with configurable panel background and terminal transparency
-- **Mouse support** — click to select, fold/unfold directories, switch panes,
-  scroll, and double-click a directory to change root
-- **Configurable** layout, behavior, and keybindings via a simple TOML file
+**Navigation**
+- Tree navigation by keyboard or mouse, respecting `.gitignore`
+- Breadcrumb path bar; change root, go up a directory, double-click to descend
+- Code folding (`Space`) — collapse/expand blocks, with language-aware fold regions
+
+**Search**
+- Fuzzy file-name search (`/`) — fzf-style, as you type
+- Full-text content search (`f`) across the tree
+- In-file search and go-to-line (`:`)
+
+**Viewing & rendering**
+- Syntax highlighting for a wide range of languages
+- Markdown rendering — headings, tables, task lists, code blocks (`M` toggles raw)
+- JSON pretty-printing (`J`) for minified files
+- Word wrap, line numbers, and a status bar (line, language, scroll, encoding)
+
+**Productivity**
+- Command palette (`Ctrl+P`) — fuzzy-find every action with its keybinding
+- Recent files (`Ctrl+O`), copy path (`y` / `Y`)
+- Open in your `$EDITOR` (`e`) and drop back into `mantis` when you're done
+- Auto-reload on disk change; session persistence (expanded dirs, open file,
+  scroll) restored on restart, cached outside the repo
+
+**Customization**
+- Live theme switching (`t`) — built-in presets, fully recolorable
+- Remappable keybindings and configurable layout via a simple TOML file
+- Nerd Font file-type icons (optional), full mouse support
+- Opt-in plugins — extra languages, icons, and custom overlays
 
 ## Install
 
-The one-liners above (no Rust toolchain required) download the prebuilt binary
-for your platform, verify its checksum, and install it onto your `PATH`.
-With the Rust toolchain: `cargo install mantis`. Or from source:
+The one-liners above (no Rust toolchain required) download the prebuilt binary for
+your platform, verify its checksum, and install it onto your `PATH`. With the Rust
+toolchain: `cargo install mantis`. Or from source:
 
 ```sh
 git clone https://github.com/ansromanov/mantis.git
@@ -101,74 +111,15 @@ for prebuilt binaries, Windows, and checksum verification.
 ## Usage
 
 ```sh
-mantis          # view the current directory
+mantis              # view the current directory
 mantis path/to/dir  # view a specific directory
 mantis file.md      # open a file directly
 ```
 
-Press `?` at any time for in-app help, and `q` to quit.
-
-## Keybindings
-
-Press `?` in-app for the full list, or `Ctrl+P` to fuzzy-find any action with its
-binding. The essentials:
-
-| Key | Action |
-| --- | --- |
-| `q`, `Ctrl+c` | Quit |
-| `?` | Toggle help |
-| `Ctrl+P` · `p` | Command palette · plugin palette |
-| `Tab` | Switch panel |
-| `/` · `f` | Fuzzy file search · full-text content search |
-| `r` · `e` | Reload tree · open current file in `$EDITOR` |
-| `Ctrl+O` · `y` · `Y` | Recent files · copy absolute path · copy relative path |
-| `Space` · `:` | Toggle fold at cursor · go to line |
-| `Alt+.` | Toggle hidden files |
-| `H` · `b` · `B` | Git history · toggle git blame · blame the active line |
-| `V` | Visual-line mode (select lines; `b` blames the range) |
-| `Ctrl+G` · `Alt+G` | Toggle git mode · flat/tree view in git mode |
-| `t` | Theme picker |
-
-**Navigation** — `Up`/`k`, `Down`/`j` move or scroll; `Enter`/`Right`/`l` expand
-a directory or open a file; `Left`/`h` collapse or go up; `-`/`=` collapse/expand
-the whole tree. In the content panel, `PageUp`/`PageDown` page, `g`/`G` jump to
-top/bottom, `0` resets horizontal scroll, `z` toggles word wrap, `L` toggles line
-numbers, `Space` toggles a fold, `M` toggles raw/rendered markdown, `J` toggles
-JSON pretty-print.
-
-**Search popup** — type to filter, `Up`/`Down` to navigate, `Tab` to switch
-files ↔ content mode, `Enter` to open, `Esc` to close.
-
-**Mouse** — click a tree row to select (opens a file or folds a directory), click
-a pane to focus it, scroll the pane under the cursor. In popups, single-click
-selects and double-click activates.
-
-## Git features
-
-- **History** (`H`) — fzf-style list of commits that touched the open file. Type
-  to filter, `Enter`/double-click to load that revision's diff against your
-  working tree (additions green, deletions red).
-- **Blame** (`b`, `B`) — `b` toggles an inline gutter with short hash, author, and
-  date per line; `B` blames just the active line. Unavailable while viewing a diff.
-- **Visual-line blame** (`V`) — enter visual-line mode, extend the selection with
-  `j`/`k` (or `g`/`G`), then press `b` to open a panel showing the short hash,
-  author, relative date, and content for every line in the range. `Esc` exits.
-- **Git mode** (`Ctrl+G`) — show only files with uncommitted changes; selecting
-  one shows its working-tree diff. `Alt+G` toggles between tree and a flat list
-  of changed files. Directories with changes auto-expand; diffs refresh on the
-  30-second auto-reload tick and on manual `r`.
-- **Diff view** — while viewing a diff, `D` toggles side-by-side, `S` toggles
-  the staged diff, and `n`/`N` jump to the next/previous hunk.
-
-All require `git` on your `PATH` and a tracked file/repository. Configure via
-`mantis.toml`:
-
-```toml
-git_mode = false         # start in git mode (default: false)
-git_mode_flat = false    # start in flat list view (default: false)
-git_status = true        # colour tree entries by git status (default: true)
-git_show_deleted = false # show ghost nodes for deleted tracked files (default: false)
-```
+Press `?` at any time for in-app help, and `q` to quit. For the full keybinding
+list and every action name, see the
+[Usage & Keybindings guide](https://ansromanov.github.io/mantis/usage.html) — or
+press `Ctrl+P` in-app to fuzzy-find any action with its binding.
 
 ## Plugins
 
@@ -178,86 +129,27 @@ extend it. Two kinds:
 - **Process plugins** — standalone executables that hook into app events and send
   actions back over newline-delimited JSON on stdin/stdout. They can add language
   providers (syntax highlighting + per-file-type fold regions), file-tree icons,
-  git overlays, and more. A plugin can be any executable — a compiled binary, a
+  custom overlays, and more. A plugin can be any executable — a compiled binary, a
   script, anything that reads stdin and writes stdout.
-- **Syntax plugins** — `.sublime-syntax` files loaded into the syntect highlighter
-  at startup to add new file types without rebuilding `mantis`.
+- **Syntax plugins** — `.sublime-syntax` files loaded into the highlighter at
+  startup to add new file types without rebuilding `mantis`.
 
 Press `p` for the plugin palette to enable/disable plugins; the choice persists
 across restarts (under `[plugins]` in `mantis.toml`). Bundled plugins auto-register
-and install on first enable, and a git-backed registry (`index.json`) lets
-`mantis` discover and fetch community plugins.
+and install on first enable, and a git-backed registry (`index.json`) lets `mantis`
+discover and fetch community plugins.
 
 See the [Plugins guide](https://ansromanov.github.io/mantis/plugins.html),
-[Plugin Registry](https://ansromanov.github.io/mantis/plugin-registry.html),
-and [Plugin Development](https://ansromanov.github.io/mantis/plugin-development.html)
+[Plugin Registry](https://ansromanov.github.io/mantis/plugin-registry.html), and
+[Plugin Development](https://ansromanov.github.io/mantis/plugin-development.html)
 docs for the full protocol and manifest (`plugin.toml`) format.
 
-## Configuration
+## Documentation
 
-`mantis` reads a `mantis.toml` file. It first looks for one in the directory being
-viewed (and its ancestors), then falls back to the global config:
-`$XDG_CONFIG_HOME/mantis/mantis.toml` (or `~/.config/mantis/mantis.toml`) on Linux/macOS,
-`%APPDATA%\mantis\mantis.toml` on Windows. A project-local file overrides
-the global one, so a repository can ship its own defaults.
-
-```toml
-show_hidden = false       # show dotfiles
-ignore_gitignore = false  # show files excluded by .gitignore
-tree_width = 28           # tree panel width, as a percent of the terminal
-tree_independent_scroll = false  # PageUp/PageDown & Home/End scroll the tree
-                                 # viewport without moving the selection
-word_wrap = false         # wrap long lines in the content panel
-indent_guides = true      # draw indent guides in the tree
-icons = false             # Nerd Font file-type icons (icon map from a plugin)
-show_file_info = true     # encoding + line endings in the status bar
-recent_files_count = 10   # how many entries the recent-files list (Ctrl+O) keeps
-
-# Every keybinding is remappable under [keys]. Each action takes a list of
-# key specs — a single character ("q", "?", "0") or a named key (Up, Enter,
-# Tab, Esc, PageUp, ...), optionally prefixed with "ctrl+" / "alt+".
-[keys]
-quit = ["q", "ctrl+c"]
-search_files = ["/"]
-nav_up = ["Up", "k"]
-tree_expand = ["Enter", "Right", "l"]
-# ... see `?` in-app or the command palette for every action name.
-```
-
-### Theme
-
-Press `t` for an fzf-style picker to switch themes live, or set one in config.
-Built-in presets: `default`, `monokai`, `solarized`, `catppuccin`, `synthwave84`.
-
-Configure under a `[theme]` table. `name` selects a preset as the base; each role
-then overrides it. A role takes a color name (`cyan`, `lightyellow`, `reset`) or
-a hex value (`#aabbcc`); `syntax` is a
-[syntect](https://github.com/trishume/syntect) theme name for file contents.
-Anything left unset keeps the preset's value. Presets ship their own background;
-the `default` theme leaves it transparent. Set `transparent_background = true` to
-keep a preset's colors but use your terminal's background.
-
-```toml
-[theme]
-name = "catppuccin"             # built-in preset to start from
-transparent_background = false  # true = use terminal's background instead
-background = "reset"            # panel backgrounds (reset = terminal default)
-accent = "cyan"                # focused borders, primary highlights
-accent_alt = "yellow"          # popup chrome, keys, prompts
-dim = "darkgray"               # unfocused borders, gutters, hints, rules
-text = "white"                 # emphasized / default text
-dir = "blue"                   # directory entries in the tree
-file = "reset"                 # file entries in the tree
-selection_bg = "darkgray"      # selected row / status bar background
-selection_fg = "yellow"        # selected row foreground in popups
-heading1 = "lightcyan"         # markdown H1 / table headers
-heading2 = "lightyellow"       # markdown H2
-heading3 = "lightgreen"        # markdown H3
-code = "lightyellow"           # inline code / code blocks
-diff_add = "green"             # added lines in a diff
-diff_del = "red"               # removed lines in a diff
-syntax = "base16-ocean.dark"
-```
+- [Usage & Keybindings](https://ansromanov.github.io/mantis/usage.html) — every key and action
+- [Configuration](https://ansromanov.github.io/mantis/configuration.html) — `mantis.toml` options and `[keys]`
+- [Themes](https://ansromanov.github.io/mantis/themes.html) — presets and every recolorable role
+- [Plugins](https://ansromanov.github.io/mantis/plugins.html) — enable, install, and build plugins
 
 See [`example.md`](example.md) for a document that exercises the markdown renderer.
 
