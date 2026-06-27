@@ -12,6 +12,8 @@ use ratatui::backend::TestBackend;
 
 use crate::app::{App, Focus};
 use crate::config::Config;
+use crate::git::BlameLine;
+use crate::ui::content::draw::{format_blame_annotation, BLAME_COL_WIDTH};
 use crate::ui::content::draw_content;
 
 static COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -251,4 +253,162 @@ fn plugin_content_is_rendered_for_current_file() {
         "plugin content must take precedence in the content pane"
     );
     fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn format_blame_annotation_shows_author_and_subject() {
+    let bl = BlameLine {
+        commit_hash: String::new(),
+        short_hash: "abc1234".to_string(),
+        author: "Alice".to_string(),
+        date_relative: "3 days ago".to_string(),
+        line_no: 1,
+        subject: "fix memory leak in parser".to_string(),
+    };
+    let result = format_blame_annotation(&bl);
+    assert!(result.contains("Alice"), "author must appear: {result:?}");
+    assert!(
+        result.contains("fix memory leak"),
+        "subject must appear: {result:?}"
+    );
+    assert!(
+        !result.contains("abc1234"),
+        "hash must NOT appear: {result:?}"
+    );
+    assert!(!result.contains("days"), "date must NOT appear: {result:?}");
+    assert_eq!(result.len(), BLAME_COL_WIDTH);
+}
+
+#[test]
+fn format_blame_annotation_truncates_long_author_and_subject() {
+    let bl = BlameLine {
+        commit_hash: String::new(),
+        short_hash: "abc1234".to_string(),
+        author: "Christopher".to_string(),
+        date_relative: "3 days ago".to_string(),
+        line_no: 1,
+        subject: "This is an extremely long commit message that goes on and on and on and on"
+            .to_string(),
+    };
+    let result = format_blame_annotation(&bl);
+    assert!(
+        result.starts_with("Christophe"),
+        "author should be truncated to 10 chars: {result:?}"
+    );
+    assert_eq!(result.len(), BLAME_COL_WIDTH);
+    assert!(
+        !result.contains("abc1234"),
+        "hash must not appear: {result:?}"
+    );
+    assert!(!result.contains("days"), "date must not appear: {result:?}");
+}
+
+#[test]
+fn format_blame_annotation_empty_subject() {
+    let bl = BlameLine {
+        commit_hash: String::new(),
+        short_hash: "abc1234".to_string(),
+        author: "Bob".to_string(),
+        date_relative: "now".to_string(),
+        line_no: 2,
+        subject: String::new(),
+    };
+    let result = format_blame_annotation(&bl);
+    assert!(result.contains("Bob"), "author must appear");
+    assert_eq!(result.len(), BLAME_COL_WIDTH);
+    assert!(!result.contains("abc1234"), "hash must not appear");
+}
+
+#[test]
+fn blame_column_click_sets_show_line_blame_and_correct_active_line() {
+    let dir = tempfile::TempDir::new().expect("temp dir");
+    let path = dir.path().join("test.txt");
+    std::fs::write(&path, "a\nb\nc\n").unwrap();
+    let mut app = crate::app::App::new(
+        dir.path().to_path_buf(),
+        crate::config::Config::default(),
+        None,
+        None,
+    )
+    .expect("App::new");
+    app.open_file(&path);
+    // Inject plugin blame data so the blame column renders non-empty without
+    // requiring a real git repo.
+    let plugin_blame: Vec<String> = vec![
+        format!("{:<10} Alice's commit  ", "Alice"),
+        format!("{:<10} Bob's change    ", "Bob"),
+        format!("{:<10} Charlie's fix   ", "Charlie"),
+    ];
+    app.plugin_blame.insert(path, plugin_blame);
+    app.show_blame = true;
+    // Render to populate blame_col_width and content_area from the actual layout.
+    let backend = TestBackend::new(80, 24);
+    let mut terminal = ratatui::Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| draw_content(frame, &mut app, frame.area()))
+        .unwrap();
+    assert!(
+        app.blame_col_width > 0,
+        "blame_col_width must be set after render"
+    );
+    // Content area starts at x=1 (after border). Blame column occupies
+    // x=1..1+blame_col_width. Click at x=2 (within blame column) on the
+    // third content row (row 3 = y=1 border + 2nd 0-indexed content row).
+    let cx = app.content_area.x;
+    let blame_at = cx + 1;
+    app.handle_mouse(crossterm::event::MouseEvent {
+        kind: crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left),
+        column: blame_at,
+        row: 3,
+        modifiers: crossterm::event::KeyModifiers::empty(),
+    });
+    assert!(
+        app.show_line_blame,
+        "clicking blame column must open line-blame popup"
+    );
+    // The third content row corresponds to physical line 2.
+    assert_eq!(app.active_line, 2, "must set active_line to clicked line");
+}
+
+#[test]
+fn blame_column_click_does_not_start_drag_selection() {
+    let dir = tempfile::TempDir::new().expect("temp dir");
+    let path = dir.path().join("test.txt");
+    std::fs::write(&path, "a\nb\nc\n").unwrap();
+    let mut app = crate::app::App::new(
+        dir.path().to_path_buf(),
+        crate::config::Config::default(),
+        None,
+        None,
+    )
+    .expect("App::new");
+    app.open_file(&path);
+    let plugin_blame: Vec<String> = vec![
+        format!("{:<10} Alice's commit  ", "Alice"),
+        format!("{:<10} Bob's change    ", "Bob"),
+    ];
+    app.plugin_blame.insert(path, plugin_blame);
+    app.show_blame = true;
+    let backend = TestBackend::new(80, 24);
+    let mut terminal = ratatui::Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| draw_content(frame, &mut app, frame.area()))
+        .unwrap();
+    // Click on the blame column column within the blame column area.
+    let cx = app.content_area.x;
+    let blame_at = cx + 1;
+    app.handle_mouse(crossterm::event::MouseEvent {
+        kind: crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left),
+        column: blame_at,
+        row: 1,
+        modifiers: crossterm::event::KeyModifiers::empty(),
+    });
+    assert!(
+        app.selection.is_none(),
+        "blame column click should not start drag selection"
+    );
+    assert!(
+        app.show_line_blame,
+        "blame column click should open line-blame popup"
+    );
 }

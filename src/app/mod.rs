@@ -251,6 +251,8 @@ pub struct App {
     pub auto_watch: bool,
     pub show_file_info: bool,
     pub indent_guides: bool,
+    /// Content-pane blame column width captured during the last render (0 when hidden).
+    pub blame_col_width: usize,
     /// Whether to show file-type icon glyphs in the tree. The glyphs come from
     /// a plugin via the `set_icon_map` action; off by default because they
     /// require a Nerd Font in the terminal.

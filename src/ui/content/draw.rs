@@ -19,12 +19,26 @@ use ratatui::{
 use unicode_width::UnicodeWidthStr;
 
 use crate::app::{App, Focus};
+use crate::git::BlameLine;
 
 use super::diff::draw_side_by_side_diff;
 use super::draw_text::{render_inline_fallback, render_virtual_file};
 use super::scrollbar::draw_content_scrollbar;
 use super::search::apply_search_to_regions;
 use super::selection::apply_selection;
+
+/// Width of the inline blame column (author + subject). Exposed so tests and
+/// the mouse handler can reference the same size. Cap subject to make room.
+pub(crate) const BLAME_COL_WIDTH: usize = 37;
+
+/// Formats a `BlameLine` into an inline annotation string showing `{author:<10}
+/// {subject}` truncated to `BLAME_COL_WIDTH`. Exposed for testing.
+pub(crate) fn format_blame_annotation(bl: &BlameLine) -> String {
+    let subj_len = BLAME_COL_WIDTH.saturating_sub(11);
+    let author: String = bl.author.chars().take(10).collect();
+    let subject: String = bl.subject.chars().take(subj_len).collect();
+    format!("{:<10} {:<width$}", author, subject, width = subj_len)
+}
 
 /// Renders the content/diff panel. Handles four modes:
 /// - Diff view (styled per-line, no gutter, no selection)
@@ -98,8 +112,6 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     let in_file_search = app.in_file_search.as_ref();
 
     // Blame annotations: one formatted string per 0-based line index.
-    // BLAME_COL_WIDTH = 7 (hash) + 1 + 10 (author) + 1 + 6 (date) + 1 = 26 chars.
-    const BLAME_COL_WIDTH: usize = 26;
     let blame_annotations: Vec<String> = if app.show_blame && !app.is_diff {
         if let Some(path) = &app.current_file {
             // Plugin-provided blame data takes precedence over live git blame.
@@ -123,10 +135,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                     for bl in &git_lines {
                         let idx = (bl.line_no as usize).saturating_sub(1);
                         if idx < annotations.len() {
-                            let author: String = bl.author.chars().take(10).collect();
-                            let date: String = bl.date_relative.chars().take(6).collect();
-                            annotations[idx] =
-                                format!("{} {:<10} {:<6} ", bl.short_hash, author, date);
+                            annotations[idx] = format_blame_annotation(bl);
                         }
                     }
                     annotations
@@ -144,6 +153,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     } else {
         BLAME_COL_WIDTH
     };
+    app.blame_col_width = blame_width;
     let blame_style = Style::default().fg(app.theme.dim);
     let show_ln = app.show_line_numbers;
 
