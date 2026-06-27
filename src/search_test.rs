@@ -216,12 +216,41 @@ fn search_state_new_creates_file_results() {
     fs::write(root.join("a.txt"), "hello\n").unwrap();
     fs::write(root.join("b.txt"), "world\n").unwrap();
 
-    let s = SearchState::new(&root, false, true, 0);
+    let s = SearchState::new(&root, false, true, 0, None);
     assert_eq!(s.file_results.len(), 2);
     assert_eq!(s.mode, SearchMode::Files);
     assert!(s.query.is_empty());
     assert_eq!(s.selected, 0);
+    assert!(!s.scoped);
     fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn search_state_new_scoped() {
+    let mut files = std::collections::HashSet::new();
+    files.insert(PathBuf::from("/tmp/a.txt"));
+    files.insert(PathBuf::from("/tmp/b.txt"));
+    let s = SearchState::new(Path::new("/tmp"), false, true, 0, Some(&files));
+    assert_eq!(s.all_files.len(), 2);
+    assert!(s.scoped);
+}
+
+#[test]
+fn search_state_new_scoped_filters_outside_root() {
+    let mut files = std::collections::HashSet::new();
+    files.insert(PathBuf::from("/tmp/a.txt"));
+    files.insert(PathBuf::from("/other/b.txt"));
+    let s = SearchState::new(Path::new("/tmp"), false, true, 0, Some(&files));
+    assert_eq!(s.all_files.len(), 1);
+    assert!(s.scoped);
+}
+
+#[test]
+fn search_state_new_scoped_empty_set() {
+    let files = std::collections::HashSet::new();
+    let s = SearchState::new(Path::new("/tmp"), false, true, 0, Some(&files));
+    assert!(s.all_files.is_empty());
+    assert!(s.scoped);
 }
 
 #[test]
@@ -231,7 +260,7 @@ fn search_state_push_and_pop_query() {
     fs::write(root.join("a.txt"), "hello\n").unwrap();
     fs::write(root.join("b.txt"), "world\n").unwrap();
 
-    let mut s = SearchState::new(&root, false, true, 0);
+    let mut s = SearchState::new(&root, false, true, 0, None);
     assert_eq!(s.file_results.len(), 2);
     s.push('A');
     assert_eq!(s.query, "A");
@@ -247,7 +276,7 @@ fn search_state_toggle_mode() {
     fs::create_dir_all(&root).unwrap();
     fs::write(root.join("a.txt"), "hello\n").unwrap();
 
-    let mut s = SearchState::new(&root, false, true, 0);
+    let mut s = SearchState::new(&root, false, true, 0, None);
     assert_eq!(s.mode, SearchMode::Files);
     s.toggle_mode();
     assert_eq!(s.mode, SearchMode::Content);
@@ -262,7 +291,7 @@ fn search_state_results_len() {
     fs::create_dir_all(&root).unwrap();
     fs::write(root.join("a.txt"), "hello\n").unwrap();
 
-    let mut s = SearchState::new(&root, false, true, 0);
+    let mut s = SearchState::new(&root, false, true, 0, None);
     assert_eq!(s.results_len(), 1);
     s.toggle_mode();
     s.push('h');
@@ -283,7 +312,7 @@ fn search_state_content_context_lines() {
     )
     .unwrap();
 
-    let mut s = SearchState::new(&root, false, true, 2);
+    let mut s = SearchState::new(&root, false, true, 2, None);
     s.toggle_mode();
     s.push('d');
     s.push('a');
@@ -302,7 +331,7 @@ fn search_state_content_context_capped_at_eof() {
     fs::create_dir_all(&root).unwrap();
     fs::write(root.join("a.txt"), "match\nnext\n").unwrap();
 
-    let mut s = SearchState::new(&root, false, true, 5);
+    let mut s = SearchState::new(&root, false, true, 5, None);
     s.toggle_mode();
     for c in "mat".chars() {
         s.push(c);
@@ -319,11 +348,11 @@ fn search_state_reload_files() {
     fs::create_dir_all(&root).unwrap();
     fs::write(root.join("a.txt"), "hello\n").unwrap();
 
-    let mut s = SearchState::new(&root, false, true, 0);
+    let mut s = SearchState::new(&root, false, true, 0, None);
     assert_eq!(s.file_results.len(), 1);
 
     fs::write(root.join("b.txt"), "world\n").unwrap();
-    s.reload_files(&root, false, true);
+    s.reload_files(&root, false, true, None);
     assert_eq!(s.file_results.len(), 2);
     fs::remove_dir_all(&root).ok();
 }

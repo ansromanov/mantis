@@ -47,7 +47,7 @@ These work no matter which panel is focused.
 | `b`            | Toggle git blame        |
 | `B`            | Blame the active line   |
 | `t`            | Theme picker            |
-| `Ctrl+G`       | Toggle git mode (changed files + diffs) |
+| `Ctrl+G`       | Toggle git mode (changed files + diffs; `/` and `f` search scope to changed files) |
 | `F`            | Toggle flat / tree view in git mode |
 
 ## Tree panel
@@ -86,6 +86,8 @@ The content pane has a **line cursor** (visible as a highlighted full-width row)
 ## Search popup
 
 Open with `/` (file names) or `f` (file contents). Just start typing to filter.
+In git mode (`Ctrl+G`), search is automatically scoped to only the changed
+files — the popup title shows "(changed files)" to make this visible.
 
 | Key       | Action                          |
 | --------- | ------------------------------- |

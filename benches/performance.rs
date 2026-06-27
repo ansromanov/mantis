@@ -230,7 +230,7 @@ fn bench_content_search(c: &mut Criterion) {
             ),
             &dir,
             |b, dir| {
-                let mut state = SearchState::new(dir, false, true, 0);
+                let mut state = SearchState::new(dir, false, true, 0, None);
                 state.toggle_mode();
                 // Warm the cache
                 state.push('x');

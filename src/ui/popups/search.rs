@@ -31,9 +31,14 @@ pub(crate) fn draw_search(f: &mut Frame, app: &mut App, area: Rect) {
     let popup = centered_rect(72, 75, area);
     f.render_widget(Clear, popup);
 
+    let scope = if search.scoped {
+        " (changed files)"
+    } else {
+        ""
+    };
     let mode_label = match search.mode {
-        SearchMode::Files => " Search: Files  [Tab → Content] ",
-        SearchMode::Content => " Search: Content  [Tab → Files] ",
+        SearchMode::Files => format!(" Search: Files{scope}  [Tab → Content] "),
+        SearchMode::Content => format!(" Search: Content{scope}  [Tab → Files] "),
     };
 
     let block = Block::default()

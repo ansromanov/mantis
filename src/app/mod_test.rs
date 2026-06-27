@@ -750,6 +750,113 @@ fn git_mode_flat_toggle_returns_to_tree_view() {
 }
 
 #[test]
+fn git_mode_search_is_scoped_to_changed_files() {
+    let root = temp_git_with_changes();
+    let mut app = app_for(&root);
+    app.handle_key(ctrl_g());
+    assert!(app.git_mode);
+
+    // Open file search ("/" with content focus, no file open).
+    app.focus = Focus::Content;
+    app.current_file = None;
+    app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
+    let search = app.search.as_ref().unwrap();
+    assert!(search.scoped, "search must be scoped in git mode");
+
+    // Only changed files appear: committed.txt, new.txt, sub/nested.txt.
+    // Unchanged.txt must NOT be in the results.
+    let names: Vec<&str> = search
+        .file_results
+        .iter()
+        .filter_map(|p| p.file_name())
+        .map(|n| n.to_str().unwrap())
+        .collect();
+    assert!(
+        names.contains(&"committed.txt"),
+        "changed file must be in results; got {names:?}"
+    );
+    assert!(
+        names.contains(&"new.txt"),
+        "new file must be in results; got {names:?}"
+    );
+    assert!(
+        !names.contains(&"unchanged.txt"),
+        "unchanged file must NOT be in results; got {names:?}"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn git_mode_search_is_not_scoped_outside_git_mode() {
+    let root = temp_git_with_changes();
+    let mut app = app_for(&root);
+    assert!(!app.git_mode);
+
+    app.focus = Focus::Content;
+    app.current_file = None;
+    app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
+    let search = app.search.as_ref().unwrap();
+    assert!(!search.scoped, "search must NOT be scoped outside git mode");
+    // Unchanged file must appear.
+    let names: Vec<&str> = search
+        .file_results
+        .iter()
+        .filter_map(|p| p.file_name())
+        .map(|n| n.to_str().unwrap())
+        .collect();
+    assert!(
+        names.contains(&"unchanged.txt"),
+        "unchanged file must appear outside git mode; got {names:?}"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn git_changed_files_set_returns_none_outside_git_mode() {
+    let root = temp_tree();
+    let app = app_for(&root);
+    assert!(app.git_changed_files_set().is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn git_changed_files_set_returns_files_in_git_mode() {
+    let root = temp_git_with_changes();
+    let mut app = app_for(&root);
+    app.handle_key(ctrl_g());
+    let set = app.git_changed_files_set();
+    assert!(set.is_some());
+    let set = set.unwrap();
+    assert!(set.contains(&root.join("committed.txt")));
+    assert!(set.contains(&root.join("new.txt")));
+    assert!(set.contains(&root.join("sub").join("nested.txt")));
+    assert!(!set.contains(&root.join("unchanged.txt")));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn git_mode_empty_changed_set_gives_empty_search() {
+    let root = temp_tree(); // not a git repo, no git status
+    let mut app = app_for(&root);
+    app.handle_key(ctrl_g());
+    assert!(app.git_mode);
+    // git_status_map should be empty since this is not a git repo.
+    assert!(app.git_status_map.is_empty() || app.nodes.is_empty());
+
+    app.focus = Focus::Content;
+    app.current_file = None;
+    app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
+    if let Some(search) = app.search.as_ref() {
+        assert!(search.scoped);
+        assert!(
+            search.file_results.is_empty(),
+            "empty changed set should give empty results"
+        );
+    }
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn git_mode_flat_key_is_noop_outside_git_mode() {
     let root = temp_git_with_changes();
     let mut app = app_for(&root);

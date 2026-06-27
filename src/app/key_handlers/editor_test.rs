@@ -150,6 +150,47 @@ fn tree_up_dir_command_changes_root_for_top_level_file() {
 }
 
 #[test]
+fn open_file_search_command_scoped_in_git_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.git_mode = true;
+    app.command_palette = Some(palette_with_query("Open file search"));
+    app.dispatch_command();
+    assert!(
+        app.search.as_ref().unwrap().scoped,
+        "file search must be scoped when git mode is active"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn open_file_search_command_not_scoped_outside_git_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.command_palette = Some(palette_with_query("Open file search"));
+    app.dispatch_command();
+    assert!(
+        !app.search.as_ref().unwrap().scoped,
+        "file search must not be scoped outside git mode"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn open_content_search_command_scoped_in_git_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.git_mode = true;
+    app.command_palette = Some(palette_with_query("Open content search"));
+    app.dispatch_command();
+    assert!(
+        app.search.as_ref().unwrap().scoped,
+        "content search must be scoped when git mode is active"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn toggle_git_mode_command_flips_git_mode_flag() {
     let root = temp_tree();
     let mut app = app_for(&root);

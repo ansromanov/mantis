@@ -50,7 +50,7 @@ fn hint_history() {
 #[test]
 fn hint_search() {
     let mut app = make_app();
-    app.search = Some(SearchState::new(Path::new("."), false, true, 0));
+    app.search = Some(SearchState::new(Path::new("."), false, true, 0, None));
     let text = render_bar(&app);
     assert!(text.contains("Enter select"));
 }

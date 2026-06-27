@@ -51,7 +51,7 @@ fn draw_no_overlay() {
 #[test]
 fn draw_search_overlay() {
     let mut app = make_app();
-    app.search = Some(SearchState::new(Path::new("."), false, true, 0));
+    app.search = Some(SearchState::new(Path::new("."), false, true, 0, None));
     let rows = render(&mut app);
     let joined = rows.join("\n");
     assert!(joined.contains("Search: Files"));
