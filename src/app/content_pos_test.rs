@@ -5,6 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use ratatui::layout::Rect;
 use ratatui::style::Style;
 
 use crate::app::App;
@@ -90,5 +91,292 @@ fn line_prefix_width_zero_for_plugin_content() {
     seed_plugin(&mut app, path, &["x", "y"]);
     app.show_line_numbers = true;
     assert_eq!(app.line_prefix_width(), 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- content_scroll_max / set_content_scroll / clamp_content_scroll tests --
+
+#[test]
+fn set_content_scroll_clamps_to_max() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    // Simulate a content area 10 rows tall with 20 lines of content.
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 10,
+    };
+    // doc.md has 1 line; force a larger virtual file:
+    app.content = (0..20).map(|i| format!("line {i}")).collect();
+    assert_eq!(app.content_scroll_max(), 20usize.saturating_sub(10)); // 10
+
+    app.set_content_scroll(usize::MAX);
+    assert_eq!(app.content_scroll, app.content_scroll_max());
+
+    app.set_content_scroll(5);
+    assert_eq!(app.content_scroll, 5);
+
+    app.set_content_scroll(app.content_scroll_max() + 100);
+    assert_eq!(app.content_scroll, app.content_scroll_max());
+
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn set_content_scroll_zero_always_works() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 10,
+    };
+    app.content = (0..5).map(|i| format!("line {i}")).collect();
+    app.content_scroll = 3;
+    app.set_content_scroll(0);
+    assert_eq!(app.content_scroll, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn clamp_content_scroll_reduces_when_content_shrinks() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 5,
+    };
+    app.content = (0..100).map(|i| format!("line {i}")).collect();
+    app.content_scroll = 90;
+    // max = 100 - 5 = 95; 90 <= 95, so no change.
+    app.clamp_content_scroll();
+    assert_eq!(app.content_scroll, 90);
+
+    // Content shrinks to 10 lines → max = 10 - 5 = 5.
+    app.content = (0..10).map(|i| format!("line {i}")).collect();
+    app.clamp_content_scroll();
+    assert_eq!(app.content_scroll, 5);
+
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn clamp_content_scroll_does_not_increase_when_content_grows() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 5,
+    };
+    app.content = (0..10).map(|i| format!("line {i}")).collect();
+    app.content_scroll = 4;
+    // Content grows → max increases, clamp leaves scroll at 4.
+    app.content = (0..100).map(|i| format!("line {i}")).collect();
+    app.clamp_content_scroll();
+    assert_eq!(app.content_scroll, 4);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- page_rows tests --
+
+#[test]
+fn page_rows_defaults_to_viewport_height_minus_one() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 25,
+    };
+    assert_eq!(app.page_rows(), 24);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn page_rows_at_least_one() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 0,
+    };
+    assert_eq!(app.page_rows(), 1);
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 1,
+    };
+    assert_eq!(app.page_rows(), 1);
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- has_text_cursor tests --
+
+#[test]
+fn has_text_cursor_true_for_normal_text() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.is_diff = false;
+    app.is_markdown = false;
+    app.current_file = None;
+    assert!(app.has_text_cursor());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn has_text_cursor_false_for_diff() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.is_diff = true;
+    assert!(!app.has_text_cursor());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn has_text_cursor_false_for_rendered_markdown() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.is_diff = false;
+    app.is_markdown = true;
+    app.show_raw_markdown = false;
+    app.markdown_lines = vec![vec![(Style::default(), "hello".into())]];
+    assert!(!app.has_text_cursor());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn has_text_cursor_true_for_raw_markdown() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.is_diff = false;
+    app.is_markdown = true;
+    app.show_raw_markdown = true; // raw = text cursor
+    app.markdown_lines = vec![vec![(Style::default(), "hello".into())]];
+    assert!(app.has_text_cursor());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn has_text_cursor_false_for_plugin_content() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.is_diff = false;
+    app.is_markdown = false;
+    let path = root.join("doc.md");
+    seed_plugin(&mut app, path, &["plugin content"]);
+    assert!(!app.has_text_cursor());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn has_text_cursor_true_for_empty_markdown_lines() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.is_diff = false;
+    app.is_markdown = true;
+    app.show_raw_markdown = false;
+    app.markdown_lines = vec![]; // empty → treat as text
+    assert!(app.has_text_cursor());
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- scroll_line_into_view tests --
+
+#[test]
+fn scroll_line_into_view_already_visible_noop() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 10,
+    };
+    app.content = (0..50).map(|i| format!("line {i}")).collect();
+    app.content_scroll = 10;
+    app.scroll_line_into_view(12); // line 12 is within [10, 20)
+    assert_eq!(app.content_scroll, 10);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn scroll_line_into_view_above_viewport() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 10,
+    };
+    app.content = (0..50).map(|i| format!("line {i}")).collect();
+    app.content_scroll = 20;
+    app.scroll_line_into_view(5); // line 5 is above scroll
+    assert_eq!(app.content_scroll, 5);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn scroll_line_into_view_below_viewport() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 10,
+    };
+    app.content = (0..50).map(|i| format!("line {i}")).collect();
+    app.content_scroll = 5;
+    // viewport covers lines 5..15, line 30 is below
+    app.scroll_line_into_view(30);
+    // target = 30 - 10 + 1 = 21
+    assert_eq!(app.content_scroll, 21);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn scroll_line_into_view_last_row() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 10,
+    };
+    app.content = (0..50).map(|i| format!("line {i}")).collect();
+    app.content_scroll = 0;
+    // line 49 is the last, viewport is 10 tall → scroll to 40
+    app.scroll_line_into_view(49);
+    assert_eq!(app.content_scroll, 40);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn scroll_line_into_view_clamps_to_max() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 10,
+    };
+    app.content = (0..50).map(|i| format!("line {i}")).collect();
+    // scroll_line_into_view of line 49 with height 10 should not exceed max
+    // max = 50 - 10 = 40
+    app.scroll_line_into_view(49);
+    assert_eq!(app.content_scroll, 40);
     fs::remove_dir_all(&root).ok();
 }

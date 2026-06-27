@@ -456,7 +456,7 @@ impl App {
         if let Some((path, line)) = action {
             self.open_file(&path);
             if let Some(ln) = line {
-                self.content_scroll = ln.saturating_sub(1);
+                self.set_content_scroll(ln.saturating_sub(1));
             }
             self.reveal_in_tree(&path.clone());
         }

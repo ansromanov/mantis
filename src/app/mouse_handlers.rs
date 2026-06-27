@@ -16,6 +16,7 @@ use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 
 use crate::selection::TextSelection;
 
+use super::content_pos::WHEEL_STEP;
 use super::{rect_contains, App, Focus};
 
 #[cfg(test)]
@@ -152,7 +153,7 @@ impl App {
                                 return;
                             }
                         }
-                        let can_select = !self.is_diff;
+                        let can_select = self.has_text_cursor();
                         if can_select {
                             let pos = self.content_pos(ev.column, ev.row);
                             self.drag_start = Some(pos);
@@ -177,10 +178,9 @@ impl App {
                     // is calculated with the already-updated scroll offset.
                     let ca = self.content_area;
                     if ev.row < ca.y + 2 {
-                        self.content_scroll = self.content_scroll.saturating_sub(1);
+                        self.set_content_scroll(self.content_scroll.saturating_sub(1));
                     } else if ev.row >= ca.y + ca.height.saturating_sub(2) {
-                        self.content_scroll =
-                            (self.content_scroll + 1).min(self.content_scroll_max());
+                        self.set_content_scroll(self.content_scroll.saturating_add(1));
                     }
                     let pos = self.content_pos(ev.column, ev.row);
                     self.selection = Some(TextSelection {
@@ -212,16 +212,16 @@ impl App {
             }
             MouseEventKind::ScrollDown => {
                 if rect_contains(self.content_area, ev.column, ev.row) {
-                    self.content_scroll = (self.content_scroll + 3).min(self.content_scroll_max());
+                    self.set_content_scroll(self.content_scroll.saturating_add(WHEEL_STEP));
                 } else if rect_contains(self.tree_area, ev.column, ev.row) {
-                    self.tree_scroll = (self.tree_scroll + 3).min(self.tree_scroll_max());
+                    self.tree_scroll = (self.tree_scroll + WHEEL_STEP).min(self.tree_scroll_max());
                 }
             }
             MouseEventKind::ScrollUp => {
                 if rect_contains(self.content_area, ev.column, ev.row) {
-                    self.content_scroll = self.content_scroll.saturating_sub(3);
+                    self.set_content_scroll(self.content_scroll.saturating_sub(WHEEL_STEP));
                 } else if rect_contains(self.tree_area, ev.column, ev.row) {
-                    self.tree_scroll = self.tree_scroll.saturating_sub(3);
+                    self.tree_scroll = self.tree_scroll.saturating_sub(WHEEL_STEP);
                 }
             }
             _ => {}

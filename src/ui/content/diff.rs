@@ -33,7 +33,7 @@ pub(crate) fn draw_side_by_side_diff(f: &mut Frame, app: &mut App, area: Rect, b
 
     let total = app.diff_rows.len();
     let view_height = inner.height as usize;
-    let scroll = app.content_scroll.min(total.saturating_sub(1));
+    let scroll = app.content_scroll.min(app.content_scroll_max());
     let end = (scroll + view_height).min(total);
 
     let (old_max, new_max) = crate::diff::max_line_numbers(&app.diff_rows);

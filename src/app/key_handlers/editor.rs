@@ -96,7 +96,7 @@ impl App {
             Some("toggle_word_wrap") => {
                 self.word_wrap = !self.word_wrap;
                 self.config.word_wrap = self.word_wrap;
-                self.content_scroll = 0;
+                self.set_content_scroll(0);
                 self.content_hscroll = 0;
                 self.save_config();
             }
@@ -107,17 +107,17 @@ impl App {
             }
             Some("toggle_raw_markdown") if self.is_markdown => {
                 self.show_raw_markdown = !self.show_raw_markdown;
-                self.content_scroll = 0;
+                self.set_content_scroll(0);
                 self.content_hscroll = 0;
             }
             Some("toggle_pretty_json") if self.is_json && !self.json_pretty_lines.is_empty() => {
                 self.show_pretty_json = !self.show_pretty_json;
-                self.content_scroll = 0;
+                self.set_content_scroll(0);
                 self.content_hscroll = 0;
             }
             Some("toggle_diff_side_by_side") if self.is_diff => {
                 self.diff_side_by_side = !self.diff_side_by_side;
-                self.content_scroll = 0;
+                self.set_content_scroll(0);
                 self.content_hscroll = 0;
             }
             Some("open_in_editor") => self.open_in_editor(),
@@ -139,7 +139,7 @@ impl App {
                 }
             }
             Some("blame_line") => {
-                if !self.is_diff {
+                if self.has_text_cursor() {
                     self.show_line_blame = !self.show_line_blame;
                 }
             }
