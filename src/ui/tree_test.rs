@@ -202,7 +202,7 @@ fn draw_tree_git_mode_clean_shows_placeholder() {
     let rows = render_tree(&mut app, 40, 5);
     let text = all_text(&rows);
     assert!(
-        text.contains("✓"),
+        text.contains('+'),
         "clean placeholder should show checkmark"
     );
     assert!(
@@ -229,7 +229,7 @@ fn draw_tree_git_mode_not_a_repo_shows_different_message() {
     let rows = render_tree(&mut app, 40, 5);
     let text = all_text(&rows);
     assert!(
-        text.contains("✗") || text.contains('X'),
+        text.contains('!'),
         "non-repo placeholder should show an error indicator"
     );
     assert!(
