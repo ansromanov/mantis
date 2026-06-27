@@ -79,7 +79,7 @@ fills.
 - In-file search and go-to-line (`:`)
 
 **Viewing & rendering**
-- Syntax highlighting via [syntect](https://github.com/trishume/syntect)
+- Syntax highlighting for a wide range of languages
 - Markdown rendering — headings, tables, task lists, code blocks (`M` toggles raw)
 - JSON pretty-printing (`J`) for minified files
 - Word wrap, line numbers, and a status bar (line, language, scroll, encoding)
@@ -134,8 +134,8 @@ extend it. Two kinds:
   providers (syntax highlighting + per-file-type fold regions), file-tree icons,
   custom overlays, and more. A plugin can be any executable — a compiled binary, a
   script, anything that reads stdin and writes stdout.
-- **Syntax plugins** — `.sublime-syntax` files loaded into the syntect highlighter
-  at startup to add new file types without rebuilding `mantis`.
+- **Syntax plugins** — `.sublime-syntax` files loaded into the highlighter at
+  startup to add new file types without rebuilding `mantis`.
 
 Press `p` for the plugin palette to enable/disable plugins; the choice persists
 across restarts (under `[plugins]` in `mantis.toml`). Bundled plugins auto-register
