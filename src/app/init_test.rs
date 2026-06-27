@@ -374,3 +374,14 @@ fn blame_col_width_initialises_to_zero() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn plugin_content_active_path_initialises_to_none() {
+    let root = temp_dir();
+    let app = new_app(&root, Config::default());
+    assert!(
+        app.plugin_content_active_path.is_none(),
+        "plugin_content_active_path must be None at construction so the first set_content is treated as first-render"
+    );
+    fs::remove_dir_all(&root).ok();
+}

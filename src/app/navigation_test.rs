@@ -763,3 +763,23 @@ fn git_mode_tree_includes_ignored_status_when_in_map() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn set_root_clears_plugin_content_active_path() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let orig_root = root.clone();
+    let file_idx = app
+        .nodes
+        .iter()
+        .position(|n| n.path == root.join("a.txt"))
+        .expect("a.txt node");
+    app.tree_selected = file_idx;
+    app.plugin_content_active_path = Some(root.join("a.txt"));
+    app.tree_up_dir();
+    assert!(
+        app.plugin_content_active_path.is_none(),
+        "set_root must clear plugin_content_active_path so the next plugin render is treated as first-render"
+    );
+    fs::remove_dir_all(&orig_root).ok();
+}
