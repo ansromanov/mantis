@@ -488,3 +488,37 @@ fn viewing_revision_cleared_by_esc_in_normal_mode() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+// -- highlight cache invalidation -------------------------------------------
+
+#[test]
+fn reload_content_clears_highlight_cache() {
+    let root = temp_dir();
+    let path = root.join("file.txt");
+    fs::write(&path, "hello\n").unwrap();
+    let mut app = app_for(&root);
+    app.open_file(&path);
+    *app.content_highlight_cache.borrow_mut() = Some((
+        crate::app::HighlightCacheKey {
+            path: path.clone(),
+            scroll: 0,
+            visible_end: 1,
+            theme: app.theme.syntax.clone(),
+            word_wrap: app.word_wrap,
+        },
+        vec![vec![(
+            ratatui::style::Style::default(),
+            "hello".to_string(),
+        )]],
+    ));
+    assert!(
+        app.content_highlight_cache.borrow().is_some(),
+        "precondition"
+    );
+    app.reload_content();
+    assert!(
+        app.content_highlight_cache.borrow().is_none(),
+        "reload_content must clear the highlight cache"
+    );
+    fs::remove_dir_all(&root).ok();
+}

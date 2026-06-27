@@ -283,3 +283,15 @@ fn app_new_last_breadcrumb_click_is_none() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn app_new_highlight_cache_starts_empty() {
+    let root = temp_dir();
+    fs::write(root.join("a.txt"), "x\n").unwrap();
+    let app = new_app(&root, Config::default());
+    assert!(
+        app.content_highlight_cache.borrow().is_none(),
+        "fresh App must have no cached highlights"
+    );
+    fs::remove_dir_all(&root).ok();
+}
