@@ -34,7 +34,7 @@ impl App {
     }
 
     /// Handles keyboard input while in-file search is active.
-    /// Extra keys: n/N/Tab/BackTab/Ctrl-p navigate matches.
+    /// Extra keys: n/N/Tab/BackTab/Ctrl-p/Up/Down navigate matches.
     pub(super) fn handle_in_file_search_key(&mut self, key: KeyEvent) {
         // Extra keys first
         match key.code {
@@ -46,11 +46,11 @@ impl App {
                 self.in_file_search_prev();
                 return;
             }
-            KeyCode::Tab => {
+            KeyCode::Tab | KeyCode::Down => {
                 self.in_file_search_next();
                 return;
             }
-            KeyCode::BackTab => {
+            KeyCode::BackTab | KeyCode::Up => {
                 self.in_file_search_prev();
                 return;
             }

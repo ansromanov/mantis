@@ -488,3 +488,28 @@ fn tree_filter_pop_invalidates_cache() {
     f.pop();
     assert!(f.cached.is_none(), "pop must clear the filter cache");
 }
+
+#[test]
+fn recent_files_list_picker_impl_delegates() {
+    use crate::list_picker::ListPicker;
+    let paths = vec![
+        PathBuf::from("/a.txt"),
+        PathBuf::from("/b.txt"),
+        PathBuf::from("/c.txt"),
+    ];
+    let mut r = RecentFilesState::new(paths);
+    assert_eq!(ListPicker::results_len(&r), 3);
+    assert_eq!(ListPicker::selected(&r), 0);
+    ListPicker::set_selected(&mut r, 2);
+    assert_eq!(r.selected, 2);
+    assert!(ListPicker::query_is_empty(&r));
+    ListPicker::query_push(&mut r, 'a');
+    assert!(!ListPicker::query_is_empty(&r));
+    assert!(
+        ListPicker::results_len(&r) < 3,
+        "push should filter results"
+    );
+    ListPicker::query_pop(&mut r);
+    assert!(ListPicker::query_is_empty(&r));
+    assert_eq!(ListPicker::results_len(&r), 3);
+}

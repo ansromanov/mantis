@@ -1,6 +1,6 @@
 use crate::app::{App, Focus};
 use crate::config::Config;
-use crate::search::{GotoLineState, TreeFilter};
+use crate::search::{GotoLineState, InFileSearch, TreeFilter};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::Rect;
 use std::fs;
@@ -88,5 +88,36 @@ fn tree_filter_jump_scrolls_match_into_view() {
         app.tree_scroll,
         app.tree_scroll + h
     );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn in_file_search_down_advances_current_match() {
+    // Write multiple 'f'-containing lines so the search finds >=2 matches.
+    let root = temp_tree();
+    fs::write(root.join("a.txt"), "foo bar\nfoo baz\nfoo qux\n").unwrap();
+    let mut app = app_for(&root);
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 20,
+    };
+    let mut s = InFileSearch::new();
+    s.push('f');
+    app.in_file_search = Some(s);
+    app.refresh_in_file_search();
+    assert!(
+        app.in_file_search.as_ref().unwrap().matches.len() >= 2,
+        "need >=2 matches; got {}",
+        app.in_file_search.as_ref().unwrap().matches.len()
+    );
+    assert_eq!(app.in_file_search.as_ref().unwrap().current, 0);
+    // Down should advance to next match without resetting to 0.
+    app.handle_in_file_search_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
+    assert_eq!(app.in_file_search.as_ref().unwrap().current, 1);
+    // Up should go back.
+    app.handle_in_file_search_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()));
+    assert_eq!(app.in_file_search.as_ref().unwrap().current, 0);
     fs::remove_dir_all(&root).ok();
 }

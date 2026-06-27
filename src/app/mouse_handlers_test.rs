@@ -444,3 +444,19 @@ fn scrollbar_drag_clamps_at_scroll_max() {
     assert!(app.content_scroll <= app.content_scroll_max());
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn plugin_picker_click_outside_closes() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.plugin_picker = Some(crate::search::PluginPicker::new(vec![]));
+    app.plugin_picker_area = Rect {
+        x: 10,
+        y: 10,
+        width: 40,
+        height: 20,
+    };
+    app.handle_mouse(left_down_at(1, 1)); // outside popup
+    assert!(app.plugin_picker.is_none());
+    fs::remove_dir_all(&root).ok();
+}

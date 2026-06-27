@@ -1,13 +1,13 @@
 //! Mouse event dispatch for `App`.
 //!
 //! `handle_mouse` mirrors the keyboard overlay precedence chain for pointer
-//! input: theme picker, command palette, history, recent files, and search
-//! overlays intercept clicks first, then events route to the tree or content
-//! panel by hit-testing the `Rect`s recorded during the last render. It handles
-//! left-click selection, drag-selection of text, splitter dragging to resize the
-//! tree pane, scrollbar dragging, wheel scrolling, and double-click to open a
-//! picker result. All coordinate math must account for the panels' scroll
-//! offsets, which are also captured at render time.
+//! input: theme picker, plugin picker, command palette, history, recent files,
+//! and search overlays intercept clicks first, then events route to the tree or
+//! content panel by hit-testing the `Rect`s recorded during the last render. It
+//! handles left-click selection, drag-selection of text, splitter dragging to
+//! resize the tree pane, scrollbar dragging, wheel scrolling, and double-click
+//! to open a picker result. All coordinate math must account for the panels'
+//! scroll offsets, which are also captured at render time.
 
 use std::time::{Duration, Instant};
 
@@ -24,10 +24,10 @@ use super::{rect_contains, App, Focus};
 mod tests;
 
 impl App {
-    /// Dispatches a mouse event. Overlays (theme, history, search) intercept
-    /// first; otherwise routes based on the click location (tree vs content
-    /// panel). Handles left-click, drag, scroll, and double-click for
-    /// search/history/theme results.
+    /// Dispatches a mouse event. Overlays (theme, plugin, command palette,
+    /// history, recent files, search) intercept first; otherwise routes based
+    /// on click location (tree vs content panel). Handles left-click, drag,
+    /// scroll, and double-click for search/history/theme results.
     pub fn handle_mouse(&mut self, ev: MouseEvent) {
         if self.show_help {
             return;
@@ -36,16 +36,16 @@ impl App {
             self.handle_theme_mouse(ev);
             return;
         }
+        if self.plugin_picker.is_some() {
+            self.handle_plugin_mouse(ev);
+            return;
+        }
         if self.command_palette.is_some() {
             self.handle_command_palette_mouse(ev);
             return;
         }
         if self.history.is_some() {
             self.handle_history_mouse(ev);
-            return;
-        }
-        if self.plugin_picker.is_some() {
-            self.handle_plugin_mouse(ev);
             return;
         }
         if self.recent_files.is_some() {
