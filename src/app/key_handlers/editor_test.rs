@@ -159,3 +159,19 @@ fn toggle_git_mode_command_flips_git_mode_flag() {
     assert!(app.git_mode, "Toggle git mode command must enable git mode");
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn app_git_show_fields_default_matches_config() {
+    let root = temp_tree();
+    let app = app_for(&root);
+    let cfg = Config::default();
+    assert_eq!(
+        app.git_show_untracked, cfg.git_show_untracked,
+        "git_show_untracked must match Config::default()"
+    );
+    assert_eq!(
+        app.git_show_ignored, cfg.git_show_ignored,
+        "git_show_ignored must match Config::default()"
+    );
+    fs::remove_dir_all(&root).ok();
+}

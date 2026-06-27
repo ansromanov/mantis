@@ -722,3 +722,44 @@ fn set_root_refreshes_git_status_when_enabled() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn git_flat_nodes_includes_ignored_status_when_in_map() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    // Seed the map with an Ignored-status file (as if git_show_ignored=true was
+    // passed to repo_status). The flat-node filter must not strip it.
+    let ignored_path = root.join("build.log");
+    fs::write(&ignored_path, "log\n").unwrap();
+    app.git_status_map
+        .insert(ignored_path.clone(), crate::git::GitStatus::Ignored);
+    app.git_status_enabled = true;
+    app.git_mode = true;
+    app.git_mode_flat = true;
+    app.rebuild(false);
+    assert!(
+        app.nodes.iter().any(|n| n.path == ignored_path),
+        "Ignored entry in the status map must appear in flat git mode"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn git_mode_tree_includes_ignored_status_when_in_map() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    // Same scenario for hierarchical git mode.
+    let ignored_path = root.join("build.log");
+    fs::write(&ignored_path, "log\n").unwrap();
+    app.git_status_map
+        .insert(ignored_path.clone(), crate::git::GitStatus::Ignored);
+    app.git_status_enabled = true;
+    app.git_mode = true;
+    app.git_mode_flat = false;
+    app.rebuild(false);
+    assert!(
+        app.nodes.iter().any(|n| n.path == ignored_path),
+        "Ignored entry in the status map must appear in hierarchical git mode"
+    );
+    fs::remove_dir_all(&root).ok();
+}
