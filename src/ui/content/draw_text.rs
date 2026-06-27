@@ -17,6 +17,7 @@ use crate::app::App;
 use crate::search::InFileSearch;
 use crate::virtual_file::VirtualFile;
 
+use super::draw::BLAME_COL_WIDTH;
 use super::search::apply_search_to_regions;
 use super::selection::apply_selection;
 
@@ -37,7 +38,6 @@ pub(crate) fn render_virtual_file<'a>(
     sel: Option<((usize, usize), (usize, usize))>,
     sel_bg: ratatui::style::Color,
 ) -> (usize, Vec<Line<'a>>, Vec<Line<'a>>, Vec<(u16, usize)>) {
-    const BLAME_COL_WIDTH: usize = 26;
     let phys_total = app.line_count();
     let lw = phys_total.to_string().len().max(1);
     let fold_gw = app.fold_gutter_width();
@@ -241,7 +241,6 @@ pub(crate) fn render_inline_fallback<'a>(
     sel: Option<((usize, usize), (usize, usize))>,
     sel_bg: ratatui::style::Color,
 ) -> (usize, Vec<Line<'a>>, Vec<Line<'a>>, Vec<(u16, usize)>) {
-    const BLAME_COL_WIDTH: usize = 26;
     let phys_total = app.line_count();
     let fold_gw = app.fold_gutter_width();
     let lw = phys_total.to_string().len().max(1);

@@ -117,6 +117,14 @@ impl App {
                     }
                 } else if rect_contains(self.content_area, ev.column, ev.row) {
                     self.focus = Focus::Content;
+                    // Check if click is on the blame column.
+                    let rel_col = (ev.column.saturating_sub(self.content_area.x)) as usize;
+                    if self.blame_col_width > 0 && rel_col < self.blame_col_width {
+                        let pos = self.content_pos(ev.column, ev.row);
+                        self.active_line = pos.0;
+                        self.show_line_blame = true;
+                        return;
+                    }
                     let on_scrollbar = self.show_scrollbar
                         && self.display_line_count() > self.content_area.height as usize
                         && ev.column
@@ -126,10 +134,10 @@ impl App {
                         self.set_scroll_from_mouse_y(ev.row);
                         self.mark_content_scrolled();
                     } else {
-                        // Check if click is on the fold gutter (leftmost fold_gutter_width columns).
+                        // Check if click is on the fold gutter (after the blame column).
                         let fold_gw = self.fold_gutter_width();
-                        let rel_col = (ev.column.saturating_sub(self.content_area.x)) as usize;
-                        if fold_gw > 0 && rel_col < fold_gw {
+                        let fold_start = self.blame_col_width;
+                        if fold_gw > 0 && rel_col >= fold_start && rel_col < fold_start + fold_gw {
                             // Find the fold region for this screen row.
                             let hit = self
                                 .fold_gutter_rows

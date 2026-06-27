@@ -120,3 +120,40 @@ fn highlight_cache_key_stable_on_identical_render() {
         "cache key must be stable across identical renders"
     );
 }
+
+#[test]
+fn blame_col_width_constant_is_37() {
+    // draw_text.rs previously defined BLAME_COL_WIDTH=26 locally; it now
+    // imports the shared constant from draw.rs which is 37. Assert the value
+    // so any future accidental revert is caught immediately.
+    assert_eq!(
+        crate::ui::content::draw::BLAME_COL_WIDTH,
+        37,
+        "shared BLAME_COL_WIDTH must be 37 (not the old 26)"
+    );
+}
+
+#[test]
+fn render_inline_fallback_with_blame_does_not_panic() {
+    let (mut app, dir) = render_app();
+    let path = dir.path().join("f.txt");
+    app.plugin_blame.insert(
+        path,
+        vec![
+            format!("{:<37}", "Alice     fix memory leak"),
+            format!("{:<37}", "Bob       add feature"),
+            format!("{:<37}", "Carol     refactor"),
+        ],
+    );
+    let screen = render(&mut app, |app| {
+        app.current_file = None;
+        app.virtual_file = None;
+        app.show_blame = true;
+        app.content = vec!["line1".to_string(), "line2".to_string()];
+        app.highlighted = vec![
+            vec![(Style::default(), "line1".to_string())],
+            vec![(Style::default(), "line2".to_string())],
+        ];
+    });
+    assert!(!screen.is_empty());
+}
