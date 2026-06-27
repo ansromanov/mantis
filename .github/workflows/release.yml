@@ -14,6 +14,7 @@ jobs:
     outputs:
       version: ${{ steps.bump.outputs.version || steps.current.outputs.version }}
       sha: ${{ steps.sha.outputs.sha }}
+      changelog: ${{ steps.changelog.outputs.log }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -38,15 +39,34 @@ jobs:
           sed -i "/^name = \"mantis\"/{n;s/version = \"${current}\"/version = \"${new_version}\"/}" Cargo.lock
           echo "version=${new_version}" >> "$GITHUB_OUTPUT"
 
+      - name: Generate changelog
+        if: inputs.bump
+        id: changelog
+        run: |
+          prev_tag=$(git tag --sort=-version:refname | grep '^v' | head -1 || true)
+          if [ -z "$prev_tag" ]; then
+            log=$(git log --pretty=format:"- %s")
+          else
+            log=$(git log --pretty=format:"- %s" "${prev_tag}..HEAD")
+          fi
+          log=$(echo "$log" | grep -v "^- chore: bump version to v" || true)
+          log=$(echo "$log" | sed 's/"""/\\"\\"\\"/g')
+          {
+            echo "log<<EOF"
+            echo "$log"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Write release info
         if: inputs.bump
         run: |
-          cat > release-info.toml << EOF
+          cat > release-info.toml << 'TOMLEOF'
           version = "${{ steps.bump.outputs.version }}"
-          date = "$(date +%Y-%m-%d)"
-          whats_new = ""
+          date = "__RELEASE_DATE__"
+          whats_new = """${{ steps.changelog.outputs.log }}"""
           release_url = "https://github.com/ansromanov/mantis/releases/tag/v${{ steps.bump.outputs.version }}"
-          EOF
+          TOMLEOF
+          sed -i "s/__RELEASE_DATE__/$(date +%Y-%m-%d)/" release-info.toml
 
       - name: Commit and push
         if: inputs.bump
@@ -124,39 +144,6 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: ${{ needs.bump.outputs.sha }}
-          fetch-depth: 0
-          ssh-key: ${{ secrets.DEPLOY_KEY }}
-
-      - name: Generate changelog
-        id: changelog
-        run: |
-          prev_tag=$(git tag --sort=-version:refname | grep '^v' | head -1 || true)
-          if [ -z "$prev_tag" ]; then
-            log=$(git log --pretty=format:"- %s")
-          else
-            log=$(git log --pretty=format:"- %s" "${prev_tag}..HEAD")
-          fi
-          log=$(echo "$log" | grep -v "^- chore: bump version to v" || true)
-          {
-            echo "log<<EOF"
-            echo "$log"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Update release info with changelog
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          cat > release-info.toml << 'TOMLEOF'
-          version = "${{ needs.bump.outputs.version }}"
-          date = "__RELEASE_DATE__"
-          whats_new = """${{ steps.changelog.outputs.log }}"""
-          release_url = "https://github.com/ansromanov/mantis/releases/tag/v${{ needs.bump.outputs.version }}"
-          TOMLEOF
-          sed -i "s/__RELEASE_DATE__/$(date +%Y-%m-%d)/" release-info.toml
-          git add release-info.toml
-          git commit -m "chore: add changelog to release info [skip ci]"
-          git push origin HEAD:main
 
       - uses: actions/download-artifact@v8
         with:
@@ -178,5 +165,5 @@ jobs:
           body: |
             ## What's Changed
 
-            ${{ steps.changelog.outputs.log }}
+            ${{ needs.bump.outputs.changelog }}
           files: artifacts/*

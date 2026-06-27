@@ -31,12 +31,14 @@ jobs:
           new_version="${major}.${minor}.$((patch + 1))"
           sed -i "s/^version = \"${current}\"/version = \"${new_version}\"/" Cargo.toml
           sed -i "/^name = \"mantis\"/{n;s/version = \"${current}\"/version = \"${new_version}\"/}" Cargo.lock
+          sed -i "s/^version = \".*\"/version = \"${new_version}\"/" release-info.toml
+          sed -i "s/^date = \".*\"/date = \"$(date +%Y-%m-%d)\"/" release-info.toml
           echo "version=${new_version}" >> "$GITHUB_OUTPUT"
 
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Cargo.toml Cargo.lock
+          git add Cargo.toml Cargo.lock release-info.toml
           git commit -m "chore: bump version to v${{ steps.bump.outputs.version }} [skip ci]"
           git push origin HEAD:main
