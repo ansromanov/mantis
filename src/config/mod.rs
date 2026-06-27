@@ -178,10 +178,10 @@ pub fn pressed(bindings: &[KeyBinding], key: &KeyEvent) -> bool {
 }
 
 impl Keymap {
-    /// Returns a display label for the first binding mapped to `action_id`,
-    /// e.g. `"Ctrl+G"` for `toggle_git_mode`.
-    pub fn label_for_action(&self, action_id: &str) -> String {
-        let bindings: &[KeyBinding] = match action_id {
+    /// Returns the bindings for an `action_id`, or an empty slice.
+    fn bindings_for_action(&self, action_id: &str) -> &[KeyBinding] {
+        match action_id {
+            // Command-palette action IDs.
             "toggle_help" => &self.help,
             "toggle_hidden" => &self.toggle_hidden,
             "open_file_search" => &self.search_files,
@@ -210,9 +210,61 @@ impl Keymap {
             "go_to_line" => &self.goto_line,
             "blame_line" => &self.blame_line,
             "tree_up_dir" => &self.tree_up_dir,
-            _ => return String::new(),
-        };
-        bindings.first().map(|b| b.display()).unwrap_or_default()
+            // Direct field-name lookups (used by help overlay).
+            // Only entries whose field name differs from the CP action ID, or
+            // that are not covered by the CP block at all, go here.
+            "help" => &self.help,
+            "quit" => &self.quit,
+            "switch_panel" => &self.switch_panel,
+            "search_files" => &self.search_files,
+            "search_content" => &self.search_content,
+            "file_history" => &self.file_history,
+            "theme_picker" => &self.theme_picker,
+            "nav_up" => &self.nav_up,
+            "nav_down" => &self.nav_down,
+            "tree_expand" => &self.tree_expand,
+            "tree_collapse" => &self.tree_collapse,
+            "content_left" => &self.content_left,
+            "content_right" => &self.content_right,
+            "content_top" => &self.content_top,
+            "content_bottom" => &self.content_bottom,
+            "content_page_up" => &self.content_page_up,
+            "content_page_down" => &self.content_page_down,
+            "content_reset_col" => &self.content_reset_col,
+            "diff_hunk_next" => &self.diff_hunk_next,
+            "diff_hunk_prev" => &self.diff_hunk_prev,
+            "git_mode_toggle" => &self.git_mode_toggle,
+            "git_mode_flat_toggle" => &self.git_mode_flat_toggle,
+            "command_palette" => &self.command_palette,
+            "recent_files" => &self.recent_files,
+            "plugin_picker" => &self.plugin_picker,
+            "toggle_wrap" => &self.toggle_wrap,
+            "goto_line" => &self.goto_line,
+            _ => &[],
+        }
+    }
+
+    /// Returns a display label for the first binding mapped to `action_id`,
+    /// e.g. `"Ctrl+G"` for `toggle_git_mode`.
+    pub fn label_for_action(&self, action_id: &str) -> String {
+        self.bindings_for_action(action_id)
+            .first()
+            .map(|b| b.display())
+            .unwrap_or_default()
+    }
+
+    /// Returns all bindings for `action_id` joined by ` / `, e.g. `"q / Ctrl+C"`,
+    /// or `"—"` when the action is unbound.
+    pub fn labels_for_action(&self, action_id: &str) -> String {
+        let bindings = self.bindings_for_action(action_id);
+        if bindings.is_empty() {
+            return "—".to_string();
+        }
+        bindings
+            .iter()
+            .map(|b| b.display())
+            .collect::<Vec<_>>()
+            .join(" / ")
     }
 }
 
@@ -323,7 +375,7 @@ impl Default for Keymap {
 
 /// Build a list of bindings from string specs. Panics on an invalid spec, so
 /// it must only be used for the hardcoded defaults above.
-fn bind(specs: &[&str]) -> Vec<KeyBinding> {
+pub(crate) fn bind(specs: &[&str]) -> Vec<KeyBinding> {
     specs
         .iter()
         .map(|s| parse_binding(s).expect("invalid default key binding"))
