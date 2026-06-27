@@ -77,7 +77,20 @@ Review for:
   - A reload / watcher tick / plugin re-render that resets scroll/cursor/selection or tears
     down an open overlay on the *same* content (must guard on a genuine content switch)
   - New hot path (per-frame render, large-input parse/search) without a `benches/` case
+- **Security:**
+  - Untrusted input reaching a shell/process: git/plugin args built from file paths or plugin
+    output without escaping; `Command` args from user-controlled data
+  - Path traversal — reading/writing paths outside the viewed root from plugin or config input
+  - Terminal/ANSI injection: file content, git output, or plugin output written to the screen
+    without going through the existing sanitiser
+  - Trusting plugin JSON without validating fields/bounds; unbounded reads from a plugin pipe
+  - Any hardcoded secret/credential
 - Rust style: line length >100, wildcard imports (except `use super::*;` in tests), missing `.clone()` on non-Copy types
+
+**Delegate, don't re-implement.** If the `ponytail` plugin is installed, run
+`/ponytail-review` for the over-engineering/over-complexity pass and fold its findings in.
+If `caveman` is installed, format the per-finding output via `/caveman-review`. When neither
+is present, do those passes inline using the rules above. Don't reproduce their logic here.
 
 For each finding output exactly:
 ```
