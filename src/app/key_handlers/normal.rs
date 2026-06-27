@@ -268,7 +268,7 @@ impl App {
         if pressed(&k.toggle_raw_markdown, &key) {
             if self.is_markdown {
                 self.show_raw_markdown = !self.show_raw_markdown;
-                self.content_scroll = 0;
+                self.set_content_scroll(0);
                 self.content_hscroll = 0;
             } else {
                 self.set_status("raw toggle: not a markdown file");
@@ -276,7 +276,7 @@ impl App {
         } else if pressed(&k.toggle_pretty_json, &key) {
             if self.is_json && !self.json_pretty_lines.is_empty() {
                 self.show_pretty_json = !self.show_pretty_json;
-                self.content_scroll = 0;
+                self.set_content_scroll(0);
                 self.content_hscroll = 0;
             } else if !self.is_json {
                 self.set_status("pretty JSON: not a JSON file");
@@ -284,14 +284,14 @@ impl App {
                 self.set_status("pretty JSON: could not parse");
             }
         } else if pressed(&k.toggle_blame, &key) {
-            if !self.is_diff {
+            if self.has_text_cursor() {
                 self.show_blame = !self.show_blame;
             } else {
                 self.set_status("blame: not available in a diff");
             }
         } else if self.is_diff && pressed(&k.toggle_diff_side_by_side, &key) {
             self.diff_side_by_side = !self.diff_side_by_side;
-            self.content_scroll = 0;
+            self.set_content_scroll(0);
             self.content_hscroll = 0;
         } else if self.is_diff && pressed(&k.toggle_diff_staged, &key) {
             self.diff_mode = self.diff_mode.next();
@@ -312,21 +312,21 @@ impl App {
         } else if pressed(&k.toggle_wrap, &key) {
             self.word_wrap = !self.word_wrap;
             self.config.word_wrap = self.word_wrap;
-            self.content_scroll = 0;
+            self.set_content_scroll(0);
             self.content_hscroll = 0;
             self.save_config();
         } else if pressed(&k.toggle_line_numbers, &key) {
             self.show_line_numbers = !self.show_line_numbers;
             self.config.line_numbers = self.show_line_numbers;
             self.save_config();
-        } else if !self.is_diff && pressed(&k.nav_up, &key) {
+        } else if self.has_text_cursor() && pressed(&k.nav_up, &key) {
             // Move active line up (non-diff content).
             if self.active_line > 0 {
                 self.active_line -= 1;
                 self.scroll_active_line_into_view();
                 self.mark_content_scrolled();
             }
-        } else if !self.is_diff && pressed(&k.nav_down, &key) {
+        } else if self.has_text_cursor() && pressed(&k.nav_down, &key) {
             // Move active line down (non-diff content).
             let max = self.display_line_count().saturating_sub(1);
             if self.active_line < max {
@@ -335,38 +335,34 @@ impl App {
                 self.mark_content_scrolled();
             }
         } else if pressed(&k.nav_up, &key) {
-            // Diff: fall back to scrolling.
-            self.content_scroll = self.content_scroll.saturating_sub(1);
+            // Cursorless content: fall back to scrolling.
+            self.set_content_scroll(self.content_scroll.saturating_sub(1));
         } else if pressed(&k.nav_down, &key) {
-            // Diff: fall back to scrolling.
-            let max = self.content_scroll_max();
-            if self.content_scroll < max {
-                self.content_scroll += 1;
-            }
+            // Cursorless content: fall back to scrolling.
+            self.set_content_scroll(self.content_scroll.saturating_add(1));
         } else if pressed(&k.content_top, &key) {
-            if !self.is_diff {
+            if self.has_text_cursor() {
                 self.active_line = 0;
             }
-            self.content_scroll = 0;
+            self.set_content_scroll(0);
         } else if pressed(&k.content_bottom, &key) {
-            if !self.is_diff {
+            if self.has_text_cursor() {
                 self.active_line = self.display_line_count().saturating_sub(1);
                 self.scroll_active_line_into_view();
             } else {
-                self.content_scroll = self.content_scroll_max();
+                self.set_content_scroll(usize::MAX);
             }
         } else if pressed(&k.content_page_up, &key) {
-            self.content_scroll = self.content_scroll.saturating_sub(20);
+            self.set_content_scroll(self.content_scroll.saturating_sub(self.page_rows()));
         } else if pressed(&k.content_page_down, &key) {
-            let max = self.content_scroll_max();
-            self.content_scroll = (self.content_scroll + 20).min(max);
+            self.set_content_scroll(self.content_scroll.saturating_add(self.page_rows()));
         } else if !self.word_wrap && pressed(&k.content_left, &key) {
             self.content_hscroll = self.content_hscroll.saturating_sub(4);
         } else if !self.word_wrap && pressed(&k.content_right, &key) {
             self.content_hscroll += 4;
         } else if !self.word_wrap && pressed(&k.content_reset_col, &key) {
             self.content_hscroll = 0;
-        } else if !self.is_diff && pressed(&k.blame_line, &key) {
+        } else if self.has_text_cursor() && pressed(&k.blame_line, &key) {
             self.show_line_blame = !self.show_line_blame;
         }
         if self.content_scroll != scroll_before || self.content_hscroll != hscroll_before {
@@ -407,16 +403,8 @@ impl App {
     }
 
     /// Nudges `content_scroll` so `active_line` stays within the visible
-    /// viewport after a cursor move.
+    /// viewport after a cursor move. Delegates to the unified helper.
     fn scroll_active_line_into_view(&mut self) {
-        let view_height = (self.content_area.height as usize).max(1);
-        if self.active_line < self.content_scroll {
-            self.content_scroll = self.active_line;
-        } else if self.active_line >= self.content_scroll + view_height {
-            self.content_scroll = self
-                .active_line
-                .saturating_sub(view_height)
-                .saturating_add(1);
-        }
+        self.scroll_line_into_view(self.active_line);
     }
 }

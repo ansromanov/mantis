@@ -46,14 +46,14 @@ impl App {
             self.folded.insert(region_idx);
         }
         self.rebuild_fold_display_map();
-        self.content_scroll = self.content_scroll.min(self.content_scroll_max());
+        self.clamp_content_scroll();
     }
 
     /// Folds every detected region and scrolls to the top.
     pub fn fold_all(&mut self) {
         self.folded = (0..self.fold_regions.len()).collect();
         self.rebuild_fold_display_map();
-        self.content_scroll = 0;
+        self.set_content_scroll(0);
     }
 
     /// Expands every region.

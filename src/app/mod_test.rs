@@ -524,11 +524,12 @@ fn page_down_stops_at_scroll_max() {
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt")); // 50 lines
     app.focus = Focus::Content;
-    app.content_area = viewport(10); // scroll_max = 40
+    app.content_area = viewport(10); // scroll_max = 40, page_rows = 9
 
-    app.handle_key(KeyEvent::new(KeyCode::PageDown, KeyModifiers::empty()));
-    app.handle_key(KeyEvent::new(KeyCode::PageDown, KeyModifiers::empty()));
-    app.handle_key(KeyEvent::new(KeyCode::PageDown, KeyModifiers::empty()));
+    // 5 PageDowns: 0 → 9 → 18 → 27 → 36 → 40 (clamped)
+    for _ in 0..5 {
+        app.handle_key(KeyEvent::new(KeyCode::PageDown, KeyModifiers::empty()));
+    }
     assert_eq!(
         app.content_scroll, 40,
         "PageDown must not scroll past scroll_max"
@@ -2873,6 +2874,12 @@ fn content_key_page_up_scrolls_up() {
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
     app.focus = Focus::Content;
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 21,
+    };
     app.content_scroll = 25;
     app.handle_key(KeyEvent::new(KeyCode::PageUp, KeyModifiers::empty()));
     assert_eq!(app.content_scroll, 5);
@@ -3339,7 +3346,7 @@ fn mouse_up_clears_drag_without_selection() {
 fn mouse_drag_auto_scroll_up_when_near_top() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.open_file(&root.join("a.txt"));
+    app.open_file(&root.join("long.txt"));
     app.content_area = Rect {
         x: 5,
         y: 5,

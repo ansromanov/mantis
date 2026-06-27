@@ -400,10 +400,10 @@ impl App {
                         self.plugin_content_active_path.as_deref() != self.current_file.as_deref();
                     self.plugin_content_active_path = self.current_file.clone();
                     if first_render {
-                        self.content_scroll = 0;
+                        self.set_content_scroll(0);
                         self.content_hscroll = 0;
                     } else {
-                        self.content_scroll = self.content_scroll.min(self.content_scroll_max());
+                        self.clamp_content_scroll();
                     }
                     self.plugin_content_active = true;
                 }

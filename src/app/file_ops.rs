@@ -43,12 +43,12 @@ impl App {
 
     /// Runs `f` (which replaces the content buffer) while preserving the
     /// vertical and horizontal scroll position, clamping the vertical scroll to
-    /// the new line count so it never points past the end of the buffer.
+    /// the new display-line count so it never points past the end of the buffer.
     fn preserving_scroll(&mut self, f: impl FnOnce(&mut Self)) {
         let scroll = self.content_scroll;
         let hscroll = self.content_hscroll;
         f(self);
-        self.content_scroll = scroll.min(self.line_count().saturating_sub(1));
+        self.set_content_scroll(scroll);
         self.content_hscroll = hscroll;
     }
 
@@ -190,7 +190,7 @@ impl App {
         self.file_line_ending = None;
         if is_new_file {
             self.in_file_search = None;
-            self.content_scroll = 0;
+            self.set_content_scroll(0);
             self.content_hscroll = 0;
             self.active_line = 0;
             self.show_line_blame = false;
@@ -205,7 +205,7 @@ impl App {
         self.content = load.content;
         if !is_new_file {
             // Same-file reload: clamp scroll and refresh in-file search.
-            self.content_scroll = self.content_scroll.min(self.content_scroll_max());
+            self.clamp_content_scroll();
             if self.in_file_search.is_some() {
                 self.refresh_in_file_search();
             }
@@ -243,7 +243,7 @@ impl App {
         self.highlighted = Vec::new();
         self.markdown_lines = Vec::new();
         self.content_title = None;
-        self.content_scroll = 0;
+        self.set_content_scroll(0);
         self.content_hscroll = 0;
         self.active_line = 0;
         self.show_line_blame = false;
@@ -289,7 +289,7 @@ impl App {
         let is_new_file = self.current_file.as_deref() != Some(path);
         if is_new_file {
             self.in_file_search = None;
-            self.content_scroll = 0;
+            self.set_content_scroll(0);
             self.content_hscroll = 0;
             self.active_line = 0;
             self.show_line_blame = false;
@@ -334,7 +334,7 @@ impl App {
                 self.push_recent(path.to_path_buf());
             } else {
                 // Same-file reload: clamp scroll and refresh in-file search.
-                self.content_scroll = self.content_scroll.min(self.content_scroll_max());
+                self.clamp_content_scroll();
                 if self.in_file_search.is_some() {
                     self.refresh_in_file_search();
                 }
@@ -445,7 +445,7 @@ impl App {
         self.clear_fold_state();
         self.file_encoding = None;
         self.file_line_ending = None;
-        self.content_scroll = 0;
+        self.set_content_scroll(0);
         self.content_hscroll = 0;
         self.active_line = 0;
         self.show_line_blame = false;

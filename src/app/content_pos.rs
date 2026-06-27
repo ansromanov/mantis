@@ -15,6 +15,9 @@ use unicode_width::UnicodeWidthStr;
 
 use super::App;
 
+/// Number of lines to scroll per mouse wheel tick or drag-edge auto-scroll.
+pub const WHEEL_STEP: usize = 3;
+
 /// Extract the selected text from styled span lines (plugin content or rendered
 /// markdown share the same `Vec<Vec<(Style, String)>>` shape). `start`/`end` are
 /// the normalized selection bounds in (line, char-column) space.
@@ -257,6 +260,57 @@ impl App {
     pub(super) fn clear_selection(&mut self) {
         self.selection = None;
         self.drag_start = None;
+    }
+
+    /// Sets `content_scroll` to `n`, clamping to `content_scroll_max()`.
+    /// Route every raw `content_scroll = …` mutation through this helper.
+    pub fn set_content_scroll(&mut self, n: usize) {
+        self.content_scroll = n.min(self.content_scroll_max());
+    }
+
+    /// Clamps the current `content_scroll` to `content_scroll_max()`.
+    /// Call after any content change (reload, fold toggle, markdown toggle, etc.).
+    pub fn clamp_content_scroll(&mut self) {
+        let max = self.content_scroll_max();
+        if self.content_scroll > max {
+            self.content_scroll = max;
+        }
+    }
+
+    /// Number of rows in a page — viewport height minus one overlap row.
+    pub fn page_rows(&self) -> usize {
+        (self.content_area.height as usize).saturating_sub(1).max(1)
+    }
+
+    /// Returns `true` when the content pane uses a text cursor (`active_line`)
+    /// instead of raw scroll. Diff, rendered markdown, and plugin-rendered views
+    /// are cursorless — they scroll directly without an active-line cursor.
+    pub fn has_text_cursor(&self) -> bool {
+        if self.is_diff {
+            return false;
+        }
+        // Rendered markdown has no cursor.
+        if self.is_markdown && !self.show_raw_markdown && !self.markdown_lines.is_empty() {
+            return false;
+        }
+        // Plugin-rendered content has no cursor.
+        if let Some(path) = &self.current_file {
+            if self.plugin_content.contains_key(path) {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Unified scroll-into-view helper: nudges `content_scroll` so the given
+    /// `display_line` becomes visible. No-op when already visible.
+    pub fn scroll_line_into_view(&mut self, display_line: usize) {
+        let view_height = (self.content_area.height as usize).max(1);
+        if display_line < self.content_scroll {
+            self.set_content_scroll(display_line);
+        } else if display_line >= self.content_scroll + view_height {
+            self.set_content_scroll(display_line.saturating_sub(view_height).saturating_add(1));
+        }
     }
 }
 

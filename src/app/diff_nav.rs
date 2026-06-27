@@ -35,7 +35,7 @@ impl App {
     pub(crate) fn diff_next_hunk(&mut self) {
         let cur = self.content_scroll;
         if let Some(&next) = self.diff_hunk_rows().iter().find(|&&i| i > cur) {
-            self.content_scroll = next.min(self.content_scroll_max());
+            self.set_content_scroll(next);
             self.mark_content_scrolled();
         }
     }
@@ -44,7 +44,7 @@ impl App {
     pub(crate) fn diff_prev_hunk(&mut self) {
         let cur = self.content_scroll;
         if let Some(&prev) = self.diff_hunk_rows().iter().rev().find(|&&i| i < cur) {
-            self.content_scroll = prev;
+            self.set_content_scroll(prev);
             self.mark_content_scrolled();
         }
     }

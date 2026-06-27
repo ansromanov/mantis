@@ -282,8 +282,7 @@ impl App {
         // Restore scroll/active-line position after the file is loaded.
         if let Some(ref s) = session_state {
             if s.current_file.as_deref() == app.current_file.as_deref() {
-                let max_scroll = app.content_scroll_max();
-                app.content_scroll = s.content_scroll.min(max_scroll);
+                app.set_content_scroll(s.content_scroll);
                 app.active_line = s.active_line.min(app.line_count().saturating_sub(1));
             }
         }

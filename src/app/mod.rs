@@ -676,7 +676,7 @@ impl App {
         self.json_pretty_text = Vec::new();
         self.json_pretty_lines = Vec::new();
         self.viewing_revision = None;
-        self.content_scroll = 0;
+        self.set_content_scroll(0);
         self.content_hscroll = 0;
         self.active_line = 0;
         self.show_line_blame = false;

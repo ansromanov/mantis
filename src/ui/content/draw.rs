@@ -104,7 +104,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
 
     let view_height = inner.height as usize;
     let total_lines = app.display_line_count();
-    let scroll = app.content_scroll.min(total_lines.saturating_sub(1));
+    let scroll = app.content_scroll.min(app.content_scroll_max());
     let visible_end = (scroll + view_height).min(total_lines);
 
     let sel = app.selection.as_ref().map(|s| s.normalized());
@@ -112,7 +112,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     let in_file_search = app.in_file_search.as_ref();
 
     // Blame annotations: one formatted string per 0-based line index.
-    let blame_annotations: Vec<String> = if app.show_blame && !app.is_diff {
+    let blame_annotations: Vec<String> = if app.show_blame && app.has_text_cursor() {
         if let Some(path) = &app.current_file {
             // Plugin-provided blame data takes precedence over live git blame.
             let lines: Option<Vec<String>> = app.plugin_blame.get(path).cloned();
@@ -328,7 +328,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     };
 
     // Active-line highlight: full-width row background + gutter caret.
-    if !app.is_diff && !app.diff_sbs_active() {
+    if app.has_text_cursor() && !app.diff_sbs_active() {
         let active_bg = app.theme.active_line_bg;
         let content_w = inner.width.saturating_sub(ln_width as u16) as usize;
         for (j, line) in content_lines.iter_mut().enumerate() {

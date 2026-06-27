@@ -120,7 +120,6 @@ impl App {
     }
 
     pub(crate) fn scroll_in_file_search_to_current(&mut self) {
-        let view_height = (self.content_area.height as usize).max(1);
         let Some(s) = &self.in_file_search else {
             return;
         };
@@ -128,11 +127,7 @@ impl App {
             return;
         };
         let display_line = self.physical_to_display(m.line);
-        if display_line < self.content_scroll {
-            self.content_scroll = display_line;
-        } else if display_line >= self.content_scroll + view_height {
-            self.content_scroll = display_line.saturating_sub(view_height).saturating_add(1);
-        }
+        self.scroll_line_into_view(display_line);
         self.mark_content_scrolled();
     }
 
@@ -375,8 +370,7 @@ impl App {
                     }
                 });
                 if let Some(line) = target {
-                    let max = self.content_scroll_max();
-                    self.content_scroll = line.min(max);
+                    self.set_content_scroll(line);
                     self.mark_content_scrolled();
                 }
                 self.goto_line = None;
