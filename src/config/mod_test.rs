@@ -452,3 +452,82 @@ fn unknown_key_surfaces_as_warning_but_config_still_loads() {
 
     fs::remove_dir_all(&dir).ok();
 }
+
+// Serialize env-var manipulation across parallel tests.
+static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+fn unique_migrate_tmp(label: &str) -> std::path::PathBuf {
+    std::env::temp_dir().join(format!(
+        "mantis_migrate_{}_{}_{label}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0),
+    ))
+}
+
+#[test]
+#[cfg(not(windows))]
+fn migrate_renames_old_dir_to_new() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let tmp = unique_migrate_tmp("a");
+    let old_dir = tmp.join("tree-viewer");
+    let new_dir = tmp.join("mantis");
+    fs::create_dir_all(&old_dir).unwrap();
+    fs::write(old_dir.join("tv.toml"), b"# config").unwrap();
+    fs::write(old_dir.join("tv.default.toml"), b"# default").unwrap();
+
+    std::env::set_var("XDG_CONFIG_HOME", &tmp);
+    migrate_legacy_config();
+    std::env::remove_var("XDG_CONFIG_HOME");
+
+    assert!(new_dir.exists(), "new dir created");
+    assert!(!old_dir.exists(), "old dir renamed away");
+    assert!(new_dir.join("mantis.toml").exists(), "tv.toml renamed");
+    assert!(
+        new_dir.join("mantis.default.toml").exists(),
+        "tv.default.toml renamed"
+    );
+    fs::remove_dir_all(&tmp).ok();
+}
+
+#[test]
+#[cfg(not(windows))]
+fn migrate_skips_when_new_dir_exists() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let tmp = unique_migrate_tmp("b");
+    let old_dir = tmp.join("tree-viewer");
+    let new_dir = tmp.join("mantis");
+    fs::create_dir_all(&old_dir).unwrap();
+    fs::write(old_dir.join("tv.toml"), b"# config").unwrap();
+    fs::create_dir_all(&new_dir).unwrap();
+
+    std::env::set_var("XDG_CONFIG_HOME", &tmp);
+    migrate_legacy_config();
+    std::env::remove_var("XDG_CONFIG_HOME");
+
+    assert!(
+        old_dir.exists(),
+        "old dir untouched when new dir already exists"
+    );
+    fs::remove_dir_all(&tmp).ok();
+}
+
+#[test]
+#[cfg(not(windows))]
+fn migrate_no_op_when_old_dir_absent() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let tmp = unique_migrate_tmp("c");
+    fs::create_dir_all(&tmp).unwrap();
+
+    std::env::set_var("XDG_CONFIG_HOME", &tmp);
+    migrate_legacy_config();
+    std::env::remove_var("XDG_CONFIG_HOME");
+
+    assert!(
+        !tmp.join("mantis").exists(),
+        "nothing created when old dir absent"
+    );
+    fs::remove_dir_all(&tmp).ok();
+}

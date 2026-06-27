@@ -151,7 +151,7 @@ info "${GREEN}Installed${RESET} ${BIN} to ${BOLD}${INSTALL_DIR}/${BIN}${exe}${RE
 
 # --- PATH hint ------------------------------------------------------------
 case ":${PATH}:" in
-  *":${INSTALL_DIR}"*) ;;
+  *":${INSTALL_DIR}:"*) ;;
   *) warn "${INSTALL_DIR} is not on your PATH. Add it, e.g.:
     export PATH=\"${INSTALL_DIR}:\$PATH\"" ;;
 esac
