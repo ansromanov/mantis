@@ -22,7 +22,7 @@ use crate::app::{App, Focus};
 use crate::git::BlameLine;
 
 use super::diff::draw_side_by_side_diff;
-use super::draw_text::{render_inline_fallback, render_virtual_file};
+use super::draw_text::{render_inline_fallback, render_virtual_file, wrap_content};
 use super::scrollbar::draw_content_scrollbar;
 use super::search::apply_search_to_regions;
 use super::selection::apply_selection;
@@ -158,7 +158,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     let show_ln = app.show_line_numbers;
 
     // ln_width, ln_lines, content_lines, fold_gutter_rows
-    let (ln_width, mut ln_lines, mut content_lines, new_fold_gutter_rows) = if app.is_diff {
+    let (ln_width, mut ln_lines, mut content_lines, mut new_fold_gutter_rows) = if app.is_diff {
         // Diff view: iterate all highlighted lines (diffs are never large).
         let lines = app
             .highlighted
@@ -327,12 +327,37 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         )
     };
 
+    // Word-wrap expansion: break content + gutters into visual rows so they
+    // stay aligned under wrap (ratatui's Wrap can't communicate row count to
+    // the gutter Paragraph, causing cumulative drift on each wrapped line).
+    let visual_to_display: Vec<usize> = if app.word_wrap && ln_width > 0 {
+        let cw = inner.width.saturating_sub(ln_width as u16) as usize;
+        if cw > 0 {
+            let (exp_gutters, exp_content, vmap, updated_fold) = wrap_content(
+                &content_lines,
+                &ln_lines,
+                cw,
+                inner.y,
+                &new_fold_gutter_rows,
+            );
+            ln_lines = exp_gutters;
+            content_lines = exp_content;
+            new_fold_gutter_rows = updated_fold;
+            vmap
+        } else {
+            (0..content_lines.len()).collect()
+        }
+    } else {
+        (0..content_lines.len()).collect()
+    };
+
     // Active-line highlight: full-width row background + gutter caret.
     if app.has_text_cursor() && !app.diff_sbs_active() {
         let active_bg = app.theme.active_line_bg;
         let content_w = inner.width.saturating_sub(ln_width as u16) as usize;
         for (j, line) in content_lines.iter_mut().enumerate() {
-            if scroll + j != app.active_line {
+            let display_line = visual_to_display.get(j).copied().unwrap_or(0);
+            if scroll + display_line != app.active_line {
                 continue;
             }
             // Full-width content highlight
@@ -349,7 +374,8 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         }
         // Gutter caret: brighten the active line's gutter foreground
         for (j, gutter) in ln_lines.iter_mut().enumerate() {
-            if scroll + j == app.active_line {
+            let display_line = visual_to_display.get(j).copied().unwrap_or(0);
+            if scroll + display_line == app.active_line {
                 for span in &mut gutter.spans {
                     span.style = span.style.bg(active_bg).fg(app.theme.accent);
                 }
@@ -384,8 +410,11 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     // vertical scroll is 0. Horizontal scroll is still applied.
     let cx = inner.x + ln_width as u16;
     let cw = inner.width.saturating_sub(ln_width as u16);
+    // When there is no gutter (ln_width == 0) but word-wrap is on, fall back to
+    // ratatui's built-in Wrap — there is no drift risk without a parallel gutter
+    // paragraph, so the pre-expansion path is skipped and ratatui handles it.
     let mut para = Paragraph::new(content_lines).scroll((0, hscroll));
-    if app.word_wrap {
+    if app.word_wrap && ln_width == 0 {
         para = para.wrap(Wrap { trim: false });
     }
     f.render_widget(

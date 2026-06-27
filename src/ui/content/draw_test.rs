@@ -412,3 +412,44 @@ fn blame_column_click_does_not_start_drag_selection() {
         "blame column click should open line-blame popup"
     );
 }
+
+#[test]
+fn word_wrap_without_line_numbers_still_wraps() {
+    // Regression: when ln_width==0 (no line numbers, no blame, no folds),
+    // word wrap must still visually wrap long lines — the pre-expansion path
+    // only runs when ln_width>0, so ratatui Wrap is the fallback.
+    let root = temp_tree();
+    let long_line: String = "x".repeat(160);
+    let path = root.join("wrap_no_ln.txt");
+    fs::write(&path, format!("{long_line}\n")).unwrap();
+    let mut app = app_for(&root);
+    app.open_file(&path);
+    app.show_line_numbers = false;
+    app.word_wrap = true;
+    // Render into 80x24 buffer.
+    let backend = ratatui::backend::TestBackend::new(80, 24);
+    let mut terminal = ratatui::Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| draw_content(frame, &mut app, frame.area()))
+        .unwrap();
+    let buf = terminal.backend().buffer();
+    let row = |y: u16| -> String {
+        let w = buf.area.width as usize;
+        let start = y as usize * w;
+        buf.content()[start..start + w]
+            .iter()
+            .map(|c| c.symbol())
+            .collect()
+    };
+    let r1 = row(1);
+    let r2 = row(2);
+    assert!(
+        r1.trim_end().contains('x'),
+        "row 1 must contain content, got: {r1:?}"
+    );
+    assert!(
+        r2.trim_end().contains('x'),
+        "row 2 must also have content (word wrap), got: {r2:?}"
+    );
+    fs::remove_dir_all(&root).ok();
+}
