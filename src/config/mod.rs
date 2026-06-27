@@ -28,7 +28,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use serde::{Deserialize, Deserializer, Serialize};
 
 #[cfg(unix)]
-use crate::event_source::CURRENT_BASE_KEY;
+use crate::event_source::CURRENT_ALT_KEYS;
 
 use crate::plugin::PluginEntry;
 use crate::theme::ThemeConfig;
@@ -123,24 +123,31 @@ impl KeyBinding {
     /// ignored because crossterm already encodes it in the char case.
     ///
     /// On terminals that support the kitty keyboard protocol with
-    /// `REPORT_ALTERNATE_KEYS`, the event carries a *base key* — the
-    /// US-layout physical key. When it is available, `matches` prefers the
-    /// base key over `key.code` for `Char` bindings, so shortcuts work
-    /// regardless of the active keyboard layout.
+    /// `REPORT_ALTERNATE_KEYS`, the event carries alternate keycodes — the
+    /// **shifted** key (capital/symbol in the current layout) and the
+    /// **base-layout** key (the US-physical key). For ASCII alphabetic
+    /// bindings the base-layout key is preferred (layout-independent);
+    /// for symbols and non-alphabetic bindings the shifted key is used
+    /// (so `?` bound to Shift+/ on a US layout still works).
     pub fn matches(&self, key: &KeyEvent) -> bool {
         #[cfg(unix)]
-        let event_code = CURRENT_BASE_KEY
-            .with(|cell| cell.get())
-            .and_then(|bk| {
-                // Only substitute for Char bindings; layout-dependent keys
-                // (Enter, Space, Tab, arrows, …) are never affected.
-                if matches!(self.code, KeyCode::Char(_)) {
-                    Some(bk)
-                } else {
-                    None
-                }
-            })
-            .unwrap_or(key.code);
+        let event_code = if matches!(self.code, KeyCode::Char(_)) {
+            let alt = CURRENT_ALT_KEYS.with(|c| c.get());
+            let shift = key.modifiers.contains(KeyModifiers::SHIFT);
+            // Layout-independent: a letter's identity is its US base-layout key.
+            // Apply Shift to choose the case so capital bindings (Y, G, …) still work.
+            if let Some(b) = alt.base.filter(|b| b.is_ascii_alphabetic()) {
+                KeyCode::Char(if shift { b.to_ascii_uppercase() } else { b })
+            } else if let Some(s) = alt.shifted {
+                // Non-letter (or no base reported): keep prior behaviour — the
+                // shifted field carries layout symbols like '?' for Shift+/.
+                KeyCode::Char(s)
+            } else {
+                key.code
+            }
+        } else {
+            key.code
+        };
         #[cfg(not(unix))]
         let event_code = key.code;
 

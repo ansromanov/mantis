@@ -182,21 +182,65 @@ fn incomplete_csi_returns_none_not_error() {
 }
 
 // ---------------------------------------------------------------------------
-// CSI-u: base key stored in thread-local
+// CSI-u: alternate keys stored in thread-local
 // ---------------------------------------------------------------------------
 
 #[test]
-fn csi_u_sets_current_base_key() {
-    // U+0437 = 'з' (decimal 1079), alternate = 112 = 'p'
-    // ESC [ 1079 : 112 ; 1 u → primary='з', base_key=Some(Char('p'))
-    CURRENT_BASE_KEY.with(|c| c.set(None));
+fn csi_u_stores_shifted_and_base_in_alt_keys() {
+    // U+0437 = 'з' (decimal 1079), shifted = 1047 = 'З', base = 112 = 'p'
+    // ESC [ 1079 : 1047 : 112 ; 1 u → 3-field form (real kitty protocol).
+    CURRENT_ALT_KEYS.with(|c| c.set(AltKeys::default()));
+    let seq = b"\x1b[1079:1047:112;1u";
+    let (ev, _) = parse_ok(seq);
+    let k = key_event(&ev);
+    assert_eq!(k.code, KeyCode::Char('з'));
+    let alt = CURRENT_ALT_KEYS.with(|c| c.get());
+    assert_eq!(alt.shifted, Some('З'));
+    assert_eq!(alt.base, Some('p'));
+    CURRENT_ALT_KEYS.with(|c| c.set(AltKeys::default()));
+}
+
+#[test]
+fn csi_u_shifted_and_base_same_in_2_field_form() {
+    // 2-field form: 1079:112 (primary='з', alternate='p').
+    // The alternate is stored as shifted; base is None.
+    CURRENT_ALT_KEYS.with(|c| c.set(AltKeys::default()));
     let seq = b"\x1b[1079:112;1u";
     let (ev, _) = parse_ok(seq);
     let k = key_event(&ev);
     assert_eq!(k.code, KeyCode::Char('з'));
-    let base = CURRENT_BASE_KEY.with(|c| c.get());
-    assert_eq!(base, Some(KeyCode::Char('p')));
-    CURRENT_BASE_KEY.with(|c| c.set(None));
+    let alt = CURRENT_ALT_KEYS.with(|c| c.get());
+    assert_eq!(alt.shifted, Some('p'));
+    assert_eq!(alt.base, None);
+    CURRENT_ALT_KEYS.with(|c| c.set(AltKeys::default()));
+}
+
+#[test]
+fn csi_u_no_shifted_field_middle_empty() {
+    // Empty middle field: 1080::98 (primary='и', shifted absent, base='b').
+    CURRENT_ALT_KEYS.with(|c| c.set(AltKeys::default()));
+    let seq = b"\x1b[1080::98;1u";
+    let (ev, _) = parse_ok(seq);
+    let k = key_event(&ev);
+    assert_eq!(k.code, KeyCode::Char('и'));
+    let alt = CURRENT_ALT_KEYS.with(|c| c.get());
+    assert_eq!(alt.shifted, None);
+    assert_eq!(alt.base, Some('b'));
+    CURRENT_ALT_KEYS.with(|c| c.set(AltKeys::default()));
+}
+
+#[test]
+fn csi_u_no_alternates_single_field() {
+    // Single field: just 'k' (107). Both shifted and base are None.
+    CURRENT_ALT_KEYS.with(|c| c.set(AltKeys::default()));
+    let seq = b"\x1b[107;1u";
+    let (ev, _) = parse_ok(seq);
+    let k = key_event(&ev);
+    assert_eq!(k.code, KeyCode::Char('k'));
+    let alt = CURRENT_ALT_KEYS.with(|c| c.get());
+    assert_eq!(alt.shifted, None);
+    assert_eq!(alt.base, None);
+    CURRENT_ALT_KEYS.with(|c| c.set(AltKeys::default()));
 }
 
 // ---------------------------------------------------------------------------

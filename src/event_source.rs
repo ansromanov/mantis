@@ -1,10 +1,10 @@
 //! Raw terminal event source with kitty keyboard protocol support.
 //!
 //! Reads bytes directly from stdin via `libc::poll`/`read` so it can parse
-//! CSI-u sequences and extract the *alternate keycode* (the US-layout physical
-//! key) that crossterm discards. The extracted base key is stored in a
-//! `thread_local!` cell so [`KeyBinding::matches`](crate::config::KeyBinding)
-//! can use it for layout-independent matching.
+//! CSI-u sequences and extract the *alternate keycodes* (shifted key and
+//! US-layout physical key) that crossterm discards. The extracted keys are
+//! stored in a `thread_local!` cell so [`KeyBinding::matches`](crate::config::KeyBinding)
+//! can use them for layout-independent matching.
 
 use std::cell::Cell;
 use std::io;
@@ -15,14 +15,22 @@ use crossterm::event::{
 };
 
 // ---------------------------------------------------------------------------
-// Thread-local base key for the current event
+// Thread-local alternate keys for the current event
 // ---------------------------------------------------------------------------
 
+/// Kitty alternate key codes for the current event: the shifted key and the
+/// US-physical (base-layout) key. Both `None` when the terminal didn't report
+/// them.
+#[derive(Clone, Copy, Default)]
+pub struct AltKeys {
+    pub shifted: Option<char>,
+    pub base: Option<char>,
+}
+
 thread_local! {
-    /// Physical (US-layout) key for the event currently being dispatched, if
-    /// the terminal provided alternate-keycode information via the kitty
-    /// keyboard protocol.
-    pub static CURRENT_BASE_KEY: Cell<Option<KeyCode>> = const { Cell::new(None) };
+    /// Alternate keycodes for the event currently being dispatched, if the
+    /// terminal provided them via the kitty keyboard protocol.
+    pub static CURRENT_ALT_KEYS: Cell<AltKeys> = const { Cell::new(AltKeys { shifted: None, base: None }) };
 }
 
 // ---------------------------------------------------------------------------
@@ -148,7 +156,7 @@ impl RawEventSource {
     /// Parse and return the next event from the buffer, blocking briefly (16 ms)
     /// for data when the buffer is empty.
     pub fn next_raw_event(&mut self) -> io::Result<Option<Event>> {
-        CURRENT_BASE_KEY.with(|cell| cell.set(None));
+        CURRENT_ALT_KEYS.with(|c| c.set(AltKeys::default()));
         self.fill(16)?;
         self.parse_next()
     }
@@ -156,7 +164,7 @@ impl RawEventSource {
     /// Try to return an already-buffered event without waiting.
     /// Returns `None` when no event is immediately available.
     pub fn try_next_raw_event(&mut self) -> io::Result<Option<Event>> {
-        CURRENT_BASE_KEY.with(|cell| cell.set(None));
+        CURRENT_ALT_KEYS.with(|c| c.set(AltKeys::default()));
         self.fill(0)?;
         self.parse_next()
     }
@@ -324,14 +332,14 @@ fn parse_csi(bytes: &[u8]) -> io::Result<Option<(Event, usize)>> {
 
 /// Parse a CSI-u key event.
 ///
-/// Format: `keycode[:alternate][; modifiers[:event_type]]`
+/// Format: `keycode[:shifted[:base-layout]][; modifiers[:event_type]]`
 ///
-/// We extract the **first alternate keycode** as the US-layout physical key
-/// and store it in [`CURRENT_BASE_KEY`].
+/// We extract both the **shifted** key (field 1) and the **base-layout** key
+/// (field 2, the US-physical key) and store them in [`CURRENT_ALT_KEYS`].
 fn parse_csi_u(params: &str, consumed: usize) -> io::Result<Option<(Event, usize)>> {
     let mut parts = params.split(';');
 
-    // ---- key codes (primary[:alternate[:...]]) ----
+    // ---- key codes (primary[:shifted[:base-layout]]) ----
     let codes_str = parts.next().unwrap_or("");
     let mut codes = codes_str.split(':');
 
@@ -340,12 +348,11 @@ fn parse_csi_u(params: &str, consumed: usize) -> io::Result<Option<(Event, usize
         .parse()
         .map_err(|_| invalid("bad primary keycode"))?;
 
-    // First alternate keycode = US-layout physical key (if present).
-    let base_key = codes
-        .next()
-        .and_then(|s| s.parse::<u32>().ok())
-        .and_then(char::from_u32)
-        .map(KeyCode::Char);
+    let parse_char = |s: &str| s.parse::<u32>().ok().and_then(char::from_u32);
+    // Field 1 = shifted (current layout), field 2 = base-layout (US physical).
+    // Either may be empty, e.g. "98::100" when there is no shifted variant.
+    let shifted = codes.next().and_then(parse_char);
+    let base = codes.next().and_then(parse_char);
 
     // ---- modifiers and event type ----
     let mut modifiers = KeyModifiers::empty();
@@ -373,8 +380,8 @@ fn parse_csi_u(params: &str, consumed: usize) -> io::Result<Option<(Event, usize
     // ---- translate primary code to KeyCode ----
     let keycode = u32_to_keycode(primary);
 
-    // Store base key for the dispatch layer.
-    CURRENT_BASE_KEY.with(|cell| cell.set(base_key));
+    // Store alternate keys for the dispatch layer.
+    CURRENT_ALT_KEYS.with(|c| c.set(AltKeys { shifted, base }));
 
     Ok(Some((
         Event::Key(KeyEvent::new_with_kind_and_state(
