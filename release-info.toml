@@ -1,7 +1,4 @@
-version = "0.10.0"
+version = "0.11.0"
 date = "2026-06-27"
-whats_new = """- feat: rebrand tree-viewer/tv to mantis (#333)
-- ux: breadcrumb navigation requires double-click (#338)
-- feat: config options for untracked/ignored files in git status (#332)
-- chore: add changelog to release info [skip ci]"""
-release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.10.0"
+whats_new = ""
+release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.11.0"
