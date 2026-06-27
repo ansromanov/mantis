@@ -139,6 +139,7 @@ impl App {
             in_file_search: None,
             tree_filter: None,
             goto_line: None,
+            command_usage: crate::command_usage::UsageStats::load(),
             command_palette: None,
             history: None,
             theme_picker: None,

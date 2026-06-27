@@ -13,6 +13,7 @@
 pub mod ansi;
 pub mod app;
 pub mod command_palette;
+pub mod command_usage;
 pub mod config;
 pub mod diff;
 #[cfg(unix)]

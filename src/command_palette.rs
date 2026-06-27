@@ -143,27 +143,58 @@ pub struct CommandPalette {
     pub filtered: Vec<usize>,
     pub selected: usize,
     pub binding_labels: Vec<String>,
+    /// Index order used when the query is empty. Always a permutation of
+    /// `0..COMMANDS.len()`. Built by [`ranked_base_order`] from usage stats.
+    pub base_order: Vec<usize>,
+    /// How many of the first entries in `base_order` are pinned (recent +
+    /// frequent). Used by the UI to show a star prefix for pinned commands
+    /// when the query is empty.
+    pub base_pinned: usize,
     matcher: SkimMatcherV2,
 }
 
 impl Default for CommandPalette {
     fn default() -> Self {
-        Self::new(&Keymap::default())
+        Self::new(&Keymap::default(), Vec::new(), 0)
     }
 }
 
 impl CommandPalette {
-    pub fn new(keymap: &Keymap) -> Self {
+    pub fn new(keymap: &Keymap, base_order: Vec<usize>, base_pinned: usize) -> Self {
         let binding_labels = COMMANDS
             .iter()
             .map(|cmd| keymap.label_for_action(cmd.action_id))
             .collect();
-        let filtered = (0..COMMANDS.len()).collect();
+        // Sanitise base_order: drop out-of-range indices, de-duplicate, then
+        // append any missing indices in natural order so it is always a valid
+        // permutation of 0..COMMANDS.len().
+        let base_order = if base_order.is_empty() {
+            (0..COMMANDS.len()).collect()
+        } else {
+            let mut seen = vec![false; COMMANDS.len()];
+            let mut order: Vec<usize> = Vec::with_capacity(COMMANDS.len());
+            for &i in &base_order {
+                if i < COMMANDS.len() && !seen[i] {
+                    seen[i] = true;
+                    order.push(i);
+                }
+            }
+            for (i, s) in seen.iter_mut().enumerate() {
+                if !*s {
+                    *s = true;
+                    order.push(i);
+                }
+            }
+            order
+        };
+        let filtered = base_order.clone();
         CommandPalette {
             query: String::new(),
             filtered,
             selected: 0,
             binding_labels,
+            base_order,
+            base_pinned,
             matcher: SkimMatcherV2::default(),
         }
     }
@@ -193,7 +224,7 @@ impl CommandPalette {
     fn refilter(&mut self) {
         self.selected = 0;
         if self.query.is_empty() {
-            self.filtered = (0..COMMANDS.len()).collect();
+            self.filtered = self.base_order.clone();
             return;
         }
         let hay = |i: usize| format!("{} {}", COMMANDS[i].name, self.binding_labels[i]);
@@ -207,6 +238,47 @@ impl CommandPalette {
         scored.sort_by_key(|(_, s)| std::cmp::Reverse(*s));
         self.filtered = scored.into_iter().map(|(i, _)| i).collect();
     }
+}
+
+/// Build the empty-query display order: `[last_used] ++ top_used(frequent) ++ rest`,
+/// de-duplicated, with every remaining command appended in source order.
+/// Returns the ordered indices and the number of pinned entries.
+/// `pin_recent`/`frequent` come from config. Unknown action_ids (e.g. a renamed
+/// command still in an old usage file) are ignored.
+pub fn ranked_base_order(
+    usage: &crate::command_usage::UsageStats,
+    pin_recent: bool,
+    frequent: usize,
+) -> (Vec<usize>, usize) {
+    let index_of = |id: &str| COMMANDS.iter().position(|c| c.action_id == id);
+    let mut order: Vec<usize> = Vec::with_capacity(COMMANDS.len());
+    let mut seen = vec![false; COMMANDS.len()];
+    let mut pinned = 0;
+
+    let mut push = |i: usize, is_pinned: bool| {
+        if !seen[i] {
+            seen[i] = true;
+            order.push(i);
+            if is_pinned {
+                pinned += 1;
+            }
+        }
+    };
+
+    if pin_recent {
+        if let Some(i) = usage.last_used().and_then(index_of) {
+            push(i, true);
+        }
+    }
+    for id in usage.top_used(frequent) {
+        if let Some(i) = index_of(id) {
+            push(i, true);
+        }
+    }
+    for i in 0..COMMANDS.len() {
+        push(i, false);
+    }
+    (order, pinned)
 }
 
 #[cfg(test)]
