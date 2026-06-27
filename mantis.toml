@@ -2,17 +2,12 @@
 # To open this file for editing from within mantis: Ctrl+P → "Open config in editor"
 
 show_hidden = false
-ignore_gitignore = false
 tree_width = 28
 word_wrap = false
 line_numbers = true  # show line-number gutter in the content pane (toggle at runtime with L)
 # tree_independent_scroll = false  # PageUp/PageDown and Home/End scroll the tree
 #                                    viewport without moving the selection;
 #                                    Up/Down still move the cursor (default: false)
-git_status = true
-git_show_deleted = false
-# git_show_untracked = true   # include untracked (??) files in git status/colors (default: true)
-# git_show_ignored   = false  # include ignored (!!) files in git status/colors (default: false)
 scrollbar = true
 scroll_percentage = true
 in_file_search = true
@@ -23,9 +18,22 @@ in_file_search = true
 # palette_pin_recent = true   # pin the last-used command at the top of the Ctrl+P palette (default: true)
 # palette_frequent_count = 3  # how many most-used commands to pin below it; 0 disables (default: 3)
 indent_guides = true         # draw indentation guides (│) in the tree pane
-# diff_mode = "all"           # default git diff source: "all" (vs HEAD), "staged", "unstaged"
 # icons = false               # show Nerd Font file-type icons in the tree (requires a
                                 # Nerd Font in your terminal and the iconize plugin enabled)
+
+# --- git -------------------------------------------------------------------
+# These options configure the BUILT-IN git integration (git-core feature).
+# They do NOT affect the git-plugin (configured under [plugins]).
+[git]
+status = true             # show git status colours/markers in the tree
+show_deleted = false      # include deleted files in git status
+# show_untracked = true   # include untracked (??) files (default: true)
+# show_ignored = false    # include ignored (!!) files (default: false)
+# ignore_gitignore = false # respect .gitignore when listing files (default: false)
+
+[git.diff]
+# mode = "all"            # default diff source: all | staged | unstaged
+# side_by_side = false    # start diff view in side-by-side layout
 
 # Keybindings. Each action takes a list of key specs. A spec is a single
 # character ("q", "?", "0") or a named key (Up, Down, Left, Right, Enter,

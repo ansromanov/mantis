@@ -9,7 +9,10 @@ use ratatui::Terminal;
 
 fn make_app(root: &std::path::Path) -> App {
     let cfg = Config {
-        git_status: false,
+        git: crate::config::GitConfig {
+            status: false,
+            ..Default::default()
+        },
         ..Config::default()
     };
     App::new(root.to_path_buf(), cfg, None, None).unwrap()

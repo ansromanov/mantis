@@ -17,7 +17,7 @@ use crate::plugin::{self, PluginManager};
 use crate::tree::build_visible;
 
 use super::loader::Loader;
-use super::{App, DiffMode, Focus};
+use super::{App, Focus};
 
 impl App {
     /// Builds the app: walks the root directory, loads git status, resolves
@@ -29,14 +29,14 @@ impl App {
         config_error: Option<String>,
     ) -> anyhow::Result<Self> {
         let expanded = HashSet::new();
-        let git_status_enabled = cfg.git_status;
-        let git_show_deleted = cfg.git_show_deleted;
-        let git_show_untracked = cfg.git_show_untracked;
-        let git_show_ignored = cfg.git_show_ignored;
+        let git_status_enabled = cfg.git.status;
+        let git_show_deleted = cfg.git.show_deleted;
+        let git_show_untracked = cfg.git.show_untracked;
+        let git_show_ignored = cfg.git.show_ignored;
         let git_status_map = if git_status_enabled {
             #[cfg(feature = "git-core")]
             {
-                crate::git::repo_status(&root, cfg.git_show_untracked, cfg.git_show_ignored)
+                crate::git::repo_status(&root, cfg.git.show_untracked, cfg.git.show_ignored)
             }
             #[cfg(not(feature = "git-core"))]
             {
@@ -62,7 +62,7 @@ impl App {
             &root,
             &expanded,
             cfg.show_hidden,
-            cfg.ignore_gitignore,
+            cfg.git.ignore_gitignore,
             &deleted,
         );
         let theme = cfg.theme.resolve();
@@ -128,12 +128,8 @@ impl App {
             current_file: None,
             current_syntax: None,
             is_diff: false,
-            diff_mode: match cfg.diff_mode.as_str() {
-                "staged" => DiffMode::Staged,
-                "unstaged" => DiffMode::Unstaged,
-                _ => DiffMode::All,
-            },
-            diff_side_by_side: false,
+            diff_mode: cfg.git.diff.mode,
+            diff_side_by_side: cfg.git.diff.side_by_side,
             viewing_revision: None,
             diff_rows: Vec::new(),
             content_title: None,
@@ -155,7 +151,7 @@ impl App {
             recent_area: ratatui::layout::Rect::default(),
             recent_offset: 0,
             show_hidden: cfg.show_hidden,
-            ignore_gitignore: cfg.ignore_gitignore,
+            ignore_gitignore: cfg.git.ignore_gitignore,
             tree_revision: 0,
             tree_width: cfg.tree_width,
             show_help: false,

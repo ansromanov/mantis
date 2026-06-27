@@ -207,11 +207,11 @@ fn app_git_show_fields_default_matches_config() {
     let app = app_for(&root);
     let cfg = Config::default();
     assert_eq!(
-        app.git_show_untracked, cfg.git_show_untracked,
+        app.git_show_untracked, cfg.git.show_untracked,
         "git_show_untracked must match Config::default()"
     );
     assert_eq!(
-        app.git_show_ignored, cfg.git_show_ignored,
+        app.git_show_ignored, cfg.git.show_ignored,
         "git_show_ignored must match Config::default()"
     );
     fs::remove_dir_all(&root).ok();

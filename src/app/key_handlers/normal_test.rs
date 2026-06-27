@@ -431,6 +431,50 @@ fn toggle_blame_status_clears_on_valid_keypress() {
     fs::remove_dir_all(&root).ok();
 }
 
+// -- diff toggle persistence -------------------------------------------------
+
+#[test]
+fn toggle_diff_side_by_side_persists_to_config() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.is_diff = true;
+    app.diff_side_by_side = false;
+    app.handle_key(key(KeyCode::Char('D')));
+    assert!(app.diff_side_by_side, "app field should toggle");
+    assert!(
+        app.config.git.diff.side_by_side,
+        "config should persist the toggle"
+    );
+    // Toggle back.
+    app.handle_key(key(KeyCode::Char('D')));
+    assert!(!app.diff_side_by_side);
+    assert!(!app.config.git.diff.side_by_side);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn toggle_diff_staged_persists_to_config() {
+    use crate::app::DiffMode;
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.is_diff = true;
+    app.diff_mode = DiffMode::All;
+    app.handle_key(key(KeyCode::Char('S')));
+    assert_eq!(app.diff_mode, DiffMode::Staged, "should cycle to Staged");
+    assert_eq!(
+        app.config.git.diff.mode,
+        DiffMode::Staged,
+        "config should persist the new mode"
+    );
+    // Cycle again.
+    app.handle_key(key(KeyCode::Char('S')));
+    assert_eq!(app.diff_mode, DiffMode::Unstaged);
+    assert_eq!(app.config.git.diff.mode, DiffMode::Unstaged);
+    fs::remove_dir_all(&root).ok();
+}
+
 // -- copy path ---------------------------------------------------------------
 
 #[test]
