@@ -58,18 +58,28 @@ impl App {
                     self.splitter_drag = true;
                     return;
                 }
-                // Breadcrumb click: check before the tree area so breadcrumb
-                // segments take priority over the tree row that happens to lie
-                // at the same screen position (breadcrumb sits above the list).
+                // Breadcrumb double-click: navigate on second click within 400 ms.
                 let clicked = self
                     .breadcrumb_areas
                     .iter()
                     .find(|(_, area)| rect_contains(*area, ev.column, ev.row))
                     .map(|(path, _)| path.clone());
                 if let Some(path) = clicked {
-                    self.focus = Focus::Tree;
-                    self.clear_selection();
-                    self.navigate_to_breadcrumb(&path);
+                    let now = Instant::now();
+                    let is_double = matches!(
+                        &self.last_breadcrumb_click,
+                        Some((t, p))
+                            if *p == path
+                                && now.duration_since(*t) < Duration::from_millis(400)
+                    );
+                    if is_double {
+                        self.last_breadcrumb_click = None;
+                        self.focus = Focus::Tree;
+                        self.clear_selection();
+                        self.navigate_to_breadcrumb(&path);
+                    } else {
+                        self.last_breadcrumb_click = Some((now, path));
+                    }
                     return;
                 }
                 if rect_contains(self.tree_area, ev.column, ev.row) {
