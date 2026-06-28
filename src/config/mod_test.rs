@@ -197,6 +197,48 @@ fn matches_uses_shifted_key_for_symbol_binding() {
 
 #[test]
 #[cfg(unix)]
+fn matches_uses_base_key_for_non_letter_symbol() {
+    // On a Russian layout, the physical '/' key (US) produces '.'.
+    // With the base field, `/` should still match the binding.
+    let binding = parse_binding("/").unwrap();
+
+    // Russian '.' key event with base='/'.
+    let event = evm(KeyCode::Char('.'), KeyModifiers::empty());
+    set_alt(Some('.'), Some('/'));
+    assert!(binding.matches(&event));
+
+    reset_alt();
+}
+
+#[test]
+#[cfg(unix)]
+fn matches_uses_base_key_with_us_shift_for_symbol() {
+    // On a Russian layout, Shift+physical '/' (US) produces ','.
+    // Base='/' + Shift should produce '?' via US shift mapping.
+    let binding = parse_binding("?").unwrap();
+
+    let event = evm(KeyCode::Char(','), KeyModifiers::SHIFT);
+    set_alt(Some(','), Some('/'));
+    assert!(binding.matches(&event));
+
+    reset_alt();
+}
+
+#[test]
+#[cfg(unix)]
+fn matches_symbol_base_only_no_mismatch() {
+    // base='/' with no shift should NOT match '?' binding.
+    let binding = parse_binding("?").unwrap();
+
+    let event = evm(KeyCode::Char('.'), KeyModifiers::empty());
+    set_alt(Some('.'), Some('/'));
+    assert!(!binding.matches(&event));
+
+    reset_alt();
+}
+
+#[test]
+#[cfg(unix)]
 fn matches_alt_keys_does_not_affect_non_char_bindings() {
     let binding = parse_binding("Enter").unwrap();
     let event = evm(KeyCode::Enter, KeyModifiers::empty());

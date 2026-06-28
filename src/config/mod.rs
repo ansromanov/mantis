@@ -205,6 +205,36 @@ pub struct KeyBinding {
     super_key: bool,
 }
 
+/// Map a US keyboard base-layout character to its shifted variant.
+/// This is the US ANSI keyboard shift mapping for non-letter symbol keys.
+/// For ASCII letters, `to_ascii_uppercase` suffices and is handled separately.
+fn us_shifted(c: char) -> char {
+    match c {
+        '1' => '!',
+        '2' => '@',
+        '3' => '#',
+        '4' => '$',
+        '5' => '%',
+        '6' => '^',
+        '7' => '&',
+        '8' => '*',
+        '9' => '(',
+        '0' => ')',
+        '-' => '_',
+        '=' => '+',
+        '[' => '{',
+        ']' => '}',
+        '\\' => '|',
+        ';' => ':',
+        '\'' => '"',
+        ',' => '<',
+        '.' => '>',
+        '/' => '?',
+        '`' => '~',
+        c => c,
+    }
+}
+
 impl KeyBinding {
     /// Whether a key event matches this binding. Shift is intentionally
     /// ignored because crossterm already encodes it in the char case.
@@ -213,9 +243,11 @@ impl KeyBinding {
     /// `REPORT_ALTERNATE_KEYS`, the event carries alternate keycodes — the
     /// **shifted** key (capital/symbol in the current layout) and the
     /// **base-layout** key (the US-physical key). For ASCII alphabetic
-    /// bindings the base-layout key is preferred (layout-independent);
-    /// for symbols and non-alphabetic bindings the shifted key is used
-    /// (so `?` bound to Shift+/ on a US layout still works).
+    /// bindings the base-layout key is preferred (layout-independent).
+    /// For non-letter symbols the base key + US shift mapping is used, so
+    /// bindings like `?` (Shift+/ on US) work regardless of keyboard layout.
+    /// When only the shifted key is reported (2-field CSI-u), it is used as
+    /// a fallback.
     pub fn matches(&self, key: &KeyEvent) -> bool {
         #[cfg(unix)]
         let event_code = if matches!(self.code, KeyCode::Char(_)) {
@@ -225,9 +257,13 @@ impl KeyBinding {
             // Apply Shift to choose the case so capital bindings (Y, G, …) still work.
             if let Some(b) = alt.base.filter(|b| b.is_ascii_alphabetic()) {
                 KeyCode::Char(if shift { b.to_ascii_uppercase() } else { b })
+            } else if let Some(b) = alt.base {
+                // Non-letter: use the base-layout key with US shift mapping.
+                // This makes symbol bindings (?, /, ., ...) work regardless of
+                // the current keyboard layout.
+                KeyCode::Char(if shift { us_shifted(b) } else { b })
             } else if let Some(s) = alt.shifted {
-                // Non-letter (or no base reported): keep prior behaviour — the
-                // shifted field carries layout symbols like '?' for Shift+/.
+                // Fallback for terminals that report shifted but no base (2-field CSI-u).
                 KeyCode::Char(s)
             } else {
                 key.code
