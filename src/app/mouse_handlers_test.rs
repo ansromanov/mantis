@@ -325,6 +325,48 @@ fn breadcrumb_double_click_expired_does_not_navigate() {
 }
 
 #[test]
+fn breadcrumb_double_click_on_compact_dotdot_changes_root() {
+    let root = tree_with_dir();
+    let mut app = app_for(&root);
+    let parent = root.parent().expect("temp dir has a parent").to_path_buf();
+
+    // Simulate a compact breadcrumb: a ".." segment pointing to the parent,
+    // followed by the root segment.
+    app.breadcrumb_areas.push((
+        parent.clone(),
+        Rect {
+            x: 1,
+            y: 1,
+            width: 2,
+            height: 1,
+        },
+    ));
+    app.breadcrumb_areas.push((
+        root.clone(),
+        Rect {
+            x: 6,
+            y: 1,
+            width: 4,
+            height: 1,
+        },
+    ));
+
+    // Double-click on the ".." rect.
+    app.last_breadcrumb_click = Some((Instant::now(), parent.clone()));
+    app.handle_mouse(left_down_at(2, 1));
+
+    assert_eq!(
+        app.root, parent,
+        "double-click on compact .. must change root to parent"
+    );
+    assert!(
+        app.last_breadcrumb_click.is_none(),
+        "last_breadcrumb_click must be cleared after navigation"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn blame_column_click_opens_line_blame() {
     let root = temp_tree();
     let mut app = app_for(&root);
