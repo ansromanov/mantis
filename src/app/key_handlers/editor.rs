@@ -7,9 +7,9 @@
 //! screen, runs the editor, then restores the terminal and flags `needs_clear`
 //! so the next frame repaints cleanly. Theme switching and the highlighter
 //! rebuild triggered from the palette live here too, alongside the related
-//! terminal-state bookkeeping. `open_release_url` is guarded by
-//! `should_open_browser`, which requires a non-empty URL and a TTY stdout so
-//! that browser focus-stealing does not occur in non-interactive environments.
+//! terminal-state bookkeeping. `open_release_url` delegates to the shared
+//! `open_in_browser` helper, which guards against spawning the browser when
+//! stdout is not a TTY (piped/headless/CI runs).
 
 use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
 use crossterm::execute;
@@ -18,6 +18,7 @@ use crossterm::terminal::{
 };
 
 use std::io::IsTerminal;
+use std::path::Path;
 
 use crate::config;
 use crate::highlight::Highlighter;
@@ -142,32 +143,88 @@ impl App {
         }
     }
 
-    pub(super) fn open_release_url(&self) {
+    pub(super) fn open_release_url(&mut self) {
         let Some(release) = crate::release_info::RELEASE.as_ref() else {
             return;
         };
-        let url = release.release_url.clone();
-        if !should_open_browser(&url, std::io::stdout().is_terminal()) {
-            return;
-        }
-        #[cfg(target_os = "macos")]
-        let _ = std::process::Command::new("open").arg(&url).spawn();
-        #[cfg(target_os = "windows")]
-        let _ = std::process::Command::new("cmd")
-            .args(["/c", "start", "", &url])
-            .spawn();
-        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-        let _ = std::process::Command::new("xdg-open").arg(&url).spawn();
+        self.open_in_browser(&release.release_url);
     }
 }
 
-/// Returns `true` when the browser should be launched for `url`:
-/// the URL is non-empty and stdout is connected to a terminal (interactive).
-pub(super) fn should_open_browser(url: &str, is_tty: bool) -> bool {
-    !url.is_empty() && is_tty
+/// Resolves the external editor command from environment, falling back to
+/// an OS-appropriate default (`vim` on Unix, `notepad` on Windows).
+pub(super) fn resolve_editor() -> String {
+    std::env::var("VISUAL")
+        .or_else(|_| std::env::var("EDITOR"))
+        .unwrap_or_else(|_| {
+            if cfg!(windows) {
+                "notepad".to_string()
+            } else {
+                "vim".to_string()
+            }
+        })
 }
 
 impl App {
+    /// Suspends the TUI, opens `path` in the user's `$EDITOR` (resolved by
+    /// `resolve_editor`), waits for the editor to exit, restores the TUI,
+    /// and flags a clear. The caller is responsible for reloading content
+    /// after the editor returns.
+    fn launch_editor(&mut self, path: &Path) {
+        let editor = resolve_editor();
+
+        let _ = disable_raw_mode();
+        let _ = execute!(std::io::stdout(), LeaveAlternateScreen, DisableMouseCapture);
+
+        let parts: Vec<&str> = editor.split_whitespace().collect();
+        let launch_err = if let Some((cmd, args)) = parts.split_first() {
+            std::process::Command::new(cmd)
+                .args(args)
+                .arg(path)
+                .status()
+                .err()
+        } else {
+            None
+        };
+
+        let _ = execute!(std::io::stdout(), EnterAlternateScreen, EnableMouseCapture);
+        if let Err(e) = enable_raw_mode() {
+            eprintln!("mantis: failed to restore raw mode after editor: {e}");
+        }
+        self.needs_clear = true;
+        if let Some(e) = launch_err {
+            self.set_status(format!("editor launch failed: {e}"));
+        }
+    }
+
+    /// Opens `url` in the system browser. No-op for empty URLs. When stdout
+    /// is not a terminal (piped/headless/CI), sets a status message instead
+    /// of spawning the browser.
+    pub(super) fn open_in_browser(&mut self, url: &str) {
+        if url.is_empty() {
+            return;
+        }
+        if !std::io::stdout().is_terminal() {
+            self.set_status("not opening browser (non-interactive)");
+            return;
+        }
+        #[cfg(target_os = "macos")]
+        if let Err(e) = std::process::Command::new("open").arg(url).spawn() {
+            self.set_status(format!("browser launch failed: {e}"));
+        }
+        #[cfg(target_os = "windows")]
+        if let Err(e) = std::process::Command::new("cmd")
+            .args(["/c", "start", "", url])
+            .spawn()
+        {
+            self.set_status(format!("browser launch failed: {e}"));
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        if let Err(e) = std::process::Command::new("xdg-open").arg(url).spawn() {
+            self.set_status(format!("browser launch failed: {e}"));
+        }
+    }
+
     /// Applies the theme selected in the picker, saves it to config, and
     /// closes the overlay.
     pub(crate) fn apply_selected_theme(&mut self) {
@@ -217,87 +274,23 @@ impl App {
         }
     }
 
-    /// Opens the currently selected file in the user's `$EDITOR` (falling back
-    /// to `$VISUAL`). Suspends the TUI, spawns the editor, waits for it to
-    /// exit, then restores the TUI and reloads the file content.
+    /// Opens the currently selected file in the user's `$EDITOR`. Delegates
+    /// to `launch_editor` for the TUI suspend/resume dance, then reloads the
+    /// file content.
     pub(super) fn open_in_editor(&mut self) {
-        let Some(path) = self.current_file.clone() else {
-            return;
-        };
-
-        let editor = std::env::var("VISUAL")
-            .or_else(|_| std::env::var("EDITOR"))
-            .unwrap_or_else(|_| {
-                if cfg!(windows) {
-                    "notepad".to_string()
-                } else {
-                    "vim".to_string()
-                }
-            });
-
-        // Suspend TUI
-        let _ = disable_raw_mode();
-        let _ = execute!(std::io::stdout(), LeaveAlternateScreen, DisableMouseCapture,);
-
-        // Spawn editor and wait for it to finish.
-        // Split on whitespace so $EDITOR="code --wait" works correctly.
-        let parts: Vec<&str> = editor.split_whitespace().collect();
-        if let Some((cmd, args)) = parts.split_first() {
-            let _ = std::process::Command::new(cmd)
-                .args(args)
-                .arg(&path)
-                .status();
+        if let Some(p) = self.current_file.clone() {
+            self.launch_editor(&p);
+            self.reload_content();
         }
-
-        // Restore TUI
-        let _ = execute!(std::io::stdout(), EnterAlternateScreen, EnableMouseCapture,);
-        if let Err(e) = enable_raw_mode() {
-            eprintln!("mantis: failed to restore raw mode after editor: {e}");
-        }
-
-        // Flag that the terminal was suspended so main.rs clears ratatui's
-        // internal buffer (which is stale after re-entering the alt screen).
-        self.needs_clear = true;
-
-        // File may have been modified; reload its content
-        self.reload_content();
     }
 
-    /// Opens the global config file (`~/.config/mantis/mantis.toml`) in the
-    /// user's `$EDITOR`, using the same suspend/resume pattern as `open_in_editor`.
+    /// Opens the config file in the user's `$EDITOR`. Delegates to
+    /// `launch_editor` for the TUI suspend/resume dance, then re-reads config.
     fn open_config_in_editor(&mut self) {
-        let Some(path) = self.config_path.clone() else {
-            return;
-        };
-
-        let editor = std::env::var("VISUAL")
-            .or_else(|_| std::env::var("EDITOR"))
-            .unwrap_or_else(|_| {
-                if cfg!(windows) {
-                    "notepad".to_string()
-                } else {
-                    "vim".to_string()
-                }
-            });
-
-        let _ = disable_raw_mode();
-        let _ = execute!(std::io::stdout(), LeaveAlternateScreen, DisableMouseCapture,);
-
-        let parts: Vec<&str> = editor.split_whitespace().collect();
-        if let Some((cmd, args)) = parts.split_first() {
-            let _ = std::process::Command::new(cmd)
-                .args(args)
-                .arg(&path)
-                .status();
+        if let Some(p) = self.config_path.clone() {
+            self.launch_editor(&p);
+            self.reload_config();
         }
-
-        let _ = execute!(std::io::stdout(), EnterAlternateScreen, EnableMouseCapture,);
-        if let Err(e) = enable_raw_mode() {
-            eprintln!("mantis: failed to restore raw mode after editor: {e}");
-        }
-
-        self.needs_clear = true;
-        self.reload_config();
     }
 
     /// Re-reads the config file and applies all changed fields to App state,

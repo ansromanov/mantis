@@ -232,25 +232,100 @@ fn app_git_show_fields_default_matches_config() {
     fs::remove_dir_all(&root).ok();
 }
 
+// -- resolve_editor ----------------------------------------------------------
+
 #[test]
-fn should_open_browser_rejects_empty_url() {
-    assert!(!super::editor::should_open_browser("", true));
+fn resolve_editor_uses_visual_when_set() {
+    let prior_visual = std::env::var("VISUAL").ok();
+    let prior_editor = std::env::var("EDITOR").ok();
+    std::env::set_var("VISUAL", "my-editor");
+    std::env::remove_var("EDITOR");
+    let result = super::editor::resolve_editor();
+    if let Some(v) = prior_visual {
+        std::env::set_var("VISUAL", v);
+    } else {
+        std::env::remove_var("VISUAL");
+    }
+    if let Some(v) = prior_editor {
+        std::env::set_var("EDITOR", v);
+    } else {
+        std::env::remove_var("EDITOR");
+    }
+    assert_eq!(result, "my-editor");
 }
 
 #[test]
-fn should_open_browser_rejects_non_tty() {
-    assert!(!super::editor::should_open_browser(
-        "https://example.com",
-        false
-    ));
+fn resolve_editor_uses_editor_when_visual_unset() {
+    let prior_visual = std::env::var("VISUAL").ok();
+    let prior_editor = std::env::var("EDITOR").ok();
+    std::env::remove_var("VISUAL");
+    std::env::set_var("EDITOR", "nano");
+    let result = super::editor::resolve_editor();
+    if let Some(v) = prior_visual {
+        std::env::set_var("VISUAL", v);
+    } else {
+        std::env::remove_var("VISUAL");
+    }
+    if let Some(v) = prior_editor {
+        std::env::set_var("EDITOR", v);
+    } else {
+        std::env::remove_var("EDITOR");
+    }
+    assert_eq!(result, "nano");
 }
 
 #[test]
-fn should_open_browser_allows_tty_with_url() {
-    assert!(super::editor::should_open_browser(
-        "https://example.com",
-        true
-    ));
+fn resolve_editor_fallback_vim_on_unix() {
+    if cfg!(windows) {
+        return; // fallback differs on Windows; tested separately
+    }
+    let prior_visual = std::env::var("VISUAL").ok();
+    let prior_editor = std::env::var("EDITOR").ok();
+    std::env::remove_var("VISUAL");
+    std::env::remove_var("EDITOR");
+    let result = super::editor::resolve_editor();
+    if let Some(v) = prior_visual {
+        std::env::set_var("VISUAL", v);
+    } else {
+        std::env::remove_var("VISUAL");
+    }
+    if let Some(v) = prior_editor {
+        std::env::set_var("EDITOR", v);
+    } else {
+        std::env::remove_var("EDITOR");
+    }
+    assert_eq!(result, "vim");
+}
+
+// -- open_in_browser ---------------------------------------------------------
+
+#[test]
+fn open_in_browser_empty_url_noop() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    assert!(app.status_message.is_none());
+    app.open_in_browser("");
+    assert!(
+        app.status_message.is_none(),
+        "empty URL must not set status"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn open_in_browser_non_tty_sets_status() {
+    // In test context stdout is not a terminal, so the non-interactive branch fires.
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    assert!(app.status_message.is_none());
+    app.open_in_browser("https://example.com");
+    assert!(
+        app.status_message.is_some(),
+        "non-interactive browser open must set a status message"
+    );
+    let msg = app.status_message.as_ref().unwrap();
+    assert!(msg.text.contains("not opening browser"));
+    fs::remove_dir_all(&root).ok();
 }
 
 #[test]
