@@ -344,9 +344,20 @@ impl App {
                 self.set_content_scroll(usize::MAX);
             }
         } else if pressed(&k.content_page_up, &key) {
-            self.set_content_scroll(self.content_scroll.saturating_sub(self.page_rows()));
+            if self.has_text_cursor() {
+                self.active_line = self.active_line.saturating_sub(self.page_rows());
+                self.scroll_active_line_into_view();
+            } else {
+                self.set_content_scroll(self.content_scroll.saturating_sub(self.page_rows()));
+            }
         } else if pressed(&k.content_page_down, &key) {
-            self.set_content_scroll(self.content_scroll.saturating_add(self.page_rows()));
+            if self.has_text_cursor() {
+                let max = self.display_line_count().saturating_sub(1);
+                self.active_line = (self.active_line + self.page_rows()).min(max);
+                self.scroll_active_line_into_view();
+            } else {
+                self.set_content_scroll(self.content_scroll.saturating_add(self.page_rows()));
+            }
         } else if !self.word_wrap && pressed(&k.content_left, &key) {
             self.content_hscroll = self.content_hscroll.saturating_sub(4);
         } else if !self.word_wrap && pressed(&k.content_right, &key) {
