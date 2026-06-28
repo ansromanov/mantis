@@ -405,7 +405,7 @@ fn tree_auto_scroll_brings_selection_into_view() {
 }
 
 #[test]
-fn breadcrumb_renders_for_nested_node() {
+fn breadcrumb_shows_root_not_cursor_subdir() {
     let mut app = make_app(false, HashMap::new());
     app.root = PathBuf::from("/root");
     app.nodes = vec![TreeNode {
@@ -417,13 +417,17 @@ fn breadcrumb_renders_for_nested_node() {
     }];
     app.tree_selected = 0;
     let rows = render_tree(&mut app, 40, 6);
-    let breadcrumb_row = &rows[1]; // row 1 is inside the border, before the tree list
+    let breadcrumb_row = &rows[1];
     assert!(
-        breadcrumb_row.contains("root") && breadcrumb_row.contains("src"),
-        "breadcrumb row should contain path segments, got: {:?}",
+        breadcrumb_row.contains("root"),
+        "breadcrumb should contain root name, got: {:?}",
         breadcrumb_row
     );
-    // Should also include the filesystem root segment (/).
+    assert!(
+        !breadcrumb_row.contains("src"),
+        "breadcrumb must not contain cursor subdir, got: {:?}",
+        breadcrumb_row
+    );
     assert!(
         breadcrumb_row.contains('/'),
         "breadcrumb should include filesystem root, got: {:?}",
@@ -444,27 +448,20 @@ fn breadcrumb_areas_match_rendered_columns() {
     }];
     app.tree_selected = 0;
     render_tree(&mut app, 40, 6);
-    // Should have 3 clickable areas: "/", "r", and "src".
+    // Breadcrumb shows root + ancestors only: "/" and "r".
     assert_eq!(
         app.breadcrumb_areas.len(),
-        3,
-        "expected 3 segments (/, r, src), got {}",
+        2,
+        "expected 2 segments (/, r), got {}",
         app.breadcrumb_areas.len()
     );
     let (fs_path, fs_rect) = &app.breadcrumb_areas[0];
     let (root_path, root_rect) = &app.breadcrumb_areas[1];
-    let (src_path, src_rect) = &app.breadcrumb_areas[2];
     assert_eq!(fs_path, &PathBuf::from("/"));
     assert_eq!(root_path, &PathBuf::from("/r"));
-    assert_eq!(src_path, &PathBuf::from("/r/src"));
-    // "/" is 1 char wide, "r" is 1 char, "src" is 3 chars.
     assert_eq!(fs_rect.width, 1);
     assert_eq!(root_rect.width, 1);
-    assert_eq!(src_rect.width, 3);
-    // "r" rect must start after "/" + " / " (3 chars separator).
     assert_eq!(root_rect.x, fs_rect.x + fs_rect.width + 3);
-    // "src" rect must start after "r" + " / ".
-    assert_eq!(src_rect.x, root_rect.x + root_rect.width + 3);
 }
 
 fn breadcrumb_text_for(app: &mut App, width: u16) -> String {
@@ -496,77 +493,78 @@ fn render_breadcrumb_truncation_does_not_panic() {
 #[test]
 fn compact_breadcrumb_collapses_ancestors_to_dotdot() {
     let mut app = make_app(false, HashMap::new());
-    app.root = PathBuf::from("/root");
+    // Deep root so breadcrumb has many ancestor segments to compact.
+    app.root = PathBuf::from("/a/b/c/d/root");
     app.nodes = vec![TreeNode {
-        path: PathBuf::from("/root/a/b/c/d/e"),
+        path: PathBuf::from("/a/b/c/d/root/e"),
         name: "e".to_string(),
-        depth: 5,
+        depth: 1,
         is_dir: true,
         deleted: false,
     }];
     app.tree_selected = 0;
     // Narrow width forces compact mode: leading segments become "..".
-    let text = breadcrumb_text_for(&mut app, 29);
+    let text = breadcrumb_text_for(&mut app, 16);
     assert!(
         text.contains(".."),
         "compact breadcrumb should contain '..', got: {text:?}"
     );
     assert!(
-        text.contains('e'),
-        "current dir 'e' must be visible, got: {text:?}"
+        text.contains("root"),
+        "root name must be visible, got: {text:?}"
     );
-    // In compact mode the first breadcrumb_area is the ".." click target —
-    // it must be a proper ancestor of the leaf path, not the leaf itself.
-    let leaf = PathBuf::from("/root/a/b/c/d/e");
+    // The ".." target must be a proper ancestor of the root path.
+    let root_path = PathBuf::from("/a/b/c/d/root");
+    let dotdot = app.breadcrumb_areas.first().map(|(p, _)| p.clone());
     assert!(
-        app.breadcrumb_areas
-            .first()
-            .is_some_and(|(p, _)| leaf.starts_with(p) && *p != leaf),
-        ".. target must be a proper ancestor of the leaf path, got: {:?}",
-        app.breadcrumb_areas.first().map(|(p, _)| p)
+        dotdot
+            .clone()
+            .is_some_and(|p| root_path.starts_with(&p) && p != root_path),
+        ".. target must be a proper ancestor of root, got: {:?}",
+        dotdot
     );
 }
 
 #[test]
-fn compact_breadcrumb_keeps_current_dir_always() {
+fn compact_breadcrumb_keeps_root_always() {
     let mut app = make_app(false, HashMap::new());
-    app.root = PathBuf::from("/verylongrootname");
+    app.root = PathBuf::from("/a/longroot");
     app.nodes = vec![TreeNode {
-        path: PathBuf::from("/verylongrootname/a/deeply/nested"),
-        name: "nested".to_string(),
-        depth: 3,
+        path: PathBuf::from("/a/longroot/x"),
+        name: "x".to_string(),
+        depth: 1,
         is_dir: true,
         deleted: false,
     }];
     app.tree_selected = 0;
-    // Very narrow width — only ".. / nested" should fit.
+    // Narrow width — compact shows ".. / longroot".
     let text = breadcrumb_text_for(&mut app, 16);
     assert!(
-        text.contains("nested"),
-        "current dir must always be visible, got: {text:?}"
+        text.contains("longroot"),
+        "root must always be visible, got: {text:?}"
     );
 }
 
 #[test]
 fn compact_breadcrumb_dotdot_target_is_parent_of_first_kept() {
     let mut app = make_app(false, HashMap::new());
-    app.root = PathBuf::from("/r");
+    // Deep root so we have multiple ancestor segments.
+    app.root = PathBuf::from("/a/b/c/root");
     app.nodes = vec![TreeNode {
-        path: PathBuf::from("/r/a/b/c"),
-        name: "c".to_string(),
-        depth: 3,
+        path: PathBuf::from("/a/b/c/root/x"),
+        name: "x".to_string(),
+        depth: 1,
         is_dir: true,
         deleted: false,
     }];
     app.tree_selected = 0;
-    // Use enough width to show ".. / b / c".
-    let text = breadcrumb_text_for(&mut app, 14);
+    // Enough width to show ".. / b / c / root" (compact the first ancestor).
+    // Inner width = 20-2 = 18, so first_kept=2 fits: total = 5+6+6 = 17 ≤ 18.
+    let text = breadcrumb_text_for(&mut app, 20);
     assert!(text.contains(".."), "should have .. marker: {text:?}");
-    assert!(text.contains("b"), "parent b should be visible: {text:?}");
-    assert!(text.contains("c"), "current c should be visible: {text:?}");
-    // With 7 segments and width 14 (inner=12), forward iteration picks
-    // first_kept=3, keeping "b" and "c". The ".." target is the parent of
-    // the first kept segment "b", i.e. /r/a.
+    assert!(text.contains("root"), "root should be visible: {text:?}");
+    // The ".." target is the parent of the first kept segment (which is "b"
+    // when first_kept=2: keeping "b", "c", "root"). Parent of "b" is "/a".
     let dotdot_target =
         app.breadcrumb_areas.iter().find_map(
             |(p, r)| {
@@ -579,7 +577,7 @@ fn compact_breadcrumb_dotdot_target_is_parent_of_first_kept() {
         );
     assert_eq!(
         dotdot_target,
-        Some(PathBuf::from("/r/a")),
+        Some(PathBuf::from("/a")),
         ".. should navigate to parent of first kept segment"
     );
 }
@@ -587,22 +585,22 @@ fn compact_breadcrumb_dotdot_target_is_parent_of_first_kept() {
 #[test]
 fn compact_breadcrumb_fits_all_when_wide_enough() {
     let mut app = make_app(false, HashMap::new());
-    app.root = PathBuf::from("/r");
+    app.root = PathBuf::from("/a/b/c/root");
     app.nodes = vec![TreeNode {
-        path: PathBuf::from("/r/a/b"),
-        name: "b".to_string(),
-        depth: 2,
+        path: PathBuf::from("/a/b/c/root/x"),
+        name: "x".to_string(),
+        depth: 1,
         is_dir: true,
         deleted: false,
     }];
     app.tree_selected = 0;
-    // Wide enough for all three segments "/ / r / a / b".
+    // Wide enough for all segments " / a / b / c / root".
     let text = breadcrumb_text_for(&mut app, 40);
     assert!(
         !text.contains(".."),
         "full-width breadcrumb should not compact, got: {text:?}"
     );
-    assert!(text.contains('b'), "current dir must appear, got: {text:?}");
+    assert!(text.contains("root"), "root must appear, got: {text:?}");
 }
 
 // -- icon rendering -----------------------------------------------------------
@@ -720,11 +718,11 @@ fn draw_tree_icon_looks_up_extensionless_file_by_name() {
 #[test]
 fn render_breadcrumb_truncation_shows_compact_dotdot() {
     let mut app = make_app(false, HashMap::new());
-    app.root = PathBuf::from("/r");
+    app.root = PathBuf::from("/a/b/c/d/root");
     app.nodes = vec![TreeNode {
-        path: PathBuf::from("/r/a/b/c/d/e"),
+        path: PathBuf::from("/a/b/c/d/root/e"),
         name: "e".to_string(),
-        depth: 5,
+        depth: 1,
         is_dir: true,
         deleted: false,
     }];
@@ -736,8 +734,8 @@ fn render_breadcrumb_truncation_shows_compact_dotdot() {
         "truncated breadcrumb must show '..', got: {:?}",
         breadcrumb_row
     );
-    // Last segment ("e") must always be visible.
-    assert!(breadcrumb_row.contains('e'), "last segment must be visible");
+    // Last segment (root) must always be visible.
+    assert!(breadcrumb_row.contains("root"), "root must be visible");
 }
 
 #[test]
@@ -760,20 +758,110 @@ fn breadcrumb_when_root_is_filesystem_root() {
         "breadcrumb must render the / root segment, got: {:?}",
         breadcrumb_row
     );
+    // Breadcrumb shows only root (and ancestors), so no "etc" segment.
     assert!(
-        breadcrumb_row.contains("etc"),
-        "breadcrumb must include child segment, got: {:?}",
+        !breadcrumb_row.contains("etc"),
+        "breadcrumb must not include cursor subdir, got: {:?}",
         breadcrumb_row
     );
-    // Exactly two clickable areas: "/" and "etc".
+    // Exactly one clickable area: "/".
     assert_eq!(
         app.breadcrumb_areas.len(),
-        2,
-        "expected 2 segments (/ and etc), got {}",
+        1,
+        "expected 1 segment (/), got {}",
         app.breadcrumb_areas.len()
     );
     assert_eq!(app.breadcrumb_areas[0].0, PathBuf::from("/"));
-    assert_eq!(app.breadcrumb_areas[1].0, PathBuf::from("/etc"));
+}
+
+#[test]
+fn breadcrumb_is_independent_of_cursor_position() {
+    let mut app = make_app(false, HashMap::new());
+    app.root = PathBuf::from("/a/b/mantis");
+    app.nodes = vec![
+        TreeNode {
+            path: PathBuf::from("/a/b/mantis/docs"),
+            name: "docs".to_string(),
+            depth: 1,
+            is_dir: true,
+            deleted: false,
+        },
+        TreeNode {
+            path: PathBuf::from("/a/b/mantis/src"),
+            name: "src".to_string(),
+            depth: 1,
+            is_dir: true,
+            deleted: false,
+        },
+    ];
+    // Select "docs" — breadcrumb must end at "mantis", not include "docs".
+    app.tree_selected = 0;
+    let rows = render_tree(&mut app, 40, 6);
+    let breadcrumb = &rows[1];
+    assert!(
+        breadcrumb.contains("mantis"),
+        "root name must be in breadcrumb"
+    );
+    assert!(
+        !breadcrumb.contains("docs"),
+        "cursor subdir must not be in breadcrumb"
+    );
+    // Switch to "src" — breadcrumb must remain the same.
+    app.tree_selected = 1;
+    let rows2 = render_tree(&mut app, 40, 6);
+    assert_eq!(
+        rows[1], rows2[1],
+        "breadcrumb must not change when cursor moves to different subdir"
+    );
+}
+
+#[test]
+fn compact_breadcrumb_dotdot_target_is_root_parent() {
+    let mut app = make_app(false, HashMap::new());
+    // Deep root so narrow tree forces compaction.
+    app.root = PathBuf::from("/a/b/c/d/root");
+    app.nodes = vec![TreeNode {
+        path: PathBuf::from("/a/b/c/d/root/file.rs"),
+        name: "file.rs".to_string(),
+        depth: 1,
+        is_dir: false,
+        deleted: false,
+    }];
+    app.tree_selected = 0;
+    // Very narrow — only ".. / root" fits, falling back to the last segment's
+    // parent = root.parent() = /a/b/c/d.
+    render_tree(&mut app, 10, 6);
+    let dotdot = app.breadcrumb_areas.first().map(|(p, _)| p.clone());
+    assert_eq!(
+        dotdot,
+        Some(PathBuf::from("/a/b/c/d")),
+        ".. must target root.parent(), got: {:?}",
+        dotdot
+    );
+}
+
+#[test]
+fn breadcrumb_root_is_filesystem_root_renders_single_segment() {
+    let mut app = make_app(false, HashMap::new());
+    app.root = PathBuf::from("/");
+    app.nodes = vec![TreeNode {
+        path: PathBuf::from("/home"),
+        name: "home".to_string(),
+        depth: 1,
+        is_dir: true,
+        deleted: false,
+    }];
+    app.tree_selected = 0;
+    // Must render without panic. Breadcrumb is just "/".
+    let rows = render_tree(&mut app, 40, 6);
+    let breadcrumb_row = &rows[1];
+    assert!(
+        breadcrumb_row.contains('/'),
+        "root segment / must render, got: {:?}",
+        breadcrumb_row
+    );
+    assert_eq!(app.breadcrumb_areas.len(), 1);
+    assert_eq!(app.breadcrumb_areas[0].0, PathBuf::from("/"));
 }
 
 // ---------------------------------------------------------------------------

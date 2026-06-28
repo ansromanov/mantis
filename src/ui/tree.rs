@@ -392,30 +392,15 @@ fn highlight_matches(
     spans
 }
 
-/// Computes breadcrumb path segments from the selected tree node up to the
-/// filesystem root (`/`). Returns a list of (label, target_directory_path)
-/// pairs ordered root-first. Always includes at least the root segment when a
-/// node is selected; returns empty only when there are no nodes.
+/// Computes breadcrumb path segments from the filesystem root (`/`) down
+/// through `app.root`. Returns a list of (label, target_directory_path) pairs
+/// ordered root-first. Always includes at least the root segment when there are
+/// nodes; returns empty only when there are no nodes. The breadcrumb represents
+/// the root's location — it never descends into the cursor's subdirectory.
 fn compute_breadcrumb(app: &App) -> Vec<(String, PathBuf)> {
-    let Some(node) = app.nodes.get(app.tree_selected) else {
+    if app.nodes.is_empty() {
         return Vec::new();
-    };
-
-    let dir_path = if node.is_dir {
-        node.path.clone()
-    } else {
-        match node.path.parent() {
-            Some(p) => {
-                let p = p.to_path_buf();
-                if p.as_os_str().is_empty() {
-                    app.root.clone()
-                } else {
-                    p
-                }
-            }
-            None => return Vec::new(),
-        }
-    };
+    }
 
     // Build segments from the filesystem root (/) down through app.root.
     // Walk leaf-first, then reverse once so we allocate only one Vec.
@@ -433,26 +418,6 @@ fn compute_breadcrumb(app: &App) -> Vec<(String, PathBuf)> {
         }
     }
     segments.reverse();
-
-    if dir_path == app.root {
-        return segments;
-    }
-
-    // dir_path comes from app.nodes which are always children of app.root, so
-    // strip_prefix should not fail. Silently return what we have if it does
-    // (e.g. in tests that construct App with relative paths).
-    let Ok(relative) = dir_path.strip_prefix(&app.root) else {
-        return segments;
-    };
-
-    let mut cumulative = app.root.clone();
-    for component in relative.components() {
-        cumulative.push(component.as_os_str());
-        segments.push((
-            component.as_os_str().to_string_lossy().to_string(),
-            cumulative.clone(),
-        ));
-    }
 
     segments
 }
