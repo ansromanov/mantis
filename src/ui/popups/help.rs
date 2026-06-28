@@ -117,8 +117,12 @@ const KEYMAP_SECTIONS: &[HelpSection] = &[
                 desc: "expand all directories",
             },
             HelpEntry {
+                action_id: "find_files",
+                desc: "global fuzzy file-name picker",
+            },
+            HelpEntry {
                 action_id: "search_files",
-                desc: "fuzzy file search",
+                desc: "tree filter / in-file search",
             },
             HelpEntry {
                 action_id: "search_content",

@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::app::App;
 use crate::config::Config;
-use crate::search::InFileSearch;
+use crate::search::{InFileSearch, SearchMode};
 
 static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -819,6 +819,50 @@ fn same_file_reload_does_not_save_cursor_twice() {
     assert_eq!(
         app.active_line, 1,
         "active_line preserved across same-file reload"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- open_file_search --------------------------------------------------------
+
+#[test]
+fn open_file_search_sets_search_state_in_files_mode() {
+    let root = temp_dir();
+    let mut app = app_for(&root);
+    app.open_file_search();
+    assert!(
+        app.search.is_some(),
+        "open_file_search must populate app.search"
+    );
+    assert_eq!(
+        app.search.as_ref().unwrap().mode,
+        SearchMode::Files,
+        "open_file_search must open in Files mode"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn open_file_search_scoped_in_git_mode() {
+    let root = temp_dir();
+    let mut app = app_for(&root);
+    app.git_mode = true;
+    app.open_file_search();
+    assert!(
+        app.search.as_ref().unwrap().scoped,
+        "open_file_search must scope to changed files in git mode"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn open_file_search_not_scoped_outside_git_mode() {
+    let root = temp_dir();
+    let mut app = app_for(&root);
+    app.open_file_search();
+    assert!(
+        !app.search.as_ref().unwrap().scoped,
+        "open_file_search must not scope outside git mode"
     );
     fs::remove_dir_all(&root).ok();
 }

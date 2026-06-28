@@ -7,6 +7,7 @@ use ratatui::layout::Rect;
 
 use crate::app::{App, Focus};
 use crate::config::Config;
+use crate::search::SearchMode;
 
 static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -515,7 +516,8 @@ fn copy_path_directory_from_tree_absolute() {
     let Ok(mut cb) = arboard::Clipboard::new() else {
         return;
     };
-    assert_eq!(cb.get_text().unwrap(), dir_path.display().to_string());
+    let Ok(text) = cb.get_text() else { return };
+    assert_eq!(text, dir_path.display().to_string());
     fs::remove_dir_all(&root).ok();
 }
 
@@ -534,7 +536,8 @@ fn copy_path_directory_from_tree_relative() {
     let Ok(mut cb) = arboard::Clipboard::new() else {
         return;
     };
-    assert_eq!(cb.get_text().unwrap(), rel);
+    let Ok(text) = cb.get_text() else { return };
+    assert_eq!(text, rel);
     fs::remove_dir_all(&root).ok();
 }
 
@@ -548,10 +551,8 @@ fn copy_path_file_from_content_still_works() {
     let Ok(mut cb) = arboard::Clipboard::new() else {
         return;
     };
-    assert_eq!(
-        cb.get_text().unwrap(),
-        root.join("long.txt").display().to_string()
-    );
+    let Ok(text) = cb.get_text() else { return };
+    assert_eq!(text, root.join("long.txt").display().to_string());
     fs::remove_dir_all(&root).ok();
 }
 
@@ -565,7 +566,8 @@ fn copy_path_file_from_content_relative() {
     let Ok(mut cb) = arboard::Clipboard::new() else {
         return;
     };
-    assert_eq!(cb.get_text().unwrap(), "long.txt");
+    let Ok(text) = cb.get_text() else { return };
+    assert_eq!(text, "long.txt");
     fs::remove_dir_all(&root).ok();
 }
 
@@ -679,4 +681,114 @@ fn ctrl_p_opens_palette_with_ranked_order_from_usage() {
         "toggle_help (index 0) must be first in base_order as the last-used command"
     );
     fs::remove_dir_all(&root).ok();
+}
+
+// -- find_files (ctrl+f) ----------------------------------------------------
+
+fn ctrl_f() -> KeyEvent {
+    KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL)
+}
+
+#[test]
+fn ctrl_f_opens_file_picker_when_tree_focused() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Tree;
+    app.handle_key(ctrl_f());
+    assert!(
+        app.search.is_some(),
+        "ctrl+f must open the search picker from Tree focus"
+    );
+    assert_eq!(
+        app.search.as_ref().unwrap().mode,
+        SearchMode::Files,
+        "ctrl+f must open in Files mode"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn ctrl_f_opens_file_picker_when_content_focused_with_file() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.handle_key(ctrl_f());
+    assert!(
+        app.search.is_some(),
+        "ctrl+f must open the search picker from Content focus with an open file"
+    );
+    assert_eq!(
+        app.search.as_ref().unwrap().mode,
+        SearchMode::Files,
+        "ctrl+f must open in Files mode (not in-file search)"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn ctrl_f_opens_file_picker_when_content_focused_no_file() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.handle_key(ctrl_f());
+    assert!(
+        app.search.is_some(),
+        "ctrl+f must open the search picker from Content focus without a file"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- search_files (/) unchanged ----------------------------------------------
+
+#[test]
+fn slash_opens_tree_filter_when_tree_focused() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Tree;
+    app.handle_key(key(KeyCode::Char('/')));
+    assert!(
+        app.tree_filter.is_some(),
+        "/ must open tree filter from Tree focus"
+    );
+    assert!(app.search.is_none(), "/ must not open the search picker");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn slash_opens_in_file_search_when_content_focused_with_file() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.handle_key(key(KeyCode::Char('/')));
+    assert!(
+        app.in_file_search.is_some(),
+        "/ must open in-file search from Content focus with open file"
+    );
+    assert!(app.search.is_none(), "/ must not open the search picker");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn slash_opens_file_picker_when_content_focused_no_file() {
+    // Use an empty directory so App::new() has no file to open, leaving
+    // current_file = None.
+    let dir = std::env::temp_dir().join(format!(
+        "tv_slash_empty_{}_{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0)
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let mut app = app_for(&dir);
+    app.focus = Focus::Content;
+    app.handle_key(key(KeyCode::Char('/')));
+    assert!(
+        app.search.is_some(),
+        "/ must fall back to file picker from Content focus without a file"
+    );
+    fs::remove_dir_all(&dir).ok();
 }

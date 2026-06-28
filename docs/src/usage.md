@@ -33,7 +33,8 @@ These work no matter which panel is focused.
 | `?`            | Toggle help             |
 | `Ctrl+P`       | Command palette (fuzzy-find any action) |
 | `Tab`          | Switch panel            |
-| `/`            | Fuzzy file search       |
+| `/`            | Tree filter / in-file search |
+| `Ctrl+F`       | Global fuzzy file-name picker |
 | `f`            | Content (full-text) search |
 | `r`            | Reload tree             |
 | `e`            | Open current file in `$EDITOR` |
@@ -87,8 +88,17 @@ When git blame is toggled on (`b`), a column appears on the left showing the aut
 
 ## Search popup
 
-Open with `/` (file names) or `f` (file contents). Just start typing to filter.
-In git mode (`Ctrl+G`), search is automatically scoped to only the changed
+Three search entry points cover different needs:
+
+- **`Ctrl+F`** — global fuzzy file-name picker. Opens the same file-name search
+  from either panel, regardless of focus. Use this when you want to jump to any
+  file in the project by name.
+- **`/`** — context-sensitive: in the tree panel it filters file names inline;
+  in the content panel (with a file open) it opens the in-file search bar.
+- **`f`** — fuzzy content search across all files (or changed files in git mode).
+
+Open any search popup and just start typing to filter.
+In git mode (`Ctrl+G`), searches are automatically scoped to only the changed
 files — the popup title shows "(changed files)" to make this visible.
 
 | Key       | Action                          |

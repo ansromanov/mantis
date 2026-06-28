@@ -46,22 +46,7 @@ impl App {
                 self.reload();
                 self.save_config();
             }
-            Some("open_file_search") => {
-                let root = self.root.clone();
-                let changed = self.git_changed_files_set();
-                let mut s = SearchState::new(
-                    &root,
-                    self.show_hidden,
-                    self.ignore_gitignore,
-                    self.config.search_context_lines,
-                    changed.as_ref(),
-                );
-                if self.config.keep_search_query && !self.last_search_query.is_empty() {
-                    s.query = self.last_search_query.clone();
-                    s.refresh_now();
-                }
-                self.search = Some(s);
-            }
+            Some("open_file_search") => self.open_file_search(),
             Some("open_content_search") => {
                 let root = self.root.clone();
                 let changed = self.git_changed_files_set();
@@ -89,13 +74,11 @@ impl App {
                 self.plugin_picker = Some(PluginPicker::new(entries));
             }
             Some("toggle_git_mode") => self.toggle_git_mode(),
-            Some("toggle_git_flat") => {
-                if self.git_mode {
-                    self.git_mode_flat = !self.git_mode_flat;
-                    self.rebuild(true);
-                    self.try_open_selected();
-                    self.save_config();
-                }
+            Some("toggle_git_flat") if self.git_mode => {
+                self.git_mode_flat = !self.git_mode_flat;
+                self.rebuild(true);
+                self.try_open_selected();
+                self.save_config();
             }
             Some("toggle_word_wrap") => {
                 self.word_wrap = !self.word_wrap;
@@ -144,10 +127,8 @@ impl App {
                     self.mark_content_scrolled();
                 }
             }
-            Some("blame_line") => {
-                if self.has_text_cursor() {
-                    self.show_line_blame = !self.show_line_blame;
-                }
+            Some("blame_line") if self.has_text_cursor() => {
+                self.show_line_blame = !self.show_line_blame;
             }
             Some("copy_path") => self.copy_path_to_clipboard(false),
             Some("copy_relative_path") => self.copy_path_to_clipboard(true),
