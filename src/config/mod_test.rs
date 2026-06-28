@@ -430,6 +430,58 @@ fn icons_false_round_trips_through_serde() {
     assert!(!parsed.icons);
 }
 
+// -- find_files keybinding ---------------------------------------------------
+
+#[test]
+fn find_files_defaults_to_ctrl_f() {
+    let cfg = Config::default();
+    assert!(
+        cfg.keys
+            .find_files
+            .iter()
+            .any(|b| { b.matches(&KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL)) }),
+        "default find_files must include ctrl+f"
+    );
+}
+
+#[test]
+fn find_files_can_be_overridden_in_config() {
+    let toml_str = r#"
+[keys]
+find_files = ["ctrl+x"]
+"#;
+    let cfg: Config = toml::from_str(toml_str).unwrap();
+    assert!(
+        cfg.keys
+            .find_files
+            .iter()
+            .any(|b| { b.matches(&KeyEvent::new(KeyCode::Char('x'), KeyModifiers::CONTROL)) }),
+        "overridden find_files must match ctrl+x"
+    );
+    assert!(
+        !cfg.keys
+            .find_files
+            .iter()
+            .any(|b| { b.matches(&KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL)) }),
+        "overridden find_files must not include ctrl+f"
+    );
+}
+
+#[test]
+fn find_files_without_config_key_gets_default_from_serde_container() {
+    let toml_str = r#"
+[keys]
+"#;
+    let cfg: Config = toml::from_str(toml_str).unwrap();
+    assert!(
+        cfg.keys
+            .find_files
+            .iter()
+            .any(|b| { b.matches(&KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL)) }),
+        "omitted find_files must default to ctrl+f via serde container default"
+    );
+}
+
 #[test]
 fn validate_keys_flags_unknown_top_level_key_with_suggestion() {
     let warnings = validate_keys("tre_width = 30\n");

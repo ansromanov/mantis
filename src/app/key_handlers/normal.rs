@@ -57,6 +57,8 @@ impl App {
             self.config.show_hidden = self.show_hidden;
             self.reload();
             self.save_config();
+        } else if pressed(&k.find_files, &key) {
+            self.open_file_search();
         } else if pressed(&k.search_files, &key) {
             if self.focus == Focus::Content
                 && self.current_file.is_some()
@@ -68,22 +70,7 @@ impl App {
                 // Tree focused: open the inline tree name filter.
                 self.tree_filter = Some(TreeFilter::new());
             } else {
-                // Content focused but no file open (or in-file search disabled):
-                // fall back to the full filesystem search picker.
-                let root = self.root.clone();
-                let changed = self.git_changed_files_set();
-                let mut s = SearchState::new(
-                    &root,
-                    self.show_hidden,
-                    self.ignore_gitignore,
-                    self.config.search_context_lines,
-                    changed.as_ref(),
-                );
-                if self.config.keep_search_query && !self.last_search_query.is_empty() {
-                    s.query = self.last_search_query.clone();
-                    s.refresh_now();
-                }
-                self.search = Some(s);
+                self.open_file_search();
             }
         } else if pressed(&k.reload, &key) {
             self.viewing_revision = None;

@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use notify::{EventKind, RecursiveMode, Watcher};
 
 use crate::git::GitStatus;
-use crate::search::{HistoryState, RecentFilesState};
+use crate::search::{HistoryState, RecentFilesState, SearchState};
 
 use super::loader::{compute_diff_load, compute_file_load, DiffLoad, FileLoad};
 use super::{diff_line_style, App, Focus};
@@ -403,6 +403,25 @@ impl App {
         if let Some(path) = path {
             self.open_and_reveal(&path);
         }
+    }
+
+    /// Opens the global fuzzy file-name picker (SearchState in Files mode),
+    /// scoped to git-changed files when in git mode. Focus-independent.
+    pub fn open_file_search(&mut self) {
+        let root = self.root.clone();
+        let changed = self.git_changed_files_set();
+        let mut s = SearchState::new(
+            &root,
+            self.show_hidden,
+            self.ignore_gitignore,
+            self.config.search_context_lines,
+            changed.as_ref(),
+        );
+        if self.config.keep_search_query && !self.last_search_query.is_empty() {
+            s.query = self.last_search_query.clone();
+            s.refresh_now();
+        }
+        self.search = Some(s);
     }
 
     /// Opens the git history of the currently displayed file as a picker.
