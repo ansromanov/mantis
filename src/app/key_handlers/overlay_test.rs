@@ -121,3 +121,209 @@ fn in_file_search_down_advances_current_match() {
     assert_eq!(app.in_file_search.as_ref().unwrap().current, 0);
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn tree_filter_down_moves_to_next_match_and_clamps() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.tree_filter = Some(TreeFilter::new());
+    let visible = vec![0usize, 2, 5];
+    app.tree_visible_indices = Some(visible.clone());
+    app.tree_area = Rect {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 10,
+    };
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 10,
+    };
+    // Start at first match.
+    app.tree_selected = visible[0];
+
+    // Down -> second match
+    app.handle_tree_filter_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
+    assert_eq!(app.tree_selected, visible[1]);
+
+    // Down -> third match
+    app.handle_tree_filter_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
+    assert_eq!(app.tree_selected, visible[2]);
+
+    // Down -> clamped at last
+    app.handle_tree_filter_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
+    assert_eq!(app.tree_selected, visible[2]);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_filter_up_moves_to_prev_match_and_clamps() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.tree_filter = Some(TreeFilter::new());
+    let visible = vec![0usize, 2, 5];
+    app.tree_visible_indices = Some(visible.clone());
+    app.tree_area = Rect {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 10,
+    };
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 10,
+    };
+    // Start at last match.
+    app.tree_selected = visible[2];
+
+    // Up -> second match
+    app.handle_tree_filter_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()));
+    assert_eq!(app.tree_selected, visible[1]);
+
+    // Up -> first match
+    app.handle_tree_filter_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()));
+    assert_eq!(app.tree_selected, visible[0]);
+
+    // Up -> clamped at first
+    app.handle_tree_filter_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()));
+    assert_eq!(app.tree_selected, visible[0]);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_filter_pagedown_advances_by_page_and_clamps() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.tree_filter = Some(TreeFilter::new());
+    // A large visible set so we can test page scrolling.
+    let visible: Vec<usize> = (0..50).collect();
+    app.tree_visible_indices = Some(visible.clone());
+    app.tree_area = Rect {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 10,
+    };
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 10,
+    };
+    app.tree_selected = visible[0];
+
+    // page_rows = (10 - 1).max(1) = 9
+    let page = app.page_rows();
+    assert_eq!(page, 9);
+
+    // PageDown from first -> index 9
+    app.handle_tree_filter_key(KeyEvent::new(KeyCode::PageDown, KeyModifiers::empty()));
+    assert_eq!(app.tree_selected, visible[9]);
+
+    // PageDown again -> index 18
+    app.handle_tree_filter_key(KeyEvent::new(KeyCode::PageDown, KeyModifiers::empty()));
+    assert_eq!(app.tree_selected, visible[18]);
+
+    // Jump near end then PageDown clamps
+    app.tree_selected = visible[48];
+    app.handle_tree_filter_key(KeyEvent::new(KeyCode::PageDown, KeyModifiers::empty()));
+    assert_eq!(app.tree_selected, visible[49]);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_filter_pageup_goes_back_by_page_and_clamps() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.tree_filter = Some(TreeFilter::new());
+    let visible: Vec<usize> = (0..50).collect();
+    app.tree_visible_indices = Some(visible.clone());
+    app.tree_area = Rect {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 10,
+    };
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 10,
+    };
+    // page_rows = 9
+    app.tree_selected = visible[30];
+
+    // PageUp from 30 -> 21
+    app.handle_tree_filter_key(KeyEvent::new(KeyCode::PageUp, KeyModifiers::empty()));
+    assert_eq!(app.tree_selected, visible[21]);
+
+    // PageUp again -> 12
+    app.handle_tree_filter_key(KeyEvent::new(KeyCode::PageUp, KeyModifiers::empty()));
+    assert_eq!(app.tree_selected, visible[12]);
+
+    // PageUp from first clamps to first
+    app.tree_selected = visible[0];
+    app.handle_tree_filter_key(KeyEvent::new(KeyCode::PageUp, KeyModifiers::empty()));
+    assert_eq!(app.tree_selected, visible[0]);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_filter_typing_after_navigation_jumps_to_first_match() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.tree_filter = Some(TreeFilter::new());
+    for c in "a".chars() {
+        app.tree_filter.as_mut().unwrap().push(c);
+    }
+    let visible = vec![0usize, 1];
+    app.tree_visible_indices = Some(visible.clone());
+    app.tree_area = Rect {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 10,
+    };
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 10,
+    };
+
+    // Start at first match (index 0).
+    assert_eq!(app.tree_selected, 0);
+
+    // Navigate down to the second match (index 1).
+    app.handle_tree_filter_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
+    assert_eq!(app.tree_selected, 1);
+
+    // Type another char — should re-jump to first match.
+    app.handle_tree_filter_key(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::empty()));
+    assert_eq!(app.tree_selected, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_filter_esc_closes() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.tree_filter = Some(TreeFilter::new());
+    app.handle_tree_filter_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+    assert!(app.tree_filter.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_filter_enter_closes() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.tree_filter = Some(TreeFilter::new());
+    app.handle_tree_filter_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert!(app.tree_filter.is_none());
+    fs::remove_dir_all(&root).ok();
+}

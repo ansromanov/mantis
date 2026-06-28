@@ -191,10 +191,33 @@ impl App {
     }
 
     /// Handles keyboard input while the inline tree filter is open.
+    /// Up/Down/PageUp/PageDown navigate between matches; other keys
+    /// (typing, Backspace, Esc, Enter) go through the generic picker.
     pub(super) fn handle_tree_filter_key(&mut self, key: KeyEvent) {
-        let Some(ref mut f) = self.tree_filter else {
+        if self.tree_filter.is_none() {
             return;
-        };
+        }
+        let page = self.page_rows() as isize;
+        match key.code {
+            KeyCode::Up => {
+                self.move_tree_filter_selection(-1);
+                return;
+            }
+            KeyCode::Down => {
+                self.move_tree_filter_selection(1);
+                return;
+            }
+            KeyCode::PageUp => {
+                self.move_tree_filter_selection(-page);
+                return;
+            }
+            KeyCode::PageDown => {
+                self.move_tree_filter_selection(page);
+                return;
+            }
+            _ => {}
+        }
+        let f = self.tree_filter.as_mut().unwrap();
         match handle_list_picker_key(f, &key) {
             OverlayKey::Activate | OverlayKey::Close => {
                 self.tree_filter = None;
@@ -203,6 +226,25 @@ impl App {
                 self.move_tree_filter_selection_to_first_match();
             }
             _ => {}
+        }
+    }
+
+    /// Move the tree-filter selection by `delta` rows within the filtered
+    /// match set (`tree_visible_indices`), clamping to its bounds. Falls
+    /// back to the full node list when no filter set is recorded.
+    fn move_tree_filter_selection(&mut self, delta: isize) {
+        let visible: Vec<usize> = match self.tree_visible_indices.as_ref() {
+            Some(v) if !v.is_empty() => v.clone(),
+            _ => return,
+        };
+        let cur_pos = visible
+            .iter()
+            .position(|&i| i == self.tree_selected)
+            .unwrap_or(0);
+        let new_pos = (cur_pos as isize + delta).clamp(0, visible.len() as isize - 1) as usize;
+        if let Some(&node_idx) = visible.get(new_pos) {
+            self.tree_selected = node_idx;
+            self.scroll_tree_into_view();
         }
     }
 
