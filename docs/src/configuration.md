@@ -138,6 +138,24 @@ Two options control the ranking:
 Pinned entries are marked with a `★` prefix in the palette. Usage data is
 persisted across sessions in the state directory alongside session history.
 
+## Status bar
+
+Segments in the status bar can be placed on the left or right side. Left
+segments render at column 0; right segments are right-anchored as a block with
+spaces between. When the terminal is too narrow, low-priority segments are
+dropped from both sides.
+
+```toml
+[statusbar]
+# Segments to right-align. Valid ids: hint badges scroll lnum type fileinfo
+# git errors folds message version
+# right = ["lnum", "type", "git", "version"]
+```
+
+The default places the line number, file type, git info, and version on the
+right; all other segments (keybinding hints, status messages, badges, scroll
+percentage, file encoding, errors, fold stats) remain on the left.
+
 ## Theme
 
 Themes live under a `[theme]` table and have their own page: see

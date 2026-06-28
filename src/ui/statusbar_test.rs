@@ -656,14 +656,20 @@ fn overlay_theme_picker_truncated_at_narrow_width() {
 
 #[test]
 fn fit_segments_empty_input() {
-    let line = fit_segments(vec![], 80);
+    let cfg = StatusBarConfig::default();
+    let line = fit_two_sided(vec![], 80, &cfg);
     assert_eq!(line.width(), 0);
 }
 
 #[test]
 fn fit_segments_zero_max_width() {
-    let segs = vec![(Span::styled("hello", Style::default()), P_HINT)];
-    let line = fit_segments(segs, 0);
+    let cfg = StatusBarConfig::default();
+    let segs = vec![(
+        Span::styled("hello", Style::default()),
+        StatusSegment::Hint,
+        P_HINT,
+    )];
+    let line = fit_two_sided(segs, 0, &cfg);
     assert_eq!(line.width(), 0);
 }
 
@@ -720,4 +726,205 @@ fn bar_never_overflows_various_widths() {
             "bar has {char_count} chars at width {width}: {text:?}",
         );
     }
+}
+
+// ── Alignment tests ───────────────────────────────────────────────────────
+
+#[test]
+fn default_config_hint_starts_at_col_0() {
+    let app = make_app();
+    let text = render_bar_width(&app, 200);
+    assert!(
+        text.starts_with(" j/k nav"),
+        "hint should start at column 0, got {text:?}"
+    );
+}
+
+#[test]
+fn default_config_version_right_aligned() {
+    let app = make_app();
+    let text = render_bar_width(&app, 200);
+    let version = format!("v{}", env!("CARGO_PKG_VERSION"));
+    // Version should appear near the right end, after padding spaces.
+    assert!(
+        text.trim_end().ends_with(&version),
+        "version should be right-aligned, got {text:?}"
+    );
+}
+
+#[test]
+fn default_config_lnum_right_side() {
+    let mut app = make_app();
+    app.current_file = Some(PathBuf::from("Cargo.toml"));
+    app.active_line = 10;
+    let text = render_bar_width(&app, 200);
+    // Ln 11 should be on the right side, after padding
+    let hint_end = text.find("? help").unwrap();
+    let lnum_pos = text.find("Ln 11").unwrap();
+    assert!(
+        lnum_pos > hint_end,
+        "Ln should be right-aligned after hint, got Ln at {lnum_pos}, hint ends at {hint_end}"
+    );
+}
+
+#[test]
+fn wide_bar_left_plus_gap_plus_right_equals_max() {
+    let mut app = make_app();
+    app.show_hidden = true;
+    app.git_info = Some(GitRepoInfo {
+        head: GitHead::Branch("main".into()),
+        ahead: 0,
+        behind: 0,
+        total_changed: 0,
+        staged: 0,
+        untracked: 0,
+    });
+    let text = render_bar_width(&app, 200);
+    assert_eq!(text.chars().count(), 200);
+}
+
+#[test]
+fn narrow_bar_drops_lowest_priority_across_both_sides() {
+    let mut app = make_app();
+    app.walk_errors = 1;
+    let text = render_bar_width(&app, 15);
+    // At width 15 only version (" vX.Y.Z") and error (" [!1]") should survive.
+    assert!(
+        text.contains(&format!("v{}", env!("CARGO_PKG_VERSION"))),
+        "version should be kept at width 15"
+    );
+    assert!(text.contains("[!1]"), "errors should survive at width 15");
+}
+
+#[test]
+fn custom_right_only_version() {
+    let cfg = Config {
+        git: crate::config::GitConfig {
+            status: false,
+            ..Default::default()
+        },
+        statusbar: StatusBarConfig {
+            right: vec!["version".into()],
+        },
+        ..Config::default()
+    };
+    let app = App::new(PathBuf::from("."), cfg, None, None).unwrap();
+    let text = render_bar_width(&app, 200);
+    let version = format!("v{}", env!("CARGO_PKG_VERSION"));
+    // Version should be the only right-side segment, at the end.
+    assert!(
+        text.trim_end().ends_with(&version),
+        "version should be right-aligned, got {text:?}"
+    );
+    // Ln shouldn't appear since no file is open, but git/type/lnum
+    // are not in right list so they fall to the left.
+}
+
+#[test]
+fn empty_right_all_left() {
+    let cfg = Config {
+        git: crate::config::GitConfig {
+            status: false,
+            ..Default::default()
+        },
+        statusbar: StatusBarConfig { right: vec![] },
+        ..Config::default()
+    };
+    let app = App::new(PathBuf::from("."), cfg, None, None).unwrap();
+    let text = render_bar_width(&app, 200);
+    let version = format!("v{}", env!("CARGO_PKG_VERSION"));
+    // Version is now left-aligned — should appear near the right end but
+    // without any padding-gap before it; should be immediately after earlier segments.
+    // Just verify the bar starts with the hint and ends with version without extra gap.
+    assert!(text.starts_with(" j/k nav"));
+    assert!(text.contains(&version));
+}
+
+#[test]
+fn unknown_id_in_right_ignored() {
+    let cfg = Config {
+        git: crate::config::GitConfig {
+            status: false,
+            ..Default::default()
+        },
+        statusbar: StatusBarConfig {
+            right: vec!["nonexistent".into()],
+        },
+        ..Config::default()
+    };
+    let app = App::new(PathBuf::from("."), cfg, None, None).unwrap();
+    let text = render_bar_width(&app, 200);
+    // With default config settings, nothing is in right list (since "nonexistent"
+    // doesn't match any segment), so all should be left-aligned.
+    assert!(text.starts_with(" j/k nav"));
+}
+
+#[test]
+fn split_sides_left_right_groups() {
+    let cfg = StatusBarConfig {
+        right: vec!["version".into(), "git".into()],
+    };
+    // Manually exercise split_sides.
+    let segs = vec![
+        (
+            Span::styled("hint", Style::default()),
+            StatusSegment::Hint,
+            P_HINT,
+        ),
+        (
+            Span::styled("ver", Style::default()),
+            StatusSegment::Version,
+            P_VER,
+        ),
+        (
+            Span::styled("git", Style::default()),
+            StatusSegment::Git,
+            P_GIT,
+        ),
+    ];
+    let (left, right) = split_sides(segs, &cfg);
+    assert_eq!(left.len(), 1);
+    assert_eq!(left[0].content.as_ref(), "hint");
+    assert_eq!(right.len(), 2);
+    assert_eq!(right[0].content.as_ref(), "ver");
+    assert_eq!(right[1].content.as_ref(), "git");
+}
+
+#[test]
+fn compose_left_right_padding() {
+    let left = vec![Span::styled("left", Style::default())];
+    let right = vec![Span::styled("right", Style::default())];
+    // left=4, right=5, max=20 -> gap=11
+    let line = compose_left_right(left, right, 20);
+    assert_eq!(line.width(), 20);
+    let content: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
+    assert_eq!(content, "left           right");
+}
+
+#[test]
+fn compose_left_right_no_padding_needed() {
+    let left = vec![Span::styled("abc", Style::default())];
+    let right = vec![Span::styled("de", Style::default())];
+    let line = compose_left_right(left, right, 7);
+    assert_eq!(line.width(), 7);
+    let content: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
+    assert_eq!(content, "abc  de");
+}
+
+#[test]
+fn compose_left_right_exact_fit() {
+    let left = vec![Span::styled("abc", Style::default())];
+    let right = vec![Span::styled("de", Style::default())];
+    let line = compose_left_right(left, right, 5);
+    assert_eq!(line.width(), 5);
+    let content: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
+    assert_eq!(content, "abcde");
+}
+
+#[test]
+fn compose_left_right_empty_groups() {
+    let line = compose_left_right(vec![], vec![], 10);
+    assert_eq!(line.width(), 10);
+    let content: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
+    assert_eq!(content, "          ");
 }

@@ -75,6 +75,24 @@ pub struct GitDiffConfig {
     pub side_by_side: bool,
 }
 
+/// Status-bar segment alignment, grouped under `[statusbar]` in the TOML.
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[serde(default)]
+pub struct StatusBarConfig {
+    /// Segment ids to render on the right side, right-aligned.
+    /// Anything not listed renders on the left in its natural order.
+    /// Valid ids: hint badges scroll lnum type fileinfo git errors folds message version
+    pub right: Vec<String>,
+}
+
+impl Default for StatusBarConfig {
+    fn default() -> Self {
+        StatusBarConfig {
+            right: vec!["lnum".into(), "type".into(), "git".into(), "version".into()],
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(default)]
 pub struct Config {
@@ -114,6 +132,8 @@ pub struct Config {
     pub plugins: HashMap<String, PluginEntry>,
     /// Grouped git settings.
     pub git: GitConfig,
+    /// Status-bar segment alignment config.
+    pub statusbar: StatusBarConfig,
 
     // --- deprecated flat keys (read for backward-compat; never written) ---
     #[serde(default, skip_serializing, rename = "git_status")]
@@ -154,6 +174,7 @@ impl Default for Config {
             palette_frequent_count: 3,
             plugins: HashMap::new(),
             git: GitConfig::default(),
+            statusbar: StatusBarConfig::default(),
             legacy_git_status: None,
             legacy_git_show_deleted: None,
             legacy_git_show_untracked: None,

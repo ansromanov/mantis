@@ -23,7 +23,53 @@ use ratatui::{
 };
 
 use crate::app::{App, Focus};
+use crate::config::StatusBarConfig;
 use crate::git::{GitHead, GitRepoInfo};
+
+/// Named segment identifiers for status-bar alignment.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum StatusSegment {
+    Hint,
+    Badges,
+    Scroll,
+    Lnum,
+    Type,
+    FileInfo,
+    Git,
+    Errors,
+    Folds,
+    Message,
+    Version,
+}
+
+impl StatusSegment {
+    fn side(self, config: &StatusBarConfig) -> StatusSide {
+        let id = match self {
+            StatusSegment::Hint => "hint",
+            StatusSegment::Badges => "badges",
+            StatusSegment::Scroll => "scroll",
+            StatusSegment::Lnum => "lnum",
+            StatusSegment::Type => "type",
+            StatusSegment::FileInfo => "fileinfo",
+            StatusSegment::Git => "git",
+            StatusSegment::Errors => "errors",
+            StatusSegment::Folds => "folds",
+            StatusSegment::Message => "message",
+            StatusSegment::Version => "version",
+        };
+        if config.right.iter().any(|s| s == id) {
+            StatusSide::Right
+        } else {
+            StatusSide::Left
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum StatusSide {
+    Left,
+    Right,
+}
 
 /// Priority levels for status-bar segments (higher = kept when eliding).
 const P_HINT: u8 = 0; // keybinding hints
@@ -86,13 +132,14 @@ fn overlay_line(text: &str, style: Style, max_width: u16) -> Line<'static> {
     Line::from(vec![Span::styled(display, style)])
 }
 
-/// Normal (non-overlay) status bar with priority-based elision.
+/// Normal (non-overlay) status bar with priority-based elision and configurable
+/// left/right alignment per segment.
 fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
     let badge = base.fg(app.theme.accent).add_modifier(Modifier::BOLD);
     let err_style = base.fg(app.theme.diff_del).add_modifier(Modifier::BOLD);
     let dim = base.fg(app.theme.dim);
 
-    let mut segs: Vec<(Span<'static>, u8)> = Vec::new();
+    let mut segs: Vec<(Span<'static>, StatusSegment, u8)> = Vec::new();
 
     // -- Priority 0: keybinding hint (dropped first) --
     let hint = match app.focus {
@@ -136,12 +183,16 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
             )
         }
     };
-    segs.push((Span::styled(hint, dim), P_HINT));
+    segs.push((Span::styled(hint, dim), StatusSegment::Hint, P_HINT));
 
     // -- Priority 2: active-mode badges --
     if matches!(app.focus, Focus::Tree) {
         if app.show_hidden {
-            segs.push((Span::styled(" [hidden]", badge), P_INFO));
+            segs.push((
+                Span::styled(" [hidden]", badge),
+                StatusSegment::Badges,
+                P_INFO,
+            ));
         }
         if app.git_mode {
             let label = if app.git_mode_flat {
@@ -149,25 +200,35 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
             } else {
                 " [git]"
             };
-            segs.push((Span::styled(label, badge), P_INFO));
+            segs.push((Span::styled(label, badge), StatusSegment::Badges, P_INFO));
         }
     }
     if app.auto_watch {
-        segs.push((Span::styled(" [watch]", badge), P_INFO));
+        segs.push((
+            Span::styled(" [watch]", badge),
+            StatusSegment::Badges,
+            P_INFO,
+        ));
     }
     if !app.plugin_manager.is_empty() {
-        segs.push((Span::styled(" [plugin]", badge), P_INFO));
+        segs.push((
+            Span::styled(" [plugin]", badge),
+            StatusSegment::Badges,
+            P_INFO,
+        ));
     }
     if app.is_diff && app.git_mode {
         let key = app.keys().label_for_action("toggle_diff_staged");
         if key.is_empty() {
             segs.push((
                 Span::styled(format!(" [diff: {}]", app.diff_mode.label()), badge),
+                StatusSegment::Badges,
                 P_INFO,
             ));
         } else {
             segs.push((
                 Span::styled(format!(" [diff: {} · {key}]", app.diff_mode.label()), badge),
+                StatusSegment::Badges,
                 P_INFO,
             ));
         }
@@ -181,16 +242,28 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
                 .checked_div(max)
                 .unwrap_or(0)
                 .min(100);
-            segs.push((Span::styled(format!("  {pct}%"), base), P_INFO));
+            segs.push((
+                Span::styled(format!("  {pct}%"), base),
+                StatusSegment::Scroll,
+                P_INFO,
+            ));
         }
     }
 
     // -- Priority 2: active line number and language indicator --
     if app.current_file.is_some() && !app.is_diff {
         let ln = app.active_line + 1;
-        segs.push((Span::styled(format!(" Ln {ln}"), dim), P_INFO));
+        segs.push((
+            Span::styled(format!(" Ln {ln}"), dim),
+            StatusSegment::Lnum,
+            P_INFO,
+        ));
         if let Some(ref syn) = app.current_syntax {
-            segs.push((Span::styled(format!(" [{syn}]"), dim), P_INFO));
+            segs.push((
+                Span::styled(format!(" [{syn}]"), dim),
+                StatusSegment::Type,
+                P_INFO,
+            ));
         }
     }
 
@@ -203,7 +276,7 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
             } else {
                 (format!(" [{enc}]"), dim)
             };
-            segs.push((Span::styled(label, style), P_INFO));
+            segs.push((Span::styled(label, style), StatusSegment::FileInfo, P_INFO));
         }
     }
 
@@ -220,7 +293,7 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
         } else {
             format!(" [{}]", plugin.branch)
         };
-        segs.push((Span::styled(label, base.fg(fg)), P_GIT));
+        segs.push((Span::styled(label, base.fg(fg)), StatusSegment::Git, P_GIT));
     } else if let Some(ref info) = app.git_info {
         let fg = match info.head {
             GitHead::Detached => app.theme.git_conflict,
@@ -228,22 +301,35 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
             GitHead::Branch(_) if info.is_dirty() => app.theme.git_dirty,
             GitHead::Branch(_) => app.theme.git_clean,
         };
-        segs.push((Span::styled(git_info_str(info), base.fg(fg)), P_GIT));
+        segs.push((
+            Span::styled(git_info_str(info), base.fg(fg)),
+            StatusSegment::Git,
+            P_GIT,
+        ));
     }
 
     // -- Priority 4: error indicators --
     if app.walk_errors > 0 {
         segs.push((
             Span::styled(format!(" [!{}]", app.walk_errors), err_style),
+            StatusSegment::Errors,
             P_ERR,
         ));
     }
     if app.config_error.is_some() {
-        segs.push((Span::styled(" [config error]", err_style), P_ERR));
+        segs.push((
+            Span::styled(" [config error]", err_style),
+            StatusSegment::Errors,
+            P_ERR,
+        ));
     }
     if let Some(ref err) = app.yaml_error {
         let label = err.lines().next().unwrap_or(err);
-        segs.push((Span::styled(format!(" [YAML: {label}]"), err_style), P_ERR));
+        segs.push((
+            Span::styled(format!(" [YAML: {label}]"), err_style),
+            StatusSegment::Errors,
+            P_ERR,
+        ));
     }
 
     // -- Priority 2: fold stats --
@@ -260,6 +346,7 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
                 format!(" [{yaml_suffix}{folded_count}/{total_regions}]"),
                 base.fg(app.theme.accent),
             ),
+            StatusSegment::Folds,
             P_INFO,
         ));
     }
@@ -268,12 +355,14 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
     if let Some(ref msg) = app.plugin_message {
         segs.push((
             Span::styled(format!(" {msg}"), base.fg(app.theme.accent)),
+            StatusSegment::Message,
             P_META,
         ));
     }
     if let Some(ref sm) = app.status_message {
         segs.push((
             Span::styled(format!(" {}", sm.text), base.fg(app.theme.accent)),
+            StatusSegment::Message,
             P_META,
         ));
     }
@@ -284,25 +373,32 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
             format!(" v{}", env!("CARGO_PKG_VERSION")),
             base.fg(app.theme.dim),
         ),
+        StatusSegment::Version,
         P_VER,
     ));
 
-    fit_segments(segs, max_width as usize)
+    fit_two_sided(segs, max_width as usize, &app.config.statusbar)
 }
 
-/// From a list of `(Span, priority)` pairs, return a `Line` containing a
-/// subset that fits within `max_width`.  Higher-priority items are kept
-/// first; within the same priority level, items further to the right
-/// (added later) are dropped before items on the left.
-fn fit_segments(segs: Vec<(Span<'static>, u8)>, max_width: usize) -> Line<'static> {
+/// From a list of `(Span, StatusSegment, priority)` pairs, return a `Line`
+/// with segments split into left-aligned and right-aligned groups per config.
+/// Higher-priority items are kept first; within the same priority level,
+/// rightmost items are dropped first — across both groups.  The right group
+/// is right-anchored as a block, with padding spaces in between.
+fn fit_two_sided(
+    segs: Vec<(Span<'static>, StatusSegment, u8)>,
+    max_width: usize,
+    config: &StatusBarConfig,
+) -> Line<'static> {
     if segs.is_empty() || max_width == 0 {
         return Line::from(Vec::<Span>::new());
     }
 
     // Fast path: everything fits.
-    let total: usize = segs.iter().map(|(s, _)| s.width()).sum();
+    let total: usize = segs.iter().map(|(s, _, _)| s.width()).sum();
     if total <= max_width {
-        return Line::from(segs.into_iter().map(|(s, _)| s).collect::<Vec<_>>());
+        let (left, right) = split_sides(segs, config);
+        return compose_left_right(left, right, max_width);
     }
 
     let n = segs.len();
@@ -311,7 +407,7 @@ fn fit_segments(segs: Vec<(Span<'static>, u8)>, max_width: usize) -> Line<'stati
     // Indices sorted by priority (ascending) then position (descending),
     // so we remove lowest-priority, rightmost items first.
     let mut order: Vec<usize> = (0..n).collect();
-    order.sort_by(|&a, &b| segs[a].1.cmp(&segs[b].1).then(b.cmp(&a)));
+    order.sort_by(|&a, &b| segs[a].2.cmp(&segs[b].2).then(b.cmp(&a)));
 
     let mut current_width = total;
 
@@ -325,14 +421,52 @@ fn fit_segments(segs: Vec<(Span<'static>, u8)>, max_width: usize) -> Line<'stati
         }
     }
 
-    let final_spans: Vec<Span<'static>> = segs
+    let kept: Vec<_> = segs
         .into_iter()
         .enumerate()
         .filter(|(i, _)| keep[*i])
-        .map(|(_, s)| s.0)
+        .map(|(_, t)| t)
         .collect();
 
-    Line::from(final_spans)
+    let (left, right) = split_sides(kept, config);
+    compose_left_right(left, right, max_width)
+}
+
+/// Split kept segments into left and right groups by config.
+fn split_sides(
+    segs: Vec<(Span<'static>, StatusSegment, u8)>,
+    config: &StatusBarConfig,
+) -> (Vec<Span<'static>>, Vec<Span<'static>>) {
+    let mut left = Vec::new();
+    let mut right = Vec::new();
+    for (span, id, _) in segs {
+        if id.side(config) == StatusSide::Right {
+            right.push(span);
+        } else {
+            left.push(span);
+        }
+    }
+    (left, right)
+}
+
+/// Compose left and right span groups into a single Line, with a padding
+/// gap between them.  Right group is right-anchored flush to max_width.
+fn compose_left_right(
+    left: Vec<Span<'static>>,
+    right: Vec<Span<'static>>,
+    max_width: usize,
+) -> Line<'static> {
+    let left_w: usize = left.iter().map(Span::width).sum();
+    let right_w: usize = right.iter().map(Span::width).sum();
+    let gap = max_width.saturating_sub(left_w + right_w);
+
+    let mut all: Vec<Span<'static>> = Vec::with_capacity(left.len() + 1 + right.len());
+    all.extend(left);
+    if gap > 0 {
+        all.push(Span::raw(" ".repeat(gap)));
+    }
+    all.extend(right);
+    Line::from(all)
 }
 
 fn git_info_str(info: &GitRepoInfo) -> String {
