@@ -20,6 +20,24 @@ use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use crate::file::is_binary_bytes;
 use crate::tree::collect_all_files;
 
+fn fuzzy_refilter<T>(
+    items: &[T],
+    matcher: &SkimMatcherV2,
+    query: &str,
+    haystack: impl Fn(&T) -> String,
+) -> Vec<usize> {
+    if query.is_empty() {
+        return (0..items.len()).collect();
+    }
+    let mut scored: Vec<(usize, i64)> = items
+        .iter()
+        .enumerate()
+        .filter_map(|(i, item)| matcher.fuzzy_match(&haystack(item), query).map(|s| (i, s)))
+        .collect();
+    scored.sort_by_key(|(_, s)| std::cmp::Reverse(*s));
+    scored.into_iter().map(|(i, _)| i).collect()
+}
+
 #[derive(Debug, PartialEq)]
 pub enum SearchMode {
     Files,
@@ -290,23 +308,9 @@ impl HistoryState {
 
     fn refilter(&mut self) {
         self.selected = 0;
-        if self.query.is_empty() {
-            self.filtered = (0..self.commits.len()).collect();
-            return;
-        }
-        let mut scored: Vec<(usize, i64)> = self
-            .commits
-            .iter()
-            .enumerate()
-            .filter_map(|(i, c)| {
-                let hay = format!("{} {} {}", c.short, c.date, c.subject);
-                self.matcher
-                    .fuzzy_match(&hay, &self.query)
-                    .map(|sc| (i, sc))
-            })
-            .collect();
-        scored.sort_by_key(|(_, sc)| std::cmp::Reverse(*sc));
-        self.filtered = scored.into_iter().map(|(i, _)| i).collect();
+        self.filtered = fuzzy_refilter(&self.commits, &self.matcher, &self.query, |c| {
+            format!("{} {} {}", c.short, c.date, c.subject)
+        });
     }
 }
 
@@ -508,18 +512,7 @@ impl ThemePicker {
 
     fn refilter(&mut self) {
         self.selected = 0;
-        if self.query.is_empty() {
-            self.filtered = (0..self.names.len()).collect();
-            return;
-        }
-        let mut scored: Vec<(usize, i64)> = self
-            .names
-            .iter()
-            .enumerate()
-            .filter_map(|(i, n)| self.matcher.fuzzy_match(n, &self.query).map(|s| (i, s)))
-            .collect();
-        scored.sort_by_key(|(_, s)| std::cmp::Reverse(*s));
-        self.filtered = scored.into_iter().map(|(i, _)| i).collect();
+        self.filtered = fuzzy_refilter(&self.names, &self.matcher, &self.query, |n| n.clone());
     }
 }
 
@@ -572,22 +565,9 @@ impl RecentFilesState {
 
     fn refilter(&mut self) {
         self.selected = 0;
-        if self.query.is_empty() {
-            self.filtered = (0..self.paths.len()).collect();
-            return;
-        }
-        let mut scored: Vec<(usize, i64)> = self
-            .paths
-            .iter()
-            .enumerate()
-            .filter_map(|(i, p)| {
-                self.matcher
-                    .fuzzy_match(&p.to_string_lossy(), &self.query)
-                    .map(|sc| (i, sc))
-            })
-            .collect();
-        scored.sort_by_key(|(_, sc)| std::cmp::Reverse(*sc));
-        self.filtered = scored.into_iter().map(|(i, _)| i).collect();
+        self.filtered = fuzzy_refilter(&self.paths, &self.matcher, &self.query, |p| {
+            p.to_string_lossy().into_owned()
+        });
     }
 }
 
