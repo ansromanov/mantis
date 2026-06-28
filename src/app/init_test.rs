@@ -107,7 +107,10 @@ fn app_new_show_hidden_includes_dotfiles() {
     fs::write(root.join(".hidden"), "y\n").unwrap();
 
     let cfg = Config {
-        show_hidden: true,
+        tree: crate::config::TreeConfig {
+            show_hidden: true,
+            ..Default::default()
+        },
         ..Config::default()
     };
     let app = new_app(&root, cfg);

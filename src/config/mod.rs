@@ -34,6 +34,87 @@ use crate::app::DiffMode;
 use crate::plugin::PluginEntry;
 use crate::theme::ThemeConfig;
 
+/// Tree-pane configuration, grouped under `[tree]` in the TOML.
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[serde(default)]
+pub struct TreeConfig {
+    /// Show dotfiles / hidden entries in the tree.
+    pub show_hidden: bool,
+    /// Tree pane width in columns.
+    pub width: u16,
+    /// PageUp/Down scroll the tree viewport without moving selection.
+    pub independent_scroll: bool,
+    /// Draw indentation guides (│) in the tree pane.
+    pub indent_guides: bool,
+    /// Nerd Font file-type icons in the tree.
+    pub icons: bool,
+}
+
+impl Default for TreeConfig {
+    fn default() -> Self {
+        TreeConfig {
+            show_hidden: false,
+            width: 28,
+            independent_scroll: false,
+            indent_guides: true,
+            icons: false,
+        }
+    }
+}
+
+/// Content-pane configuration, grouped under `[content]` in the TOML.
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[serde(default)]
+pub struct ContentConfig {
+    /// Enable word wrapping in the content pane.
+    pub word_wrap: bool,
+    /// Show line-number gutter in the content pane.
+    pub line_numbers: bool,
+    /// Show a scrollbar in the content pane.
+    pub scrollbar: bool,
+    /// Show scroll percentage indicator.
+    pub scroll_percentage: bool,
+    /// Auto-reload file content when it changes on disk.
+    pub watch: bool,
+    /// Show encoding and line-ending info in the status bar.
+    pub show_file_info: bool,
+}
+
+impl Default for ContentConfig {
+    fn default() -> Self {
+        ContentConfig {
+            word_wrap: false,
+            line_numbers: true,
+            scrollbar: true,
+            scroll_percentage: true,
+            watch: false,
+            show_file_info: true,
+        }
+    }
+}
+
+/// Search/filter configuration, grouped under `[search]` in the TOML.
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[serde(default)]
+pub struct SearchConfig {
+    /// Enable in-file incremental search via `/`.
+    pub in_file_search: bool,
+    /// Trailing context lines shown after each content match.
+    pub context_lines: usize,
+    /// Restore last search query when reopening search.
+    pub keep_query: bool,
+}
+
+impl Default for SearchConfig {
+    fn default() -> Self {
+        SearchConfig {
+            in_file_search: true,
+            context_lines: 0,
+            keep_query: false,
+        }
+    }
+}
+
 /// Git-related configuration, grouped under `[git]` in the TOML.
 #[derive(Serialize, Deserialize, Clone, PartialEq)]
 #[serde(default)]
@@ -96,31 +177,16 @@ impl Default for StatusBarConfig {
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(default)]
 pub struct Config {
-    pub show_hidden: bool,
-    pub tree_width: u16,
-    pub tree_independent_scroll: bool,
-    pub word_wrap: bool,
-    pub line_numbers: bool,
-    pub scrollbar: bool,
-    pub scroll_percentage: bool,
-    pub in_file_search: bool,
-    pub search_context_lines: usize,
-    pub keep_search_query: bool,
-    /// Automatically reload file content when the open file changes on disk.
-    /// Toggled at runtime with the `toggle_watch` keybinding.
-    pub watch: bool,
+    /// Grouped tree settings.
+    pub tree: TreeConfig,
+    /// Grouped content settings.
+    pub content: ContentConfig,
+    /// Grouped search settings.
+    pub search: SearchConfig,
     /// Maximum number of recently opened files to remember. Defaults to 10.
     pub recent_files_count: usize,
-    /// Show file encoding and line-ending info in the status bar.
-    pub show_file_info: bool,
     pub keys: Keymap,
     pub theme: ThemeConfig,
-    /// Render indentation guide lines (│) in the tree pane.
-    pub indent_guides: bool,
-    /// Show Nerd Font file-type icons in the tree. The icon map is provided by
-    /// a plugin (e.g. the bundled iconize plugin). Off by default — requires a
-    /// Nerd Font in your terminal.
-    pub icons: bool,
     /// Pin the most-recently-used command at the top of the command palette's
     /// empty-query view. Default: true.
     pub palette_pin_recent: bool,
@@ -148,28 +214,47 @@ pub struct Config {
     pub legacy_ignore_gitignore: Option<bool>,
     #[serde(default, skip_serializing, rename = "diff_mode")]
     pub legacy_diff_mode: Option<String>,
+
+    // --- deprecated tree/content/search flat keys ---
+    #[serde(default, skip_serializing, rename = "show_hidden")]
+    pub legacy_show_hidden: Option<bool>,
+    #[serde(default, skip_serializing, rename = "tree_width")]
+    pub legacy_tree_width: Option<u16>,
+    #[serde(default, skip_serializing, rename = "tree_independent_scroll")]
+    pub legacy_tree_independent_scroll: Option<bool>,
+    #[serde(default, skip_serializing, rename = "indent_guides")]
+    pub legacy_indent_guides: Option<bool>,
+    #[serde(default, skip_serializing, rename = "icons")]
+    pub legacy_icons: Option<bool>,
+    #[serde(default, skip_serializing, rename = "word_wrap")]
+    pub legacy_word_wrap: Option<bool>,
+    #[serde(default, skip_serializing, rename = "line_numbers")]
+    pub legacy_line_numbers: Option<bool>,
+    #[serde(default, skip_serializing, rename = "scrollbar")]
+    pub legacy_scrollbar: Option<bool>,
+    #[serde(default, skip_serializing, rename = "scroll_percentage")]
+    pub legacy_scroll_percentage: Option<bool>,
+    #[serde(default, skip_serializing, rename = "watch")]
+    pub legacy_watch: Option<bool>,
+    #[serde(default, skip_serializing, rename = "show_file_info")]
+    pub legacy_show_file_info: Option<bool>,
+    #[serde(default, skip_serializing, rename = "in_file_search")]
+    pub legacy_in_file_search: Option<bool>,
+    #[serde(default, skip_serializing, rename = "search_context_lines")]
+    pub legacy_search_context_lines: Option<usize>,
+    #[serde(default, skip_serializing, rename = "keep_search_query")]
+    pub legacy_keep_search_query: Option<bool>,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Config {
-            show_hidden: false,
-            tree_width: 28,
-            tree_independent_scroll: false,
-            word_wrap: false,
-            line_numbers: true,
-            scrollbar: true,
-            scroll_percentage: true,
-            in_file_search: true,
-            search_context_lines: 0,
-            keep_search_query: false,
-            watch: false,
+            tree: TreeConfig::default(),
+            content: ContentConfig::default(),
+            search: SearchConfig::default(),
             recent_files_count: 10,
-            show_file_info: true,
             keys: Keymap::default(),
             theme: ThemeConfig::default(),
-            indent_guides: true,
-            icons: false,
             palette_pin_recent: true,
             palette_frequent_count: 3,
             plugins: HashMap::new(),
@@ -181,6 +266,20 @@ impl Default for Config {
             legacy_git_show_ignored: None,
             legacy_ignore_gitignore: None,
             legacy_diff_mode: None,
+            legacy_show_hidden: None,
+            legacy_tree_width: None,
+            legacy_tree_independent_scroll: None,
+            legacy_indent_guides: None,
+            legacy_icons: None,
+            legacy_word_wrap: None,
+            legacy_line_numbers: None,
+            legacy_scrollbar: None,
+            legacy_scroll_percentage: None,
+            legacy_watch: None,
+            legacy_show_file_info: None,
+            legacy_in_file_search: None,
+            legacy_search_context_lines: None,
+            legacy_keep_search_query: None,
         }
     }
 }
@@ -189,6 +288,54 @@ impl Config {
     /// Folds any set legacy top-level git keys into `self.git`, then clears them
     /// so they are never re-serialized. New `[git]` keys win only when the legacy
     /// key is absent (old files keep their meaning until the user re-saves).
+    /// Folds legacy top-level tree/content/search keys into their respective
+    /// grouped tables, then clears them so they are never re-serialized.
+    pub fn migrate_legacy_flat_fields(&mut self) {
+        if let Some(v) = self.legacy_show_hidden.take() {
+            self.tree.show_hidden = v;
+        }
+        if let Some(v) = self.legacy_tree_width.take() {
+            self.tree.width = v;
+        }
+        if let Some(v) = self.legacy_tree_independent_scroll.take() {
+            self.tree.independent_scroll = v;
+        }
+        if let Some(v) = self.legacy_indent_guides.take() {
+            self.tree.indent_guides = v;
+        }
+        if let Some(v) = self.legacy_icons.take() {
+            self.tree.icons = v;
+        }
+        if let Some(v) = self.legacy_word_wrap.take() {
+            self.content.word_wrap = v;
+        }
+        if let Some(v) = self.legacy_line_numbers.take() {
+            self.content.line_numbers = v;
+        }
+        if let Some(v) = self.legacy_scrollbar.take() {
+            self.content.scrollbar = v;
+        }
+        if let Some(v) = self.legacy_scroll_percentage.take() {
+            self.content.scroll_percentage = v;
+        }
+        if let Some(v) = self.legacy_watch.take() {
+            self.content.watch = v;
+        }
+        if let Some(v) = self.legacy_show_file_info.take() {
+            self.content.show_file_info = v;
+        }
+        if let Some(v) = self.legacy_in_file_search.take() {
+            self.search.in_file_search = v;
+        }
+        if let Some(v) = self.legacy_search_context_lines.take() {
+            self.search.context_lines = v;
+        }
+        if let Some(v) = self.legacy_keep_search_query.take() {
+            self.search.keep_query = v;
+        }
+    }
+
+    /// Folds deprecated top-level git flat keys into `self.git`, then clears them.
     pub fn migrate_legacy_git_fields(&mut self) {
         if let Some(v) = self.legacy_git_status.take() {
             self.git.status = v;
@@ -661,6 +808,7 @@ pub fn load(root: &Path) -> (Config, Option<PathBuf>, Option<String>) {
         };
         match toml::from_str::<Config>(&s) {
             Ok(mut config) => {
+                config.migrate_legacy_flat_fields();
                 config.migrate_legacy_git_fields();
                 // The config parsed, but `#[serde(default)]` silently ignores
                 // unknown keys. Flag them (with nearest-match hints) so typos
