@@ -121,7 +121,7 @@ fn save_and_reload_preserves_theme() {
     assert_eq!(cfg.tree_width, 30);
 
     cfg.theme = ThemeConfig::from_preset("synthwave84");
-    config::save(&cfg, path.as_deref().unwrap());
+    config::save(&cfg, path.as_deref().unwrap()).unwrap();
 
     let (reloaded, _, _) = config::load(&dir);
     let theme = reloaded.theme.resolve();
