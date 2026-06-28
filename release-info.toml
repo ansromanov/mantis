@@ -1,5 +1,5 @@
-version = "0.11.3"
-date = "2026-06-27"
+version = "0.11.4"
+date = "2026-06-28"
 whats_new = """- refactor: unify overlay/popup input model (shared ListPicker + uniform close rules) (#383)
 - refactor: group git config into [git] table (+ [git.diff] defaults, back-compat) (#384)
 - feat: restore per-file cursor + scroll position when returning to a file (#387)
