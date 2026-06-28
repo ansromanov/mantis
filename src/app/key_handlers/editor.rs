@@ -177,18 +177,24 @@ impl App {
         let _ = execute!(std::io::stdout(), LeaveAlternateScreen, DisableMouseCapture);
 
         let parts: Vec<&str> = editor.split_whitespace().collect();
-        if let Some((cmd, args)) = parts.split_first() {
-            let _ = std::process::Command::new(cmd)
+        let launch_err = if let Some((cmd, args)) = parts.split_first() {
+            std::process::Command::new(cmd)
                 .args(args)
                 .arg(path)
-                .status();
-        }
+                .status()
+                .err()
+        } else {
+            None
+        };
 
         let _ = execute!(std::io::stdout(), EnterAlternateScreen, EnableMouseCapture);
         if let Err(e) = enable_raw_mode() {
             eprintln!("mantis: failed to restore raw mode after editor: {e}");
         }
         self.needs_clear = true;
+        if let Some(e) = launch_err {
+            self.set_status(format!("editor launch failed: {e}"));
+        }
     }
 
     /// Opens `url` in the system browser. No-op for empty URLs. When stdout
@@ -203,13 +209,20 @@ impl App {
             return;
         }
         #[cfg(target_os = "macos")]
-        let _ = std::process::Command::new("open").arg(url).spawn();
+        if let Err(e) = std::process::Command::new("open").arg(url).spawn() {
+            self.set_status(format!("browser launch failed: {e}"));
+        }
         #[cfg(target_os = "windows")]
-        let _ = std::process::Command::new("cmd")
+        if let Err(e) = std::process::Command::new("cmd")
             .args(["/c", "start", "", url])
-            .spawn();
+            .spawn()
+        {
+            self.set_status(format!("browser launch failed: {e}"));
+        }
         #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-        let _ = std::process::Command::new("xdg-open").arg(url).spawn();
+        if let Err(e) = std::process::Command::new("xdg-open").arg(url).spawn() {
+            self.set_status(format!("browser launch failed: {e}"));
+        }
     }
 
     /// Applies the theme selected in the picker, saves it to config, and
