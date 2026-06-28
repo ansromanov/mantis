@@ -89,13 +89,11 @@ impl App {
                 self.plugin_picker = Some(PluginPicker::new(entries));
             }
             Some("toggle_git_mode") => self.toggle_git_mode(),
-            Some("toggle_git_flat") => {
-                if self.git_mode {
-                    self.git_mode_flat = !self.git_mode_flat;
-                    self.rebuild(true);
-                    self.try_open_selected();
-                    self.save_config();
-                }
+            Some("toggle_git_flat") if self.git_mode => {
+                self.git_mode_flat = !self.git_mode_flat;
+                self.rebuild(true);
+                self.try_open_selected();
+                self.save_config();
             }
             Some("toggle_word_wrap") => {
                 self.word_wrap = !self.word_wrap;
@@ -144,10 +142,8 @@ impl App {
                     self.mark_content_scrolled();
                 }
             }
-            Some("blame_line") => {
-                if self.has_text_cursor() {
-                    self.show_line_blame = !self.show_line_blame;
-                }
+            Some("blame_line") if self.has_text_cursor() => {
+                self.show_line_blame = !self.show_line_blame;
             }
             Some("copy_path") => self.copy_path_to_clipboard(false),
             Some("copy_relative_path") => self.copy_path_to_clipboard(true),

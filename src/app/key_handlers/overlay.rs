@@ -217,7 +217,9 @@ impl App {
             }
             _ => {}
         }
-        let f = self.tree_filter.as_mut().unwrap();
+        let Some(f) = self.tree_filter.as_mut() else {
+            return;
+        };
         match handle_list_picker_key(f, &key) {
             OverlayKey::Activate | OverlayKey::Close => {
                 self.tree_filter = None;
@@ -230,8 +232,8 @@ impl App {
     }
 
     /// Move the tree-filter selection by `delta` rows within the filtered
-    /// match set (`tree_visible_indices`), clamping to its bounds. Falls
-    /// back to the full node list when no filter set is recorded.
+    /// match set (`tree_visible_indices`), clamping to its bounds. Does
+    /// nothing when no filter set is recorded or the set is empty.
     fn move_tree_filter_selection(&mut self, delta: isize) {
         let visible: Vec<usize> = match self.tree_visible_indices.as_ref() {
             Some(v) if !v.is_empty() => v.clone(),
