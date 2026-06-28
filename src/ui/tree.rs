@@ -10,8 +10,9 @@
 //! (`App::tree_filter`) is active, only nodes whose names match the query (plus
 //! their ancestor directories) are rendered. The selected row is highlighted, and
 //! focus state controls the border style. At the top of the panel a breadcrumb
-//! path bar shows the current directory's ancestors (relative to root) with
-//! clickable segments. It records `tree_area`, `tree_offset`, and
+//! path bar shows the filesystem ancestors of `app.root` (from `/` down to the
+//! root itself) as clickable segments — it represents where the root is, not
+//! where the cursor is. It records `tree_area`, `tree_offset`, and
 //! `breadcrumb_areas` back onto `App` so mouse handlers can map a click row to a
 //! node index or a breadcrumb segment to a directory. Rendering only - selection
 //! and expansion are driven by the navigation handlers.
