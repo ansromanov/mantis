@@ -107,6 +107,21 @@ fn apply_theme_clears_plugin_content() {
 }
 
 #[test]
+fn toggle_git_flat_noop_when_not_in_git_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    assert!(!app.git_mode);
+    assert!(!app.git_mode_flat);
+    app.command_palette = Some(palette_with_query("Toggle git flat"));
+    app.dispatch_command();
+    assert!(
+        !app.git_mode_flat,
+        "git_mode_flat must not change when git_mode is false"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn go_to_line_command_opens_dialog_when_content_focused() {
     let root = temp_tree();
     let mut app = app_for(&root);
