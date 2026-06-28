@@ -197,7 +197,7 @@ impl App {
         if self.tree_filter.is_none() {
             return;
         }
-        let page = self.page_rows() as isize;
+        let page = (self.tree_area.height as usize).max(1) as isize;
         match key.code {
             KeyCode::Up => {
                 self.move_tree_filter_selection(-1);

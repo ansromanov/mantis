@@ -216,17 +216,14 @@ fn tree_filter_pagedown_advances_by_page_and_clamps() {
     };
     app.tree_selected = visible[0];
 
-    // page_rows = (10 - 1).max(1) = 9
-    let page = app.page_rows();
-    assert_eq!(page, 9);
-
-    // PageDown from first -> index 9
+    // tree_area.height = 10, page = 10.max(1) = 10
+    // PageDown from first -> index 10
     app.handle_tree_filter_key(KeyEvent::new(KeyCode::PageDown, KeyModifiers::empty()));
-    assert_eq!(app.tree_selected, visible[9]);
+    assert_eq!(app.tree_selected, visible[10]);
 
-    // PageDown again -> index 18
+    // PageDown again -> index 20
     app.handle_tree_filter_key(KeyEvent::new(KeyCode::PageDown, KeyModifiers::empty()));
-    assert_eq!(app.tree_selected, visible[18]);
+    assert_eq!(app.tree_selected, visible[20]);
 
     // Jump near end then PageDown clamps
     app.tree_selected = visible[48];
@@ -254,16 +251,16 @@ fn tree_filter_pageup_goes_back_by_page_and_clamps() {
         width: 40,
         height: 10,
     };
-    // page_rows = 9
+    // tree_area.height = 10, page = 10
     app.tree_selected = visible[30];
 
-    // PageUp from 30 -> 21
+    // PageUp from 30 -> 20
     app.handle_tree_filter_key(KeyEvent::new(KeyCode::PageUp, KeyModifiers::empty()));
-    assert_eq!(app.tree_selected, visible[21]);
+    assert_eq!(app.tree_selected, visible[20]);
 
-    // PageUp again -> 12
+    // PageUp again -> 10
     app.handle_tree_filter_key(KeyEvent::new(KeyCode::PageUp, KeyModifiers::empty()));
-    assert_eq!(app.tree_selected, visible[12]);
+    assert_eq!(app.tree_selected, visible[10]);
 
     // PageUp from first clamps to first
     app.tree_selected = visible[0];
