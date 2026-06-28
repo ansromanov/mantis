@@ -5097,12 +5097,56 @@ fn copy_to_clipboard_sets_status() {
     let mut app = app_for(&root);
     app.copy_to_clipboard("hello".to_string(), "test");
     let sm = app.status_message.as_ref().expect("status must be set");
-    // Either success or error — both produce a status message (old mouse
+    // Either success or failure — both produce a status message (old mouse
     // path was silent on failure, new path always reports).
     assert!(
         sm.text.starts_with("copied ") || sm.text.starts_with("clipboard error:"),
         "unexpected status text: {:?}",
         sm.text
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn save_config_sets_status_on_failure() {
+    let root = temp_tree();
+    // Point config_path at a non-existent directory so the write fails.
+    let bad_path = root.join("nonexistent").join("mantis.toml");
+    let mut app = App::new(root.to_path_buf(), Config::default(), Some(bad_path), None).unwrap();
+
+    // Initially no status.
+    assert!(app.status_message.is_none(), "no status before save_config");
+
+    app.save_config();
+
+    let sm = app
+        .status_message
+        .as_ref()
+        .expect("status must be set on failure");
+    assert!(
+        sm.text.starts_with("could not save config:"),
+        "unexpected status text: {:?}",
+        sm.text
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn save_config_no_status_on_success() {
+    let root = temp_tree();
+    let good_path = root.join("mantis.toml");
+    let mut app = App::new(root.to_path_buf(), Config::default(), Some(good_path), None).unwrap();
+
+    // Initially no status.
+    assert!(app.status_message.is_none(), "no status before save_config");
+
+    app.save_config();
+
+    // Successful save should not produce a status message.
+    assert!(
+        app.status_message.is_none(),
+        "successful save must not set status: {:?}",
+        app.status_message
     );
     fs::remove_dir_all(&root).ok();
 }

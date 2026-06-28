@@ -631,9 +631,9 @@ pub fn load(root: &Path) -> (Config, Option<PathBuf>, Option<String>) {
 /// Writes `config` back to the user's `path` as a *sparse* override file: only
 /// the keys whose value differs from the built-in defaults are written, so the
 /// user config stays small and readable instead of growing into a full dump of
-/// every setting. Silently ignores I/O errors.
-pub fn save(config: &Config, path: &Path) {
-    let _ = fs::write(path, sparse_toml(config));
+/// every setting.
+pub fn save(config: &Config, path: &Path) -> std::io::Result<()> {
+    fs::write(path, sparse_toml(config))
 }
 
 /// Serialises `config` keeping only the top-level keys whose value differs from

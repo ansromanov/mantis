@@ -416,9 +416,13 @@ pub struct App {
 
 impl App {
     /// Persists the current config to disk if a config path was provided.
-    fn save_config(&self) {
+    /// Surfaces a status message on failure so the user isn't silently
+    /// reverted on next launch.
+    fn save_config(&mut self) {
         if let Some(path) = &self.config_path {
-            config::save(&self.config, path);
+            if let Err(e) = config::save(&self.config, path) {
+                self.set_status(format!("could not save config: {e}"));
+            }
         }
     }
 

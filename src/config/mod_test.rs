@@ -777,6 +777,46 @@ fn legacy_keys_produce_no_validate_warnings() {
 }
 
 #[test]
+fn save_returns_err_on_unwritable_dir() {
+    let dir = scratch_dir("save_err");
+    // Don't create the subdir — save to a non-existent path.
+    let bad = dir.join("nonexistent").join("mantis.toml");
+    let cfg = Config::default();
+    let result = save(&cfg, &bad);
+    assert!(result.is_err(), "save to unwritable dir should fail");
+    fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn save_returns_ok_on_success_and_round_trips() {
+    let dir = scratch_dir("save_ok");
+    let path = dir.join("mantis.toml");
+    let cfg = Config {
+        tree_width: 42,
+        show_hidden: true,
+        ..Config::default()
+    };
+
+    let result = save(&cfg, &path);
+    assert!(result.is_ok(), "save should succeed: {:?}", result);
+
+    // Round-trip: re-load and verify overrides survive, defaults remain.
+    let loaded_raw = fs::read_to_string(&path).unwrap();
+    let loaded: Config = toml::from_str(&loaded_raw).unwrap();
+    assert_eq!(loaded.tree_width, 42);
+    assert!(loaded.show_hidden);
+    assert!(!loaded.word_wrap); // falls back to default
+
+    // Output is sparse — only non-default keys appear.
+    assert!(loaded_raw.contains("tree_width = 42"), "{loaded_raw}");
+    assert!(
+        !loaded_raw.contains("word_wrap"),
+        "default leaked: {loaded_raw}"
+    );
+    fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
 fn unknown_key_still_warns_even_alongside_deprecated_keys() {
     let warnings = validate_keys("git_staus = true\n");
     assert!(
