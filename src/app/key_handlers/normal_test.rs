@@ -656,6 +656,136 @@ fn r_key_clears_viewing_revision() {
     fs::remove_dir_all(&root).ok();
 }
 
+// -- PageUp/PageDown content navigation -------------------------------------
+
+#[test]
+fn content_page_down_moves_active_line_by_page_rows() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 20,
+    };
+    let rows = app.page_rows();
+    assert!(rows > 1, "page_rows must be > 1 for a meaningful test");
+    app.active_line = 0;
+    app.handle_key(key(KeyCode::PageDown));
+    assert_eq!(
+        app.active_line, rows,
+        "PageDown must move active_line by page_rows()"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_page_up_moves_active_line_by_page_rows() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 20,
+    };
+    let rows = app.page_rows();
+    assert!(rows > 1, "page_rows must be > 1 for a meaningful test");
+    app.active_line = rows * 2;
+    app.handle_key(key(KeyCode::PageUp));
+    assert_eq!(
+        app.active_line, rows,
+        "PageUp must move active_line up by page_rows()"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_page_down_clamps_at_last_display_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 20,
+    };
+    let last = app.display_line_count().saturating_sub(1);
+    app.active_line = last.saturating_sub(1);
+    app.handle_key(key(KeyCode::PageDown));
+    assert_eq!(
+        app.active_line, last,
+        "PageDown must clamp active_line to the last display line"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_page_up_clamps_at_zero() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 20,
+    };
+    app.active_line = 1;
+    app.handle_key(key(KeyCode::PageUp));
+    assert_eq!(app.active_line, 0, "PageUp must clamp active_line to 0");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_page_down_in_diff_only_scrolls() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.is_diff = true;
+    app.content_scroll = 5;
+    app.active_line = 42;
+    let scroll_before = app.content_scroll;
+    app.handle_key(key(KeyCode::PageDown));
+    assert_eq!(
+        app.active_line, 42,
+        "PageDown in diff mode must not change active_line"
+    );
+    assert!(
+        app.content_scroll > scroll_before,
+        "PageDown in diff mode must scroll the viewport forward"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_page_up_in_diff_only_scrolls() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.is_diff = true;
+    app.content_scroll = 50;
+    app.active_line = 42;
+    let scroll_before = app.content_scroll;
+    app.handle_key(key(KeyCode::PageUp));
+    assert_eq!(
+        app.active_line, 42,
+        "PageUp in diff mode must not change active_line"
+    );
+    assert!(
+        app.content_scroll < scroll_before,
+        "PageUp in diff mode must scroll the viewport back"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
 // -- command palette ranking -------------------------------------------------
 
 #[test]

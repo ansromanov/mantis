@@ -522,17 +522,17 @@ fn j_key_stops_at_scroll_max() {
 fn page_down_stops_at_scroll_max() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.open_file(&root.join("long.txt")); // 50 lines
+    app.open_file(&root.join("long.txt")); // 50 lines → last display line = 49
     app.focus = Focus::Content;
-    app.content_area = viewport(10); // scroll_max = 40, page_rows = 9
+    app.content_area = viewport(10); // page_rows = 9
 
-    // 5 PageDowns: 0 → 9 → 18 → 27 → 36 → 40 (clamped)
-    for _ in 0..5 {
+    // Many PageDowns: active_line must clamp at display_line_count()-1 = 49
+    for _ in 0..10 {
         app.handle_key(KeyEvent::new(KeyCode::PageDown, KeyModifiers::empty()));
     }
     assert_eq!(
-        app.content_scroll, 40,
-        "PageDown must not scroll past scroll_max"
+        app.active_line, 49,
+        "PageDown must clamp active_line at the last display line"
     );
     fs::remove_dir_all(&root).ok();
 }
@@ -2880,9 +2880,12 @@ fn content_key_page_up_scrolls_up() {
         width: 80,
         height: 21,
     };
-    app.content_scroll = 25;
+    app.active_line = 25; // page_rows = 20
     app.handle_key(KeyEvent::new(KeyCode::PageUp, KeyModifiers::empty()));
-    assert_eq!(app.content_scroll, 5);
+    assert_eq!(
+        app.active_line, 5,
+        "PageUp must move active_line back by page_rows"
+    );
     fs::remove_dir_all(&root).ok();
 }
 
