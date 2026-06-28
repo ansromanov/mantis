@@ -4,16 +4,21 @@ on:
   workflow_dispatch:
     inputs:
       bump:
-        description: Bump minor version before releasing
-        type: boolean
-        default: true
+        description: Version part to bump before releasing (none = tag current version)
+        type: choice
+        options:
+          - none
+          - patch
+          - minor
+          - major
+        default: none
 
 jobs:
   bump:
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.bump.outputs.version || steps.current.outputs.version }}
-      sha: ${{ steps.sha.outputs.sha }}
+      version: ${{ steps.version.outputs.version }}
+      sha: ${{ steps.commit.outputs.sha }}
       changelog: ${{ steps.changelog.outputs.log }}
     steps:
       - uses: actions/checkout@v6
@@ -21,26 +26,26 @@ jobs:
           fetch-depth: 0
           ssh-key: ${{ secrets.DEPLOY_KEY }}
 
-      - name: Get current version
-        id: current
-        run: |
-          current=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
-          echo "version=${current}" >> "$GITHUB_OUTPUT"
-
-      - name: Bump minor version
-        if: inputs.bump
-        id: bump
+      - name: Compute version
+        id: version
         run: |
           current=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
           major=$(echo "$current" | cut -d. -f1)
           minor=$(echo "$current" | cut -d. -f2)
-          new_version="${major}.$((minor + 1)).0"
-          sed -i "s/^version = \"${current}\"/version = \"${new_version}\"/" Cargo.toml
-          sed -i "/^name = \"mantis\"/{n;s/version = \"${current}\"/version = \"${new_version}\"/}" Cargo.lock
+          patch=$(echo "$current" | cut -d. -f3)
+          case "${{ inputs.bump }}" in
+            major) new_version="$((major + 1)).0.0" ;;
+            minor) new_version="${major}.$((minor + 1)).0" ;;
+            patch) new_version="${major}.${minor}.$((patch + 1))" ;;
+            none|*) new_version="${current}" ;;
+          esac
+          if [ "$new_version" != "$current" ]; then
+            sed -i "s/^version = \"${current}\"/version = \"${new_version}\"/" Cargo.toml
+            sed -i "/^name = \"mantis\"/{n;s/version = \"${current}\"/version = \"${new_version}\"/}" Cargo.lock
+          fi
           echo "version=${new_version}" >> "$GITHUB_OUTPUT"
 
       - name: Generate changelog
-        if: inputs.bump
         id: changelog
         run: |
           prev_tag=$(git tag --sort=-version:refname | grep '^v' | head -1 || true)
@@ -58,28 +63,28 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Write release info
-        if: inputs.bump
         run: |
           cat > release-info.toml << 'TOMLEOF'
-          version = "${{ steps.bump.outputs.version }}"
+          version = "${{ steps.version.outputs.version }}"
           date = "__RELEASE_DATE__"
           whats_new = """${{ steps.changelog.outputs.log }}"""
-          release_url = "https://github.com/ansromanov/mantis/releases/tag/v${{ steps.bump.outputs.version }}"
+          release_url = "https://github.com/ansromanov/mantis/releases/tag/v${{ steps.version.outputs.version }}"
           TOMLEOF
           sed -i "s/__RELEASE_DATE__/$(date +%Y-%m-%d)/" release-info.toml
 
       - name: Commit and push
-        if: inputs.bump
+        id: commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Cargo.toml Cargo.lock release-info.toml
-          git commit -m "chore: bump version to v${{ steps.bump.outputs.version }} [skip ci]"
-          git push origin HEAD:main
-
-      - name: Set sha
-        id: sha
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          if git diff --cached --quiet; then
+            echo "Nothing to commit (version and release notes unchanged)."
+          else
+            git commit -m "chore: release v${{ steps.version.outputs.version }} [skip ci]"
+            git push origin HEAD:main
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   build:
     needs: bump
