@@ -271,7 +271,7 @@ pub struct App {
     /// Fallback icon for file types not in `icon_map`.
     pub icon_fallback: String,
     keys: Keymap,
-    config: Config,
+    pub config: Config,
     config_path: Option<std::path::PathBuf>,
     // Geometry captured during the last render, used to map mouse events.
     pub tree_area: Rect,

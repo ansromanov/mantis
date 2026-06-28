@@ -21,6 +21,13 @@ indent_guides = true         # draw indentation guides (│) in the tree pane
 # icons = false               # show Nerd Font file-type icons in the tree (requires a
                                 # Nerd Font in your terminal and the iconize plugin enabled)
 
+# --- status bar ------------------------------------------------------------
+# Segments to right-align in the status bar. Left side gets everything else,
+# in natural order. Valid ids: hint badges scroll lnum type fileinfo git
+# errors folds message version
+# [statusbar]
+# right = ["lnum", "type", "git", "version"]
+
 # --- git -------------------------------------------------------------------
 # These options configure the BUILT-IN git integration (git-core feature).
 # They do NOT affect the git-plugin (configured under [plugins]).
