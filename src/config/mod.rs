@@ -243,9 +243,11 @@ impl KeyBinding {
     /// `REPORT_ALTERNATE_KEYS`, the event carries alternate keycodes — the
     /// **shifted** key (capital/symbol in the current layout) and the
     /// **base-layout** key (the US-physical key). For ASCII alphabetic
-    /// bindings the base-layout key is preferred (layout-independent);
-    /// for symbols and non-alphabetic bindings the shifted key is used
-    /// (so `?` bound to Shift+/ on a US layout still works).
+    /// bindings the base-layout key is preferred (layout-independent).
+    /// For non-letter symbols the base key + US shift mapping is used, so
+    /// bindings like `?` (Shift+/ on US) work regardless of keyboard layout.
+    /// When only the shifted key is reported (2-field CSI-u), it is used as
+    /// a fallback.
     pub fn matches(&self, key: &KeyEvent) -> bool {
         #[cfg(unix)]
         let event_code = if matches!(self.code, KeyCode::Char(_)) {
