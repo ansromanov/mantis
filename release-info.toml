@@ -1,26 +1,7 @@
 version = "0.11.6"
 date = "2026-06-28"
-whats_new = """- refactor: unify overlay/popup input model (shared ListPicker + uniform close rules) (#383)
-- refactor: group git config into [git] table (+ [git.diff] defaults, back-compat) (#384)
-- feat: restore per-file cursor + scroll position when returning to a file (#387)
-- refactor: unify scroll/cursor through centralized API (#382)
-- perf: draw_tree O(view_height) per frame, not O(total_nodes) (#377)
-- docs: pr-review adds security checks + ponytail/caveman delegation (#381)
-- fix: report all keys as escape codes so non-Latin letter bindings fire (#378)
-- feat: show working tree clean placeholder in git mode (#307) (#371)
-- fix: preserve scroll and in-file search across same-file reload (#361) (#370)
-- feat: make active diff source visible + add diff_mode config default (#364)
-- docs: encode consistency + perf practices in AGENTS.md + pr-review (#374)
-- fix: parse kitty base-layout key from correct CSI-u field (#353) (#362)
-- ux: About popup: Enter closes, `o` opens release in browser (#360)
-- feat: blame column shows author+subject and click opens line-blame popup (#348)
-- docs: simplify README + split out keybindings/config/themes (#358)
-- ux: scope file/content search to changed files in git mode (#352)
-- feat: rank command palette by recency + frequency (pin last-used + top-3 most-used) (#351)
-- perf: coalesce mouse-wheel event bursts & cache visible highlight (#346) (#350)
-- chore: run require-tests gate in just test-pr (#356)
-- chore: force fresh-main rebase + descriptive PR body in ship (#349)
-- ux: tree panel title shows view mode (Files/Git) instead of root dir name (#345)
-- fix: help overlay uses live keymap instead of hardcoded strings (#292) (#341)
-- chore: add changelog to release info [skip ci]"""
-release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.11.0"
+whats_new = """- ci: don't bump minor by default; always generate release notes (#413)
+- fix: PageUp/PageDown move text cursor in content pane (#410)
+- fix: tree filter Up/Down/PageUp/PageDown navigate between matches (#408)
+- feat: dedicated ctrl+f key for global fuzzy file-name picker (#409)"""
+release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.11.6"
