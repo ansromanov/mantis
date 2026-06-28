@@ -109,6 +109,22 @@ fn help_multi_binding_shows_joined() {
     );
 }
 
+/// find_files (Ctrl+F) appears in the help overlay.
+#[test]
+fn help_shows_find_files_entry() {
+    let dir = tempfile::tempdir().unwrap();
+    let app = make_app(dir.path());
+    let backend = TestBackend::new(80, 75);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|f| draw_help(f, &app, f.area())).unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(
+        joined.contains("global fuzzy file-name picker"),
+        "help must list 'global fuzzy file-name picker' for find_files, got:\n{joined}"
+    );
+}
+
 /// Unbound actions show `—` instead of a key label.
 #[test]
 fn help_unbound_action_shows_dash() {

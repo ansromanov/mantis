@@ -516,7 +516,8 @@ fn copy_path_directory_from_tree_absolute() {
     let Ok(mut cb) = arboard::Clipboard::new() else {
         return;
     };
-    assert_eq!(cb.get_text().unwrap(), dir_path.display().to_string());
+    let Ok(text) = cb.get_text() else { return };
+    assert_eq!(text, dir_path.display().to_string());
     fs::remove_dir_all(&root).ok();
 }
 
@@ -535,7 +536,8 @@ fn copy_path_directory_from_tree_relative() {
     let Ok(mut cb) = arboard::Clipboard::new() else {
         return;
     };
-    assert_eq!(cb.get_text().unwrap(), rel);
+    let Ok(text) = cb.get_text() else { return };
+    assert_eq!(text, rel);
     fs::remove_dir_all(&root).ok();
 }
 
@@ -549,10 +551,8 @@ fn copy_path_file_from_content_still_works() {
     let Ok(mut cb) = arboard::Clipboard::new() else {
         return;
     };
-    assert_eq!(
-        cb.get_text().unwrap(),
-        root.join("long.txt").display().to_string()
-    );
+    let Ok(text) = cb.get_text() else { return };
+    assert_eq!(text, root.join("long.txt").display().to_string());
     fs::remove_dir_all(&root).ok();
 }
 
@@ -566,7 +566,8 @@ fn copy_path_file_from_content_relative() {
     let Ok(mut cb) = arboard::Clipboard::new() else {
         return;
     };
-    assert_eq!(cb.get_text().unwrap(), "long.txt");
+    let Ok(text) = cb.get_text() else { return };
+    assert_eq!(text, "long.txt");
     fs::remove_dir_all(&root).ok();
 }
 

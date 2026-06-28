@@ -253,3 +253,20 @@ fn dispatch_command_records_action_in_usage() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+// -- toggle_git_flat guard ---------------------------------------------------
+
+#[test]
+fn toggle_git_flat_noop_outside_git_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    assert!(!app.git_mode);
+    let initial = app.git_mode_flat;
+    app.command_palette = Some(palette_with_query("Toggle git flat mode"));
+    app.dispatch_command();
+    assert_eq!(
+        app.git_mode_flat, initial,
+        "toggle_git_flat must be a noop when git_mode is off"
+    );
+    fs::remove_dir_all(&root).ok();
+}

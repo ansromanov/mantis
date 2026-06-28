@@ -397,7 +397,8 @@ fn draw_help_all_sections() {
     assert!(joined.contains("In-file search"));
     assert!(joined.contains("Search / history popup"));
     assert!(joined.contains("toggle this help"));
-    assert!(joined.contains("fuzzy file search"));
+    assert!(joined.contains("tree filter / in-file search"));
+    assert!(joined.contains("global fuzzy file-name picker"));
     assert!(joined.contains("toggle word wrap"));
 }
 
