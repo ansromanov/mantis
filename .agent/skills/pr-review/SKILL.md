@@ -68,6 +68,9 @@ Review for:
   - Missing `//!` module doc blocks on new `.rs` files
   - New `set_*` plugin actions without `PluginContributions` entry
   - Doc update missing for user-visible feature changes
+  - **Module split without test split** — if the PR adds new `.rs` submodules extracted
+    from an existing module, the source module's `_test.rs` must be split in the same PR
+    so each new submodule has its own `_test.rs`. Flag as `BUG` if missing.
 - **Consistency (AGENTS.md → Consistency & performance):**
   - Duplicated logic — a second near-copy of an existing routine (clipboard copy,
     editor/browser launch, overlay key handling, scroll clamp) instead of a shared helper

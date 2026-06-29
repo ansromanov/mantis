@@ -246,22 +246,6 @@ fn full_rect() -> Rect {
 }
 
 #[test]
-fn rect_contains_checks_bounds() {
-    let r = Rect {
-        x: 2,
-        y: 3,
-        width: 4,
-        height: 5,
-    };
-    assert!(rect_contains(r, 2, 3)); // top-left corner
-    assert!(rect_contains(r, 5, 7)); // inside, near far corner
-    assert!(!rect_contains(r, 6, 3)); // column == x + width
-    assert!(!rect_contains(r, 2, 8)); // row == y + height
-    assert!(!rect_contains(r, 1, 3)); // left of area
-    assert!(!rect_contains(r, 2, 2)); // above area
-}
-
-#[test]
 fn left_click_in_tree_opens_file() {
     let root = temp_tree();
     let mut app = app_for(&root);
@@ -911,94 +895,6 @@ fn git_mode_starts_normal_despite_session() {
         !app.git_mode,
         "must start in normal mode despite session git_mode"
     );
-    fs::remove_dir_all(&root).ok();
-}
-
-// -- diff_line_style ------------------------------------------------------
-
-#[test]
-fn diff_line_style_hunk_header_uses_accent() {
-    let root = temp_tree();
-    let app = app_for(&root);
-    let style = diff_line_style("@@ -1,3 +1,4 @@", &app.theme);
-    assert_eq!(style.fg, Some(app.theme.accent));
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn diff_line_style_file_header_uses_dim_bold() {
-    let root = temp_tree();
-    let app = app_for(&root);
-    let style = diff_line_style("+++ b/file.rs", &app.theme);
-    assert_eq!(style.fg, Some(app.theme.dim));
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn diff_line_style_addition_uses_diff_add() {
-    let root = temp_tree();
-    let app = app_for(&root);
-    let style = diff_line_style("+new line", &app.theme);
-    assert_eq!(style.fg, Some(app.theme.diff_add));
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn diff_line_style_removal_uses_diff_del() {
-    let root = temp_tree();
-    let app = app_for(&root);
-    let style = diff_line_style("-old line", &app.theme);
-    assert_eq!(style.fg, Some(app.theme.diff_del));
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn diff_line_style_diff_meta_uses_dim() {
-    let root = temp_tree();
-    let app = app_for(&root);
-    let style = diff_line_style("diff --git a/file b/file", &app.theme);
-    assert_eq!(style.fg, Some(app.theme.dim));
-    let style2 = diff_line_style("index abc..def", &app.theme);
-    assert_eq!(style2.fg, Some(app.theme.dim));
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn diff_line_style_plain_text_uses_default() {
-    let root = temp_tree();
-    let app = app_for(&root);
-    let style = diff_line_style(" context line", &app.theme);
-    assert_eq!(style.fg, None);
-    fs::remove_dir_all(&root).ok();
-}
-
-// -- deleted_set -----------------------------------------------------------
-
-#[test]
-fn deleted_set_returns_empty_when_disabled() {
-    let map = std::collections::HashMap::new();
-    let result = deleted_set(&map, false);
-    assert!(result.is_empty());
-}
-
-#[test]
-fn deleted_set_filters_existing_files() {
-    let root = temp_tree();
-    let mut map = std::collections::HashMap::new();
-    map.insert(root.join("a.txt"), crate::git::GitStatus::Deleted);
-    let result = deleted_set(&map, true);
-    assert!(result.is_empty(), "existing files are not in deleted set");
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn deleted_set_includes_absent_deleted_files() {
-    let root = temp_tree();
-    let gone = root.join("gone.txt");
-    let mut map = std::collections::HashMap::new();
-    map.insert(gone.clone(), crate::git::GitStatus::Deleted);
-    let result = deleted_set(&map, true);
-    assert!(result.contains(&gone));
     fs::remove_dir_all(&root).ok();
 }
 
@@ -4956,35 +4852,6 @@ fn panel_mode_label_git_mode_flat_returns_git_flat() {
     app.git_mode_flat = true;
     assert_eq!(app.panel_mode_label(), "Git · flat");
     fs::remove_dir_all(&root).ok();
-}
-
-// -- DiffMode -----------------------------------------------------------------
-
-#[test]
-fn diff_mode_next_cycles_all_staged_unstaged() {
-    assert_eq!(DiffMode::All.next(), DiffMode::Staged);
-    assert_eq!(DiffMode::Staged.next(), DiffMode::Unstaged);
-    assert_eq!(DiffMode::Unstaged.next(), DiffMode::All);
-}
-
-#[test]
-fn diff_mode_labels_are_distinct() {
-    let labels = [
-        DiffMode::All.label(),
-        DiffMode::Staged.label(),
-        DiffMode::Unstaged.label(),
-    ];
-    let unique: std::collections::HashSet<_> = labels.iter().collect();
-    assert_eq!(
-        unique.len(),
-        3,
-        "each DiffMode variant must have a unique label"
-    );
-}
-
-#[test]
-fn diff_mode_default_is_all() {
-    assert_eq!(DiffMode::default(), DiffMode::All);
 }
 
 // -- S keybinding toggles diff mode in git mode --------------------------------

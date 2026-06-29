@@ -265,6 +265,11 @@ new module, create its `_test.rs` companion at the same time. Cross-module /
 black-box tests live in the integration `tests/` directory. The `split-tests` skill
 (`.agent/skills/split-tests/`) automates extracting any inline block.
 
+**Module-split rule:** when a module is split into submodules, its `_test.rs` must
+be split in the same PR. Each new submodule gets its own `_test.rs` containing the
+tests for items it defines. Leaving a monolithic `_test.rs` behind while splitting
+production code is a merge-blocking violation.
+
 **Mandatory test rule:** every code change — bug fix, feature, refactor — must
 include tests. There are no exceptions. If a change is untestable (e.g. pure UI
 paint code), explain why in the PR description. Otherwise add or update tests in

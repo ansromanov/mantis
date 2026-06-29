@@ -48,3 +48,7 @@ pub(crate) fn diff_line_style(line: &str, theme: &Theme) -> ratatui::style::Styl
         Style::default()
     }
 }
+
+#[cfg(test)]
+#[path = "util_test.rs"]
+mod tests;
