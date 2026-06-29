@@ -351,3 +351,7 @@ impl Config {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "types_test.rs"]
+mod tests;

@@ -425,3 +425,7 @@ impl Serialize for KeyBinding {
         s.serialize_str(&spec)
     }
 }
+
+#[cfg(test)]
+#[path = "keymap_test.rs"]
+mod tests;

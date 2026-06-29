@@ -36,9 +36,9 @@ pub use types::{GitConfig, GitDiffConfig, TreeConfig};
 pub use keymap::KeyBinding;
 #[allow(unused_imports)]
 pub use types::{ContentConfig, SearchConfig};
-// Internal helpers used in tests.
+// Used in test code across multiple modules.
 #[cfg_attr(not(test), allow(unused_imports))]
-pub(crate) use keymap::{bind, parse_binding};
+pub(crate) use keymap::bind;
 
 use std::fs;
 use std::path::{Path, PathBuf};
