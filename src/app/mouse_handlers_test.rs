@@ -523,6 +523,27 @@ fn splitter_drag_release_saves_tree_width_to_config() {
 }
 
 #[test]
+fn tree_click_out_of_range_is_noop() {
+    let root = tree_with_dir();
+    let mut app = app_for(&root);
+    app.tree_area = Rect {
+        x: 0,
+        y: 0,
+        width: 20,
+        height: 10,
+    };
+    app.tree_offset = 0;
+    let prev = app.tree_selected;
+    // Click on row 100, well past the end of the node list.
+    app.handle_mouse(left_down_at(1, 100));
+    assert_eq!(
+        app.tree_selected, prev,
+        "click on out-of-range row must not change selection"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn plugin_picker_click_outside_closes() {
     let root = temp_tree();
     let mut app = app_for(&root);

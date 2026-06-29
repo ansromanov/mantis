@@ -150,13 +150,16 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
                     cache_miss = true;
                     let q: String = filter.query.to_lowercase();
                     let matching: HashSet<usize> = (0..total_nodes)
+                        // index i is loop-bounded by 0..total_nodes
                         .filter(|&i| app.nodes[i].name.to_lowercase().contains(&q))
                         .collect();
                     let mut include = matching.clone();
                     for &mi in &matching {
+                        // index mi is from matching, a subset of 0..total_nodes
                         let match_path = &app.nodes[mi].path;
                         let match_depth = app.nodes[mi].depth;
                         for j in (0..mi).rev() {
+                            // index j is loop-bounded by 0..mi
                             let nd = &app.nodes[j];
                             if nd.depth >= match_depth {
                                 continue;
@@ -210,7 +213,7 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
         let mut masks = std::collections::HashMap::new();
         let mut pending = vec![false; max_depth + 1];
         for i in (0..total_nodes).rev() {
-            let d = app.nodes[i].depth;
+            let d = app.nodes[i].depth; // index i is loop-bounded by 0..total_nodes
             if visible_set.contains(&i) {
                 masks.insert(i, (0..d).map(|lvl| pending[lvl]).collect());
             }
@@ -225,6 +228,7 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
     let items: Vec<ListItem> = visible_indices[offset..end]
         .iter()
         .map(|&global_i| {
+            // global_i is from visible_indices, a filtered subset of 0..total_nodes
             let node = &app.nodes[global_i];
             let (color, bold) = git_status_style(node, app, theme);
             let name_style = Style::default().fg(color).add_modifier(bold);

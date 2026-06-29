@@ -103,10 +103,10 @@ impl App {
                                 self.activate_selected();
                             }
                         }
-                    } else if index < self.nodes.len() {
+                    } else if let Some(node) = self.nodes.get(index) {
                         self.tree_selected = index;
                         let now = Instant::now();
-                        let is_dir = self.nodes[index].is_dir;
+                        let is_dir = node.is_dir;
                         let double = matches!(
                             self.last_click,
                             Some((t, i))

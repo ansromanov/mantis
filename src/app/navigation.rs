@@ -74,7 +74,7 @@ impl App {
                 return;
             }
         }
-        self.tree_selected = self.tree_selected.min(self.nodes.len().saturating_sub(1));
+        self.clamp_tree_selection();
         // When in git mode and no changed files remain (e.g. the working tree
         // went clean or this isn't a git repo), clear the content pane so a
         // stale diff doesn't linger (Issue #307).
@@ -86,6 +86,13 @@ impl App {
         } else {
             self.tree_scroll = self.tree_scroll.min(self.tree_scroll_max());
         }
+    }
+
+    /// Clamp `tree_selected` into range after the node list changes (shrink,
+    /// reload). When the node list is empty, this yields 0 and subsequent
+    /// `nodes.get(0)` is `None` (no panic).
+    pub(crate) fn clamp_tree_selection(&mut self) {
+        self.tree_selected = self.tree_selected.min(self.nodes.len().saturating_sub(1));
     }
 
     /// Produces a flat list of all changed (non-ignored) files with depth 0
@@ -352,13 +359,9 @@ impl App {
             }
         }
         self.scroll_tree_into_view();
-        if let Some(i) = self
-            .nodes
-            .get(self.tree_selected)
-            .map(|_| self.tree_selected)
-        {
-            let path = self.nodes[i].path.as_path();
-            self.plugin_manager.on_selection_change(Some(path));
+        if let Some(node) = self.nodes.get(self.tree_selected) {
+            self.plugin_manager
+                .on_selection_change(Some(node.path.as_path()));
         }
     }
 
@@ -373,13 +376,9 @@ impl App {
         self.mark_session_dirty();
         self.rebuild(true);
         self.scroll_tree_into_view();
-        if let Some(i) = self
-            .nodes
-            .get(self.tree_selected)
-            .map(|_| self.tree_selected)
-        {
-            let path = self.nodes[i].path.as_path();
-            self.plugin_manager.on_selection_change(Some(path));
+        if let Some(node) = self.nodes.get(self.tree_selected) {
+            self.plugin_manager
+                .on_selection_change(Some(node.path.as_path()));
         }
     }
 
