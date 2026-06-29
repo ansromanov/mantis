@@ -797,7 +797,9 @@ fn explicit_left_right_only_listed_segments_render() {
         },
         ..Config::default()
     };
-    let app = App::new(PathBuf::from("."), cfg, None, None).unwrap();
+    let mut app = App::new(PathBuf::from("."), cfg, None, None).unwrap();
+    // Enable show_hidden so the badges segment would produce "[hidden]" if rendered.
+    app.show_hidden = true;
     let text = render_bar_width(&app, 200);
     // Hint on left.
     assert!(text.contains("j/k nav"), "hint should be visible");
@@ -807,10 +809,10 @@ fn explicit_left_right_only_listed_segments_render() {
         text.trim_end().ends_with(&version),
         "version should be right-aligned, got {text:?}"
     );
-    // Other segments hidden.
+    // Badges segment not in allowlist → [hidden] must not appear.
     assert!(
         !text.contains("[hidden]"),
-        "badges should be hidden in explicit mode"
+        "badges should be hidden in explicit mode, got {text:?}"
     );
 }
 
@@ -986,7 +988,7 @@ fn nonexistent_id_ignored() {
 }
 
 #[test]
-fn split_sides_left_right_groups() {
+fn split_sides_default_mode_natural_order() {
     // Default mode: both None.
     let cfg = StatusBarConfig {
         left: None,

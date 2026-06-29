@@ -59,20 +59,15 @@ impl StatusSegment {
         }
     }
 
-    /// Returns which side this segment belongs to in **default** mode.
-    /// When `config.right` is `Some`, uses that list; otherwise falls back to
-    /// the historical default right set. This is only used when both `left`
-    /// and `right` are `None`; explicit mode uses `split_sides` directly.
-    fn side(self, config: &StatusBarConfig) -> StatusSide {
-        let id = self.id_str();
-        if let Some(ref right) = config.right {
-            if right.iter().any(|s| s == id) {
-                return StatusSide::Right;
-            }
-        } else if ["lnum", "type", "git", "version"].contains(&id) {
-            return StatusSide::Right;
+    /// Returns which side this segment belongs to in **default** mode
+    /// (both `left` and `right` are `None`). Explicit mode uses `split_sides`
+    /// directly and never calls this.
+    fn side(self) -> StatusSide {
+        if ["lnum", "type", "git", "version"].contains(&self.id_str()) {
+            StatusSide::Right
+        } else {
+            StatusSide::Left
         }
-        StatusSide::Left
     }
 }
 
@@ -489,7 +484,7 @@ fn split_sides(
         let mut left = Vec::new();
         let mut right = Vec::new();
         for (span, id, _) in segs {
-            if id.side(config) == StatusSide::Right {
+            if id.side() == StatusSide::Right {
                 right.push(span);
             } else {
                 left.push(span);
