@@ -10,10 +10,11 @@
 //! keybindings stay a single source of truth. Add new commands here and wire the
 //! `action_id` into that dispatcher.
 
-use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
+use fuzzy_matcher::skim::SkimMatcherV2;
 
 use crate::config::Keymap;
 use crate::list_picker::ListPicker;
+use crate::search::fuzzy_refilter;
 
 pub struct CommandEntry {
     pub name: &'static str,
@@ -228,16 +229,11 @@ impl CommandPalette {
             self.filtered = self.base_order.clone();
             return;
         }
-        let hay = |i: usize| format!("{} {}", COMMANDS[i].name, self.binding_labels[i]);
-        let mut scored: Vec<(usize, i64)> = (0..COMMANDS.len())
-            .filter_map(|i| {
-                self.matcher
-                    .fuzzy_match(&hay(i), &self.query)
-                    .map(|s| (i, s))
-            })
-            .collect();
-        scored.sort_by_key(|(_, s)| std::cmp::Reverse(*s));
-        self.filtered = scored.into_iter().map(|(i, _)| i).collect();
+        let binding_labels = &self.binding_labels;
+        let indices: Vec<usize> = (0..COMMANDS.len()).collect();
+        self.filtered = fuzzy_refilter(&indices, &self.matcher, &self.query, |&i| {
+            std::borrow::Cow::Owned(format!("{} {}", COMMANDS[i].name, binding_labels[i]))
+        });
     }
 }
 

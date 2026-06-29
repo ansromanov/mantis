@@ -20,11 +20,11 @@ use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use crate::file::is_binary_bytes;
 use crate::tree::collect_all_files;
 
-fn fuzzy_refilter<T>(
+pub(crate) fn fuzzy_refilter<T>(
     items: &[T],
     matcher: &SkimMatcherV2,
     query: &str,
-    haystack: impl Fn(&T) -> String,
+    haystack: impl for<'a> Fn(&'a T) -> std::borrow::Cow<'a, str>,
 ) -> Vec<usize> {
     if query.is_empty() {
         return (0..items.len()).collect();
@@ -32,7 +32,11 @@ fn fuzzy_refilter<T>(
     let mut scored: Vec<(usize, i64)> = items
         .iter()
         .enumerate()
-        .filter_map(|(i, item)| matcher.fuzzy_match(&haystack(item), query).map(|s| (i, s)))
+        .filter_map(|(i, item)| {
+            matcher
+                .fuzzy_match(haystack(item).as_ref(), query)
+                .map(|s| (i, s))
+        })
         .collect();
     scored.sort_by_key(|(_, s)| std::cmp::Reverse(*s));
     scored.into_iter().map(|(i, _)| i).collect()
@@ -309,7 +313,7 @@ impl HistoryState {
     fn refilter(&mut self) {
         self.selected = 0;
         self.filtered = fuzzy_refilter(&self.commits, &self.matcher, &self.query, |c| {
-            format!("{} {} {}", c.short, c.date, c.subject)
+            std::borrow::Cow::Owned(format!("{} {} {}", c.short, c.date, c.subject))
         });
     }
 }
@@ -512,7 +516,9 @@ impl ThemePicker {
 
     fn refilter(&mut self) {
         self.selected = 0;
-        self.filtered = fuzzy_refilter(&self.names, &self.matcher, &self.query, |n| n.clone());
+        self.filtered = fuzzy_refilter(&self.names, &self.matcher, &self.query, |n| {
+            std::borrow::Cow::Borrowed(n.as_str())
+        });
     }
 }
 
@@ -566,7 +572,7 @@ impl RecentFilesState {
     fn refilter(&mut self) {
         self.selected = 0;
         self.filtered = fuzzy_refilter(&self.paths, &self.matcher, &self.query, |p| {
-            p.to_string_lossy().into_owned()
+            p.to_string_lossy()
         });
     }
 }
