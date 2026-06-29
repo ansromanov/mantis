@@ -38,7 +38,7 @@ pub trait ListPicker {
 
 /// Shared key handling for any `ListPicker`.
 ///
-/// Handles: Esc → Close, Enter → Activate, Up/Down → navigation,
+/// Handles: Esc → Close, Enter → Activate, Up/Down/PageUp/PageDown → navigation,
 /// Backspace → pop or Close if empty query, Char → push.
 /// Returns what the caller should do with the result.
 pub fn handle_list_picker_key<P: ListPicker>(p: &mut P, key: &KeyEvent) -> OverlayKey {
@@ -49,10 +49,30 @@ pub fn handle_list_picker_key<P: ListPicker>(p: &mut P, key: &KeyEvent) -> Overl
             p.set_selected(p.selected().saturating_sub(1));
             OverlayKey::Handled
         }
+        // j/k navigate only when no query is active (vim-style); otherwise fall through to Char(c).
+        KeyCode::Char('k') if p.query_is_empty() => {
+            p.set_selected(p.selected().saturating_sub(1));
+            OverlayKey::Handled
+        }
         KeyCode::Down => {
             if p.selected() + 1 < p.results_len() {
                 p.set_selected(p.selected() + 1);
             }
+            OverlayKey::Handled
+        }
+        KeyCode::Char('j') if p.query_is_empty() => {
+            if p.selected() + 1 < p.results_len() {
+                p.set_selected(p.selected() + 1);
+            }
+            OverlayKey::Handled
+        }
+        KeyCode::PageUp => {
+            p.set_selected(p.selected().saturating_sub(10));
+            OverlayKey::Handled
+        }
+        KeyCode::PageDown => {
+            let next = (p.selected() + 10).min(p.results_len().saturating_sub(1));
+            p.set_selected(next);
             OverlayKey::Handled
         }
         KeyCode::Backspace => {

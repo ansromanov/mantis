@@ -183,3 +183,59 @@ fn goto_line_impl_up_down_noop() {
     g.set_selected(42);
     assert_eq!(g.selected(), 0);
 }
+
+#[test]
+fn page_up_navigates_by_10() {
+    let items: Vec<String> = (0..20).map(|i| i.to_string()).collect();
+    let mut p = TestPicker::new(items);
+    p.selected = 15;
+    let result = handle_list_picker_key(&mut p, &key(KeyCode::PageUp));
+    assert_eq!(result, OverlayKey::Handled);
+    assert_eq!(p.selected, 5);
+    // Clamps at 0
+    let result = handle_list_picker_key(&mut p, &key(KeyCode::PageUp));
+    assert_eq!(result, OverlayKey::Handled);
+    assert_eq!(p.selected, 0);
+}
+
+#[test]
+fn page_down_navigates_by_10() {
+    let items: Vec<String> = (0..20).map(|i| i.to_string()).collect();
+    let mut p = TestPicker::new(items);
+    p.selected = 5;
+    let result = handle_list_picker_key(&mut p, &key(KeyCode::PageDown));
+    assert_eq!(result, OverlayKey::Handled);
+    assert_eq!(p.selected, 15);
+    // Clamps at last
+    let result = handle_list_picker_key(&mut p, &key(KeyCode::PageDown));
+    assert_eq!(result, OverlayKey::Handled);
+    assert_eq!(p.selected, 19);
+}
+
+#[test]
+fn vim_jk_navigate_when_query_empty() {
+    let mut p = TestPicker::new(vec!["a".into(), "b".into(), "c".into()]);
+    assert!(p.query_is_empty());
+    let result = handle_list_picker_key(&mut p, &key(KeyCode::Char('j')));
+    assert_eq!(result, OverlayKey::Handled);
+    assert_eq!(p.selected, 1);
+    let result = handle_list_picker_key(&mut p, &key(KeyCode::Char('k')));
+    assert_eq!(result, OverlayKey::Handled);
+    assert_eq!(p.selected, 0);
+}
+
+#[test]
+fn vim_jk_push_to_query_when_non_empty() {
+    let mut p = TestPicker::new(vec!["a".into()]);
+    p.query_push('x'); // query is now non-empty
+    assert!(!p.query_is_empty());
+    // j and k must type into query, not navigate
+    let result = handle_list_picker_key(&mut p, &key(KeyCode::Char('j')));
+    assert_eq!(result, OverlayKey::Handled);
+    assert_eq!(p.query, "xj");
+    assert_eq!(p.selected, 0, "selection must not change");
+    let result = handle_list_picker_key(&mut p, &key(KeyCode::Char('k')));
+    assert_eq!(result, OverlayKey::Handled);
+    assert_eq!(p.query, "xjk");
+    assert_eq!(p.selected, 0, "selection must not change");
+}

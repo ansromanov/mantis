@@ -5,8 +5,9 @@
 //! fall through to the dispatcher and map `Activate`/`Close` to the
 //! overlay-specific action.
 
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent};
 
+use crate::config::static_keys;
 use crate::list_picker::{handle_list_picker_key, OverlayKey};
 
 use super::super::App;
@@ -16,7 +17,7 @@ impl App {
     /// Extra keys: Tab toggles file/content mode.
     pub(super) fn handle_search_key(&mut self, key: KeyEvent) {
         // Extra keys first
-        if let KeyCode::Tab = key.code {
+        if static_keys::is_toggle_modal(&key) {
             if let Some(s) = &mut self.search {
                 s.toggle_mode();
             }
@@ -37,28 +38,13 @@ impl App {
     /// Extra keys: n/N/Tab/BackTab/Ctrl-p/Up/Down navigate matches.
     pub(super) fn handle_in_file_search_key(&mut self, key: KeyEvent) {
         // Extra keys first
-        match key.code {
-            KeyCode::Char('n') => {
-                self.in_file_search_next();
-                return;
-            }
-            KeyCode::Char('N') | KeyCode::Char('P') => {
-                self.in_file_search_prev();
-                return;
-            }
-            KeyCode::Tab | KeyCode::Down => {
-                self.in_file_search_next();
-                return;
-            }
-            KeyCode::BackTab | KeyCode::Up => {
-                self.in_file_search_prev();
-                return;
-            }
-            KeyCode::Char('p') if key.modifiers.intersects(KeyModifiers::CONTROL) => {
-                self.in_file_search_prev();
-                return;
-            }
-            _ => {}
+        if static_keys::is_next_match(&key) {
+            self.in_file_search_next();
+            return;
+        }
+        if static_keys::is_prev_match(&key) {
+            self.in_file_search_prev();
+            return;
         }
         let Some(ref mut s) = self.in_file_search else {
             return;
@@ -160,28 +146,15 @@ impl App {
     }
 
     /// Handles keyboard input while the plugin manager overlay is open.
-    /// Extra keys: Space toggles; j/k navigate.
+    /// Extra keys: Space toggles; j/k navigate (handled by list_picker now).
     pub(super) fn handle_plugin_key(&mut self, key: KeyEvent) {
         let Some(ref mut p) = self.plugin_picker else {
             return;
         };
         // Extra keys first
-        match key.code {
-            KeyCode::Char(' ') => {
-                self.toggle_plugin_picker_selection();
-                return;
-            }
-            KeyCode::Char('k') => {
-                p.selected = p.selected.saturating_sub(1);
-                return;
-            }
-            KeyCode::Char('j') => {
-                if p.selected + 1 < p.results_len() {
-                    p.selected += 1;
-                }
-                return;
-            }
-            _ => {}
+        if static_keys::is_toggle_selection(&key) {
+            self.toggle_plugin_picker_selection();
+            return;
         }
         match handle_list_picker_key(p, &key) {
             OverlayKey::Activate => self.toggle_plugin_picker_selection(),
@@ -198,24 +171,21 @@ impl App {
             return;
         }
         let page = (self.tree_area.height as usize).max(1) as isize;
-        match key.code {
-            KeyCode::Up => {
-                self.move_tree_filter_selection(-1);
-                return;
-            }
-            KeyCode::Down => {
-                self.move_tree_filter_selection(1);
-                return;
-            }
-            KeyCode::PageUp => {
-                self.move_tree_filter_selection(-page);
-                return;
-            }
-            KeyCode::PageDown => {
-                self.move_tree_filter_selection(page);
-                return;
-            }
-            _ => {}
+        if key.code == KeyCode::Up {
+            self.move_tree_filter_selection(-1);
+            return;
+        }
+        if key.code == KeyCode::Down {
+            self.move_tree_filter_selection(1);
+            return;
+        }
+        if static_keys::is_page_up(&key) {
+            self.move_tree_filter_selection(-page);
+            return;
+        }
+        if static_keys::is_page_down(&key) {
+            self.move_tree_filter_selection(page);
+            return;
         }
         let Some(f) = self.tree_filter.as_mut() else {
             return;

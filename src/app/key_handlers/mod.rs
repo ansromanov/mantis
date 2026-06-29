@@ -25,6 +25,7 @@ mod mod_tests;
 mod normal_tests;
 
 use super::App;
+use crate::config::static_keys;
 
 impl App {
     /// Dispatches a key event. Overlays (help, theme, history, search) are
@@ -43,27 +44,15 @@ impl App {
         // active) so search/picker input is not broadcast. Plugins receive
         // the key as a readable string: "q", "ctrl+c", "Enter", etc.
         if self.show_about {
-            match key.code {
-                crossterm::event::KeyCode::Char('?')
-                | crossterm::event::KeyCode::Esc
-                | crossterm::event::KeyCode::Char('q')
-                | crossterm::event::KeyCode::Enter => {
-                    self.show_about = false; // Enter now just closes, never opens browser
-                }
-                crossterm::event::KeyCode::Char('o') => {
-                    self.open_release_url(); // deliberate, explicit open
-                }
-                _ => {}
+            if static_keys::is_open_release(&key) {
+                self.open_release_url();
+            } else if static_keys::is_modal_close(&key) {
+                self.show_about = false;
             }
             return;
         }
         if self.show_help {
-            if matches!(
-                key.code,
-                crossterm::event::KeyCode::Char('?')
-                    | crossterm::event::KeyCode::Esc
-                    | crossterm::event::KeyCode::Char('q')
-            ) {
+            if static_keys::is_modal_close(&key) {
                 self.show_help = false;
             }
             return;

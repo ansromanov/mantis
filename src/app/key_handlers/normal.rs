@@ -9,9 +9,9 @@
 //! keep new global keybindings here and route panel-specific motion to the
 //! tree/content helpers rather than inlining it.
 
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::KeyEvent;
 
-use crate::config::pressed;
+use crate::config::{pressed, static_keys};
 use crate::search::{
     CommandPalette, GotoLineState, InFileSearch, PluginPicker, SearchState, ThemePicker, TreeFilter,
 };
@@ -26,7 +26,7 @@ impl App {
         // Clear transient status messages on the next handled keypress.
         self.status_message = None;
 
-        if key.code == KeyCode::Esc {
+        if static_keys::is_close(&key) {
             if self.show_line_blame {
                 self.show_line_blame = false;
                 return;
