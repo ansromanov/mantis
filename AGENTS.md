@@ -145,7 +145,6 @@ Quick lookup: type/function → file. Use this before grepping.
 |---|---|---|
 | `App` | `src/app/mod.rs:74` | Central state struct |
 | `Focus` | `src/app/mod.rs:51` | `Tree` / `Content` enum |
-| `PluginGitInfo` | `src/app/mod.rs:60` | Plugin-supplied git status |
 | `PluginContributions` | `src/plugin/types.rs` | Plugin contribution tracking for teardown |
 | `App::teardown_plugin_contributions` | `src/app/mod.rs` | Clears all state produced by a plugin |
 | `App::tick` | `src/app/refresh.rs` | Per-frame update |

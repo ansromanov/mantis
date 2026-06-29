@@ -849,27 +849,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mantis-plugin-git-diff"
-version = "0.1.0"
-dependencies = [
- "serde_json",
-]
-
-[[package]]
-name = "mantis-plugin-git-log"
-version = "0.1.0"
-dependencies = [
- "serde_json",
-]
-
-[[package]]
-name = "mantis-plugin-git-plugin"
-version = "0.1.0"
-dependencies = [
- "serde_json",
-]
-
-[[package]]
 name = "mantis-plugin-iconize"
 version = "0.1.0"
 dependencies = [

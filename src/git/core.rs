@@ -11,10 +11,7 @@
 //! installed, or a failed command yields empty/`None` results instead of an
 //! error, so the viewer works fine outside a repository.
 //!
-//! **Feature gate:** This module is compiled only when the `git-core` feature
-//! is enabled (default on). When disabled, the same functionality is provided
-//! by the bundled `git-plugin` subprocess plugin. Types are in the sibling `types` module
-//! and are always available regardless of the feature flag.
+//! All git functionality is built in — no feature gate, no plugin fallback.
 //!
 //! Three diff helpers cover the main diff modes available in the content pane:
 //! `working_tree_diff` (all changes vs HEAD), `staged_diff` (index vs HEAD),

@@ -63,10 +63,7 @@ fn language_provider_registration_holds_fields() {
 fn plugin_contributions_default_is_empty() {
     let c = PluginContributions::default();
     assert!(c.content_paths.is_empty());
-    assert!(c.blame_paths.is_empty());
-    assert!(c.status_paths.is_empty());
     assert!(c.fold_region_paths.is_empty());
-    assert!(!c.has_git_info);
     assert!(!c.has_icon_map);
 }
 
@@ -78,8 +75,6 @@ fn plugin_contributions_tracks_inserted_paths() {
     c.has_icon_map = true;
     assert!(c.content_paths.contains(&p));
     assert!(c.has_icon_map);
-    // Independent sets stay empty.
-    assert!(c.blame_paths.is_empty());
 }
 
 #[test]

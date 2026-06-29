@@ -136,16 +136,7 @@ fn blame_col_width_constant_is_37() {
 
 #[test]
 fn render_inline_fallback_with_blame_does_not_panic() {
-    let (mut app, dir) = render_app();
-    let path = dir.path().join("f.txt");
-    app.plugin_blame.insert(
-        path,
-        vec![
-            format!("{:<37}", "Alice     fix memory leak"),
-            format!("{:<37}", "Bob       add feature"),
-            format!("{:<37}", "Carol     refactor"),
-        ],
-    );
+    let (mut app, _dir) = render_app();
     let screen = render(&mut app, |app| {
         app.current_file = None;
         app.virtual_file = None;

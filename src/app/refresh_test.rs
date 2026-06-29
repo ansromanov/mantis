@@ -375,8 +375,6 @@ fn create_base_app() -> App {
         plugin_is_opening_file: false,
         plugin_message: None,
         plugin_contributions: HashMap::new(),
-        plugin_blame: HashMap::new(),
-        plugin_git_info: None,
         plugin_content: HashMap::new(),
         plugin_content_text: HashMap::new(),
         cursor_positions: HashMap::new(),
@@ -738,23 +736,6 @@ fn set_content_stamps_contribution() {
 }
 
 #[test]
-fn set_blame_data_stamps_contribution() {
-    let mut app = create_base_app();
-    app.drain_plugin_actions_for_test(
-        "blame-plugin",
-        "set_blame_data",
-        serde_json::json!({"path": "/tmp/doc.md", "lines": ["author A"]}),
-    );
-    let contrib = app.plugin_contributions.get("blame-plugin").unwrap();
-    assert!(
-        contrib
-            .blame_paths
-            .contains(&std::path::PathBuf::from("/tmp/doc.md")),
-        "blame_paths must track the path"
-    );
-}
-
-#[test]
 fn set_icon_map_stamps_contribution() {
     let mut app = create_base_app();
     app.drain_plugin_actions_for_test(
@@ -764,35 +745,6 @@ fn set_icon_map_stamps_contribution() {
     );
     let contrib = app.plugin_contributions.get("iconize").unwrap();
     assert!(contrib.has_icon_map, "has_icon_map must be true");
-}
-
-#[test]
-fn set_status_bar_git_info_stamps_contribution() {
-    let mut app = create_base_app();
-    app.drain_plugin_actions_for_test(
-        "git-plugin",
-        "set_status_bar_git_info",
-        serde_json::json!({"branch": "main", "head": "abc123", "dirty": false, "state": "clean"}),
-    );
-    let contrib = app.plugin_contributions.get("git-plugin").unwrap();
-    assert!(contrib.has_git_info, "has_git_info must be true");
-}
-
-#[test]
-fn set_file_statuses_stamps_contribution() {
-    let mut app = create_base_app();
-    app.drain_plugin_actions_for_test(
-        "status-plugin",
-        "set_file_statuses",
-        serde_json::json!({"/tmp/file.txt": "modified", "/tmp/new.txt": "added"}),
-    );
-    let contrib = app.plugin_contributions.get("status-plugin").unwrap();
-    assert!(contrib
-        .status_paths
-        .contains(&std::path::PathBuf::from("/tmp/file.txt")));
-    assert!(contrib
-        .status_paths
-        .contains(&std::path::PathBuf::from("/tmp/new.txt")));
 }
 
 #[test]
@@ -853,25 +805,6 @@ fn teardown_clears_content_state() {
 }
 
 #[test]
-fn teardown_clears_blame_state() {
-    let mut app = create_base_app();
-    let path = std::path::PathBuf::from("/tmp/doc.md");
-    app.drain_plugin_actions_for_test(
-        "blame-plugin",
-        "set_blame_data",
-        serde_json::json!({"path": "/tmp/doc.md", "lines": ["author A"]}),
-    );
-    assert!(app.plugin_blame.contains_key(&path));
-
-    app.teardown_plugin_contributions("blame-plugin");
-
-    assert!(
-        !app.plugin_blame.contains_key(&path),
-        "blame must be removed"
-    );
-}
-
-#[test]
 fn teardown_clears_icon_state() {
     let mut app = App {
         icons_enabled: true,
@@ -904,60 +837,6 @@ fn teardown_clears_icon_state() {
     assert!(app.icon_dir_open.is_empty());
     assert!(app.icon_dir_closed.is_empty());
     assert!(app.icon_fallback.is_empty());
-}
-
-#[test]
-fn teardown_clears_git_info() {
-    let mut app = App {
-        plugin_git_info: Some(crate::app::PluginGitInfo {
-            branch: "main".into(),
-            head: "abc".into(),
-            dirty: false,
-            state: "clean".into(),
-        }),
-        plugin_contributions: {
-            let mut m = std::collections::HashMap::new();
-            m.insert(
-                "git-plugin".to_string(),
-                crate::plugin::PluginContributions {
-                    has_git_info: true,
-                    ..Default::default()
-                },
-            );
-            m
-        },
-        ..create_base_app()
-    };
-
-    app.teardown_plugin_contributions("git-plugin");
-
-    assert!(app.plugin_git_info.is_none(), "git info must be cleared");
-}
-
-#[test]
-fn teardown_clears_status_paths() {
-    let mut app = create_base_app();
-    let path = std::path::PathBuf::from("/tmp/file.txt");
-    app.git_status_map
-        .insert(path.clone(), crate::git::GitStatus::Modified);
-    app.plugin_contributions.insert(
-        "status-plugin".to_string(),
-        crate::plugin::PluginContributions {
-            status_paths: {
-                let mut s = std::collections::HashSet::new();
-                s.insert(path.clone());
-                s
-            },
-            ..Default::default()
-        },
-    );
-
-    app.teardown_plugin_contributions("status-plugin");
-
-    assert!(
-        !app.git_status_map.contains_key(&path),
-        "status entry must be removed"
-    );
 }
 
 #[test]

@@ -35,23 +35,7 @@ pub(crate) fn draw_line_blame(f: &mut Frame, app: &App, area: Rect) {
     let lineno = phys + 1;
 
     // Fetch blame data (cached internally by git::file_blame).
-    let plugin_lines: Option<Vec<String>> = app
-        .plugin_blame
-        .get(path)
-        .filter(|v| !v.is_empty())
-        .cloned();
-    let blame_lines: Vec<crate::git::BlameLine> = if plugin_lines.is_none() {
-        #[cfg(feature = "git-core")]
-        {
-            crate::git::file_blame(&app.root, path)
-        }
-        #[cfg(not(feature = "git-core"))]
-        {
-            Vec::new()
-        }
-    } else {
-        Vec::new()
-    };
+    let blame_lines: Vec<crate::git::BlameLine> = crate::git::file_blame(&app.root, path);
 
     let blame = blame_lines.iter().find(|b| b.line_no == lineno as u32);
 
@@ -71,13 +55,7 @@ pub(crate) fn draw_line_blame(f: &mut Frame, app: &App, area: Rect) {
     let accent_alt = Style::default().fg(theme.accent_alt);
     let text = Style::default().fg(theme.text);
 
-    let rows: Vec<Line> = if let Some(ref plines) = plugin_lines {
-        let prefix = plines.get(phys).map(|s| s.as_str()).unwrap_or("");
-        vec![
-            Line::from(Span::styled(prefix.to_string(), dim)),
-            Line::from(Span::styled("(plugin blame data)", dim)),
-        ]
-    } else if let Some(b) = blame {
+    let rows: Vec<Line> = if let Some(b) = blame {
         vec![
             Line::from(vec![
                 Span::styled("Hash:   ", dim),

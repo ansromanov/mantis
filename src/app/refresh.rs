@@ -161,20 +161,9 @@ impl App {
     /// (tests). Bumps `git_seq` so earlier in-flight results are ignored.
     pub(super) fn request_git_status_refresh(&mut self) {
         if cfg!(test) {
-            #[cfg(feature = "git-core")]
-            {
-                self.git_status_map = crate::git::repo_status(
-                    &self.root,
-                    self.git_show_untracked,
-                    self.git_show_ignored,
-                );
-                self.git_info = crate::git::repo_info(&self.root);
-            }
-            #[cfg(not(feature = "git-core"))]
-            {
-                self.git_status_map.clear();
-                self.git_info = None;
-            }
+            self.git_status_map =
+                crate::git::repo_status(&self.root, self.git_show_untracked, self.git_show_ignored);
+            self.git_info = crate::git::repo_info(&self.root);
         } else {
             self.git_seq = self.git_seq.wrapping_add(1);
             self.loader.request(LoadRequest::GitStatus {
@@ -252,10 +241,7 @@ impl App {
         match action {
             "show_message" => self.handle_plugin_show_message(name, params),
             "open_file" => self.handle_plugin_open_file(name, params),
-            "set_file_statuses" => self.handle_plugin_set_file_statuses(name, params),
-            "set_blame_data" => self.handle_plugin_set_blame_data(name, params),
             "set_icon_map" => self.handle_plugin_set_icon_map(name, params),
-            "set_status_bar_git_info" => self.handle_plugin_set_status_bar_git_info(name, params),
             "set_content" => self.handle_plugin_set_content(name, params),
             "register_language_provider" => {
                 self.handle_plugin_register_language_provider(name, params);
@@ -277,50 +263,6 @@ impl App {
             self.open_and_reveal(std::path::Path::new(path_str));
             self.plugin_is_opening_file = false;
         }
-    }
-
-    fn handle_plugin_set_file_statuses(&mut self, name: &str, params: &serde_json::Value) {
-        if let Some(obj) = params.as_object() {
-            for (path_str, status_val) in obj {
-                let Some(status_str) = status_val.as_str() else {
-                    continue;
-                };
-                let git_status = match status_str {
-                    "modified" | "renamed" | "conflict" => crate::git::GitStatus::Modified,
-                    "added" | "untracked" => crate::git::GitStatus::New,
-                    "deleted" => crate::git::GitStatus::Deleted,
-                    "ignored" => crate::git::GitStatus::Ignored,
-                    _ => continue,
-                };
-                let path = std::path::PathBuf::from(path_str);
-                self.git_status_map.insert(path.clone(), git_status);
-                self.plugin_contributions
-                    .entry(name.to_string())
-                    .or_default()
-                    .status_paths
-                    .insert(path);
-            }
-        }
-    }
-
-    fn handle_plugin_set_blame_data(&mut self, name: &str, params: &serde_json::Value) {
-        let path = match params.get("path").and_then(|v| v.as_str()) {
-            Some(p) => std::path::PathBuf::from(p),
-            None => return,
-        };
-        let lines: Vec<String> = match params.get("lines").and_then(|v| v.as_array()) {
-            Some(arr) => arr
-                .iter()
-                .filter_map(|v| v.as_str().map(String::from))
-                .collect(),
-            None => return,
-        };
-        self.plugin_blame.insert(path.clone(), lines);
-        self.plugin_contributions
-            .entry(name.to_string())
-            .or_default()
-            .blame_paths
-            .insert(path);
     }
 
     fn handle_plugin_set_icon_map(&mut self, name: &str, params: &serde_json::Value) {
@@ -348,38 +290,6 @@ impl App {
                 .or_default()
                 .has_icon_map = true;
         }
-    }
-
-    fn handle_plugin_set_status_bar_git_info(&mut self, name: &str, params: &serde_json::Value) {
-        let branch = params
-            .get("branch")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string();
-        let head = params
-            .get("head")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string();
-        let dirty = params
-            .get("dirty")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
-        let state = params
-            .get("state")
-            .and_then(|v| v.as_str())
-            .unwrap_or("clean")
-            .to_string();
-        self.plugin_git_info = Some(super::PluginGitInfo {
-            branch,
-            head,
-            dirty,
-            state,
-        });
-        self.plugin_contributions
-            .entry(name.to_string())
-            .or_default()
-            .has_git_info = true;
     }
 
     fn handle_plugin_set_content(&mut self, name: &str, params: &serde_json::Value) {

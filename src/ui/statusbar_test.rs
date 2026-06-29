@@ -928,3 +928,14 @@ fn compose_left_right_empty_groups() {
     let content: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
     assert_eq!(content, "          ");
 }
+
+#[test]
+fn git_info_none_no_branch_segment() {
+    // git_info is now the sole git source (plugin_git_info removed in 0.11.22).
+    // With git_info = None, no branch or git-status segment renders.
+    let app = make_app(); // git.status = false → git_info stays None
+    assert!(app.git_info.is_none());
+    let text = render_bar(&app);
+    assert!(!text.contains("[main]"));
+    assert!(!text.contains("HEAD (detached)"));
+}

@@ -220,20 +220,9 @@ pub(super) fn compute_git_status_load(
     include_untracked: bool,
     include_ignored: bool,
 ) -> GitStatusLoad {
-    #[cfg(feature = "git-core")]
-    {
-        let status_map = crate::git::repo_status(root, include_untracked, include_ignored);
-        let info = crate::git::repo_info(root);
-        GitStatusLoad { status_map, info }
-    }
-    #[cfg(not(feature = "git-core"))]
-    {
-        let _ = (include_untracked, include_ignored);
-        GitStatusLoad {
-            status_map: HashMap::new(),
-            info: None,
-        }
-    }
+    let status_map = crate::git::repo_status(root, include_untracked, include_ignored);
+    let info = crate::git::repo_info(root);
+    GitStatusLoad { status_map, info }
 }
 
 /// Runs the appropriate `git diff` variant for `path` and parses it into
@@ -245,14 +234,11 @@ pub(super) fn compute_diff_load(
     theme: &Theme,
     diff_mode: DiffMode,
 ) -> DiffLoad {
-    #[cfg(feature = "git-core")]
     let lines = match diff_mode {
         DiffMode::All => crate::git::working_tree_diff(root, path),
         DiffMode::Staged => crate::git::staged_diff(root, path),
         DiffMode::Unstaged => crate::git::unstaged_diff(root, path),
     };
-    #[cfg(not(feature = "git-core"))]
-    let lines: Vec<String> = vec!["(git-core disabled)".to_string()];
     let rel = path.strip_prefix(root).unwrap_or(path);
     let highlighted = lines
         .iter()

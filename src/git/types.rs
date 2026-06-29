@@ -1,11 +1,7 @@
-//! Git-related types shared between core and plugin code paths.
+//! Git-related types used throughout `mantis`.
 //!
-//! These types are always compiled regardless of the `git-core` feature flag so
-//! the rest of the codebase can reference them without conditional compilation.
-//! When `git-core` is enabled, `git.rs` also provides function implementations
-//! that populate these types from the `git` CLI. When `git-core` is disabled,
-//! the same types are populated by plugin actions (`set_file_statuses`,
-//! `set_status_bar_git_info`, `set_blame_data`).
+//! These types are always compiled and populated by the built-in git
+//! implementation in `core.rs`.
 
 use std::collections::HashMap;
 use std::path::PathBuf;

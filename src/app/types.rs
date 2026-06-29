@@ -50,20 +50,6 @@ impl DiffMode {
     }
 }
 
-/// Git info provided by a plugin for the status bar, replacing the live
-/// `git::repo_info()` call when set.
-pub struct PluginGitInfo {
-    /// Branch name (e.g. "main", "feature/x").
-    pub branch: String,
-    /// Short commit hash (e.g. "abc1234").
-    #[allow(dead_code)]
-    pub head: String,
-    /// Whether the working tree is dirty.
-    pub dirty: bool,
-    /// State label: "clean", "dirty", "conflict", "rebase", or "merge".
-    pub state: String,
-}
-
 /// A transient status message with a timestamp so it can auto-expire.
 #[derive(Debug)]
 pub struct StatusMessage {

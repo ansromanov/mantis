@@ -281,20 +281,7 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
     }
 
     // -- Priority 3: git info --
-    if let Some(ref plugin) = app.plugin_git_info {
-        let fg = match plugin.state.as_str() {
-            "conflict" => app.theme.git_conflict,
-            "rebase" | "merge" => app.theme.git_progress,
-            "dirty" => app.theme.git_dirty,
-            _ => app.theme.git_clean,
-        };
-        let label = if plugin.dirty {
-            format!(" [{} +1]", plugin.branch)
-        } else {
-            format!(" [{}]", plugin.branch)
-        };
-        segs.push((Span::styled(label, base.fg(fg)), StatusSegment::Git, P_GIT));
-    } else if let Some(ref info) = app.git_info {
+    if let Some(ref info) = app.git_info {
         let fg = match info.head {
             GitHead::Detached => app.theme.git_conflict,
             GitHead::Rebase | GitHead::Merge => app.theme.git_progress,

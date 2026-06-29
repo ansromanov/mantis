@@ -18,6 +18,34 @@ use crate::ui::content::draw_content;
 
 static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
+fn temp_git_blame(dir: &std::path::Path, filename: &str) -> PathBuf {
+    let git = |args: &[&str]| {
+        assert!(std::process::Command::new("git")
+            .arg("-C")
+            .arg(dir)
+            .arg("-c")
+            .arg("user.email=test@test.com")
+            .arg("-c")
+            .arg("user.name=Test")
+            .args(args)
+            .status()
+            .unwrap()
+            .success());
+    };
+    git(&["init", "-q"]);
+    let path = dir.join(filename);
+    std::fs::write(&path, "a\n").unwrap();
+    git(&["add", filename]);
+    git(&["commit", "-m", "first"]);
+    std::fs::write(&path, "a\nb\n").unwrap();
+    git(&["add", filename]);
+    git(&["commit", "-m", "second"]);
+    std::fs::write(&path, "a\nb\nc\n").unwrap();
+    git(&["add", filename]);
+    git(&["commit", "-m", "third"]);
+    path
+}
+
 fn temp_tree() -> PathBuf {
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
     let dir = std::env::temp_dir().join(format!("tv_draw_test_{}_{n}", std::process::id()));
@@ -322,8 +350,7 @@ fn format_blame_annotation_empty_subject() {
 #[test]
 fn blame_column_click_sets_show_line_blame_and_correct_active_line() {
     let dir = tempfile::TempDir::new().expect("temp dir");
-    let path = dir.path().join("test.txt");
-    std::fs::write(&path, "a\nb\nc\n").unwrap();
+    let path = temp_git_blame(dir.path(), "test.txt");
     let mut app = crate::app::App::new(
         dir.path().to_path_buf(),
         crate::config::Config::default(),
@@ -332,14 +359,6 @@ fn blame_column_click_sets_show_line_blame_and_correct_active_line() {
     )
     .expect("App::new");
     app.open_file(&path);
-    // Inject plugin blame data so the blame column renders non-empty without
-    // requiring a real git repo.
-    let plugin_blame: Vec<String> = vec![
-        format!("{:<10} Alice's commit  ", "Alice"),
-        format!("{:<10} Bob's change    ", "Bob"),
-        format!("{:<10} Charlie's fix   ", "Charlie"),
-    ];
-    app.plugin_blame.insert(path, plugin_blame);
     app.show_blame = true;
     // Render to populate blame_col_width and content_area from the actual layout.
     let backend = TestBackend::new(80, 24);
@@ -373,8 +392,7 @@ fn blame_column_click_sets_show_line_blame_and_correct_active_line() {
 #[test]
 fn blame_column_click_does_not_start_drag_selection() {
     let dir = tempfile::TempDir::new().expect("temp dir");
-    let path = dir.path().join("test.txt");
-    std::fs::write(&path, "a\nb\nc\n").unwrap();
+    let path = temp_git_blame(dir.path(), "test.txt");
     let mut app = crate::app::App::new(
         dir.path().to_path_buf(),
         crate::config::Config::default(),
@@ -383,11 +401,6 @@ fn blame_column_click_does_not_start_drag_selection() {
     )
     .expect("App::new");
     app.open_file(&path);
-    let plugin_blame: Vec<String> = vec![
-        format!("{:<10} Alice's commit  ", "Alice"),
-        format!("{:<10} Bob's change    ", "Bob"),
-    ];
-    app.plugin_blame.insert(path, plugin_blame);
     app.show_blame = true;
     let backend = TestBackend::new(80, 24);
     let mut terminal = ratatui::Terminal::new(backend).unwrap();

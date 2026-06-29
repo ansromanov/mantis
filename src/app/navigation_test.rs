@@ -915,14 +915,6 @@ fn rebuild_empty_git_mode_clears_plugin_content() {
         app.plugin_content_text.is_empty(),
         "rebuild with empty git set must clear plugin_content_text"
     );
-    assert!(
-        app.plugin_blame.is_empty(),
-        "rebuild with empty git set must clear plugin_blame"
-    );
-    assert!(
-        app.plugin_git_info.is_none(),
-        "rebuild with empty git set must clear plugin_git_info"
-    );
     fs::remove_dir_all(&root).ok();
 }
 

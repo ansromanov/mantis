@@ -311,13 +311,7 @@ impl App {
         self.plugin_contributions.clear();
         self.load_seq = self.load_seq.wrapping_add(1);
         if self.git_status_enabled {
-            #[cfg(feature = "git-core")]
             self.request_git_status_refresh();
-            #[cfg(not(feature = "git-core"))]
-            {
-                self.git_status_map.clear();
-                self.git_info = None;
-            }
         }
         if self.git_mode {
             self.expand_git_dirs();
