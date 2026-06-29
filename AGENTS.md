@@ -78,8 +78,11 @@ src/
 ├── plugin/
 │   └── mod.rs                      # Plugin, PluginManager, PluginKind, ExtraSyntax; subprocess IPC
 ├── release_info.rs                 # Compile-time release metadata (ReleaseInfo, RELEASE static)
-├── search.rs                       # SearchState, HistoryState, ThemePicker, InFileSearch,
-│                                   #   RecentFilesState, PluginPicker (SkimMatcherV2)
+├── search/
+│   ├── mod.rs                      # SearchState + re-exports (SearchMode, ContentMatch)
+│   ├── history.rs                  # HistoryState (git log picker)
+│   └── pickers.rs                  # TreeFilter, GotoLineState, InFileSearch, ThemePicker,
+│                                   #   RecentFilesState, PluginPicker
 ├── selection.rs                    # TextSelection + VisualLine for copy/visual mode
 ├── theme.rs                        # Theme struct, color roles, presets, parse_color
 ├── tree.rs                         # TreeNode, build_visible (flat Vec from ignore::WalkBuilder)
@@ -155,12 +158,12 @@ Quick lookup: type/function → file. Use this before grepping.
 | `Loader` / `LoadRequest` / `LoadResponse` | `src/app/loader.rs` | Background file I/O thread |
 | `TreeNode` / `build_visible` | `src/tree.rs` | Flat tree vector |
 | `VirtualFile` | `src/virtual_file.rs` | Mmap'd lazily-indexed file |
-| `SearchState` | `src/search.rs:36` | Fuzzy file+content search |
-| `HistoryState` | `src/search.rs:221` | Git file-log picker |
-| `InFileSearch` | `src/search.rs:294` | Within-file incremental search |
-| `ThemePicker` | `src/search.rs:357` | Theme selection overlay |
-| `RecentFilesState` | `src/search.rs:421` | Recent-files overlay |
-| `PluginPicker` | `src/search.rs:489` | Plugin manager overlay |
+| `SearchState` | `src/search/mod.rs` | Fuzzy file+content search |
+| `HistoryState` | `src/search/history.rs` | Git file-log picker |
+| `InFileSearch` | `src/search/pickers.rs` | Within-file incremental search |
+| `ThemePicker` | `src/search/pickers.rs` | Theme selection overlay |
+| `RecentFilesState` | `src/search/pickers.rs` | Recent-files overlay |
+| `PluginPicker` | `src/search/pickers.rs` | Plugin manager overlay |
 | `CommandPalette` / `CommandEntry` | `src/command_palette.rs` | Ctrl-P palette |
 | `TextSelection` / `VisualLine` | `src/selection.rs` | Visual/copy selection |
 | `Theme` / `parse_color` | `src/theme.rs` | Color roles + presets |
