@@ -227,10 +227,12 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         (ln_w, gutters, lines, vec![])
     } else if let Some(md_lines) = render_lines {
         // Rendered content (plugin or core markdown): iterate only the visible
-        // window of pre-rendered lines.
-        let ln_style = Style::default().fg(app.theme.dim);
-        let lw = app.line_count().to_string().len().max(1);
-        let ln_w = if show_ln { lw + 1 } else { 0 };
+        // window of pre-rendered lines. Line numbers are hidden for rendered
+        // content since rendered-line indices don't correspond to source lines
+        // (rendering collapses blank lines, strips code fences, etc.). This
+        // matches line_prefix_width() which already returns 0 for rendered
+        // markdown, keeping input and render math consistent.
+        let blame_style_inner = blame_style;
         let gutters: Vec<Line> = (scroll..visible_end)
             .map(|i| {
                 let mut spans = Vec::new();
@@ -239,13 +241,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                         .get(i)
                         .cloned()
                         .unwrap_or_else(|| " ".repeat(BLAME_COL_WIDTH));
-                    spans.push(Span::styled(annotation, blame_style));
-                }
-                if show_ln {
-                    spans.push(Span::styled(
-                        format!("{:>width$} ", i + 1, width = lw),
-                        ln_style,
-                    ));
+                    spans.push(Span::styled(annotation, blame_style_inner));
                 }
                 Line::from(spans)
             })
@@ -287,7 +283,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                 }
             })
             .collect();
-        (blame_width + ln_w, gutters, lines, vec![])
+        (blame_width, gutters, lines, vec![])
     } else if let Some(vf) = app.virtual_file.as_ref() {
         render_virtual_file(
             app,

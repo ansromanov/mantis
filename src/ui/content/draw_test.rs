@@ -466,3 +466,114 @@ fn word_wrap_without_line_numbers_still_wraps() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn rendered_markdown_no_line_number_gutter() {
+    // Rendered markdown should not show line-number gutter even when
+    // show_line_numbers=true, because rendered-line indices don't map to
+    // source lines. Verify line_prefix_width() is 0 and gutter contains
+    // no digits.
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let path = root.join("test.md");
+    fs::write(&path, "# Heading\n\nSome text\n").unwrap();
+    app.open_file(&path);
+    app.is_markdown = true;
+    app.show_raw_markdown = false;
+    app.show_line_numbers = true;
+    // Populate markdown_lines with rendered content.
+    app.markdown_lines = vec![
+        vec![(ratatui::style::Style::default(), "# Heading".to_string())],
+        vec![(ratatui::style::Style::default(), "Some text".to_string())],
+    ];
+    // line_prefix_width() should be 0 for rendered markdown.
+    assert_eq!(
+        app.line_prefix_width(),
+        0,
+        "rendered markdown must have no line-number gutter width"
+    );
+    // Render and check no digits appear in the content.
+    let out = render_to_string(&mut app);
+    // Line numbers would be "1 " and "2 " in the output.
+    // Since markdown is rendered, they should not appear at the start of
+    // content lines.
+    assert!(
+        !out.contains("1 # Heading"),
+        "rendered markdown must not have line numbers in output"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn plugin_content_no_line_number_gutter() {
+    // Plugin-rendered content should not show line-number gutter even when
+    // show_line_numbers=true, because the content is rendered and indices
+    // don't map to source.
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let path = root.join("long.txt");
+    app.open_file(&path);
+    app.show_line_numbers = true;
+    // Install plugin content.
+    app.plugin_content.insert(
+        path.clone(),
+        vec![
+            vec![(
+                ratatui::style::Style::default(),
+                "PLUGIN LINE 1".to_string(),
+            )],
+            vec![(
+                ratatui::style::Style::default(),
+                "PLUGIN LINE 2".to_string(),
+            )],
+        ],
+    );
+    app.plugin_content_text.insert(
+        path,
+        vec!["PLUGIN LINE 1".to_string(), "PLUGIN LINE 2".to_string()],
+    );
+    // line_prefix_width() should be 0 for plugin content.
+    assert_eq!(
+        app.line_prefix_width(),
+        0,
+        "plugin content must have no line-number gutter width"
+    );
+    // Render and verify no line numbers appear before plugin content.
+    let out = render_to_string(&mut app);
+    assert!(
+        out.contains("PLUGIN LINE 1"),
+        "plugin content must be rendered"
+    );
+    assert!(
+        !out.contains("1 PLUGIN"),
+        "plugin content must not have line numbers in gutter"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn raw_markdown_still_shows_line_numbers() {
+    // Raw markdown (show_raw_markdown=true) should still show line numbers.
+    // This ensures the fix only affects rendered paths.
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let path = root.join("test.md");
+    fs::write(&path, "# Heading\n\nSome text\n").unwrap();
+    app.open_file(&path);
+    app.is_markdown = true;
+    app.show_raw_markdown = true;
+    app.show_line_numbers = true;
+    // line_prefix_width() should be non-zero for raw markdown.
+    let ln_width = app.line_prefix_width();
+    assert!(
+        ln_width > 0,
+        "raw markdown must have line-number gutter width, got {ln_width}"
+    );
+    // Render and verify line numbers appear.
+    let out = render_to_string(&mut app);
+    assert!(
+        out.contains("1 "),
+        "raw markdown must show line numbers in output"
+    );
+    fs::remove_dir_all(&root).ok();
+}
