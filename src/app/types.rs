@@ -98,3 +98,7 @@ pub(crate) struct HighlightCacheKey {
 }
 
 pub(crate) type HighlightCacheValue = Vec<Vec<(ratatui::style::Style, String)>>;
+
+#[cfg(test)]
+#[path = "types_test.rs"]
+mod tests;
