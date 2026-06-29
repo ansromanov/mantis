@@ -12,11 +12,79 @@
 use std::time::{Duration, Instant};
 
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
+use ratatui::layout::Rect;
 
+use crate::list_picker::ListPicker;
 use crate::selection::TextSelection;
 
 use super::content_pos::WHEEL_STEP;
 use super::{rect_contains, App, Focus};
+
+/// Outcome of a picker mouse event handled by [`handle_picker_mouse`].
+#[derive(Debug, PartialEq, Eq)]
+pub(super) enum PickerMouseAction {
+    /// Double-click on an item — caller should activate the selection.
+    Activate,
+    /// No special action; the event was handled or irrelevant.
+    None,
+}
+
+/// Shared mouse-event handling for any `ListPicker` overlay.
+///
+/// Handles left-click (select, double-click to activate, close on click outside),
+/// and scroll-wheel navigation. Returns [`PickerMouseAction::Activate`] when the
+/// caller should invoke the picker-specific activation method.
+fn handle_picker_mouse<P: ListPicker>(
+    ev: MouseEvent,
+    area: Rect,
+    offset: usize,
+    picker: &mut Option<P>,
+    last_click: &mut Option<(Instant, usize)>,
+) -> PickerMouseAction {
+    match ev.kind {
+        MouseEventKind::Down(MouseButton::Left) => {
+            if !rect_contains(area, ev.column, ev.row) {
+                *picker = None;
+                return PickerMouseAction::None;
+            }
+            let index = offset + (ev.row - area.y) as usize;
+            let in_range = picker.as_ref().is_some_and(|p| index < p.results_len());
+            if !in_range {
+                return PickerMouseAction::None;
+            }
+            if let Some(p) = picker.as_mut() {
+                p.set_selected(index);
+            }
+            let now = Instant::now();
+            let double = matches!(
+                last_click,
+                Some((t, i)) if *i == index && now.duration_since(*t) < Duration::from_millis(400)
+            );
+            if double {
+                *last_click = None;
+                PickerMouseAction::Activate
+            } else {
+                *last_click = Some((now, index));
+                PickerMouseAction::None
+            }
+        }
+        MouseEventKind::ScrollDown => {
+            if let Some(p) = picker.as_mut() {
+                if p.selected() + 1 < p.results_len() {
+                    p.set_selected(p.selected() + 1);
+                }
+            }
+            PickerMouseAction::None
+        }
+        MouseEventKind::ScrollUp => {
+            if let Some(p) = picker.as_mut() {
+                p.set_selected(p.selected().saturating_sub(1));
+            }
+            PickerMouseAction::None
+        }
+        _ => PickerMouseAction::None,
+    }
+}
 
 #[cfg(test)]
 #[path = "mouse_handlers_test.rs"]
@@ -275,48 +343,15 @@ impl App {
     /// double-click to open the diff, scroll to navigate.
     /// Close on click outside the popup area.
     fn handle_history_mouse(&mut self, ev: MouseEvent) {
-        match ev.kind {
-            MouseEventKind::Down(MouseButton::Left) => {
-                if !rect_contains(self.history_area, ev.column, ev.row) {
-                    self.history = None;
-                    return;
-                }
-                let index = self.history_offset + (ev.row - self.history_area.y) as usize;
-                let in_range = self
-                    .history
-                    .as_ref()
-                    .is_some_and(|h| index < h.results_len());
-                if !in_range {
-                    return;
-                }
-                if let Some(h) = &mut self.history {
-                    h.selected = index;
-                }
-                let now = Instant::now();
-                let double = matches!(
-                    self.last_click,
-                    Some((t, i)) if i == index && now.duration_since(t) < Duration::from_millis(400)
-                );
-                if double {
-                    self.last_click = None;
-                    self.show_selected_revision();
-                } else {
-                    self.last_click = Some((now, index));
-                }
-            }
-            MouseEventKind::ScrollDown => {
-                if let Some(h) = &mut self.history {
-                    if h.selected + 1 < h.results_len() {
-                        h.selected += 1;
-                    }
-                }
-            }
-            MouseEventKind::ScrollUp => {
-                if let Some(h) = &mut self.history {
-                    h.selected = h.selected.saturating_sub(1);
-                }
-            }
-            _ => {}
+        if handle_picker_mouse(
+            ev,
+            self.history_area,
+            self.history_offset,
+            &mut self.history,
+            &mut self.last_click,
+        ) == PickerMouseAction::Activate
+        {
+            self.show_selected_revision();
         }
     }
 
@@ -324,48 +359,15 @@ impl App {
     /// double-click to apply, scroll to navigate.
     /// Close on click outside the popup area.
     fn handle_theme_mouse(&mut self, ev: MouseEvent) {
-        match ev.kind {
-            MouseEventKind::Down(MouseButton::Left) => {
-                if !rect_contains(self.theme_area, ev.column, ev.row) {
-                    self.theme_picker = None;
-                    return;
-                }
-                let index = self.theme_offset + (ev.row - self.theme_area.y) as usize;
-                let in_range = self
-                    .theme_picker
-                    .as_ref()
-                    .is_some_and(|p| index < p.results_len());
-                if !in_range {
-                    return;
-                }
-                if let Some(p) = &mut self.theme_picker {
-                    p.selected = index;
-                }
-                let now = Instant::now();
-                let double = matches!(
-                    self.last_click,
-                    Some((t, i)) if i == index && now.duration_since(t) < Duration::from_millis(400)
-                );
-                if double {
-                    self.last_click = None;
-                    self.apply_selected_theme();
-                } else {
-                    self.last_click = Some((now, index));
-                }
-            }
-            MouseEventKind::ScrollDown => {
-                if let Some(p) = &mut self.theme_picker {
-                    if p.selected + 1 < p.results_len() {
-                        p.selected += 1;
-                    }
-                }
-            }
-            MouseEventKind::ScrollUp => {
-                if let Some(p) = &mut self.theme_picker {
-                    p.selected = p.selected.saturating_sub(1);
-                }
-            }
-            _ => {}
+        if handle_picker_mouse(
+            ev,
+            self.theme_area,
+            self.theme_offset,
+            &mut self.theme_picker,
+            &mut self.last_click,
+        ) == PickerMouseAction::Activate
+        {
+            self.apply_selected_theme();
         }
     }
 
@@ -373,49 +375,15 @@ impl App {
     /// double-click to execute, scroll to navigate.
     /// Close on click outside the popup area.
     fn handle_command_palette_mouse(&mut self, ev: MouseEvent) {
-        match ev.kind {
-            MouseEventKind::Down(MouseButton::Left) => {
-                if !rect_contains(self.command_palette_area, ev.column, ev.row) {
-                    self.command_palette = None;
-                    return;
-                }
-                let index =
-                    self.command_palette_offset + (ev.row - self.command_palette_area.y) as usize;
-                let in_range = self
-                    .command_palette
-                    .as_ref()
-                    .is_some_and(|p| index < p.results_len());
-                if !in_range {
-                    return;
-                }
-                if let Some(p) = &mut self.command_palette {
-                    p.selected = index;
-                }
-                let now = Instant::now();
-                let double = matches!(
-                    self.last_click,
-                    Some((t, i)) if i == index && now.duration_since(t) < Duration::from_millis(400)
-                );
-                if double {
-                    self.last_click = None;
-                    self.dispatch_command();
-                } else {
-                    self.last_click = Some((now, index));
-                }
-            }
-            MouseEventKind::ScrollDown => {
-                if let Some(p) = &mut self.command_palette {
-                    if p.selected + 1 < p.results_len() {
-                        p.selected += 1;
-                    }
-                }
-            }
-            MouseEventKind::ScrollUp => {
-                if let Some(p) = &mut self.command_palette {
-                    p.selected = p.selected.saturating_sub(1);
-                }
-            }
-            _ => {}
+        if handle_picker_mouse(
+            ev,
+            self.command_palette_area,
+            self.command_palette_offset,
+            &mut self.command_palette,
+            &mut self.last_click,
+        ) == PickerMouseAction::Activate
+        {
+            self.dispatch_command();
         }
     }
 
@@ -433,49 +401,15 @@ impl App {
     /// double-click to open the result, scroll to navigate.
     /// Close on click outside the popup area.
     fn handle_search_mouse(&mut self, ev: MouseEvent) {
-        match ev.kind {
-            MouseEventKind::Down(MouseButton::Left) => {
-                if !rect_contains(self.search_area, ev.column, ev.row) {
-                    self.search = None;
-                    return;
-                }
-                let index = self.search_offset + (ev.row - self.search_area.y) as usize;
-                let in_range = self
-                    .search
-                    .as_ref()
-                    .is_some_and(|s| index < s.results_len());
-                if !in_range {
-                    return;
-                }
-                if let Some(s) = &mut self.search {
-                    s.selected = index;
-                }
-                // A second click on the same row within the window opens it.
-                let now = Instant::now();
-                let double = matches!(
-                    self.last_click,
-                    Some((t, i)) if i == index && now.duration_since(t) < Duration::from_millis(400)
-                );
-                if double {
-                    self.last_click = None;
-                    self.activate_search_selection();
-                } else {
-                    self.last_click = Some((now, index));
-                }
-            }
-            MouseEventKind::ScrollDown => {
-                if let Some(s) = &mut self.search {
-                    if s.selected + 1 < s.results_len() {
-                        s.selected += 1;
-                    }
-                }
-            }
-            MouseEventKind::ScrollUp => {
-                if let Some(s) = &mut self.search {
-                    s.selected = s.selected.saturating_sub(1);
-                }
-            }
-            _ => {}
+        if handle_picker_mouse(
+            ev,
+            self.search_area,
+            self.search_offset,
+            &mut self.search,
+            &mut self.last_click,
+        ) == PickerMouseAction::Activate
+        {
+            self.activate_search_selection();
         }
     }
 
