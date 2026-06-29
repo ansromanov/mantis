@@ -183,16 +183,22 @@ segments render at column 0; right segments are right-anchored as a block with
 spaces between. When the terminal is too narrow, low-priority segments are
 dropped from both sides.
 
+**Default mode** (both `left` and `right` unset): all segments are visible.
+The historical default places `["lnum", "type", "git", "version"]` on the right,
+everything else on the left.
+
+**Explicit allowlist mode** (either `left` or `right` set): only the listed
+segment ids render, on their configured side, in the order you specify.
+Unlisted segments are hidden. Set both to empty lists for an empty bar.
+
 ```toml
 [statusbar]
-# Segments to right-align. Valid ids: hint badges scroll lnum type fileinfo
-# git errors folds message version
+# left = ["hint", "badges", "scroll", "lnum", "type", "fileinfo", "git", "errors", "folds", "message"]
 # right = ["lnum", "type", "git", "version"]
 ```
 
-The default places the line number, file type, git info, and version on the
-right; all other segments (keybinding hints, status messages, badges, scroll
-percentage, file encoding, errors, fold stats) remain on the left.
+Valid ids: `hint` `badges` `scroll` `lnum` `type` `fileinfo` `git` `errors`
+`folds` `message` `version`.
 
 ## Theme
 

@@ -50,3 +50,21 @@ fn typo_within_tree_table_warns_with_suggestion() {
         "nested typo should name the path and suggest the fix: {warnings:?}"
     );
 }
+
+#[test]
+fn validate_keys_accepts_statusbar_left_right() {
+    let warnings = validate_keys("[statusbar]\nleft = [\"hint\"]\nright = [\"version\"]\n");
+    assert!(
+        warnings.is_empty(),
+        "statusbar.left/right should be known: {warnings:?}"
+    );
+}
+
+#[test]
+fn validate_keys_rejects_statusbar_typo() {
+    let warnings = validate_keys("[statusbar]\nlefft = [\"hint\"]\n");
+    assert!(
+        warnings.iter().any(|w| w.contains("statusbar.lefft")),
+        "typo in statusbar should warn: {warnings:?}"
+    );
+}

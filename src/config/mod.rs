@@ -41,9 +41,6 @@ pub use types::{ContentConfig, SearchConfig};
 #[cfg_attr(not(test), allow(unused_imports))]
 pub(crate) use keymap::bind;
 
-use std::fs;
-use std::path::{Path, PathBuf};
-
 /// Loads config for the given view root. A project-local `mantis.toml` found in
 /// the root or any ancestor takes precedence over the global config; this lets
 /// a repo ship its own defaults. On first run it seeds a minimal user config and

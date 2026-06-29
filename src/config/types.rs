@@ -139,19 +139,32 @@ pub struct GitDiffConfig {
 }
 
 /// Status-bar segment alignment, grouped under `[statusbar]` in the TOML.
-#[derive(Serialize, Deserialize, Clone, PartialEq)]
+///
+/// ## Semantics
+/// - **Both `None`** — default mode: all segments visible, using the historical
+///   default right-side set `["lnum", "type", "git", "version"]`.
+/// - **Either `Some`** — explicit allowlist mode: only segments whose id appears
+///   in `left` or `right` are rendered, in the order specified by the list.
+///   Unlisted segments are hidden. Both lists empty → empty bar.
+#[derive(Default, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(default)]
 pub struct StatusBarConfig {
-    /// Segment ids to render on the right side, right-aligned.
-    /// Anything not listed renders on the left in its natural order.
+    /// Segments to show on the left, in order. `None` = default behaviour.
     /// Valid ids: hint badges scroll lnum type fileinfo git errors folds message version
-    pub right: Vec<String>,
+    pub left: Option<Vec<String>>,
+    /// Segments to show on the right, in order. `None` = default behaviour.
+    /// Valid ids: hint badges scroll lnum type fileinfo git errors folds message version
+    pub right: Option<Vec<String>>,
 }
 
-impl Default for StatusBarConfig {
-    fn default() -> Self {
+impl StatusBarConfig {
+    /// A fully-populated instance for config-validation schema building.
+    /// Every field is `Some` so that TOML serialization emits them (unlike
+    /// `Default` where everything is `None` and would be omitted).
+    pub(crate) fn schema() -> Self {
         StatusBarConfig {
-            right: vec!["lnum".into(), "type".into(), "git".into(), "version".into()],
+            left: Some(vec!["hint".into()]),
+            right: Some(vec!["version".into()]),
         }
     }
 }

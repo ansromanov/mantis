@@ -43,8 +43,8 @@ pub(crate) enum StatusSegment {
 }
 
 impl StatusSegment {
-    fn side(self, config: &StatusBarConfig) -> StatusSide {
-        let id = match self {
+    fn id_str(self) -> &'static str {
+        match self {
             StatusSegment::Hint => "hint",
             StatusSegment::Badges => "badges",
             StatusSegment::Scroll => "scroll",
@@ -56,12 +56,23 @@ impl StatusSegment {
             StatusSegment::Folds => "folds",
             StatusSegment::Message => "message",
             StatusSegment::Version => "version",
-        };
-        if config.right.iter().any(|s| s == id) {
-            StatusSide::Right
-        } else {
-            StatusSide::Left
         }
+    }
+
+    /// Returns which side this segment belongs to in **default** mode.
+    /// When `config.right` is `Some`, uses that list; otherwise falls back to
+    /// the historical default right set. This is only used when both `left`
+    /// and `right` are `None`; explicit mode uses `split_sides` directly.
+    fn side(self, config: &StatusBarConfig) -> StatusSide {
+        let id = self.id_str();
+        if let Some(ref right) = config.right {
+            if right.iter().any(|s| s == id) {
+                return StatusSide::Right;
+            }
+        } else if ["lnum", "type", "git", "version"].contains(&id) {
+            return StatusSide::Right;
+        }
+        StatusSide::Left
     }
 }
 
@@ -372,12 +383,34 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
 /// Higher-priority items are kept first; within the same priority level,
 /// rightmost items are dropped first — across both groups.  The right group
 /// is right-anchored as a block, with padding spaces in between.
+///
+/// In explicit allowlist mode (either `left` or `right` is `Some`), segments
+/// not listed in either list are filtered out before any width/elision math.
 fn fit_two_sided(
     segs: Vec<(Span<'static>, StatusSegment, u8)>,
     max_width: usize,
     config: &StatusBarConfig,
 ) -> Line<'static> {
     if segs.is_empty() || max_width == 0 {
+        return Line::from(Vec::<Span>::new());
+    }
+
+    // Explicit allowlist mode: drop unlisted segments before width calc.
+    let segs = if config.left.is_some() || config.right.is_some() {
+        let left_ids = config.left.as_deref().unwrap_or(&[]);
+        let right_ids = config.right.as_deref().unwrap_or(&[]);
+        segs.into_iter()
+            .filter(|(_, id, _)| {
+                let name = id.id_str();
+                left_ids.iter().any(|s| s == name) || right_ids.iter().any(|s| s == name)
+            })
+            .collect()
+    } else {
+        segs
+    };
+
+    // After filtering, might be empty.
+    if segs.is_empty() {
         return Line::from(Vec::<Span>::new());
     }
 
@@ -420,20 +453,50 @@ fn fit_two_sided(
 }
 
 /// Split kept segments into left and right groups by config.
+///
+/// In explicit allowlist mode (either `left` or `right` is `Some`), the
+/// groups are built by iterating each list in config order, preserving the
+/// user-specified sequence. In default mode (both `None`), the order is the
+/// build order, partitioned by `StatusSegment::side()`.
 fn split_sides(
     segs: Vec<(Span<'static>, StatusSegment, u8)>,
     config: &StatusBarConfig,
 ) -> (Vec<Span<'static>>, Vec<Span<'static>>) {
-    let mut left = Vec::new();
-    let mut right = Vec::new();
-    for (span, id, _) in segs {
-        if id.side(config) == StatusSide::Right {
-            right.push(span);
-        } else {
-            left.push(span);
+    let explicit = config.left.is_some() || config.right.is_some();
+    if explicit {
+        let left_ids = config.left.as_deref().unwrap_or(&[]);
+        let right_ids = config.right.as_deref().unwrap_or(&[]);
+
+        let mut left = Vec::new();
+        let mut right = Vec::new();
+
+        // Left side: iterate config order, pull matching built segment.
+        for id in left_ids {
+            if let Some((span, _, _)) = segs.iter().find(|(_, sid, _)| sid.id_str() == id.as_str())
+            {
+                left.push(span.clone());
+            }
         }
+        // Right side: iterate config order, pull matching built segment.
+        for id in right_ids {
+            if let Some((span, _, _)) = segs.iter().find(|(_, sid, _)| sid.id_str() == id.as_str())
+            {
+                right.push(span.clone());
+            }
+        }
+        (left, right)
+    } else {
+        let mut left = Vec::new();
+        let mut right = Vec::new();
+        for (span, id, _) in segs {
+            if id.side(config) == StatusSide::Right {
+                right.push(span);
+            } else {
+                left.push(span);
+            }
+        }
+        (left, right)
     }
-    (left, right)
 }
 
 /// Compose left and right span groups into a single Line, with a padding
