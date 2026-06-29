@@ -408,3 +408,32 @@ fn defaults_for_new_tables() {
 
     assert_eq!(cfg.recent_files_count, 10);
 }
+
+#[test]
+fn statusbar_config_defaults_to_none() {
+    let cfg = StatusBarConfig::default();
+    assert!(cfg.left.is_none());
+    assert!(cfg.right.is_none());
+}
+
+#[test]
+fn statusbar_config_schema_has_some_fields() {
+    let schema = StatusBarConfig::schema();
+    assert!(schema.left.is_some());
+    assert!(schema.right.is_some());
+}
+
+#[test]
+fn statusbar_config_round_trips_explicit_mode() {
+    let cfg = Config {
+        statusbar: StatusBarConfig {
+            left: Some(vec!["hint".into()]),
+            right: Some(vec!["version".into()]),
+        },
+        ..Config::default()
+    };
+    let toml_str = toml::to_string_pretty(&cfg).unwrap();
+    let parsed: Config = toml::from_str(&toml_str).unwrap();
+    assert_eq!(parsed.statusbar.left, Some(vec!["hint".into()]));
+    assert_eq!(parsed.statusbar.right, Some(vec!["version".into()]));
+}

@@ -10,7 +10,7 @@
 //! warnings without failing the launch. Validation is best-effort: unparseable
 //! input is left to the caller's error path.
 
-use super::Config;
+use super::{Config, StatusBarConfig};
 use crate::theme::ThemeConfig;
 
 /// Old top-level keys that moved into `[git]`. Still accepted (folded by
@@ -54,11 +54,12 @@ pub(super) fn validate_keys(src: &str) -> Vec<String> {
 }
 
 /// Builds the set of recognized keys, keyed by table, by serializing a fully
-/// populated `Config`. The theme must be populated explicitly because its
-/// default fields are all `None`, which TOML omits on serialization.
+/// populated `Config`. The theme and statusbar must be populated explicitly
+/// because their default fields are all `None`, which TOML omits.
 fn schema_table() -> toml::Table {
     let cfg = Config {
         theme: ThemeConfig::schema(),
+        statusbar: StatusBarConfig::schema(),
         ..Config::default()
     };
     toml::Table::try_from(cfg).unwrap_or_default()

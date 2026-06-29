@@ -728,6 +728,127 @@ fn bar_never_overflows_various_widths() {
     }
 }
 
+// ── Explicit-allowlist / empty-bar tests ──────────────────────────────────
+
+#[test]
+fn both_none_default_split() {
+    // Regression: both None should behave like the old default.
+    let cfg = StatusBarConfig {
+        left: None,
+        right: None,
+    };
+    let segs = vec![
+        (
+            Span::styled("hint", Style::default()),
+            StatusSegment::Hint,
+            P_HINT,
+        ),
+        (
+            Span::styled("ver", Style::default()),
+            StatusSegment::Version,
+            P_VER,
+        ),
+        (
+            Span::styled("git", Style::default()),
+            StatusSegment::Git,
+            P_GIT,
+        ),
+    ];
+    let (left, right) = split_sides(segs, &cfg);
+    assert_eq!(left.len(), 1);
+    assert_eq!(left[0].content.as_ref(), "hint");
+    assert_eq!(right.len(), 2);
+    assert_eq!(right[0].content.as_ref(), "ver");
+    assert_eq!(right[1].content.as_ref(), "git");
+}
+
+#[test]
+fn both_some_empty_yields_empty_bar() {
+    let cfg = Config {
+        git: crate::config::GitConfig {
+            status: false,
+            ..Default::default()
+        },
+        statusbar: StatusBarConfig {
+            left: Some(vec![]),
+            right: Some(vec![]),
+        },
+        ..Config::default()
+    };
+    let app = App::new(PathBuf::from("."), cfg, None, None).unwrap();
+    let text = render_bar_width(&app, 80);
+    let trimmed = text.trim_end_matches(' ');
+    assert!(
+        trimmed.is_empty(),
+        "bar should be empty with both allowlists empty, got {text:?}"
+    );
+}
+
+#[test]
+fn explicit_left_right_only_listed_segments_render() {
+    let cfg = Config {
+        git: crate::config::GitConfig {
+            status: false,
+            ..Default::default()
+        },
+        statusbar: StatusBarConfig {
+            left: Some(vec!["hint".into()]),
+            right: Some(vec!["version".into()]),
+        },
+        ..Config::default()
+    };
+    let mut app = App::new(PathBuf::from("."), cfg, None, None).unwrap();
+    // Enable show_hidden so the badges segment would produce "[hidden]" if rendered.
+    app.show_hidden = true;
+    let text = render_bar_width(&app, 200);
+    // Hint on left.
+    assert!(text.contains("j/k nav"), "hint should be visible");
+    // Version on right.
+    let version = format!("v{}", env!("CARGO_PKG_VERSION"));
+    assert!(
+        text.trim_end().ends_with(&version),
+        "version should be right-aligned, got {text:?}"
+    );
+    // Badges segment not in allowlist → [hidden] must not appear.
+    assert!(
+        !text.contains("[hidden]"),
+        "badges should be hidden in explicit mode, got {text:?}"
+    );
+}
+
+#[test]
+fn explicit_elision_still_drops_lowest_priority() {
+    let mut app = {
+        let cfg = Config {
+            git: crate::config::GitConfig {
+                status: false,
+                ..Default::default()
+            },
+            statusbar: StatusBarConfig {
+                left: Some(vec!["badges".into()]),
+                right: Some(vec!["version".into()]),
+            },
+            ..Config::default()
+        };
+        App::new(PathBuf::from("."), cfg, None, None).unwrap()
+    };
+    app.show_hidden = true;
+    // Visible: "[hidden]"(9) + " vX.Y.Z"(~8) = ~17 total.
+    // At width 8, neither fits; elision drops [hidden] (P_INFO=2) first,
+    // leaving version (P_VER=5) — but version alone is ~8 chars, might barely
+    // not fit either. Use width 14: still < 17, drops [hidden], version stays.
+    let text = render_bar_width(&app, 14);
+    let version = format!("v{}", env!("CARGO_PKG_VERSION"));
+    assert!(
+        text.contains(&version),
+        "version (highest priority) should survive elision at width 14, got {text:?}"
+    );
+    assert!(
+        !text.contains("[hidden]"),
+        "badges elided before version at width 14, got {text:?}"
+    );
+}
+
 // ── Alignment tests ───────────────────────────────────────────────────────
 
 #[test]
@@ -804,7 +925,8 @@ fn custom_right_only_version() {
             ..Default::default()
         },
         statusbar: StatusBarConfig {
-            right: vec!["version".into()],
+            right: Some(vec!["version".into()]),
+            left: Some(vec!["hint".into()]),
         },
         ..Config::default()
     };
@@ -816,8 +938,12 @@ fn custom_right_only_version() {
         text.trim_end().ends_with(&version),
         "version should be right-aligned, got {text:?}"
     );
-    // Ln shouldn't appear since no file is open, but git/type/lnum
-    // are not in right list so they fall to the left.
+    // Hint is on left, version on right, everything else hidden.
+    assert!(text.contains("j/k nav"), "hint should be visible on left");
+    assert!(
+        !text.contains("[main]"),
+        "git segment should be hidden in explicit mode"
+    );
 }
 
 #[test]
@@ -827,42 +953,46 @@ fn empty_right_all_left() {
             status: false,
             ..Default::default()
         },
-        statusbar: StatusBarConfig { right: vec![] },
+        statusbar: StatusBarConfig {
+            left: None,
+            right: None,
+        },
         ..Config::default()
     };
     let app = App::new(PathBuf::from("."), cfg, None, None).unwrap();
     let text = render_bar_width(&app, 200);
     let version = format!("v{}", env!("CARGO_PKG_VERSION"));
-    // Version is now left-aligned — should appear near the right end but
-    // without any padding-gap before it; should be immediately after earlier segments.
-    // Just verify the bar starts with the hint and ends with version without extra gap.
+    // In default mode (both None), version is on the right, hint on left.
     assert!(text.starts_with(" j/k nav"));
-    assert!(text.contains(&version));
+    assert!(text.trim_end().ends_with(&version));
 }
 
 #[test]
-fn unknown_id_in_right_ignored() {
+fn nonexistent_id_ignored() {
     let cfg = Config {
         git: crate::config::GitConfig {
             status: false,
             ..Default::default()
         },
         statusbar: StatusBarConfig {
-            right: vec!["nonexistent".into()],
+            left: Some(vec!["hint".into()]),
+            right: Some(vec!["nonexistent".into()]),
         },
         ..Config::default()
     };
     let app = App::new(PathBuf::from("."), cfg, None, None).unwrap();
     let text = render_bar_width(&app, 200);
-    // With default config settings, nothing is in right list (since "nonexistent"
-    // doesn't match any segment), so all should be left-aligned.
+    // "nonexistent" doesn't match any built segment; only "hint" (on left) appears.
     assert!(text.starts_with(" j/k nav"));
+    assert!(!text.contains(&format!("v{}", env!("CARGO_PKG_VERSION"))));
 }
 
 #[test]
-fn split_sides_left_right_groups() {
+fn split_sides_default_mode_natural_order() {
+    // Default mode: both None.
     let cfg = StatusBarConfig {
-        right: vec!["version".into(), "git".into()],
+        left: None,
+        right: None,
     };
     // Manually exercise split_sides.
     let segs = vec![
@@ -888,6 +1018,39 @@ fn split_sides_left_right_groups() {
     assert_eq!(right.len(), 2);
     assert_eq!(right[0].content.as_ref(), "ver");
     assert_eq!(right[1].content.as_ref(), "git");
+}
+
+#[test]
+fn split_sides_explicit_mode_order_follows_config() {
+    let cfg = StatusBarConfig {
+        left: Some(vec!["git".into(), "hint".into()]),
+        right: Some(vec!["version".into()]),
+    };
+    let segs = vec![
+        (
+            Span::styled("hint", Style::default()),
+            StatusSegment::Hint,
+            P_HINT,
+        ),
+        (
+            Span::styled("ver", Style::default()),
+            StatusSegment::Version,
+            P_VER,
+        ),
+        (
+            Span::styled("git", Style::default()),
+            StatusSegment::Git,
+            P_GIT,
+        ),
+    ];
+    let (left, right) = split_sides(segs, &cfg);
+    // Left order follows config: git before hint.
+    assert_eq!(left.len(), 2);
+    assert_eq!(left[0].content.as_ref(), "git");
+    assert_eq!(left[1].content.as_ref(), "hint");
+    // Right: version.
+    assert_eq!(right.len(), 1);
+    assert_eq!(right[0].content.as_ref(), "ver");
 }
 
 #[test]
@@ -938,4 +1101,49 @@ fn git_info_none_no_branch_segment() {
     let text = render_bar(&app);
     assert!(!text.contains("[main]"));
     assert!(!text.contains("HEAD (detached)"));
+}
+
+// ── Right-edge flush with Unicode glyphs (Part 2) ────────────────────────
+
+#[test]
+fn right_segment_with_unicode_arrows_is_flush_to_edge() {
+    // Render a bar with git info containing ↑↓ glyphs, verify the last
+    // non-space character hits the right edge.
+    let mut app = make_app();
+    app.git_info = Some(GitRepoInfo {
+        head: GitHead::Branch("main".into()),
+        ahead: 3,
+        behind: 2,
+        total_changed: 5,
+        staged: 2,
+        untracked: 3,
+    });
+    // width = 200 is generous: everything fits, right group is anchored flush.
+    let text = render_bar_width(&app, 200);
+    // The bar should be exactly 200 chars wide.
+    assert_eq!(text.chars().count(), 200);
+    // Rightmost segment (version) must be at the very end, non-space.
+    let trimmed = text.trim_end_matches(' ');
+    assert!(
+        trimmed.ends_with(&format!("v{}", env!("CARGO_PKG_VERSION"))),
+        "version (rightmost segment) should be flush to right edge, got {trimmed:?}"
+    );
+    // Git arrow glyphs should not cause an off-by-one gap.
+    assert!(text.contains('\u{2191}'), "↑ should appear");
+    assert!(text.contains('\u{2193}'), "↓ should appear");
+}
+
+#[test]
+fn right_segment_flush_at_various_widths() {
+    // At any width, after compose_left_right the right group must sit flush
+    // to the right edge (no phantom gap after the last segment).
+    let app = make_app();
+    for width in [30, 40, 50, 60, 80, 100] {
+        let text = render_bar_width(&app, width);
+        let last_non_space = text.trim_end_matches(' ').chars().last().unwrap_or(' ');
+        assert_ne!(
+            last_non_space, ' ',
+            "bar at width {width} should not have trailing space after last segment"
+        );
+    }
 }
