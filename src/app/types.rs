@@ -1,0 +1,100 @@
+//! Supporting types used by the central `App` struct: focus, diff mode, status
+//! messages, and cache keys.
+//!
+//! Extracted from `mod.rs` to stay under the 700-line project limit. Re-exported
+//! from `super::mod.rs` so callers continue to use `crate::app::Focus`,
+//! `crate::app::DiffMode`, etc.
+
+use std::path::PathBuf;
+use std::time::{Duration, Instant};
+
+/// Which panel is currently focused.
+#[derive(Debug, PartialEq)]
+pub enum Focus {
+    /// The file tree panel on the left.
+    Tree,
+    /// The file content / diff panel on the right.
+    Content,
+}
+
+/// Which git diff view is active in the content pane.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum DiffMode {
+    /// All changes vs HEAD (`git diff HEAD`) — the default.
+    #[default]
+    All,
+    /// Only staged changes (`git diff --cached`).
+    Staged,
+    /// Only unstaged changes (`git diff`).
+    Unstaged,
+}
+
+impl DiffMode {
+    /// Cycles through All -> Staged -> Unstaged -> All.
+    pub fn next(self) -> Self {
+        match self {
+            DiffMode::All => DiffMode::Staged,
+            DiffMode::Staged => DiffMode::Unstaged,
+            DiffMode::Unstaged => DiffMode::All,
+        }
+    }
+
+    /// Short label used in the content title badge.
+    pub fn label(self) -> &'static str {
+        match self {
+            DiffMode::All => "all",
+            DiffMode::Staged => "staged",
+            DiffMode::Unstaged => "unstaged",
+        }
+    }
+}
+
+/// Git info provided by a plugin for the status bar, replacing the live
+/// `git::repo_info()` call when set.
+pub struct PluginGitInfo {
+    /// Branch name (e.g. "main", "feature/x").
+    pub branch: String,
+    /// Short commit hash (e.g. "abc1234").
+    #[allow(dead_code)]
+    pub head: String,
+    /// Whether the working tree is dirty.
+    pub dirty: bool,
+    /// State label: "clean", "dirty", "conflict", "rebase", or "merge".
+    pub state: String,
+}
+
+/// A transient status message with a timestamp so it can auto-expire.
+#[derive(Debug)]
+pub struct StatusMessage {
+    pub text: String,
+    pub set_at: Instant,
+}
+
+impl StatusMessage {
+    pub fn new(text: impl Into<String>, now: Instant) -> Self {
+        Self {
+            text: text.into(),
+            set_at: now,
+        }
+    }
+
+    /// Returns `true` when the message has been alive for at least `ttl`.
+    pub fn expired(&self, ttl: Duration) -> bool {
+        self.set_at.elapsed() >= ttl
+    }
+}
+
+/// Cache key for syntax-highlighted visible window. When all fields match the
+/// current rendering state the cached highlight spans can be reused without
+/// re-invoking syntect.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct HighlightCacheKey {
+    pub path: PathBuf,
+    pub scroll: usize,
+    pub visible_end: usize,
+    pub theme: String,
+    pub word_wrap: bool,
+}
+
+pub(crate) type HighlightCacheValue = Vec<Vec<(ratatui::style::Style, String)>>;

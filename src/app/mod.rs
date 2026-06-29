@@ -20,7 +20,7 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::mpsc::Receiver;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use notify::RecommendedWatcher;
 
@@ -30,7 +30,7 @@ use crate::config::{self, Config, Keymap};
 use crate::fold::FoldRegion;
 use crate::git::GitStatus;
 use crate::highlight::Highlighter;
-use crate::plugin::{self, ExtraSyntax, PluginContributions, PluginManager};
+use crate::plugin::{ExtraSyntax, PluginContributions, PluginManager};
 use crate::search::{
     CommandPalette, GotoLineState, HistoryState, InFileSearch, PluginPicker, RecentFilesState,
     SearchState, ThemePicker, TreeFilter,
@@ -50,100 +50,16 @@ mod key_handlers;
 mod loader;
 mod mouse_handlers;
 mod navigation;
+mod plugin_ops;
 mod refresh;
+mod types;
+mod util;
 
 use loader::Loader;
 
-/// Which panel is currently focused.
-#[derive(Debug, PartialEq)]
-pub enum Focus {
-    /// The file tree panel on the left.
-    Tree,
-    /// The file content / diff panel on the right.
-    Content,
-}
-
-/// Which git diff view is active in the content pane.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum DiffMode {
-    /// All changes vs HEAD (`git diff HEAD`) — the default.
-    #[default]
-    All,
-    /// Only staged changes (`git diff --cached`).
-    Staged,
-    /// Only unstaged changes (`git diff`).
-    Unstaged,
-}
-
-impl DiffMode {
-    /// Cycles through All -> Staged -> Unstaged -> All.
-    pub fn next(self) -> Self {
-        match self {
-            DiffMode::All => DiffMode::Staged,
-            DiffMode::Staged => DiffMode::Unstaged,
-            DiffMode::Unstaged => DiffMode::All,
-        }
-    }
-
-    /// Short label used in the content title badge.
-    pub fn label(self) -> &'static str {
-        match self {
-            DiffMode::All => "all",
-            DiffMode::Staged => "staged",
-            DiffMode::Unstaged => "unstaged",
-        }
-    }
-}
-
-/// Git info provided by a plugin for the status bar, replacing the live
-/// `git::repo_info()` call when set.
-pub struct PluginGitInfo {
-    /// Branch name (e.g. "main", "feature/x").
-    pub branch: String,
-    /// Short commit hash (e.g. "abc1234").
-    #[allow(dead_code)]
-    pub head: String,
-    /// Whether the working tree is dirty.
-    pub dirty: bool,
-    /// State label: "clean", "dirty", "conflict", "rebase", or "merge".
-    pub state: String,
-}
-
-/// A transient status message with a timestamp so it can auto-expire.
-#[derive(Debug)]
-pub struct StatusMessage {
-    pub text: String,
-    pub set_at: Instant,
-}
-
-impl StatusMessage {
-    pub fn new(text: impl Into<String>, now: Instant) -> Self {
-        Self {
-            text: text.into(),
-            set_at: now,
-        }
-    }
-
-    /// Returns `true` when the message has been alive for at least `ttl`.
-    pub fn expired(&self, ttl: Duration) -> bool {
-        self.set_at.elapsed() >= ttl
-    }
-}
-
-/// Cache key for syntax-highlighted visible window. When all fields match the
-/// current rendering state the cached highlight spans can be reused without
-/// re-invoking syntect.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct HighlightCacheKey {
-    pub path: PathBuf,
-    pub scroll: usize,
-    pub visible_end: usize,
-    pub theme: String,
-    pub word_wrap: bool,
-}
-
-pub(crate) type HighlightCacheValue = Vec<Vec<(ratatui::style::Style, String)>>;
+pub use types::{DiffMode, Focus, PluginGitInfo, StatusMessage};
+pub(crate) use types::{HighlightCacheKey, HighlightCacheValue};
+pub(crate) use util::{deleted_set, diff_line_style, rect_contains};
 
 /// Central application state. Holds the file tree, content buffers, overlay
 /// state, geometry captured during rendering, and configuration.
@@ -517,81 +433,6 @@ impl App {
         }
     }
 
-    /// Toggles the currently highlighted plugin in the picker: spawns it if
-    /// stopped, kills it if running, or flips the enabled flag for syntax
-    /// plugins and reloads syntax definitions so the change takes effect
-    /// immediately. Updates `config.plugins[name].enabled` and writes `mantis.toml`
-    /// so the change persists across restarts.
-    pub(crate) fn toggle_plugin_picker_selection(&mut self) {
-        let Some(picker) = &self.plugin_picker else {
-            return;
-        };
-        let Some((name, running, kind)) = picker.entries.get(picker.selected).cloned() else {
-            return;
-        };
-        if kind == plugin::PluginKind::Syntax {
-            // Syntax plugin: just flip the enabled flag and rebuild syntaxes.
-            let was_enabled = self
-                .config
-                .plugins
-                .get(&name)
-                .map(|e| e.enabled)
-                .unwrap_or(false);
-            if let Some(entry) = self.config.plugins.get_mut(&name) {
-                entry.enabled = !was_enabled;
-            }
-            self.plugin_manager.set_enabled(&name, !was_enabled);
-            self.save_config();
-            self.rebuild_extra_syntaxes();
-            self.reload_content();
-        } else if running {
-            self.plugin_manager.deactivate_one(&name);
-            if let Some(entry) = self.config.plugins.get_mut(&name) {
-                entry.enabled = false;
-            }
-            self.save_config();
-            // Tear down all state this plugin produced, then re-render the
-            // current file without plugin content. This replaces the former
-            // per-plugin-name special case (e.g. `if name == "iconize"`).
-            self.teardown_plugin_contributions(&name);
-        } else {
-            // Ensure the plugin file is present on disk before spawning.
-            plugin::install_bundled_plugins();
-            match self
-                .plugin_manager
-                .activate_one(&name, self.current_file.as_deref())
-            {
-                Ok(()) => {
-                    if let Some(entry) = self.config.plugins.get_mut(&name) {
-                        entry.enabled = true;
-                    }
-                    self.save_config();
-                }
-                Err(e) => {
-                    self.plugin_message = Some(format!("Plugin error: {e}"));
-                }
-            }
-        }
-        let updated = self.plugin_manager.plugin_entries();
-        if let Some(picker) = &mut self.plugin_picker {
-            picker.entries = updated;
-        }
-    }
-
-    /// Rebuilds the `extra_syntaxes` list from the current config and updates
-    /// the main-thread highlighter and the worker thread's highlighter so that
-    /// syntax highlighting reflects the latest set of enabled syntax plugins.
-    fn rebuild_extra_syntaxes(&mut self) {
-        let mut plugin_entries: Vec<_> = self.config.plugins.clone().into_iter().collect();
-        plugin_entries.sort_by(|a, b| a.0.cmp(&b.0));
-        self.extra_syntaxes = plugin::load_extra_syntaxes(&plugin_entries);
-        self.highlighter = crate::highlight::Highlighter::with_extra_syntaxes(
-            &self.theme.syntax,
-            &self.extra_syntaxes,
-        );
-        self.loader_set_extra_syntaxes();
-    }
-
     /// Rebuilds the file tree, re-fetches git status (async), and reloads the
     /// current file. Triggered explicitly by the reload key, by debounced
     /// filesystem events from the root watcher, or by the periodic fallback
@@ -719,44 +560,6 @@ impl App {
         self.plugin_content_text.clear();
         self.plugin_blame.clear();
         self.plugin_git_info = None;
-    }
-}
-
-/// Builds the set of absolute paths that should appear as ghost (deleted) nodes
-/// in the tree. Only files that are absent from the working tree are included.
-fn deleted_set(map: &HashMap<PathBuf, GitStatus>, enabled: bool) -> HashSet<PathBuf> {
-    if !enabled {
-        return HashSet::new();
-    }
-    map.iter()
-        .filter(|(path, &status)| status == GitStatus::Deleted && !path.exists())
-        .map(|(path, _)| path.clone())
-        .collect()
-}
-
-/// Returns `true` when `(col, row)` lies within the given `Rect`.
-fn rect_contains(area: Rect, col: u16, row: u16) -> bool {
-    col >= area.x
-        && col < area.x.saturating_add(area.width)
-        && row >= area.y
-        && row < area.y.saturating_add(area.height)
-}
-
-/// Colors a unified-diff line by its leading marker.
-fn diff_line_style(line: &str, theme: &Theme) -> ratatui::style::Style {
-    use ratatui::style::{Modifier, Style};
-    if line.starts_with("@@") {
-        Style::default().fg(theme.accent)
-    } else if line.starts_with("+++") || line.starts_with("---") {
-        Style::default().fg(theme.dim).add_modifier(Modifier::BOLD)
-    } else if line.starts_with('+') {
-        Style::default().fg(theme.diff_add)
-    } else if line.starts_with('-') {
-        Style::default().fg(theme.diff_del)
-    } else if line.starts_with("diff ") || line.starts_with("index ") {
-        Style::default().fg(theme.dim)
-    } else {
-        Style::default()
     }
 }
 
