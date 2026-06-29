@@ -7,8 +7,9 @@
 //! carries a hit's path, line number, and surrounding context. The same
 //! query/filtered-list/selected-index shape backs `HistoryState`, `ThemePicker`,
 //! `CommandPalette`, `RecentFilesState`, `PluginPicker`, the in-file search (`InFileSearch`),
-//! and the go-to-line dialog (`GotoLineState`), all defined here. Results sort by
-//! descending fuzzy score; binary files are skipped via `is_binary_bytes`.
+//! and the go-to-line dialog (`GotoLineState`), all defined here. The shared
+//! `fuzzy_refilter` helper scores and sorts any typed item list by descending fuzzy
+//! score; binary files are skipped via `is_binary_bytes`.
 
 use std::collections::{HashMap, HashSet};
 use std::fs;

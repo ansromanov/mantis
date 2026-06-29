@@ -457,9 +457,8 @@ fn fuzzy_refilter_returns_matching_indices() {
 }
 
 #[test]
-fn fuzzy_refilter_sorts_by_descending_score() {
+fn fuzzy_refilter_returns_all_matched_items() {
     let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
-    // All three items match "bar"; verify they are all returned
     let items = vec!["foobar", "baz_bar_qux", "barn"];
     let result = fuzzy_refilter(&items, &matcher, "bar", |s| std::borrow::Cow::Borrowed(*s));
     assert_eq!(
@@ -467,10 +466,22 @@ fn fuzzy_refilter_sorts_by_descending_score() {
         3,
         "all items matching 'bar' should be returned"
     );
-    // Verify the result is a permutation of {0, 1, 2} (all indices present)
     let mut sorted = result.clone();
     sorted.sort_unstable();
     assert_eq!(sorted, vec![0, 1, 2]);
+}
+
+#[test]
+fn fuzzy_refilter_sorts_by_descending_score() {
+    let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
+    // "beta" is an exact/prefix match for query "beta"; "alphabeta" is weaker
+    let items = vec!["alphabeta", "beta"];
+    let result = fuzzy_refilter(&items, &matcher, "beta", |s| std::borrow::Cow::Borrowed(*s));
+    assert_eq!(result.len(), 2);
+    assert_eq!(
+        result[0], 1,
+        "exact match 'beta' should rank before 'alphabeta'"
+    );
 }
 
 #[test]
