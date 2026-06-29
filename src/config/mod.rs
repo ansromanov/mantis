@@ -25,13 +25,17 @@ mod keymap;
 mod types;
 mod validate;
 
-// Types re-exported for the public API; only used in tests/doc links within the crate.
+// Used in both test and non-test code.
+pub use keymap::{pressed, Keymap};
+pub use types::{Config, StatusBarConfig};
+// Used by name only in test code (struct literals in *_test helpers).
+#[cfg_attr(not(test), allow(unused_imports))]
+pub use types::{GitConfig, GitDiffConfig, TreeConfig};
+// Only referenced in doc links or via field access — never named in code.
 #[allow(unused_imports)]
-pub use keymap::{pressed, KeyBinding, Keymap};
+pub use keymap::KeyBinding;
 #[allow(unused_imports)]
-pub use types::{
-    Config, ContentConfig, GitConfig, GitDiffConfig, SearchConfig, StatusBarConfig, TreeConfig,
-};
+pub use types::{ContentConfig, SearchConfig};
 // Internal helpers used in tests.
 #[cfg_attr(not(test), allow(unused_imports))]
 pub(crate) use keymap::{bind, parse_binding};
