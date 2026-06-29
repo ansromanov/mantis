@@ -221,7 +221,11 @@ impl App {
             return;
         };
         match handle_list_picker_key(f, &key) {
-            OverlayKey::Activate | OverlayKey::Close => {
+            OverlayKey::Activate => {
+                self.tree_filter = None;
+                self.activate_selected();
+            }
+            OverlayKey::Close => {
                 self.tree_filter = None;
             }
             OverlayKey::Handled => {
