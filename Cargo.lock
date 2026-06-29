@@ -826,7 +826,7 @@ dependencies = [
 
 [[package]]
 name = "mantis"
-version = "0.11.20"
+version = "0.11.21"
 dependencies = [
  "anyhow",
  "arboard",
