@@ -28,28 +28,53 @@ keys that differ from the defaults back to your `mantis.toml`, keeping it small.
 see all available options, open `mantis.default.toml`; to change one, copy that line
 into your `mantis.toml`.
 
-## General options
+## Options
 
-These top-level keys control default behavior:
+Options are grouped into tables by area. A few general keys sit at the top
+level (they must appear before the first `[table]` header); everything else
+lives under `[tree]`, `[content]`, `[search]`, or `[git]`.
+
+> **Migrated from flat keys?** Older configs used flat top-level keys
+> (`show_hidden`, `tree_width`, `git_status`, …). Those still load — they are
+> folded into the grouped tables automatically — but the grouped form below is
+> canonical. `mantis.default.toml` is refreshed to the grouped layout on upgrade.
 
 ```toml
-show_hidden = false       # show dotfiles
-ignore_gitignore = false  # show files excluded by .gitignore
-tree_width = 28           # tree panel width, as a percent of the terminal
-word_wrap = false         # wrap long lines in the content panel
-line_numbers = true       # show the line-number gutter in the content panel
-show_file_info = true     # show encoding and line-ending info in the status bar
-recent_files_count = 10   # number of recently opened files to remember
+# top-level (must precede any [table])
+recent_files_count = 10      # number of recently opened files to remember
+palette_pin_recent = true    # pin the last-used command atop the Ctrl+P palette
+palette_frequent_count = 3   # most-used commands pinned below it; 0 disables
 
-# Git status — which working-tree changes appear in the changed-file list
-# and the tree status colors:
-# git_show_untracked = true   # include untracked (??) files (default: true)
-# git_show_ignored   = false  # include ignored (!!) files (default: false)
-# git_show_deleted   = false  # show ghost nodes for deleted tracked files (default: false)
-indent_guides = true      # draw indentation guide lines (│) in the tree pane
-icons = false             # Nerd Font file-type icons (icon map supplied by a plugin)
+[tree]
+show_hidden = false          # show dotfiles / hidden entries
+width = 28                   # tree panel width in columns
+independent_scroll = false   # PageUp/Down scroll the viewport, not the selection
+indent_guides = true         # draw indentation guide lines (│)
+icons = false                # Nerd Font file-type icons (icon map from a plugin)
 
-# diff_mode = "all"       # default git diff source: "all" (vs HEAD), "staged", "unstaged"
+[content]
+word_wrap = false            # wrap long lines in the content pane
+line_numbers = true          # show the line-number gutter
+scrollbar = true             # show a scrollbar
+scroll_percentage = true     # show scroll-position percentage
+watch = false                # auto-reload the open file when it changes on disk
+show_file_info = true        # encoding + line-ending info in the status bar
+
+[search]
+in_file_search = true        # enable in-file incremental search via `/`
+context_lines = 0            # trailing context lines shown after each match
+keep_query = false           # restore the last query when reopening search
+
+[git]
+status = true                # show git status colours/markers in the tree
+show_untracked = true        # include untracked (??) files
+show_ignored = false         # include ignored (!!) files
+show_deleted = false         # ghost nodes for deleted tracked files
+ignore_gitignore = false     # respect .gitignore when listing files
+
+[git.diff]
+mode = "all"                 # default diff source: "all" (vs HEAD) | "staged" | "unstaged"
+side_by_side = false         # start the diff view in side-by-side layout
 ```
 
 ## Keybindings
@@ -75,37 +100,43 @@ with modifiers: `"ctrl+c"`.
 
 ```toml
 [keys]
+# global
 quit = ["q", "ctrl+c"]
 help = ["?"]
-toggle_hidden = ["."]
-search_files = ["/"]
-find_files = ["ctrl+f"]
-search_content = ["f"]
+command_palette = ["ctrl+p"]
 reload = ["r"]
 switch_panel = ["Tab"]
-file_history = ["H"]
-recent_files = ["ctrl+o"]
+toggle_hidden = ["."]
 theme_picker = ["t"]
 plugin_picker = ["p"]
-command_palette = ["ctrl+p"]
 open_in_editor = ["e"]
 copy_path = ["y"]
 copy_relative_path = ["Y"]
-toggle_blame = ["b"]
-blame_line = ["B"]
-go_to_line = [":"]
+toggle_watch = ["W"]
+recent_files = ["ctrl+o"]
+file_history = ["H"]
+goto_line = [":"]
 git_mode_toggle = ["ctrl+g"]
 git_mode_flat_toggle = ["F"]
 
+# search
+search_files = ["/"]
+find_files = ["ctrl+f"]
+search_content = ["f"]
+
+# navigation (shared by tree and content panes)
 nav_up = ["Up", "k"]
 nav_down = ["Down", "j"]
 
+# tree pane
 tree_expand = ["Enter", "Right", "l"]
 tree_collapse = ["Left", "h"]
 tree_up_dir = ["Backspace"]
 tree_collapse_all = ["-"]
 tree_expand_all = ["="]
+fold_toggle = ["Space"]
 
+# content pane
 content_left = ["Left"]
 content_right = ["Right"]
 content_top = ["g", "Home"]
@@ -113,11 +144,18 @@ content_bottom = ["G", "End"]
 content_page_up = ["PageUp"]
 content_page_down = ["PageDown"]
 content_reset_col = ["0"]
-fold_toggle = ["Space"]
 toggle_wrap = ["z"]
 toggle_line_numbers = ["L"]
 toggle_raw_markdown = ["M"]
 toggle_pretty_json = ["J"]
+toggle_blame = ["b"]
+blame_line = ["B"]
+
+# diff view
+toggle_diff_side_by_side = ["D"]
+toggle_diff_staged = ["S"]
+diff_hunk_next = ["n"]
+diff_hunk_prev = ["N"]
 ```
 
 ## Command palette ranking
