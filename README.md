@@ -102,6 +102,7 @@ Linux you can also use Homebrew:
 
 ```sh
 brew tap ansromanov/mantis https://github.com/ansromanov/mantis
+brew trust ansromanov/mantis
 brew install mantis
 ```
 

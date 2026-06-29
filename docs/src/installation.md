@@ -116,12 +116,16 @@ sha256sum --check --ignore-missing SHA256SUMS
 
 ### Homebrew (macOS / Linux)
 
-The formula lives in this repository, so tap it by URL, then install:
+The formula lives in this repository, so tap it by URL, trust it, then install:
 
 ```sh
 brew tap ansromanov/mantis https://github.com/ansromanov/mantis
+brew trust ansromanov/mantis
 brew install mantis
 ```
+
+> The `brew trust` step is required: Homebrew refuses to load formulae from
+> third-party taps until you explicitly trust them.
 
 The formula installs the prebuilt binary for your platform (Apple Silicon, Intel,
 Linux x86_64, and Linux arm64) — no Rust toolchain required. It is bumped
