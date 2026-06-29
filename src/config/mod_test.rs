@@ -462,3 +462,42 @@ fn sparse_toml_emits_nested_tree_content_search_form() {
     assert!(reparsed.content.word_wrap);
     assert_eq!(reparsed.search.context_lines, 5);
 }
+
+#[test]
+fn init_writes_static_keys_reference() {
+    let dir = scratch_dir("static_keys");
+    let user = dir.join("mantis.toml");
+    init_config_dir(&user);
+
+    // Static keys reference is written alongside user config.
+    let static_keys = fs::read_to_string(dir.join("mantis.static.toml"))
+        .expect("mantis.static.toml should be created");
+    assert!(
+        static_keys.contains("Reserved modal keybindings"),
+        "missing header in static keys"
+    );
+    assert!(
+        static_keys.contains("modal_keys"),
+        "missing [modal_keys] section"
+    );
+    assert!(
+        static_keys.contains("close"),
+        "missing close binding documentation"
+    );
+
+    fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn refresh_static_keys_reference_rewrites_only_when_stale() {
+    let dir = scratch_dir("static_keys_refresh");
+    // Missing -> written.
+    assert!(refresh_static_keys_reference(&dir));
+    // Identical -> skipped.
+    assert!(!refresh_static_keys_reference(&dir));
+    // Stale (simulating an old version) -> rewritten to the current template.
+    fs::write(dir.join("mantis.static.toml"), "# outdated\n").unwrap();
+    assert!(refresh_static_keys_reference(&dir));
+
+    fs::remove_dir_all(&dir).ok();
+}

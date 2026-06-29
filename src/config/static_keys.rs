@@ -1,0 +1,87 @@
+//! Reserved (non-configurable) modal keys.
+//!
+//! Defines intent-based predicates for keys that are reserved and not user-rewritable:
+//! Esc, Enter, Up/Down, PageUp/PageDown, Backspace, Tab/BackTab, and printable Char.
+//! This is the single source of truth for modal keybindings; all overlays and modals
+//! should use these predicates instead of matching `KeyCode::*` directly.
+
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+/// Modal-only. Closes/cancels the active overlay (Esc).
+pub fn is_close(key: &KeyEvent) -> bool {
+    key.code == KeyCode::Esc
+}
+
+/// Modal-only. Activates the selected item (Enter).
+#[allow(dead_code)]
+pub fn is_activate(key: &KeyEvent) -> bool {
+    key.code == KeyCode::Enter
+}
+
+/// Modal list navigation: move up (Up, k).
+pub fn is_list_up(key: &KeyEvent) -> bool {
+    matches!(key.code, KeyCode::Up | KeyCode::Char('k'))
+}
+
+/// Modal list navigation: move down (Down, j).
+pub fn is_list_down(key: &KeyEvent) -> bool {
+    matches!(key.code, KeyCode::Down | KeyCode::Char('j'))
+}
+
+/// Modal list pagination: page up (PageUp).
+pub fn is_page_up(key: &KeyEvent) -> bool {
+    key.code == KeyCode::PageUp
+}
+
+/// Modal list pagination: page down (PageDown).
+pub fn is_page_down(key: &KeyEvent) -> bool {
+    key.code == KeyCode::PageDown
+}
+
+/// In-file search navigation: previous match (Up, N, BackTab, Ctrl+P).
+pub fn is_prev_match(key: &KeyEvent) -> bool {
+    match key.code {
+        KeyCode::Up | KeyCode::BackTab => true,
+        KeyCode::Char('N') => true,
+        KeyCode::Char('P') => key.modifiers.intersects(KeyModifiers::CONTROL),
+        _ => false,
+    }
+}
+
+/// In-file search navigation: next match (Down, n, Tab).
+pub fn is_next_match(key: &KeyEvent) -> bool {
+    matches!(key.code, KeyCode::Down | KeyCode::Char('n') | KeyCode::Tab)
+}
+
+/// Modal-only. Deletes character or closes on empty (Backspace).
+#[allow(dead_code)]
+pub fn is_delete_char(key: &KeyEvent) -> bool {
+    key.code == KeyCode::Backspace
+}
+
+/// Modal overlay toggle (Tab for search: file/content mode toggle).
+pub fn is_toggle_modal(key: &KeyEvent) -> bool {
+    key.code == KeyCode::Tab
+}
+
+/// Plugin picker toggle (Space).
+pub fn is_toggle_selection(key: &KeyEvent) -> bool {
+    key.code == KeyCode::Char(' ')
+}
+
+/// Modal about screen: open release URL (o).
+pub fn is_open_release(key: &KeyEvent) -> bool {
+    key.code == KeyCode::Char('o')
+}
+
+/// Modal about/help screen: close (?, q, Esc, Enter).
+pub fn is_modal_close(key: &KeyEvent) -> bool {
+    matches!(
+        key.code,
+        KeyCode::Char('?') | KeyCode::Char('q') | KeyCode::Esc | KeyCode::Enter
+    )
+}
+
+#[cfg(test)]
+#[path = "static_keys_test.rs"]
+mod tests;

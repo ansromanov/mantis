@@ -38,21 +38,30 @@ pub trait ListPicker {
 
 /// Shared key handling for any `ListPicker`.
 ///
-/// Handles: Esc → Close, Enter → Activate, Up/Down → navigation,
+/// Handles: Esc → Close, Enter → Activate, Up/Down/PageUp/PageDown → navigation,
 /// Backspace → pop or Close if empty query, Char → push.
 /// Returns what the caller should do with the result.
 pub fn handle_list_picker_key<P: ListPicker>(p: &mut P, key: &KeyEvent) -> OverlayKey {
     match key.code {
         KeyCode::Esc => OverlayKey::Close,
         KeyCode::Enter => OverlayKey::Activate,
-        KeyCode::Up => {
+        KeyCode::Up | KeyCode::Char('k') => {
             p.set_selected(p.selected().saturating_sub(1));
             OverlayKey::Handled
         }
-        KeyCode::Down => {
+        KeyCode::Down | KeyCode::Char('j') => {
             if p.selected() + 1 < p.results_len() {
                 p.set_selected(p.selected() + 1);
             }
+            OverlayKey::Handled
+        }
+        KeyCode::PageUp => {
+            p.set_selected(p.selected().saturating_sub(10));
+            OverlayKey::Handled
+        }
+        KeyCode::PageDown => {
+            let next = (p.selected() + 10).min(p.results_len().saturating_sub(1));
+            p.set_selected(next);
             OverlayKey::Handled
         }
         KeyCode::Backspace => {

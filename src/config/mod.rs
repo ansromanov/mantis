@@ -22,6 +22,7 @@
 //! a saved config is lossless.
 
 mod keymap;
+pub mod static_keys;
 mod types;
 mod validate;
 
@@ -120,17 +121,18 @@ pub fn sparse_toml(config: &Config) -> String {
 }
 
 /// Prepares the global config directory on launch. The fully-commented default
-/// reference (`mantis.default.toml`) is refreshed whenever it is missing or stale
-/// (i.e. after an upgrade), so users always have an up-to-date catalogue of every
-/// option. The user's own `mantis.toml` is **never** overwritten: it is created once,
-/// as a minimal stub, only when absent. Bundled themes and plugins are seeded on
-/// that same first run.
+/// reference (`mantis.default.toml`) and static keys reference (`mantis.static.toml`)
+/// are refreshed whenever they are missing or stale (i.e. after an upgrade), so users
+/// always have an up-to-date catalogue of every option and reserved key. The user's own
+/// `mantis.toml` is **never** overwritten: it is created once, as a minimal stub, only
+/// when absent. Bundled themes and plugins are seeded on that same first run.
 fn init_config_dir(user_path: &Path) {
     let Some(dir) = user_path.parent() else {
         return;
     };
     let _ = fs::create_dir_all(dir);
     refresh_default_reference(dir);
+    refresh_static_keys_reference(dir);
     if !user_path.exists() {
         let _ = fs::write(user_path, USER_CONFIG_STUB);
         crate::theme::install_embedded_themes();
@@ -151,6 +153,17 @@ fn refresh_default_reference(dir: &Path) -> bool {
     fs::write(&path, DEFAULT_CONFIG_TEMPLATE).is_ok()
 }
 
+/// Writes the embedded static keys reference to `{dir}/mantis.static.toml`, but
+/// only when the file is missing or stale. Returns whether the file was (re)written.
+/// This is informational only; the static keys cannot be overridden.
+fn refresh_static_keys_reference(dir: &Path) -> bool {
+    let path = dir.join(STATIC_KEYS_REFERENCE_NAME);
+    if fs::read_to_string(&path).ok().as_deref() == Some(STATIC_KEYS_TEMPLATE) {
+        return false;
+    }
+    fs::write(&path, STATIC_KEYS_TEMPLATE).is_ok()
+}
+
 /// The embedded, fully-commented default configuration. Source of truth for both
 /// default values and the on-disk `mantis.default.toml` reference.
 const DEFAULT_CONFIG_TEMPLATE: &str = include_str!("../../mantis.toml");
@@ -169,6 +182,52 @@ const USER_CONFIG_STUB: &str = "\
 # See mantis.default.toml in this directory (refreshed on every upgrade) for the
 # full, commented list of available options.
 ";
+
+/// Reserved (non-configurable) modal keybindings reference.
+/// This is informational only — these keys cannot be remapped via [keys].
+const STATIC_KEYS_TEMPLATE: &str = "\
+# ============================================================================
+#  Reserved modal keybindings (non-configurable)
+# ============================================================================
+# This file documents the fixed keybindings for modal overlays and screens.
+# These keys CANNOT be remapped via the [keys] section in mantis.toml.
+# They are reserved to ensure consistent, predictable modal behavior.
+#
+# This is a read-only reference; changes here have no effect.
+# ============================================================================
+
+[modal_keys]
+# Overlay navigation and activation
+close = \"Esc\"                           # close/cancel any overlay
+activate = \"Enter\"                      # activate selected item
+
+# List navigation (search, history, picker, etc.)
+list_up = [\"Up\", \"k\"]                 # move up
+list_down = [\"Down\", \"j\"]             # move down
+page_up = \"PageUp\"                      # scroll up by page
+page_down = \"PageDown\"                  # scroll down by page
+
+# Text input
+delete_char = \"Backspace\"               # delete character or close if empty
+input_char = \"<any printable>\"          # type to filter
+
+# In-file search navigation
+search_next = [\"Down\", \"n\", \"Tab\"]  # next match
+search_prev = [\"Up\", \"N\", \"BackTab\", \"Ctrl+P\"]  # previous match
+
+# About/Help screens
+about_open_release = \"o\"                # open release URL (About screen)
+modal_close = [\"?\", \"q\", \"Esc\", \"Enter\"]  # close modal (About/Help)
+
+# Search overlay
+toggle_search_mode = \"Tab\"              # toggle file/content search mode
+
+# Plugin picker
+plugin_toggle = \"Space\"                 # toggle plugin selection
+";
+
+/// Filename of the read-only static keys reference written next to the user config.
+const STATIC_KEYS_REFERENCE_NAME: &str = "mantis.static.toml";
 
 /// Candidate config paths in precedence order: project-local (`mantis.toml` in the
 /// root and each ancestor), then the global config.
