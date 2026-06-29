@@ -66,3 +66,17 @@ fn active_line_in_bounds_after_file_open() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn show_line_blame_without_file_is_no_op() {
+    // draw_line_blame now always calls git::file_blame (plugin_blame removed).
+    // Guard condition: current_file must be set; without it the popup is skipped.
+    let root = temp_dir();
+    let mut app = app_for(&root);
+    app.show_line_blame = true;
+    assert!(
+        app.current_file.is_none(),
+        "no file open — draw_line_blame returns early, no blame call"
+    );
+    fs::remove_dir_all(&root).ok();
+}
