@@ -250,233 +250,253 @@ impl App {
         params: &serde_json::Value,
     ) {
         match action {
-            "show_message" => {
-                if let Some(msg) = params.get("message").and_then(|v| v.as_str()) {
-                    self.plugin_message = Some(format!("[{name}] {msg}"));
-                }
-            }
-            "open_file" => {
-                if let Some(path_str) = params.get("path").and_then(|v| v.as_str()) {
-                    self.plugin_is_opening_file = true;
-                    self.open_and_reveal(std::path::Path::new(path_str));
-                    self.plugin_is_opening_file = false;
-                }
-            }
-            "set_file_statuses" => {
-                if let Some(obj) = params.as_object() {
-                    for (path_str, status_val) in obj {
-                        let Some(status_str) = status_val.as_str() else {
-                            continue;
-                        };
-                        let git_status = match status_str {
-                            "modified" | "renamed" | "conflict" => crate::git::GitStatus::Modified,
-                            "added" | "untracked" => crate::git::GitStatus::New,
-                            "deleted" => crate::git::GitStatus::Deleted,
-                            "ignored" => crate::git::GitStatus::Ignored,
-                            _ => continue,
-                        };
-                        let path = std::path::PathBuf::from(path_str);
-                        self.git_status_map.insert(path.clone(), git_status);
-                        self.plugin_contributions
-                            .entry(name.to_string())
-                            .or_default()
-                            .status_paths
-                            .insert(path);
-                    }
-                }
-            }
-            "set_blame_data" => {
-                let path = match params.get("path").and_then(|v| v.as_str()) {
-                    Some(p) => std::path::PathBuf::from(p),
-                    None => return,
-                };
-                let lines: Vec<String> = match params.get("lines").and_then(|v| v.as_array()) {
-                    Some(arr) => arr
-                        .iter()
-                        .filter_map(|v| v.as_str().map(String::from))
-                        .collect(),
-                    None => return,
-                };
-                self.plugin_blame.insert(path.clone(), lines);
-                self.plugin_contributions
-                    .entry(name.to_string())
-                    .or_default()
-                    .blame_paths
-                    .insert(path);
-            }
-            "set_icon_map" => {
-                if let Some(obj) = params.as_object() {
-                    if let Some(icons) = obj.get("icons").and_then(|v| v.as_object()) {
-                        for (ext, glyph) in icons {
-                            if let Some(g) = glyph.as_str() {
-                                self.icon_map
-                                    .insert(ext.to_ascii_lowercase(), g.to_string());
-                            }
-                        }
-                        self.icons_enabled = true;
-                    }
-                    if let Some(open) = obj.get("dir_open").and_then(|v| v.as_str()) {
-                        self.icon_dir_open = open.to_string();
-                    }
-                    if let Some(closed) = obj.get("dir_closed").and_then(|v| v.as_str()) {
-                        self.icon_dir_closed = closed.to_string();
-                    }
-                    if let Some(fallback) = obj.get("fallback").and_then(|v| v.as_str()) {
-                        self.icon_fallback = fallback.to_string();
-                    }
-                    self.plugin_contributions
-                        .entry(name.to_string())
-                        .or_default()
-                        .has_icon_map = true;
-                }
-            }
-            "set_status_bar_git_info" => {
-                let branch = params
-                    .get("branch")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string();
-                let head = params
-                    .get("head")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string();
-                let dirty = params
-                    .get("dirty")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false);
-                let state = params
-                    .get("state")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("clean")
-                    .to_string();
-                self.plugin_git_info = Some(super::PluginGitInfo {
-                    branch,
-                    head,
-                    dirty,
-                    state,
-                });
-                self.plugin_contributions
-                    .entry(name.to_string())
-                    .or_default()
-                    .has_git_info = true;
-            }
-            "set_content" => {
-                let lines: Vec<String> = match params.get("lines").and_then(|v| v.as_array()) {
-                    Some(arr) => arr
-                        .iter()
-                        .filter_map(|v| v.as_str().map(String::from))
-                        .collect(),
-                    None => return,
-                };
-                let path = match params.get("path").and_then(|v| v.as_str()) {
-                    Some(p) => std::path::PathBuf::from(p),
-                    None => return,
-                };
-                let rendered: Vec<Vec<(ratatui::style::Style, String)>> = lines
-                    .iter()
-                    .map(|l| crate::ansi::parse_ansi_line(l))
-                    .collect();
-                let text: Vec<String> = rendered
-                    .iter()
-                    .map(|spans| spans.iter().map(|(_, t)| t.as_str()).collect::<String>())
-                    .collect();
-                // Only reset scroll / mark active when the render targets the
-                // file currently on screen; a plugin rendering a background path
-                // must not yank the viewport of the file the user is reading.
-                let is_current = self.current_file.as_deref() == Some(path.as_path());
-                self.plugin_content_text.insert(path.clone(), text);
-                self.plugin_content.insert(path.clone(), rendered);
-                self.plugin_contributions
-                    .entry(name.to_string())
-                    .or_default()
-                    .content_paths
-                    .insert(path);
-                if is_current {
-                    // First render of this file by a plugin resets the viewport;
-                    // subsequent re-renders preserve scroll (clamped) so that
-                    // periodic plugin updates don't yank the user's position.
-                    let first_render =
-                        self.plugin_content_active_path.as_deref() != self.current_file.as_deref();
-                    self.plugin_content_active_path = self.current_file.clone();
-                    if first_render {
-                        self.set_content_scroll(0);
-                        self.content_hscroll = 0;
-                    } else {
-                        self.clamp_content_scroll();
-                    }
-                    self.plugin_content_active = true;
-                }
-            }
+            "show_message" => self.handle_plugin_show_message(name, params),
+            "open_file" => self.handle_plugin_open_file(name, params),
+            "set_file_statuses" => self.handle_plugin_set_file_statuses(name, params),
+            "set_blame_data" => self.handle_plugin_set_blame_data(name, params),
+            "set_icon_map" => self.handle_plugin_set_icon_map(name, params),
+            "set_status_bar_git_info" => self.handle_plugin_set_status_bar_git_info(name, params),
+            "set_content" => self.handle_plugin_set_content(name, params),
             "register_language_provider" => {
-                let extensions: Vec<String> = params
-                    .get("extensions")
-                    .and_then(|v| v.as_array())
-                    .map(|arr| {
-                        arr.iter()
-                            .filter_map(|v| v.as_str().map(str::to_ascii_lowercase))
-                            .collect()
-                    })
-                    .unwrap_or_default();
-                let capabilities: std::collections::HashSet<crate::plugin::Capability> = params
-                    .get("capabilities")
-                    .and_then(|v| v.as_array())
-                    .map(|arr| {
-                        arr.iter()
-                            .filter_map(|v| serde_json::from_value(v.clone()).ok())
-                            .collect()
-                    })
-                    .unwrap_or_default();
-                let reg = crate::plugin::LanguageProviderRegistration {
-                    plugin_name: name.to_string(),
-                    extensions,
-                    capabilities,
-                };
-                self.plugin_manager.register_provider(reg);
+                self.handle_plugin_register_language_provider(name, params);
             }
-            "set_fold_regions" => {
-                let path = match params.get("path").and_then(|v| v.as_str()) {
-                    Some(p) => std::path::PathBuf::from(p),
-                    None => return,
+            "set_fold_regions" => self.handle_plugin_set_fold_regions(name, params),
+            _ => {}
+        }
+    }
+
+    fn handle_plugin_show_message(&mut self, name: &str, params: &serde_json::Value) {
+        if let Some(msg) = params.get("message").and_then(|v| v.as_str()) {
+            self.plugin_message = Some(format!("[{name}] {msg}"));
+        }
+    }
+
+    fn handle_plugin_open_file(&mut self, _name: &str, params: &serde_json::Value) {
+        if let Some(path_str) = params.get("path").and_then(|v| v.as_str()) {
+            self.plugin_is_opening_file = true;
+            self.open_and_reveal(std::path::Path::new(path_str));
+            self.plugin_is_opening_file = false;
+        }
+    }
+
+    fn handle_plugin_set_file_statuses(&mut self, name: &str, params: &serde_json::Value) {
+        if let Some(obj) = params.as_object() {
+            for (path_str, status_val) in obj {
+                let Some(status_str) = status_val.as_str() else {
+                    continue;
                 };
-                // Only accept fold regions from a provider that registered the
-                // file's extension with the Fold capability.
-                let ext = path
-                    .extension()
-                    .and_then(|e| e.to_str())
-                    .unwrap_or_default();
-                if self
-                    .plugin_manager
-                    .provider_for(ext, &crate::plugin::Capability::Fold)
-                    .is_none()
-                {
-                    return;
-                }
-                let regions: Vec<crate::fold::FoldRegion> = params
-                    .get("regions")
-                    .and_then(|v| v.as_array())
-                    .map(|arr| {
-                        arr.iter()
-                            .filter_map(|r| {
-                                let pair = r.as_array()?;
-                                let start = pair.first()?.as_i64()? as usize;
-                                let end = pair.get(1)?.as_i64()? as usize;
-                                Some(crate::fold::FoldRegion { start, end })
-                            })
-                            .collect()
-                    })
-                    .unwrap_or_default();
-                self.plugin_fold_regions.insert(path.clone(), regions);
+                let git_status = match status_str {
+                    "modified" | "renamed" | "conflict" => crate::git::GitStatus::Modified,
+                    "added" | "untracked" => crate::git::GitStatus::New,
+                    "deleted" => crate::git::GitStatus::Deleted,
+                    "ignored" => crate::git::GitStatus::Ignored,
+                    _ => continue,
+                };
+                let path = std::path::PathBuf::from(path_str);
+                self.git_status_map.insert(path.clone(), git_status);
                 self.plugin_contributions
                     .entry(name.to_string())
                     .or_default()
-                    .fold_region_paths
-                    .insert(path.clone());
-                if self.current_file.as_deref() == Some(&path) {
-                    self.apply_plugin_fold_regions(&path);
-                }
+                    .status_paths
+                    .insert(path);
             }
-            _ => {}
+        }
+    }
+
+    fn handle_plugin_set_blame_data(&mut self, name: &str, params: &serde_json::Value) {
+        let path = match params.get("path").and_then(|v| v.as_str()) {
+            Some(p) => std::path::PathBuf::from(p),
+            None => return,
+        };
+        let lines: Vec<String> = match params.get("lines").and_then(|v| v.as_array()) {
+            Some(arr) => arr
+                .iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect(),
+            None => return,
+        };
+        self.plugin_blame.insert(path.clone(), lines);
+        self.plugin_contributions
+            .entry(name.to_string())
+            .or_default()
+            .blame_paths
+            .insert(path);
+    }
+
+    fn handle_plugin_set_icon_map(&mut self, name: &str, params: &serde_json::Value) {
+        if let Some(obj) = params.as_object() {
+            if let Some(icons) = obj.get("icons").and_then(|v| v.as_object()) {
+                for (ext, glyph) in icons {
+                    if let Some(g) = glyph.as_str() {
+                        self.icon_map
+                            .insert(ext.to_ascii_lowercase(), g.to_string());
+                    }
+                }
+                self.icons_enabled = true;
+            }
+            if let Some(open) = obj.get("dir_open").and_then(|v| v.as_str()) {
+                self.icon_dir_open = open.to_string();
+            }
+            if let Some(closed) = obj.get("dir_closed").and_then(|v| v.as_str()) {
+                self.icon_dir_closed = closed.to_string();
+            }
+            if let Some(fallback) = obj.get("fallback").and_then(|v| v.as_str()) {
+                self.icon_fallback = fallback.to_string();
+            }
+            self.plugin_contributions
+                .entry(name.to_string())
+                .or_default()
+                .has_icon_map = true;
+        }
+    }
+
+    fn handle_plugin_set_status_bar_git_info(&mut self, name: &str, params: &serde_json::Value) {
+        let branch = params
+            .get("branch")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let head = params
+            .get("head")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let dirty = params
+            .get("dirty")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let state = params
+            .get("state")
+            .and_then(|v| v.as_str())
+            .unwrap_or("clean")
+            .to_string();
+        self.plugin_git_info = Some(super::PluginGitInfo {
+            branch,
+            head,
+            dirty,
+            state,
+        });
+        self.plugin_contributions
+            .entry(name.to_string())
+            .or_default()
+            .has_git_info = true;
+    }
+
+    fn handle_plugin_set_content(&mut self, name: &str, params: &serde_json::Value) {
+        let lines: Vec<String> = match params.get("lines").and_then(|v| v.as_array()) {
+            Some(arr) => arr
+                .iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect(),
+            None => return,
+        };
+        let path = match params.get("path").and_then(|v| v.as_str()) {
+            Some(p) => std::path::PathBuf::from(p),
+            None => return,
+        };
+        let rendered: Vec<Vec<(ratatui::style::Style, String)>> = lines
+            .iter()
+            .map(|l| crate::ansi::parse_ansi_line(l))
+            .collect();
+        let text: Vec<String> = rendered
+            .iter()
+            .map(|spans| spans.iter().map(|(_, t)| t.as_str()).collect::<String>())
+            .collect();
+        // Only reset scroll / mark active when the render targets the
+        // file currently on screen; a plugin rendering a background path
+        // must not yank the viewport of the file the user is reading.
+        let is_current = self.current_file.as_deref() == Some(path.as_path());
+        self.plugin_content_text.insert(path.clone(), text);
+        self.plugin_content.insert(path.clone(), rendered);
+        self.plugin_contributions
+            .entry(name.to_string())
+            .or_default()
+            .content_paths
+            .insert(path);
+        if is_current {
+            // First render of this file by a plugin resets the viewport;
+            // subsequent re-renders preserve scroll (clamped) so that
+            // periodic plugin updates don't yank the user's position.
+            let first_render =
+                self.plugin_content_active_path.as_deref() != self.current_file.as_deref();
+            self.plugin_content_active_path = self.current_file.clone();
+            if first_render {
+                self.set_content_scroll(0);
+                self.content_hscroll = 0;
+            } else {
+                self.clamp_content_scroll();
+            }
+            self.plugin_content_active = true;
+        }
+    }
+
+    fn handle_plugin_register_language_provider(&mut self, name: &str, params: &serde_json::Value) {
+        let extensions: Vec<String> = params
+            .get("extensions")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(str::to_ascii_lowercase))
+                    .collect()
+            })
+            .unwrap_or_default();
+        let capabilities: std::collections::HashSet<crate::plugin::Capability> = params
+            .get("capabilities")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| serde_json::from_value(v.clone()).ok())
+                    .collect()
+            })
+            .unwrap_or_default();
+        let reg = crate::plugin::LanguageProviderRegistration {
+            plugin_name: name.to_string(),
+            extensions,
+            capabilities,
+        };
+        self.plugin_manager.register_provider(reg);
+    }
+
+    fn handle_plugin_set_fold_regions(&mut self, name: &str, params: &serde_json::Value) {
+        let path = match params.get("path").and_then(|v| v.as_str()) {
+            Some(p) => std::path::PathBuf::from(p),
+            None => return,
+        };
+        // Only accept fold regions from a provider that registered the
+        // file's extension with the Fold capability.
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or_default();
+        if self
+            .plugin_manager
+            .provider_for(ext, &crate::plugin::Capability::Fold)
+            .is_none()
+        {
+            return;
+        }
+        let regions: Vec<crate::fold::FoldRegion> = params
+            .get("regions")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|r| {
+                        let pair = r.as_array()?;
+                        let start = pair.first()?.as_i64()? as usize;
+                        let end = pair.get(1)?.as_i64()? as usize;
+                        Some(crate::fold::FoldRegion { start, end })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        self.plugin_fold_regions.insert(path.clone(), regions);
+        self.plugin_contributions
+            .entry(name.to_string())
+            .or_default()
+            .fold_region_paths
+            .insert(path.clone());
+        if self.current_file.as_deref() == Some(&path) {
+            self.apply_plugin_fold_regions(&path);
         }
     }
 }
