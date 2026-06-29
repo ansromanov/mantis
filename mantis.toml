@@ -68,9 +68,19 @@ side_by_side = false         # start the diff view in side-by-side layout
 
 
 # --- status bar -------------------------------------------------------------
-# Which segments right-align. Everything not listed renders left, in natural
-# order. Valid ids: hint badges scroll lnum type fileinfo git errors folds
-# message version
+# `right` lists the segments to right-align; everything else renders left, in
+# natural order. On narrow terminals low-priority segments are elided. Ids:
+#   hint      keybinding hints for the current context
+#   badges    mode badges (git mode, diff mode)
+#   scroll    scroll-position percentage
+#   lnum      cursor line:column
+#   type      detected file type / syntax
+#   fileinfo  encoding + line-ending
+#   git       branch and working-tree status
+#   errors    parse errors (e.g. YAML)
+#   folds     fold count / state
+#   message   transient status messages
+#   version   mantis version
 [statusbar]
 right = ["lnum", "type", "git", "version"]
 
