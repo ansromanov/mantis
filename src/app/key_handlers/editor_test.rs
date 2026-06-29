@@ -344,6 +344,38 @@ fn dispatch_command_records_action_in_usage() {
     fs::remove_dir_all(&root).ok();
 }
 
+// -- content config persist --------------------------------------------------
+
+#[test]
+fn toggle_word_wrap_via_command_persists_to_config() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.word_wrap = false;
+    app.command_palette = Some(palette_with_query("Toggle word wrap"));
+    app.dispatch_command();
+    assert!(app.word_wrap, "app field should toggle");
+    assert!(
+        app.config.content.word_wrap,
+        "config.content.word_wrap should persist the toggle"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn toggle_line_numbers_via_command_persists_to_config() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let initial = app.show_line_numbers;
+    app.command_palette = Some(palette_with_query("Toggle line numbers"));
+    app.dispatch_command();
+    assert_eq!(app.show_line_numbers, !initial, "app field should toggle");
+    assert_eq!(
+        app.config.content.line_numbers, !initial,
+        "config.content.line_numbers should persist the toggle"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
 // -- toggle_git_flat guard ---------------------------------------------------
 
 #[test]
