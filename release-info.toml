@@ -1,4 +1,4 @@
-version = "0.11.26"
+version = "0.11.27"
 date = "2026-06-29"
 whats_new = """- refactor(git): remove git plugins, make git-core unconditional (#436)
 - feat: Enter in tree filter opens selected match (not just close) (#434)
