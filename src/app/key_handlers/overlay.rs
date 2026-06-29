@@ -171,11 +171,11 @@ impl App {
             return;
         }
         let page = (self.tree_area.height as usize).max(1) as isize;
-        if static_keys::is_list_up(&key) {
+        if key.code == KeyCode::Up {
             self.move_tree_filter_selection(-1);
             return;
         }
-        if static_keys::is_list_down(&key) {
+        if key.code == KeyCode::Down {
             self.move_tree_filter_selection(1);
             return;
         }

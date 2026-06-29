@@ -156,6 +156,20 @@ fn esc_closes_line_blame_first() {
     fs::remove_dir_all(&root).ok();
 }
 
+#[test]
+fn non_esc_does_not_close_line_blame() {
+    // is_close maps only Esc; other keys must not dismiss blame.
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.show_line_blame = true;
+    // 'q' navigates in normal mode (not an Esc alias) — blame must stay open.
+    app.handle_key(KeyEvent::new(KeyCode::Char('q'), KeyModifiers::empty()));
+    assert!(app.show_line_blame, "non-Esc key must not close line blame");
+    fs::remove_dir_all(&root).ok();
+}
+
 // -- navigation preserves blame popup ---------------------------------------
 
 #[test]

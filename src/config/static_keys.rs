@@ -18,16 +18,6 @@ pub fn is_activate(key: &KeyEvent) -> bool {
     key.code == KeyCode::Enter
 }
 
-/// Modal list navigation: move up (Up, k).
-pub fn is_list_up(key: &KeyEvent) -> bool {
-    matches!(key.code, KeyCode::Up | KeyCode::Char('k'))
-}
-
-/// Modal list navigation: move down (Down, j).
-pub fn is_list_down(key: &KeyEvent) -> bool {
-    matches!(key.code, KeyCode::Down | KeyCode::Char('j'))
-}
-
 /// Modal list pagination: page up (PageUp).
 pub fn is_page_up(key: &KeyEvent) -> bool {
     key.code == KeyCode::PageUp

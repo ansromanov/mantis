@@ -24,22 +24,6 @@ fn test_is_activate() {
 }
 
 #[test]
-fn test_is_list_up() {
-    assert!(is_list_up(&make_key(KeyCode::Up)));
-    assert!(is_list_up(&make_key(KeyCode::Char('k'))));
-    assert!(!is_list_up(&make_key(KeyCode::Down)));
-    assert!(!is_list_up(&make_key(KeyCode::Char('j'))));
-}
-
-#[test]
-fn test_is_list_down() {
-    assert!(is_list_down(&make_key(KeyCode::Down)));
-    assert!(is_list_down(&make_key(KeyCode::Char('j'))));
-    assert!(!is_list_down(&make_key(KeyCode::Up)));
-    assert!(!is_list_down(&make_key(KeyCode::Char('k'))));
-}
-
-#[test]
 fn test_is_page_up() {
     assert!(is_page_up(&make_key(KeyCode::PageUp)));
     assert!(!is_page_up(&make_key(KeyCode::Up)));

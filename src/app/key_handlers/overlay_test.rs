@@ -306,6 +306,44 @@ fn tree_filter_typing_after_navigation_jumps_to_first_match() {
 }
 
 #[test]
+fn tree_filter_j_types_when_query_non_empty() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let mut f = TreeFilter::new();
+    f.push('a'); // query non-empty
+    app.tree_filter = Some(f);
+    app.tree_selected = 0;
+    // 'j' must append to query, not navigate
+    app.handle_tree_filter_key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::empty()));
+    assert_eq!(
+        app.tree_filter.as_ref().map(|f| f.query.as_str()),
+        Some("aj"),
+        "'j' must append to query when query is non-empty"
+    );
+    assert_eq!(app.tree_selected, 0, "selection must not change");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_filter_k_types_when_query_non_empty() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let mut f = TreeFilter::new();
+    f.push('a'); // query non-empty
+    app.tree_filter = Some(f);
+    app.tree_selected = 0;
+    // 'k' must append to query, not navigate
+    app.handle_tree_filter_key(KeyEvent::new(KeyCode::Char('k'), KeyModifiers::empty()));
+    assert_eq!(
+        app.tree_filter.as_ref().map(|f| f.query.as_str()),
+        Some("ak"),
+        "'k' must append to query when query is non-empty"
+    );
+    assert_eq!(app.tree_selected, 0, "selection must not change");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn tree_filter_esc_closes() {
     let root = temp_tree();
     let mut app = app_for(&root);
