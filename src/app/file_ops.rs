@@ -314,6 +314,8 @@ impl App {
         self.file_line_ending = load.line_ending;
         self.show_pretty_json = load.show_pretty_json;
         self.markdown_lines = load.markdown_lines;
+        self.markdown_src = load.markdown_src;
+        self.markdown_wrap_width = 0;
         self.json_pretty_text = load.json_pretty_text;
         self.json_pretty_lines = load.json_pretty_lines;
         self.clear_fold_state();
@@ -365,6 +367,26 @@ impl App {
             self.current_syntax = None;
             self.mark_session_dirty();
             self.set_file_watch(None);
+        }
+    }
+
+    /// Re-renders markdown if terminal width has changed significantly.
+    /// Call before drawing to ensure smooth scrolling under word wrap.
+    pub(crate) fn rerender_markdown_if_needed(&mut self, available_width: usize) {
+        if !self.is_markdown || self.markdown_src.is_empty() {
+            return;
+        }
+        if self.markdown_wrap_width == available_width {
+            return;
+        }
+        self.markdown_wrap_width = available_width;
+        #[cfg(feature = "markdown-core")]
+        {
+            self.markdown_lines = crate::markdown::render_with_width(
+                &self.markdown_src,
+                &self.theme,
+                Some(available_width),
+            );
         }
     }
 

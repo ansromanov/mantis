@@ -46,6 +46,8 @@ pub(super) struct FileLoad {
     pub content: Vec<String>,
     pub highlighted: Spans,
     pub markdown_lines: Spans,
+    /// Raw markdown source (full text) so it can be re-rendered on terminal resize.
+    pub markdown_src: String,
     pub json_pretty_text: Vec<String>,
     pub json_pretty_lines: Spans,
     pub show_pretty_json: bool,
@@ -96,6 +98,7 @@ impl FileLoad {
             content: Vec::new(),
             highlighted: Vec::new(),
             markdown_lines: Vec::new(),
+            markdown_src: String::new(),
             json_pretty_text: Vec::new(),
             json_pretty_lines: Vec::new(),
             show_pretty_json: false,
@@ -199,6 +202,7 @@ pub(super) fn compute_file_load(path: &Path, theme: &Theme, hl: &Highlighter) ->
     load.syntax_name = hl.syntax_name(path);
     #[cfg(feature = "markdown-core")]
     if is_markdown {
+        load.markdown_src = s.clone();
         load.markdown_lines = crate::markdown::render(&s, theme);
     }
     if is_json {

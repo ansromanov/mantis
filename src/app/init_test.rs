@@ -437,3 +437,15 @@ fn app_new_cursor_positions_starts_empty() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn app_new_markdown_resize_fields_start_empty() {
+    let root = temp_dir();
+    let app = new_app(&root, Config::default());
+    assert!(app.markdown_src.is_empty(), "markdown_src must start empty");
+    assert_eq!(
+        app.markdown_wrap_width, 0,
+        "markdown_wrap_width must start at 0"
+    );
+    fs::remove_dir_all(&root).ok();
+}

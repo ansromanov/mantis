@@ -205,3 +205,14 @@ fn compute_file_load_sets_no_syntax_name_for_unknown_extension() {
     let load = compute_file_load(f.path(), &Theme::default(), &hl());
     assert_eq!(load.syntax_name, None);
 }
+
+#[cfg(feature = "markdown-core")]
+#[test]
+fn markdown_file_load_populates_markdown_src() {
+    let mut f = tempfile::NamedTempFile::with_suffix(".md").unwrap();
+    use std::io::Write;
+    f.write_all(b"# Title\n\nbody paragraph\n").unwrap();
+    let load = compute_file_load(f.path(), &Theme::default(), &hl());
+    assert!(load.is_markdown);
+    assert_eq!(load.markdown_src, "# Title\n\nbody paragraph\n");
+}

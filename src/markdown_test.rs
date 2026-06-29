@@ -238,3 +238,46 @@ fn render_table_empty_input() {
     let t = default_theme();
     assert!(render_table(&[], &[], &t).is_empty());
 }
+
+#[test]
+fn paragraph_wrap_reduces_logical_lines_to_visual_rows() {
+    let theme = default_theme();
+    // Long paragraph that should wrap at 30 chars
+    let md = "This is a long paragraph that should wrap into multiple lines when rendered with word wrap.";
+
+    // Without wrapping: single logical line (+ trailing blank)
+    let unwrapped = render(md, &theme);
+    assert_eq!(unwrapped.len(), 2, "unwrapped: paragraph + blank");
+
+    // With wrapping at 30 chars: should split into multiple logical lines
+    let wrapped = render_with_width(md, &theme, Some(30));
+
+    // Each wrapped line should be at most 30 chars
+    let mut total_text = String::new();
+    let mut line_count = 0;
+    for line in &wrapped {
+        if line.is_empty() {
+            continue;
+        }
+        let text: String = line.iter().map(|(_, s)| s.as_str()).collect();
+        if !text.trim().is_empty() {
+            line_count += 1;
+            total_text.push_str(&text);
+            assert!(text.len() <= 30, "wrapped line exceeds width: {}", text);
+        }
+    }
+
+    // Should have more logical lines with wrapping
+    assert!(
+        line_count > 1,
+        "wrapped paragraph should span multiple lines"
+    );
+
+    // Content should be preserved (minus whitespace normalization)
+    let unwrapped_text: String = unwrapped[0].iter().map(|(_, s)| s.as_str()).collect();
+    assert_eq!(
+        total_text.replace(" ", ""),
+        unwrapped_text.replace(" ", ""),
+        "content preserved after wrapping"
+    );
+}

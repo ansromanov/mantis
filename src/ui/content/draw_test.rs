@@ -52,6 +52,8 @@ fn temp_tree() -> PathBuf {
     fs::create_dir_all(&dir).unwrap();
     let long: String = (1..=20).map(|i| format!("line {i}\n")).collect();
     fs::write(dir.join("long.txt"), long).unwrap();
+    let md = "# Title\n\nA long paragraph of markdown content that should be wrapped by the renderer when word wrap is enabled.\n";
+    fs::write(dir.join("readme.md"), md).unwrap();
     dir.canonicalize().unwrap()
 }
 
@@ -424,6 +426,30 @@ fn blame_column_click_does_not_start_drag_selection() {
         app.show_line_blame,
         "blame column click should open line-blame popup"
     );
+}
+
+/// Regression: pre-rerender must happen before total_lines/visible_end are
+/// computed so a terminal-widening resize (fewer wrapped lines) doesn't panic.
+#[cfg(feature = "markdown-core")]
+#[test]
+fn markdown_word_wrap_draw_does_not_panic_on_width_change() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.word_wrap = true;
+    app.open_file(&root.join("readme.md"));
+    // Simulate render at narrow width then wider width (fewer wrapped lines).
+    let backend = TestBackend::new(40, 24);
+    let mut terminal = ratatui::Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| draw_content(frame, &mut app, frame.area()))
+        .unwrap();
+    // Switch to wider terminal — would OOB-panic before the fix.
+    let backend = TestBackend::new(120, 24);
+    let mut terminal = ratatui::Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| draw_content(frame, &mut app, frame.area()))
+        .unwrap();
+    fs::remove_dir_all(&root).ok();
 }
 
 #[test]
