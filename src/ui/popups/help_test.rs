@@ -125,6 +125,110 @@ fn help_shows_find_files_entry() {
     );
 }
 
+/// Git section header appears in the help overlay.
+#[test]
+fn help_shows_git_section_header() {
+    let dir = tempfile::tempdir().unwrap();
+    let app = make_app(dir.path());
+    let backend = TestBackend::new(120, 200);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|f| draw_help(f, &app, f.area())).unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(
+        joined.contains("Git"),
+        "help overlay must contain 'Git' section header, got:\n{joined}"
+    );
+}
+
+/// Git section shows tree-color legend.
+#[test]
+fn help_git_section_shows_tree_colors() {
+    let dir = tempfile::tempdir().unwrap();
+    let app = make_app(dir.path());
+    let backend = TestBackend::new(120, 200);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|f| draw_help(f, &app, f.area())).unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(
+        joined.contains("Tree colors"),
+        "help overlay must list 'Tree colors' in the Git section, got:\n{joined}"
+    );
+    assert!(
+        joined.contains("green = new"),
+        "help overlay must show 'green = new' in the tree-color legend, got:\n{joined}"
+    );
+}
+
+/// Git section shows status-bar legend.
+#[test]
+fn help_git_section_shows_status_bar() {
+    let dir = tempfile::tempdir().unwrap();
+    let app = make_app(dir.path());
+    let backend = TestBackend::new(120, 200);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|f| draw_help(f, &app, f.area())).unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(
+        joined.contains("Status bar"),
+        "help overlay must list 'Status bar' in the Git section, got:\n{joined}"
+    );
+}
+
+/// Git section blame_line entry shows the default key label.
+#[test]
+fn help_git_section_shows_blame_line_key() {
+    let dir = tempfile::tempdir().unwrap();
+    let app = make_app(dir.path());
+    let backend = TestBackend::new(120, 200);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|f| draw_help(f, &app, f.area())).unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(
+        joined.contains("blame current line"),
+        "help overlay must list 'blame current line' in the Git section, got:\n{joined}"
+    );
+}
+
+/// Git section file_history entry shows the default key label.
+#[test]
+fn help_git_section_shows_file_history_key() {
+    let dir = tempfile::tempdir().unwrap();
+    let app = make_app(dir.path());
+    let backend = TestBackend::new(120, 200);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|f| draw_help(f, &app, f.area())).unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(
+        joined.contains("pick a commit"),
+        "help overlay must list 'pick a commit' in the Git section, got:\n{joined}"
+    );
+}
+
+/// Remapped blame_line key shows the new binding in the Git section.
+#[test]
+fn help_git_section_remapped_blame_line() {
+    let keys = Keymap {
+        blame_line: bind(&["ctrl+b"]),
+        ..Keymap::default()
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let app = make_app_with_keys(dir.path(), keys);
+    let backend = TestBackend::new(120, 200);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|f| draw_help(f, &app, f.area())).unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(
+        joined.contains("Ctrl+b"),
+        "help with remapped blame_line to Ctrl+B should show 'Ctrl+b', got:\n{joined}"
+    );
+}
+
 /// Unbound actions show `—` instead of a key label.
 #[test]
 fn help_unbound_action_shows_dash() {

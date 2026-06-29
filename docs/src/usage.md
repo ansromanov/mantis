@@ -92,6 +92,41 @@ When a Markdown file is displayed in **rendered mode** (the default; press `M` t
 
 Plugins that provide rendered content (e.g., custom syntax highlighting) also hide line numbers when active, for the same reason.
 
+## Git features
+
+### Tree colors
+
+Files and folders in the tree are colored by their git status:
+
+| Color  | Meaning |
+| ------ | ------- |
+| Green  | New / untracked |
+| Yellow | Modified |
+| Red    | Deleted |
+| Gray   | Ignored |
+
+A directory takes the color of the most significant change inside it.
+
+### Status bar
+
+The status bar shows a git summary when inside a repository:
+
+```
+[branch  +ahead -behind  N changed]
+```
+
+### Git mode and diff navigation
+
+| Key       | Action |
+| --------- | ------ |
+| `Ctrl+G`  | Toggle git mode — show only changed files; opening a file shows its diff |
+| `F`       | Toggle flat list / nested tree (git mode only) |
+| `D`       | Toggle side-by-side / unified diff |
+| `S`       | Cycle diff source: all (vs HEAD) → staged → unstaged |
+| `n` / `N` | Jump to next / previous change hunk |
+| `B`       | Blame the current line: hash, author, date, summary |
+| `H`       | File history — pick a commit to view its diff |
+
 ## Search popup
 
 Three search entry points cover different needs:
