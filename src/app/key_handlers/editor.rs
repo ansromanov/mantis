@@ -43,7 +43,7 @@ impl App {
             Some("toggle_help") => self.show_help = !self.show_help,
             Some("toggle_hidden") => {
                 self.show_hidden = !self.show_hidden;
-                self.config.show_hidden = self.show_hidden;
+                self.config.tree.show_hidden = self.show_hidden;
                 self.reload();
                 self.save_config();
             }
@@ -55,11 +55,11 @@ impl App {
                     &root,
                     self.show_hidden,
                     self.ignore_gitignore,
-                    self.config.search_context_lines,
+                    self.config.search.context_lines,
                     changed.as_ref(),
                 );
                 s.toggle_mode();
-                if self.config.keep_search_query && !self.last_search_query.is_empty() {
+                if self.config.search.keep_query && !self.last_search_query.is_empty() {
                     s.query = self.last_search_query.clone();
                     s.refresh_now();
                 }
@@ -83,14 +83,14 @@ impl App {
             }
             Some("toggle_word_wrap") => {
                 self.word_wrap = !self.word_wrap;
-                self.config.word_wrap = self.word_wrap;
+                self.config.content.word_wrap = self.word_wrap;
                 self.set_content_scroll(0);
                 self.content_hscroll = 0;
                 self.save_config();
             }
             Some("toggle_line_numbers") => {
                 self.show_line_numbers = !self.show_line_numbers;
-                self.config.line_numbers = self.show_line_numbers;
+                self.config.content.line_numbers = self.show_line_numbers;
                 self.save_config();
             }
             Some("toggle_raw_markdown") if self.is_markdown => {
@@ -306,21 +306,22 @@ impl App {
         let Ok(mut cfg) = toml::from_str::<config::Config>(&s) else {
             return;
         };
+        cfg.migrate_legacy_flat_fields();
         cfg.migrate_legacy_git_fields();
 
-        self.show_hidden = cfg.show_hidden;
+        self.show_hidden = cfg.tree.show_hidden;
         self.ignore_gitignore = cfg.git.ignore_gitignore;
-        self.tree_width = cfg.tree_width;
-        self.tree_independent_scroll = cfg.tree_independent_scroll;
-        self.word_wrap = cfg.word_wrap;
+        self.tree_width = cfg.tree.width;
+        self.tree_independent_scroll = cfg.tree.independent_scroll;
+        self.word_wrap = cfg.content.word_wrap;
         self.git_status_enabled = cfg.git.status;
         self.git_show_deleted = cfg.git.show_deleted;
         self.git_show_untracked = cfg.git.show_untracked;
         self.git_show_ignored = cfg.git.show_ignored;
-        self.show_scrollbar = cfg.scrollbar;
-        self.show_scroll_percentage = cfg.scroll_percentage;
+        self.show_scrollbar = cfg.content.scrollbar;
+        self.show_scroll_percentage = cfg.content.scroll_percentage;
         self.keys = cfg.keys.clone();
-        self.icons_enabled = cfg.icons;
+        self.icons_enabled = cfg.tree.icons;
 
         let theme_name = cfg.theme.name.as_deref().unwrap_or("default").to_string();
         let theme = cfg.theme.resolve();

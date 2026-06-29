@@ -4179,7 +4179,7 @@ fn dispatch_command_open_file_search_creates_search() {
 fn dispatch_command_open_file_search_with_keep_query() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.config.keep_search_query = true;
+    app.config.search.keep_query = true;
     app.last_search_query = "test".to_string();
     setup_command(&mut app, "open_file_search");
     app.dispatch_command();
@@ -4817,7 +4817,10 @@ fn icons_enabled_defaults_to_false() {
 fn icons_enabled_true_when_config_says_so() {
     let root = temp_tree();
     let cfg = Config {
-        icons: true,
+        tree: crate::config::TreeConfig {
+            icons: true,
+            ..Default::default()
+        },
         ..Config::default()
     };
     let app = App::new(root.to_path_buf(), cfg, None, None).unwrap();

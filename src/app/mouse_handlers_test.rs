@@ -488,6 +488,41 @@ fn scrollbar_drag_clamps_at_scroll_max() {
 }
 
 #[test]
+fn splitter_drag_release_saves_tree_width_to_config() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    // Simulate a splitter drag: set splitter_drag and adjust tree_width, then release.
+    app.tree_area = Rect {
+        x: 0,
+        y: 0,
+        width: 28,
+        height: 40,
+    };
+    app.content_area = Rect {
+        x: 32,
+        y: 0,
+        width: 48,
+        height: 40,
+    };
+    app.splitter_drag = true;
+    app.tree_width = 35;
+    // Mouse up ends the drag and persists to config.
+    let up = MouseEvent {
+        kind: MouseEventKind::Up(MouseButton::Left),
+        column: 35,
+        row: 5,
+        modifiers: crossterm::event::KeyModifiers::empty(),
+    };
+    app.handle_mouse(up);
+    assert!(!app.splitter_drag, "drag flag should clear on release");
+    assert_eq!(
+        app.config.tree.width, 35,
+        "config.tree.width should reflect the new tree_width"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn plugin_picker_click_outside_closes() {
     let root = temp_tree();
     let mut app = app_for(&root);

@@ -476,6 +476,41 @@ fn toggle_diff_staged_persists_to_config() {
     fs::remove_dir_all(&root).ok();
 }
 
+// -- content config persist --------------------------------------------------
+
+#[test]
+fn toggle_wrap_persists_to_config() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.word_wrap = false;
+    app.handle_key(key(KeyCode::Char('z')));
+    assert!(app.word_wrap, "app field should toggle");
+    assert!(
+        app.config.content.word_wrap,
+        "config.content.word_wrap should persist the toggle"
+    );
+    app.handle_key(key(KeyCode::Char('z')));
+    assert!(!app.word_wrap);
+    assert!(!app.config.content.word_wrap);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn toggle_line_numbers_persists_to_config() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    let initial = app.show_line_numbers;
+    app.handle_key(key(KeyCode::Char('L')));
+    assert_eq!(app.show_line_numbers, !initial, "app field should toggle");
+    assert_eq!(
+        app.config.content.line_numbers, !initial,
+        "config.content.line_numbers should persist the toggle"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
 // -- copy path ---------------------------------------------------------------
 
 #[test]

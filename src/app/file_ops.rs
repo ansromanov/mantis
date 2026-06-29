@@ -414,10 +414,10 @@ impl App {
             &root,
             self.show_hidden,
             self.ignore_gitignore,
-            self.config.search_context_lines,
+            self.config.search.context_lines,
             changed.as_ref(),
         );
-        if self.config.keep_search_query && !self.last_search_query.is_empty() {
+        if self.config.search.keep_query && !self.last_search_query.is_empty() {
             s.query = self.last_search_query.clone();
             s.refresh_now();
         }

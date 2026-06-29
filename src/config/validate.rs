@@ -16,12 +16,28 @@ use crate::theme::ThemeConfig;
 /// Old top-level keys that moved into `[git]`. Still accepted (folded by
 /// `migrate_legacy_git_fields`) so existing configs don't warn.
 const DEPRECATED_TOP_LEVEL_KEYS: &[&str] = &[
+    // git (#342)
     "git_status",
     "git_show_deleted",
     "git_show_untracked",
     "git_show_ignored",
     "ignore_gitignore",
     "diff_mode",
+    // tree/content/search (this issue)
+    "show_hidden",
+    "tree_width",
+    "tree_independent_scroll",
+    "indent_guides",
+    "icons",
+    "word_wrap",
+    "line_numbers",
+    "scrollbar",
+    "scroll_percentage",
+    "watch",
+    "show_file_info",
+    "in_file_search",
+    "search_context_lines",
+    "keep_search_query",
 ];
 
 /// Validates the raw TOML against the config schema, returning a message for

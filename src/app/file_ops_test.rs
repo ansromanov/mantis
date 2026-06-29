@@ -866,3 +866,33 @@ fn open_file_search_not_scoped_outside_git_mode() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn open_file_search_restores_last_query_when_keep_query_enabled() {
+    let root = temp_dir();
+    let mut app = app_for(&root);
+    app.config.search.keep_query = true;
+    app.last_search_query = "foo".to_string();
+    app.open_file_search();
+    assert_eq!(
+        app.search.as_ref().unwrap().query,
+        "foo",
+        "open_file_search must restore last query when search.keep_query is true"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn open_file_search_does_not_restore_query_when_keep_query_disabled() {
+    let root = temp_dir();
+    let mut app = app_for(&root);
+    app.config.search.keep_query = false;
+    app.last_search_query = "foo".to_string();
+    app.open_file_search();
+    assert_eq!(
+        app.search.as_ref().unwrap().query,
+        "",
+        "open_file_search must not restore query when search.keep_query is false"
+    );
+    fs::remove_dir_all(&root).ok();
+}

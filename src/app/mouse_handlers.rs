@@ -195,7 +195,7 @@ impl App {
             MouseEventKind::Up(MouseButton::Left) => {
                 if self.splitter_drag {
                     self.splitter_drag = false;
-                    self.config.tree_width = self.tree_width;
+                    self.config.tree.width = self.tree_width;
                     self.save_config();
                 }
                 self.scrollbar_drag = false;

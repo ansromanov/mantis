@@ -322,7 +322,7 @@ fn init_writes_stub_user_config_and_default_reference() {
     let reference = fs::read_to_string(dir.join("mantis.default.toml")).unwrap();
     assert!(reference.contains("Open config in editor"));
     let cfg: Config = toml::from_str(&reference).expect("default reference should parse");
-    assert_eq!(cfg.tree_width, 28);
+    assert_eq!(cfg.tree.width, 28);
 
     fs::remove_dir_all(&dir).ok();
 }
@@ -361,14 +361,15 @@ fn sparse_toml_omits_defaults_and_keeps_overrides() {
     let out = sparse_toml(&cfg);
     // A pristine config serialises to (essentially) nothing.
     assert!(
-        !out.contains("tree_width"),
+        !out.contains("[tree]"),
         "default-valued key should be omitted: {out}"
     );
 
-    cfg.tree_width = 42;
-    cfg.show_hidden = true;
+    cfg.tree.width = 42;
+    cfg.tree.show_hidden = true;
     let out = sparse_toml(&cfg);
-    assert!(out.contains("tree_width = 42"), "override missing: {out}");
+    assert!(out.contains("[tree]"), "missing [tree] section: {out}");
+    assert!(out.contains("width = 42"), "override missing: {out}");
     assert!(
         out.contains("show_hidden = true"),
         "override missing: {out}"
@@ -378,9 +379,9 @@ fn sparse_toml_omits_defaults_and_keeps_overrides() {
 
     // Round-trips: a sparse file re-parses to the same effective values.
     let reparsed: Config = toml::from_str(&out).unwrap();
-    assert_eq!(reparsed.tree_width, 42);
-    assert!(reparsed.show_hidden);
-    assert!(!reparsed.word_wrap); // falls back to default
+    assert_eq!(reparsed.tree.width, 42);
+    assert!(reparsed.tree.show_hidden);
+    assert!(!reparsed.content.word_wrap); // falls back to default
 }
 
 #[test]
@@ -450,18 +451,21 @@ fn validate_keys_accepts_full_default_template() {
 #[test]
 fn icons_defaults_to_false() {
     let cfg = Config::default();
-    assert!(!cfg.icons);
+    assert!(!cfg.tree.icons);
 }
 
 #[test]
 fn icons_round_trips_through_serde() {
     let cfg = Config {
-        icons: true,
+        tree: TreeConfig {
+            icons: true,
+            ..Default::default()
+        },
         ..Config::default()
     };
     let toml_str = toml::to_string_pretty(&cfg).unwrap();
     let parsed: Config = toml::from_str(&toml_str).unwrap();
-    assert!(parsed.icons);
+    assert!(parsed.tree.icons);
 }
 
 #[test]
@@ -469,7 +473,7 @@ fn icons_false_round_trips_through_serde() {
     let cfg = Config::default();
     let toml_str = toml::to_string_pretty(&cfg).unwrap();
     let parsed: Config = toml::from_str(&toml_str).unwrap();
-    assert!(!parsed.icons);
+    assert!(!parsed.tree.icons);
 }
 
 // -- find_files keybinding ---------------------------------------------------
@@ -526,11 +530,10 @@ fn find_files_without_config_key_gets_default_from_serde_container() {
 
 #[test]
 fn validate_keys_flags_unknown_top_level_key_with_suggestion() {
-    let warnings = validate_keys("tre_width = 30\n");
+    let warnings = validate_keys("tre = 30\n");
     assert_eq!(warnings.len(), 1);
     assert!(
-        warnings[0].contains("unknown key 'tre_width'")
-            && warnings[0].contains("did you mean 'tree_width'?"),
+        warnings[0].contains("unknown key 'tre'") && warnings[0].contains("did you mean 'tree'?"),
         "expected nearest-match hint: {}",
         warnings[0]
     );
@@ -650,12 +653,12 @@ fn unknown_key_surfaces_as_warning_but_config_still_loads() {
     let (config, path, error) = load(&dir);
     // The config still loads (the typo'd key is simply ignored)...
     assert!(path.is_some());
-    assert_eq!(config.tree_width, Config::default().tree_width);
+    assert_eq!(config.tree.width, Config::default().tree.width);
     // ...but the typo is surfaced with a suggestion.
     let msg = error.expect("unknown key should produce a warning");
     assert!(
-        msg.contains("tree_widht") && msg.contains("tree_width"),
-        "warning should name the bad key and suggestion: {msg}"
+        msg.contains("tree_widht"),
+        "warning should name the bad key: {msg}"
     );
 
     fs::remove_dir_all(&dir).ok();
@@ -834,8 +837,11 @@ fn save_returns_ok_on_success_and_round_trips() {
     let dir = scratch_dir("save_ok");
     let path = dir.join("mantis.toml");
     let cfg = Config {
-        tree_width: 42,
-        show_hidden: true,
+        tree: TreeConfig {
+            width: 42,
+            show_hidden: true,
+            ..Default::default()
+        },
         ..Config::default()
     };
 
@@ -845,12 +851,12 @@ fn save_returns_ok_on_success_and_round_trips() {
     // Round-trip: re-load and verify overrides survive, defaults remain.
     let loaded_raw = fs::read_to_string(&path).unwrap();
     let loaded: Config = toml::from_str(&loaded_raw).unwrap();
-    assert_eq!(loaded.tree_width, 42);
-    assert!(loaded.show_hidden);
-    assert!(!loaded.word_wrap); // falls back to default
+    assert_eq!(loaded.tree.width, 42);
+    assert!(loaded.tree.show_hidden);
+    assert!(!loaded.content.word_wrap); // falls back to default
 
     // Output is sparse — only non-default keys appear.
-    assert!(loaded_raw.contains("tree_width = 42"), "{loaded_raw}");
+    assert!(loaded_raw.contains("width = 42"), "{loaded_raw}");
     assert!(
         !loaded_raw.contains("word_wrap"),
         "default leaked: {loaded_raw}"
@@ -907,4 +913,222 @@ fn sparse_toml_emits_nested_git_form_not_flat_keys() {
     assert!(!reparsed.git.show_untracked);
     // Defaults not in the output still resolve correctly.
     assert!(reparsed.git.show_deleted == Config::default().git.show_deleted);
+}
+
+// ---- tree/content/search config grouping -----------------------------------
+
+#[test]
+fn legacy_flat_tree_keys_fold_into_tree_config() {
+    let toml_str = r#"
+show_hidden = true
+tree_width = 40
+tree_independent_scroll = true
+indent_guides = false
+icons = true
+"#;
+    let mut cfg: Config = toml::from_str(toml_str).unwrap();
+    cfg.migrate_legacy_flat_fields();
+    assert!(cfg.tree.show_hidden, "legacy show_hidden=true should fold");
+    assert_eq!(cfg.tree.width, 40, "legacy tree_width=40 should fold");
+    assert!(
+        cfg.tree.independent_scroll,
+        "legacy tree_independent_scroll=true should fold"
+    );
+    assert!(
+        !cfg.tree.indent_guides,
+        "legacy indent_guides=false should fold"
+    );
+    assert!(cfg.tree.icons, "legacy icons=true should fold");
+}
+
+#[test]
+fn legacy_flat_content_keys_fold_into_content_config() {
+    let toml_str = r#"
+word_wrap = true
+line_numbers = false
+scrollbar = false
+scroll_percentage = false
+watch = true
+show_file_info = false
+"#;
+    let mut cfg: Config = toml::from_str(toml_str).unwrap();
+    cfg.migrate_legacy_flat_fields();
+    assert!(cfg.content.word_wrap, "legacy word_wrap=true should fold");
+    assert!(
+        !cfg.content.line_numbers,
+        "legacy line_numbers=false should fold"
+    );
+    assert!(!cfg.content.scrollbar, "legacy scrollbar=false should fold");
+    assert!(
+        !cfg.content.scroll_percentage,
+        "legacy scroll_percentage=false should fold"
+    );
+    assert!(cfg.content.watch, "legacy watch=true should fold");
+    assert!(
+        !cfg.content.show_file_info,
+        "legacy show_file_info=false should fold"
+    );
+}
+
+#[test]
+fn legacy_flat_search_keys_fold_into_search_config() {
+    let toml_str = r#"
+in_file_search = false
+search_context_lines = 3
+keep_search_query = true
+"#;
+    let mut cfg: Config = toml::from_str(toml_str).unwrap();
+    cfg.migrate_legacy_flat_fields();
+    assert!(
+        !cfg.search.in_file_search,
+        "legacy in_file_search=false should fold"
+    );
+    assert_eq!(
+        cfg.search.context_lines, 3,
+        "legacy search_context_lines=3 should fold"
+    );
+    assert!(
+        cfg.search.keep_query,
+        "legacy keep_search_query=true should fold"
+    );
+}
+
+#[test]
+fn new_tree_table_populates_fields() {
+    let toml_str = r#"
+[tree]
+show_hidden = true
+width = 40
+independent_scroll = true
+indent_guides = false
+icons = true
+"#;
+    let cfg: Config = toml::from_str(toml_str).unwrap();
+    assert!(cfg.tree.show_hidden);
+    assert_eq!(cfg.tree.width, 40);
+    assert!(cfg.tree.independent_scroll);
+    assert!(!cfg.tree.indent_guides);
+    assert!(cfg.tree.icons);
+}
+
+#[test]
+fn new_content_table_populates_fields() {
+    let toml_str = r#"
+[content]
+word_wrap = true
+line_numbers = false
+scrollbar = false
+scroll_percentage = false
+watch = true
+show_file_info = false
+"#;
+    let cfg: Config = toml::from_str(toml_str).unwrap();
+    assert!(cfg.content.word_wrap);
+    assert!(!cfg.content.line_numbers);
+    assert!(!cfg.content.scrollbar);
+    assert!(!cfg.content.scroll_percentage);
+    assert!(cfg.content.watch);
+    assert!(!cfg.content.show_file_info);
+}
+
+#[test]
+fn new_search_table_populates_fields() {
+    let toml_str = r#"
+[search]
+in_file_search = false
+context_lines = 3
+keep_query = true
+"#;
+    let cfg: Config = toml::from_str(toml_str).unwrap();
+    assert!(!cfg.search.in_file_search);
+    assert_eq!(cfg.search.context_lines, 3);
+    assert!(cfg.search.keep_query);
+}
+
+#[test]
+fn legacy_flat_keys_produce_no_validate_warnings() {
+    let warnings = validate_keys(
+        "show_hidden = true\ntree_width = 40\nword_wrap = true\nsearch_context_lines = 3\n",
+    );
+    assert!(
+        warnings.is_empty(),
+        "deprecated keys should not produce warnings: {:?}",
+        warnings
+    );
+}
+
+#[test]
+fn typo_on_moved_key_still_warns() {
+    let warnings = validate_keys("scrol_percentage = true\n");
+    assert!(
+        warnings.iter().any(|w| w.contains("scrol_percentage")),
+        "typo on moved key should still warn: {:?}",
+        warnings
+    );
+}
+
+#[test]
+fn recent_files_count_stays_top_level() {
+    let toml_str = "recent_files_count = 25\n";
+    let cfg: Config = toml::from_str(toml_str).unwrap();
+    assert_eq!(cfg.recent_files_count, 25);
+}
+
+#[test]
+fn sparse_toml_emits_nested_tree_content_search_form() {
+    let mut cfg = Config::default();
+    cfg.tree.width = 50;
+    cfg.content.word_wrap = true;
+    cfg.search.context_lines = 5;
+    let out = sparse_toml(&cfg);
+    // Should contain the new nested sections, not flat keys.
+    assert!(out.contains("[tree]"), "missing [tree] section: {out}");
+    assert!(
+        out.contains("[content]"),
+        "missing [content] section: {out}"
+    );
+    assert!(out.contains("[search]"), "missing [search] section: {out}");
+    assert!(out.contains("width = 50"), "missing width override: {out}");
+    assert!(
+        out.contains("word_wrap = true"),
+        "missing word_wrap override: {out}"
+    );
+    assert!(
+        out.contains("context_lines = 5"),
+        "missing context_lines override: {out}"
+    );
+    // Flat legacy keys must not appear.
+    assert!(!out.contains("tree_width"), "flat key leaked: {out}");
+    assert!(
+        !out.contains("search_context_lines"),
+        "flat key leaked: {out}"
+    );
+    // Round-trips.
+    let reparsed: Config = toml::from_str(&out).unwrap();
+    assert_eq!(reparsed.tree.width, 50);
+    assert!(reparsed.content.word_wrap);
+    assert_eq!(reparsed.search.context_lines, 5);
+}
+
+#[test]
+fn defaults_for_new_tables() {
+    let cfg = Config::default();
+    assert!(!cfg.tree.show_hidden);
+    assert_eq!(cfg.tree.width, 28);
+    assert!(!cfg.tree.independent_scroll);
+    assert!(cfg.tree.indent_guides);
+    assert!(!cfg.tree.icons);
+
+    assert!(!cfg.content.word_wrap);
+    assert!(cfg.content.line_numbers);
+    assert!(cfg.content.scrollbar);
+    assert!(cfg.content.scroll_percentage);
+    assert!(!cfg.content.watch);
+    assert!(cfg.content.show_file_info);
+
+    assert!(cfg.search.in_file_search);
+    assert_eq!(cfg.search.context_lines, 0);
+    assert!(!cfg.search.keep_query);
+
+    assert_eq!(cfg.recent_files_count, 10);
 }

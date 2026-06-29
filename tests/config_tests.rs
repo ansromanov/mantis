@@ -33,9 +33,10 @@ fn default_keymap_has_expected_bindings() {
 
 #[test]
 fn config_uses_serde_defaults_for_missing_fields() {
-    let cfg: Config = toml::from_str("tree_width = 42").unwrap();
-    assert_eq!(cfg.tree_width, 42);
-    assert!(!cfg.show_hidden);
+    let mut cfg: Config = toml::from_str("tree_width = 42").unwrap();
+    cfg.migrate_legacy_flat_fields();
+    assert_eq!(cfg.tree.width, 42);
+    assert!(!cfg.tree.show_hidden);
     assert!(pressed(
         &cfg.keys.quit,
         &ev(KeyCode::Char('q'), KeyModifiers::empty())
@@ -54,8 +55,8 @@ fn default_config_serializes_and_round_trips() {
     let toml_str = toml::to_string_pretty(&cfg).expect("default config must serialize");
     assert!(!toml_str.is_empty());
     let back: Config = toml::from_str(&toml_str).expect("serialized config must round-trip");
-    assert_eq!(back.show_hidden, cfg.show_hidden);
-    assert_eq!(back.tree_width, cfg.tree_width);
+    assert_eq!(back.tree.show_hidden, cfg.tree.show_hidden);
+    assert_eq!(back.tree.width, cfg.tree.width);
     assert!(pressed(
         &back.keys.quit,
         &ev(KeyCode::Char('q'), KeyModifiers::empty())
@@ -97,7 +98,7 @@ fn load_returns_path_of_loaded_file() {
     fs::write(&cfg_file, "tree_width = 99\n").unwrap();
 
     let (cfg, path, err) = config::load(&dir);
-    assert_eq!(cfg.tree_width, 99);
+    assert_eq!(cfg.tree.width, 99);
     assert_eq!(path.as_deref(), Some(cfg_file.as_path()));
     assert!(err.is_none());
 
@@ -118,7 +119,7 @@ fn save_and_reload_preserves_theme() {
     fs::write(dir.join("mantis.toml"), "tree_width = 30\n").unwrap();
 
     let (mut cfg, path, _) = config::load(&dir);
-    assert_eq!(cfg.tree_width, 30);
+    assert_eq!(cfg.tree.width, 30);
 
     cfg.theme = ThemeConfig::from_preset("synthwave84");
     config::save(&cfg, path.as_deref().unwrap()).unwrap();

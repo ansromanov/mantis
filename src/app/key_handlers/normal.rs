@@ -54,7 +54,7 @@ impl App {
             self.show_help = !self.show_help;
         } else if pressed(&k.toggle_hidden, &key) {
             self.show_hidden = !self.show_hidden;
-            self.config.show_hidden = self.show_hidden;
+            self.config.tree.show_hidden = self.show_hidden;
             self.reload();
             self.save_config();
         } else if pressed(&k.find_files, &key) {
@@ -62,7 +62,7 @@ impl App {
         } else if pressed(&k.search_files, &key) {
             if self.focus == Focus::Content
                 && self.current_file.is_some()
-                && self.config.in_file_search
+                && self.config.search.in_file_search
             {
                 // Content focused with an open file: open the in-file search bar.
                 self.in_file_search = Some(InFileSearch::new());
@@ -82,11 +82,11 @@ impl App {
                 &root,
                 self.show_hidden,
                 self.ignore_gitignore,
-                self.config.search_context_lines,
+                self.config.search.context_lines,
                 changed.as_ref(),
             );
             s.toggle_mode();
-            if self.config.keep_search_query && !self.last_search_query.is_empty() {
+            if self.config.search.keep_query && !self.last_search_query.is_empty() {
                 s.query = self.last_search_query.clone();
                 s.refresh_now();
             }
@@ -128,7 +128,7 @@ impl App {
             self.open_in_editor();
         } else if pressed(&k.toggle_watch, &key) {
             self.auto_watch = !self.auto_watch;
-            self.config.watch = self.auto_watch;
+            self.config.content.watch = self.auto_watch;
             self.save_config();
         } else if pressed(&k.copy_path, &key) {
             self.copy_path_to_clipboard(false);
@@ -302,13 +302,13 @@ impl App {
             }
         } else if pressed(&k.toggle_wrap, &key) {
             self.word_wrap = !self.word_wrap;
-            self.config.word_wrap = self.word_wrap;
+            self.config.content.word_wrap = self.word_wrap;
             self.set_content_scroll(0);
             self.content_hscroll = 0;
             self.save_config();
         } else if pressed(&k.toggle_line_numbers, &key) {
             self.show_line_numbers = !self.show_line_numbers;
-            self.config.line_numbers = self.show_line_numbers;
+            self.config.content.line_numbers = self.show_line_numbers;
             self.save_config();
         } else if self.has_text_cursor() && pressed(&k.nav_up, &key) {
             // Move active line up (non-diff content).

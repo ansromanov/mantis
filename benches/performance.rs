@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use mantis::app::App;
-use mantis::config::Config;
+use mantis::config::{Config, ContentConfig, TreeConfig};
 use mantis::highlight::Highlighter;
 #[cfg(feature = "markdown-core")]
 use mantis::markdown;
@@ -422,11 +422,17 @@ fn bench_tree_redraw(c: &mut Criterion) {
         let root = dir.canonicalize().unwrap();
 
         let cfg = Config {
-            indent_guides: false,
-            icons: false,
-            scrollbar: false,
-            line_numbers: false,
-            show_hidden: false,
+            tree: TreeConfig {
+                indent_guides: false,
+                icons: false,
+                show_hidden: false,
+                ..Default::default()
+            },
+            content: ContentConfig {
+                scrollbar: false,
+                line_numbers: false,
+                ..Default::default()
+            },
             ..Config::default()
         };
         // generate_many_files creates a flat directory; App::new shows all files
