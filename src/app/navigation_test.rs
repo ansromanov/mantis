@@ -966,11 +966,8 @@ fn rebuild_calls_clamp_tree_selection_when_selection_lost() {
     // to restore by path, fail since the index is beyond the last element, and
     // fall through to clamp_tree_selection.
     let len = app.nodes.len();
-    app.tree_selected = len.saturating_sub(1);
-    // Simulate a node list that shrinks on rebuild: remove a.txt so a file
-    // disappears but we're selected on the last node → it should stay valid.
-    // Instead: set selected to last, then after rebuild with smaller list
-    // ensure clamp ran. We'll use git_mode to produce a shrunk tree.
+    // Place selection beyond the end so rebuild must clamp it.
+    app.tree_selected = len + 5;
     app.rebuild(false);
     assert!(
         app.tree_selected < app.nodes.len(),
