@@ -316,11 +316,68 @@ fn tree_filter_esc_closes() {
 }
 
 #[test]
-fn tree_filter_enter_closes() {
+fn tree_filter_enter_on_file_opens_it() {
     let root = temp_tree();
     let mut app = app_for(&root);
+    // App::new opens the first file. Clear state so we can test Enter opens it.
+    app.current_file = None;
     app.tree_filter = Some(TreeFilter::new());
+    let file_idx = app
+        .nodes
+        .iter()
+        .position(|n| n.path.ends_with("a.txt"))
+        .expect("a.txt must be in the tree");
+    app.tree_selected = file_idx;
     app.handle_tree_filter_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
-    assert!(app.tree_filter.is_none());
+    assert!(app.tree_filter.is_none(), "filter must close on Enter");
+    assert_eq!(
+        app.current_file.as_deref(),
+        Some(root.join("a.txt").as_path())
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_filter_enter_on_dir_toggles_expansion() {
+    let root = temp_tree();
+    fs::create_dir_all(root.join("sub")).unwrap();
+    fs::write(root.join("sub").join("c.txt"), "nested\n").unwrap();
+    let mut app = app_for(&root);
+    app.tree_filter = Some(TreeFilter::new());
+    let dir_idx = app
+        .nodes
+        .iter()
+        .position(|n| n.is_dir && n.path.ends_with("sub"))
+        .expect("sub dir must be in the tree");
+    app.tree_selected = dir_idx;
+    assert!(
+        !app.expanded.contains(&root.join("sub")),
+        "sub must not be expanded initially"
+    );
+    app.handle_tree_filter_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert!(app.tree_filter.is_none(), "filter must close on Enter");
+    assert!(
+        app.expanded.contains(&root.join("sub")),
+        "sub must be expanded after Enter"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_filter_esc_does_not_activate() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    // App::new opens the first file; clear so we can test Esc doesn't open one.
+    app.current_file = None;
+    app.tree_filter = Some(TreeFilter::new());
+    let file_idx = app
+        .nodes
+        .iter()
+        .position(|n| n.path.ends_with("a.txt"))
+        .expect("a.txt must be in the tree");
+    app.tree_selected = file_idx;
+    app.handle_tree_filter_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+    assert!(app.tree_filter.is_none(), "filter must close on Esc");
+    assert!(app.current_file.is_none(), "Esc must not open a file");
     fs::remove_dir_all(&root).ok();
 }
