@@ -251,3 +251,29 @@ fn command_palette_list_picker_impl_delegates() {
     assert!(ListPicker::query_is_empty(&p));
     assert_eq!(ListPicker::results_len(&p), COMMANDS.len());
 }
+
+#[test]
+fn command_palette_refilter_excludes_non_matching() {
+    let mut p = CommandPalette::default();
+    for c in "zzzzzzzzz".chars() {
+        p.push(c);
+    }
+    assert_eq!(p.results_len(), 0);
+}
+
+#[test]
+fn command_palette_refilter_scores_by_relevance() {
+    let mut p = CommandPalette::default();
+    // "fold" matches "Fold all" and "Unfold all" and "Toggle fold at cursor"
+    for c in "fold".chars() {
+        p.push(c);
+    }
+    let results = p.results_len();
+    assert!(results > 0, "expected at least one match for 'fold'");
+    let first = p.selected_command().unwrap();
+    assert!(
+        first.name.to_lowercase().contains("fold"),
+        "top result '{}' should be relevant to query 'fold'",
+        first.name
+    );
+}

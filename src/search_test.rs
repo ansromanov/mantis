@@ -430,6 +430,68 @@ fn recent_files_state_no_match_gives_empty_results() {
     assert!(r.selected_path().is_none());
 }
 
+// -- fuzzy_refilter ----------------------------------------------------------
+
+#[test]
+fn fuzzy_refilter_empty_query_returns_identity() {
+    let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
+    let items = vec!["alpha", "beta", "gamma"];
+    let result = fuzzy_refilter(&items, &matcher, "", |s| std::borrow::Cow::Borrowed(*s));
+    assert_eq!(result, vec![0, 1, 2]);
+}
+
+#[test]
+fn fuzzy_refilter_filters_non_matching_items() {
+    let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
+    let items = vec!["alpha", "beta", "gamma"];
+    let result = fuzzy_refilter(&items, &matcher, "zzz", |s| std::borrow::Cow::Borrowed(*s));
+    assert!(result.is_empty());
+}
+
+#[test]
+fn fuzzy_refilter_returns_matching_indices() {
+    let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
+    let items = vec!["alpha", "beta", "gamma"];
+    let result = fuzzy_refilter(&items, &matcher, "bet", |s| std::borrow::Cow::Borrowed(*s));
+    assert_eq!(result, vec![1]);
+}
+
+#[test]
+fn fuzzy_refilter_returns_all_matched_items() {
+    let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
+    let items = vec!["foobar", "baz_bar_qux", "barn"];
+    let result = fuzzy_refilter(&items, &matcher, "bar", |s| std::borrow::Cow::Borrowed(*s));
+    assert_eq!(
+        result.len(),
+        3,
+        "all items matching 'bar' should be returned"
+    );
+    let mut sorted = result.clone();
+    sorted.sort_unstable();
+    assert_eq!(sorted, vec![0, 1, 2]);
+}
+
+#[test]
+fn fuzzy_refilter_sorts_by_descending_score() {
+    let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
+    // "beta" is an exact/prefix match for query "beta"; "alphabeta" is weaker
+    let items = vec!["alphabeta", "beta"];
+    let result = fuzzy_refilter(&items, &matcher, "beta", |s| std::borrow::Cow::Borrowed(*s));
+    assert_eq!(result.len(), 2);
+    assert_eq!(
+        result[0], 1,
+        "exact match 'beta' should rank before 'alphabeta'"
+    );
+}
+
+#[test]
+fn fuzzy_refilter_empty_items_returns_empty() {
+    let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
+    let items: Vec<&str> = vec![];
+    let result = fuzzy_refilter(&items, &matcher, "abc", |s| std::borrow::Cow::Borrowed(*s));
+    assert!(result.is_empty());
+}
+
 // -- GotoLineState -----------------------------------------------------------
 
 #[test]
