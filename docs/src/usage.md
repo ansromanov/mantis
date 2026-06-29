@@ -86,6 +86,12 @@ When git blame is toggled on (`b`), a column appears on the left showing the aut
 | `S`            | Cycle diff source: all / staged / unstaged (in a diff) |
 | `n`/`N`        | Next / previous hunk (in a diff) |
 
+### Markdown rendering and line numbers
+
+When a Markdown file is displayed in **rendered mode** (the default; press `M` to toggle), line numbers are hidden in the gutter. This is by design: rendered Markdown collapses blank lines, strips code fences, and restructures formatting, so rendered-line numbers don't correspond to source-file line numbers. Toggling to **raw mode** (`M`) displays the original source with accurate line numbers.
+
+Plugins that provide rendered content (e.g., custom syntax highlighting) also hide line numbers when active, for the same reason.
+
 ## Search popup
 
 Three search entry points cover different needs:
