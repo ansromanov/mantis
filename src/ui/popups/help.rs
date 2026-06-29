@@ -213,6 +213,37 @@ const KEYMAP_SECTIONS: &[HelpSection] = &[
     },
 ];
 
+/// Git-specific keybinding rows rendered in the dedicated Git section.
+/// Each tuple is `(action_id, user-facing description)`.
+const GIT_KEYMAP_ENTRIES: &[(&str, &str)] = &[
+    (
+        "git_mode_toggle",
+        "show only changed files; each file opens its diff",
+    ),
+    (
+        "git_mode_flat_toggle",
+        "toggle flat list / nested tree (git mode only)",
+    ),
+    (
+        "toggle_diff_side_by_side",
+        "toggle side-by-side / unified diff",
+    ),
+    (
+        "toggle_diff_staged",
+        "cycle diff source: all (vs HEAD) -> staged -> unstaged",
+    ),
+    ("diff_hunk_next", "jump to next change hunk"),
+    ("diff_hunk_prev", "jump to previous change hunk"),
+    (
+        "blame_line",
+        "blame current line: hash  author  when  summary",
+    ),
+    (
+        "file_history",
+        "pick a commit -> view its diff vs your working tree",
+    ),
+];
+
 /// Helper: compute the widest key label across all keymap-driven entries so
 /// rows can be aligned with consistent padding. Capped at 14 to keep the
 /// popup compact — unusually long labels are truncated with `…`.
@@ -225,6 +256,13 @@ fn max_key_width(app: &App) -> usize {
             if w > max_w {
                 max_w = w;
             }
+        }
+    }
+    for &(action_id, _) in GIT_KEYMAP_ENTRIES {
+        let label = app.keys().labels_for_action(action_id);
+        let w = label.len();
+        if w > max_w {
+            max_w = w;
         }
     }
     max_w.min(14)
@@ -289,6 +327,42 @@ pub(crate) fn draw_help(f: &mut Frame, app: &App, area: Rect) {
         }
         rows.push(gap.clone());
     }
+
+    // Git section — static orientation rows followed by keymap-driven bindings.
+    rows.push(section("Git"));
+    let static_key_span = |label: &'static str| {
+        Span::styled(
+            format!("  {:<width$}  ", label, width = key_w),
+            Style::default()
+                .fg(theme.accent_alt)
+                .add_modifier(Modifier::BOLD),
+        )
+    };
+    let indent_span = || {
+        Span::styled(
+            format!("  {:<width$}  ", "", width = key_w),
+            Style::default().fg(theme.accent_alt),
+        )
+    };
+    rows.push(Line::from(vec![
+        static_key_span("Tree colors"),
+        desc("green = new   yellow = modified   red = deleted   gray = ignored"),
+    ]));
+    rows.push(Line::from(vec![
+        indent_span(),
+        desc("a folder takes the color of changes inside it"),
+    ]));
+    rows.push(Line::from(vec![
+        static_key_span("Status bar"),
+        desc("[branch  +ahead -behind  N changed]"),
+    ]));
+    for &(action_id, description) in GIT_KEYMAP_ENTRIES {
+        let label = app.keys().labels_for_action(action_id);
+        let display = truncate_label(&label, key_w);
+        let padded = format!("  {display:width$}  ", width = key_w);
+        rows.push(Line::from(vec![key_style(padded), desc(description)]));
+    }
+    rows.push(gap.clone());
 
     // Non-keymap sections — hardcoded overlay behaviours, kept as static text.
     rows.push(section("Visual-line mode"));
