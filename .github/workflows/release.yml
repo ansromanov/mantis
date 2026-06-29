@@ -172,3 +172,29 @@ jobs:
 
             ${{ needs.bump.outputs.changelog }}
           files: artifacts/*
+
+      - name: Update Homebrew formula
+        run: |
+          version="${{ needs.bump.outputs.version }}"
+          sha_macos_arm=$(grep "mantis-macos-aarch64$" artifacts/SHA256SUMS | awk '{print $1}')
+          sha_macos_x86=$(grep "mantis-macos-x86_64$"  artifacts/SHA256SUMS | awk '{print $1}')
+          sha_linux_arm=$(grep "mantis-linux-aarch64$" artifacts/SHA256SUMS | awk '{print $1}')
+          sha_linux_x86=$(grep "mantis-linux-x86_64$"  artifacts/SHA256SUMS | awk '{print $1}')
+
+          sed -i "s/^  version \".*\"/  version \"${version}\"/" Formula/mantis.rb
+
+          # Update sha256 values in order: macos-arm, macos-x86, linux-arm, linux-x86
+          # Each block has exactly one sha256 line; replace them sequentially via awk
+          awk -v shas="${sha_macos_arm} ${sha_macos_x86} ${sha_linux_arm} ${sha_linux_x86}" '
+            BEGIN { n=0; split(shas, s, " ") }
+            /sha256 "/ { n++; sub(/"[0-9a-f]+"/, "\"" s[n] "\"") }
+            { print }
+          ' Formula/mantis.rb > Formula/mantis.rb.tmp && mv Formula/mantis.rb.tmp Formula/mantis.rb
+
+      - name: Commit updated formula
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/mantis.rb
+          git commit -m "chore: bump Homebrew formula to v${{ needs.bump.outputs.version }} [skip ci]"
+          git push origin HEAD:main
