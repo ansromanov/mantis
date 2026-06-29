@@ -49,3 +49,7 @@ impl App {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "diff_nav_test.rs"]
+mod tests;

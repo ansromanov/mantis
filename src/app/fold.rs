@@ -84,3 +84,7 @@ impl App {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "fold_test.rs"]
+mod tests;
