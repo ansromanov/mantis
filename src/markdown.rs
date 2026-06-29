@@ -383,7 +383,7 @@ fn wrap_paragraph(
     } else {
         String::new()
     };
-    let bq_width = bq_prefix.len();
+    let bq_width = bq_prefix.width();
     let available_width = width.saturating_sub(bq_width);
 
     if available_width < 10 {
@@ -415,8 +415,8 @@ fn wrap_paragraph(
                         last_text.push_str(word);
                         current_width += word_width + 1;
                     } else {
-                        current_line.push((style, word.to_string()));
-                        current_width += word_width;
+                        current_line.push((style, format!(" {word}")));
+                        current_width += space_width + word_width;
                     }
                 } else {
                     current_line.push((style, word.to_string()));

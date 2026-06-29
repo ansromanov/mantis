@@ -89,12 +89,10 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         return;
     }
 
-    let view_height = inner.height as usize;
-    let total_lines = app.display_line_count();
-    let scroll = app.content_scroll.min(app.content_scroll_max());
-    let visible_end = (scroll + view_height).min(total_lines);
-
-    // Pre-wrap markdown if word wrap is enabled and width has changed
+    // Pre-wrap markdown before computing line counts so total_lines/visible_end
+    // reflect the post-rerender state. Without this ordering, a terminal-widening
+    // resize can produce fewer wrapped lines than visible_end expects, causing an
+    // out-of-bounds panic in md_lines[scroll..visible_end].
     if app.word_wrap {
         let content_width = inner
             .width
@@ -104,12 +102,17 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                 0
             })
             .saturating_sub(if app.show_blame && app.has_text_cursor() {
-                crate::ui::content::draw::BLAME_COL_WIDTH as u16
+                BLAME_COL_WIDTH as u16
             } else {
                 0
             }) as usize;
         app.rerender_markdown_if_needed(content_width);
     }
+
+    let view_height = inner.height as usize;
+    let total_lines = app.display_line_count();
+    let scroll = app.content_scroll.min(app.content_scroll_max());
+    let visible_end = (scroll + view_height).min(total_lines);
 
     // Rendered-content source: plugin takes precedence over core markdown.
     let render_lines: Option<&Vec<Vec<(ratatui::style::Style, String)>>> = app
