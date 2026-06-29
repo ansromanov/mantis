@@ -1,5 +1,6 @@
 use super::*;
 
+use std::fs;
 use std::sync::atomic::AtomicUsize;
 static TEST_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -8,203 +9,66 @@ fn search_temp_dir(label: &str) -> PathBuf {
     std::env::temp_dir().join(format!("tv_search_{}_{}_{}", label, std::process::id(), n))
 }
 
-// -- InFileSearch ----------------------------------------------------------
+// -- fuzzy_refilter ----------------------------------------------------------
 
 #[test]
-fn in_file_search_finds_matches() {
-    let mut s = InFileSearch::new();
-    assert!(s.matches.is_empty());
-    assert_eq!(s.current, 0);
-
-    let lines = ["hello world".to_string(), "foo bar".to_string()];
-    s.push('o');
-    s.refresh(lines.len(), |i| lines.get(i).cloned());
-    assert_eq!(s.matches.len(), 4);
-
-    s.push(' ');
-    s.refresh(lines.len(), |i| lines.get(i).cloned());
-    assert_eq!(s.matches.len(), 2);
-    assert_eq!(s.matches[0].line, 0);
-    assert_eq!(s.matches[0].col, 4);
-
-    s.pop();
-    s.refresh(lines.len(), |i| lines.get(i).cloned());
-    assert_eq!(s.matches.len(), 4);
+fn fuzzy_refilter_empty_query_returns_identity() {
+    let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
+    let items = vec!["alpha", "beta", "gamma"];
+    let result = fuzzy_refilter(&items, &matcher, "", |s| std::borrow::Cow::Borrowed(*s));
+    assert_eq!(result, vec![0, 1, 2]);
 }
 
 #[test]
-fn in_file_search_case_insensitive() {
-    let mut s = InFileSearch::new();
-    let lines = ["Hello World".to_string()];
-    s.push('w');
-    s.refresh(lines.len(), |i| lines.get(i).cloned());
-    assert_eq!(s.matches.len(), 1);
-    assert_eq!(s.matches[0].col, 6);
+fn fuzzy_refilter_filters_non_matching_items() {
+    let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
+    let items = vec!["alpha", "beta", "gamma"];
+    let result = fuzzy_refilter(&items, &matcher, "zzz", |s| std::borrow::Cow::Borrowed(*s));
+    assert!(result.is_empty());
 }
 
 #[test]
-fn in_file_search_empty_query_clears_matches() {
-    let mut s = InFileSearch::new();
-    let lines = ["hello".to_string()];
-    s.push('h');
-    s.refresh(lines.len(), |i| lines.get(i).cloned());
-    assert_eq!(s.matches.len(), 1);
-    s.pop();
-    s.refresh(lines.len(), |i| lines.get(i).cloned());
-    assert!(s.matches.is_empty());
+fn fuzzy_refilter_returns_matching_indices() {
+    let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
+    let items = vec!["alpha", "beta", "gamma"];
+    let result = fuzzy_refilter(&items, &matcher, "bet", |s| std::borrow::Cow::Borrowed(*s));
+    assert_eq!(result, vec![1]);
 }
 
 #[test]
-fn in_file_search_current_navigation() {
-    let mut s = InFileSearch::new();
-    let lines = ["aa".to_string()];
-    s.push('a');
-    s.refresh(lines.len(), |i| lines.get(i).cloned());
-    assert_eq!(s.matches.len(), 2);
-    assert_eq!(s.current, 0);
+fn fuzzy_refilter_returns_all_matched_items() {
+    let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
+    let items = vec!["foobar", "baz_bar_qux", "barn"];
+    let result = fuzzy_refilter(&items, &matcher, "bar", |s| std::borrow::Cow::Borrowed(*s));
+    assert_eq!(
+        result.len(),
+        3,
+        "all items matching 'bar' should be returned"
+    );
+    let mut sorted = result.clone();
+    sorted.sort_unstable();
+    assert_eq!(sorted, vec![0, 1, 2]);
 }
 
 #[test]
-fn in_file_search_default_is_empty() {
-    let s = InFileSearch::default();
-    assert!(s.query.is_empty());
-    assert!(s.matches.is_empty());
-    assert_eq!(s.current, 0);
-}
-
-// -- ThemePicker -----------------------------------------------------------
-
-#[test]
-fn theme_picker_starts_with_all_presets() {
-    let p = ThemePicker::default();
-    let count = crate::theme::Theme::discover_all().len();
-    assert_eq!(p.names.len(), count);
-    assert_eq!(p.filtered.len(), count);
-    assert_eq!(p.selected, 0);
+fn fuzzy_refilter_sorts_by_descending_score() {
+    let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
+    // "beta" is an exact/prefix match for query "beta"; "alphabeta" is weaker
+    let items = vec!["alphabeta", "beta"];
+    let result = fuzzy_refilter(&items, &matcher, "beta", |s| std::borrow::Cow::Borrowed(*s));
+    assert_eq!(result.len(), 2);
+    assert_eq!(
+        result[0], 1,
+        "exact match 'beta' should rank before 'alphabeta'"
+    );
 }
 
 #[test]
-fn theme_picker_push_filters() {
-    let mut p = ThemePicker::default();
-    p.push('m');
-    assert!(p.filtered.len() < p.names.len());
-    assert!(p.filtered.iter().any(|&i| p.names[i].contains("monokai")));
-}
-
-#[test]
-fn theme_picker_pop_restores() {
-    let mut p = ThemePicker::default();
-    p.push('m');
-    let filtered_after_push = p.filtered.len();
-    p.pop();
-    assert_eq!(p.filtered.len(), p.names.len());
-    assert!(filtered_after_push < p.names.len());
-}
-
-#[test]
-fn theme_picker_selected_name() {
-    let mut p = ThemePicker::default();
-    p.push('m');
-    let name = p.selected_name();
-    assert!(name.is_some());
-    assert!(name.unwrap().contains("monokai"));
-}
-
-#[test]
-fn theme_picker_selected_name_returns_none_when_empty() {
-    let mut p = ThemePicker::default();
-    for c in "zzzzzzz".chars() {
-        p.push(c);
-    }
-    assert_eq!(p.results_len(), 0);
-    assert!(p.selected_name().is_none());
-}
-
-#[test]
-fn theme_picker_results_len() {
-    let p = ThemePicker::default();
-    assert_eq!(p.results_len(), crate::theme::Theme::discover_all().len());
-}
-
-// -- HistoryState ----------------------------------------------------------
-
-fn sample_commits() -> Vec<crate::git::Commit> {
-    vec![
-        crate::git::Commit {
-            hash: "abc123def456".into(),
-            short: "abc123".into(),
-            date: "2024-01-15".into(),
-            subject: "fix critical bug".into(),
-        },
-        crate::git::Commit {
-            hash: "def789abc012".into(),
-            short: "def789".into(),
-            date: "2024-01-14".into(),
-            subject: "add new feature".into(),
-        },
-        crate::git::Commit {
-            hash: "ghi345jkl678".into(),
-            short: "ghi345".into(),
-            date: "2024-01-13".into(),
-            subject: "refactor module".into(),
-        },
-    ]
-}
-
-#[test]
-fn history_state_starts_with_all_commits() {
-    let commits = sample_commits();
-    let h = HistoryState::new(PathBuf::from("f.txt"), commits);
-    assert_eq!(h.results_len(), 3);
-    assert_eq!(h.selected, 0);
-}
-
-#[test]
-fn history_state_push_filters() {
-    let commits = sample_commits();
-    let mut h = HistoryState::new(PathBuf::from("f.txt"), commits);
-    h.push('b');
-    assert!(h.results_len() < 3);
-    assert_eq!(h.filtered[0], 0);
-}
-
-#[test]
-fn history_state_pop_restores() {
-    let commits = sample_commits();
-    let mut h = HistoryState::new(PathBuf::from("f.txt"), commits);
-    h.push('b');
-    let after_push = h.results_len();
-    h.pop();
-    assert_eq!(h.results_len(), 3);
-    assert!(after_push < 3);
-}
-
-#[test]
-fn history_state_selected_commit() {
-    let commits = sample_commits();
-    let mut h = HistoryState::new(PathBuf::from("f.txt"), commits);
-    assert_eq!(h.selected_commit().unwrap().short, "abc123");
-    h.selected = 1;
-    assert_eq!(h.selected_commit().unwrap().short, "def789");
-}
-
-#[test]
-fn history_state_selected_commit_returns_none_out_of_bounds() {
-    let commits = sample_commits();
-    let mut h = HistoryState::new(PathBuf::from("f.txt"), commits);
-    h.selected = 99;
-    assert!(h.selected_commit().is_none());
-}
-
-#[test]
-fn history_state_filtered_out_of_bounds() {
-    let commits = sample_commits();
-    let mut h = HistoryState::new(PathBuf::from("f.txt"), commits);
-    for c in "zzzzzzz".chars() {
-        h.push(c);
-    }
-    assert_eq!(h.results_len(), 0);
-    assert!(h.selected_commit().is_none());
+fn fuzzy_refilter_empty_items_returns_empty() {
+    let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
+    let items: Vec<&str> = vec![];
+    let result = fuzzy_refilter(&items, &matcher, "abc", |s| std::borrow::Cow::Borrowed(*s));
+    assert!(result.is_empty());
 }
 
 // -- SearchState -----------------------------------------------------------
@@ -355,223 +219,4 @@ fn search_state_reload_files() {
     s.reload_files(&root, false, true, None);
     assert_eq!(s.file_results.len(), 2);
     fs::remove_dir_all(&root).ok();
-}
-
-// -- RecentFilesState -------------------------------------------------------
-
-fn sample_paths() -> Vec<PathBuf> {
-    vec![
-        PathBuf::from("/tmp/alpha.rs"),
-        PathBuf::from("/tmp/beta.rs"),
-        PathBuf::from("/tmp/gamma.toml"),
-    ]
-}
-
-#[test]
-fn recent_files_state_starts_with_all_paths() {
-    let r = RecentFilesState::new(sample_paths());
-    assert_eq!(r.results_len(), 3);
-    assert_eq!(r.selected, 0);
-    assert!(r.query.is_empty());
-}
-
-#[test]
-fn recent_files_state_push_filters() {
-    let mut r = RecentFilesState::new(sample_paths());
-    // 'h' only appears in "/tmp/alpha.rs" (not in beta or gamma)
-    r.push('h');
-    assert!(r.results_len() < 3);
-    let path = r.selected_path().unwrap();
-    assert!(path.to_string_lossy().contains('h'));
-}
-
-#[test]
-fn recent_files_state_pop_restores() {
-    let mut r = RecentFilesState::new(sample_paths());
-    r.push('h');
-    let after_push = r.results_len();
-    r.pop();
-    assert_eq!(r.results_len(), 3);
-    assert!(after_push < 3);
-}
-
-#[test]
-fn recent_files_state_selected_path_in_bounds() {
-    let mut r = RecentFilesState::new(sample_paths());
-    assert_eq!(r.selected_path().unwrap(), &PathBuf::from("/tmp/alpha.rs"));
-    r.selected = 2;
-    assert_eq!(
-        r.selected_path().unwrap(),
-        &PathBuf::from("/tmp/gamma.toml")
-    );
-}
-
-#[test]
-fn recent_files_state_selected_path_returns_none_when_empty() {
-    let paths: Vec<PathBuf> = vec![];
-    let r = RecentFilesState::new(paths);
-    assert!(r.selected_path().is_none());
-}
-
-#[test]
-fn recent_files_state_selected_path_returns_none_out_of_bounds() {
-    let mut r = RecentFilesState::new(sample_paths());
-    r.selected = 99;
-    assert!(r.selected_path().is_none());
-}
-
-#[test]
-fn recent_files_state_no_match_gives_empty_results() {
-    let mut r = RecentFilesState::new(sample_paths());
-    for c in "zzzzzzz".chars() {
-        r.push(c);
-    }
-    assert_eq!(r.results_len(), 0);
-    assert!(r.selected_path().is_none());
-}
-
-// -- fuzzy_refilter ----------------------------------------------------------
-
-#[test]
-fn fuzzy_refilter_empty_query_returns_identity() {
-    let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
-    let items = vec!["alpha", "beta", "gamma"];
-    let result = fuzzy_refilter(&items, &matcher, "", |s| std::borrow::Cow::Borrowed(*s));
-    assert_eq!(result, vec![0, 1, 2]);
-}
-
-#[test]
-fn fuzzy_refilter_filters_non_matching_items() {
-    let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
-    let items = vec!["alpha", "beta", "gamma"];
-    let result = fuzzy_refilter(&items, &matcher, "zzz", |s| std::borrow::Cow::Borrowed(*s));
-    assert!(result.is_empty());
-}
-
-#[test]
-fn fuzzy_refilter_returns_matching_indices() {
-    let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
-    let items = vec!["alpha", "beta", "gamma"];
-    let result = fuzzy_refilter(&items, &matcher, "bet", |s| std::borrow::Cow::Borrowed(*s));
-    assert_eq!(result, vec![1]);
-}
-
-#[test]
-fn fuzzy_refilter_returns_all_matched_items() {
-    let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
-    let items = vec!["foobar", "baz_bar_qux", "barn"];
-    let result = fuzzy_refilter(&items, &matcher, "bar", |s| std::borrow::Cow::Borrowed(*s));
-    assert_eq!(
-        result.len(),
-        3,
-        "all items matching 'bar' should be returned"
-    );
-    let mut sorted = result.clone();
-    sorted.sort_unstable();
-    assert_eq!(sorted, vec![0, 1, 2]);
-}
-
-#[test]
-fn fuzzy_refilter_sorts_by_descending_score() {
-    let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
-    // "beta" is an exact/prefix match for query "beta"; "alphabeta" is weaker
-    let items = vec!["alphabeta", "beta"];
-    let result = fuzzy_refilter(&items, &matcher, "beta", |s| std::borrow::Cow::Borrowed(*s));
-    assert_eq!(result.len(), 2);
-    assert_eq!(
-        result[0], 1,
-        "exact match 'beta' should rank before 'alphabeta'"
-    );
-}
-
-#[test]
-fn fuzzy_refilter_empty_items_returns_empty() {
-    let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
-    let items: Vec<&str> = vec![];
-    let result = fuzzy_refilter(&items, &matcher, "abc", |s| std::borrow::Cow::Borrowed(*s));
-    assert!(result.is_empty());
-}
-
-// -- GotoLineState -----------------------------------------------------------
-
-#[test]
-fn goto_line_state_new_is_empty() {
-    let s = GotoLineState::new();
-    assert!(s.query.is_empty());
-}
-
-#[test]
-fn goto_line_state_push_appends() {
-    let mut s = GotoLineState::new();
-    s.push('4');
-    assert_eq!(s.query, "4");
-    s.push('2');
-    assert_eq!(s.query, "42");
-}
-
-#[test]
-fn goto_line_state_pop_removes() {
-    let mut s = GotoLineState::new();
-    s.push('4');
-    s.push('2');
-    s.pop();
-    assert_eq!(s.query, "4");
-    s.pop();
-    assert!(s.query.is_empty());
-}
-
-#[test]
-fn goto_line_state_default_is_empty() {
-    let s = GotoLineState::default();
-    assert!(s.query.is_empty());
-}
-
-// -- TreeFilter --------------------------------------------------------------
-
-#[test]
-fn tree_filter_new_has_no_cache() {
-    let f = TreeFilter::new();
-    assert!(f.cached.is_none());
-}
-
-#[test]
-fn tree_filter_push_invalidates_cache() {
-    let mut f = TreeFilter::new();
-    f.cached = Some(("a".to_string(), 0, vec![1, 2, 3]));
-    f.push('b');
-    assert!(f.cached.is_none(), "push must clear the filter cache");
-}
-
-#[test]
-fn tree_filter_pop_invalidates_cache() {
-    let mut f = TreeFilter::new();
-    f.push('a');
-    f.cached = Some(("a".to_string(), 0, vec![1, 2, 3]));
-    f.pop();
-    assert!(f.cached.is_none(), "pop must clear the filter cache");
-}
-
-#[test]
-fn recent_files_list_picker_impl_delegates() {
-    use crate::list_picker::ListPicker;
-    let paths = vec![
-        PathBuf::from("/a.txt"),
-        PathBuf::from("/b.txt"),
-        PathBuf::from("/c.txt"),
-    ];
-    let mut r = RecentFilesState::new(paths);
-    assert_eq!(ListPicker::results_len(&r), 3);
-    assert_eq!(ListPicker::selected(&r), 0);
-    ListPicker::set_selected(&mut r, 2);
-    assert_eq!(r.selected, 2);
-    assert!(ListPicker::query_is_empty(&r));
-    ListPicker::query_push(&mut r, 'a');
-    assert!(!ListPicker::query_is_empty(&r));
-    assert!(
-        ListPicker::results_len(&r) < 3,
-        "push should filter results"
-    );
-    ListPicker::query_pop(&mut r);
-    assert!(ListPicker::query_is_empty(&r));
-    assert_eq!(ListPicker::results_len(&r), 3);
 }
