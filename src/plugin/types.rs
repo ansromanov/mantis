@@ -141,14 +141,8 @@ pub(crate) struct FromPlugin {
 pub(crate) struct PluginContributions {
     /// Paths in `plugin_content` / `plugin_content_text` rendered by this plugin.
     pub(crate) content_paths: HashSet<PathBuf>,
-    /// Paths in `plugin_blame` provided by this plugin.
-    pub(crate) blame_paths: HashSet<PathBuf>,
-    /// Paths this plugin contributed to `git_status_map` via `set_file_statuses`.
-    pub(crate) status_paths: HashSet<PathBuf>,
     /// Paths in `plugin_fold_regions` registered by this plugin.
     pub(crate) fold_region_paths: HashSet<PathBuf>,
-    /// Whether this plugin set `plugin_git_info` via `set_status_bar_git_info`.
-    pub(crate) has_git_info: bool,
     /// Whether this plugin set the icon map / icon fields via `set_icon_map`.
     pub(crate) has_icon_map: bool,
 }

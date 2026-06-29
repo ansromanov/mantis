@@ -1,9 +1,6 @@
 [workspace]
 members = [
     "plugins/mantis-plugin-markdown",
-    "plugins/mantis-plugin-git-diff",
-    "plugins/mantis-plugin-git-log",
-    "plugins/mantis-plugin-git-plugin",
     "plugins/mantis-plugin-iconize",
 ]
 resolver = "2"
@@ -37,8 +34,6 @@ codegen-units = 1   # better optimization at the cost of build time
 panic = "abort"     # no unwinding tables; smaller binary
 
 [features]
-default = ["git-core"]
-git-core = []
 markdown-core = ["dep:pulldown-cmark"]
 
 [dependencies]

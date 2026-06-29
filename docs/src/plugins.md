@@ -85,9 +85,6 @@ Plugins receive lifecycle and hook events from `mantis` and can respond with
 | `show_message` | Displays a message in the status bar |
 | `open_file` | Opens a file in the content panel |
 | `set_content` | Replaces content panel with ANSI-escaped lines |
-| `set_file_statuses` | Provides per-path git status for tree coloring |
-| `set_blame_data` | Provides per-line blame annotations for the content pane |
-| `set_status_bar_git_info` | Provides branch/HEAD/dirty state for the status bar |
 | `set_icon_map` | Sets file-type icon glyphs (requires Nerd Font) |
 | `register_language_provider` | Declares file extensions and capabilities |
 | `set_fold_regions` | Provides fold regions for a file |
@@ -156,7 +153,6 @@ compiled alongside `mantis` and installed on first run.
 
 | Plugin | Binary | What it does |
 |---|---|---|---|
-| git-plugin | `mantis-plugin-git-plugin` | Comprehensive git support: repo info in status bar, file statuses for tree coloring, working-tree diff on file open, file log on `H`, file blame on `b`. |
 | iconize | `mantis-plugin-iconize` | On `init`, sends a `set_icon_map` action with Nerd Font glyphs for ~80 file extensions. Requires `icons = true` in `mantis.toml` and a Nerd Font terminal. |
 | markdown | `mantis-plugin-markdown` | Renders `.md` files using pulldown-cmark, sending the output as ANSI-escaped lines via `set_content`. Responds to theme changes and `M` keypress for raw/rendered toggle. |
 
@@ -166,25 +162,10 @@ adding entries in `mantis.toml`:
 
 ```toml
 [plugins]
-git-plugin = { path = "mantis-plugin-git-plugin" }
 iconize    = { path = "mantis-plugin-iconize" }
 markdown   = { path = "mantis-plugin-markdown" }
 ```
 
-> **Note:** The plugin and native git code paths coexist:
-> - Plugin data (file statuses, blame, git info) takes precedence over native
->   equivalents when the plugin is enabled.
-> - `git-plugin` uses git's ANSI colouring for diffs and logs rather than mantis's
->   theme-aware `diff_line_style` / side-by-side rendering.
-> - The interactive commit-selection popup (built-in `H` key) and side-by-side
->   diff view remain native-only; the plugin shows log/diff as static ANSI
->   content via `set_content`.
->
-> **Key conflict:** `H` is also the default binding for the built-in
-> `file_history` picker. Enabling `git-plugin` without clearing that binding
-> will trigger both actions on the same keypress. To give the plugin sole
-> ownership of `H`, add this to `mantis.toml`:
-> ```toml
-> [keys]
-> file_history = []
-> ```
+> **Note:** Git features are built into `mantis` natively — no plugin required.
+> Git status colors, blame, file history (`H`), and working-tree diffs all work
+> without any plugin enabled.

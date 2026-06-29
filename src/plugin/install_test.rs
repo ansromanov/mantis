@@ -58,10 +58,6 @@ fn bundled_plugin_entries_all_disabled_and_include_markdown_and_terraform() {
     );
     assert!(names.contains(&"iconize"), "iconize plugin must be listed");
     assert!(
-        names.contains(&"git-plugin"),
-        "git-plugin plugin must be listed"
-    );
-    assert!(
         names.contains(&"terraform"),
         "terraform syntax plugin must be listed"
     );

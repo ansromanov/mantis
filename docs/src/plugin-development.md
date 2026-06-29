@@ -50,7 +50,7 @@ below) so the plugin can verify compatibility dynamically.
 
 | Version | Release | Changes |
 |---|---|---|
-| `"1"` | 0.7.x | Initial protocol. Events: init, on_file_open, on_keypress, on_selection_change, on_theme_change, on_quit, shutdown. Actions: show_message, open_file, set_content, set_file_statuses, set_blame_data, set_status_bar_git_info, set_icon_map. |
+| `"1"` | 0.7.x | Initial protocol. Events: init, on_file_open, on_keypress, on_selection_change, on_theme_change, on_quit, shutdown. Actions: show_message, open_file, set_content, set_icon_map. Git features (set_file_statuses, set_blame_data, set_status_bar_git_info) were removed in 0.11.22 — git is now built in only. |
 | `"2"` | 0.8.x | Language providers (register_language_provider, set_fold_regions), event subscription (`events` field in manifest), protocol hardening (bounded queues, line caps), `protocol_version` field on init event. |
 
 ### Discovery
@@ -186,53 +186,6 @@ that generate rich output (e.g. markdown renderers, linters).
 {"event":"action","action":"set_content","params":{"lines":["\u001b[32mgreen line\u001b[0m","plain line"]}}
 ```
 
-### `set_file_statuses`
-
-Provides per-path git status information for tree coloring. The `params` object
-maps absolute file paths to status strings. Sent by the bundled `git-plugin` on
-`init` and `on_file_open` / `on_selection_change`.
-
-```json
-{"event":"action","action":"set_file_statuses","params":{
-  "/home/user/proj/src/main.rs": "modified",
-  "/home/user/proj/src/lib.rs": "added"
-}}
-```
-
-Status values: `"modified"`, `"renamed"`, `"conflict"`, `"added"`, `"untracked"`,
-`"deleted"`, `"ignored"`.
-
-### `set_blame_data`
-
-Provides per-line blame annotations for a file. Each entry in `lines` is a
-pre-formatted display string (hash + author + date) for the corresponding line
-(0-indexed). Sent by the bundled `git-plugin` on `b` keypress. When set, these
-annotations take precedence over the built-in `git::file_blame()` call in the
-content pane.
-
-```json
-{"event":"action","action":"set_blame_data","params":{
-  "path": "/home/user/proj/src/main.rs",
-  "lines": ["abc1234 (John Doe 2024-01-15) ", ...]
-}}
-```
-
-### `set_status_bar_git_info`
-
-Provides branch, HEAD, and dirty state for the status bar. When set, this takes
-precedence over the built-in `git_info`. Sent by the bundled `git-plugin` on
-`init` and `on_file_open`. The `state` field is one of `"clean"`, `"dirty"`,
-`"conflict"`, `"rebase"`, or `"merge"`.
-
-```json
-{"event":"action","action":"set_status_bar_git_info","params":{
-  "branch": "main",
-  "head": "abc1234",
-  "dirty": true,
-  "state": "dirty"
-}}
-```
-
 ### `set_icon_map`
 
 Sets the file-type icon glyphs used in the tree. Requires `icons = true` in `mantis.toml` and a Nerd Font terminal. Keys in `icons` are file extensions (lowercase) or full filenames for extensionless files (e.g. `"dockerfile"`).
@@ -359,9 +312,6 @@ special cases needed.
 | Action | State cleared |
 |---|---|
 | `set_content` | `plugin_content` / `plugin_content_text` entries for contributed paths |
-| `set_blame_data` | `plugin_blame` entries for contributed paths |
-| `set_file_statuses` | `git_status_map` entries for contributed paths |
-| `set_status_bar_git_info` | `plugin_git_info` (status bar override) |
 | `set_icon_map` | `icon_map`, `icons_enabled`, `icon_dir_open/closed`, `icon_fallback` |
 | `set_fold_regions` | `plugin_fold_regions` entries for contributed paths; active fold state reset |
 | `register_language_provider` | Provider registration removed |

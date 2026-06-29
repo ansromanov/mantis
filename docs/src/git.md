@@ -4,10 +4,8 @@
 status colors, blame, file history, and a dedicated diff-review mode out of the
 box.
 
-Most git data — repo info for the status bar, per-path status for tree coloring,
-blame annotations, and file diffs — is provided by the bundled `git-plugin`
-process plugin, which is enabled by default. The `git-core` feature flag keeps
-the equivalent native implementations as a compile-time fallback.
+All git data — repo info for the status bar, per-path status for tree coloring,
+blame annotations, and file diffs — is provided natively via the `git` CLI.
 
 > ℹ️ All git features need `git` on your `PATH` and the file to be tracked in a
 > repository.

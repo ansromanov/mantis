@@ -34,26 +34,12 @@ impl App {
         let git_show_untracked = cfg.git.show_untracked;
         let git_show_ignored = cfg.git.show_ignored;
         let git_status_map = if git_status_enabled {
-            #[cfg(feature = "git-core")]
-            {
-                crate::git::repo_status(&root, cfg.git.show_untracked, cfg.git.show_ignored)
-            }
-            #[cfg(not(feature = "git-core"))]
-            {
-                HashMap::new()
-            }
+            crate::git::repo_status(&root, cfg.git.show_untracked, cfg.git.show_ignored)
         } else {
             HashMap::new()
         };
         let git_info = if git_status_enabled {
-            #[cfg(feature = "git-core")]
-            {
-                crate::git::repo_info(&root)
-            }
-            #[cfg(not(feature = "git-core"))]
-            {
-                None
-            }
+            crate::git::repo_info(&root)
         } else {
             None
         };
@@ -231,8 +217,6 @@ impl App {
             plugin_is_opening_file: false,
             plugin_message: plugin_spawn_error,
             plugin_contributions: HashMap::new(),
-            plugin_blame: HashMap::new(),
-            plugin_git_info: None,
             plugin_content: HashMap::new(),
             plugin_content_text: HashMap::new(),
             cursor_positions: HashMap::new(),

@@ -96,7 +96,6 @@ fn which_cargo() -> Option<String> {
 
 /// List of (user-facing_name, binary_name) for each bundled process plugin.
 const BUNDLED_PLUGINS: &[(&str, &str)] = &[
-    ("git-plugin", "mantis-plugin-git-plugin"),
     ("iconize", "mantis-plugin-iconize"),
     ("markdown", "mantis-plugin-markdown"),
 ];

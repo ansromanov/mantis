@@ -57,7 +57,7 @@ mod util;
 
 use loader::Loader;
 
-pub use types::{DiffMode, Focus, PluginGitInfo, StatusMessage};
+pub use types::{DiffMode, Focus, StatusMessage};
 pub(crate) use types::{HighlightCacheKey, HighlightCacheValue};
 pub(crate) use util::{deleted_set, diff_line_style, rect_contains};
 
@@ -285,13 +285,6 @@ pub struct App {
     /// Populated by `handle_plugin_action` and consumed by
     /// `teardown_plugin_contributions`.
     pub(crate) plugin_contributions: HashMap<String, PluginContributions>,
-    /// Per-file blame annotations provided by a plugin, keyed by absolute path.
-    /// Each entry is a Vec of formatted blame strings (one per line, 0-indexed).
-    /// Checked before the live `git::file_blame()` call in the content pane.
-    pub plugin_blame: HashMap<PathBuf, Vec<String>>,
-    /// Git branch/HEAD/dirty/state info provided by a plugin for the status bar.
-    /// When set, displayed instead of the live `git_info`.
-    pub plugin_git_info: Option<PluginGitInfo>,
     /// Plugin-rendered content keyed by file path. Populated by the `set_content`
     /// action; the content pane checks this before markdown/virtual-file rendering.
     pub plugin_content: HashMap<PathBuf, Vec<Vec<(ratatui::style::Style, String)>>>,
@@ -367,10 +360,10 @@ impl App {
 
     /// Tears down all application state produced by the named plugin.
     ///
-    /// Removes content, blame, file-status, fold-region, git-info, and icon-map
-    /// contributions, clears the plugin's provider registrations, and reloads
-    /// the current file if the plugin had rendered content for it — so the
-    /// display falls back to core rendering (markdown, JSON, or plain text).
+    /// Removes content, fold-region, and icon-map contributions, clears the
+    /// plugin's provider registrations, and reloads the current file if the
+    /// plugin had rendered content for it — so the display falls back to core
+    /// rendering (markdown, JSON, or plain text).
     pub(crate) fn teardown_plugin_contributions(&mut self, name: &str) {
         let Some(contrib) = self.plugin_contributions.remove(name) else {
             return;
@@ -386,16 +379,6 @@ impl App {
             .iter()
             .any(|p| self.current_file.as_deref() == Some(p));
 
-        // Blame data.
-        for path in &contrib.blame_paths {
-            self.plugin_blame.remove(path);
-        }
-
-        // File statuses — remove only the paths this plugin contributed.
-        for path in &contrib.status_paths {
-            self.git_status_map.remove(path);
-        }
-
         // Fold regions.
         for path in &contrib.fold_region_paths {
             self.plugin_fold_regions.remove(path);
@@ -406,11 +389,6 @@ impl App {
             .any(|p| self.current_file.as_deref() == Some(p))
         {
             self.clear_fold_state();
-        }
-
-        // Git info (status bar override).
-        if contrib.has_git_info {
-            self.plugin_git_info = None;
         }
 
         // Icon map (Nerd Font glyphs).
@@ -558,8 +536,6 @@ impl App {
         self.plugin_content_active = false;
         self.plugin_content.clear();
         self.plugin_content_text.clear();
-        self.plugin_blame.clear();
-        self.plugin_git_info = None;
     }
 }
 

@@ -115,31 +115,23 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     let blame_annotations: Vec<String> = if app.show_blame && app.has_text_cursor() {
         if let Some(path) = &app.current_file {
             // Plugin-provided blame data takes precedence over live git blame.
-            let lines: Option<Vec<String>> = app.plugin_blame.get(path).cloned();
-            let lines = if let Some(plugin_lines) = lines {
-                plugin_lines
+            let git_lines = crate::git::file_blame(&app.root, path);
+            let lines = if git_lines.is_empty() {
+                Vec::new()
             } else {
-                #[cfg(feature = "git-core")]
-                let git_lines = crate::git::file_blame(&app.root, path);
-                #[cfg(not(feature = "git-core"))]
-                let git_lines: Vec<crate::git::BlameLine> = Vec::new();
-                if git_lines.is_empty() {
-                    Vec::new()
-                } else {
-                    let max_line = git_lines
-                        .iter()
-                        .map(|l| l.line_no as usize)
-                        .max()
-                        .unwrap_or(0);
-                    let mut annotations = vec![String::new(); max_line + 1];
-                    for bl in &git_lines {
-                        let idx = (bl.line_no as usize).saturating_sub(1);
-                        if idx < annotations.len() {
-                            annotations[idx] = format_blame_annotation(bl);
-                        }
+                let max_line = git_lines
+                    .iter()
+                    .map(|l| l.line_no as usize)
+                    .max()
+                    .unwrap_or(0);
+                let mut annotations = vec![String::new(); max_line + 1];
+                for bl in &git_lines {
+                    let idx = (bl.line_no as usize).saturating_sub(1);
+                    if idx < annotations.len() {
+                        annotations[idx] = format_blame_annotation(bl);
                     }
-                    annotations
                 }
+                annotations
             };
             lines
         } else {
