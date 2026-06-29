@@ -114,4 +114,24 @@ sha256sum --check --ignore-missing SHA256SUMS
 
 ## Via package managers
 
-> Coming soon — Homebrew, Scoop, and more are on the roadmap.
+### Homebrew (macOS / Linux)
+
+The formula lives in this repository, so tap it by URL, then install:
+
+```sh
+brew tap ansromanov/mantis https://github.com/ansromanov/mantis
+brew install mantis
+```
+
+The formula installs the prebuilt binary for your platform (Apple Silicon, Intel,
+Linux x86_64, and Linux arm64) — no Rust toolchain required. It is bumped
+automatically on every release, so `brew upgrade mantis` always tracks the latest
+version.
+
+> The explicit URL is needed because the repository is named `mantis`, not
+> `homebrew-mantis`; Homebrew's short `brew tap user/repo` form only resolves the
+> `homebrew-`-prefixed name.
+
+### Other package managers
+
+> Coming soon — Scoop, and more are on the roadmap.

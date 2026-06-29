@@ -97,8 +97,15 @@ fills.
 ## Install
 
 The one-liners above (no Rust toolchain required) download the prebuilt binary for
-your platform, verify its checksum, and install it onto your `PATH`. With the Rust
-toolchain: `cargo install mantis`. Or from source:
+your platform, verify its checksum, and install it onto your `PATH`. On macOS or
+Linux you can also use Homebrew:
+
+```sh
+brew tap ansromanov/mantis https://github.com/ansromanov/mantis
+brew install mantis
+```
+
+With the Rust toolchain: `cargo install mantis`. Or from source:
 
 ```sh
 git clone https://github.com/ansromanov/mantis.git
