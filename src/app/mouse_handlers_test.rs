@@ -8,6 +8,9 @@ use ratatui::layout::Rect;
 
 use crate::app::App;
 use crate::config::Config;
+use crate::list_picker::ListPicker;
+
+use super::{handle_picker_mouse, PickerMouseAction};
 
 static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -557,4 +560,266 @@ fn plugin_picker_click_outside_closes() {
     app.handle_mouse(left_down_at(1, 1)); // outside popup
     assert!(app.plugin_picker.is_none());
     fs::remove_dir_all(&root).ok();
+}
+
+// -- handle_picker_mouse unit tests --
+
+struct FakePicker {
+    len: usize,
+    selected: usize,
+}
+
+impl ListPicker for FakePicker {
+    fn query_push(&mut self, _c: char) {}
+    fn query_pop(&mut self) {}
+    fn query_is_empty(&self) -> bool {
+        true
+    }
+    fn results_len(&self) -> usize {
+        self.len
+    }
+    fn selected(&self) -> usize {
+        self.selected
+    }
+    fn set_selected(&mut self, i: usize) {
+        self.selected = i;
+    }
+}
+
+fn picker_area() -> Rect {
+    Rect {
+        x: 10,
+        y: 10,
+        width: 40,
+        height: 20,
+    }
+}
+
+fn ev_scroll_down_at(column: u16, row: u16) -> MouseEvent {
+    MouseEvent {
+        kind: MouseEventKind::ScrollDown,
+        column,
+        row,
+        modifiers: crossterm::event::KeyModifiers::empty(),
+    }
+}
+
+fn ev_scroll_up_at(column: u16, row: u16) -> MouseEvent {
+    MouseEvent {
+        kind: MouseEventKind::ScrollUp,
+        column,
+        row,
+        modifiers: crossterm::event::KeyModifiers::empty(),
+    }
+}
+
+#[test]
+fn picker_click_outside_closes_picker() {
+    let mut picker: Option<FakePicker> = Some(FakePicker {
+        len: 5,
+        selected: 0,
+    });
+    let mut last_click = None;
+    let action = handle_picker_mouse(
+        left_down_at(0, 0), // outside picker_area
+        picker_area(),
+        0,
+        &mut picker,
+        &mut last_click,
+    );
+    assert_eq!(action, PickerMouseAction::None);
+    assert!(picker.is_none(), "click outside area must close the picker");
+}
+
+#[test]
+fn picker_single_click_inside_selects_row() {
+    let mut picker: Option<FakePicker> = Some(FakePicker {
+        len: 5,
+        selected: 0,
+    });
+    let mut last_click = None;
+    // area.y = 10; row 12 → index = offset(0) + (12 - 10) = 2
+    let action = handle_picker_mouse(
+        left_down_at(15, 12),
+        picker_area(),
+        0,
+        &mut picker,
+        &mut last_click,
+    );
+    assert_eq!(action, PickerMouseAction::None);
+    assert_eq!(picker.as_ref().unwrap().selected, 2);
+    assert!(
+        last_click.is_some(),
+        "single click must arm double-click detection"
+    );
+}
+
+#[test]
+fn picker_double_click_returns_activate() {
+    let mut picker: Option<FakePicker> = Some(FakePicker {
+        len: 5,
+        selected: 0,
+    });
+    // Pre-arm: first click on index 2 just happened.
+    let mut last_click: Option<(Instant, usize)> = Some((Instant::now(), 2));
+    let action = handle_picker_mouse(
+        left_down_at(15, 12), // same row → index 2 again
+        picker_area(),
+        0,
+        &mut picker,
+        &mut last_click,
+    );
+    assert_eq!(action, PickerMouseAction::Activate);
+    assert!(
+        last_click.is_none(),
+        "last_click must clear after double-click"
+    );
+}
+
+#[test]
+fn picker_double_click_expired_is_single_click() {
+    let mut picker: Option<FakePicker> = Some(FakePicker {
+        len: 5,
+        selected: 0,
+    });
+    // Stale first click (600 ms ago — past the 400 ms window).
+    let mut last_click: Option<(Instant, usize)> =
+        Some((Instant::now() - Duration::from_millis(600), 2));
+    let action = handle_picker_mouse(
+        left_down_at(15, 12),
+        picker_area(),
+        0,
+        &mut picker,
+        &mut last_click,
+    );
+    assert_eq!(
+        action,
+        PickerMouseAction::None,
+        "expired double-click must not activate"
+    );
+    assert!(
+        last_click.is_some(),
+        "new single click must re-arm the timer"
+    );
+}
+
+#[test]
+fn picker_scroll_down_increments_selected() {
+    let mut picker: Option<FakePicker> = Some(FakePicker {
+        len: 5,
+        selected: 2,
+    });
+    let mut last_click = None;
+    handle_picker_mouse(
+        ev_scroll_down_at(0, 0),
+        picker_area(),
+        0,
+        &mut picker,
+        &mut last_click,
+    );
+    assert_eq!(picker.unwrap().selected, 3);
+}
+
+#[test]
+fn picker_scroll_down_clamps_at_last_item() {
+    let mut picker: Option<FakePicker> = Some(FakePicker {
+        len: 5,
+        selected: 4,
+    });
+    let mut last_click = None;
+    handle_picker_mouse(
+        ev_scroll_down_at(0, 0),
+        picker_area(),
+        0,
+        &mut picker,
+        &mut last_click,
+    );
+    assert_eq!(
+        picker.unwrap().selected,
+        4,
+        "scroll down at end must not overflow"
+    );
+}
+
+#[test]
+fn picker_scroll_up_decrements_selected() {
+    let mut picker: Option<FakePicker> = Some(FakePicker {
+        len: 5,
+        selected: 3,
+    });
+    let mut last_click = None;
+    handle_picker_mouse(
+        ev_scroll_up_at(0, 0),
+        picker_area(),
+        0,
+        &mut picker,
+        &mut last_click,
+    );
+    assert_eq!(picker.unwrap().selected, 2);
+}
+
+#[test]
+fn picker_scroll_up_clamps_at_zero() {
+    let mut picker: Option<FakePicker> = Some(FakePicker {
+        len: 5,
+        selected: 0,
+    });
+    let mut last_click = None;
+    handle_picker_mouse(
+        ev_scroll_up_at(0, 0),
+        picker_area(),
+        0,
+        &mut picker,
+        &mut last_click,
+    );
+    assert_eq!(
+        picker.unwrap().selected,
+        0,
+        "scroll up at first item must not underflow"
+    );
+}
+
+#[test]
+fn picker_click_in_range_with_offset_selects_correct_index() {
+    let mut picker: Option<FakePicker> = Some(FakePicker {
+        len: 20,
+        selected: 0,
+    });
+    let mut last_click = None;
+    // offset = 5, area.y = 10, click row = 13 → index = 5 + (13 - 10) = 8
+    handle_picker_mouse(
+        left_down_at(15, 13),
+        picker_area(),
+        5,
+        &mut picker,
+        &mut last_click,
+    );
+    assert_eq!(
+        picker.unwrap().selected,
+        8,
+        "offset must be added to clicked row index"
+    );
+}
+
+#[test]
+fn picker_click_out_of_range_row_is_noop() {
+    let mut picker: Option<FakePicker> = Some(FakePicker {
+        len: 3,
+        selected: 0,
+    });
+    let mut last_click = None;
+    // area.y = 10, click row = 29 → index = 0 + 19 = 19, but len = 3 → out of range
+    let action = handle_picker_mouse(
+        left_down_at(15, 29),
+        picker_area(),
+        0,
+        &mut picker,
+        &mut last_click,
+    );
+    assert_eq!(action, PickerMouseAction::None);
+    assert_eq!(
+        picker.unwrap().selected,
+        0,
+        "out-of-range click must not change selection"
+    );
 }
