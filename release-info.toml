@@ -1,5 +1,5 @@
-version = "0.11.11"
-date = "2026-06-28"
+version = "0.11.12"
+date = "2026-06-29"
 whats_new = """- ci: don't bump minor by default; always generate release notes (#413)
 - fix: PageUp/PageDown move text cursor in content pane (#410)
 - fix: tree filter Up/Down/PageUp/PageDown navigate between matches (#408)
