@@ -1,21 +1,8 @@
-version = "0.11.28"
+version = "0.12.0"
 date = "2026-06-29"
-whats_new = """- refactor(git): remove git plugins, make git-core unconditional (#436)
-- feat: Enter in tree filter opens selected match (not just close) (#434)
-- refactor: split config/mod.rs into focused submodules (#428)
-- test: add missing _test.rs for diff_nav.rs and fold.rs (#433)
-- chore: split mod_test.rs into sibling test files (#432)
-- docs(config): rewrite default config + docs to grouped schema (#430)
-- refactor: extract shared picker mouse handler (#427)
-- refactor: decompose handle_plugin_action into per-action methods (#429)
-- chore: split app/mod.rs into types, util, and plugin_ops submodules (#426)
-- refactor(search): split monolithic search.rs into src/search/ submodule (#425)
-- refactor: uniform bounds-checked tree-node access + clamp-selection invariant (#424)
-- refactor: group flat config into [tree]/[content]/[search] tables (+ back-compat) (#419)
-- refactor: extract shared fuzzy refilter logic (#423)
-- feat: configurable status-bar segment alignment (left/right per segment) (#415)
-- fix(breadcrumb): drop cursor subdir from breadcrumb, fix compact .. target (#388) (#416)
-- fix: symbol/punctuation key bindings on non-Latin layouts (#379) (#414)
-- refactor: centralize external-process launch (editor+browser) with non-interactive guard (#411)
-- fix(config): surface config save failures in status bar (#412)"""
-release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.11.24"
+whats_new = """- feat(packaging): add Homebrew formula with auto-update on release (#443)
+- fix: smooth markdown scrolling by pre-wrapping paragraphs (#442)
+- fix(statusbar): allow hiding segments via explicit allowlist (#435) (#437)
+- refactor(keys): centralize fixed modal keys into reserved static_keybindings layer (#440)
+- fix: remove line-number gutter from rendered markdown (#439)"""
+release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.12.0"
