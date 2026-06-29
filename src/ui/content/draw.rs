@@ -89,6 +89,28 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         return;
     }
 
+    let view_height = inner.height as usize;
+    let total_lines = app.display_line_count();
+    let scroll = app.content_scroll.min(app.content_scroll_max());
+    let visible_end = (scroll + view_height).min(total_lines);
+
+    // Pre-wrap markdown if word wrap is enabled and width has changed
+    if app.word_wrap {
+        let content_width = inner
+            .width
+            .saturating_sub(if app.show_line_numbers {
+                app.line_count().to_string().len() as u16 + 1
+            } else {
+                0
+            })
+            .saturating_sub(if app.show_blame && app.has_text_cursor() {
+                crate::ui::content::draw::BLAME_COL_WIDTH as u16
+            } else {
+                0
+            }) as usize;
+        app.rerender_markdown_if_needed(content_width);
+    }
+
     // Rendered-content source: plugin takes precedence over core markdown.
     let render_lines: Option<&Vec<Vec<(ratatui::style::Style, String)>>> = app
         .current_file
@@ -101,11 +123,6 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                 None
             }
         });
-
-    let view_height = inner.height as usize;
-    let total_lines = app.display_line_count();
-    let scroll = app.content_scroll.min(app.content_scroll_max());
-    let visible_end = (scroll + view_height).min(total_lines);
 
     let sel = app.selection.as_ref().map(|s| s.normalized());
     let sel_bg = app.theme.selection_bg;

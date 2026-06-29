@@ -78,6 +78,10 @@ pub struct App {
     pub content: Vec<String>,
     pub highlighted: Vec<Vec<(ratatui::style::Style, String)>>,
     pub markdown_lines: Vec<Vec<(ratatui::style::Style, String)>>,
+    /// Raw markdown source for re-rendering on terminal resize.
+    pub markdown_src: String,
+    /// Last width the markdown was rendered at (chars). Used to detect resize.
+    pub markdown_wrap_width: usize,
     pub virtual_file: Option<VirtualFile>,
     pub is_markdown: bool,
     pub show_raw_markdown: bool,

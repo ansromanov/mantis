@@ -259,6 +259,8 @@ fn create_base_app() -> App {
         content: Vec::new(),
         highlighted: Vec::new(),
         markdown_lines: Vec::new(),
+        markdown_src: String::new(),
+        markdown_wrap_width: 0,
         virtual_file: None,
         is_markdown: false,
         show_raw_markdown: false,

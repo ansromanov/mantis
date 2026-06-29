@@ -17,7 +17,20 @@ use ratatui::style::{Modifier, Style};
 /// code blocks (bordered), tables (box-drawing), lists, block quotes,
 /// horizontal rules, inline formatting (bold, italic, strikethrough, code),
 /// images (placeholder), and task list markers.
+///
+/// If `wrap_width` is provided, paragraphs are pre-wrapped to fit the width,
+/// making logical lines match visual rows (smooth scrolling under word wrap).
 pub fn render(src: &str, theme: &Theme) -> Vec<Vec<(Style, String)>> {
+    render_with_width(src, theme, None)
+}
+
+/// Like `render`, but pre-wraps paragraphs to fit `wrap_width` (chars).
+/// Pass `None` to disable wrapping (default behavior).
+pub fn render_with_width(
+    src: &str,
+    theme: &Theme,
+    wrap_width: Option<usize>,
+) -> Vec<Vec<(Style, String)>> {
     let mut lines: Vec<Vec<(Style, String)>> = Vec::new();
     let mut current: Vec<(Style, String)> = Vec::new();
     let mut style_stack: Vec<Style> = vec![Style::default()];
@@ -82,7 +95,7 @@ pub fn render(src: &str, theme: &Theme) -> Vec<Vec<(Style, String)>> {
             Event::Start(Tag::Paragraph) => {}
             Event::End(Tag::Paragraph) => {
                 if !in_table {
-                    flush(&mut lines, &mut current, bq_depth, theme);
+                    flush_with_wrap(&mut lines, &mut current, bq_depth, theme, wrap_width);
                     lines.push(vec![]);
                 }
             }
@@ -330,6 +343,112 @@ fn flush(
     }
     line.extend(std::mem::take(spans));
     lines.push(line);
+}
+
+/// Like `flush`, but wraps the paragraph into multiple lines if `wrap_width` is set.
+fn flush_with_wrap(
+    lines: &mut Vec<Vec<(Style, String)>>,
+    spans: &mut Vec<(Style, String)>,
+    bq_depth: usize,
+    theme: &Theme,
+    wrap_width: Option<usize>,
+) {
+    if spans.is_empty() {
+        return;
+    }
+
+    if let Some(width) = wrap_width {
+        wrap_paragraph(lines, spans, bq_depth, theme, width);
+    } else {
+        flush(lines, spans, bq_depth, theme);
+    }
+}
+
+/// Wraps a paragraph (spans) into multiple lines, each ≤ `width` chars.
+fn wrap_paragraph(
+    lines: &mut Vec<Vec<(Style, String)>>,
+    spans: &mut Vec<(Style, String)>,
+    bq_depth: usize,
+    theme: &Theme,
+    width: usize,
+) {
+    use unicode_width::UnicodeWidthStr;
+
+    if spans.is_empty() {
+        return;
+    }
+
+    let bq_prefix = if bq_depth > 0 {
+        "│ ".repeat(bq_depth)
+    } else {
+        String::new()
+    };
+    let bq_width = bq_prefix.len();
+    let available_width = width.saturating_sub(bq_width);
+
+    if available_width < 10 {
+        flush(lines, spans, bq_depth, theme);
+        return;
+    }
+
+    let mut current_line: Vec<(Style, String)> = Vec::new();
+    let mut current_width = 0;
+    let mut need_space = false;
+
+    for (style, text) in spans.drain(..) {
+        for word in text.split_whitespace() {
+            let word_width = word.width();
+            let space_width = if need_space { 1 } else { 0 };
+
+            if current_width + space_width + word_width > available_width
+                && !current_line.is_empty()
+            {
+                push_line(lines, &mut current_line, bq_depth, theme, &bq_prefix);
+                current_width = 0;
+                need_space = false;
+            }
+
+            if need_space {
+                if let Some((s, ref mut last_text)) = current_line.last_mut() {
+                    if *s == style {
+                        last_text.push(' ');
+                        last_text.push_str(word);
+                        current_width += word_width + 1;
+                    } else {
+                        current_line.push((style, word.to_string()));
+                        current_width += word_width;
+                    }
+                } else {
+                    current_line.push((style, word.to_string()));
+                    current_width += word_width;
+                }
+            } else {
+                current_line.push((style, word.to_string()));
+                current_width += word_width;
+            }
+            need_space = true;
+        }
+    }
+
+    if !current_line.is_empty() {
+        push_line(lines, &mut current_line, bq_depth, theme, &bq_prefix);
+    }
+}
+
+/// Helper to push a wrapped line with block-quote prefix.
+fn push_line(
+    lines: &mut Vec<Vec<(Style, String)>>,
+    line: &mut Vec<(Style, String)>,
+    bq_depth: usize,
+    theme: &Theme,
+    bq_prefix: &str,
+) {
+    let mut output = Vec::new();
+    if bq_depth > 0 {
+        output.push((Style::default().fg(theme.dim), bq_prefix.to_string()));
+    }
+    output.extend(line.drain(..));
+    lines.push(output);
 }
 
 /// Returns the top of the style stack, or default if empty.
