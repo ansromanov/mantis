@@ -203,9 +203,12 @@ impl App {
                     self.rebuild(true);
                 } else if depth > 0 {
                     for i in (0..self.tree_selected).rev() {
-                        if self.nodes[i].depth < depth {
+                        let Some(nd) = self.nodes.get(i) else {
+                            continue;
+                        };
+                        if nd.depth < depth {
                             self.tree_selected = i;
-                            let p = self.nodes[i].path.clone();
+                            let p = nd.path.clone();
                             self.plugin_manager.on_selection_change(Some(&p));
                             break;
                         }

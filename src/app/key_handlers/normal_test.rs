@@ -935,6 +935,36 @@ fn slash_opens_in_file_search_when_content_focused_with_file() {
     fs::remove_dir_all(&root).ok();
 }
 
+fn tree_with_nested() -> PathBuf {
+    let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+    let dir = std::env::temp_dir().join(format!("tv_normal_nested_{}_{n}", std::process::id()));
+    fs::create_dir_all(dir.join("sub")).unwrap();
+    fs::write(dir.join("sub").join("c.txt"), "nested\n").unwrap();
+    dir.canonicalize().unwrap()
+}
+
+#[test]
+fn tree_collapse_on_child_navigates_to_parent_dir() {
+    let root = tree_with_nested();
+    let mut app = app_for(&root);
+    app.focus = Focus::Tree;
+    app.expanded.insert(root.join("sub"));
+    app.rebuild(true);
+    let child_idx = app
+        .nodes
+        .iter()
+        .position(|n| n.path == root.join("sub").join("c.txt"))
+        .expect("sub/c.txt must be visible after expand");
+    app.tree_selected = child_idx;
+    app.handle_key(key(KeyCode::Left));
+    assert_eq!(
+        app.nodes[app.tree_selected].path,
+        root.join("sub"),
+        "Left on nested child must jump to parent dir"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
 #[test]
 fn slash_opens_file_picker_when_content_focused_no_file() {
     // Use an empty directory so App::new() has no file to open, leaving

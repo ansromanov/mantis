@@ -927,6 +927,56 @@ fn rebuild_empty_git_mode_clears_plugin_content() {
 }
 
 #[test]
+fn clamp_tree_selection_shrink_clamps_to_last() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let len = app.nodes.len();
+    assert!(len > 0, "precondition: nodes must be non-empty");
+    app.tree_selected = len + 10;
+    app.clamp_tree_selection();
+    assert_eq!(
+        app.tree_selected,
+        len.saturating_sub(1),
+        "tree_selected past end must clamp to len-1"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn clamp_tree_selection_empty_yields_zero_no_panic() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.nodes.clear();
+    app.tree_selected = 42;
+    app.clamp_tree_selection();
+    assert_eq!(
+        app.tree_selected, 0,
+        "empty nodes must clamp tree_selected to 0"
+    );
+    // Subsequent .get(0) must be None, not a panic.
+    assert!(app.nodes.get(app.tree_selected).is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn rebuild_calls_clamp_tree_selection_when_selection_lost() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    // Set selection past the end of the (still intact) list. rebuild will try
+    // to restore by path, fail since the index is beyond the last element, and
+    // fall through to clamp_tree_selection.
+    let len = app.nodes.len();
+    // Place selection beyond the end so rebuild must clamp it.
+    app.tree_selected = len + 5;
+    app.rebuild(false);
+    assert!(
+        app.tree_selected < app.nodes.len(),
+        "after rebuild, tree_selected must be in range"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn rebuild_increments_tree_revision() {
     let root = temp_tree();
     let mut app = app_for(&root);
