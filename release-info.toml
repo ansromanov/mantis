@@ -1,4 +1,4 @@
-version = "0.11.14"
+version = "0.11.15"
 date = "2026-06-29"
 whats_new = """- ci: don't bump minor by default; always generate release notes (#413)
 - fix: PageUp/PageDown move text cursor in content pane (#410)
