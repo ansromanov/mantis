@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::fs;
 use std::time::{Duration, Instant};
 
 use super::*;
@@ -1049,6 +1050,48 @@ fn request_git_status_refresh_is_sync_in_tests() {
     // thing is the call doesn't crash and the fields are accessible.
     assert!(app.git_status_map.is_empty());
     assert!(app.git_info.is_none());
+}
+
+#[test]
+fn request_git_status_refresh_ignore_gitignore_includes_ignored() {
+    // When ignore_gitignore is true, request_git_status_refresh must pass
+    // include_ignored=true to repo_status even when git_show_ignored is false.
+    use std::process::Command;
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().to_path_buf();
+    let git = |args: &[&str]| {
+        Command::new("git")
+            .arg("-C")
+            .arg(&root)
+            .args(["-c", "user.email=t@e.x", "-c", "user.name=T"])
+            .args(args)
+            .status()
+            .unwrap();
+    };
+    git(&["init", "-q"]);
+    fs::write(root.join("tracked.txt"), "hello\n").unwrap();
+    fs::write(root.join(".gitignore"), "*.log\n").unwrap();
+    git(&["add", "."]);
+    git(&["commit", "-q", "-m", "init"]);
+    fs::write(root.join("build.log"), "log\n").unwrap();
+
+    let mut app = create_base_app();
+    app.root = root.canonicalize().unwrap();
+    app.git_status_enabled = true;
+    app.ignore_gitignore = true;
+    // git_show_ignored is false from create_base_app.
+    assert!(!app.git_show_ignored);
+    // The map must be empty before the refresh.
+    assert!(app.git_status_map.is_empty());
+
+    app.request_git_status_refresh();
+
+    let ignored = app.root.join("build.log");
+    assert_eq!(
+        app.git_status_map.get(&ignored),
+        Some(&crate::git::GitStatus::Ignored),
+        "request_git_status_refresh with ignore_gitignore=true must include ignored files"
+    );
 }
 
 // -- Extension trait ----------------------------------------------------------

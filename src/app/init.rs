@@ -33,8 +33,9 @@ impl App {
         let git_show_deleted = cfg.git.show_deleted;
         let git_show_untracked = cfg.git.show_untracked;
         let git_show_ignored = cfg.git.show_ignored;
+        let effective_show_ignored = cfg.git.show_ignored || cfg.git.ignore_gitignore;
         let git_status_map = if git_status_enabled {
-            crate::git::repo_status(&root, cfg.git.show_untracked, cfg.git.show_ignored)
+            crate::git::repo_status(&root, cfg.git.show_untracked, effective_show_ignored)
         } else {
             HashMap::new()
         };
