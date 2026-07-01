@@ -62,6 +62,22 @@ fn read_capped_line_returns_true_for_final_unterminated_line() {
 }
 
 #[test]
+fn read_capped_line_reads_document_sized_line() {
+    // Regression: the markdown plugin emits a fully rendered document as one
+    // `set_content` line (~70 KB for a large file with wide tables). The cap
+    // must be large enough to read it in full; a 64 KB cap silently dropped
+    // such messages, so the file rendered as raw source.
+    let big = 100_000;
+    assert!(MAX_LINE_LEN >= big, "cap too small for a rendered document");
+    let mut data = vec![b'a'; big];
+    data.push(b'\n');
+    let mut reader = std::io::BufReader::new(&data[..]);
+    let mut buf = Vec::new();
+    assert!(read_capped_line(&mut reader, &mut buf));
+    assert_eq!(buf.len(), big + 1);
+}
+
+#[test]
 fn read_capped_line_truncates_overlength_line() {
     // A line longer than MAX_LINE_LEN with the newline well past the cap must
     // not exceed the cap, even when the newline is visible in the buffer.
