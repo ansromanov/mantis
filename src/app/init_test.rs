@@ -449,3 +449,42 @@ fn app_new_markdown_resize_fields_start_empty() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn app_new_ignore_gitignore_includes_ignored_in_status_map() {
+    let root = temp_dir();
+    let git = |args: &[&str]| {
+        let status = std::process::Command::new("git")
+            .arg("-C")
+            .arg(&root)
+            .args(["-c", "user.email=t@e.x", "-c", "user.name=T"])
+            .args(args)
+            .status()
+            .unwrap();
+        assert!(status.success(), "git {:?} failed", args);
+    };
+    git(&["init", "-q"]);
+    fs::write(root.join("tracked.txt"), "hello\n").unwrap();
+    fs::write(root.join(".gitignore"), "*.log\n").unwrap();
+    git(&["add", "."]);
+    git(&["commit", "-q", "-m", "init"]);
+    fs::write(root.join("build.log"), "log\n").unwrap();
+
+    let cfg = Config {
+        git: crate::config::GitConfig {
+            ignore_gitignore: true,
+            // show_ignored defaults to false — must be overridden by ignore_gitignore.
+            ..Default::default()
+        },
+        ..Config::default()
+    };
+    let app = new_app(&root, cfg);
+    let root_canon = root.canonicalize().unwrap();
+    let ignored = root_canon.join("build.log");
+    assert_eq!(
+        app.git_status_map.get(&ignored),
+        Some(&crate::git::GitStatus::Ignored),
+        "ignore_gitignore=true must seed ignored entries even when show_ignored=false"
+    );
+    fs::remove_dir_all(&root).ok();
+}

@@ -160,9 +160,13 @@ impl App {
     /// Enqueues a git-status refresh (production) or runs it synchronously
     /// (tests). Bumps `git_seq` so earlier in-flight results are ignored.
     pub(super) fn request_git_status_refresh(&mut self) {
+        let effective_show_ignored = self.git_show_ignored || self.ignore_gitignore;
         if cfg!(test) {
-            self.git_status_map =
-                crate::git::repo_status(&self.root, self.git_show_untracked, self.git_show_ignored);
+            self.git_status_map = crate::git::repo_status(
+                &self.root,
+                self.git_show_untracked,
+                effective_show_ignored,
+            );
             self.git_info = crate::git::repo_info(&self.root);
         } else {
             self.git_seq = self.git_seq.wrapping_add(1);
@@ -170,7 +174,7 @@ impl App {
                 seq: self.git_seq,
                 root: self.root.clone(),
                 include_untracked: self.git_show_untracked,
-                include_ignored: self.git_show_ignored,
+                include_ignored: effective_show_ignored,
             });
         }
     }

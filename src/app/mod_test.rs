@@ -5001,6 +5001,75 @@ fn save_config_sets_status_on_failure() {
     fs::remove_dir_all(&root).ok();
 }
 
+/// A temp git repo with a .gitignore that ignores *.log files.
+fn temp_git_with_gitignore(ignore_gitignore: bool) -> PathBuf {
+    use std::process::Command;
+    static COUNTER: AtomicUsize = AtomicUsize::new(0);
+    let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+    let dir = std::env::temp_dir().join(format!("tv_ignore_gitignore_{}_{n}", std::process::id()));
+    fs::create_dir_all(&dir).unwrap();
+    let git = |args: &[&str]| {
+        Command::new("git")
+            .arg("-C")
+            .arg(&dir)
+            .args(["-c", "user.email=t@e.x", "-c", "user.name=T"])
+            .args(args)
+            .status()
+            .unwrap();
+    };
+    git(&["init", "-q"]);
+    fs::write(dir.join("tracked.txt"), "hello\n").unwrap();
+    fs::write(dir.join(".gitignore"), "*.log\n").unwrap();
+    git(&["add", "."]);
+    git(&["commit", "-q", "-m", "init"]);
+    // An untracked file (not ignored — subject to tree filtering).
+    fs::write(dir.join("untracked.txt"), "new\n").unwrap();
+    // An ignored file (matches *.log).
+    fs::write(dir.join("build.log"), "log content\n").unwrap();
+    // If the tree walk will include gitignored files, add one deeper too.
+    if ignore_gitignore {
+        fs::create_dir_all(dir.join("sub")).unwrap();
+        fs::write(dir.join("sub").join("debug.log"), "debug\n").unwrap();
+    }
+    dir.canonicalize().unwrap()
+}
+
+#[test]
+fn ignore_gitignore_true_colors_ignored_files_in_status_map() {
+    let root = temp_git_with_gitignore(true);
+    let cfg = Config {
+        git: crate::config::GitConfig {
+            ignore_gitignore: true,
+            // show_ignored defaults to false — the fix must OR it with
+            // ignore_gitignore so the status map still gets Ignored entries.
+            ..Default::default()
+        },
+        ..Config::default()
+    };
+    let app = App::new(root.to_path_buf(), cfg, None, None).unwrap();
+
+    let ignored = root.join("build.log");
+    assert_eq!(
+        app.git_status_map.get(&ignored),
+        Some(&crate::git::GitStatus::Ignored),
+        "ignored file must have GitStatus::Ignored even when show_ignored=false"
+    );
+    // Untracked file must still appear correctly.
+    let untracked = root.join("untracked.txt");
+    assert_eq!(
+        app.git_status_map.get(&untracked),
+        Some(&crate::git::GitStatus::New),
+        "untracked file must still have GitStatus::New"
+    );
+    // Tracked unchanged file must not be in the map.
+    let tracked = root.join("tracked.txt");
+    assert!(
+        !app.git_status_map.contains_key(&tracked),
+        "unchanged tracked file must not appear in status map"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
 #[test]
 fn save_config_no_status_on_success() {
     let root = temp_tree();
