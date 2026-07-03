@@ -245,7 +245,7 @@ impl App {
 
     /// Switches the active theme and re-renders the current view with it,
     /// preserving scroll position.
-    fn apply_theme(&mut self, theme_name: &str, theme: Theme) {
+    pub(crate) fn apply_theme(&mut self, theme_name: &str, theme: Theme) {
         // Notify plugins so they can re-render content with matching colours.
         self.plugin_manager.on_theme_change(theme_name);
         self.plugin_content.clear();
@@ -254,15 +254,6 @@ impl App {
         self.highlighter =
             Highlighter::with_extra_syntaxes(&self.theme.syntax, &self.extra_syntaxes);
         self.loader_set_theme();
-        // Notify plugins so they can re-render with matching colours.
-        // Use the config theme name if available, falling back to "default".
-        let theme_name = self
-            .config
-            .theme
-            .name
-            .clone()
-            .unwrap_or_else(|| "default".to_string());
-        self.plugin_manager.on_theme_change(&theme_name);
         if self.is_diff {
             self.highlighted = self
                 .content

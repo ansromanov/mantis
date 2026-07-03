@@ -392,3 +392,19 @@ fn toggle_git_flat_noop_outside_git_mode() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn apply_theme_does_not_modify_theme_picker() {
+    // apply_theme was made pub(crate) so overlay handlers can call it for live
+    // theme preview without saving config; it must leave picker state alone
+    // so a preview call mid-navigation doesn't clobber the open picker.
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let theme = crate::theme::Theme::default();
+    app.apply_theme("default", theme);
+    assert!(
+        app.theme_picker.is_none(),
+        "apply_theme must not modify picker state"
+    );
+    fs::remove_dir_all(&root).ok();
+}

@@ -218,8 +218,14 @@ impl ListPicker for InFileSearch {
 }
 
 /// Fuzzy-filterable list of discovered themes.
+///
+/// `themes` mirrors `names` and holds the already-parsed `Theme` for each
+/// entry (loaded once by `discover_all` at construction) so navigating the
+/// list for live preview doesn't re-read/re-parse theme files from disk on
+/// every keystroke.
 pub struct ThemePicker {
     pub names: Vec<String>,
+    pub themes: Vec<crate::theme::Theme>,
     pub query: String,
     pub filtered: Vec<usize>,
     pub selected: usize,
@@ -228,13 +234,12 @@ pub struct ThemePicker {
 
 impl Default for ThemePicker {
     fn default() -> Self {
-        let names: Vec<String> = crate::theme::Theme::discover_all()
-            .into_iter()
-            .map(|(n, _)| n)
-            .collect();
+        let (names, themes): (Vec<String>, Vec<crate::theme::Theme>) =
+            crate::theme::Theme::discover_all().into_iter().unzip();
         let filtered = (0..names.len()).collect();
         ThemePicker {
             names,
+            themes,
             query: String::new(),
             filtered,
             selected: 0,
@@ -262,6 +267,12 @@ impl ThemePicker {
         self.filtered
             .get(self.selected)
             .map(|&i| self.names[i].as_str())
+    }
+
+    /// The already-parsed theme for the current selection, avoiding a disk
+    /// re-read for live preview.
+    pub fn selected_theme(&self) -> Option<&crate::theme::Theme> {
+        self.filtered.get(self.selected).map(|&i| &self.themes[i])
     }
 
     fn refilter(&mut self) {

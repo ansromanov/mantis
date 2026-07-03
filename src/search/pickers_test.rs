@@ -120,6 +120,32 @@ fn theme_picker_results_len() {
     assert_eq!(p.results_len(), crate::theme::Theme::discover_all().len());
 }
 
+#[test]
+fn theme_picker_themes_parallel_names() {
+    let p = ThemePicker::default();
+    assert_eq!(p.names.len(), p.themes.len());
+}
+
+#[test]
+fn theme_picker_selected_theme_matches_selected_name() {
+    let mut p = ThemePicker::default();
+    p.push('m');
+    let name = p.selected_name().unwrap().to_string();
+    let expected = crate::theme::Theme::load(&name).unwrap();
+    let got = p.selected_theme().unwrap();
+    assert_eq!(got.accent, expected.accent);
+    assert_eq!(got.background, expected.background);
+}
+
+#[test]
+fn theme_picker_selected_theme_returns_none_when_empty() {
+    let mut p = ThemePicker::default();
+    for c in "zzzzzzz".chars() {
+        p.push(c);
+    }
+    assert!(p.selected_theme().is_none());
+}
+
 // -- RecentFilesState -------------------------------------------------------
 
 fn sample_paths() -> Vec<PathBuf> {
