@@ -394,10 +394,10 @@ fn toggle_git_flat_noop_outside_git_mode() {
 }
 
 #[test]
-fn apply_theme_is_pub_crate() {
+fn apply_theme_does_not_modify_theme_picker() {
     // apply_theme was made pub(crate) so overlay handlers can call it for live
-    // theme preview without saving config. This test verifies the method is
-    // accessible from within the crate and runs without panicking.
+    // theme preview without saving config; it must leave picker state alone
+    // so a preview call mid-navigation doesn't clobber the open picker.
     let root = temp_tree();
     let mut app = app_for(&root);
     let theme = crate::theme::Theme::default();

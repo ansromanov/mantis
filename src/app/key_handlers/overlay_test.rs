@@ -454,9 +454,32 @@ fn handle_theme_key_up_clamps_and_does_not_close() {
 }
 
 #[test]
+fn handle_theme_key_down_previews_selected_theme_colors() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.theme_picker = Some(ThemePicker::default());
+    app.handle_theme_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
+    let picker = app.theme_picker.as_ref().unwrap();
+    let previewed_name = picker.selected_name().unwrap().to_string();
+    let previewed = picker.selected_theme().unwrap().clone();
+    assert_eq!(
+        app.theme.accent, previewed.accent,
+        "navigating the picker must apply the previewed theme's colors live"
+    );
+    assert_ne!(
+        app.config.theme.name.as_deref(),
+        Some(previewed_name.as_str()),
+        "preview must not write the config theme until Enter commits it"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn handle_theme_key_esc_closes_and_reverts() {
     let root = temp_tree();
     let mut app = app_for(&root);
+    let original_accent = app.theme.accent;
+    let original_config_name = app.config.theme.name.clone();
     app.theme_picker = Some(ThemePicker::default());
     // Navigate to create a preview state first
     app.handle_theme_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
@@ -467,6 +490,32 @@ fn handle_theme_key_esc_closes_and_reverts() {
     // Esc should close and revert
     app.handle_theme_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
     assert!(app.theme_picker.is_none(), "picker must close on Esc");
+    assert_eq!(
+        app.theme.accent, original_accent,
+        "Esc must restore the theme that was active before the picker opened"
+    );
+    assert_eq!(
+        app.config.theme.name, original_config_name,
+        "Esc must not have written the previewed theme to config"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn handle_theme_key_esc_falls_back_to_default_for_unloadable_config_theme() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    // A config theme name that doesn't resolve to any bundled/user theme.
+    app.config.theme.name = Some("does-not-exist".to_string());
+    let default_accent = crate::theme::Theme::load("default").unwrap().accent;
+    app.theme_picker = Some(ThemePicker::default());
+    app.handle_theme_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
+    app.handle_theme_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+    assert!(app.theme_picker.is_none(), "picker must close on Esc");
+    assert_eq!(
+        app.theme.accent, default_accent,
+        "reverting to an unloadable config theme must fall back to the default theme"
+    );
     fs::remove_dir_all(&root).ok();
 }
 
@@ -510,11 +559,16 @@ fn handle_theme_key_query_typing_previews_first_match() {
         "picker must stay open during query typing"
     );
     // After typing, the first (selected) item should start with "monokai".
-    let name = app.theme_picker.as_ref().unwrap().selected_name();
+    let picker = app.theme_picker.as_ref().unwrap();
     assert_eq!(
-        name,
+        picker.selected_name(),
         Some("monokai"),
         "typing 'monokai' should match monokai"
+    );
+    let previewed = picker.selected_theme().unwrap().clone();
+    assert_eq!(
+        app.theme.accent, previewed.accent,
+        "query typing must preview the newly matched theme's colors live"
     );
     fs::remove_dir_all(&root).ok();
 }

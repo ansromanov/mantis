@@ -128,14 +128,17 @@ impl App {
     /// popup; Esc reverts to the original theme that was active before the
     /// picker opened; Enter commits the previewed theme to config.
     pub(super) fn handle_theme_key(&mut self, key: KeyEvent) {
-        let (result, selected_name, has_results) = {
+        let (result, selected_name, selected_theme) = {
             let Some(ref mut p) = self.theme_picker else {
                 return;
             };
             let result = handle_list_picker_key(p, &key);
             let selected_name = p.selected_name().map(String::from);
-            let has_results = p.results_len() > 0;
-            (result, selected_name, has_results)
+            // The picker already parsed every theme once in `discover_all`;
+            // reuse that instead of re-reading/re-parsing from disk on
+            // every navigation keystroke.
+            let selected_theme = p.selected_theme().cloned();
+            (result, selected_name, selected_theme)
         };
         match result {
             OverlayKey::Activate => self.apply_selected_theme(),
@@ -145,17 +148,23 @@ impl App {
                 // opened (self.config.theme is never written during preview).
                 let config_theme = self.config.theme.clone();
                 let theme = config_theme.resolve();
-                let name = config_theme
+                let requested_name = config_theme
                     .name
                     .clone()
                     .unwrap_or_else(|| "default".to_string());
+                // resolve() silently falls back to the default theme when the
+                // configured name can't be loaded; report that same fallback
+                // name here so plugins/UI aren't told an invalid theme name.
+                let name = if Theme::load(&requested_name).is_some() {
+                    requested_name
+                } else {
+                    "default".to_string()
+                };
                 self.apply_theme(&name, theme);
             }
-            OverlayKey::Handled if has_results => {
-                if let Some(ref name) = selected_name {
-                    if let Some(theme) = Theme::load(name) {
-                        self.apply_theme(name, theme);
-                    }
+            OverlayKey::Handled => {
+                if let (Some(name), Some(theme)) = (selected_name, selected_theme) {
+                    self.apply_theme(&name, theme);
                 }
             }
             _ => {}
