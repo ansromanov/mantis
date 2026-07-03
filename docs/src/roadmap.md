@@ -88,16 +88,42 @@ Continuous ergonomics investment: theme live preview, scrollable help,
 onboarding hints, regex/case search toggles, sticky scroll, bookmarks, a
 context menu, a jump-back navigation stack, line wrap, search result counts.
 
+### 5. Language intelligence (Rust · Python · Go)
+*Epic: [#482](https://github.com/ansromanov/mantis/issues/482)*
+
+Syntax highlighting already covers these; this pillar adds language-*aware*
+reading, built in and zero-config like the shipped YAML folding:
+
+- **Code folding** for Rust/Go (brace-based) and Python (indentation-based) —
+  starter issue [#483](https://github.com/ansromanov/mantis/issues/483).
+- **Symbol outline / go-to-symbol** fuzzy picker (regex-based, deliberately
+  not tree-sitter — binary size is a feature).
+- **Scope context in the breadcrumb**, which also feeds sticky scroll
+  ([#199](https://github.com/ansromanov/mantis/issues/199)).
+
+### Cross-cutting: plugin system hardening
+
+The plugin system is the extension surface for pillars 2, 3, and 5, and a
+July 2026 review filed its prerequisites: ship bundled plugins in releases
+([#477](https://github.com/ansromanov/mantis/issues/477)), remove the
+startup `cargo build` fallback
+([#478](https://github.com/ansromanov/mantis/issues/478) — security), plugin
+stderr diagnostics ([#479](https://github.com/ansromanov/mantis/issues/479)),
+a registry trust model before the install UI ships
+([#480](https://github.com/ansromanov/mantis/issues/480)), and protocol v3
+(request/response, key consumption, provider priorities —
+[#481](https://github.com/ansromanov/mantis/issues/481)).
+
 ---
 
 ## Sequencing
 
 | Release | Theme | Contents |
 |---|---|---|
-| **0.13** | Trust & polish | Code-review correctness fixes + quick UX wins — tracking issue [#473](https://github.com/ansromanov/mantis/issues/473) |
-| **0.14** | DevOps reader | Log follow mode + JSONL, `--diff base` startup, secret masking, CSV tables |
-| **0.15** | Agent cockpit | `--review` dashboard, remote-control socket, session summary, protocol rename |
-| **0.16** | Machine interface | Headless JSON CLI, then the MCP server on top of it |
+| **0.13** | Trust & polish | Code-review correctness fixes + quick UX wins — tracking issue [#473](https://github.com/ansromanov/mantis/issues/473); plugin packaging/security fixes [#477](https://github.com/ansromanov/mantis/issues/477)/[#478](https://github.com/ansromanov/mantis/issues/478) |
+| **0.14** | DevOps reader | Log follow mode + JSONL, `--diff base` startup, secret masking, CSV tables; code folding for Rust/Go/Python ([#483](https://github.com/ansromanov/mantis/issues/483)) |
+| **0.15** | Agent cockpit | `--review` dashboard, remote-control socket, session summary, protocol v3 + rename ([#481](https://github.com/ansromanov/mantis/issues/481)); go-to-symbol picker |
+| **0.16** | Machine interface | Headless JSON CLI, then the MCP server on top of it; registry trust model + install UI ([#480](https://github.com/ansromanov/mantis/issues/480)) |
 | **1.0** | AI-native viewer | SSH remote ([#359](https://github.com/ansromanov/mantis/issues/359)), keymap refactor ([#298](https://github.com/ansromanov/mantis/issues/298)), comprehensive help ([#304](https://github.com/ansromanov/mantis/issues/304)), plugin registry maturity |
 
 **First two bets:** *prompt-ready copy* (days of work, immediate daily-use hook
