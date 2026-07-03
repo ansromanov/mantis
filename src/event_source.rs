@@ -77,6 +77,40 @@ pub fn pop_keyboard_enhancement_flags() -> io::Result<()> {
 // Raw event source
 // ---------------------------------------------------------------------------
 
+/// Abstraction for poll+read from a file descriptor, so the
+/// read-until-drained loop in [`RawEventSource::fill_with`] can be
+/// unit-tested without a real stdin.
+trait PollReader {
+    /// Returns `true` when data is available for reading.
+    fn poll(&mut self, timeout_ms: libc::c_int) -> io::Result<bool>;
+    /// Reads into `buf`, returns bytes read (0 = EOF).
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize>;
+}
+
+/// Real [`PollReader`] that reads from fd 0 (stdin).
+struct StdinReader;
+
+impl PollReader for StdinReader {
+    fn poll(&mut self, timeout_ms: libc::c_int) -> io::Result<bool> {
+        let mut pfd = libc::pollfd {
+            fd: 0,
+            events: libc::POLLIN,
+            revents: 0,
+        };
+        let ret = unsafe { libc::poll(&mut pfd, 1, timeout_ms) };
+        Ok(ret > 0)
+    }
+
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let n = unsafe { libc::read(0, buf.as_mut_ptr() as *mut libc::c_void, buf.len()) };
+        if n < 0 {
+            Err(io::Error::last_os_error())
+        } else {
+            Ok(n as usize)
+        }
+    }
+}
+
 /// An [`EventSource`](crate::EventSource) that parses raw terminal bytes so it
 /// can extract kitty-protocol alternate keycodes.
 pub struct RawEventSource {
@@ -107,27 +141,36 @@ impl RawEventSource {
             self.buf.drain(..self.pos);
             self.pos = 0;
         }
+        self.fill_with(&mut StdinReader, timeout_ms)
+    }
 
-        // Poll for data on fd 0.
-        let mut pfd = libc::pollfd {
-            fd: 0,
-            events: libc::POLLIN,
-            revents: 0,
-        };
-        let ret = unsafe { libc::poll(&mut pfd, 1, timeout_ms) };
-        if ret <= 0 {
-            return Ok(()); // timeout or error
+    /// Read from `reader` until no more data is available, using a
+    /// `poll(0)` check before every subsequent read to avoid blocking
+    /// when the first read returned exactly the buffer size
+    /// (fixes #456).
+    fn fill_with(
+        &mut self,
+        reader: &mut dyn PollReader,
+        timeout_ms: libc::c_int,
+    ) -> io::Result<()> {
+        if !reader.poll(timeout_ms)? {
+            return Ok(());
         }
 
         let mut tmp = [0u8; 4096];
         loop {
-            let n = unsafe { libc::read(0, tmp.as_mut_ptr() as *mut libc::c_void, tmp.len()) };
-            if n <= 0 {
+            let n = reader.read(&mut tmp)?;
+            if n == 0 {
                 break;
             }
-            self.buf.extend_from_slice(&tmp[..n as usize]);
-            if (n as usize) < tmp.len() {
-                break; // no more bytes available right now
+            self.buf.extend_from_slice(&tmp[..n]);
+            if n < tmp.len() {
+                break;
+            }
+            // Poll with zero timeout to check if more data is available
+            // without blocking (fixes #456: exact-4096-burst freeze).
+            if !reader.poll(0)? {
+                break;
             }
         }
         Ok(())
