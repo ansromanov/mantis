@@ -68,6 +68,17 @@ pub fn load(root: &Path) -> (Config, Option<PathBuf>, Option<String>) {
             Ok(mut config) => {
                 config.migrate_legacy_flat_fields();
                 config.migrate_legacy_git_fields();
+                // Remove any [plugins] entries referencing retired bundled
+                // plugin filenames (e.g. old shell scripts). This is done
+                // in memory only; the user's mantis.toml is not rewritten
+                // unless save_config is called for another reason.
+                let retired = crate::plugin::retired_bundled_plugins();
+                config.plugins.retain(|_name, entry| {
+                    let Some(fname) = entry.path.file_name().and_then(|s| s.to_str()) else {
+                        return true;
+                    };
+                    !retired.contains(&fname)
+                });
                 // The config parsed, but `#[serde(default)]` silently ignores
                 // unknown keys. Flag them (with nearest-match hints) so typos
                 // don't get dropped without a word. A higher-precedence parse
@@ -136,8 +147,9 @@ fn init_config_dir(user_path: &Path) {
     if !user_path.exists() {
         let _ = fs::write(user_path, USER_CONFIG_STUB);
         crate::theme::install_embedded_themes();
-        crate::plugin::install_bundled_plugins();
     }
+    // Always run: install/refresh bundled plugins and clean up retired ones.
+    crate::plugin::install_bundled_plugins();
 }
 
 /// Writes the embedded fully-commented template to `{dir}/mantis.default.toml`, but
