@@ -415,7 +415,7 @@ fn compute_breadcrumb(app: &App) -> Vec<(String, PathBuf)> {
         let label = current
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_else(|| "/".to_string());
+            .unwrap_or_default();
         segments.push((label, current.to_path_buf()));
         match current.parent() {
             Some(parent) if parent != current => current = parent,
@@ -473,6 +473,7 @@ fn render_breadcrumb(f: &mut Frame, app: &mut App, area: Rect, segments: &[(Stri
 
     let mut spans: Vec<Span> = Vec::new();
     let mut col = area.x;
+    let mut after_root = false;
 
     for (pos, item) in items.iter().enumerate() {
         match item {
@@ -490,26 +491,47 @@ fn render_breadcrumb(f: &mut Frame, app: &mut App, area: Rect, segments: &[(Stri
                 col += 2;
             }
             BreadcrumbItem::Real(idx) => {
-                // Separator before each real segment except the first visible item.
-                if pos > 0 {
-                    spans.push(Span::styled(sep, dim_style));
-                    col += sep_len as u16;
-                }
-
-                let is_last = pos == items.len() - 1;
-                let style = if is_last { last_style } else { fg_style };
                 let text = &segments[*idx].0;
-                spans.push(Span::styled(text.clone(), style));
+                if text.is_empty() {
+                    // Root segment (empty label since the filesystem root has no
+                    // file_name) — render "/" without a trailing separator, and
+                    // flag after_root so the next segment skips the full separator.
+                    spans.push(Span::styled("/", dim_style));
+                    let rect = Rect {
+                        x: col,
+                        y: area.y,
+                        width: 1,
+                        height: 1,
+                    };
+                    app.breadcrumb_areas.push((segments[*idx].1.clone(), rect));
+                    col += 1;
+                    after_root = true;
+                } else {
+                    if after_root {
+                        // After the root segment: use a space instead of " / " to
+                        // avoid doubling the slash (root already provides "/").
+                        spans.push(Span::styled(" ", dim_style));
+                        col += 1;
+                        after_root = false;
+                    } else if pos > 0 {
+                        spans.push(Span::styled(sep, dim_style));
+                        col += sep_len as u16;
+                    }
 
-                let text_w = UnicodeWidthStr::width(text.as_str()) as u16;
-                let rect = Rect {
-                    x: col,
-                    y: area.y,
-                    width: text_w,
-                    height: 1,
-                };
-                app.breadcrumb_areas.push((segments[*idx].1.clone(), rect));
-                col += text_w;
+                    let is_last = pos == items.len() - 1;
+                    let style = if is_last { last_style } else { fg_style };
+                    spans.push(Span::styled(text.clone(), style));
+
+                    let text_w = UnicodeWidthStr::width(text.as_str()) as u16;
+                    let rect = Rect {
+                        x: col,
+                        y: area.y,
+                        width: text_w,
+                        height: 1,
+                    };
+                    app.breadcrumb_areas.push((segments[*idx].1.clone(), rect));
+                    col += text_w;
+                }
             }
         }
     }

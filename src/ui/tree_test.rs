@@ -461,7 +461,7 @@ fn breadcrumb_areas_match_rendered_columns() {
     assert_eq!(root_path, &PathBuf::from("/r"));
     assert_eq!(fs_rect.width, 1);
     assert_eq!(root_rect.width, 1);
-    assert_eq!(root_rect.x, fs_rect.x + fs_rect.width + 3);
+    assert_eq!(root_rect.x, fs_rect.x + fs_rect.width + 1);
 }
 
 fn breadcrumb_text_for(app: &mut App, width: u16) -> String {
