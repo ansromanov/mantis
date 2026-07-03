@@ -11,9 +11,11 @@ use std::time::{Duration, Instant};
 
 use crate::plugin::types::{FromPlugin, ToPlugin};
 
-/// Maximum line length from a plugin's stdout (64 KB). Lines exceeding this
-/// are discarded and the reader continues.
-pub(crate) const MAX_LINE_LEN: usize = 65536;
+/// Maximum line length from a plugin's stdout (4 MiB). Lines exceeding this
+/// are discarded and the reader continues. Sized to hold a fully rendered
+/// document in one `set_content` message (a large markdown file with wide
+/// tables serializes to ~70 KB); the cap only guards against a runaway plugin.
+pub(crate) const MAX_LINE_LEN: usize = 4 * 1024 * 1024;
 
 /// A single running plugin subprocess with background reader and writer threads.
 pub(crate) struct Plugin {
@@ -74,7 +76,7 @@ impl Plugin {
                 loop {
                     line_buf.clear();
                     // Read up to MAX_LINE_LEN bytes looking for '\n'
-                    let got_newline = read_capped_line(&mut reader, &mut line_buf);
+                    let got_newline = read_capped_line(&mut reader, &mut line_buf, MAX_LINE_LEN);
                     if line_buf.is_empty() {
                         break;
                     }
@@ -220,13 +222,13 @@ impl Plugin {
     }
 }
 
-/// Reads up to `MAX_LINE_LEN` bytes from `reader` into `buf`, stopping at the
-/// first `\n`. Returns `true` if `buf` holds a complete line to process — i.e.
-/// a newline was found within the limit, or EOF/error was reached with bytes
+/// Reads up to `cap` bytes from `reader` into `buf`, stopping at the first
+/// `\n`. Returns `true` if `buf` holds a complete line to process — i.e. a
+/// newline was found within the limit, or EOF/error was reached with bytes
 /// already buffered (the final unterminated line). Returns `false` only when
-/// the line was truncated at `MAX_LINE_LEN` without a newline, or nothing was
-/// read before EOF.
-pub(crate) fn read_capped_line<R: BufRead>(reader: &mut R, buf: &mut Vec<u8>) -> bool {
+/// the line was truncated at `cap` without a newline, or nothing was read
+/// before EOF.
+pub(crate) fn read_capped_line<R: BufRead>(reader: &mut R, buf: &mut Vec<u8>, cap: usize) -> bool {
     loop {
         let (available_len, has_newline) = {
             let available = match reader.fill_buf() {
@@ -234,7 +236,7 @@ pub(crate) fn read_capped_line<R: BufRead>(reader: &mut R, buf: &mut Vec<u8>) ->
                 Ok(b) => b,
                 Err(_) => return !buf.is_empty(),
             };
-            let remaining = MAX_LINE_LEN.saturating_sub(buf.len());
+            let remaining = cap.saturating_sub(buf.len());
             if remaining == 0 {
                 return false;
             }
