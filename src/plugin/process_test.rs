@@ -1,6 +1,10 @@
 use crate::plugin::process::{drain_rest_of_line, read_capped_line, Plugin, MAX_LINE_LEN};
 use crate::plugin::types::ToPlugin;
 
+/// Small stand-in for `MAX_LINE_LEN` so cap-boundary tests don't allocate
+/// multi-megabyte buffers just to exercise the truncation path.
+const TEST_CAP: usize = 16;
+
 #[test]
 fn plugin_new_sets_name() {
     let p = Plugin::new("test-p".into(), vec![]);
@@ -47,7 +51,7 @@ fn read_capped_line_reads_full_line_within_cap() {
     let data = b"hello world\nnext\n";
     let mut reader = std::io::BufReader::new(&data[..]);
     let mut buf = Vec::new();
-    assert!(read_capped_line(&mut reader, &mut buf));
+    assert!(read_capped_line(&mut reader, &mut buf, MAX_LINE_LEN));
     assert_eq!(buf, b"hello world\n");
 }
 
@@ -57,7 +61,7 @@ fn read_capped_line_returns_true_for_final_unterminated_line() {
     let mut reader = std::io::BufReader::new(&data[..]);
     let mut buf = Vec::new();
     // EOF reached with bytes buffered: the final line is still processed.
-    assert!(read_capped_line(&mut reader, &mut buf));
+    assert!(read_capped_line(&mut reader, &mut buf, MAX_LINE_LEN));
     assert_eq!(buf, b"no newline here");
 }
 
@@ -73,53 +77,53 @@ fn read_capped_line_reads_document_sized_line() {
     data.push(b'\n');
     let mut reader = std::io::BufReader::new(&data[..]);
     let mut buf = Vec::new();
-    assert!(read_capped_line(&mut reader, &mut buf));
+    assert!(read_capped_line(&mut reader, &mut buf, MAX_LINE_LEN));
     assert_eq!(buf.len(), big + 1);
 }
 
 #[test]
 fn read_capped_line_truncates_overlength_line() {
-    // A line longer than MAX_LINE_LEN with the newline well past the cap must
-    // not exceed the cap, even when the newline is visible in the buffer.
-    let mut data = vec![b'a'; MAX_LINE_LEN + 5000];
+    // A line longer than the cap with the newline well past it must not
+    // exceed the cap, even when the newline is visible in the buffer.
+    let mut data = vec![b'a'; TEST_CAP + 5];
     data.push(b'\n');
     data.extend_from_slice(b"after\n");
     let mut reader = std::io::BufReader::new(&data[..]);
     let mut buf = Vec::new();
     // Truncated: no newline accepted within the cap.
-    assert!(!read_capped_line(&mut reader, &mut buf));
-    assert_eq!(buf.len(), MAX_LINE_LEN);
+    assert!(!read_capped_line(&mut reader, &mut buf, TEST_CAP));
+    assert_eq!(buf.len(), TEST_CAP);
 
     // Caller drains the rest of the overlength line, then the next line reads
     // cleanly.
     drain_rest_of_line(&mut reader);
     buf.clear();
-    assert!(read_capped_line(&mut reader, &mut buf));
+    assert!(read_capped_line(&mut reader, &mut buf, TEST_CAP));
     assert_eq!(buf, b"after\n");
 }
 
 #[test]
 fn read_capped_line_does_not_overshoot_when_newline_past_cap() {
     // Regression: a chunk that contains a newline whose position exceeds the
-    // remaining cap budget must not be copied past MAX_LINE_LEN. Pre-fill buf
+    // remaining cap budget must not be copied past the cap. Pre-fill buf
     // close to the cap so remaining is tiny, then feed a short line whose
     // newline sits beyond `remaining`.
-    let mut buf = vec![b'x'; MAX_LINE_LEN - 3];
+    let mut buf = vec![b'x'; TEST_CAP - 3];
     let data = b"abcde\nrest\n";
     let mut reader = std::io::BufReader::new(&data[..]);
     // newline at index 5 > remaining (3): truncated, buf must equal exactly cap.
-    assert!(!read_capped_line(&mut reader, &mut buf));
-    assert_eq!(buf.len(), MAX_LINE_LEN);
+    assert!(!read_capped_line(&mut reader, &mut buf, TEST_CAP));
+    assert_eq!(buf.len(), TEST_CAP);
 }
 
 #[test]
 fn read_capped_line_caps_when_newline_exactly_at_boundary() {
-    // Newline sits at index MAX_LINE_LEN (the byte after the cap window): the
+    // Newline sits at index TEST_CAP (the byte after the cap window): the
     // content fills the cap exactly and is treated as overlength.
-    let mut data = vec![b'b'; MAX_LINE_LEN];
+    let mut data = vec![b'b'; TEST_CAP];
     data.push(b'\n');
     let mut reader = std::io::BufReader::new(&data[..]);
     let mut buf = Vec::new();
-    assert!(!read_capped_line(&mut reader, &mut buf));
-    assert_eq!(buf.len(), MAX_LINE_LEN);
+    assert!(!read_capped_line(&mut reader, &mut buf, TEST_CAP));
+    assert_eq!(buf.len(), TEST_CAP);
 }
