@@ -501,3 +501,65 @@ fn refresh_static_keys_reference_rewrites_only_when_stale() {
 
     fs::remove_dir_all(&dir).ok();
 }
+
+#[test]
+fn load_filters_out_retired_bundled_plugin_entries() {
+    let dir = std::env::temp_dir().join(format!(
+        "mantis_cfg_retired_plugins_{}_{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0)
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(
+        dir.join("mantis.toml"),
+        r#"
+[plugins]
+"git-diff" = { path = "git-diff.sh", enabled = true }
+"my-plugin" = { path = "my-custom-plugin", enabled = true }
+"#,
+    )
+    .unwrap();
+
+    let (config, _path, _error) = load(&dir);
+    assert!(
+        !config.plugins.contains_key("git-diff"),
+        "retired plugin 'git-diff' must be filtered out from config"
+    );
+    assert!(
+        config.plugins.contains_key("my-plugin"),
+        "user plugin 'my-plugin' must be preserved"
+    );
+
+    fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn load_preserves_all_plugins_when_none_are_retired() {
+    let dir = std::env::temp_dir().join(format!(
+        "mantis_cfg_all_ok_{}_{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0)
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(
+        dir.join("mantis.toml"),
+        r#"
+[plugins]
+"my-plugin" = { path = "my-custom-plugin", enabled = true }
+"other" = { path = "some-tool", enabled = false }
+"#,
+    )
+    .unwrap();
+
+    let (config, _path, _error) = load(&dir);
+    assert!(config.plugins.contains_key("my-plugin"));
+    assert!(config.plugins.contains_key("other"));
+
+    fs::remove_dir_all(&dir).ok();
+}

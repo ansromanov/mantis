@@ -100,6 +100,13 @@ const BUNDLED_PLUGINS: &[(&str, &str)] = &[
     ("markdown", "mantis-plugin-markdown"),
 ];
 
+/// Filenames of old shell-script plugins superseded by the current Rust binaries.
+///
+/// These were shipped by mantis up to 0.7.x and lived in the plugin directory
+/// as standalone shell scripts. They are no longer needed and are silently
+/// removed on startup so stale files cannot be accidentally re-enabled.
+pub(crate) const RETIRED_BUNDLED_PLUGINS: &[&str] = &["git-diff.sh", "git-log.sh", "iconize.sh"];
+
 /// List of (filename, content) for each bundled syntax definition.
 const BUNDLED_SYNTAX_PLUGINS: &[(&str, &str)] = &[(
     "terraform.sublime-syntax",
@@ -115,7 +122,9 @@ const BUNDLED_SYNTAX_PLUGIN_ENTRIES: &[(&str, &str, &[&str])] = &[(
 )];
 
 /// Copies every bundled plugin to the plugin directory if it doesn't already
-/// exist there. Syntax definitions go into `{plugin_dir}/syntaxes/`.
+/// exist there. Syntax definitions go into `{plugin_dir}/syntaxes/`. Also
+/// removes any retired shell-script plugins that were superseded by Rust
+/// binaries (pre-0.8 upgrade cleanup).
 pub(crate) fn install_bundled_plugins() {
     let dir = default_plugin_dir();
     let _ = std::fs::create_dir_all(&dir);
@@ -141,6 +150,29 @@ pub(crate) fn install_bundled_plugins() {
             let _ = std::fs::write(&path, content);
         }
     }
+
+    remove_retired_bundled_plugins();
+}
+
+/// Removes retired bundled plugin files from the plugin directory.
+///
+/// Deletes only exact-name matches that mantis is known to have shipped
+/// (see `RETIRED_BUNDLED_PLUGINS`). User-authored plugins are never touched.
+/// Errors are silently ignored so a permissions issue does not crash startup.
+pub(crate) fn remove_retired_bundled_plugins() {
+    let dir = default_plugin_dir();
+    for name in RETIRED_BUNDLED_PLUGINS {
+        let path = dir.join(name);
+        if path.exists() {
+            let _ = std::fs::remove_file(&path);
+        }
+    }
+}
+
+/// Returns the list of retired plugin filenames that should be removed
+/// from the plugin directory and filtered out of config `[plugins]` entries.
+pub(crate) fn retired_bundled_plugins() -> &'static [&'static str] {
+    RETIRED_BUNDLED_PLUGINS
 }
 
 /// Searches for a compiled Rust binary and copies it to `dest`.

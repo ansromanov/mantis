@@ -3,6 +3,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use super::*;
 
+use crate::plugin::install::remove_retired_bundled_plugins;
+
 fn fresh_plugin_dir() -> PathBuf {
     static COUNTER: AtomicUsize = AtomicUsize::new(0);
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
@@ -189,6 +191,75 @@ fn install_bundles_terraform_syntax_content() {
         content.to_lowercase().contains("terraform"),
         "bundled terraform syntax must contain the HCL/Terraform grammar"
     );
+    std::fs::remove_dir_all(&tmp).ok();
+}
+
+#[test]
+fn remove_retired_plugins_cleans_stale_shell_scripts_and_preserves_user_plugins() {
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let tmp = fresh_plugin_dir();
+    std::fs::create_dir_all(&tmp).unwrap();
+    let old = std::env::var_os("XDG_CONFIG_HOME");
+    unsafe { std::env::set_var("XDG_CONFIG_HOME", &tmp) };
+
+    let plugins_dir = tmp.join("mantis").join("plugins");
+    std::fs::create_dir_all(&plugins_dir).unwrap();
+
+    let retired = retired_bundled_plugins();
+    // Seed retired shell scripts
+    for name in retired {
+        std::fs::write(plugins_dir.join(name), b"# old plugin").unwrap();
+    }
+    // Seed a user-authored plugin (not in retired list)
+    let user_plugin = plugins_dir.join("custom.sh");
+    std::fs::write(&user_plugin, b"# user plugin").unwrap();
+
+    // Run cleanup
+    remove_retired_bundled_plugins();
+
+    // Retired scripts should be gone
+    for name in retired_bundled_plugins() {
+        assert!(
+            !plugins_dir.join(name).exists(),
+            "retired plugin {name} should have been removed"
+        );
+    }
+    // User plugin untouched
+    assert!(user_plugin.exists(), "user plugin must not be removed");
+
+    // Idempotent: re-run must be a no-op
+    remove_retired_bundled_plugins();
+    assert!(user_plugin.exists(), "user plugin must survive re-run");
+
+    unsafe {
+        match old {
+            Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
+            None => std::env::remove_var("XDG_CONFIG_HOME"),
+        }
+    }
+    std::fs::remove_dir_all(&tmp).ok();
+}
+
+#[test]
+fn remove_retired_plugins_no_ops_on_empty_dir() {
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let tmp = fresh_plugin_dir();
+    std::fs::create_dir_all(&tmp).unwrap();
+    let old = std::env::var_os("XDG_CONFIG_HOME");
+    unsafe { std::env::set_var("XDG_CONFIG_HOME", &tmp) };
+
+    let plugins_dir = tmp.join("mantis").join("plugins");
+    std::fs::create_dir_all(&plugins_dir).unwrap();
+
+    // No files at all — should not panic
+    remove_retired_bundled_plugins();
+
+    unsafe {
+        match old {
+            Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
+            None => std::env::remove_var("XDG_CONFIG_HOME"),
+        }
+    }
     std::fs::remove_dir_all(&tmp).ok();
 }
 

@@ -169,3 +169,9 @@ markdown   = { path = "mantis-plugin-markdown" }
 > **Note:** Git features are built into `mantis` natively — no plugin required.
 > Git status colors, blame, file history (`H`), and working-tree diffs all work
 > without any plugin enabled.
+
+### Auto-removal of retired plugins
+
+When upgrading from a pre-0.8 install (which used shell-script plugins), superseded
+files (`git-diff.sh`, `git-log.sh`, `iconize.sh`) and their `[plugins]` config entries
+are silently removed on first launch. User-authored plugins are never touched.

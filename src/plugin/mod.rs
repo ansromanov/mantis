@@ -58,6 +58,7 @@ mod syntax;
 pub(crate) use install::bundled_plugin_entries;
 pub(crate) use install::default_plugin_dir;
 pub(crate) use install::install_bundled_plugins;
+pub(crate) use install::retired_bundled_plugins;
 pub(crate) use manager::PluginManager;
 pub(crate) use syntax::load_extra_syntaxes;
 pub(crate) use types::{
