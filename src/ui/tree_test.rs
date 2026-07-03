@@ -559,8 +559,8 @@ fn compact_breadcrumb_dotdot_target_is_parent_of_first_kept() {
     }];
     app.tree_selected = 0;
     // Enough width to show ".. / b / c / root" (compact the first ancestor).
-    // Inner width = 20-2 = 18, so first_kept=2 fits: total = 5+6+6 = 17 ≤ 18.
-    let text = breadcrumb_text_for(&mut app, 20);
+    // Inner width = 19-2 = 17, so first_kept=2 fits: total = 5+6+6 = 17 ≤ 17.
+    let text = breadcrumb_text_for(&mut app, 19);
     assert!(text.contains(".."), "should have .. marker: {text:?}");
     assert!(text.contains("root"), "root should be visible: {text:?}");
     // The ".." target is the parent of the first kept segment (which is "b"

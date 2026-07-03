@@ -456,7 +456,18 @@ fn render_breadcrumb(f: &mut Frame, app: &mut App, area: Rect, segments: &[(Stri
         .iter()
         .map(|(n, _)| UnicodeWidthStr::width(n.as_str()))
         .sum();
-    let total_len = names_len + segments.len().saturating_sub(1) * sep_len;
+    // The root segment (empty label) renders as "/" plus a single-space
+    // separator to the next segment, not the usual " / " — narrower than the
+    // generic formula below assumes, so it needs its own width count to avoid
+    // triggering compaction earlier than the actual render requires.
+    let total_len = if segments[0].0.is_empty() {
+        match segments.len() {
+            1 => 1,
+            n => 2 + names_len + (n - 2) * sep_len,
+        }
+    } else {
+        names_len + segments.len().saturating_sub(1) * sep_len
+    };
 
     // Pick which items to show (indices or compact markers).
     let items: Vec<BreadcrumbItem> = if total_len <= avail {
