@@ -153,6 +153,7 @@ pub struct App {
     pub tree_revision: u64,
     pub tree_width: u16,
     pub show_help: bool,
+    pub help_scroll: usize,
     pub should_quit: bool,
     pub theme: Theme,
     pub git_status_enabled: bool,

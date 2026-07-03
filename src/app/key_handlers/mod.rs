@@ -24,8 +24,13 @@ mod mod_tests;
 #[path = "normal_test.rs"]
 mod normal_tests;
 
+use crossterm::event::KeyCode;
+
 use super::App;
 use crate::config::static_keys;
+
+/// Page size for help popup scrolling (matches `handle_list_picker_key`).
+const HELP_PAGE_SIZE: usize = 10;
 
 impl App {
     /// Dispatches a key event. Overlays (help, theme, history, search) are
@@ -54,6 +59,29 @@ impl App {
         if self.show_help {
             if static_keys::is_modal_close(&key) {
                 self.show_help = false;
+                self.help_scroll = 0;
+            } else {
+                match key.code {
+                    KeyCode::Up | KeyCode::Char('k') => {
+                        self.help_scroll = self.help_scroll.saturating_sub(1);
+                    }
+                    KeyCode::Down | KeyCode::Char('j') => {
+                        self.help_scroll = self.help_scroll.saturating_add(1);
+                    }
+                    KeyCode::PageUp => {
+                        self.help_scroll = self.help_scroll.saturating_sub(HELP_PAGE_SIZE);
+                    }
+                    KeyCode::PageDown => {
+                        self.help_scroll = self.help_scroll.saturating_add(HELP_PAGE_SIZE);
+                    }
+                    KeyCode::Home | KeyCode::Char('g') => {
+                        self.help_scroll = 0;
+                    }
+                    KeyCode::End | KeyCode::Char('G') => {
+                        self.help_scroll = usize::MAX;
+                    }
+                    _ => {}
+                }
             }
             return;
         }
