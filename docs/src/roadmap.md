@@ -101,6 +101,19 @@ reading, built in and zero-config like the shipped YAML folding:
 - **Scope context in the breadcrumb**, which also feeds sticky scroll
   ([#199](https://github.com/ansromanov/mantis/issues/199)).
 
+### 6. File-type coverage via plugins
+*Epic: [#485](https://github.com/ansromanov/mantis/issues/485)*
+
+Beyond the three built-in languages, coverage grows through plugins in two
+tiers. **Syntax packs** (`.sublime-syntax`, terraform-style): TOML,
+TypeScript/TSX, and Dockerfile bundled first
+([#486](https://github.com/ansromanov/mantis/issues/486)), then
+Protobuf/GraphQL/Jinja2/nginx and friends via the registry. **Rich viewers**
+(process plugins): a Jupyter `.ipynb` renderer and a GGUF/safetensors
+model-metadata viewer headline the AI persona; Parquet/SQLite previews and a
+PEM/JWT decoder serve DevOps. Rich viewers are blocked on the 64 KB plugin
+content cap ([#449](https://github.com/ansromanov/mantis/issues/449)).
+
 ### Cross-cutting: plugin system hardening
 
 The plugin system is the extension surface for pillars 2, 3, and 5, and a
