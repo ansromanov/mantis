@@ -304,7 +304,7 @@ fn help_scroll_j_does_not_overflow() {
     app.show_help = true;
     app.help_scroll = usize::MAX;
     app.handle_key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::empty()));
-    // saturating_add would wrap at MAX, so should still be MAX
+    // saturating_add clamps at MAX rather than wrapping, so should still be MAX
     assert_eq!(app.help_scroll, usize::MAX);
 }
 
