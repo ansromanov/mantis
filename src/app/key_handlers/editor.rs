@@ -245,7 +245,7 @@ impl App {
 
     /// Switches the active theme and re-renders the current view with it,
     /// preserving scroll position.
-    fn apply_theme(&mut self, theme_name: &str, theme: Theme) {
+    pub(crate) fn apply_theme(&mut self, theme_name: &str, theme: Theme) {
         // Notify plugins so they can re-render content with matching colours.
         self.plugin_manager.on_theme_change(theme_name);
         self.plugin_content.clear();

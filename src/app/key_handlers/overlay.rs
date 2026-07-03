@@ -9,6 +9,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 
 use crate::config::static_keys;
 use crate::list_picker::{handle_list_picker_key, OverlayKey};
+use crate::theme::{Theme, ThemeConfig};
 
 use super::super::App;
 
@@ -122,13 +123,50 @@ impl App {
     }
 
     /// Handles keyboard input while the theme picker overlay is open.
+    ///
+    /// Navigation (j/k/arrows) previews the highlighted theme live behind the
+    /// popup; Esc reverts to the original theme that was active before the
+    /// picker opened; Enter commits the previewed theme to config.
     pub(super) fn handle_theme_key(&mut self, key: KeyEvent) {
-        let Some(ref mut p) = self.theme_picker else {
-            return;
+        let (result, selected_name, has_results) = {
+            let Some(ref mut p) = self.theme_picker else {
+                return;
+            };
+            let result = handle_list_picker_key(p, &key);
+            let selected_name = p.selected_name().map(String::from);
+            let has_results = p.results_len() > 0;
+            (result, selected_name, has_results)
         };
-        match handle_list_picker_key(p, &key) {
-            OverlayKey::Activate => self.apply_selected_theme(),
-            OverlayKey::Close => self.theme_picker = None,
+        match result {
+            OverlayKey::Activate => {
+                self.theme_picker = None;
+                if let Some(ref name) = selected_name {
+                    if let Some(theme) = Theme::load(name) {
+                        self.apply_theme(name, theme);
+                        self.config.theme = ThemeConfig::from_preset(name);
+                        self.save_config();
+                    }
+                }
+            }
+            OverlayKey::Close => {
+                self.theme_picker = None;
+                // Revert to the original theme that was active before the picker
+                // opened (self.config.theme is never written during preview).
+                let config_theme = self.config.theme.clone();
+                let theme = config_theme.resolve();
+                let name = config_theme
+                    .name
+                    .clone()
+                    .unwrap_or_else(|| "default".to_string());
+                self.apply_theme(&name, theme);
+            }
+            OverlayKey::Handled if has_results => {
+                if let Some(ref name) = selected_name {
+                    if let Some(theme) = Theme::load(name) {
+                        self.apply_theme(name, theme);
+                    }
+                }
+            }
             _ => {}
         }
     }

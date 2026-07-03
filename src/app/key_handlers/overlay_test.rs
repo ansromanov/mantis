@@ -1,6 +1,6 @@
 use crate::app::{App, Focus};
 use crate::config::Config;
-use crate::search::{GotoLineState, InFileSearch, TreeFilter};
+use crate::search::{GotoLineState, InFileSearch, ThemePicker, TreeFilter};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::Rect;
 use std::fs;
@@ -417,5 +417,86 @@ fn tree_filter_esc_does_not_activate() {
     app.handle_tree_filter_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
     assert!(app.tree_filter.is_none(), "filter must close on Esc");
     assert!(app.current_file.is_none(), "Esc must not open a file");
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- Theme picker live preview -----------------------------------------------
+
+#[test]
+fn handle_theme_key_down_keeps_picker_open_for_preview() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.theme_picker = Some(ThemePicker::default());
+    let before = app.theme_picker.as_ref().unwrap().selected;
+    app.handle_theme_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
+    assert!(app.theme_picker.is_some(), "picker must stay open after navigation preview");
+    let after = app.theme_picker.as_ref().unwrap().selected;
+    assert_ne!(after, before, "selection must advance on Down");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn handle_theme_key_up_clamps_and_does_not_close() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.theme_picker = Some(ThemePicker::default());
+    // Up at index 0 should clamp, not close
+    app.handle_theme_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()));
+    assert!(app.theme_picker.is_some(), "picker must stay open after Up at top");
+    assert_eq!(app.theme_picker.as_ref().unwrap().selected, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn handle_theme_key_esc_closes_and_reverts() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.theme_picker = Some(ThemePicker::default());
+    // Navigate to create a preview state first
+    app.handle_theme_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
+    assert!(app.theme_picker.is_some(), "picker must stay open after preview");
+    // Esc should close and revert
+    app.handle_theme_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+    assert!(app.theme_picker.is_none(), "picker must close on Esc");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn handle_theme_key_enter_commits_and_closes() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.theme_picker = Some(ThemePicker::default());
+    // Filter to "default" for a predictable selection
+    for c in "default".chars() {
+        app.handle_theme_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::empty()));
+    }
+    let picker = app.theme_picker.as_ref().unwrap();
+    if picker.selected_name() == Some("default") {
+        let _ = picker;
+        app.handle_theme_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+        assert!(app.theme_picker.is_none(), "picker must close on Enter");
+        assert_eq!(
+            app.config.theme.name.as_deref(),
+            Some("default"),
+            "Enter must commit theme to config"
+        );
+    }
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn handle_theme_key_query_typing_previews_first_match() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.theme_picker = Some(ThemePicker::default());
+    // Typing narrows the list and resets selection — the first match is previewed.
+    // "monokai" is a bundled theme; use a query short enough to match something.
+    for c in "monokai".chars() {
+        app.handle_theme_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::empty()));
+    }
+    assert!(app.theme_picker.is_some(), "picker must stay open during query typing");
+    // After typing, the first (selected) item should start with "monokai".
+    let name = app.theme_picker.as_ref().unwrap().selected_name();
+    assert_eq!(name, Some("monokai"), "typing 'monokai' should match monokai");
     fs::remove_dir_all(&root).ok();
 }
