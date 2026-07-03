@@ -99,10 +99,10 @@ impl App {
         if self.show_help {
             match ev.kind {
                 MouseEventKind::ScrollDown => {
-                    self.help_scroll = self.help_scroll.saturating_add(3);
+                    self.help_scroll = self.help_scroll.saturating_add(WHEEL_STEP);
                 }
                 MouseEventKind::ScrollUp => {
-                    self.help_scroll = self.help_scroll.saturating_sub(3);
+                    self.help_scroll = self.help_scroll.saturating_sub(WHEEL_STEP);
                 }
                 _ => {}
             }
