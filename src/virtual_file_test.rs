@@ -49,3 +49,29 @@ fn binary_file_rejected() {
     f.write_all(b"hello\0world").unwrap();
     assert!(VirtualFile::open(f.path()).is_none());
 }
+
+#[test]
+fn external_truncation_does_not_sigbus_owned() {
+    let mut f = tempfile::NamedTempFile::new().unwrap();
+    f.write_all(b"line1\nline2\nline3\n").unwrap();
+    f.flush().unwrap();
+
+    let vf = VirtualFile::open(f.path()).expect("VirtualFile::open failed");
+    assert_eq!(vf.line_count(), 3);
+    assert_eq!(vf.line_text(0), Some("line1"));
+    assert_eq!(vf.line_text(1), Some("line2"));
+    assert_eq!(vf.line_text(2), Some("line3"));
+
+    // Truncate the backing file (simulates : >file, editor save-with-truncate,
+    // log rotation, or git checkout of a smaller revision).
+    f.as_file_mut().set_len(0).unwrap();
+    f.flush().unwrap();
+
+    // The file is ≤ MMAP_THRESHOLD so VirtualFile owns the data in memory.
+    // line_text must still return the original content; a SIGBUS would mean
+    // we're reading from a stale mmap.
+    assert_eq!(vf.line_count(), 3);
+    assert_eq!(vf.line_text(0), Some("line1"));
+    assert_eq!(vf.line_text(1), Some("line2"));
+    assert_eq!(vf.line_text(2), Some("line3"));
+}
