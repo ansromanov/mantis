@@ -21,3 +21,4 @@
 
 - [Development](development.md)
 - [Plugin Development](plugin-development.md)
+- [Roadmap](roadmap.md)
