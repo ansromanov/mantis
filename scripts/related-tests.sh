@@ -12,7 +12,7 @@
 #   tests/foo_tests.rs    -> integration binary `foo_tests`
 #   src/foo.rs (+ tests/foo_tests.rs present) -> also that integration binary
 #
-# Fallback to __ALL__ on: Cargo.toml/Cargo.lock/tv.toml, .cargo/config.toml,
+# Fallback to __ALL__ on: Cargo.toml/Cargo.lock/mantis.toml, .cargo/config.toml,
 # src/lib.rs, src/main.rs, or when nothing maps to a test.
 set -euo pipefail
 

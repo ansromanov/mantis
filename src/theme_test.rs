@@ -106,6 +106,16 @@ fn all_embedded_themes_are_valid() {
 }
 
 #[test]
+fn every_embedded_manifest_entry_parses() {
+    for (name, toml) in super::EMBEDDED_MANIFEST {
+        assert!(
+            Theme::from_toml(toml).is_some(),
+            "embedded theme \"{name}\" must parse successfully"
+        );
+    }
+}
+
+#[test]
 fn named_preset_is_the_base_and_overrides_layer_on_top() {
     let cfg = ThemeConfig {
         name: Some("monokai".into()),
