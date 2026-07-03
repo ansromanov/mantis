@@ -429,7 +429,10 @@ fn handle_theme_key_down_keeps_picker_open_for_preview() {
     app.theme_picker = Some(ThemePicker::default());
     let before = app.theme_picker.as_ref().unwrap().selected;
     app.handle_theme_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
-    assert!(app.theme_picker.is_some(), "picker must stay open after navigation preview");
+    assert!(
+        app.theme_picker.is_some(),
+        "picker must stay open after navigation preview"
+    );
     let after = app.theme_picker.as_ref().unwrap().selected;
     assert_ne!(after, before, "selection must advance on Down");
     fs::remove_dir_all(&root).ok();
@@ -442,7 +445,10 @@ fn handle_theme_key_up_clamps_and_does_not_close() {
     app.theme_picker = Some(ThemePicker::default());
     // Up at index 0 should clamp, not close
     app.handle_theme_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()));
-    assert!(app.theme_picker.is_some(), "picker must stay open after Up at top");
+    assert!(
+        app.theme_picker.is_some(),
+        "picker must stay open after Up at top"
+    );
     assert_eq!(app.theme_picker.as_ref().unwrap().selected, 0);
     fs::remove_dir_all(&root).ok();
 }
@@ -454,7 +460,10 @@ fn handle_theme_key_esc_closes_and_reverts() {
     app.theme_picker = Some(ThemePicker::default());
     // Navigate to create a preview state first
     app.handle_theme_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
-    assert!(app.theme_picker.is_some(), "picker must stay open after preview");
+    assert!(
+        app.theme_picker.is_some(),
+        "picker must stay open after preview"
+    );
     // Esc should close and revert
     app.handle_theme_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
     assert!(app.theme_picker.is_none(), "picker must close on Esc");
@@ -471,16 +480,18 @@ fn handle_theme_key_enter_commits_and_closes() {
         app.handle_theme_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::empty()));
     }
     let picker = app.theme_picker.as_ref().unwrap();
-    if picker.selected_name() == Some("default") {
-        let _ = picker;
-        app.handle_theme_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
-        assert!(app.theme_picker.is_none(), "picker must close on Enter");
-        assert_eq!(
-            app.config.theme.name.as_deref(),
-            Some("default"),
-            "Enter must commit theme to config"
-        );
-    }
+    assert_eq!(
+        picker.selected_name(),
+        Some("default"),
+        "typing 'default' should select the default theme"
+    );
+    app.handle_theme_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert!(app.theme_picker.is_none(), "picker must close on Enter");
+    assert_eq!(
+        app.config.theme.name.as_deref(),
+        Some("default"),
+        "Enter must commit theme to config"
+    );
     fs::remove_dir_all(&root).ok();
 }
 
@@ -494,9 +505,16 @@ fn handle_theme_key_query_typing_previews_first_match() {
     for c in "monokai".chars() {
         app.handle_theme_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::empty()));
     }
-    assert!(app.theme_picker.is_some(), "picker must stay open during query typing");
+    assert!(
+        app.theme_picker.is_some(),
+        "picker must stay open during query typing"
+    );
     // After typing, the first (selected) item should start with "monokai".
     let name = app.theme_picker.as_ref().unwrap().selected_name();
-    assert_eq!(name, Some("monokai"), "typing 'monokai' should match monokai");
+    assert_eq!(
+        name,
+        Some("monokai"),
+        "typing 'monokai' should match monokai"
+    );
     fs::remove_dir_all(&root).ok();
 }

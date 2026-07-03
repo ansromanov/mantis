@@ -9,7 +9,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 
 use crate::config::static_keys;
 use crate::list_picker::{handle_list_picker_key, OverlayKey};
-use crate::theme::{Theme, ThemeConfig};
+use crate::theme::Theme;
 
 use super::super::App;
 
@@ -138,16 +138,7 @@ impl App {
             (result, selected_name, has_results)
         };
         match result {
-            OverlayKey::Activate => {
-                self.theme_picker = None;
-                if let Some(ref name) = selected_name {
-                    if let Some(theme) = Theme::load(name) {
-                        self.apply_theme(name, theme);
-                        self.config.theme = ThemeConfig::from_preset(name);
-                        self.save_config();
-                    }
-                }
-            }
+            OverlayKey::Activate => self.apply_selected_theme(),
             OverlayKey::Close => {
                 self.theme_picker = None;
                 // Revert to the original theme that was active before the picker

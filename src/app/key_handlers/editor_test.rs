@@ -402,6 +402,9 @@ fn apply_theme_is_pub_crate() {
     let mut app = app_for(&root);
     let theme = crate::theme::Theme::default();
     app.apply_theme("default", theme);
-    assert!(app.theme_picker.is_none(), "apply_theme must not modify picker state");
+    assert!(
+        app.theme_picker.is_none(),
+        "apply_theme must not modify picker state"
+    );
     fs::remove_dir_all(&root).ok();
 }
