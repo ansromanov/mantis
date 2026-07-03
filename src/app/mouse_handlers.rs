@@ -97,6 +97,15 @@ impl App {
     /// scroll, and double-click for search/history/theme results.
     pub fn handle_mouse(&mut self, ev: MouseEvent) {
         if self.show_help {
+            match ev.kind {
+                MouseEventKind::ScrollDown => {
+                    self.help_scroll = self.help_scroll.saturating_add(WHEEL_STEP);
+                }
+                MouseEventKind::ScrollUp => {
+                    self.help_scroll = self.help_scroll.saturating_sub(WHEEL_STEP);
+                }
+                _ => {}
+            }
             return;
         }
         if self.theme_picker.is_some() {

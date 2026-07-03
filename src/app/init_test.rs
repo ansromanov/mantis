@@ -395,6 +395,17 @@ fn blame_col_width_initialises_to_zero() {
 }
 
 #[test]
+fn help_scroll_initialises_to_zero() {
+    let root = temp_dir();
+    let app = new_app(&root, Config::default());
+    assert_eq!(
+        app.help_scroll, 0,
+        "help_scroll must start at zero so the help popup opens unscrolled"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn plugin_content_active_path_initialises_to_none() {
     let root = temp_dir();
     let app = new_app(&root, Config::default());

@@ -281,7 +281,7 @@ fn truncate_label(label: &str, max_len: usize) -> String {
     }
 }
 
-pub(crate) fn draw_help(f: &mut Frame, app: &App, area: Rect) {
+pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
     let theme = &app.theme;
     let popup = centered_rect(72, 80, area);
     f.render_widget(Clear, popup);
@@ -461,5 +461,44 @@ pub(crate) fn draw_help(f: &mut Frame, app: &App, area: Rect) {
         desc("close popup"),
     ]));
 
-    f.render_widget(Paragraph::new(rows), inner);
+    let total_rows = rows.len();
+    let visible = inner.height as usize;
+    let max_scroll = total_rows.saturating_sub(visible);
+    if app.help_scroll > max_scroll {
+        app.help_scroll = max_scroll;
+    }
+
+    f.render_widget(
+        Paragraph::new(rows).scroll((app.help_scroll as u16, 0)),
+        inner,
+    );
+
+    if max_scroll > 0 {
+        let indicator_y = if total_rows > 0 {
+            (app.help_scroll as f64 * (inner.height as f64 - 2.0) / max_scroll as f64).round()
+                as u16
+        } else {
+            0
+        };
+        let indicator_y = (indicator_y + inner.y).min(inner.bottom().saturating_sub(2));
+        let indicator_chars = if app.help_scroll == 0 {
+            " ▲ "
+        } else if app.help_scroll >= max_scroll {
+            " ▼ "
+        } else {
+            " ║ "
+        };
+        f.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                indicator_chars,
+                Style::default().fg(theme.dim),
+            ))),
+            Rect {
+                x: inner.right().saturating_sub(3),
+                y: indicator_y,
+                width: 3,
+                height: 1,
+            },
+        );
+    }
 }

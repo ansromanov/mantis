@@ -215,6 +215,18 @@ the user would want to know about, report it; don't `let _ =` it away.
 
 These keep the app coherent and the render loop cheap. Reviewers enforce them.
 
+- **Design for reuse before writing code, not after.** Before adding a new piece of
+  state or interaction (a new overlay's scroll offset, a new picker, a new key-handling
+  block), check whether an existing part of the app already has the same shape —
+  and whether the shape is likely to recur (a fourth overlay, a fifth picker). If a
+  second consumer is foreseeable, build the shared primitive first rather than
+  hard-coding a single-purpose field and copy-pasting the pattern the next time it's
+  needed. Concretely: a scrollable-content overlay (help, about, blame, and any future
+  one) should scroll through one small `ScrollState`-style helper (offset, key/wheel
+  handling, clamp-and-indicator), not a bespoke `xxx_scroll: usize` field with its own
+  inline `match` in `key_handlers` and `mouse_handlers` per overlay. This is a
+  judgment call, not a mandate to abstract on the first instance — don't build the
+  shared helper for something that will only ever have one caller.
 - **One method per behaviour — don't duplicate, share.** If two code paths do the
   "same thing" (copy to clipboard, launch an editor/browser, handle a list-picker
   overlay's keys, clamp a scroll offset), extract one helper and call it from both.

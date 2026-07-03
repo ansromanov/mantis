@@ -383,11 +383,11 @@ fn draw_theme_with_filter() {
 #[test]
 fn draw_help_all_sections() {
     let dir = tempfile::tempdir().unwrap();
-    let app = make_app(dir.path());
+    let mut app = make_app(dir.path());
 
-    let backend = TestBackend::new(80, 75);
+    let backend = TestBackend::new(80, 100);
     let mut terminal = Terminal::new(backend).unwrap();
-    terminal.draw(|f| draw_help(f, &app, f.area())).unwrap();
+    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
     assert!(joined.contains("Help"));

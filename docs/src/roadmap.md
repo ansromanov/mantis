@@ -88,6 +88,13 @@ Continuous ergonomics investment: theme live preview, scrollable help,
 onboarding hints, regex/case search toggles, sticky scroll, bookmarks, a
 context menu, a jump-back navigation stack, line wrap, search result counts.
 
+This pillar is where the overlay count keeps growing (about, blame, and now
+help all render scrollable popups; bookmarks and the context menu add more).
+Each new scrollable overlay is a prompt to check whether the ad hoc
+`xxx_scroll` field + inline key/mouse match introduced for help should
+graduate into a shared `ScrollState`-style helper (see AGENTS.md →
+Consistency & performance) rather than being copied a third time.
+
 ### 5. Language intelligence (Rust · Python · Go)
 *Epic: [#482](https://github.com/ansromanov/mantis/issues/482)*
 
@@ -126,6 +133,25 @@ a registry trust model before the install UI ships
 ([#480](https://github.com/ansromanov/mantis/issues/480)), and protocol v3
 (request/response, key consumption, provider priorities —
 [#481](https://github.com/ansromanov/mantis/issues/481)).
+
+---
+
+## Engineering principles
+
+Every change — feature, fix, refactor — is planned before it's coded, not
+improvised diff-by-diff. Two questions guide that planning, in order:
+
+1. **Does this shape already exist somewhere in the app?** (an overlay, a
+   picker, a scroll offset, a clamp). If yes, reuse or extend it instead of
+   writing a parallel copy.
+2. **Will this shape recur?** If a second consumer is foreseeable (the next
+   overlay, the next picker), design the shared primitive now so the second
+   consumer extends it instead of duplicating it. If not, keep it local —
+   this is not license to abstract on the first use case.
+
+`AGENTS.md` → "Consistency & performance" is the enforced version of this
+for Rust code; this section states the intent behind that rule so it stays
+legible as the codebase (and this roadmap) grows.
 
 ---
 

@@ -144,6 +144,7 @@ impl App {
             tree_revision: 0,
             tree_width: cfg.tree.width,
             show_help: false,
+            help_scroll: 0,
             should_quit: false,
             theme,
             git_status_enabled,

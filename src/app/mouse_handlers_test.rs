@@ -54,6 +54,15 @@ fn scroll_down_at(column: u16, row: u16) -> MouseEvent {
     }
 }
 
+fn scroll_up_at(column: u16, row: u16) -> MouseEvent {
+    MouseEvent {
+        kind: MouseEventKind::ScrollUp,
+        column,
+        row,
+        modifiers: crossterm::event::KeyModifiers::empty(),
+    }
+}
+
 #[test]
 fn scrolling_content_marks_session_dirty() {
     let root = temp_tree();
@@ -104,6 +113,43 @@ fn scroll_outside_content_does_not_mark_dirty() {
     assert!(
         !app.session_dirty,
         "scrolling outside the content pane must not mark the session dirty"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn help_overlay_intercepts_wheel_before_content_pane() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 10,
+    };
+    app.show_help = true;
+    app.handle_mouse(scroll_down_at(40, 5));
+    assert_eq!(
+        app.help_scroll, 3,
+        "wheel scroll while the help overlay is open must move help_scroll, not content_scroll"
+    );
+    assert_eq!(
+        app.content_scroll, 0,
+        "help overlay must intercept the wheel event before it reaches the content pane"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn help_overlay_wheel_up_does_not_underflow() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.show_help = true;
+    app.handle_mouse(scroll_up_at(40, 5));
+    assert_eq!(
+        app.help_scroll, 0,
+        "wheel-up at the top of the help overlay must saturate at zero"
     );
     fs::remove_dir_all(&root).ok();
 }
