@@ -236,6 +236,7 @@ impl App {
                         let can_select = self.has_text_cursor();
                         if can_select {
                             let pos = self.content_pos(ev.column, ev.row);
+                            self.active_line = pos.0;
                             self.drag_start = Some(pos);
                             self.selection = None;
                         }

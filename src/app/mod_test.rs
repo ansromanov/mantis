@@ -3181,6 +3181,25 @@ fn mouse_content_click_on_scrollbar_sets_drag() {
 }
 
 #[test]
+fn mouse_content_click_moves_active_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt")); // 50 lines
+    app.content_area = Rect {
+        x: 5,
+        y: 5,
+        width: 50,
+        height: 10,
+    };
+    app.content_scroll = 3;
+    app.active_line = 0;
+    // Click at row 5 + 4 -> content row 4 -> physical line = scroll(3) + 4 = 7
+    app.handle_mouse(click(6, 5 + 4));
+    assert_eq!(app.active_line, 7);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn mouse_scrollbar_drag_updates_scroll() {
     let root = temp_tree();
     let mut app = app_for(&root);
