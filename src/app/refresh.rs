@@ -173,20 +173,19 @@ impl App {
     /// pending requests and their results have been applied. Only available
     /// in tests so assertions can observe content/git-state immediately
     /// after a `request_*` call.
+    ///
+    /// Waits generously for the first response (the worker may be slow to
+    /// schedule on a loaded CI box), then drains any already-queued
+    /// follow-ups with a short poll instead of paying a second full timeout
+    /// for the common case where nothing else is coming.
     #[cfg(test)]
     pub(crate) fn pump_loads(&mut self) {
-        use std::sync::mpsc::RecvTimeoutError;
-        loop {
-            match self.loader.rx.recv_timeout(Duration::from_millis(500)) {
-                Ok(resp) => {
-                    self.apply_response(resp);
-                }
-                Err(RecvTimeoutError::Timeout) => {
-                    self.drain_loads();
-                    break;
-                }
-                Err(_) => break,
-            }
+        match self.loader.rx.recv_timeout(Duration::from_millis(500)) {
+            Ok(resp) => self.apply_response(resp),
+            Err(_) => return,
+        };
+        while let Ok(resp) = self.loader.rx.recv_timeout(Duration::from_millis(20)) {
+            self.apply_response(resp);
         }
     }
 
