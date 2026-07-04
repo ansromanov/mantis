@@ -24,9 +24,9 @@ use memmap2::Mmap;
 
 use crate::file::is_binary_bytes;
 
-/// Files smaller than this threshold are fully read into memory so that
+/// Files at or below this threshold are fully read into memory so that
 /// external truncation cannot crash the process with SIGBUS.
-/// Files at or above this threshold use `mmap` (SIGBUS risk is documented
+/// Files larger than this threshold use `mmap` (SIGBUS risk is documented
 /// and accepted for large-file performance).
 const MMAP_THRESHOLD: u64 = 16 * 1024 * 1024;
 
