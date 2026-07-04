@@ -535,11 +535,30 @@ impl App {
     }
 }
 
+/// Disables xterm alternate-scroll mode (DECSET 1007), which otherwise
+/// translates mouse-wheel events into arrow-key presses in the alternate
+/// screen. At a scroll bound (e.g. wheel-up at the first line) those
+/// synthetic key presses cause visible flashing/tearing even though mantis's
+/// own scroll state is a no-op. Best-effort: write errors are ignored.
+pub(crate) fn disable_alternate_scroll() {
+    use std::io::Write;
+    let _ = write!(std::io::stdout(), "\x1b[?1007l");
+    let _ = std::io::stdout().flush();
+}
+
+/// Restores xterm alternate-scroll mode on teardown. Best-effort, symmetric
+/// with [`disable_alternate_scroll`].
+pub(crate) fn enable_alternate_scroll() {
+    use std::io::Write;
+    let _ = write!(std::io::stdout(), "\x1b[?1007h");
+    let _ = std::io::stdout().flush();
+}
+
 /// Restores the terminal to a normal state: pops keyboard enhancement flags
 /// (Unix only), disables raw mode, leaves the alternate screen, disables mouse
-/// capture, and shows the cursor. Best-effort and idempotent — each operation
-/// is silently ignored on error so this can be called from a panic hook or
-/// from regular teardown.
+/// capture, restores alternate-scroll mode, and shows the cursor. Best-effort
+/// and idempotent — each operation is silently ignored on error so this can be
+/// called from a panic hook or from regular teardown.
 #[cfg_attr(not(unix), allow(unused_imports))]
 pub(crate) fn restore_terminal() {
     use std::io;
@@ -558,6 +577,7 @@ pub(crate) fn restore_terminal() {
         DisableMouseCapture,
         Show
     );
+    enable_alternate_scroll();
 }
 
 #[cfg(test)]

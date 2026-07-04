@@ -90,6 +90,31 @@ fn scrolling_content_marks_session_dirty() {
 }
 
 #[test]
+fn scroll_up_at_content_top_is_noop() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.content_area = Rect {
+        x: 40,
+        y: 0,
+        width: 40,
+        height: 10,
+    };
+    assert_eq!(app.content_scroll, 0, "precondition: starts at top");
+    app.session_dirty = false;
+    app.handle_mouse(scroll_up_at(50, 5));
+    assert_eq!(
+        app.content_scroll, 0,
+        "wheel-up at the first line must stay at the top"
+    );
+    assert!(
+        !app.session_dirty,
+        "wheel-up at a bound must not mark the session dirty since scroll state did not change"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn scroll_outside_content_does_not_mark_dirty() {
     let root = temp_tree();
     let mut app = app_for(&root);
