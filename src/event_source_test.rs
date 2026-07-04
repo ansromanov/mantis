@@ -473,3 +473,100 @@ fn fill_with_empty_read_is_eof() {
     src.fill_with(&mut reader, 16).expect("fill must not error");
     assert!(src.buf.is_empty());
 }
+
+// ---------------------------------------------------------------------------
+// CSI ~ with modifier params (the key bug in #455)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn csi_tilde_ctrl_pageup() {
+    // ESC [ 5 ; 5 ~ → Ctrl+PageUp (modifier=5 = 4+1 = Ctrl)
+    let (ev, _) = parse_ok(b"\x1b[5;5~");
+    let k = key_event(&ev);
+    assert_eq!(k.code, KeyCode::PageUp);
+    assert!(k.modifiers.contains(KeyModifiers::CONTROL));
+    assert!(!k.modifiers.contains(KeyModifiers::SHIFT));
+}
+
+#[test]
+fn csi_tilde_shift_delete() {
+    // ESC [ 3 ; 2 ~ → Shift+Delete (modifier=2 = 1+1 = Shift)
+    let (ev, _) = parse_ok(b"\x1b[3;2~");
+    let k = key_event(&ev);
+    assert_eq!(k.code, KeyCode::Delete);
+    assert!(k.modifiers.contains(KeyModifiers::SHIFT));
+    assert!(!k.modifiers.contains(KeyModifiers::CONTROL));
+}
+
+#[test]
+fn csi_tilde_ctrl_pageup_release() {
+    // ESC [ 5 ; 5 : 3 ~ → Ctrl+PageUp with event type 3 (Release)
+    let (ev, _) = parse_ok(b"\x1b[5;5:3~");
+    let k = key_event(&ev);
+    assert_eq!(k.code, KeyCode::PageUp);
+    assert!(k.modifiers.contains(KeyModifiers::CONTROL));
+    assert_eq!(k.kind, KeyEventKind::Release);
+}
+
+#[test]
+fn csi_tilde_plain_still_works() {
+    // Plain PageUp without modifier must still decode correctly.
+    let (ev, _) = parse_ok(b"\x1b[5~");
+    let k = key_event(&ev);
+    assert_eq!(k.code, KeyCode::PageUp);
+    assert!(k.modifiers.is_empty());
+    assert_eq!(k.kind, KeyEventKind::Press);
+}
+
+// ---------------------------------------------------------------------------
+// SGR mouse with modifier bits (#455)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn sgr_ctrl_click_press() {
+    // cb=16 (0x10): bit 4 = Ctrl modifier.
+    // After masking out modifier bits, cb=0 → Left button.
+    let (ev, _) = parse_ok(&sgr_press(16, 5, 10));
+    let m = mouse_event(&ev);
+    assert_eq!(m.kind, MouseEventKind::Down(MouseButton::Left));
+    assert!(m.modifiers.contains(KeyModifiers::CONTROL));
+}
+
+#[test]
+fn sgr_shift_click_press() {
+    // cb=4 (0x04): bit 2 = Shift modifier. After masking, cb=0 → Left.
+    let (ev, _) = parse_ok(&sgr_press(4, 5, 10));
+    let m = mouse_event(&ev);
+    assert_eq!(m.kind, MouseEventKind::Down(MouseButton::Left));
+    assert!(m.modifiers.contains(KeyModifiers::SHIFT));
+}
+
+#[test]
+fn sgr_ctrl_shift_click_press() {
+    // cb=20 (0x14): bit 2 (Shift) + bit 4 (Ctrl). After masking, cb=0 → Left.
+    let (ev, _) = parse_ok(&sgr_press(20, 5, 10));
+    let m = mouse_event(&ev);
+    assert_eq!(m.kind, MouseEventKind::Down(MouseButton::Left));
+    assert!(m.modifiers.contains(KeyModifiers::SHIFT));
+    assert!(m.modifiers.contains(KeyModifiers::CONTROL));
+}
+
+#[test]
+fn sgr_modifiers_dont_affect_scroll() {
+    // cb=68 (0x44): scroll bit (0x40) + shift modifier bit (0x04).
+    // After masking out modifier, cb=64 → ScrollUp.
+    let (ev, _) = parse_ok(&sgr_press(68, 1, 1));
+    let m = mouse_event(&ev);
+    assert_eq!(m.kind, MouseEventKind::ScrollUp);
+    assert!(m.modifiers.contains(KeyModifiers::SHIFT));
+}
+
+#[test]
+fn sgr_modifiers_dont_affect_drag() {
+    // cb=36 (0x24): motion bit (0x20) + shift modifier bit (0x04).
+    // After masking out modifier bits, cb=32 → Drag(Left).
+    let (ev, _) = parse_ok(&sgr_press(36, 10, 5));
+    let m = mouse_event(&ev);
+    assert_eq!(m.kind, MouseEventKind::Drag(MouseButton::Left));
+    assert!(m.modifiers.contains(KeyModifiers::SHIFT));
+}
