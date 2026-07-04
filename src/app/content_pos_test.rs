@@ -254,6 +254,48 @@ fn has_text_cursor_false_for_plugin_content() {
     fs::remove_dir_all(&root).ok();
 }
 
+// -- set_active_line_from_physical tests --
+
+#[test]
+fn set_active_line_from_physical_is_identity_without_folds() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.virtual_file = None;
+    app.content = (0..20).map(|i| format!("line {i}")).collect();
+    app.session_dirty = false;
+    app.set_active_line_from_physical(7);
+    assert_eq!(app.active_line, 7);
+    assert!(app.session_dirty);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn set_active_line_from_physical_maps_through_fold_display_map() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.content = (0..20).map(|i| format!("line {i}")).collect();
+    // Display line 1 shows physical line 6 (physical lines 1..=5 are folded away).
+    app.fold_display_map = vec![0, 6, 7, 8, 9, 10];
+    app.set_active_line_from_physical(6);
+    assert_eq!(
+        app.active_line, 1,
+        "active_line must be the display index, not the physical index"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn set_active_line_from_physical_clamps_to_display_line_count() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.content = (0..20).map(|i| format!("line {i}")).collect();
+    app.fold_display_map = vec![0, 1, 2];
+    // Physical line 19 is past the end of the fold display map.
+    app.set_active_line_from_physical(19);
+    assert_eq!(app.active_line, app.display_line_count() - 1);
+    fs::remove_dir_all(&root).ok();
+}
+
 // -- scroll_line_into_view tests --
 
 #[test]

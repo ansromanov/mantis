@@ -462,6 +462,54 @@ fn click_past_blame_column_does_not_open_line_blame() {
 }
 
 #[test]
+fn mouse_content_click_moves_active_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.content_area = Rect {
+        x: 5,
+        y: 5,
+        width: 50,
+        height: 10,
+    };
+    app.content_scroll = 3;
+    app.active_line = 0;
+    // Click at row 5 + 4 -> content row 4 -> physical line = scroll(3) + 4 = 7
+    app.handle_mouse(left_down_at(6, 5 + 4));
+    assert_eq!(app.active_line, 7);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn mouse_content_click_moves_active_line_in_display_space_when_folded() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.content_area = Rect {
+        x: 5,
+        y: 5,
+        width: 50,
+        height: 10,
+    };
+    // Simulate a fold hiding physical lines 1..=5: display line 1 -> physical line 6.
+    app.fold_display_map = vec![0, 6, 7, 8, 9, 10];
+    app.content_scroll = 0;
+    app.active_line = 0;
+    app.session_dirty = false;
+    // Click at content row 1 -> display line 1 -> physical line 6 -> display line 1.
+    app.handle_mouse(left_down_at(6, 5 + 1));
+    assert_eq!(
+        app.active_line, 1,
+        "active_line must stay in display space, not the physical line index"
+    );
+    assert!(
+        app.session_dirty,
+        "moving the cursor via click must mark the session dirty, like keyboard navigation does"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn tree_click_with_no_filter_selects_node_directly() {
     let root = tree_with_dir();
     let mut app = app_for(&root);
