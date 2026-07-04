@@ -1,10 +1,4 @@
-use std::sync::Mutex;
-
 use super::*;
-
-/// Serialises all session tests so the shared `sessions.json` file is never
-/// written by two tests concurrently when `cargo test` runs in parallel.
-static SESSION_LOCK: Mutex<()> = Mutex::new(());
 
 /// A per-test environment: creates a unique root and state directory under the
 /// system temp directory, then points `MANTIS_STATE_DIR` at the isolated state dir
@@ -12,6 +6,7 @@ static SESSION_LOCK: Mutex<()> = Mutex::new(());
 /// Cleans up on drop.
 struct TestEnv {
     root: PathBuf,
+    state: PathBuf,
 }
 
 impl TestEnv {
@@ -20,9 +15,8 @@ impl TestEnv {
             std::env::temp_dir().join(format!("mantis_session_{name}_{}", std::process::id()));
         let state = root.join("state");
         fs::create_dir_all(&state).unwrap();
-        // Redirect session I/O away from the real state directory.
         std::env::set_var("MANTIS_STATE_DIR", &state);
-        TestEnv { root }
+        TestEnv { root, state }
     }
 }
 
@@ -35,7 +29,6 @@ impl Drop for TestEnv {
 
 #[test]
 fn round_trip_preserves_all_fields() {
-    let _lock = SESSION_LOCK.lock().unwrap();
     let env = TestEnv::new("round_trip");
     let sub = env.root.join("sub");
     fs::create_dir_all(&sub).unwrap();
@@ -55,7 +48,6 @@ fn round_trip_preserves_all_fields() {
 
 #[test]
 fn save_and_load_empty_state() {
-    let _lock = SESSION_LOCK.lock().unwrap();
     let env = TestEnv::new("empty");
     let state = SessionState::default();
     save(&env.root, &state);
@@ -66,15 +58,12 @@ fn save_and_load_empty_state() {
 
 #[test]
 fn load_returns_none_for_missing_key() {
-    let _lock = SESSION_LOCK.lock().unwrap();
     let env = TestEnv::new("missing");
-    // No save was called, so there's no entry for this root.
     assert!(load(&env.root).is_none());
 }
 
 #[test]
 fn stale_expanded_dirs_are_filtered() {
-    let _lock = SESSION_LOCK.lock().unwrap();
     let env = TestEnv::new("stale_expanded");
     let gone = env.root.join("gone");
 
@@ -90,7 +79,6 @@ fn stale_expanded_dirs_are_filtered() {
 
 #[test]
 fn stale_current_file_is_filtered() {
-    let _lock = SESSION_LOCK.lock().unwrap();
     let env = TestEnv::new("stale_file");
     let gone = env.root.join("gone.txt");
 
@@ -105,23 +93,43 @@ fn stale_current_file_is_filtered() {
 }
 
 #[test]
-fn corrupt_file_returns_none() {
-    let _lock = SESSION_LOCK.lock().unwrap();
-    let env = TestEnv::new("corrupt");
-    // Write garbage to the isolated sessions file (MANTIS_STATE_DIR set by TestEnv).
-    let mut p = state_dir().unwrap();
-    p.push(SESSION_FILE_NAME);
+fn corrupt_legacy_file_returns_none() {
+    let env = TestEnv::new("corrupt_legacy");
+    // Write garbage to the isolated sessions.json (legacy format path).
+    let legacy = env.state.join("sessions.json");
+    fs::write(&legacy, "not json at all").unwrap();
+
+    // load should return None because:
+    //   1. migrate_legacy tries to read sessions.json → parse fails → renames to .migrated
+    //   2. session_path(root) looks for sessions/<hash>.json → doesn't exist
+    assert!(load(&env.root).is_none());
+
+    // Should not crash on save either (save writes the per-root file)
+    save(&env.root, &SessionState::default());
+    // Now it should load
+    assert!(load(&env.root).is_some());
+}
+
+#[test]
+fn corrupt_per_root_file_returns_none() {
+    let env = TestEnv::new("corrupt_per_root");
+    // First save a valid state so the per-root file exists
+    save(&env.root, &SessionState::default());
+    assert!(load(&env.root).is_some());
+
+    // Now overwrite the per-root file with garbage
+    let p = session_path(&env.root).unwrap();
     fs::write(&p, "not json at all").unwrap();
 
     assert!(load(&env.root).is_none());
 
-    // Should not crash on save either
+    // Should not crash on save
     save(&env.root, &SessionState::default());
+    assert!(load(&env.root).is_some());
 }
 
 #[test]
 fn multiple_roots_are_independent() {
-    let _lock = SESSION_LOCK.lock().unwrap();
     let env = TestEnv::new("multi");
 
     let d1 = env.root.join("repo1");
@@ -146,7 +154,6 @@ fn multiple_roots_are_independent() {
 
 #[test]
 fn root_key_normalises_trailing_separator() {
-    let _lock = SESSION_LOCK.lock().unwrap();
     let env = TestEnv::new("trail");
 
     let state = SessionState {
@@ -159,4 +166,96 @@ fn root_key_normalises_trailing_separator() {
     let with_slash: PathBuf = format!("{}/", env.root.display()).into();
     let loaded = load(&with_slash);
     assert_eq!(loaded.unwrap().content_scroll, 7);
+}
+
+#[test]
+fn concurrent_saves_dont_clobber() {
+    let env = TestEnv::new("concurrent");
+
+    let d1 = env.root.join("project_a");
+    let d2 = env.root.join("project_b");
+    fs::create_dir_all(&d1).unwrap();
+    fs::create_dir_all(&d2).unwrap();
+
+    let s1 = SessionState {
+        content_scroll: 42,
+        active_line: 7,
+        ..SessionState::default()
+    };
+    let s2 = SessionState {
+        content_scroll: 99,
+        active_line: 3,
+        ..SessionState::default()
+    };
+
+    // Simulate two concurrent saves: each writes only its own per-root file,
+    // so there is no read-modify-write race on a shared file.
+    save(&d1, &s1);
+    save(&d2, &s2);
+
+    assert_eq!(load(&d1).unwrap().content_scroll, 42);
+    assert_eq!(load(&d2).unwrap().content_scroll, 99);
+}
+
+#[test]
+fn legacy_migration_preserves_all_roots() {
+    let env = TestEnv::new("legacy_migrate");
+
+    let d1 = env.root.join("alpha");
+    let d2 = env.root.join("beta");
+    fs::create_dir_all(&d1).unwrap();
+    fs::create_dir_all(&d2).unwrap();
+
+    // Manually write a sessions.json in the old format (version + HashMap)
+    let key1 = d1.to_string_lossy();
+    let key2 = d2.to_string_lossy();
+    let old_json = format!(
+        r#"{{"version":1,"sessions":{{"{}":{{"expanded":[],"current_file":null,"content_scroll":5,"active_line":1}},"{}":{{"expanded":[],"current_file":null,"content_scroll":10,"active_line":2}}}}}}"#,
+        key1, key2
+    );
+    let legacy = env.state.join("sessions.json");
+    fs::write(&legacy, &old_json).unwrap();
+
+    // load triggers migrate_legacy, which should migrate both roots
+    let loaded1 = load(&d1).unwrap();
+    assert_eq!(loaded1.content_scroll, 5);
+    assert_eq!(loaded1.active_line, 1);
+
+    let loaded2 = load(&d2).unwrap();
+    assert_eq!(loaded2.content_scroll, 10);
+    assert_eq!(loaded2.active_line, 2);
+
+    // Legacy file should have been renamed
+    assert!(!legacy.exists());
+    assert!(legacy.with_extension("json.migrated").exists());
+}
+
+#[test]
+fn save_load_round_trip_uses_per_root_file() {
+    let env = TestEnv::new("per_root_path");
+
+    let state = SessionState {
+        expanded: vec![],
+        current_file: None,
+        content_scroll: 3,
+        active_line: 0,
+    };
+    save(&env.root, &state);
+
+    // The per-root file must exist under sessions/<hash>.json
+    let p = session_path(&env.root).unwrap();
+    assert!(p.exists(), "per-root session file must exist");
+
+    // The legacy sessions.json must NOT exist (it's migrated or not created)
+    let legacy = env.state.join("sessions.json");
+    assert!(!legacy.exists(), "legacy sessions.json must not be written");
+
+    // The sessions directory must contain exactly one file
+    let sessions_dir = env.state.join("sessions");
+    assert!(sessions_dir.is_dir());
+    let entries: Vec<_> = fs::read_dir(&sessions_dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .collect();
+    assert_eq!(entries.len(), 1, "only one per-root file expected");
 }
