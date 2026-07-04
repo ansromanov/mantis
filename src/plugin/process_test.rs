@@ -296,9 +296,12 @@ fn spawn_strips_ansi_escapes_from_last_stderr_line() {
     // Emits a stderr line containing a CSI escape sequence (clear screen) and
     // a stray carriage return, mimicking a malicious or buggy plugin trying
     // to smuggle terminal control sequences into the diagnostics UI.
+    // `\033` (octal) is the POSIX-portable escape for ESC; `\x1b` (hex) is a
+    // bash extension that dash's `printf` builtin (Ubuntu's `/bin/sh`) does
+    // not support and would print literally.
     write!(
         f,
-        "#!/bin/sh\nprintf 'boom\\x1b[2Jtail\\r\\n' >&2\nexit 1\n"
+        "#!/bin/sh\nprintf 'boom\\033[2Jtail\\r\\n' >&2\nexit 1\n"
     )
     .unwrap();
     drop(f);
