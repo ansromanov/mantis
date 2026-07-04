@@ -535,22 +535,24 @@ impl App {
     }
 }
 
-/// Disables xterm alternate-scroll mode (DECSET 1007), which otherwise
+/// Toggles xterm alternate-scroll mode (DECSET 1007), which otherwise
 /// translates mouse-wheel events into arrow-key presses in the alternate
 /// screen. At a scroll bound (e.g. wheel-up at the first line) those
 /// synthetic key presses cause visible flashing/tearing even though mantis's
 /// own scroll state is a no-op. Best-effort: write errors are ignored.
-pub(crate) fn disable_alternate_scroll() {
+///
+/// mantis always restores this to *enabled* on exit rather than probing and
+/// restoring whatever the terminal's mode was before mantis started (that
+/// requires a synchronous DECRQM query/response round-trip). If the ambient
+/// terminal had it disabled, exiting mantis will leave it enabled.
+pub(crate) fn set_alternate_scroll(enabled: bool) {
     use std::io::Write;
-    let _ = write!(std::io::stdout(), "\x1b[?1007l");
-    let _ = std::io::stdout().flush();
-}
-
-/// Restores xterm alternate-scroll mode on teardown. Best-effort, symmetric
-/// with [`disable_alternate_scroll`].
-pub(crate) fn enable_alternate_scroll() {
-    use std::io::Write;
-    let _ = write!(std::io::stdout(), "\x1b[?1007h");
+    let sequence = if enabled {
+        "\x1b[?1007h"
+    } else {
+        "\x1b[?1007l"
+    };
+    let _ = write!(std::io::stdout(), "{sequence}");
     let _ = std::io::stdout().flush();
 }
 
@@ -577,7 +579,7 @@ pub(crate) fn restore_terminal() {
         DisableMouseCapture,
         Show
     );
-    enable_alternate_scroll();
+    set_alternate_scroll(true);
 }
 
 #[cfg(test)]

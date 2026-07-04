@@ -210,7 +210,7 @@ fn launch_tui(root: PathBuf, file: Option<PathBuf>) -> anyhow::Result<()> {
     let _guard = TerminalGuard;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    crate::app::disable_alternate_scroll();
+    crate::app::set_alternate_scroll(false);
 
     // Enable kitty keyboard protocol on terminals that support it.
     #[cfg(unix)]

@@ -180,7 +180,7 @@ impl App {
         };
 
         let _ = execute!(std::io::stdout(), EnterAlternateScreen, EnableMouseCapture);
-        crate::app::disable_alternate_scroll();
+        crate::app::set_alternate_scroll(false);
         if let Err(e) = enable_raw_mode() {
             eprintln!("mantis: failed to restore raw mode after editor: {e}");
         }
