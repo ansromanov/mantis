@@ -43,7 +43,7 @@ fn main() {
         let event = msg["event"].as_str().unwrap_or("");
         match event {
             "init" => {
-                state.handle_theme_change(msg.get("colors"));
+                state.handle_theme_change(msg.get("colors"), &mut stdout.lock());
             }
             "on_file_open" => {
                 if let Some(path) = msg["path"].as_str() {
@@ -51,14 +51,14 @@ fn main() {
                 }
             }
             "on_theme_change" => {
-                state.handle_theme_change(msg.get("colors"));
+                state.handle_theme_change(msg.get("colors"), &mut stdout.lock());
             }
             "on_keypress" => {
                 if let Some(key) = msg["key"].as_str() {
                     if key == "M" {
                         state.toggle_raw = !state.toggle_raw;
-                        if let Some(ref path) = state.current_file {
-                            state.handle_open(path, &mut stdout.lock());
+                        if let Some(path) = state.current_file.clone() {
+                            state.handle_open(&path, &mut stdout.lock());
                         }
                     }
                 }
@@ -139,23 +139,24 @@ impl PluginState {
         }
     }
 
-    fn handle_theme_change(&mut self, colors: Option<&serde_json::Value>) {
+    fn handle_theme_change(&mut self, colors: Option<&serde_json::Value>, out: &mut impl Write) {
         self.theme = colors
             .and_then(ThemeColors::from_json)
             .unwrap_or_else(ThemeColors::default_theme);
         // Re-render the current file if one is open.
-        if let Some(ref path) = self.current_file.clone() {
-            self.handle_open(path, &mut io::stdout().lock());
+        if let Some(path) = self.current_file.clone() {
+            self.handle_open(&path, out);
         }
     }
 
-    fn handle_open(&self, path_str: &str, out: &mut impl Write) {
+    fn handle_open(&mut self, path_str: &str, out: &mut impl Write) {
         let path = Path::new(path_str);
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
         let is_md = matches!(ext, "md" | "markdown");
         if !is_md {
             return;
         }
+        self.current_file = Some(path_str.to_string());
         let src = match std::fs::read_to_string(path) {
             Ok(s) => s,
             Err(_) => return,
