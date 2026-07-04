@@ -191,7 +191,7 @@ impl Keymap {
     }
 
     /// Returns a display label for the first binding mapped to `action_id`,
-    /// e.g. `"Ctrl+G"` for `toggle_git_mode`.
+    /// e.g. `"Ctrl+G"` for `git_mode_toggle`.
     pub fn label_for_action(&self, action_id: &str) -> String {
         self.bindings_for_action(action_id)
             .first()
