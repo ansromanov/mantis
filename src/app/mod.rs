@@ -195,6 +195,9 @@ pub struct App {
     /// mouse handlers can map screen rows back to global indices.
     /// `None` means identity mapping (no filter active), avoiding allocations.
     pub tree_visible_indices: Option<Vec<usize>>,
+    /// Per-node indent-guide masks, keyed by `tree_revision` so they're
+    /// recomputed only when the tree is rebuilt rather than on every render.
+    pub(crate) tree_guide_cache: Option<(u64, Vec<Vec<bool>>)>,
     pub content_area: Rect,
     pub search_area: Rect,
     pub search_offset: usize,

@@ -9,10 +9,10 @@
 //! every file for the search index. The walk also reports an error count so the
 //! UI can surface unreadable directories without aborting the build.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
-use ignore::WalkBuilder;
+use ignore::{DirEntry, WalkBuilder};
 
 /// A single entry in the flat file tree. `depth` controls indentation;
 /// `deleted` marks a file that no longer exists on disk but is tracked by git.
@@ -37,37 +37,12 @@ pub fn build_visible(
     ignore_gitignore: bool,
     deleted_files: &HashSet<PathBuf>,
 ) -> (Vec<TreeNode>, usize) {
-    let mut nodes = Vec::new();
+    let mut children: HashMap<PathBuf, Vec<DirEntry>> = HashMap::new();
     let mut error_count = 0usize;
-    collect(
-        root,
-        0,
-        expanded,
-        show_hidden,
-        ignore_gitignore,
-        deleted_files,
-        &mut nodes,
-        &mut error_count,
-    );
-    (nodes, error_count)
-}
 
-/// Recursive helper for `build_visible`. Lists a single directory's entries
-/// (depth 1 via `WalkBuilder`), sorts dirs before then files by extension
-/// then name, and recurses into expanded directories.
-#[allow(clippy::too_many_arguments)]
-fn collect(
-    dir: &Path,
-    depth: usize,
-    expanded: &HashSet<PathBuf>,
-    show_hidden: bool,
-    ignore_gitignore: bool,
-    deleted_files: &HashSet<PathBuf>,
-    out: &mut Vec<TreeNode>,
-    error_count: &mut usize,
-) {
-    let mut entries = Vec::new();
-    for result in WalkBuilder::new(dir)
+    // Root's own children are always visible regardless of expansion, so
+    // list them with a cheap one-level walk instead of gating on `expanded`.
+    for result in WalkBuilder::new(root)
         .max_depth(Some(1))
         .hidden(!show_hidden)
         .git_ignore(!ignore_gitignore)
@@ -76,11 +51,71 @@ fn collect(
         .build()
     {
         match result {
-            Ok(e) if e.depth() == 1 => entries.push(e),
+            Ok(e) if e.depth() == 1 => {
+                children.entry(root.to_path_buf()).or_default().push(e);
+            }
             Ok(_) => {}
-            Err(_) => *error_count += 1,
+            Err(_) => error_count += 1,
         }
     }
+
+    // A single deep walk over the rest of the tree, gated by `filter_entry`
+    // to only descend into expanded directories. This builds the gitignore
+    // chain once instead of re-discovering every ancestor's gitignore per
+    // directory (which made the old per-directory-WalkBuilder approach
+    // quadratic in tree depth). Depth-1 recursion is gated on the directory's
+    // own path in `expanded` (not its parent, root, which isn't necessarily
+    // in `expanded` even though root's children are always shown) so a
+    // collapsed top-level directory's contents are never read.
+    let expanded_for_filter = expanded.clone();
+    for result in WalkBuilder::new(root)
+        .hidden(!show_hidden)
+        .git_ignore(!ignore_gitignore)
+        .git_global(!ignore_gitignore)
+        .git_exclude(!ignore_gitignore)
+        .filter_entry(move |entry| match entry.depth() {
+            0 => true,
+            1 => expanded_for_filter.contains(entry.path()),
+            _ => entry
+                .path()
+                .parent()
+                .is_some_and(|p| expanded_for_filter.contains(p)),
+        })
+        .build()
+    {
+        match result {
+            // Depth-1 entries were already collected by the shallow walk
+            // above; only capture depth >= 2 here to avoid duplicates.
+            Ok(e) if e.depth() >= 2 => {
+                if let Some(parent) = e.path().parent() {
+                    children.entry(parent.to_path_buf()).or_default().push(e);
+                }
+            }
+            Ok(_) => {}
+            Err(_) => error_count += 1,
+        }
+    }
+
+    let mut nodes = Vec::new();
+    append_dir(root, 0, &children, expanded, deleted_files, &mut nodes);
+    (nodes, error_count)
+}
+
+/// Recursive helper for `build_visible`. Sorts one directory's entries
+/// (dirs before files, then by extension then name) from the pre-collected
+/// `children` map, and recurses into expanded directories.
+fn append_dir(
+    dir: &Path,
+    depth: usize,
+    children: &HashMap<PathBuf, Vec<DirEntry>>,
+    expanded: &HashSet<PathBuf>,
+    deleted_files: &HashSet<PathBuf>,
+    out: &mut Vec<TreeNode>,
+) {
+    let mut entries: Vec<&DirEntry> = match children.get(dir) {
+        Some(entries) => entries.iter().collect(),
+        None => Vec::new(),
+    };
 
     entries.sort_by(|a, b| {
         let ad = a.file_type().map(|t| t.is_dir()).unwrap_or(false);
@@ -117,16 +152,7 @@ fn collect(
         });
 
         if is_dir && expanded.contains(&path) {
-            collect(
-                &path,
-                depth + 1,
-                expanded,
-                show_hidden,
-                ignore_gitignore,
-                deleted_files,
-                out,
-                error_count,
-            );
+            append_dir(&path, depth + 1, children, expanded, deleted_files, out);
         }
     }
 

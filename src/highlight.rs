@@ -82,7 +82,7 @@ impl Highlighter {
     /// Returns the detected syntax name for the given file path, or `None` if
     /// only plain text was matched. Used by `compute_file_load` to populate
     /// `FileLoad::syntax_name` on the worker thread.
-    pub(crate) fn syntax_name(&self, path: &Path) -> Option<String> {
+    pub fn syntax_name(&self, path: &Path) -> Option<String> {
         self.ss
             .find_syntax_for_file(path)
             .ok()
@@ -93,29 +93,40 @@ impl Highlighter {
     /// Syntax-highlights the given lines by detecting the file type from
     /// `path` and applying the configured syntect theme. Returns one Vec of
     /// styled spans per line. Unrecognized files get plain-text style.
+    ///
+    /// This opens `path` to sniff the first line when the extension alone
+    /// doesn't resolve a syntax, so it's meant for a one-off full-file
+    /// highlight, not a per-redraw call — see `highlight_range` for that.
     pub fn highlight(&self, path: &Path, lines: &[String]) -> Vec<Vec<(Style, String)>> {
-        self.highlight_impl(path, lines.iter().map(|s| s.as_str()))
-    }
-
-    /// Syntax-highlights a range of lines (as `&str` slices) for virtualization.
-    /// Same as `highlight` but accepts a slice of borrowed strings to avoid
-    /// allocating a `Vec<String>` for the visible window.
-    pub fn highlight_range(&self, path: &Path, lines: &[&str]) -> Vec<Vec<(Style, String)>> {
-        self.highlight_impl(path, lines.iter().copied())
-    }
-
-    fn highlight_impl<'a>(
-        &self,
-        path: &Path,
-        lines: impl Iterator<Item = &'a str>,
-    ) -> Vec<Vec<(Style, String)>> {
         let syntax = self
             .ss
             .find_syntax_for_file(path)
             .ok()
             .flatten()
             .unwrap_or_else(|| self.ss.find_syntax_plain_text());
+        self.highlight_impl(syntax, lines.iter().map(|s| s.as_str()))
+    }
 
+    /// Syntax-highlights a range of lines (as `&str` slices) for virtualization.
+    /// Takes the syntax name already resolved at file-open time (see
+    /// `syntax_name`) instead of a path, so repeated calls while scrolling
+    /// don't re-open the file to sniff its first line.
+    pub fn highlight_range(
+        &self,
+        syntax_name: Option<&str>,
+        lines: &[&str],
+    ) -> Vec<Vec<(Style, String)>> {
+        let syntax = syntax_name
+            .and_then(|name| self.ss.find_syntax_by_name(name))
+            .unwrap_or_else(|| self.ss.find_syntax_plain_text());
+        self.highlight_impl(syntax, lines.iter().copied())
+    }
+
+    fn highlight_impl<'a>(
+        &self,
+        syntax: &syntect::parsing::SyntaxReference,
+        lines: impl Iterator<Item = &'a str>,
+    ) -> Vec<Vec<(Style, String)>> {
         let theme = &self.ts.themes[&self.theme];
         let mut h = HighlightLines::new(syntax, theme);
 

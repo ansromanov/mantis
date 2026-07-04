@@ -89,3 +89,34 @@ fn line_count_md_file_uses_virtual_file_not_builtin_markdown() {
     assert_eq!(app.line_count(), 3);
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn highlight_lines_uses_current_syntax_not_a_path_arg() {
+    // highlight_lines was changed to route through `self.current_syntax`
+    // (resolved once at file-open time) instead of taking a path, so
+    // repeated scroll redraws don't re-open the file to sniff its syntax.
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.current_syntax = Some("Rust".to_string());
+    let result = app.highlight_lines(&["fn main() {"]);
+    assert!(
+        result[0].len() > 1,
+        "Rust syntax should produce multiple styled spans, got {}",
+        result[0].len()
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn highlight_lines_none_current_syntax_is_plain_text() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.current_syntax = None;
+    let result = app.highlight_lines(&["fn main() {"]);
+    assert_eq!(
+        result[0].len(),
+        1,
+        "no current_syntax should fall back to a single plain-text span"
+    );
+    fs::remove_dir_all(&root).ok();
+}

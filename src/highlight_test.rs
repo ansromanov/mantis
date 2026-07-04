@@ -116,3 +116,38 @@ fn syntax_name_returns_none_for_unknown_extension() {
     let name = h.syntax_name(f.path());
     assert_eq!(name, None);
 }
+
+#[test]
+fn highlight_range_uses_resolved_syntax_name_not_a_path() {
+    // highlight_range takes the syntax name resolved once at file-open time
+    // (see `syntax_name`) instead of re-detecting it from a path on every call.
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[]);
+    let result = h.highlight_range(Some("Rust"), &["fn main() {"]);
+    assert!(
+        result[0].len() > 1,
+        "expected multiple spans for Rust code, got {}",
+        result[0].len()
+    );
+}
+
+#[test]
+fn highlight_range_none_syntax_name_falls_back_to_plain_text() {
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[]);
+    let result = h.highlight_range(None, &["fn main() {"]);
+    assert_eq!(
+        result[0].len(),
+        1,
+        "no syntax name should produce one plain-text span"
+    );
+}
+
+#[test]
+fn highlight_range_unknown_syntax_name_falls_back_to_plain_text() {
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[]);
+    let result = h.highlight_range(Some("NotARealSyntax"), &["fn main() {"]);
+    assert_eq!(
+        result[0].len(),
+        1,
+        "unresolvable syntax name should produce one plain-text span"
+    );
+}

@@ -267,6 +267,7 @@ fn bench_highlight(c: &mut Criterion) {
         // Simulate a scrolling window of 50 lines
         let window = 50usize;
         if all_lines.len() > window {
+            let syntax_name = hl.syntax_name(&path);
             let mid = all_lines.len() / 2;
             let window_slice: Vec<&str> = all_lines[mid..mid + window]
                 .iter()
@@ -275,8 +276,8 @@ fn bench_highlight(c: &mut Criterion) {
 
             group.bench_with_input(
                 BenchmarkId::new("highlight_range/50_window", lines),
-                &(&path, &window_slice),
-                |b, (path, slice)| b.iter(|| black_box(hl.highlight_range(path, slice))),
+                &window_slice,
+                |b, slice| b.iter(|| black_box(hl.highlight_range(syntax_name.as_deref(), slice))),
             );
         }
 
@@ -305,32 +306,29 @@ fn bench_scroll_redraw(c: &mut Criterion) {
         .filter_map(|i| vf.line_text(i).map(String::from))
         .collect();
     let refs: Vec<&str> = all_lines.iter().map(String::as_str).collect();
+    let syntax_name = hl.syntax_name(&path);
 
     for &ws in &[25usize, 50] {
         // Top of file
         let top: Vec<&str> = refs[..ws].to_vec();
-        group.bench_with_input(
-            BenchmarkId::new("highlight_range/top", ws),
-            &(&path, &top),
-            |b, (path, w)| b.iter(|| black_box(hl.highlight_range(path, w))),
-        );
+        group.bench_with_input(BenchmarkId::new("highlight_range/top", ws), &top, |b, w| {
+            b.iter(|| black_box(hl.highlight_range(syntax_name.as_deref(), w)))
+        });
 
         // Middle
         let mid = refs.len() / 2;
         let middle: Vec<&str> = refs[mid..mid + ws].to_vec();
         group.bench_with_input(
             BenchmarkId::new("highlight_range/mid", ws),
-            &(&path, &middle),
-            |b, (path, w)| b.iter(|| black_box(hl.highlight_range(path, w))),
+            &middle,
+            |b, w| b.iter(|| black_box(hl.highlight_range(syntax_name.as_deref(), w))),
         );
 
         // End
-        let end: Vec<&str> = refs[file_lines - ws..].to_vec();
-        group.bench_with_input(
-            BenchmarkId::new("highlight_range/end", ws),
-            &(&path, &end),
-            |b, (path, w)| b.iter(|| black_box(hl.highlight_range(path, w))),
-        );
+        let end: Vec<&str> = refs[refs.len() - ws..].to_vec();
+        group.bench_with_input(BenchmarkId::new("highlight_range/end", ws), &end, |b, w| {
+            b.iter(|| black_box(hl.highlight_range(syntax_name.as_deref(), w)))
+        });
     }
 
     fs::remove_dir_all(&dir).ok();

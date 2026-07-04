@@ -81,6 +81,85 @@ fn expanded_dir_shows_children_at_depth_1() {
 }
 
 #[test]
+fn three_level_nesting_expands_correctly() {
+    // Regression test for the single-walk rewrite of `build_visible`: entries
+    // must only appear when every ancestor directory up to root is expanded,
+    // and depth tracks the pre-collected `children` map correctly at 3+ levels.
+    let root = temp_dir("deep");
+    let a = root.join("a");
+    let b = a.join("b");
+    fs::create_dir_all(&b).unwrap();
+    fs::write(b.join("deep.txt"), "").unwrap();
+
+    // Neither "a" nor "a/b" expanded: only "a" itself is visible.
+    let expanded = HashSet::from([root.clone()]);
+    let (nodes, _) = build_visible(&root, &expanded, false, true, &HashSet::new());
+    assert_eq!(nodes.len(), 1);
+    assert_eq!(nodes[0].name, "a");
+
+    // "a" expanded but not "a/b": "b" is visible, "deep.txt" is not.
+    let expanded = HashSet::from([root.clone(), a.clone()]);
+    let (nodes, _) = build_visible(&root, &expanded, false, true, &HashSet::new());
+    let names: Vec<&str> = nodes.iter().map(|n| n.name.as_str()).collect();
+    assert_eq!(names, vec!["a", "b"]);
+
+    // Both "a" and "a/b" expanded: "deep.txt" appears at depth 2.
+    let expanded = HashSet::from([root.clone(), a.clone(), b.clone()]);
+    let (nodes, _) = build_visible(&root, &expanded, false, true, &HashSet::new());
+    let deep = nodes.iter().find(|n| n.name == "deep.txt").unwrap();
+    assert_eq!(deep.depth, 2);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn collapsed_sibling_dir_children_are_not_walked_deeper_than_one_level() {
+    // A collapsed top-level directory must not have anything beneath its
+    // first level leak into the output.
+    let root = temp_dir("collapsed_sibling");
+    let collapsed = root.join("collapsed");
+    fs::create_dir_all(collapsed.join("nested")).unwrap();
+    fs::write(collapsed.join("nested").join("f.txt"), "").unwrap();
+    fs::write(root.join("visible.txt"), "").unwrap();
+
+    let expanded = HashSet::from([root.clone()]);
+    let (nodes, _) = build_visible(&root, &expanded, false, true, &HashSet::new());
+    let names: Vec<&str> = nodes.iter().map(|n| n.name.as_str()).collect();
+    assert_eq!(names, vec!["collapsed", "visible.txt"]);
+    assert!(!names.contains(&"nested"));
+    assert!(!names.contains(&"f.txt"));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[cfg(unix)]
+#[test]
+fn collapsed_top_level_dir_contents_are_never_read() {
+    // Regression test: the walker must not descend into a collapsed
+    // top-level directory at all, not even one level, to build the tree. A
+    // permission-denied grandchild inside a collapsed dir must therefore
+    // never surface as a walk error, since the walker never opens it.
+    use std::os::unix::fs::PermissionsExt;
+
+    let root = temp_dir("collapsed_perm");
+    let collapsed = root.join("collapsed");
+    let locked = collapsed.join("locked");
+    fs::create_dir_all(&locked).unwrap();
+    fs::write(root.join("visible.txt"), "").unwrap();
+    fs::set_permissions(&locked, fs::Permissions::from_mode(0o000)).unwrap();
+
+    let expanded = HashSet::from([root.clone()]);
+    let (nodes, errors) = build_visible(&root, &expanded, false, true, &HashSet::new());
+    let names: Vec<&str> = nodes.iter().map(|n| n.name.as_str()).collect();
+    assert_eq!(names, vec!["collapsed", "visible.txt"]);
+    assert_eq!(
+        errors, 0,
+        "a collapsed directory's unreadable children must not surface as walk errors"
+    );
+
+    fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).unwrap();
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn show_hidden_reveals_dotfiles() {
     let root = dir_tree();
     let expanded = HashSet::from([root.clone()]);

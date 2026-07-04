@@ -331,6 +331,7 @@ fn create_base_app() -> App {
         tree_area: ratatui::layout::Rect::default(),
         tree_offset: 0,
         tree_visible_indices: None,
+        tree_guide_cache: None,
         content_area: ratatui::layout::Rect::default(),
         search_area: ratatui::layout::Rect::default(),
         search_offset: 0,

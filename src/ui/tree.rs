@@ -199,31 +199,30 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
     app.tree_scroll = app.tree_scroll.min(max_scroll);
     let offset = app.tree_scroll;
 
-    // Precompute indent guide masks only when guides are enabled, and only
-    // for nodes in the visible window. The right-to-left pending pass still
-    // visits all nodes (a row's guide depends on deeper siblings appearing
-    // later), but we only materialize a Vec<bool> for visible rows.
+    // Indent guide masks depend only on node depths, not on scroll position or
+    // filtering, so they're computed once per tree rebuild and cached on
+    // `tree_revision` rather than redone on every render.
     let guide_style = Style::default().fg(theme.dim).add_modifier(Modifier::DIM);
     let end = (offset + view_height).min(n);
-    let guide_masks: std::collections::HashMap<usize, Vec<bool>> = if app.indent_guides
-        && !visible_indices.is_empty()
-    {
-        let visible_set: HashSet<usize> = visible_indices[offset..end].iter().copied().collect();
-        let max_depth = app.nodes.iter().map(|nd| nd.depth).max().unwrap_or(0);
-        let mut masks = std::collections::HashMap::new();
-        let mut pending = vec![false; max_depth + 1];
-        for i in (0..total_nodes).rev() {
-            let d = app.nodes[i].depth; // index i is loop-bounded by 0..total_nodes
-            if visible_set.contains(&i) {
-                masks.insert(i, (0..d).map(|lvl| pending[lvl]).collect());
+    if app.indent_guides && total_nodes > 0 {
+        let stale = app
+            .tree_guide_cache
+            .as_ref()
+            .map(|(rev, _)| *rev != app.tree_revision)
+            .unwrap_or(true);
+        if stale {
+            let max_depth = app.nodes.iter().map(|nd| nd.depth).max().unwrap_or(0);
+            let mut pending = vec![false; max_depth + 1];
+            let mut masks: Vec<Vec<bool>> = vec![Vec::new(); total_nodes];
+            for i in (0..total_nodes).rev() {
+                let d = app.nodes[i].depth; // index i is loop-bounded by 0..total_nodes
+                masks[i] = (0..d).map(|lvl| pending[lvl]).collect();
+                pending[d] = true;
+                pending[(d + 1)..=max_depth].fill(false);
             }
-            pending[d] = true;
-            pending[(d + 1)..=max_depth].fill(false);
+            app.tree_guide_cache = Some((app.tree_revision, masks));
         }
-        masks
-    } else {
-        std::collections::HashMap::new()
-    };
+    }
 
     let items: Vec<ListItem> = visible_indices[offset..end]
         .iter()
@@ -235,7 +234,10 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
 
             let mut spans: Vec<Span> = Vec::new();
             if app.indent_guides {
-                let mask = guide_masks.get(&global_i);
+                let mask = app
+                    .tree_guide_cache
+                    .as_ref()
+                    .and_then(|(_, masks)| masks.get(global_i));
                 for lvl in 0..node.depth {
                     if mask.is_some_and(|m| m.get(lvl).copied().unwrap_or(false)) {
                         spans.push(Span::styled("│  ", guide_style));
