@@ -31,7 +31,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          for attempt in 1 2; do
+          bump() {
             current=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
             major=$(echo "$current" | cut -d. -f1)
             minor=$(echo "$current" | cut -d. -f2)
@@ -44,17 +44,13 @@ jobs:
 
             git add Cargo.toml Cargo.lock release-info.toml
             git commit -m "chore: bump version to v${new_version} [skip ci]"
+          }
 
-            if git push origin HEAD:main; then
-              echo "version=${new_version}" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-
-            if [ "$attempt" -eq 2 ]; then
-              echo "Push failed after retry" >&2
-              exit 1
-            fi
-
+          bump
+          if ! git push origin HEAD:main; then
             git reset --hard HEAD~1
             git pull --rebase origin main
-          done
+            bump
+            git push origin HEAD:main
+          fi
+          echo "version=${new_version}" >> "$GITHUB_OUTPUT"
