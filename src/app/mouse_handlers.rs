@@ -204,7 +204,7 @@ impl App {
                     let rel_col = (ev.column.saturating_sub(self.content_area.x)) as usize;
                     if self.blame_col_width > 0 && rel_col < self.blame_col_width {
                         let pos = self.content_pos(ev.column, ev.row);
-                        self.active_line = pos.0;
+                        self.set_active_line_from_physical(pos.0);
                         self.show_line_blame = true;
                         return;
                     }
@@ -236,7 +236,7 @@ impl App {
                         let can_select = self.has_text_cursor();
                         if can_select {
                             let pos = self.content_pos(ev.column, ev.row);
-                            self.active_line = pos.0;
+                            self.set_active_line_from_physical(pos.0);
                             self.drag_start = Some(pos);
                             self.selection = None;
                         }

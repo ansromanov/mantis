@@ -131,6 +131,16 @@ impl App {
         (buf_line, buf_col)
     }
 
+    /// Moves the text cursor to the display line containing `physical`
+    /// (the physical line index returned by `content_pos`), clamping to
+    /// `display_line_count()` and marking the session dirty like keyboard
+    /// navigation does, so the new cursor position persists.
+    pub(super) fn set_active_line_from_physical(&mut self, physical: usize) {
+        let max = self.display_line_count().saturating_sub(1);
+        self.active_line = self.physical_to_display(physical).min(max);
+        self.mark_session_dirty();
+    }
+
     /// Extract the currently selected text from the content source.
     pub fn selection_text(&self) -> String {
         let Some(sel) = &self.selection else {
