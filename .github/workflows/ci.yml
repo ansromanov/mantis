@@ -55,7 +55,7 @@ jobs:
         run: |
           changed=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files \
             --paginate --jq '.[].filename')
-          if echo "$changed" | grep -qE '^(src/|tests/|benches/|Cargo\.(toml|lock)|tv\.toml)'; then
+          if echo "$changed" | grep -qE '^(src/|tests/|benches/|Cargo\.(toml|lock)|mantis\.toml|themes/)'; then
             echo "code=true" >> "$GITHUB_OUTPUT"
             echo "Code changes detected — pr job will run."
           else

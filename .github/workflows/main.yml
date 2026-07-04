@@ -27,7 +27,7 @@ jobs:
         id: changes
         run: |
           changed=$(git diff --name-only HEAD~1 HEAD)
-          if echo "$changed" | grep -qE '^(src/|tests/|benches/|Cargo\.(toml|lock)|tv\.toml)'; then
+          if echo "$changed" | grep -qE '^(src/|tests/|benches/|Cargo\.(toml|lock)|mantis\.toml|themes/)'; then
             echo "code=true" >> "$GITHUB_OUTPUT"
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
@@ -89,7 +89,7 @@ jobs:
         shell: bash
         run: |
           changed=$(git diff --name-only HEAD~1 HEAD)
-          if echo "$changed" | grep -qE '^(src/|tests/|benches/|Cargo\.(toml|lock)|tv\.toml|install\.ps1)'; then
+          if echo "$changed" | grep -qE '^(src/|tests/|benches/|Cargo\.(toml|lock)|mantis\.toml|themes/|install\.ps1)'; then
             echo "code=true" >> "$GITHUB_OUTPUT"
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
