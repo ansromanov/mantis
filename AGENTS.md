@@ -156,7 +156,7 @@ Quick lookup: type/function → file. Use this before grepping.
 | `App::diff_next_hunk` / `App::diff_prev_hunk` | `src/app/diff_nav.rs` | Hunk navigation |
 | `Loader` / `LoadRequest` / `LoadResponse` | `src/app/loader.rs` | Background file I/O thread |
 | `TreeNode` / `build_visible` | `src/tree.rs` | Flat tree vector |
-| `VirtualFile` | `src/virtual_file.rs` | Mmap'd lazily-indexed file |
+| `VirtualFile` | `src/virtual_file.rs` | Lazily-indexed file (owned ≤16MB, mmap above) |
 | `SearchState` | `src/search/mod.rs` | Fuzzy file+content search |
 | `HistoryState` | `src/search/history.rs` | Git file-log picker |
 | `InFileSearch` | `src/search/pickers.rs` | Within-file incremental search |
