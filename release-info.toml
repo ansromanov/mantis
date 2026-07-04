@@ -1,4 +1,4 @@
-version = "0.12.16"
+version = "0.12.17"
 date = "2026-07-04"
 whats_new = """- feat(packaging): add Homebrew formula with auto-update on release (#443)
 - fix: smooth markdown scrolling by pre-wrapping paragraphs (#442)
