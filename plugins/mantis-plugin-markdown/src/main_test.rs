@@ -166,8 +166,9 @@ const LIGHT_THEME_HEX: &[(&str, &str)] = &[
 #[test]
 fn theme_change_uses_host_supplied_hex_colors() {
     let mut state = PluginState::new();
+    let mut buf: Vec<u8> = Vec::new();
     assert_eq!(state.theme.heading1, "38;5;81", "starts with the fallback");
-    state.handle_theme_change(Some(&colors_json(LIGHT_THEME_HEX)));
+    state.handle_theme_change(Some(&colors_json(LIGHT_THEME_HEX)), &mut buf);
     assert_eq!(state.theme.heading1, "38;2;5;80;174");
     assert_eq!(state.theme.text, "38;2;56;56;56");
 }
@@ -175,8 +176,9 @@ fn theme_change_uses_host_supplied_hex_colors() {
 #[test]
 fn theme_change_without_colors_falls_back_to_default() {
     let mut state = PluginState::new();
-    state.handle_theme_change(Some(&colors_json(LIGHT_THEME_HEX)));
-    state.handle_theme_change(None);
+    let mut buf: Vec<u8> = Vec::new();
+    state.handle_theme_change(Some(&colors_json(LIGHT_THEME_HEX)), &mut buf);
+    state.handle_theme_change(None, &mut buf);
     assert_eq!(state.theme.heading1, ThemeColors::default_theme().heading1);
     assert_eq!(state.theme.text, ThemeColors::default_theme().text);
 }
@@ -184,8 +186,9 @@ fn theme_change_without_colors_falls_back_to_default() {
 #[test]
 fn theme_change_with_incomplete_colors_falls_back_to_default() {
     let mut state = PluginState::new();
+    let mut buf: Vec<u8> = Vec::new();
     let incomplete = colors_json(&[("heading1", "#0550ae")]);
-    state.handle_theme_change(Some(&incomplete));
+    state.handle_theme_change(Some(&incomplete), &mut buf);
     assert_eq!(
         state.theme.heading1,
         ThemeColors::default_theme().heading1,
@@ -238,11 +241,82 @@ fn render_heading_levels() {
 
 #[test]
 fn handle_open_skips_non_markdown() {
-    let state = PluginState::new();
+    let mut state = PluginState::new();
     let mut buf: Vec<u8> = Vec::new();
     // handle_open skips non-md files silently (no panic, no output)
     state.handle_open("/dev/null/nonexistent.txt", &mut buf);
     assert!(buf.is_empty(), "no output for non-md files");
+}
+
+#[test]
+fn handle_open_records_current_file() {
+    let mut state = PluginState::new();
+    let mut buf: Vec<u8> = Vec::new();
+    let mut tmp = std::env::temp_dir();
+    tmp.push("mantis_plugin_markdown_test_current_file.md");
+    std::fs::write(&tmp, "# Hello").unwrap();
+    let path_str = tmp.to_str().unwrap().to_string();
+
+    state.handle_open(&path_str, &mut buf);
+    assert_eq!(state.current_file.as_deref(), Some(path_str.as_str()));
+
+    std::fs::remove_file(&tmp).ok();
+}
+
+#[test]
+fn theme_change_rerenders_open_file() {
+    let mut state = PluginState::new();
+    let mut buf: Vec<u8> = Vec::new();
+    let mut tmp = std::env::temp_dir();
+    tmp.push("mantis_plugin_markdown_test_theme_change.md");
+    std::fs::write(&tmp, "# Hello").unwrap();
+    let path_str = tmp.to_str().unwrap().to_string();
+
+    state.handle_open(&path_str, &mut buf);
+    let first_len = buf.len();
+    assert!(first_len > 0, "opening a markdown file should emit content");
+
+    let colors = serde_json::json!({
+        "heading1": "#ff0000",
+        "heading2": "#00ff00",
+        "heading3": "#0000ff",
+        "accent": "#ffff00",
+        "dim": "#888888",
+        "code": "#ffffff",
+        "text": "#000000",
+    });
+    state.handle_theme_change(Some(&colors), &mut buf);
+    assert!(
+        buf.len() > first_len,
+        "theme change should re-render the currently open file"
+    );
+
+    std::fs::remove_file(&tmp).ok();
+}
+
+#[test]
+fn keypress_toggle_rerenders_open_file() {
+    let mut state = PluginState::new();
+    let mut buf: Vec<u8> = Vec::new();
+    let mut tmp = std::env::temp_dir();
+    tmp.push("mantis_plugin_markdown_test_toggle.md");
+    std::fs::write(&tmp, "# Hello").unwrap();
+    let path_str = tmp.to_str().unwrap().to_string();
+
+    state.handle_open(&path_str, &mut buf);
+    let first_len = buf.len();
+
+    // Simulate the on_keypress "M" handler behavior.
+    state.toggle_raw = !state.toggle_raw;
+    if let Some(path) = state.current_file.clone() {
+        state.handle_open(&path, &mut buf);
+    }
+    assert!(
+        buf.len() > first_len,
+        "pressing M should re-render the currently open file"
+    );
+
+    std::fs::remove_file(&tmp).ok();
 }
 
 #[test]
