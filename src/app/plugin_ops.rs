@@ -83,3 +83,7 @@ impl App {
         self.loader_set_extra_syntaxes();
     }
 }
+
+#[cfg(test)]
+#[path = "plugin_ops_test.rs"]
+mod plugin_ops_tests;

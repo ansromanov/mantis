@@ -41,7 +41,7 @@ pub(super) use tree_filter::draw_tree_filter;
 mod tests;
 
 #[cfg(test)]
-#[path = "popups_plugin_test.rs"]
+#[path = "plugin_test.rs"]
 mod plugin_tests;
 
 #[cfg(test)]

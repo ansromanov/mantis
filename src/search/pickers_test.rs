@@ -302,3 +302,46 @@ fn tree_filter_pop_invalidates_cache() {
     f.pop();
     assert!(f.cached.is_none(), "pop must clear the filter cache");
 }
+
+// -- PluginPicker ------------------------------------------------------------
+
+#[test]
+fn plugin_picker_new_stores_entries_and_starts_selected_at_zero() {
+    let entries = vec![
+        (
+            "alpha".to_string(),
+            true,
+            crate::plugin::PluginKind::Process,
+            None,
+        ),
+        (
+            "beta".to_string(),
+            false,
+            crate::plugin::PluginKind::Process,
+            Some("panic: oh no".to_string()),
+        ),
+    ];
+    let picker = PluginPicker::new(entries.clone());
+    assert_eq!(picker.entries, entries);
+    assert_eq!(picker.selected, 0);
+}
+
+#[test]
+fn plugin_picker_entries_carry_crash_badge_only_for_dead_plugins() {
+    let picker = PluginPicker::new(vec![
+        (
+            "running".to_string(),
+            true,
+            crate::plugin::PluginKind::Process,
+            None,
+        ),
+        (
+            "crashed".to_string(),
+            false,
+            crate::plugin::PluginKind::Process,
+            Some("exited unexpectedly".to_string()),
+        ),
+    ]);
+    assert_eq!(picker.entries[0].3, None);
+    assert_eq!(picker.entries[1].3.as_deref(), Some("exited unexpectedly"));
+}
