@@ -23,7 +23,7 @@ author = "ansromanov"                # Optional: author name/handle
 entry = "run.sh"                     # Required: executable relative to this dir
 mantis_protocol = "3"                # Required: IPC protocol version (tv_protocol still accepted, see below)
 platforms = ["linux", "macos"]       # Optional: OS filter (default: all)
-events = ["on_file_open"]            # Optional: handled events (advisory)
+events = ["on_file_open"]            # Optional: events to subscribe to (empty/absent = all, for back-compat)
 permissions = ["run_git"]            # Optional: required permissions (advisory)
 ```
 
@@ -38,7 +38,7 @@ Fields:
 | `entry` | Yes | Path to the executable, relative to this manifest's directory. |
 | `mantis_protocol` | Yes | IPC protocol version (`"3"` for the current protocol). Plugins declaring a different version are skipped. The field was named `tv_protocol` through protocol 2 (pre-rename); `mantis_protocol` is the current name and `tv_protocol` remains accepted as an alias — if both are present, `mantis_protocol` wins. New plugins should use `mantis_protocol`. |
 | `platforms` | No | OS filter: list of `"linux"`, `"macos"`, `"windows"`. Absent = all. |
-| `events` | No | Events the plugin handles (advisory, not enforced). |
+| `events` | No | Events this plugin subscribes to; only listed events are sent to it. Empty or absent means all events are sent (back-compat with pre-subscription plugins). |
 | `permissions` | No | Permissions the plugin needs (advisory, shown at install). |
 
 ### Protocol version
@@ -153,9 +153,10 @@ up to one tick (~16ms) after dispatching `on_keypress` before deciding
 whether to also run its own normal-mode key handling for that key. If any
 reply arrives with `handled: true` within that window, `mantis` swallows the
 key — no built-in binding fires for it. If multiple subscribed plugins
-reply, the first `handled: true` (in manifest/registration order) wins and
-the key is consumed exactly once; a plugin that doesn't reply within the
-window is treated as not having handled the key. Plugins that never send
+reply, the first `handled: true` response the host receives within the
+window wins and the key is consumed exactly once; a plugin that doesn't
+reply within the window is treated as not having handled the key. Plugins
+that never send
 `key_handled` behave exactly as under protocol 2 — the keypress always falls
 through to normal handling.
 
@@ -218,7 +219,8 @@ for this file, now") rather than a broadcast the plugin may or may not act on.
 {"event":"request","id":42,"method":"fold_regions","params":{"path":"/absolute/path/to/file"}}
 ```
 
-**Plugin → host response**, sent on stdout like any other action:
+**Plugin → host response**, sent on stdout as its own line, alongside (but
+distinct from) `action` lines:
 
 ```json
 {"event":"response","id":42,"result":{"regions":[[0,5],[10,20]]}}
