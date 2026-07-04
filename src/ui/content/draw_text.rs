@@ -87,7 +87,7 @@ pub(crate) fn render_virtual_file<'a>(
                 match cached {
                     Some(spans) => spans,
                     None => {
-                        let result = app.highlight_lines(&path_buf, &lines);
+                        let result = app.highlight_lines(&lines);
                         *app.content_highlight_cache.borrow_mut() =
                             Some((cache_key, result.clone()));
                         result

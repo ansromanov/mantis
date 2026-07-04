@@ -56,13 +56,12 @@ impl App {
         }
     }
 
-    /// Syntax-highlights a slice of lines for the visible window.
-    pub fn highlight_lines(
-        &self,
-        path: &std::path::Path,
-        lines: &[&str],
-    ) -> Vec<Vec<(ratatui::style::Style, String)>> {
-        self.highlighter.highlight_range(path, lines)
+    /// Syntax-highlights a slice of lines for the visible window, using the
+    /// syntax already resolved when the file was opened (`current_syntax`)
+    /// rather than re-detecting it from disk on every scroll redraw.
+    pub fn highlight_lines(&self, lines: &[&str]) -> Vec<Vec<(ratatui::style::Style, String)>> {
+        self.highlighter
+            .highlight_range(self.current_syntax.as_deref(), lines)
     }
 
     /// Whether the diff should currently render in the side-by-side layout: the
