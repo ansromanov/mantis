@@ -11,6 +11,10 @@ on:
       - 'mantis.toml'
   workflow_dispatch:
 
+concurrency:
+  group: main-version-writer
+  cancel-in-progress: false
+
 jobs:
   bump:
     if: "github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[skip ci]')"
@@ -21,24 +25,32 @@ jobs:
           fetch-depth: 0
           ssh-key: ${{ secrets.DEPLOY_KEY }}
 
-      - name: Bump patch version
+      - name: Bump patch version, commit, and push
         id: bump
-        run: |
-          current=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
-          major=$(echo "$current" | cut -d. -f1)
-          minor=$(echo "$current" | cut -d. -f2)
-          patch=$(echo "$current" | cut -d. -f3)
-          new_version="${major}.${minor}.$((patch + 1))"
-          sed -i "s/^version = \"${current}\"/version = \"${new_version}\"/" Cargo.toml
-          sed -i "/^name = \"mantis\"/{n;s/version = \"${current}\"/version = \"${new_version}\"/}" Cargo.lock
-          sed -i "s/^version = \".*\"/version = \"${new_version}\"/" release-info.toml
-          sed -i "s/^date = \".*\"/date = \"$(date +%Y-%m-%d)\"/" release-info.toml
-          echo "version=${new_version}" >> "$GITHUB_OUTPUT"
-
-      - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Cargo.toml Cargo.lock release-info.toml
-          git commit -m "chore: bump version to v${{ steps.bump.outputs.version }} [skip ci]"
-          git push origin HEAD:main
+
+          bump() {
+            current=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+            major=$(echo "$current" | cut -d. -f1)
+            minor=$(echo "$current" | cut -d. -f2)
+            patch=$(echo "$current" | cut -d. -f3)
+            new_version="${major}.${minor}.$((patch + 1))"
+            sed -i "s/^version = \"${current}\"/version = \"${new_version}\"/" Cargo.toml
+            sed -i "/^name = \"mantis\"/{n;s/version = \"${current}\"/version = \"${new_version}\"/}" Cargo.lock
+            sed -i "s/^version = \".*\"/version = \"${new_version}\"/" release-info.toml
+            sed -i "s/^date = \".*\"/date = \"$(date +%Y-%m-%d)\"/" release-info.toml
+
+            git add Cargo.toml Cargo.lock release-info.toml
+            git commit -m "chore: bump version to v${new_version} [skip ci]"
+          }
+
+          bump
+          if ! git push origin HEAD:main; then
+            git reset --hard HEAD~1
+            git pull --rebase origin main
+            bump
+            git push origin HEAD:main
+          fi
+          echo "version=${new_version}" >> "$GITHUB_OUTPUT"
