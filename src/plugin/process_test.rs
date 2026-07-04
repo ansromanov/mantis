@@ -296,7 +296,11 @@ fn spawn_strips_ansi_escapes_from_last_stderr_line() {
     // Emits a stderr line containing a CSI escape sequence (clear screen) and
     // a stray carriage return, mimicking a malicious or buggy plugin trying
     // to smuggle terminal control sequences into the diagnostics UI.
-    write!(f, "printf 'boom\\x1b[2Jtail\\r\\n' >&2\nexit 1\n").unwrap();
+    write!(
+        f,
+        "#!/bin/sh\nprintf 'boom\\x1b[2Jtail\\r\\n' >&2\nexit 1\n"
+    )
+    .unwrap();
     drop(f);
     std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
 
