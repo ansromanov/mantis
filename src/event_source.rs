@@ -159,7 +159,11 @@ impl RawEventSource {
 
         let mut tmp = [0u8; 4096];
         loop {
-            let n = reader.read(&mut tmp)?;
+            let n = match reader.read(&mut tmp) {
+                Ok(n) => n,
+                Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+                Err(_) => break, // treat other read errors as "no more data right now"
+            };
             if n == 0 {
                 break;
             }
