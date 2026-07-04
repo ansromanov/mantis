@@ -11,8 +11,9 @@
 //! - [`parse_sgr_mouse`]: Translates an SGR mouse sequence into a mouse event.
 //! - [`decode_mouse_button`]: Decodes a raw button code to a `MouseButton`.
 
-use crossterm::event::{Event, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use std::io;
+
+use crossterm::event::{Event, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 
 /// Parse an SGR-encoded mouse event.
 ///

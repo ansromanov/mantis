@@ -37,7 +37,9 @@ pub struct AltKeys {
 thread_local! {
     /// Alternate keycodes for the event currently being dispatched, if the
     /// terminal provided them via the kitty keyboard protocol.
-    pub static CURRENT_ALT_KEYS: Cell<AltKeys> = const { Cell::new(AltKeys { shifted: None, base: None }) };
+    pub static CURRENT_ALT_KEYS: Cell<AltKeys> = const {
+        Cell::new(AltKeys { shifted: None, base: None })
+    };
 }
 
 // ---------------------------------------------------------------------------
