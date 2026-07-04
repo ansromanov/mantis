@@ -15,9 +15,9 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture, Event},
+    event::{EnableMouseCapture, Event},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{enable_raw_mode, EnterAlternateScreen},
 };
 use ratatui::{backend::Backend, backend::CrosstermBackend, Terminal};
 
@@ -195,8 +195,21 @@ fn main() -> anyhow::Result<()> {
 /// kitty keyboard protocol, runs the app to completion, then restores the
 /// terminal regardless of how the app exited. This is the only part of startup
 /// that touches the real terminal, so it is not unit-tested.
+/// Restores the terminal on drop so that any early `?` return during setup
+/// (after raw mode is already enabled) still leaves the terminal usable.
+/// Redundant with the explicit restore on the success path, but harmless
+/// since `restore_terminal` is idempotent.
+struct TerminalGuard;
+
+impl Drop for TerminalGuard {
+    fn drop(&mut self) {
+        crate::app::restore_terminal();
+    }
+}
+
 fn launch_tui(root: PathBuf, file: Option<PathBuf>) -> anyhow::Result<()> {
     enable_raw_mode()?;
+    let _guard = TerminalGuard;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
 
@@ -207,6 +220,14 @@ fn launch_tui(root: PathBuf, file: Option<PathBuf>) -> anyhow::Result<()> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
     terminal.hide_cursor()?;
+
+    // Install panic hook right after terminal setup so that any panic (including
+    // abort in release builds) restores the terminal to a usable state.
+    let prev = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        crate::app::restore_terminal();
+        prev(info);
+    }));
 
     // Use a trait-object event source so we can swap between the kitty-aware
     // raw parser (on Unix) and the regular crossterm source.
@@ -220,19 +241,6 @@ fn launch_tui(root: PathBuf, file: Option<PathBuf>) -> anyhow::Result<()> {
     let mut events: Box<dyn EventSource> = Box::new(CrosstermEvents);
 
     let result = run_app(&mut terminal, root, file, events.as_mut());
-
-    // Teardown: reverse order from setup.
-    #[cfg(unix)]
-    if keyboard_enhanced {
-        let _ = event_source::pop_keyboard_enhancement_flags();
-    }
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
 
     result
 }

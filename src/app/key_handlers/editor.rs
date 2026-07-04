@@ -11,11 +11,9 @@
 //! `open_in_browser` helper, which guards against spawning the browser when
 //! stdout is not a TTY (piped/headless/CI runs).
 
-use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
+use crossterm::event::EnableMouseCapture;
 use crossterm::execute;
-use crossterm::terminal::{
-    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
-};
+use crossterm::terminal::{enable_raw_mode, EnterAlternateScreen};
 
 use std::io::IsTerminal;
 use std::path::Path;
@@ -173,8 +171,7 @@ impl App {
     fn launch_editor(&mut self, path: &Path) {
         let editor = resolve_editor();
 
-        let _ = disable_raw_mode();
-        let _ = execute!(std::io::stdout(), LeaveAlternateScreen, DisableMouseCapture);
+        crate::app::restore_terminal();
 
         let parts: Vec<&str> = editor.split_whitespace().collect();
         let launch_err = if let Some((cmd, args)) = parts.split_first() {
