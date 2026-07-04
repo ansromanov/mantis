@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: read
     steps:
       - uses: actions/checkout@v6
         with:
@@ -20,11 +21,42 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
+      # Restore the previous successful run's criterion data so cargo bench
+      # compares against it natively (writes change/estimates.json per bench).
+      - name: Restore criterion baseline from previous run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prev_run=$(gh run list --workflow "${{ github.workflow }}" \
+            --branch main --status success --limit 1 --json databaseId \
+            --jq '.[0].databaseId // empty' || true)
+          if [ -z "${prev_run:-}" ]; then
+            echo "No previous successful run; drift comparison will be skipped."
+          elif gh run download "$prev_run" --name criterion-baseline --dir target/criterion; then
+            echo "Restored criterion baseline from run $prev_run."
+          else
+            echo "Run $prev_run has no criterion-baseline artifact; drift comparison will be skipped."
+          fi
+
       - name: Run full benchmarks
         run: ./scripts/bench-report.sh
+
+      - name: Write perf recap
+        run: ./scripts/bench-summary.sh | tee bench-results/summary.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload bench report
         uses: actions/upload-artifact@v4
         with:
           name: bench-report-${{ github.sha }}
           path: bench-results/
+
+      # Stable-named artifact consumed as the baseline by the next run.
+      # HTML reports are excluded — comparison only needs the sampled data.
+      - name: Upload criterion baseline
+        uses: actions/upload-artifact@v4
+        with:
+          name: criterion-baseline
+          path: |
+            target/criterion
+            !target/criterion/report
+            !target/criterion/**/report
