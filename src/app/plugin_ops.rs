@@ -17,7 +17,7 @@ impl App {
         let Some(picker) = &self.plugin_picker else {
             return;
         };
-        let Some((name, running, kind)) = picker.entries.get(picker.selected).cloned() else {
+        let Some((name, running, kind, _)) = picker.entries.get(picker.selected).cloned() else {
             return;
         };
         if kind == plugin::PluginKind::Syntax {
@@ -83,3 +83,7 @@ impl App {
         self.loader_set_extra_syntaxes();
     }
 }
+
+#[cfg(test)]
+#[path = "plugin_ops_test.rs"]
+mod plugin_ops_tests;

@@ -5,8 +5,9 @@
 //! queue → stdin) threads.
 
 use std::io::{BufRead, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use crate::plugin::types::{FromPlugin, ToPlugin};
@@ -16,6 +17,12 @@ use crate::plugin::types::{FromPlugin, ToPlugin};
 /// document in one `set_content` message (a large markdown file with wide
 /// tables serializes to ~70 KB); the cap only guards against a runaway plugin.
 pub(crate) const MAX_LINE_LEN: usize = 4 * 1024 * 1024;
+
+/// Maximum size of a plugin's on-disk stderr log before older lines are
+/// dropped to make room for new ones. Keeps a crashing plugin from filling
+/// the disk while still holding enough context (stack traces, panic
+/// messages) to diagnose the failure.
+const STDERR_LOG_CAP: usize = 64 * 1024;
 
 /// A single running plugin subprocess with background reader and writer threads.
 pub(crate) struct Plugin {
@@ -28,6 +35,12 @@ pub(crate) struct Plugin {
     action_rx: Option<std::sync::mpsc::Receiver<(String, serde_json::Value)>>,
     _reader_thread: Option<std::thread::JoinHandle<()>>,
     _writer_thread: Option<std::thread::JoinHandle<()>>,
+    _stderr_thread: Option<std::thread::JoinHandle<()>>,
+    /// Most recent non-empty stderr line, updated live by the stderr-drain
+    /// thread. Read after death to enrich the "exited unexpectedly" message.
+    last_stderr_line: Arc<Mutex<Option<String>>>,
+    /// Path to this plugin's rotating stderr log, if the state dir is available.
+    log_path: Option<PathBuf>,
 }
 
 impl Plugin {
@@ -40,7 +53,23 @@ impl Plugin {
             action_rx: None,
             _reader_thread: None,
             _writer_thread: None,
+            _stderr_thread: None,
+            last_stderr_line: Arc::new(Mutex::new(None)),
+            log_path: None,
         }
+    }
+
+    /// Most recent non-empty stderr line seen from this plugin, if any.
+    pub(crate) fn last_stderr_line(&self) -> Option<String> {
+        self.last_stderr_line
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
+    }
+
+    /// Path to this plugin's rotating stderr log, if one was created.
+    pub(crate) fn log_path(&self) -> Option<PathBuf> {
+        self.log_path.clone()
     }
 
     /// Returns `true` if this plugin has subscribed to the given event.
@@ -53,7 +82,7 @@ impl Plugin {
         let mut child = Command::new(path)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
+            .stderr(Stdio::piped())
             .spawn()
             .map_err(|e| format!("failed to spawn plugin '{}': {}", self.name, e))?;
 
@@ -65,6 +94,10 @@ impl Plugin {
             .stdout
             .take()
             .ok_or_else(|| format!("no stdout for plugin '{}'", self.name))?;
+        let stderr = child
+            .stderr
+            .take()
+            .ok_or_else(|| format!("no stderr for plugin '{}'", self.name))?;
 
         let (read_tx, read_rx) = std::sync::mpsc::sync_channel(1024);
         let name_for_reader = self.name.clone();
@@ -118,11 +151,21 @@ impl Plugin {
             })
             .map_err(|e| format!("failed to spawn writer thread: {e}"))?;
 
+        let log_path = plugin_log_path(&self.name);
+        self.log_path = log_path.clone();
+        let last_stderr = self.last_stderr_line.clone();
+        let name_for_stderr = self.name.clone();
+        let stderr_handle = std::thread::Builder::new()
+            .name(format!("plugin-stderr-{}", name_for_stderr))
+            .spawn(move || drain_stderr(stderr, log_path, last_stderr))
+            .map_err(|e| format!("failed to spawn stderr thread: {e}"))?;
+
         self.child = Some(child);
         self.write_tx = Some(write_tx);
         self.action_rx = Some(read_rx);
         self._reader_thread = Some(read_handle);
         self._writer_thread = Some(write_handle);
+        self._stderr_thread = Some(stderr_handle);
         Ok(())
     }
 
@@ -152,6 +195,13 @@ impl Plugin {
                 Ok((action, params)) => actions.push((action, params)),
                 Err(std::sync::mpsc::TryRecvError::Empty) => break,
                 Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    // The stderr-drain thread sees EOF around the same time as
+                    // the reader thread; join it so `last_stderr_line` is
+                    // fully populated before the caller reads crash
+                    // diagnostics, instead of racing to capture a partial line.
+                    if let Some(handle) = self._stderr_thread.take() {
+                        let _ = handle.join();
+                    }
                     return (actions, true);
                 }
             }
@@ -219,6 +269,118 @@ impl Plugin {
                 }
             }
         }
+    }
+}
+
+/// Returns the path of `<name>`'s rotating stderr log under
+/// `{state_dir}/plugin-logs/`, creating the directory if needed. Returns
+/// `None` when no state dir is available on this platform.
+fn plugin_log_path(name: &str) -> Option<PathBuf> {
+    let dir = crate::session::state_dir()?.join("plugin-logs");
+    std::fs::create_dir_all(&dir).ok()?;
+    Some(dir.join(format!("{}.log", sanitize_log_filename(name))))
+}
+
+/// Maps every character other than an ASCII alphanumeric, `-`, or `_` to `_`,
+/// so a plugin name (a `[plugins]` config key, not validated for filesystem
+/// safety) can never contain a path separator or `..` and escape
+/// `plugin-logs/` when used as a single filename component.
+fn sanitize_log_filename(name: &str) -> String {
+    name.chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect()
+}
+
+/// Drains a plugin's stderr, capping the on-disk log at [`STDERR_LOG_CAP`]
+/// bytes and keeping `last_line` current for diagnostics after the plugin
+/// dies. Runs until stderr closes (plugin exits).
+fn drain_stderr<R: std::io::Read>(
+    stderr: R,
+    log_path: Option<PathBuf>,
+    last_line: Arc<Mutex<Option<String>>>,
+) {
+    let mut reader = std::io::BufReader::new(stderr);
+    let mut line_buf: Vec<u8> = Vec::with_capacity(1024);
+    let mut log_buf: Vec<u8> = Vec::new();
+    loop {
+        line_buf.clear();
+        let got_newline = read_capped_line(&mut reader, &mut line_buf, MAX_LINE_LEN);
+        if line_buf.is_empty() {
+            break;
+        }
+        if !got_newline {
+            drain_rest_of_line(&mut reader);
+        }
+        if line_buf.ends_with(b"\n") {
+            line_buf.pop();
+        }
+        if line_buf.ends_with(b"\r") {
+            line_buf.pop();
+        }
+        let line = String::from_utf8_lossy(&line_buf).to_string();
+        if line.trim().is_empty() {
+            continue;
+        }
+        let sanitized = sanitize_line(&line);
+        if sanitized.is_empty() {
+            continue;
+        }
+        if let Ok(mut guard) = last_line.lock() {
+            *guard = Some(truncate_for_display(&sanitized));
+        }
+        if let Some(path) = &log_path {
+            log_buf.extend_from_slice(sanitized.as_bytes());
+            log_buf.push(b'\n');
+            cap_log_buf(&mut log_buf, STDERR_LOG_CAP);
+            let _ = std::fs::write(path, &log_buf);
+        }
+    }
+}
+
+/// Maximum length of a stderr line kept for the live "last line" diagnostic
+/// (crash message and plugin-picker badge). A crashing plugin's stderr is
+/// untrusted and unbounded (up to [`MAX_LINE_LEN`]); this keeps a single
+/// runaway line from blowing up a one-line UI widget.
+const MAX_DISPLAY_STDERR_LEN: usize = 300;
+
+/// Strips control characters — including ANSI/terminal escape sequences —
+/// from a plugin's stderr line before it can reach the screen or the on-disk
+/// log. Plugin stderr is untrusted output and must never be interpreted by
+/// the terminal.
+fn sanitize_line(s: &str) -> String {
+    s.chars()
+        .filter(|&c| c == '\t' || !c.is_control())
+        .collect()
+}
+
+/// Truncates `s` to [`MAX_DISPLAY_STDERR_LEN`] characters for display,
+/// appending an ellipsis when truncated.
+fn truncate_for_display(s: &str) -> String {
+    if s.chars().count() <= MAX_DISPLAY_STDERR_LEN {
+        return s.to_string();
+    }
+    let mut truncated: String = s.chars().take(MAX_DISPLAY_STDERR_LEN).collect();
+    truncated.push('…');
+    truncated
+}
+
+/// Trims complete lines off the front of `buf` until its length is at or
+/// under `cap`, so the log never grows unbounded while keeping full lines.
+fn cap_log_buf(buf: &mut Vec<u8>, cap: usize) {
+    while buf.len() > cap {
+        match buf.iter().position(|&b| b == b'\n') {
+            Some(pos) => buf.drain(..=pos),
+            None => {
+                buf.clear();
+                return;
+            }
+        };
     }
 }
 

@@ -32,6 +32,14 @@ pub struct SessionState {
 const SESSION_DIR_NAME: &str = "sessions";
 const LEGACY_FILE_NAME: &str = "sessions.json";
 
+/// Serialises every test in the crate that sets the process-global
+/// `MANTIS_STATE_DIR` env var (used to point [`state_dir`] at an isolated
+/// temp directory). `cargo test` runs tests on separate threads within the
+/// same process by default, so any test that sets this var without holding
+/// this lock can race with another one and read/write the wrong state dir.
+#[cfg(test)]
+pub(crate) static STATE_DIR_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 /// Returns the path to the state directory, creating it if absent.
 /// Silently returns `None` when the platform has no suitable state dir.
 pub fn state_dir() -> Option<PathBuf> {

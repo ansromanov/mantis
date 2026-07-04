@@ -1204,3 +1204,69 @@ impl DrainPluginActionsForTest for App {
         self.handle_plugin_action(name, action, &params);
     }
 }
+
+// -- drain_plugin_actions crash-message tests --------------------------------
+
+/// Shared crate-wide lock serialising every test that sets `MANTIS_STATE_DIR`
+/// (a process-global env var) — see `crate::session::STATE_DIR_ENV_LOCK`.
+#[cfg(unix)]
+use crate::session::STATE_DIR_ENV_LOCK;
+
+#[test]
+#[cfg(unix)]
+fn drain_plugin_actions_surfaces_crash_diagnostics_in_plugin_message() {
+    use std::io::Write as _;
+    use std::os::unix::fs::PermissionsExt;
+
+    let _lock = STATE_DIR_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+
+    let dir = std::env::temp_dir().join(format!("tv_refresh_crash_test_{}", std::process::id()));
+    let state_dir = dir.join("state");
+    fs::create_dir_all(&state_dir).unwrap();
+    std::env::set_var("MANTIS_STATE_DIR", &state_dir);
+
+    let script = dir.join("crash.sh");
+    let mut f = fs::File::create(&script).unwrap();
+    write!(f, "#!/bin/sh\necho 'panic: oh no' >&2\nexit 1\n").unwrap();
+    drop(f);
+    fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+
+    let entry = crate::plugin::PluginEntry {
+        path: script.clone(),
+        enabled: false,
+        ..Default::default()
+    };
+    let mut app = App {
+        plugin_manager: crate::plugin::PluginManager::new(vec![("crashy".to_string(), entry)]),
+        ..create_base_app()
+    };
+    app.plugin_manager
+        .activate_one("crashy", None)
+        .expect("spawn crash.sh");
+
+    let deadline = Instant::now() + Duration::from_secs(3);
+    loop {
+        app.drain_plugin_actions();
+        if app.plugin_message.is_some() {
+            break;
+        }
+        assert!(Instant::now() < deadline, "plugin was never seen as dead");
+        std::thread::sleep(Duration::from_millis(25));
+    }
+
+    let message = app
+        .plugin_message
+        .as_ref()
+        .expect("crash must set a plugin_message");
+    assert!(
+        message.contains("panic: oh no"),
+        "message must surface the last stderr line, got: {message:?}"
+    );
+    assert!(
+        message.contains("full log:"),
+        "message must point to the on-disk log, got: {message:?}"
+    );
+
+    std::env::remove_var("MANTIS_STATE_DIR");
+    fs::remove_dir_all(&dir).ok();
+}

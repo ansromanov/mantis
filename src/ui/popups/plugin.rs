@@ -64,7 +64,7 @@ pub(crate) fn draw_plugin_picker(f: &mut Frame, app: &mut App, area: Rect) {
     let items: Vec<ListItem> = picker
         .entries
         .iter()
-        .map(|(name, running, kind)| {
+        .map(|(name, running, kind, crash_badge)| {
             let (marker, marker_style) = if *running {
                 ("[✓] ", Style::default().fg(theme.diff_add))
             } else {
@@ -74,11 +74,18 @@ pub(crate) fn draw_plugin_picker(f: &mut Frame, app: &mut App, area: Rect) {
                 PluginKind::Syntax => " [syntax]",
                 PluginKind::Process => "",
             };
-            ListItem::new(Line::from(vec![
+            let mut spans = vec![
                 Span::styled(marker, marker_style),
                 Span::raw(name.as_str()),
                 Span::styled(kind_badge, Style::default().fg(theme.dim)),
-            ]))
+            ];
+            if let Some(detail) = crash_badge {
+                spans.push(Span::styled(
+                    format!(" ! {detail}"),
+                    Style::default().fg(theme.diff_del),
+                ));
+            }
+            ListItem::new(Line::from(spans))
         })
         .collect();
 

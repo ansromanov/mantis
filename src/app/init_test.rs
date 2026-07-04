@@ -131,7 +131,7 @@ fn app_new_registers_syntax_plugins_in_manager_for_palette() {
     assert!(
         entries
             .iter()
-            .any(|(_, _, kind)| *kind == crate::plugin::PluginKind::Syntax),
+            .any(|(_, _, kind, _)| *kind == crate::plugin::PluginKind::Syntax),
         "a syntax plugin must be registered in the manager so it appears in the \
          plugin palette; got {entries:?}"
     );
@@ -365,6 +365,7 @@ fn app_new_diff_mode_invalid_falls_back_to_all() {
 
 #[test]
 fn app_new_command_usage_starts_empty() {
+    let _lock = crate::session::STATE_DIR_ENV_LOCK.lock().unwrap();
     let root = temp_dir();
     // Point at a fresh temp dir so no on-disk usage data is loaded.
     let state_dir = temp_dir();

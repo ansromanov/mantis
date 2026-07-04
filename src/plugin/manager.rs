@@ -5,7 +5,8 @@
 //! that `App` calls on file-open, keypress, theme-change, selection-change,
 //! and shutdown events.
 
-use std::path::Path;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
 use crate::plugin::install::default_plugin_dir;
 use crate::plugin::process::Plugin;
@@ -13,12 +14,22 @@ use crate::plugin::types::{
     Capability, LanguageProviderRegistration, PluginEntry, PluginKind, ToPlugin,
 };
 
+/// Diagnostics captured from a plugin's stderr at the moment it was found dead.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub(crate) struct CrashInfo {
+    pub(crate) last_stderr: Option<String>,
+    pub(crate) log_path: Option<PathBuf>,
+}
+
 /// Manages discovery, lifecycle, and hook dispatch for all plugins.
 pub(crate) struct PluginManager {
     entries: Vec<(String, PluginEntry)>,
     plugins: Vec<Plugin>,
     pending_actions: Vec<(String, String, serde_json::Value)>,
     dead_plugins: Vec<String>,
+    /// Diagnostics for the most recent crash of each plugin, keyed by name.
+    /// Cleared on a successful manual restart via `activate_one`.
+    last_crash: HashMap<String, CrashInfo>,
     spawn_errors: Vec<String>,
     active_theme: Option<String>,
     provider_registrations: Vec<LanguageProviderRegistration>,
@@ -31,6 +42,7 @@ impl PluginManager {
             plugins: Vec::new(),
             pending_actions: Vec::new(),
             dead_plugins: Vec::new(),
+            last_crash: HashMap::new(),
             spawn_errors: Vec::new(),
             active_theme: None,
             provider_registrations: Vec::new(),
@@ -213,6 +225,18 @@ impl PluginManager {
                     .push((plugin.name.clone(), action, params));
             }
         }
+        // Capture stderr diagnostics before the dead plugins are dropped.
+        for name in &dead {
+            if let Some(plugin) = self.plugins.iter().find(|p| &p.name == name) {
+                self.last_crash.insert(
+                    name.clone(),
+                    CrashInfo {
+                        last_stderr: plugin.last_stderr_line(),
+                        log_path: plugin.log_path(),
+                    },
+                );
+            }
+        }
         // Remove dead plugins and track their names.
         self.plugins.retain(|p| !dead.contains(&p.name));
         self.dead_plugins.extend(dead);
@@ -222,6 +246,12 @@ impl PluginManager {
     /// Dead means the reader channel disconnected (process exited or crashed).
     pub(crate) fn take_dead_plugins(&mut self) -> Vec<String> {
         std::mem::take(&mut self.dead_plugins)
+    }
+
+    /// Returns the captured stderr diagnostics for the most recent crash of
+    /// `name`, if any was recorded.
+    pub(crate) fn crash_detail(&self, name: &str) -> Option<&CrashInfo> {
+        self.last_crash.get(name)
     }
 
     /// Removes all provider registrations owned by the named plugin.
@@ -240,11 +270,13 @@ impl PluginManager {
         self.plugins.is_empty()
     }
 
-    /// Returns every registered plugin as `(name, is_active, kind)`, in order.
-    /// For process plugins "active" means a running subprocess; syntax plugins
-    /// have no subprocess, so their `enabled` flag stands in (it drives the
-    /// palette checkbox and is kept current via [`set_enabled`]).
-    pub(crate) fn plugin_entries(&self) -> Vec<(String, bool, PluginKind)> {
+    /// Returns every registered plugin as `(name, is_active, kind, crash_badge)`,
+    /// in order. For process plugins "active" means a running subprocess;
+    /// syntax plugins have no subprocess, so their `enabled` flag stands in
+    /// (it drives the palette checkbox and is kept current via
+    /// [`set_enabled`]). `crash_badge` is a short diagnostic summary when the
+    /// plugin isn't running and last exited unexpectedly.
+    pub(crate) fn plugin_entries(&self) -> Vec<(String, bool, PluginKind, Option<String>)> {
         self.entries
             .iter()
             .map(|(name, entry)| {
@@ -253,7 +285,12 @@ impl PluginManager {
                 } else {
                     self.plugins.iter().any(|p| p.name == *name)
                 };
-                (name.clone(), active, entry.kind.clone())
+                let crash_badge = if !active {
+                    self.last_crash.get(name).map(crash_summary)
+                } else {
+                    None
+                };
+                (name.clone(), active, entry.kind.clone(), crash_badge)
             })
             .collect()
     }
@@ -324,6 +361,7 @@ impl PluginManager {
             });
         }
         self.plugins.push(plugin);
+        self.last_crash.remove(name);
         Ok(())
     }
 
@@ -342,5 +380,16 @@ impl PluginManager {
             protocol_version: None,
         });
         plugin.close_in_background();
+    }
+}
+
+/// Renders a `CrashInfo` into the short summary shown next to a dead
+/// plugin's entry in the plugin picker (a `!` badge).
+fn crash_summary(info: &CrashInfo) -> String {
+    match (&info.last_stderr, &info.log_path) {
+        (Some(line), Some(path)) => format!("{line} (log: {})", path.display()),
+        (Some(line), None) => line.clone(),
+        (None, Some(path)) => format!("log: {}", path.display()),
+        (None, None) => "exited unexpectedly".to_string(),
     }
 }

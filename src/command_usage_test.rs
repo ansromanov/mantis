@@ -1,8 +1,5 @@
-use std::sync::Mutex;
-
 use super::*;
-
-static USAGE_LOCK: Mutex<()> = Mutex::new(());
+use crate::session::STATE_DIR_ENV_LOCK as USAGE_LOCK;
 
 struct TestEnv {
     _state: std::path::PathBuf,

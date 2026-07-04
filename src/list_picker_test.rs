@@ -159,6 +159,7 @@ fn plugin_picker_impl_push_pop_noop() {
         "a".into(),
         true,
         crate::plugin::PluginKind::Process,
+        None,
     )]);
     p.query_push('x');
     assert!(p.query_is_empty());

@@ -382,14 +382,16 @@ impl ListPicker for RecentFilesState {
 
 /// Scrollable list of registered plugins with their running state for the plugin manager overlay.
 pub struct PluginPicker {
-    /// `(name, is_running, kind)` for each registered plugin, in the order provided
-    /// by the manager (alphabetical by name as loaded from config).
-    pub entries: Vec<(String, bool, crate::plugin::PluginKind)>,
+    /// `(name, is_running, kind, crash_badge)` for each registered plugin, in
+    /// the order provided by the manager (alphabetical by name as loaded from
+    /// config). `crash_badge` is `Some(summary)` when the plugin isn't running
+    /// and its last run exited unexpectedly.
+    pub entries: Vec<(String, bool, crate::plugin::PluginKind, Option<String>)>,
     pub selected: usize,
 }
 
 impl PluginPicker {
-    pub fn new(entries: Vec<(String, bool, crate::plugin::PluginKind)>) -> Self {
+    pub fn new(entries: Vec<(String, bool, crate::plugin::PluginKind, Option<String>)>) -> Self {
         PluginPicker {
             entries,
             selected: 0,
