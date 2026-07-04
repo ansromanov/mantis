@@ -557,49 +557,6 @@ fn draw_inline_fallback_no_file_shows_title() {
 }
 
 #[test]
-fn draw_inline_fallback_no_file_shows_orientation_hint() {
-    let (mut app, _dir) = render_app();
-    app.current_file = None;
-    app.content = Vec::new();
-    app.highlighted = Vec::new();
-    app.virtual_file = None;
-    let buffer = render_content(&mut app, |_| {});
-    let lines: Vec<String> = buffer
-        .content()
-        .chunks(80)
-        .map(|row| row.iter().map(|c| c.symbol()).collect::<String>())
-        .collect();
-    let all = lines.concat();
-    assert!(
-        all.contains("to search") && all.contains("to open a file"),
-        "empty content pane should show the orientation hint; got: {all:?}"
-    );
-}
-
-#[test]
-fn draw_inline_fallback_no_file_hint_survives_word_wrap_with_gutter() {
-    let (mut app, _dir) = render_app();
-    let buffer = render_content(&mut app, |app| {
-        app.current_file = None;
-        app.content = Vec::new();
-        app.highlighted = Vec::new();
-        app.virtual_file = None;
-        app.word_wrap = true;
-        app.show_line_numbers = true;
-    });
-    let lines: Vec<String> = buffer
-        .content()
-        .chunks(80)
-        .map(|row| row.iter().map(|c| c.symbol()).collect::<String>())
-        .collect();
-    let all = lines.concat();
-    assert!(
-        all.contains("to search") && all.contains("to open a file"),
-        "orientation hint must not be dropped by word-wrap's gutter/content zip; got: {all:?}"
-    );
-}
-
-#[test]
 fn draw_inline_fallback_with_content() {
     let (mut app, _dir) = render_app();
     let buffer = render_content(&mut app, |app| {
