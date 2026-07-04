@@ -337,10 +337,22 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
 
     // Empty state hint for first-time users: show orientation if no file open.
     if content_lines.is_empty() && app.current_file.is_none() {
-        content_lines.push(Line::from(Span::styled(
-            " Press / to search, or Enter on a tree item to open a file",
-            Style::default().fg(app.theme.dim),
-        )));
+        let search_key = app.keys().label_for_action("search_files");
+        let open_key = app.keys().label_for_action("tree_expand");
+        if !search_key.is_empty() && !open_key.is_empty() {
+            content_lines.push(Line::from(Span::styled(
+                format!(
+                    " Press {search_key} to search, or {open_key} on a tree item to open a file"
+                ),
+                Style::default().fg(app.theme.dim),
+            )));
+            // Keep ln_lines in sync with content_lines so wrap_content's zip
+            // (which stops at the shorter side) doesn't drop this line when
+            // word wrap is on and the line-number gutter is showing.
+            if ln_width > 0 {
+                ln_lines.push(Line::from(""));
+            }
+        }
     }
 
     // Word-wrap expansion: break content + gutters into visual rows so they
