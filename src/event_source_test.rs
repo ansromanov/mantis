@@ -307,7 +307,7 @@ fn csi_u_ctrl_modifier_decodes_correctly() {
 
 // ---------------------------------------------------------------------------
 // CSI-u: shifted alternate substituted into KeyCode::Char when SHIFT is set
-// (regression test for #519 — shifted ASCII symbols on kitty-protocol
+// (regression test for #519 - shifted ASCII symbols on kitty-protocol
 // terminals were emitted as their unshifted digit/base character).
 // ---------------------------------------------------------------------------
 
