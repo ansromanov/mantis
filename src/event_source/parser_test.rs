@@ -1,7 +1,6 @@
-use std::collections::VecDeque;
-
+use super::super::{AltKeys, RawEventSource, CURRENT_ALT_KEYS};
 use super::*;
-use crossterm::event::{KeyCode, KeyEventKind, KeyModifiers, MouseButton, MouseEventKind};
+use crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -22,13 +21,6 @@ fn key_event(ev: &Event) -> &crossterm::event::KeyEvent {
     }
 }
 
-fn mouse_event(ev: &Event) -> &crossterm::event::MouseEvent {
-    match ev {
-        Event::Mouse(m) => m,
-        other => panic!("expected Mouse event, got {other:?}"),
-    }
-}
-
 // ---------------------------------------------------------------------------
 // ctrl-byte range: 0x07 (BEL) → Ctrl+G
 // ---------------------------------------------------------------------------
@@ -40,24 +32,6 @@ fn bel_byte_produces_ctrl_g_not_error() {
     let k = key_event(&ev);
     assert_eq!(k.code, KeyCode::Char('g'));
     assert!(k.modifiers.contains(KeyModifiers::CONTROL));
-}
-
-// ---------------------------------------------------------------------------
-// Unhandled bytes: Ok(None) not Err
-// ---------------------------------------------------------------------------
-
-#[test]
-fn high_byte_skipped_by_next_raw_event() {
-    // parse_event returns Err for 0x80; next_raw_event must convert that to
-    // Ok(None) (skip the byte) rather than propagating the error.
-    let mut src = RawEventSource::new();
-    src.buf.push(0x80);
-    src.buf.push(b'q'); // a valid event after the bad byte
-    let result = src.next_raw_event();
-    assert!(
-        result.is_ok(),
-        "bad byte must not propagate Err from next_raw_event"
-    );
 }
 
 // ---------------------------------------------------------------------------
@@ -111,64 +85,6 @@ fn fkey_range_23_to_26_is_f11_to_f14() {
         let (ev, _) = parse_ok(&csi_tilde(23 + i as u16));
         assert_eq!(key_event(&ev).code, code, "CSI {}~", 23 + i);
     }
-}
-
-// ---------------------------------------------------------------------------
-// SGR mouse: '<' prefix stripped, cb parsed correctly
-// ---------------------------------------------------------------------------
-
-fn sgr_press(cb: u16, col: u16, row: u16) -> Vec<u8> {
-    format!("\x1b[<{cb};{col};{row}M").into_bytes()
-}
-
-fn sgr_release(cb: u16, col: u16, row: u16) -> Vec<u8> {
-    format!("\x1b[<{cb};{col};{row}m").into_bytes()
-}
-
-#[test]
-fn sgr_left_click_press() {
-    let (ev, _) = parse_ok(&sgr_press(0, 5, 10));
-    let m = mouse_event(&ev);
-    assert_eq!(m.kind, MouseEventKind::Down(MouseButton::Left));
-    assert_eq!(m.column, 4); // 1-indexed → 0-indexed
-    assert_eq!(m.row, 9);
-}
-
-#[test]
-fn sgr_left_click_release() {
-    let (ev, _) = parse_ok(&sgr_release(0, 5, 10));
-    let m = mouse_event(&ev);
-    assert_eq!(m.kind, MouseEventKind::Up(MouseButton::Left));
-}
-
-#[test]
-fn sgr_right_click_press() {
-    let (ev, _) = parse_ok(&sgr_press(2, 1, 1));
-    let m = mouse_event(&ev);
-    assert_eq!(m.kind, MouseEventKind::Down(MouseButton::Right));
-}
-
-#[test]
-fn sgr_middle_click_press() {
-    let (ev, _) = parse_ok(&sgr_press(1, 1, 1));
-    let m = mouse_event(&ev);
-    assert_eq!(m.kind, MouseEventKind::Down(MouseButton::Middle));
-}
-
-#[test]
-fn sgr_scroll_up() {
-    // cb=64 (0x40) = scroll, bit 0 clear = ScrollUp
-    let (ev, _) = parse_ok(&sgr_press(64, 1, 1));
-    let m = mouse_event(&ev);
-    assert_eq!(m.kind, MouseEventKind::ScrollUp);
-}
-
-#[test]
-fn sgr_scroll_down() {
-    // cb=65 (0x41) = scroll, bit 0 set = ScrollDown
-    let (ev, _) = parse_ok(&sgr_press(65, 1, 1));
-    let m = mouse_event(&ev);
-    assert_eq!(m.kind, MouseEventKind::ScrollDown);
 }
 
 // ---------------------------------------------------------------------------
@@ -342,26 +258,6 @@ fn csi_u_shift_without_shifted_field_falls_back_to_primary() {
 }
 
 // ---------------------------------------------------------------------------
-// SGR mouse drag vs moved
-// ---------------------------------------------------------------------------
-
-#[test]
-fn sgr_left_button_drag() {
-    // cb=32 (0x20): bit5=motion, bits0-1=0 (left button held) → Drag(Left)
-    let (ev, _) = parse_ok(&sgr_press(32, 10, 5));
-    let m = mouse_event(&ev);
-    assert_eq!(m.kind, MouseEventKind::Drag(MouseButton::Left));
-}
-
-#[test]
-fn sgr_motion_no_button_is_moved() {
-    // cb=35 (0x23): bit5=motion, bits0-1=3 (no button) → Moved
-    let (ev, _) = parse_ok(&sgr_press(35, 10, 5));
-    let m = mouse_event(&ev);
-    assert_eq!(m.kind, MouseEventKind::Moved);
-}
-
-// ---------------------------------------------------------------------------
 // CSI arrows: bare, disambiguated, and release forms.
 // REPORT_ALL_KEYS_AS_ESCAPE_CODES only affects printable keys; arrows still
 // come through the legacy CSI path (ESC[A or ESC[1;1A via DISAMBIGUATE_ESCAPE_CODES).
@@ -391,123 +287,6 @@ fn csi_arrow_release_decodes_as_release() {
     let (ev, _) = parse_ok(b"\x1b[1;1:3A");
     assert_eq!(key_event(&ev).code, KeyCode::Up);
     assert_eq!(key_event(&ev).kind, KeyEventKind::Release);
-}
-
-// ---------------------------------------------------------------------------
-// try_next_raw_event: non-blocking path
-// ---------------------------------------------------------------------------
-
-#[test]
-fn try_next_raw_event_returns_buffered_event() {
-    let mut src = RawEventSource::new();
-    src.buf.extend_from_slice(b"q");
-    let ev = src.try_next_raw_event().expect("must not error");
-    assert!(
-        ev.is_some(),
-        "pre-buffered event must be returned immediately"
-    );
-}
-
-#[test]
-fn try_next_raw_event_returns_none_when_buffer_empty() {
-    let mut src = RawEventSource::new();
-    // poll(fd=0, timeout=0) returns immediately when stdin has no data.
-    let ev = src.try_next_raw_event().expect("must not error");
-    assert!(ev.is_none());
-}
-
-// ---------------------------------------------------------------------------
-// fill_with / PollReader: mock-based tests for #456 (exact-4096 freeze)
-// ---------------------------------------------------------------------------
-
-/// Mock [`PollReader`] that returns pre-configured poll and read results
-/// from front-to-back queues.
-struct MockReader {
-    poll_results: VecDeque<bool>,
-    read_counts: VecDeque<usize>,
-}
-
-impl PollReader for MockReader {
-    fn poll(&mut self, _timeout_ms: libc::c_int) -> io::Result<bool> {
-        Ok(self.poll_results.pop_front().unwrap_or(false))
-    }
-
-    fn read(&mut self, _buf: &mut [u8]) -> io::Result<usize> {
-        self.read_counts
-            .pop_front()
-            .ok_or_else(|| io::Error::other("MockReader: unexpected extra read() call"))
-    }
-}
-
-#[test]
-fn fill_with_exact_4096_does_not_block() {
-    // Simulate an exact 4096-byte burst with no more data available.
-    // The loop must use poll(0) and break, not issue a blocking read.
-    let mut src = RawEventSource::new();
-    let mut reader = MockReader {
-        poll_results: VecDeque::from([true, false]),
-        read_counts: VecDeque::from([4096]),
-    };
-    src.fill_with(&mut reader, 16).expect("fill must not error");
-    assert_eq!(src.buf.len(), 4096);
-    assert!(
-        reader.read_counts.is_empty(),
-        "no more reads should be attempted"
-    );
-}
-
-#[test]
-fn fill_with_partial_read_stops_without_extra_poll() {
-    // A read returning less than the buffer size means no more data is
-    // pending, so the loop must break without calling poll(0).
-    let mut src = RawEventSource::new();
-    let mut reader = MockReader {
-        poll_results: VecDeque::from([true, false]),
-        read_counts: VecDeque::from([100]),
-    };
-    src.fill_with(&mut reader, 16).expect("fill must not error");
-    assert_eq!(src.buf.len(), 100);
-    // The poll(0) result was not consumed.
-    assert_eq!(
-        reader.poll_results.len(),
-        1,
-        "poll(0) should not be consumed after partial read"
-    );
-}
-
-#[test]
-fn fill_with_drains_multiple_4096_bursts() {
-    // Two exact 4096-byte reads, with poll(0) returning true between them.
-    let mut src = RawEventSource::new();
-    let mut reader = MockReader {
-        poll_results: VecDeque::from([true, true, false]),
-        read_counts: VecDeque::from([4096, 4096]),
-    };
-    src.fill_with(&mut reader, 16).expect("fill must not error");
-    assert_eq!(src.buf.len(), 8192);
-    assert!(reader.read_counts.is_empty());
-}
-
-#[test]
-fn fill_with_returns_early_on_poll_timeout() {
-    let mut src = RawEventSource::new();
-    let mut reader = MockReader {
-        poll_results: VecDeque::from([false]),
-        read_counts: VecDeque::from([]),
-    };
-    src.fill_with(&mut reader, 16).expect("fill must not error");
-    assert!(src.buf.is_empty());
-}
-
-#[test]
-fn fill_with_empty_read_is_eof() {
-    let mut src = RawEventSource::new();
-    let mut reader = MockReader {
-        poll_results: VecDeque::from([true]),
-        read_counts: VecDeque::from([0]),
-    };
-    src.fill_with(&mut reader, 16).expect("fill must not error");
-    assert!(src.buf.is_empty());
 }
 
 // ---------------------------------------------------------------------------
@@ -626,7 +405,7 @@ fn utf8_paste_split_across_fill_boundary() {
     src.buf.extend_from_slice(&full[..split]);
     let mut decoded = String::new();
     while let Some(ev) = src.parse_next().unwrap() {
-        if let Event::Key(KeyEvent {
+        if let Event::Key(crossterm::event::KeyEvent {
             code: KeyCode::Char(c),
             ..
         }) = ev
@@ -641,7 +420,7 @@ fn utf8_paste_split_across_fill_boundary() {
     // The rest of the paste arrives in a second read.
     src.buf.extend_from_slice(&full[split..]);
     while let Some(ev) = src.parse_next().unwrap() {
-        if let Event::Key(KeyEvent {
+        if let Event::Key(crossterm::event::KeyEvent {
             code: KeyCode::Char(c),
             ..
         }) = ev
@@ -650,57 +429,4 @@ fn utf8_paste_split_across_fill_boundary() {
         }
     }
     assert_eq!(decoded, "héllo мир");
-}
-
-// ---------------------------------------------------------------------------
-// SGR mouse with modifier bits (#455)
-// ---------------------------------------------------------------------------
-
-#[test]
-fn sgr_ctrl_click_press() {
-    // cb=16 (0x10): bit 4 = Ctrl modifier.
-    // After masking out modifier bits, cb=0 → Left button.
-    let (ev, _) = parse_ok(&sgr_press(16, 5, 10));
-    let m = mouse_event(&ev);
-    assert_eq!(m.kind, MouseEventKind::Down(MouseButton::Left));
-    assert!(m.modifiers.contains(KeyModifiers::CONTROL));
-}
-
-#[test]
-fn sgr_shift_click_press() {
-    // cb=4 (0x04): bit 2 = Shift modifier. After masking, cb=0 → Left.
-    let (ev, _) = parse_ok(&sgr_press(4, 5, 10));
-    let m = mouse_event(&ev);
-    assert_eq!(m.kind, MouseEventKind::Down(MouseButton::Left));
-    assert!(m.modifiers.contains(KeyModifiers::SHIFT));
-}
-
-#[test]
-fn sgr_ctrl_shift_click_press() {
-    // cb=20 (0x14): bit 2 (Shift) + bit 4 (Ctrl). After masking, cb=0 → Left.
-    let (ev, _) = parse_ok(&sgr_press(20, 5, 10));
-    let m = mouse_event(&ev);
-    assert_eq!(m.kind, MouseEventKind::Down(MouseButton::Left));
-    assert!(m.modifiers.contains(KeyModifiers::SHIFT));
-    assert!(m.modifiers.contains(KeyModifiers::CONTROL));
-}
-
-#[test]
-fn sgr_modifiers_dont_affect_scroll() {
-    // cb=68 (0x44): scroll bit (0x40) + shift modifier bit (0x04).
-    // After masking out modifier, cb=64 → ScrollUp.
-    let (ev, _) = parse_ok(&sgr_press(68, 1, 1));
-    let m = mouse_event(&ev);
-    assert_eq!(m.kind, MouseEventKind::ScrollUp);
-    assert!(m.modifiers.contains(KeyModifiers::SHIFT));
-}
-
-#[test]
-fn sgr_modifiers_dont_affect_drag() {
-    // cb=36 (0x24): motion bit (0x20) + shift modifier bit (0x04).
-    // After masking out modifier bits, cb=32 → Drag(Left).
-    let (ev, _) = parse_ok(&sgr_press(36, 10, 5));
-    let m = mouse_event(&ev);
-    assert_eq!(m.kind, MouseEventKind::Drag(MouseButton::Left));
-    assert!(m.modifiers.contains(KeyModifiers::SHIFT));
 }

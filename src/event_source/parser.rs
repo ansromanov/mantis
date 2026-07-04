@@ -1,248 +1,29 @@
-//! Raw terminal event source with kitty keyboard protocol support.
+//! Low-level terminal byte stream parser for events.
 //!
-//! Reads bytes directly from stdin via `libc::poll`/`read` so it can parse
-//! CSI-u sequences and extract the *alternate keycodes* (shifted key and
-//! US-layout physical key) that crossterm discards. The extracted keys are
-//! stored in a `thread_local!` cell so [`KeyBinding::matches`](crate::config::KeyBinding)
-//! can use them for layout-independent matching.
+//! This module contains parsing functions that translate raw ESC sequences, CSI
+//! parameters, and UTF-8 byte patterns into structured crossterm `Event` objects.
+//! It supports standard ANSI escapes, function key tilde sequences, and the Kitty
+//! keyboard protocol.
+//!
+//! Public (crate) items:
+//! - [`parse_event`]: Parses a single event from raw bytes.
+//! - [`decode_modifier_mask`]: Decodes Kitty protocol modifier bitmask.
 
-use std::cell::Cell;
 use std::io;
 
 use crossterm::event::{
-    Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers, MouseButton, MouseEvent,
+    Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers, MouseButton,
     MouseEventKind,
 };
 
-// ---------------------------------------------------------------------------
-// Thread-local alternate keys for the current event
-// ---------------------------------------------------------------------------
-
-/// Kitty alternate key codes for the current event: the shifted key and the
-/// US-physical (base-layout) key. Both `None` when the terminal didn't report
-/// them.
-#[derive(Clone, Copy, Default)]
-pub struct AltKeys {
-    pub shifted: Option<char>,
-    pub base: Option<char>,
-}
-
-thread_local! {
-    /// Alternate keycodes for the event currently being dispatched, if the
-    /// terminal provided them via the kitty keyboard protocol.
-    pub static CURRENT_ALT_KEYS: Cell<AltKeys> = const { Cell::new(AltKeys { shifted: None, base: None }) };
-}
-
-// ---------------------------------------------------------------------------
-// Keyboard enhancement flag management
-// ---------------------------------------------------------------------------
-
-/// Attempt to enable the kitty keyboard protocol on the terminal.
-///
-/// Returns `true` when the terminal supports it and the flags were
-/// successfully pushed. The caller **must** call
-/// [`pop_keyboard_enhancement_flags`] on teardown.
-pub fn push_keyboard_enhancement_flags() -> io::Result<bool> {
-    let supported = crossterm::terminal::supports_keyboard_enhancement()?;
-    if supported {
-        use crossterm::event::{KeyboardEnhancementFlags, PushKeyboardEnhancementFlags};
-        use crossterm::execute;
-        execute!(
-            io::stdout(),
-            PushKeyboardEnhancementFlags(
-                KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
-                    | KeyboardEnhancementFlags::REPORT_EVENT_TYPES
-                    | KeyboardEnhancementFlags::REPORT_ALTERNATE_KEYS
-                    // Without this, text-producing keys are sent as plain UTF-8
-                    // on press (e.g. Russian `и` for physical `b`), so the
-                    // base-layout alternate key never reaches the dispatcher and
-                    // layout-independent letter bindings fail. Forcing every key
-                    // to a CSI-u escape makes the base-layout field available on
-                    // press. See parse_csi_u / KeyBinding::matches.
-                    | KeyboardEnhancementFlags::REPORT_ALL_KEYS_AS_ESCAPE_CODES
-            )
-        )?;
-    }
-    Ok(supported)
-}
-
-/// Pop the keyboard enhancement flags pushed earlier.
-pub fn pop_keyboard_enhancement_flags() -> io::Result<()> {
-    use crossterm::event::PopKeyboardEnhancementFlags;
-    use crossterm::execute;
-    execute!(io::stdout(), PopKeyboardEnhancementFlags)
-}
-
-// ---------------------------------------------------------------------------
-// Raw event source
-// ---------------------------------------------------------------------------
-
-/// Abstraction for poll+read from a file descriptor, so the
-/// read-until-drained loop in [`RawEventSource::fill_with`] can be
-/// unit-tested without a real stdin.
-trait PollReader {
-    /// Returns `true` when data is available for reading.
-    fn poll(&mut self, timeout_ms: libc::c_int) -> io::Result<bool>;
-    /// Reads into `buf`, returns bytes read (0 = EOF).
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize>;
-}
-
-/// Real [`PollReader`] that reads from fd 0 (stdin).
-struct StdinReader;
-
-impl PollReader for StdinReader {
-    fn poll(&mut self, timeout_ms: libc::c_int) -> io::Result<bool> {
-        loop {
-            let mut pfd = libc::pollfd {
-                fd: 0,
-                events: libc::POLLIN,
-                revents: 0,
-            };
-            let ret = unsafe { libc::poll(&mut pfd, 1, timeout_ms) };
-            if ret < 0 {
-                let err = io::Error::last_os_error();
-                if err.kind() == io::ErrorKind::Interrupted {
-                    continue;
-                }
-                return Err(err);
-            }
-            return Ok(ret > 0 && pfd.revents & libc::POLLIN != 0);
-        }
-    }
-
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        loop {
-            let n = unsafe { libc::read(0, buf.as_mut_ptr() as *mut libc::c_void, buf.len()) };
-            if n < 0 {
-                let err = io::Error::last_os_error();
-                if err.kind() == io::ErrorKind::Interrupted {
-                    continue;
-                }
-                return Err(err);
-            }
-            return Ok(n as usize);
-        }
-    }
-}
-
-/// An [`EventSource`](crate::EventSource) that parses raw terminal bytes so it
-/// can extract kitty-protocol alternate keycodes.
-pub struct RawEventSource {
-    buf: Vec<u8>,
-    pos: usize,
-}
-
-impl Default for RawEventSource {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl RawEventSource {
-    pub fn new() -> Self {
-        Self {
-            buf: Vec::with_capacity(4096),
-            pos: 0,
-        }
-    }
-
-    /// Fill the internal buffer from stdin with the given poll timeout (ms).
-    /// Use `timeout_ms = 16` for the blocking next-event path and `timeout_ms = 0`
-    /// for the non-blocking try-next-event path.
-    fn fill(&mut self, timeout_ms: libc::c_int) -> io::Result<()> {
-        // Discard already-consumed bytes.
-        if self.pos > 0 {
-            self.buf.drain(..self.pos);
-            self.pos = 0;
-        }
-        self.fill_with(&mut StdinReader, timeout_ms)
-    }
-
-    /// Read from `reader` until no more data is available, using a
-    /// `poll(0)` check before every subsequent read to avoid blocking
-    /// when the first read returned exactly the buffer size
-    /// (fixes #456).
-    fn fill_with(
-        &mut self,
-        reader: &mut dyn PollReader,
-        timeout_ms: libc::c_int,
-    ) -> io::Result<()> {
-        if !reader.poll(timeout_ms)? {
-            return Ok(());
-        }
-
-        let mut tmp = [0u8; 4096];
-        loop {
-            let n = reader.read(&mut tmp)?;
-            if n == 0 {
-                break;
-            }
-            self.buf.extend_from_slice(&tmp[..n]);
-            if n < tmp.len() {
-                break;
-            }
-            // Poll with zero timeout to check if more data is available
-            // without blocking (fixes #456: exact-4096-burst freeze).
-            if !reader.poll(0)? {
-                break;
-            }
-        }
-        Ok(())
-    }
-
-    fn parse_next(&mut self) -> io::Result<Option<Event>> {
-        if self.pos >= self.buf.len() {
-            return Ok(None);
-        }
-
-        let remaining = &self.buf[self.pos..];
-        if remaining.is_empty() {
-            return Ok(None);
-        }
-
-        match parse_event(remaining) {
-            Ok(Some((event, consumed))) => {
-                self.pos += consumed;
-                Ok(Some(event))
-            }
-            Ok(None) => {
-                // Incomplete sequence — leave bytes in buffer for next fill().
-                Ok(None)
-            }
-            Err(_) => {
-                // Unparseable byte: skip it and signal no event (don't crash).
-                self.pos += 1;
-                Ok(None)
-            }
-        }
-    }
-
-    /// Parse and return the next event from the buffer, blocking briefly (16 ms)
-    /// for data when the buffer is empty.
-    pub fn next_raw_event(&mut self) -> io::Result<Option<Event>> {
-        CURRENT_ALT_KEYS.with(|c| c.set(AltKeys::default()));
-        self.fill(16)?;
-        self.parse_next()
-    }
-
-    /// Try to return an already-buffered event without waiting.
-    /// Returns `None` when no event is immediately available.
-    pub fn try_next_raw_event(&mut self) -> io::Result<Option<Event>> {
-        CURRENT_ALT_KEYS.with(|c| c.set(AltKeys::default()));
-        self.fill(0)?;
-        self.parse_next()
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Low-level parser
-// ---------------------------------------------------------------------------
+use super::mouse::parse_sgr_mouse;
+use super::{AltKeys, CURRENT_ALT_KEYS};
 
 /// Try to parse a single event from the front of `bytes`.
 ///
 /// Returns `Ok(Some((event, consumed)))` on success, `Ok(None)` for an
 /// incomplete sequence (need more data), or `Err` for an unparseable byte.
-fn parse_event(bytes: &[u8]) -> io::Result<Option<(Event, usize)>> {
+pub(crate) fn parse_event(bytes: &[u8]) -> io::Result<Option<(Event, usize)>> {
     if bytes.is_empty() {
         return Ok(None);
     }
@@ -369,10 +150,6 @@ fn parse_escape(bytes: &[u8]) -> io::Result<Option<(Event, usize)>> {
     }
 }
 
-// ---------------------------------------------------------------------------
-// CSI parser (ESC [ ... )
-// ---------------------------------------------------------------------------
-
 /// Find the end of a CSI sequence: any byte 0x40-0x7E is a final byte.
 fn csi_final_byte_pos(bytes: &[u8]) -> Option<usize> {
     // Position 0 is ESC, position 1 is '[' — final byte must be at index ≥ 2.
@@ -424,10 +201,6 @@ fn parse_csi(bytes: &[u8]) -> io::Result<Option<(Event, usize)>> {
         _ => Ok(Some((key(KeyCode::Null), consumed))),
     }
 }
-
-// ---------------------------------------------------------------------------
-// CSI-u / kitty key event parser
-// ---------------------------------------------------------------------------
 
 /// Parse a CSI-u key event.
 ///
@@ -636,7 +409,7 @@ fn translate_functional(codepoint: u32) -> Option<KeyCode> {
 /// Kitty encodes the modifier field as `bitmask + 1` so that the value 1
 /// means "no modifiers" (not absent) and 0 is never sent. Subtract 1 before
 /// decoding: bits: 0=Shift, 1=Alt, 2=Ctrl, 3=Super.
-fn decode_modifier_mask(mask: u8) -> KeyModifiers {
+pub(crate) fn decode_modifier_mask(mask: u8) -> KeyModifiers {
     let bits = mask.saturating_sub(1);
     let mut m = KeyModifiers::empty();
     if bits & 0x01 != 0 {
@@ -653,10 +426,6 @@ fn decode_modifier_mask(mask: u8) -> KeyModifiers {
     }
     m
 }
-
-// ---------------------------------------------------------------------------
-// CSI ~ (function-key) parser
-// ---------------------------------------------------------------------------
 
 fn parse_csi_tilde(params: &str, consumed: usize) -> io::Result<Option<(Event, usize)>> {
     // params is everything between '[' and '~'.
@@ -705,10 +474,6 @@ fn parse_csi_tilde(params: &str, consumed: usize) -> io::Result<Option<(Event, u
     )))
 }
 
-// ---------------------------------------------------------------------------
-// SS3 parser (ESC O ... )
-// ---------------------------------------------------------------------------
-
 fn parse_ss3(bytes: &[u8]) -> io::Result<Option<(Event, usize)>> {
     if bytes.len() < 3 {
         return Ok(None);
@@ -728,95 +493,6 @@ fn parse_ss3(bytes: &[u8]) -> io::Result<Option<(Event, usize)>> {
     };
     Ok(Some((key(code), 3)))
 }
-
-// ---------------------------------------------------------------------------
-// SGR mouse parser
-// ---------------------------------------------------------------------------
-
-/// Parse an SGR-encoded mouse event.
-///
-/// Format: `code;col;row` (parameters between '[' and the final M/m).
-fn parse_sgr_mouse(
-    params: &str,
-    consumed: usize,
-    default_kind: MouseEventKind,
-) -> io::Result<Option<(Event, usize)>> {
-    // SGR sequences include a leading '<' in the parameter string (ESC[<cb;col;rowM).
-    let params = params.strip_prefix('<').unwrap_or(params);
-    let mut parts = params.split(';');
-    let cb_str = parts.next().unwrap_or("0");
-    let col_str = parts.next().unwrap_or("1");
-    let row_str = parts.next().unwrap_or("1");
-
-    let raw_cb: u16 = cb_str.parse().unwrap_or(0);
-    let col: u16 = col_str.parse().unwrap_or(0);
-    let row: u16 = row_str.parse().unwrap_or(0);
-
-    // SGR mouse modifier bits in cb: bit 2=Shift (0x04), bit 3=Meta (0x08),
-    // bit 4=Ctrl (0x10). Extract and mask out before button/motion decode.
-    let mut modifiers = KeyModifiers::empty();
-    if raw_cb & 0x04 != 0 {
-        modifiers |= KeyModifiers::SHIFT;
-    }
-    if raw_cb & 0x10 != 0 {
-        modifiers |= KeyModifiers::CONTROL;
-    }
-    // Meta (bit 3) maps to Alt in the terminal world.
-    if raw_cb & 0x08 != 0 {
-        modifiers |= KeyModifiers::ALT;
-    }
-    let cb = raw_cb & !0b11100;
-
-    // Button 0-2: press/release determined by final byte (M/m) via default_kind;
-    // 0x20: motion (drag); 0x40: scroll (wheel).
-    let kind = if cb & 0x40 != 0 {
-        // Scroll event
-        if cb & 0x01 != 0 {
-            MouseEventKind::ScrollDown
-        } else {
-            MouseEventKind::ScrollUp
-        }
-    } else if cb & 0x20 != 0 {
-        // Bit 5 set = motion event. Bits 0-1 encode which button is held:
-        // value 3 means no button (hover/move); anything else is a drag.
-        if cb & 0x03 == 3 {
-            MouseEventKind::Moved
-        } else {
-            MouseEventKind::Drag(decode_mouse_button(cb))
-        }
-    } else {
-        // In SGR mode press vs release is signaled by the final byte (M or m),
-        // conveyed here via default_kind. Preserve the correct button from cb.
-        let button = decode_mouse_button(cb);
-        match default_kind {
-            MouseEventKind::Up(_) => MouseEventKind::Up(button),
-            _ => MouseEventKind::Down(button),
-        }
-    };
-
-    Ok(Some((
-        Event::Mouse(MouseEvent {
-            kind,
-            column: col.saturating_sub(1),
-            row: row.saturating_sub(1),
-            modifiers,
-        }),
-        consumed,
-    )))
-}
-
-fn decode_mouse_button(cb: u16) -> MouseButton {
-    match cb & 0x03 {
-        0 => MouseButton::Left,
-        1 => MouseButton::Middle,
-        2 => MouseButton::Right,
-        _ => MouseButton::Left,
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 fn key(code: KeyCode) -> Event {
     Event::Key(KeyEvent::new(code, KeyModifiers::empty()))
@@ -856,5 +532,5 @@ fn invalid(msg: &str) -> io::Error {
 }
 
 #[cfg(test)]
-#[path = "event_source_test.rs"]
+#[path = "parser_test.rs"]
 mod tests;
