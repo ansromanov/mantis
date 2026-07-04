@@ -513,3 +513,20 @@ fn help_scroll_down_reveals_later_sections() {
         has_search_section_after,
     );
 }
+
+#[test]
+fn help_shows_no_markdown_entry() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    let backend = TestBackend::new(200, 200);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    // The built-in markdown renderer was removed; no "raw" or "markdown" toggle
+    // should appear in the help overlay.
+    assert!(
+        !joined.contains("raw markdown"),
+        "help must not mention raw-markdown toggle after built-in renderer removal"
+    );
+}

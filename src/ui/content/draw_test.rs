@@ -428,30 +428,6 @@ fn blame_column_click_does_not_start_drag_selection() {
     );
 }
 
-/// Regression: pre-rerender must happen before total_lines/visible_end are
-/// computed so a terminal-widening resize (fewer wrapped lines) doesn't panic.
-#[cfg(feature = "markdown-core")]
-#[test]
-fn markdown_word_wrap_draw_does_not_panic_on_width_change() {
-    let root = temp_tree();
-    let mut app = app_for(&root);
-    app.word_wrap = true;
-    app.open_file(&root.join("readme.md"));
-    // Simulate render at narrow width then wider width (fewer wrapped lines).
-    let backend = TestBackend::new(40, 24);
-    let mut terminal = ratatui::Terminal::new(backend).unwrap();
-    terminal
-        .draw(|frame| draw_content(frame, &mut app, frame.area()))
-        .unwrap();
-    // Switch to wider terminal — would OOB-panic before the fix.
-    let backend = TestBackend::new(120, 24);
-    let mut terminal = ratatui::Terminal::new(backend).unwrap();
-    terminal
-        .draw(|frame| draw_content(frame, &mut app, frame.area()))
-        .unwrap();
-    fs::remove_dir_all(&root).ok();
-}
-
 #[test]
 fn word_wrap_without_line_numbers_still_wraps() {
     // Regression: when ln_width==0 (no line numbers, no blame, no folds),
@@ -489,43 +465,6 @@ fn word_wrap_without_line_numbers_still_wraps() {
     assert!(
         r2.trim_end().contains('x'),
         "row 2 must also have content (word wrap), got: {r2:?}"
-    );
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn rendered_markdown_no_line_number_gutter() {
-    // Rendered markdown should not show line-number gutter even when
-    // show_line_numbers=true, because rendered-line indices don't map to
-    // source lines. Verify line_prefix_width() is 0 and gutter contains
-    // no digits.
-    let root = temp_tree();
-    let mut app = app_for(&root);
-    let path = root.join("test.md");
-    fs::write(&path, "# Heading\n\nSome text\n").unwrap();
-    app.open_file(&path);
-    app.is_markdown = true;
-    app.show_raw_markdown = false;
-    app.show_line_numbers = true;
-    // Populate markdown_lines with rendered content.
-    app.markdown_lines = vec![
-        vec![(ratatui::style::Style::default(), "# Heading".to_string())],
-        vec![(ratatui::style::Style::default(), "Some text".to_string())],
-    ];
-    // line_prefix_width() should be 0 for rendered markdown.
-    assert_eq!(
-        app.line_prefix_width(),
-        0,
-        "rendered markdown must have no line-number gutter width"
-    );
-    // Render and check no digits appear in the content.
-    let out = render_to_string(&mut app);
-    // Line numbers would be "1 " and "2 " in the output.
-    // Since markdown is rendered, they should not appear at the start of
-    // content lines.
-    assert!(
-        !out.contains("1 # Heading"),
-        "rendered markdown must not have line numbers in output"
     );
     fs::remove_dir_all(&root).ok();
 }
@@ -576,34 +515,6 @@ fn plugin_content_no_line_number_gutter() {
     );
     fs::remove_dir_all(&root).ok();
 }
-
-#[test]
-fn raw_markdown_still_shows_line_numbers() {
-    // Raw markdown (show_raw_markdown=true) should still show line numbers.
-    // This ensures the fix only affects rendered paths.
-    let root = temp_tree();
-    let mut app = app_for(&root);
-    let path = root.join("test.md");
-    fs::write(&path, "# Heading\n\nSome text\n").unwrap();
-    app.open_file(&path);
-    app.is_markdown = true;
-    app.show_raw_markdown = true;
-    app.show_line_numbers = true;
-    // line_prefix_width() should be non-zero for raw markdown.
-    let ln_width = app.line_prefix_width();
-    assert!(
-        ln_width > 0,
-        "raw markdown must have line-number gutter width, got {ln_width}"
-    );
-    // Render and verify line numbers appear.
-    let out = render_to_string(&mut app);
-    assert!(
-        out.contains("1 "),
-        "raw markdown must show line numbers in output"
-    );
-    fs::remove_dir_all(&root).ok();
-}
-
 #[test]
 fn empty_state_shows_orientation_hint_when_no_file_open() {
     let root = temp_tree();

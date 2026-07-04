@@ -255,15 +255,7 @@ impl App {
         let scroll_before = self.content_scroll;
         let hscroll_before = self.content_hscroll;
         let active_line_before = self.active_line;
-        if pressed(&k.toggle_raw_markdown, &key) {
-            if self.is_markdown {
-                self.show_raw_markdown = !self.show_raw_markdown;
-                self.set_content_scroll(0);
-                self.content_hscroll = 0;
-            } else {
-                self.set_status("raw toggle: not a markdown file");
-            }
-        } else if pressed(&k.toggle_pretty_json, &key) {
+        if pressed(&k.toggle_pretty_json, &key) {
             if self.is_json && !self.json_pretty_lines.is_empty() {
                 self.show_pretty_json = !self.show_pretty_json;
                 self.set_content_scroll(0);

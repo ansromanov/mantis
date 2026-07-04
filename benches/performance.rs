@@ -9,11 +9,7 @@ use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criteri
 use mantis::app::App;
 use mantis::config::{Config, ContentConfig, TreeConfig};
 use mantis::highlight::Highlighter;
-#[cfg(feature = "markdown-core")]
-use mantis::markdown;
 use mantis::search::SearchState;
-#[cfg(feature = "markdown-core")]
-use mantis::theme::Theme;
 use mantis::tree::{build_visible, collect_all_files};
 use mantis::virtual_file::VirtualFile;
 use ratatui::backend::TestBackend;
@@ -78,42 +74,6 @@ fn generate_deep_tree(dir: &Path, depth: usize) {
     }
 }
 
-/// A large markdown file with headings, tables, code blocks, lists, etc.
-/// Produces a file with exactly `line_count` lines (counted by `\n`).
-#[cfg(feature = "markdown-core")]
-fn generate_large_markdown(path: &Path, line_count: usize) {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).unwrap();
-    }
-    let mut content = String::with_capacity(line_count * 60);
-    content.push_str("# Large Benchmark Document\n\n");
-    let mut lines_written = 2usize;
-    let mut i = 0usize;
-    while lines_written < line_count {
-        let chunk = match i % 10 {
-            0 => format!("## Section {i}\n\n"),
-            1 => "Paragraph with **bold** and *italic* text and `code`.\n\n".to_string(),
-            2 => "- list item 1\n- list item 2\n- list item 3\n\n".to_string(),
-            3 => "> Block quote with some text in it.\n\n".to_string(),
-            4 => "```rust\nfn hello() { println!(\"world\"); }\n```\n\n".to_string(),
-            5 => format!(
-                "| Col A | Col B | Col C |\n|-------|-------|-------|\n| {i}A    | \
-                     {i}B    | {i}C    |\n\n"
-            ),
-            6 => "---\n\n".to_string(),
-            _ => format!("Regular paragraph with some content at line {i}.\n\n"),
-        };
-        let chunk_lines = chunk.chars().filter(|&c| c == '\n').count();
-        if lines_written + chunk_lines > line_count {
-            break;
-        }
-        content.push_str(&chunk);
-        lines_written += chunk_lines;
-        i += 1;
-    }
-    fs::write(path, content).unwrap();
-}
-
 /// Generates searchable text files with `count` files each having `lines` lines.
 fn generate_search_files(dir: &Path, count: usize, lines: usize) {
     fs::create_dir_all(dir).unwrap();
@@ -152,11 +112,6 @@ fn expand_all(root: &Path) -> HashSet<PathBuf> {
 
 fn highlighter() -> Highlighter {
     Highlighter::with_extra_syntaxes("base16-ocean.dark", &[])
-}
-
-#[cfg(feature = "markdown-core")]
-fn theme() -> Theme {
-    Theme::default()
 }
 
 // ---------------------------------------------------------------------------
@@ -332,33 +287,6 @@ fn bench_highlight(c: &mut Criterion) {
 }
 
 // ---------------------------------------------------------------------------
-// Benchmark: markdown render
-// ---------------------------------------------------------------------------
-
-#[cfg(feature = "markdown-core")]
-fn bench_markdown_render(c: &mut Criterion) {
-    let mut group = c.benchmark_group("markdown_render");
-    let t = theme();
-
-    for &lines in &[100, 1_000, 10_000] {
-        let dir = fixture_dir("md");
-        let path = dir.join("bench.md");
-        generate_large_markdown(&path, lines);
-        let content = fs::read_to_string(&path).unwrap();
-
-        group.bench_with_input(
-            BenchmarkId::new("render", lines),
-            &(&content, &t),
-            |b, (src, theme)| b.iter(|| black_box(markdown::render(src, theme))),
-        );
-
-        fs::remove_dir_all(&dir).ok();
-    }
-
-    group.finish();
-}
-
-// ---------------------------------------------------------------------------
 // Benchmark: scroll / redraw — highlight a visible window at different
 // positions in a large file.
 // ---------------------------------------------------------------------------
@@ -501,19 +429,6 @@ fn bench_tree_redraw(c: &mut Criterion) {
 // Criterion entry point
 // ---------------------------------------------------------------------------
 
-#[cfg(feature = "markdown-core")]
-criterion_group!(
-    benches,
-    bench_tree_walk,
-    bench_content_search,
-    bench_file_open,
-    bench_highlight,
-    bench_markdown_render,
-    bench_scroll_redraw,
-    bench_tree_redraw,
-);
-
-#[cfg(not(feature = "markdown-core"))]
 criterion_group!(
     benches,
     bench_tree_walk,

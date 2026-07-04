@@ -6,8 +6,8 @@
 > defers here and adds only Claude-Code-specific notes.
 
 A fast terminal-based file tree viewer built with ratatui. Navigate filesystems,
-preview files with syntax highlighting (`syntect`), render markdown
-(`pulldown-cmark`), fuzzy-search files/content (`fuzzy-matcher`), browse git history
+preview files with syntax highlighting (`syntect`), fuzzy-search files/content
+(`fuzzy-matcher`), browse git history
 (`git` CLI), and switch themes — all with mouse and keyboard.
 
 ---
@@ -74,7 +74,6 @@ src/
 ├── file.rs                         # Binary detection, encoding/line-ending probe
 ├── git.rs                          # Shell-out to git: log, diff, blame, status, repo_info
 ├── highlight.rs                    # syntect Highlighter → ratatui Style spans
-├── markdown.rs                     # pulldown-cmark → styled ratatui spans
 ├── plugin/
 │   └── mod.rs                      # Plugin, PluginManager, PluginKind, ExtraSyntax; subprocess IPC
 ├── release_info.rs                 # Compile-time release metadata (ReleaseInfo, RELEASE static)

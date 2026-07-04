@@ -132,7 +132,6 @@ content_page_down = ["PageDown"]
 content_reset_col = ["0"]
 toggle_wrap = ["z"]
 toggle_line_numbers = ["L"]
-toggle_raw_markdown = ["M"]
 toggle_pretty_json = ["J"]
 toggle_blame = ["b"]         # inline blame for the whole file
 blame_line = ["B"]           # blame popup for the current line

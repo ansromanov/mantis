@@ -55,11 +55,9 @@ impl App {
     /// Re-opens `path` via `open_file` while preserving scroll position,
     /// horizontal scroll, and view-mode toggles.
     pub(super) fn reopen_file(&mut self, path: &std::path::Path) {
-        let raw = self.show_raw_markdown;
         let pretty = self.show_pretty_json;
         self.preserving_scroll(|s| {
             s.open_file(path);
-            s.show_raw_markdown = raw;
             if s.is_json {
                 s.show_pretty_json = pretty;
             }
@@ -177,9 +175,6 @@ impl App {
         self.current_syntax = None;
         self.mark_session_dirty();
         self.plugin_content_active = false;
-        self.is_markdown = false;
-        self.show_raw_markdown = false;
-        self.markdown_lines = Vec::new();
         self.is_json = false;
         self.show_pretty_json = false;
         self.json_pretty_text = Vec::new();
@@ -229,8 +224,6 @@ impl App {
         self.plugin_content_active_path = None;
         self.is_diff = false;
         self.diff_rows = Vec::new();
-        self.is_markdown = false;
-        self.show_raw_markdown = false;
         self.is_json = false;
         self.show_pretty_json = false;
         self.json_pretty_text = Vec::new();
@@ -241,7 +234,6 @@ impl App {
         self.virtual_file = None;
         self.content = vec!["[deleted]".into()];
         self.highlighted = Vec::new();
-        self.markdown_lines = Vec::new();
         self.content_title = None;
         self.set_content_scroll(0);
         self.content_hscroll = 0;
@@ -264,20 +256,19 @@ impl App {
         self.focus = Focus::Content;
     }
 
-    /// Reads a file from disk, detects binary/markdown, runs syntax
-    /// highlighting, and renders markdown if applicable, synchronously. The
-    /// async navigation path uses `request_open_file`; both share
-    /// `apply_file_load`. Errors and empty files produce inline messages rather
-    /// than crashing.
+    /// Reads a file from disk, detects binary, runs syntax highlighting, and
+    /// renders JSON/YAML if applicable, synchronously. The async navigation path
+    /// uses `request_open_file`; both share `apply_file_load`. Errors and empty
+    /// files produce inline messages rather than crashing.
     pub fn open_file(&mut self, path: &Path) {
         self.invalidate_pending_load();
-        let load = compute_file_load(path, &self.theme, &self.highlighter);
+        let load = compute_file_load(path, &self.highlighter);
         self.apply_file_load(path, load);
     }
 
     /// Applies a computed file load to the content panel: resets scroll and
-    /// selection, then installs the rendered content/highlighting/markdown/JSON/
-    /// YAML state. Shared by the synchronous and worker-thread code paths.
+    /// selection, then installs the rendered content/highlighting/JSON/YAML
+    /// state. Shared by the synchronous and worker-thread code paths.
     pub(super) fn apply_file_load(&mut self, path: &Path, load: FileLoad) {
         self.is_diff = false;
         self.viewing_revision = None;
@@ -307,15 +298,10 @@ impl App {
             self.clear_selection();
         }
 
-        self.is_markdown = load.is_markdown;
-        self.show_raw_markdown = false;
         self.is_json = load.is_json;
         self.file_encoding = load.encoding;
         self.file_line_ending = load.line_ending;
         self.show_pretty_json = load.show_pretty_json;
-        self.markdown_lines = load.markdown_lines;
-        self.markdown_src = load.markdown_src;
-        self.markdown_wrap_width = 0;
         self.json_pretty_text = load.json_pretty_text;
         self.json_pretty_lines = load.json_pretty_lines;
         self.clear_fold_state();
@@ -367,26 +353,6 @@ impl App {
             self.current_syntax = None;
             self.mark_session_dirty();
             self.set_file_watch(None);
-        }
-    }
-
-    /// Re-renders markdown if terminal width has changed significantly.
-    /// Call before drawing to ensure smooth scrolling under word wrap.
-    pub(crate) fn rerender_markdown_if_needed(&mut self, available_width: usize) {
-        if !self.is_markdown || self.markdown_src.is_empty() {
-            return;
-        }
-        if self.markdown_wrap_width == available_width {
-            return;
-        }
-        self.markdown_wrap_width = available_width;
-        #[cfg(feature = "markdown-core")]
-        {
-            self.markdown_lines = crate::markdown::render_with_width(
-                &self.markdown_src,
-                &self.theme,
-                Some(available_width),
-            );
         }
     }
 
@@ -483,9 +449,6 @@ impl App {
         self.mark_session_dirty();
         self.plugin_content_active = false;
         self.plugin_content_active_path = None;
-        self.is_markdown = false;
-        self.show_raw_markdown = false;
-        self.markdown_lines = Vec::new();
         self.is_json = false;
         self.show_pretty_json = false;
         self.json_pretty_text = Vec::new();

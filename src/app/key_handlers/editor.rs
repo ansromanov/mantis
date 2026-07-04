@@ -91,11 +91,6 @@ impl App {
                 self.config.content.line_numbers = self.show_line_numbers;
                 self.save_config();
             }
-            Some("toggle_raw_markdown") if self.is_markdown => {
-                self.show_raw_markdown = !self.show_raw_markdown;
-                self.set_content_scroll(0);
-                self.content_hscroll = 0;
-            }
             Some("toggle_pretty_json") if self.is_json && !self.json_pretty_lines.is_empty() => {
                 self.show_pretty_json = !self.show_pretty_json;
                 self.set_content_scroll(0);

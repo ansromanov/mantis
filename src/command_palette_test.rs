@@ -54,10 +54,10 @@ fn command_palette_results_len() {
 #[test]
 fn command_palette_filters_by_name() {
     let mut p = CommandPalette::default();
-    for c in "markdown".chars() {
+    for c in "json".chars() {
         p.push(c);
     }
-    assert!(p.selected_command().unwrap().name.contains("markdown"));
+    assert!(p.selected_command().unwrap().name.contains("JSON"));
 }
 
 #[test]

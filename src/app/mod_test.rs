@@ -962,10 +962,8 @@ fn reopen_file_preserves_scroll_and_raw_markdown() {
     app.open_file(&md_path);
     app.content_scroll = 3;
     app.content_hscroll = 5;
-    app.show_raw_markdown = true;
 
     app.reopen_file(&md_path);
-    assert!(app.show_raw_markdown);
     assert_eq!(
         app.content_scroll,
         3.min(app.line_count().saturating_sub(1))
@@ -975,20 +973,6 @@ fn reopen_file_preserves_scroll_and_raw_markdown() {
 }
 
 // -- content_line_count ----------------------------------------------------
-
-#[cfg(feature = "markdown-core")]
-#[test]
-fn content_line_count_markdown_rendered() {
-    let root = temp_tree();
-    let mut app = app_for(&root);
-    let md_path = root.join("readme.md");
-    fs::write(&md_path, "# H1\n\npara\n").unwrap();
-    app.open_file(&md_path);
-    assert!(app.is_markdown);
-    assert!(!app.show_raw_markdown);
-    assert_eq!(app.line_count(), app.markdown_lines.len());
-    fs::remove_dir_all(&root).ok();
-}
 
 // -- content_scroll_max ----------------------------------------------------
 
@@ -1016,9 +1000,12 @@ fn line_prefix_width_zero_for_diff_and_markdown() {
     app.is_diff = true;
     assert_eq!(app.line_prefix_width(), 0);
     app.is_diff = false;
-    app.is_markdown = true;
-    app.show_raw_markdown = false;
-    app.markdown_lines = vec![vec![(ratatui::style::Style::default(), "x".to_string())]];
+    let md_path = root.join("doc.md");
+    app.current_file = Some(md_path.clone());
+    app.plugin_content.insert(
+        md_path,
+        vec![vec![(ratatui::style::Style::default(), "x".to_string())]],
+    );
     assert_eq!(app.line_prefix_width(), 0);
     fs::remove_dir_all(&root).ok();
 }
@@ -1702,18 +1689,21 @@ fn content_pos_no_wrap_plain_text() {
 fn content_pos_word_wrap_first_visual_row_of_first_line() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    // Markdown mode: prefix = 0.
-    app.is_markdown = true;
-    app.show_raw_markdown = false;
-    app.markdown_lines = vec![
-        // Line 0: 5 chars -> ceil(5/10) = 1 visual row.
-        vec![(ratatui::style::Style::default(), "hello".to_string())],
-        // Line 1: 22 chars -> ceil(22/10) = 3 visual rows.
-        vec![(
-            ratatui::style::Style::default(),
-            "a long line that wraps".to_string(),
-        )],
-    ];
+    // Plugin content mode: prefix = 0.
+    let md_path = root.join("doc.md");
+    app.current_file = Some(md_path.clone());
+    app.plugin_content.insert(
+        md_path,
+        vec![
+            // Line 0: 5 chars -> ceil(5/10) = 1 visual row.
+            vec![(ratatui::style::Style::default(), "hello".to_string())],
+            // Line 1: 22 chars -> ceil(22/10) = 3 visual rows.
+            vec![(
+                ratatui::style::Style::default(),
+                "a long line that wraps".to_string(),
+            )],
+        ],
+    );
     app.word_wrap = true;
     app.content_scroll = 0;
     app.content_area = Rect {
@@ -1734,15 +1724,18 @@ fn content_pos_word_wrap_first_visual_row_of_first_line() {
 fn content_pos_word_wrap_first_visual_row_of_second_line() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.is_markdown = true;
-    app.show_raw_markdown = false;
-    app.markdown_lines = vec![
-        vec![(ratatui::style::Style::default(), "hello".to_string())],
-        vec![(
-            ratatui::style::Style::default(),
-            "a long line that wraps".to_string(),
-        )],
-    ];
+    let md_path = root.join("doc.md");
+    app.current_file = Some(md_path.clone());
+    app.plugin_content.insert(
+        md_path,
+        vec![
+            vec![(ratatui::style::Style::default(), "hello".to_string())],
+            vec![(
+                ratatui::style::Style::default(),
+                "a long line that wraps".to_string(),
+            )],
+        ],
+    );
     app.word_wrap = true;
     app.content_scroll = 0;
     app.content_area = Rect {
@@ -1762,15 +1755,18 @@ fn content_pos_word_wrap_first_visual_row_of_second_line() {
 fn content_pos_word_wrap_second_visual_row_of_second_line() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.is_markdown = true;
-    app.show_raw_markdown = false;
-    app.markdown_lines = vec![
-        vec![(ratatui::style::Style::default(), "hello".to_string())],
-        vec![(
-            ratatui::style::Style::default(),
-            "a long line that wraps".to_string(),
-        )],
-    ];
+    let md_path = root.join("doc.md");
+    app.current_file = Some(md_path.clone());
+    app.plugin_content.insert(
+        md_path,
+        vec![
+            vec![(ratatui::style::Style::default(), "hello".to_string())],
+            vec![(
+                ratatui::style::Style::default(),
+                "a long line that wraps".to_string(),
+            )],
+        ],
+    );
     app.word_wrap = true;
     app.content_scroll = 0;
     app.content_area = Rect {
@@ -1790,15 +1786,18 @@ fn content_pos_word_wrap_second_visual_row_of_second_line() {
 fn content_pos_word_wrap_third_visual_row_of_second_line() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.is_markdown = true;
-    app.show_raw_markdown = false;
-    app.markdown_lines = vec![
-        vec![(ratatui::style::Style::default(), "hello".to_string())],
-        vec![(
-            ratatui::style::Style::default(),
-            "a long line that wraps".to_string(),
-        )],
-    ];
+    let md_path = root.join("doc.md");
+    app.current_file = Some(md_path.clone());
+    app.plugin_content.insert(
+        md_path,
+        vec![
+            vec![(ratatui::style::Style::default(), "hello".to_string())],
+            vec![(
+                ratatui::style::Style::default(),
+                "a long line that wraps".to_string(),
+            )],
+        ],
+    );
     app.word_wrap = true;
     app.content_scroll = 0;
     app.content_area = Rect {
@@ -1818,15 +1817,18 @@ fn content_pos_word_wrap_third_visual_row_of_second_line() {
 fn content_pos_word_wrap_past_all_content_clamps_to_last_line() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.is_markdown = true;
-    app.show_raw_markdown = false;
-    app.markdown_lines = vec![
-        vec![(ratatui::style::Style::default(), "hello".to_string())],
-        vec![(
-            ratatui::style::Style::default(),
-            "a long line that wraps".to_string(),
-        )],
-    ];
+    let md_path = root.join("doc.md");
+    app.current_file = Some(md_path.clone());
+    app.plugin_content.insert(
+        md_path,
+        vec![
+            vec![(ratatui::style::Style::default(), "hello".to_string())],
+            vec![(
+                ratatui::style::Style::default(),
+                "a long line that wraps".to_string(),
+            )],
+        ],
+    );
     app.word_wrap = true;
     app.content_scroll = 0;
     app.content_area = Rect {
@@ -1845,12 +1847,15 @@ fn content_pos_word_wrap_past_all_content_clamps_to_last_line() {
 fn content_pos_word_wrap_empty_line_counts_as_one_visual_row() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.is_markdown = true;
-    app.show_raw_markdown = false;
-    app.markdown_lines = vec![
-        vec![(ratatui::style::Style::default(), "".to_string())],
-        vec![(ratatui::style::Style::default(), "next".to_string())],
-    ];
+    let md_path = root.join("doc.md");
+    app.current_file = Some(md_path.clone());
+    app.plugin_content.insert(
+        md_path,
+        vec![
+            vec![(ratatui::style::Style::default(), "".to_string())],
+            vec![(ratatui::style::Style::default(), "next".to_string())],
+        ],
+    );
     app.word_wrap = true;
     app.content_scroll = 0;
     app.content_area = Rect {
@@ -1869,13 +1874,16 @@ fn content_pos_word_wrap_empty_line_counts_as_one_visual_row() {
 fn content_pos_word_wrap_respects_content_scroll() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.is_markdown = true;
-    app.show_raw_markdown = false;
-    app.markdown_lines = vec![
-        vec![(ratatui::style::Style::default(), "line0".to_string())],
-        vec![(ratatui::style::Style::default(), "line1".to_string())],
-        vec![(ratatui::style::Style::default(), "line2".to_string())],
-    ];
+    let md_path = root.join("doc.md");
+    app.current_file = Some(md_path.clone());
+    app.plugin_content.insert(
+        md_path,
+        vec![
+            vec![(ratatui::style::Style::default(), "line0".to_string())],
+            vec![(ratatui::style::Style::default(), "line1".to_string())],
+            vec![(ratatui::style::Style::default(), "line2".to_string())],
+        ],
+    );
     app.word_wrap = true;
     app.content_scroll = 1; // first visible logical line is index 1
     app.content_area = Rect {
@@ -1898,7 +1906,6 @@ fn content_pos_word_wrap_plain_text_multi_span_line() {
     let root = temp_tree();
     let mut app = app_for(&root);
     // Plain-text mode with word_wrap.
-    app.is_markdown = false;
     app.is_diff = false;
     app.content = vec![
         "short".to_string(),        // 5 chars -> 1 visual row with width 10
@@ -1935,18 +1942,21 @@ fn content_pos_word_wrap_plain_text_multi_span_line() {
 fn content_pos_word_wrap_counts_wide_chars_by_display_width() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    // Markdown mode: prefix = 0, wrap_width = content_area.width = 8.
-    app.is_markdown = true;
-    app.show_raw_markdown = false;
-    app.markdown_lines = vec![
-        // 5 wide CJK glyphs: 5 chars but display width 10 -> ceil(10/8) = 2 rows.
-        // Counting by chars would give ceil(5/8) = 1 row and mis-map the row below.
-        vec![(
-            ratatui::style::Style::default(),
-            "\u{4e16}\u{754c}\u{4f60}\u{597d}\u{554a}".to_string(),
-        )],
-        vec![(ratatui::style::Style::default(), "next".to_string())],
-    ];
+    // Plugin content mode: prefix = 0, wrap_width = content_area.width = 8.
+    let md_path = root.join("doc.md");
+    app.current_file = Some(md_path.clone());
+    app.plugin_content.insert(
+        md_path,
+        vec![
+            // 5 wide CJK glyphs: 5 chars but display width 10 -> ceil(10/8) = 2 rows.
+            // Counting by chars would give ceil(5/8) = 1 row and mis-map the row below.
+            vec![(
+                ratatui::style::Style::default(),
+                "\u{4e16}\u{754c}\u{4f60}\u{597d}\u{554a}".to_string(),
+            )],
+            vec![(ratatui::style::Style::default(), "next".to_string())],
+        ],
+    );
     app.word_wrap = true;
     app.content_scroll = 0;
     app.content_area = Rect {
@@ -2823,35 +2833,6 @@ fn content_key_left_is_noop_when_word_wrap() {
     assert_eq!(app.content_hscroll, 10); // unchanged
     app.handle_key(KeyEvent::new(KeyCode::Right, KeyModifiers::empty()));
     assert_eq!(app.content_hscroll, 10); // unchanged
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn content_key_markdown_toggle_raw() {
-    let root = temp_tree();
-    let mut app = app_for(&root);
-    let md_path = root.join("doc.md");
-    fs::write(&md_path, "# Title\nbody\n").unwrap();
-    app.open_file(&md_path);
-    app.focus = Focus::Content;
-    assert!(!app.show_raw_markdown);
-    app.handle_key(KeyEvent::new(KeyCode::Char('M'), KeyModifiers::empty()));
-    assert!(app.show_raw_markdown);
-    app.handle_key(KeyEvent::new(KeyCode::Char('M'), KeyModifiers::empty()));
-    assert!(!app.show_raw_markdown);
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn content_key_markdown_toggle_raw_noop_when_not_markdown() {
-    let root = temp_tree();
-    let mut app = app_for(&root);
-    app.open_file(&root.join("a.txt"));
-    app.focus = Focus::Content;
-    assert!(!app.is_markdown);
-    let before = app.show_raw_markdown;
-    app.handle_key(KeyEvent::new(KeyCode::Char('M'), KeyModifiers::empty()));
-    assert_eq!(app.show_raw_markdown, before);
     fs::remove_dir_all(&root).ok();
 }
 
@@ -3736,12 +3717,15 @@ fn content_pos_with_fold_display_map() {
 fn content_pos_word_wrap_zero_width_area_falls_through() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.is_markdown = true;
-    app.show_raw_markdown = false;
-    app.markdown_lines = vec![vec![(
-        ratatui::style::Style::default(),
-        "hello".to_string(),
-    )]];
+    let md_path = root.join("doc.md");
+    app.current_file = Some(md_path.clone());
+    app.plugin_content.insert(
+        md_path,
+        vec![vec![(
+            ratatui::style::Style::default(),
+            "hello".to_string(),
+        )]],
+    );
     app.word_wrap = true;
     app.content_scroll = 0;
     // wrap_width = 0 → NonZeroUsize::new(0) is None → falls through to no-wrap path
@@ -3836,57 +3820,6 @@ fn selection_text_inline_out_of_bounds_returns_empty() {
     app.selection = Some(crate::selection::TextSelection {
         anchor: (10, 0),
         active: (20, 0),
-    });
-    assert_eq!(app.selection_text(), "");
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn selection_text_markdown_single_line() {
-    let root = temp_tree();
-    let mut app = app_for(&root);
-    app.is_markdown = true;
-    app.show_raw_markdown = false;
-    app.markdown_lines = vec![vec![(
-        ratatui::style::Style::default(),
-        "hello **world**".to_string(),
-    )]];
-    app.selection = Some(crate::selection::TextSelection {
-        anchor: (0, 6),
-        active: (0, 11),
-    });
-    assert_eq!(app.selection_text(), "**wor");
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn selection_text_markdown_multi_line() {
-    let root = temp_tree();
-    let mut app = app_for(&root);
-    app.is_markdown = true;
-    app.show_raw_markdown = false;
-    app.markdown_lines = vec![
-        vec![(ratatui::style::Style::default(), "line A".to_string())],
-        vec![(ratatui::style::Style::default(), "line B".to_string())],
-    ];
-    app.selection = Some(crate::selection::TextSelection {
-        anchor: (0, 5),
-        active: (1, 4),
-    });
-    assert_eq!(app.selection_text(), "A\nline");
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn selection_text_markdown_out_of_bounds_returns_empty() {
-    let root = temp_tree();
-    let mut app = app_for(&root);
-    app.is_markdown = true;
-    app.show_raw_markdown = false;
-    app.markdown_lines = vec![];
-    app.selection = Some(crate::selection::TextSelection {
-        anchor: (5, 0),
-        active: (10, 0),
     });
     assert_eq!(app.selection_text(), "");
     fs::remove_dir_all(&root).ok();
@@ -4109,18 +4042,6 @@ fn dispatch_command_toggle_word_wrap_toggles() {
     assert_ne!(app.word_wrap, before);
     assert_eq!(app.content_scroll, 0);
     assert_eq!(app.content_hscroll, 0);
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn dispatch_command_toggle_raw_markdown_toggles() {
-    let root = temp_tree();
-    let mut app = app_for(&root);
-    app.is_markdown = true;
-    setup_command(&mut app, "toggle_raw_markdown");
-    assert!(!app.show_raw_markdown);
-    app.dispatch_command();
-    assert!(app.show_raw_markdown);
     fs::remove_dir_all(&root).ok();
 }
 

@@ -100,6 +100,7 @@ fn line_prefix_width_zero_for_plugin_content() {
 fn set_content_scroll_clamps_to_max() {
     let root = temp_root();
     let mut app = app_for(&root);
+    app.virtual_file = None;
     // Simulate a content area 10 rows tall with 20 lines of content.
     app.content_area = Rect {
         x: 0,
@@ -107,7 +108,6 @@ fn set_content_scroll_clamps_to_max() {
         width: 80,
         height: 10,
     };
-    // doc.md has 1 line; force a larger virtual file:
     app.content = (0..20).map(|i| format!("line {i}")).collect();
     assert_eq!(app.content_scroll_max(), 20usize.saturating_sub(10)); // 10
 
@@ -144,6 +144,7 @@ fn set_content_scroll_zero_always_works() {
 fn clamp_content_scroll_reduces_when_content_shrinks() {
     let root = temp_root();
     let mut app = app_for(&root);
+    app.virtual_file = None; // clear auto-loaded vf from temp_root doc.md
     app.content_area = Rect {
         x: 0,
         y: 0,
@@ -168,6 +169,7 @@ fn clamp_content_scroll_reduces_when_content_shrinks() {
 fn clamp_content_scroll_does_not_increase_when_content_grows() {
     let root = temp_root();
     let mut app = app_for(&root);
+    app.virtual_file = None; // clear auto-loaded vf from temp_root doc.md
     app.content_area = Rect {
         x: 0,
         y: 0,
@@ -227,7 +229,6 @@ fn has_text_cursor_true_for_normal_text() {
     let root = temp_root();
     let mut app = app_for(&root);
     app.is_diff = false;
-    app.is_markdown = false;
     app.current_file = None;
     assert!(app.has_text_cursor());
     fs::remove_dir_all(&root).ok();
@@ -243,50 +244,13 @@ fn has_text_cursor_false_for_diff() {
 }
 
 #[test]
-fn has_text_cursor_false_for_rendered_markdown() {
-    let root = temp_root();
-    let mut app = app_for(&root);
-    app.is_diff = false;
-    app.is_markdown = true;
-    app.show_raw_markdown = false;
-    app.markdown_lines = vec![vec![(Style::default(), "hello".into())]];
-    assert!(!app.has_text_cursor());
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn has_text_cursor_true_for_raw_markdown() {
-    let root = temp_root();
-    let mut app = app_for(&root);
-    app.is_diff = false;
-    app.is_markdown = true;
-    app.show_raw_markdown = true; // raw = text cursor
-    app.markdown_lines = vec![vec![(Style::default(), "hello".into())]];
-    assert!(app.has_text_cursor());
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
 fn has_text_cursor_false_for_plugin_content() {
     let root = temp_root();
     let mut app = app_for(&root);
     app.is_diff = false;
-    app.is_markdown = false;
     let path = root.join("doc.md");
     seed_plugin(&mut app, path, &["plugin content"]);
     assert!(!app.has_text_cursor());
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn has_text_cursor_true_for_empty_markdown_lines() {
-    let root = temp_root();
-    let mut app = app_for(&root);
-    app.is_diff = false;
-    app.is_markdown = true;
-    app.show_raw_markdown = false;
-    app.markdown_lines = vec![]; // empty → treat as text
-    assert!(app.has_text_cursor());
     fs::remove_dir_all(&root).ok();
 }
 
@@ -313,6 +277,7 @@ fn scroll_line_into_view_already_visible_noop() {
 fn scroll_line_into_view_above_viewport() {
     let root = temp_root();
     let mut app = app_for(&root);
+    app.virtual_file = None;
     app.content_area = Rect {
         x: 0,
         y: 0,
@@ -330,6 +295,7 @@ fn scroll_line_into_view_above_viewport() {
 fn scroll_line_into_view_below_viewport() {
     let root = temp_root();
     let mut app = app_for(&root);
+    app.virtual_file = None;
     app.content_area = Rect {
         x: 0,
         y: 0,
@@ -349,6 +315,7 @@ fn scroll_line_into_view_below_viewport() {
 fn scroll_line_into_view_last_row() {
     let root = temp_root();
     let mut app = app_for(&root);
+    app.virtual_file = None;
     app.content_area = Rect {
         x: 0,
         y: 0,
@@ -367,6 +334,7 @@ fn scroll_line_into_view_last_row() {
 fn scroll_line_into_view_clamps_to_max() {
     let root = temp_root();
     let mut app = app_for(&root);
+    app.virtual_file = None;
     app.content_area = Rect {
         x: 0,
         y: 0,

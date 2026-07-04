@@ -67,10 +67,6 @@ pub static COMMANDS: &[CommandEntry] = &[
         action_id: "toggle_line_numbers",
     },
     CommandEntry {
-        name: "Toggle markdown render",
-        action_id: "toggle_raw_markdown",
-    },
-    CommandEntry {
         name: "Toggle JSON pretty-print",
         action_id: "toggle_pretty_json",
     },

@@ -111,28 +111,6 @@ fn content_focus_default() {
 }
 
 #[test]
-fn content_markdown_raw() {
-    let mut app = make_app();
-    app.focus = Focus::Content;
-    app.word_wrap = true;
-    app.is_markdown = true;
-    app.show_raw_markdown = true;
-    let text = render_bar_width(&app, 120);
-    assert!(text.contains("M render"));
-}
-
-#[test]
-fn content_markdown_rendered() {
-    let mut app = make_app();
-    app.focus = Focus::Content;
-    app.word_wrap = true;
-    app.is_markdown = true;
-    app.show_raw_markdown = false;
-    let text = render_bar_width(&app, 120);
-    assert!(text.contains("M raw"));
-}
-
-#[test]
 fn content_json_pretty() {
     let mut app = make_app();
     app.focus = Focus::Content;

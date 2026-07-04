@@ -77,14 +77,7 @@ pub struct App {
     pub tree_independent_scroll: bool,
     pub content: Vec<String>,
     pub highlighted: Vec<Vec<(ratatui::style::Style, String)>>,
-    pub markdown_lines: Vec<Vec<(ratatui::style::Style, String)>>,
-    /// Raw markdown source for re-rendering on terminal resize.
-    pub markdown_src: String,
-    /// Last width the markdown was rendered at (chars). Used to detect resize.
-    pub markdown_wrap_width: usize,
     pub virtual_file: Option<VirtualFile>,
-    pub is_markdown: bool,
-    pub show_raw_markdown: bool,
     pub is_json: bool,
     pub file_encoding: Option<String>,
     pub file_line_ending: Option<String>,
@@ -502,7 +495,7 @@ impl App {
     }
 
     /// Clears all content-pane state (file buffer, diff, highlights, rendered
-    /// markdown/JSON, scroll, selection, fold state, plugin content, etc.).
+    /// JSON, scroll, selection, fold state, plugin content, etc.).
     /// Called when the current file is no longer valid — git mode becomes clean
     /// (no changed files) or the viewer root changes. Does NOT clear plugin
     /// contributions or file watchers (those are managed at the call site).
@@ -511,9 +504,7 @@ impl App {
         self.current_syntax = None;
         self.content = Vec::new();
         self.highlighted = Vec::new();
-        self.markdown_lines = Vec::new();
         self.virtual_file = None;
-        self.is_markdown = false;
         self.is_json = false;
         self.file_encoding = None;
         self.file_line_ending = None;

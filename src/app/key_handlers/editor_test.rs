@@ -408,3 +408,15 @@ fn apply_theme_does_not_modify_theme_picker() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn dispatch_command_unknown_action_id_does_not_crash() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt"));
+    // Enter the overlay -> command palette path so dispatch_command() runs.
+    app.command_palette = Some(palette_with_query("Toggle word wrap"));
+    // Dispatch whatever the palette selected — just verify no crash.
+    app.dispatch_command();
+    fs::remove_dir_all(&root).ok();
+}

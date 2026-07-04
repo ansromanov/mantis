@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use ratatui::style::{Color, Style};
 use ratatui::text::Span;
 
@@ -669,17 +671,19 @@ fn draw_diff_mode_renders_without_panicking() {
 }
 
 #[test]
-fn draw_markdown_mode() {
+fn draw_plugin_content_passes_through() {
     let (mut app, _dir) = render_app();
     let _buffer = render_content(&mut app, |app| {
-        app.current_file = None;
+        let plugin_path = PathBuf::from("plugin.md");
+        app.current_file = Some(plugin_path.clone());
         app.virtual_file = None;
-        app.is_markdown = true;
-        app.show_raw_markdown = false;
-        app.markdown_lines = vec![
-            vec![(Style::default().fg(Color::Cyan), "# Title".to_string())],
-            vec![(Style::default(), "body text".to_string())],
-        ];
+        app.plugin_content.insert(
+            plugin_path,
+            vec![
+                vec![(Style::default().fg(Color::Cyan), "# Title".to_string())],
+                vec![(Style::default(), "body text".to_string())],
+            ],
+        );
     });
     let all: String = _buffer.content().iter().map(|c| c.symbol()).collect();
     assert!(
