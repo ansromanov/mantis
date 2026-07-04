@@ -7,7 +7,7 @@
 //!
 //! ## Theme colour mapping
 //!
-//! mantis theme colours are mapped to ANSI 256-colour codes:
+//! The default palette maps mantis theme colours to ANSI 256-colour codes:
 //!
 //! | Role      | ANSI colour |
 //! |-----------|-------------|
@@ -21,9 +21,10 @@
 //!
 //! These can be overridden by sending `on_theme_change` with a different
 //! theme name. The plugin maintains a small dictionary of theme presets,
-//! including truecolor presets for the bundled light themes (`vscode-light`,
-//! `solarized-light`, `catppuccin-latte`, `pink`); unknown theme names still
-//! fall back to the dark default.
+//! including truecolor (`38;2;R;G;B`) presets for the bundled light themes
+//! (`vscode-light`, `solarized-light`, `catppuccin-latte`, `pink`) so their
+//! colours remain readable against a light background; unknown theme names
+//! still fall back to the 256-colour dark default above.
 
 use std::io::{self, BufRead, Write};
 use std::path::Path;

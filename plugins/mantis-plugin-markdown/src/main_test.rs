@@ -175,11 +175,8 @@ fn light_themes_get_dedicated_dark_text_presets() {
     ] {
         state.handle_theme_change(theme_name);
         assert_ne!(
-            state.theme.text, "38;2;255;255;255",
-            "{theme_name} text should not fall back to the dark default's white"
-        );
-        assert!(
-            !state.theme.text.contains("38;5;15"),
+            state.theme.text,
+            ThemeColors::default_theme().text,
             "{theme_name} should not use the dark default's white text"
         );
     }
