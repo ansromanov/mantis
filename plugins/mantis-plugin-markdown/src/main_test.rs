@@ -145,41 +145,67 @@ fn render_table() {
     );
 }
 
+fn colors_json(hex: &[(&str, &str)]) -> serde_json::Value {
+    serde_json::Value::Object(
+        hex.iter()
+            .map(|(k, v)| (k.to_string(), serde_json::Value::String(v.to_string())))
+            .collect(),
+    )
+}
+
+const LIGHT_THEME_HEX: &[(&str, &str)] = &[
+    ("heading1", "#0550ae"),
+    ("heading2", "#953800"),
+    ("heading3", "#116329"),
+    ("accent", "#0066b8"),
+    ("dim", "#cccccc"),
+    ("code", "#d73a49"),
+    ("text", "#383838"),
+];
+
 #[test]
-fn theme_change_switches_colors() {
+fn theme_change_uses_host_supplied_hex_colors() {
     let mut state = PluginState::new();
-    assert!(
-        state.theme.heading1.contains("81"),
-        "default theme uses cyan heading"
-    );
-    state.handle_theme_change("monokai");
-    assert!(
-        state.theme.heading1.contains("81"),
-        "monokai heading1 stays 81"
-    );
-    state.handle_theme_change("catppuccin");
-    assert!(
-        state.theme.heading1.contains("117"),
-        "catppuccin heading1 is 117"
+    assert_eq!(state.theme.heading1, "38;5;81", "starts with the fallback");
+    state.handle_theme_change(Some(&colors_json(LIGHT_THEME_HEX)));
+    assert_eq!(state.theme.heading1, "38;2;5;80;174");
+    assert_eq!(state.theme.text, "38;2;56;56;56");
+}
+
+#[test]
+fn theme_change_without_colors_falls_back_to_default() {
+    let mut state = PluginState::new();
+    state.handle_theme_change(Some(&colors_json(LIGHT_THEME_HEX)));
+    state.handle_theme_change(None);
+    assert_eq!(state.theme.heading1, ThemeColors::default_theme().heading1);
+    assert_eq!(state.theme.text, ThemeColors::default_theme().text);
+}
+
+#[test]
+fn theme_change_with_incomplete_colors_falls_back_to_default() {
+    let mut state = PluginState::new();
+    let incomplete = colors_json(&[("heading1", "#0550ae")]);
+    state.handle_theme_change(Some(&incomplete));
+    assert_eq!(
+        state.theme.heading1,
+        ThemeColors::default_theme().heading1,
+        "a partial colors object should not produce a half-built theme"
     );
 }
 
 #[test]
-fn light_themes_get_dedicated_dark_text_presets() {
-    let mut state = PluginState::new();
-    for theme_name in [
-        "vscode-light",
-        "solarized-light",
-        "catppuccin-latte",
-        "pink",
-    ] {
-        state.handle_theme_change(theme_name);
-        assert_ne!(
-            state.theme.text,
-            ThemeColors::default_theme().text,
-            "{theme_name} should not use the dark default's white text"
-        );
-    }
+fn hex_to_truecolor_converts_valid_hex() {
+    assert_eq!(
+        hex_to_truecolor("#0550ae"),
+        Some("38;2;5;80;174".to_string())
+    );
+}
+
+#[test]
+fn hex_to_truecolor_rejects_malformed_hex() {
+    assert_eq!(hex_to_truecolor("0550ae"), None, "missing leading #");
+    assert_eq!(hex_to_truecolor("#fff"), None, "wrong length");
+    assert_eq!(hex_to_truecolor("#zzzzzz"), None, "non-hex digits");
 }
 
 #[test]

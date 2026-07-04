@@ -9,6 +9,8 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+use crate::theme::{color_to_hex, Theme};
+
 /// What kind of plugin this is.
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -102,6 +104,36 @@ pub struct LanguageProviderRegistration {
     pub capabilities: std::collections::HashSet<Capability>,
 }
 
+/// The color roles a plugin needs to render matching output, sent as
+/// `#rrggbb` hex strings so any theme (built-in or user-defined) works
+/// without the plugin having to special-case theme names. Sent alongside
+/// `theme` on `init` and `on_theme_change` rather than requiring the plugin
+/// to maintain its own dictionary of presets per theme name.
+#[derive(Serialize, Clone)]
+pub(crate) struct ThemeColorsMsg {
+    pub(crate) heading1: String,
+    pub(crate) heading2: String,
+    pub(crate) heading3: String,
+    pub(crate) accent: String,
+    pub(crate) dim: String,
+    pub(crate) code: String,
+    pub(crate) text: String,
+}
+
+impl From<&Theme> for ThemeColorsMsg {
+    fn from(theme: &Theme) -> Self {
+        ThemeColorsMsg {
+            heading1: color_to_hex(theme.heading1),
+            heading2: color_to_hex(theme.heading2),
+            heading3: color_to_hex(theme.heading3),
+            accent: color_to_hex(theme.accent),
+            dim: color_to_hex(theme.dim),
+            code: color_to_hex(theme.code),
+            text: color_to_hex(theme.text),
+        }
+    }
+}
+
 /// Message sent from `mantis` to a plugin (on its stdin).
 #[derive(Serialize)]
 pub(crate) struct ToPlugin {
@@ -112,6 +144,11 @@ pub(crate) struct ToPlugin {
     pub(crate) key: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) theme: Option<String>,
+    /// The active theme's actual colors, so plugins can render without
+    /// hardcoding a palette per theme name. Sent on `init` and
+    /// `on_theme_change`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) colors: Option<ThemeColorsMsg>,
     /// Protocol version spoken by the host. Present only on the `init` event
     /// so the plugin can verify compatibility.
     #[serde(skip_serializing_if = "Option::is_none")]

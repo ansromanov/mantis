@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use super::*;
+use crate::theme::{color_to_hex, Theme};
 
 fn make_reg(name: &str, exts: &[&str], caps: &[Capability]) -> LanguageProviderRegistration {
     LanguageProviderRegistration {
@@ -185,6 +186,119 @@ fn activate_one_sends_init_with_protocol_version() {
     std::fs::remove_dir_all(&dir).ok();
 }
 
+/// Spawns a recording-stub plugin via `activate_all`, sends it `event`, and
+/// returns the first matching line it received on stdin. Shared by the
+/// `activate_all`/`on_theme_change` colors tests below.
+#[cfg(unix)]
+fn record_event_from_activate_all(theme: &Theme, event: &str) -> String {
+    use std::io::Write as _;
+    use std::os::unix::fs::PermissionsExt;
+    use std::time::{Duration, Instant};
+
+    let dir = std::env::temp_dir().join(format!("tv_mgr_colors_{event}_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let out = dir.join("recv.txt");
+
+    let script = dir.join("rec.sh");
+    let mut f = std::fs::File::create(&script).unwrap();
+    write!(f, "#!/bin/sh\ncat > \"{}\"\n", out.display()).unwrap();
+    drop(f);
+    std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+    let entry = PluginEntry {
+        path: script.clone(),
+        enabled: true,
+        ..Default::default()
+    };
+    let mut mgr = PluginManager::new(vec![("rec".to_string(), entry)]);
+    mgr.activate_all(Some("custom"), theme);
+    mgr.deactivate_all();
+
+    let deadline = Instant::now() + Duration::from_secs(3);
+    let contents = loop {
+        if let Ok(s) = std::fs::read_to_string(&out) {
+            if !s.is_empty() {
+                break s;
+            }
+        }
+        assert!(Instant::now() < deadline, "plugin never received {event}");
+        std::thread::sleep(Duration::from_millis(25));
+    };
+    let line = contents
+        .lines()
+        .find(|l| l.contains(&format!(r#""event":"{event}""#)))
+        .unwrap_or_else(|| panic!("{event} event must be sent, got: {contents}"))
+        .to_string();
+    std::fs::remove_dir_all(&dir).ok();
+    line
+}
+
+#[test]
+#[cfg(unix)]
+fn activate_all_sends_init_with_theme_colors() {
+    let theme = Theme::default();
+    let init_line = record_event_from_activate_all(&theme, "init");
+    let expected_heading1 = format!(r#""heading1":"{}""#, color_to_hex(theme.heading1));
+    assert!(
+        init_line.contains(&expected_heading1),
+        "init colors must carry the theme's actual heading1 hex, got: {init_line}"
+    );
+}
+
+#[test]
+#[cfg(unix)]
+fn on_theme_change_sends_updated_theme_colors() {
+    use std::io::Write as _;
+    use std::os::unix::fs::PermissionsExt;
+    use std::time::{Duration, Instant};
+
+    let dir = std::env::temp_dir().join(format!("tv_mgr_theme_change_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let out = dir.join("recv.txt");
+
+    let script = dir.join("rec.sh");
+    let mut f = std::fs::File::create(&script).unwrap();
+    write!(f, "#!/bin/sh\ncat > \"{}\"\n", out.display()).unwrap();
+    drop(f);
+    std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+    let entry = PluginEntry {
+        path: script.clone(),
+        enabled: true,
+        ..Default::default()
+    };
+    let mut mgr = PluginManager::new(vec![("rec".to_string(), entry)]);
+    mgr.activate_all(Some("default"), &Theme::default());
+
+    let monokai = Theme::load("monokai").expect("monokai theme must load");
+    mgr.on_theme_change("monokai", &monokai);
+    mgr.deactivate_all();
+
+    let deadline = Instant::now() + Duration::from_secs(3);
+    let contents = loop {
+        if let Ok(s) = std::fs::read_to_string(&out) {
+            if s.matches(r#""event":"on_theme_change""#).count() >= 1 {
+                break s;
+            }
+        }
+        assert!(
+            Instant::now() < deadline,
+            "plugin never received on_theme_change"
+        );
+        std::thread::sleep(Duration::from_millis(25));
+    };
+    let line = contents
+        .lines()
+        .find(|l| l.contains(r#""event":"on_theme_change""#))
+        .expect("on_theme_change event must be sent");
+    let expected_heading1 = format!(r#""heading1":"{}""#, color_to_hex(monokai.heading1));
+    assert!(
+        line.contains(&expected_heading1),
+        "on_theme_change colors must reflect the new theme, got: {line}"
+    );
+    std::fs::remove_dir_all(&dir).ok();
+}
+
 #[test]
 fn register_provider_and_provider_for_found() {
     let mut mgr = PluginManager::new(vec![]);
@@ -233,7 +347,7 @@ fn event_dispatch_with_no_active_plugins_is_noop() {
     // plugins; with none spawned every dispatch must be a harmless noop.
     let mut mgr = PluginManager::new(vec![]);
     mgr.on_file_open(std::path::Path::new("/tmp/x.rs"));
-    mgr.on_theme_change("dark");
+    mgr.on_theme_change("dark", &crate::theme::Theme::default());
     mgr.on_selection_change(Some(std::path::Path::new("/tmp/x.rs")));
     mgr.on_quit();
 }

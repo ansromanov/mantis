@@ -413,6 +413,35 @@ impl ThemeConfig {
     }
 }
 
+/// Renders a ratatui `Color` back to a `#rrggbb` hex string, so hosts can
+/// hand a theme's actual colors to plugins over the JSON protocol instead of
+/// just a theme name. Named ANSI colors are mapped to their standard xterm
+/// 16-color hex values; `Reset`/`Indexed` (not used by any role plugins read)
+/// fall back to a mid-gray.
+pub fn color_to_hex(c: Color) -> String {
+    let (r, g, b) = match c {
+        Color::Rgb(r, g, b) => (r, g, b),
+        Color::Black => (0, 0, 0),
+        Color::Red => (205, 0, 0),
+        Color::Green => (0, 205, 0),
+        Color::Yellow => (205, 205, 0),
+        Color::Blue => (0, 0, 238),
+        Color::Magenta => (205, 0, 205),
+        Color::Cyan => (0, 205, 205),
+        Color::Gray => (229, 229, 229),
+        Color::DarkGray => (127, 127, 127),
+        Color::LightRed => (255, 0, 0),
+        Color::LightGreen => (0, 255, 0),
+        Color::LightYellow => (255, 255, 0),
+        Color::LightBlue => (92, 92, 255),
+        Color::LightMagenta => (255, 0, 255),
+        Color::LightCyan => (0, 255, 255),
+        Color::White => (255, 255, 255),
+        Color::Reset | Color::Indexed(_) => (127, 127, 127),
+    };
+    format!("#{r:02x}{g:02x}{b:02x}")
+}
+
 /// Parses a color name or `#rrggbb` hex string into a ratatui `Color`.
 pub fn parse_color(s: &str) -> Option<Color> {
     let t = s.trim().to_ascii_lowercase();

@@ -51,7 +51,7 @@ below) so the plugin can verify compatibility dynamically.
 | Version | Release | Changes |
 |---|---|---|
 | `"1"` | 0.7.x | Initial protocol. Events: init, on_file_open, on_keypress, on_selection_change, on_theme_change, on_quit, shutdown. Actions: show_message, open_file, set_content, set_icon_map. Git features (set_file_statuses, set_blame_data, set_status_bar_git_info) were removed in 0.11.22 — git is now built in only. |
-| `"2"` | 0.8.x | Language providers (register_language_provider, set_fold_regions), event subscription (`events` field in manifest), protocol hardening (bounded queues, line caps), `protocol_version` field on init event. |
+| `"2"` | 0.8.x | Language providers (register_language_provider, set_fold_regions), event subscription (`events` field in manifest), protocol hardening (bounded queues, line caps), `protocol_version` field on init event. `init`/`on_theme_change` additionally carry an optional `colors` object (0.13.x, additive — does not bump this version) with the active theme's actual role colors as `#rrggbb` hex. |
 
 ### Discovery
 
@@ -97,12 +97,29 @@ Sent once immediately after spawn, before any user interaction. Includes the
 host protocol version so the plugin can verify it is compatible.
 
 ```json
-{"event":"init","theme":"default","protocol_version":"2"}
+{
+  "event": "init",
+  "theme": "default",
+  "colors": {
+    "heading1": "#5fd7ff", "heading2": "#ffffaf", "heading3": "#afffaf",
+    "accent": "#00ffff", "dim": "#767676", "code": "#ffffaf", "text": "#ffffff"
+  },
+  "protocol_version": "2"
+}
 ```
 
 The `protocol_version` field is present only on `init`. If the value does
 not match what the plugin expects, the plugin should exit gracefully or
 fall back to a compatible subset of features.
+
+The `colors` field carries the active theme's actual colors for seven roles
+(`heading1`, `heading2`, `heading3`, `accent`, `dim`, `code`, `text`) as
+`#rrggbb` hex strings, resolved from the theme's real definition — including
+custom themes from `mantis.toml`. Plugins should use these directly (e.g. as
+truecolor ANSI, `\x1b[38;2;R;G;Bm`) instead of hardcoding a palette per theme
+name, so any theme renders correctly without the plugin needing to know it by
+name. `colors` may be absent from an older host; fall back to a built-in
+default palette in that case.
 
 ### `on_file_open`
 
@@ -133,10 +150,18 @@ tree is empty.
 ### `on_theme_change`
 
 Sent when the user switches themes at runtime (via the theme picker or command
-palette). The `theme` field carries the new theme name exactly as configured.
+palette). The `theme` field carries the new theme name exactly as configured,
+and `colors` carries its resolved colors (same shape as on `init`; see above).
 
 ```json
-{"event":"on_theme_change","theme":"monokai"}
+{
+  "event": "on_theme_change",
+  "theme": "monokai",
+  "colors": {
+    "heading1": "#5fd7ff", "heading2": "#ffd787", "heading3": "#afd787",
+    "accent": "#af87d7", "dim": "#6c6c6c", "code": "#ffd787", "text": "#ffffff"
+  }
+}
 ```
 
 ### `on_quit`

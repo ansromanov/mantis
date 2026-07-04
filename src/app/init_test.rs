@@ -139,6 +139,72 @@ fn app_new_registers_syntax_plugins_in_manager_for_palette() {
 }
 
 #[test]
+#[cfg(unix)]
+fn app_new_sends_resolved_theme_colors_to_plugins_on_init() {
+    // init.rs resolves the configured theme and hands it to
+    // `plugin_manager.activate_all` so plugins get real theme colors on
+    // `init` instead of just a theme name (they used to have to hardcode a
+    // palette per theme name).
+    use std::io::Write as _;
+    use std::os::unix::fs::PermissionsExt;
+    use std::time::{Duration, Instant};
+
+    let root = temp_dir();
+    let plugin_dir = std::env::temp_dir().join(format!(
+        "tv_init_colors_plugin_{}_{}",
+        std::process::id(),
+        root.file_name().unwrap().to_string_lossy()
+    ));
+    fs::create_dir_all(&plugin_dir).unwrap();
+    let out = plugin_dir.join("recv.txt");
+    let script = plugin_dir.join("rec.sh");
+    let mut f = fs::File::create(&script).unwrap();
+    write!(f, "#!/bin/sh\ncat > \"{}\"\n", out.display()).unwrap();
+    drop(f);
+    fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+
+    let mut cfg = Config::default();
+    cfg.theme.name = Some("monokai".into());
+    cfg.plugins.insert(
+        "rec".to_string(),
+        crate::plugin::PluginEntry {
+            path: script.clone(),
+            enabled: true,
+            ..Default::default()
+        },
+    );
+
+    let mut app = new_app(&root, cfg);
+    app.plugin_manager.deactivate_all();
+
+    let deadline = Instant::now() + Duration::from_secs(3);
+    let contents = loop {
+        if let Ok(s) = fs::read_to_string(&out) {
+            if !s.is_empty() {
+                break s;
+            }
+        }
+        assert!(Instant::now() < deadline, "plugin never received init");
+        std::thread::sleep(Duration::from_millis(25));
+    };
+    let init_line = contents
+        .lines()
+        .find(|l| l.contains(r#""event":"init""#))
+        .expect("init event must be sent");
+    let monokai = crate::theme::Theme::load("monokai").expect("monokai theme must load");
+    let expected = format!(
+        r#""heading1":"{}""#,
+        crate::theme::color_to_hex(monokai.heading1)
+    );
+    assert!(
+        init_line.contains(&expected),
+        "init colors must carry the configured theme's actual heading1 hex, got: {init_line}"
+    );
+    fs::remove_dir_all(&root).ok();
+    fs::remove_dir_all(&plugin_dir).ok();
+}
+
+#[test]
 fn app_new_bundled_plugins_appear_in_config_plugins_map() {
     // Regression: bundled/manifest plugins were seeded into `cfg.plugins` only
     // *after* `saved_config = cfg.clone()`, so `self.config.plugins` was empty
