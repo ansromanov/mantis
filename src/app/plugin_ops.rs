@@ -17,7 +17,7 @@ impl App {
         let Some(picker) = &self.plugin_picker else {
             return;
         };
-        let Some((name, running, kind)) = picker.entries.get(picker.selected).cloned() else {
+        let Some((name, running, kind, _)) = picker.entries.get(picker.selected).cloned() else {
             return;
         };
         if kind == plugin::PluginKind::Syntax {

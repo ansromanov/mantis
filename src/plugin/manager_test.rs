@@ -126,7 +126,10 @@ fn activate_one_is_noop_when_already_running() {
     mgr.activate_one("cat-stub", None)
         .expect("second call must be noop");
     assert_eq!(
-        mgr.plugin_entries().iter().filter(|(_, r, _)| *r).count(),
+        mgr.plugin_entries()
+            .iter()
+            .filter(|(_, r, _, _)| *r)
+            .count(),
         1,
         "must still be only one running instance"
     );
@@ -248,6 +251,67 @@ fn register_provider_overwrites_same_plugin() {
         mgr.provider_for("rs", &Capability::Fold).is_none(),
         "old extension must be gone after re-registration"
     );
+}
+
+/// Serialises tests that set `MANTIS_STATE_DIR` (a process-global env var).
+#[cfg(unix)]
+static STATE_DIR_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+#[test]
+#[cfg(unix)]
+fn drain_actions_records_crash_diagnostics_and_picker_badge() {
+    use std::io::Write as _;
+    use std::os::unix::fs::PermissionsExt;
+    use std::time::{Duration, Instant};
+
+    let _lock = STATE_DIR_LOCK.lock().unwrap();
+
+    let dir = std::env::temp_dir().join(format!("tv_mgr_crash_{}", std::process::id()));
+    let state_dir = dir.join("state");
+    std::fs::create_dir_all(&state_dir).unwrap();
+    std::env::set_var("MANTIS_STATE_DIR", &state_dir);
+
+    let script = dir.join("crash.sh");
+    let mut f = std::fs::File::create(&script).unwrap();
+    write!(f, "#!/bin/sh\necho 'panic: oh no' >&2\nexit 1\n").unwrap();
+    drop(f);
+    std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+    let entry = PluginEntry {
+        path: script.clone(),
+        enabled: false,
+        ..Default::default()
+    };
+    let mut mgr = PluginManager::new(vec![("crashy".to_string(), entry)]);
+    mgr.activate_one("crashy", None).expect("spawn crash.sh");
+
+    let deadline = Instant::now() + Duration::from_secs(3);
+    loop {
+        mgr.drain_actions();
+        if mgr.crash_detail("crashy").is_some() {
+            break;
+        }
+        assert!(Instant::now() < deadline, "plugin never detected as dead");
+        std::thread::sleep(Duration::from_millis(25));
+    }
+
+    let detail = mgr.crash_detail("crashy").expect("crash detail recorded");
+    assert_eq!(detail.last_stderr.as_deref(), Some("panic: oh no"));
+    assert!(detail.log_path.is_some(), "log path must be recorded");
+
+    let badge = mgr
+        .plugin_entries()
+        .into_iter()
+        .find(|(name, _, _, _)| name == "crashy")
+        .and_then(|(_, _, _, badge)| badge)
+        .expect("dead plugin must show a crash badge in the picker");
+    assert!(
+        badge.contains("panic: oh no"),
+        "badge must surface the last stderr line, got: {badge}"
+    );
+
+    std::env::remove_var("MANTIS_STATE_DIR");
+    std::fs::remove_dir_all(&dir).ok();
 }
 
 #[test]

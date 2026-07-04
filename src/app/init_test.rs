@@ -131,7 +131,7 @@ fn app_new_registers_syntax_plugins_in_manager_for_palette() {
     assert!(
         entries
             .iter()
-            .any(|(_, _, kind)| *kind == crate::plugin::PluginKind::Syntax),
+            .any(|(_, _, kind, _)| *kind == crate::plugin::PluginKind::Syntax),
         "a syntax plugin must be registered in the manager so it appears in the \
          plugin palette; got {entries:?}"
     );

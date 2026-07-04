@@ -247,8 +247,19 @@ impl App {
         }
         // Tear down contributions of any plugins that exited or crashed.
         for name in self.plugin_manager.take_dead_plugins() {
+            let detail = match self.plugin_manager.crash_detail(&name) {
+                Some(info) => match (&info.last_stderr, &info.log_path) {
+                    (Some(line), Some(path)) => {
+                        format!(" (last stderr: {line}; full log: {})", path.display())
+                    }
+                    (Some(line), None) => format!(" (last stderr: {line})"),
+                    (None, Some(path)) => format!(" (full log: {})", path.display()),
+                    (None, None) => String::new(),
+                },
+                None => String::new(),
+            };
             self.plugin_message = Some(format!(
-                "Plugin '{name}' exited unexpectedly; tearing down its state."
+                "Plugin '{name}' exited unexpectedly{detail}; tearing down its state."
             ));
             self.teardown_plugin_contributions(&name);
         }

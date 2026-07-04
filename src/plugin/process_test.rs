@@ -116,6 +116,66 @@ fn read_capped_line_does_not_overshoot_when_newline_past_cap() {
     assert_eq!(buf.len(), TEST_CAP);
 }
 
+/// Serialises tests that set `MANTIS_STATE_DIR` (a process-global env var).
+#[cfg(unix)]
+static STATE_DIR_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+#[test]
+#[cfg(unix)]
+fn spawn_captures_stderr_to_log_and_last_line() {
+    use std::io::Write as _;
+    use std::os::unix::fs::PermissionsExt;
+    use std::time::{Duration, Instant};
+
+    let _lock = STATE_DIR_LOCK.lock().unwrap();
+
+    let dir = std::env::temp_dir().join(format!("tv_stderr_test_{}", std::process::id()));
+    let state_dir = dir.join("state");
+    std::fs::create_dir_all(&state_dir).unwrap();
+    std::env::set_var("MANTIS_STATE_DIR", &state_dir);
+
+    let script = dir.join("crash.sh");
+    let mut f = std::fs::File::create(&script).unwrap();
+    write!(f, "#!/bin/sh\necho 'boom: something broke' >&2\nexit 1\n").unwrap();
+    drop(f);
+    std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+    let mut p = Plugin::new("crash-plugin".into(), vec![]);
+    p.spawn(&script).expect("spawn crash.sh");
+
+    // Wait for the reader thread to observe the process exit (stdout closes).
+    let deadline = Instant::now() + Duration::from_secs(3);
+    loop {
+        let (_, is_dead) = p.drain_actions();
+        if is_dead {
+            break;
+        }
+        assert!(Instant::now() < deadline, "plugin never reported dead");
+        std::thread::sleep(Duration::from_millis(25));
+    }
+
+    // The stderr-drain thread runs concurrently; give it a moment to catch up.
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while p.last_stderr_line().is_none() && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(25));
+    }
+
+    assert_eq!(
+        p.last_stderr_line().as_deref(),
+        Some("boom: something broke"),
+        "last stderr line must be captured for the death message"
+    );
+    let log_path = p.log_path().expect("log path must be recorded");
+    let contents = std::fs::read_to_string(&log_path).expect("log file must exist");
+    assert!(
+        contents.contains("boom: something broke"),
+        "log file must contain the plugin's stderr output, got: {contents:?}"
+    );
+
+    std::env::remove_var("MANTIS_STATE_DIR");
+    std::fs::remove_dir_all(&dir).ok();
+}
+
 #[test]
 fn read_capped_line_caps_when_newline_exactly_at_boundary() {
     // Newline sits at index TEST_CAP (the byte after the cap window): the

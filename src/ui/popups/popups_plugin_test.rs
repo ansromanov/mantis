@@ -56,11 +56,13 @@ fn draw_plugin_picker_with_entries_shows_names_and_state() {
             "alpha".to_string(),
             true,
             crate::plugin::PluginKind::Process,
+            None,
         ),
         (
             "beta".to_string(),
             false,
             crate::plugin::PluginKind::Process,
+            None,
         ),
     ]));
     let backend = TestBackend::new(80, 30);
@@ -75,6 +77,28 @@ fn draw_plugin_picker_with_entries_shows_names_and_state() {
     assert!(joined.contains("beta"));
     // geometry must be recorded for mouse hit-testing
     assert!(app.plugin_picker_area.width > 0);
+}
+
+#[test]
+fn draw_plugin_picker_shows_crash_badge_for_dead_plugin() {
+    use crate::search::PluginPicker;
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    app.plugin_picker = Some(PluginPicker::new(vec![(
+        "crashy".to_string(),
+        false,
+        crate::plugin::PluginKind::Process,
+        Some("panic: oh no (log: /tmp/crashy.log)".to_string()),
+    )]));
+    let backend = TestBackend::new(80, 30);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| draw_plugin_picker(f, &mut app, f.area()))
+        .unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(joined.contains("crashy"));
+    assert!(joined.contains("panic: oh no"));
 }
 
 #[test]
