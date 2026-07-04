@@ -78,10 +78,14 @@ A process plugin is any executable that:
 2. Writes newline-delimited JSON objects to **stdout** (actions back to `mantis`).
 3. Exits cleanly when it receives `shutdown` (or when stdin closes).
 
-`mantis` spawns each plugin as a subprocess with `stdin` and `stdout` piped and
-`stderr` discarded (redirected to `/dev/null`). A background reader thread
-drains each plugin's stdout and a background writer thread handles stdin so the
-`mantis` event loop never blocks on plugin I/O.
+`mantis` spawns each plugin as a subprocess with `stdin`, `stdout`, and
+`stderr` all piped. A background reader thread drains each plugin's stdout and
+a background writer thread handles stdin so the `mantis` event loop never
+blocks on plugin I/O. A third background thread drains `stderr`: it keeps the
+most recent line in memory and appends sanitized output to a rotating log
+file under the state directory (`plugin-logs/<name>.log`, capped at 64 KB).
+If the plugin exits unexpectedly, that last line and log path are surfaced in
+the "exited unexpectedly" message and as a badge in the plugin picker.
 
 ## Events: tv → plugin (stdin)
 
@@ -291,7 +295,9 @@ discarded.
 ## Rules
 
 - **One JSON object per line.** No pretty-printing, no multi-line objects.
-- **Stdout is for actions only.** Plugin stderr is discarded; write debug output to a log file instead.
+- **Stdout is for actions only.** Don't write debug output there — it will break the
+  protocol. Write to stderr instead: `mantis` captures it for crash diagnostics (the
+  last line and a rotating on-disk log), but does not otherwise act on it.
 - **Exit on shutdown.** When stdin closes or you receive `shutdown`, exit.
   Do not loop forever waiting for more input.
 - **Idempotent reads.** `mantis` may send multiple `on_file_open` events for the

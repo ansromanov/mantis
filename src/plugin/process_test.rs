@@ -177,6 +177,108 @@ fn spawn_captures_stderr_to_log_and_last_line() {
 }
 
 #[test]
+#[cfg(unix)]
+fn spawn_strips_ansi_escapes_from_last_stderr_line() {
+    use std::io::Write as _;
+    use std::os::unix::fs::PermissionsExt;
+    use std::time::{Duration, Instant};
+
+    let _lock = STATE_DIR_LOCK.lock().unwrap();
+
+    let dir = std::env::temp_dir().join(format!("tv_stderr_ansi_test_{}", std::process::id()));
+    let state_dir = dir.join("state");
+    std::fs::create_dir_all(&state_dir).unwrap();
+    std::env::set_var("MANTIS_STATE_DIR", &state_dir);
+
+    let script = dir.join("crash.sh");
+    let mut f = std::fs::File::create(&script).unwrap();
+    // Emits a stderr line containing a CSI escape sequence (clear screen) and
+    // a stray carriage return, mimicking a malicious or buggy plugin trying
+    // to smuggle terminal control sequences into the diagnostics UI.
+    write!(f, "printf 'boom\\x1b[2Jtail\\r\\n' >&2\nexit 1\n").unwrap();
+    drop(f);
+    std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+    let mut p = Plugin::new("ansi-crash-plugin".into(), vec![]);
+    p.spawn(&script).expect("spawn crash.sh");
+
+    let deadline = Instant::now() + Duration::from_secs(3);
+    loop {
+        let (_, is_dead) = p.drain_actions();
+        if is_dead {
+            break;
+        }
+        assert!(Instant::now() < deadline, "plugin never reported dead");
+        std::thread::sleep(Duration::from_millis(25));
+    }
+
+    let line = p
+        .last_stderr_line()
+        .expect("last stderr line must be captured");
+    assert_eq!(
+        line, "boom[2Jtail",
+        "control characters (ESC, CR) must be stripped before display"
+    );
+
+    std::env::remove_var("MANTIS_STATE_DIR");
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+#[cfg(unix)]
+fn spawn_truncates_oversized_last_stderr_line() {
+    use std::io::Write as _;
+    use std::os::unix::fs::PermissionsExt;
+    use std::time::{Duration, Instant};
+
+    let _lock = STATE_DIR_LOCK.lock().unwrap();
+
+    let dir = std::env::temp_dir().join(format!("tv_stderr_trunc_test_{}", std::process::id()));
+    let state_dir = dir.join("state");
+    std::fs::create_dir_all(&state_dir).unwrap();
+    std::env::set_var("MANTIS_STATE_DIR", &state_dir);
+
+    let script = dir.join("crash.sh");
+    let mut f = std::fs::File::create(&script).unwrap();
+    write!(
+        f,
+        "#!/bin/sh\nyes x | head -c 5000 | tr -d '\\n' >&2\necho >&2\nexit 1\n"
+    )
+    .unwrap();
+    drop(f);
+    std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+    let mut p = Plugin::new("longline-crash-plugin".into(), vec![]);
+    p.spawn(&script).expect("spawn crash.sh");
+
+    let deadline = Instant::now() + Duration::from_secs(3);
+    loop {
+        let (_, is_dead) = p.drain_actions();
+        if is_dead {
+            break;
+        }
+        assert!(Instant::now() < deadline, "plugin never reported dead");
+        std::thread::sleep(Duration::from_millis(25));
+    }
+
+    let line = p
+        .last_stderr_line()
+        .expect("last stderr line must be captured");
+    assert!(
+        line.chars().count() <= 301,
+        "a runaway stderr line must be truncated for display, got {} chars",
+        line.chars().count()
+    );
+    assert!(
+        line.ends_with('…'),
+        "truncated line must be marked with an ellipsis, got: {line:?}"
+    );
+
+    std::env::remove_var("MANTIS_STATE_DIR");
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
 fn read_capped_line_caps_when_newline_exactly_at_boundary() {
     // Newline sits at index TEST_CAP (the byte after the cap window): the
     // content fills the cap exactly and is treated as overlength.

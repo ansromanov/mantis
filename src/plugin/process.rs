@@ -195,6 +195,13 @@ impl Plugin {
                 Ok((action, params)) => actions.push((action, params)),
                 Err(std::sync::mpsc::TryRecvError::Empty) => break,
                 Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    // The stderr-drain thread sees EOF around the same time as
+                    // the reader thread; join it so `last_stderr_line` is
+                    // fully populated before the caller reads crash
+                    // diagnostics, instead of racing to capture a partial line.
+                    if let Some(handle) = self._stderr_thread.take() {
+                        let _ = handle.join();
+                    }
                     return (actions, true);
                 }
             }
@@ -301,16 +308,45 @@ fn drain_stderr<R: std::io::Read>(
         if trimmed.is_empty() {
             continue;
         }
+        let sanitized = sanitize_line(&trimmed);
+        if sanitized.is_empty() {
+            continue;
+        }
         if let Ok(mut guard) = last_line.lock() {
-            *guard = Some(trimmed.clone());
+            *guard = Some(truncate_for_display(&sanitized));
         }
         if let Some(path) = &log_path {
-            log_buf.extend_from_slice(trimmed.as_bytes());
+            log_buf.extend_from_slice(sanitized.as_bytes());
             log_buf.push(b'\n');
             cap_log_buf(&mut log_buf, STDERR_LOG_CAP);
             let _ = std::fs::write(path, &log_buf);
         }
     }
+}
+
+/// Maximum length of a stderr line kept for the live "last line" diagnostic
+/// (crash message and plugin-picker badge). A crashing plugin's stderr is
+/// untrusted and unbounded (up to [`MAX_LINE_LEN`]); this keeps a single
+/// runaway line from blowing up a one-line UI widget.
+const MAX_DISPLAY_STDERR_LEN: usize = 300;
+
+/// Strips control characters — including ANSI/terminal escape sequences —
+/// from a plugin's stderr line before it can reach the screen or the on-disk
+/// log. Plugin stderr is untrusted output and must never be interpreted by
+/// the terminal.
+fn sanitize_line(s: &str) -> String {
+    s.chars().filter(|c| !c.is_control()).collect()
+}
+
+/// Truncates `s` to [`MAX_DISPLAY_STDERR_LEN`] characters for display,
+/// appending an ellipsis when truncated.
+fn truncate_for_display(s: &str) -> String {
+    if s.chars().count() <= MAX_DISPLAY_STDERR_LEN {
+        return s.to_string();
+    }
+    let mut truncated: String = s.chars().take(MAX_DISPLAY_STDERR_LEN).collect();
+    truncated.push('…');
+    truncated
 }
 
 /// Trims complete lines off the front of `buf` until its length is at or
