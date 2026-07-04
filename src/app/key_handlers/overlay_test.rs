@@ -126,6 +126,30 @@ fn handle_goto_line_key_activate_clamps_to_last_line() {
 }
 
 #[test]
+fn handle_goto_line_key_activate_relative_uses_content_scroll_without_cursor() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.is_diff = true;
+    app.active_line = 999; // stale cursor value from before the diff was shown
+    app.content_scroll = 10;
+    let mut g = GotoLineState::new();
+    g.query = "+5".to_string();
+    app.goto_line = Some(g);
+    app.handle_goto_line_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert_eq!(
+        app.content_scroll, 15,
+        "cursorless views offset from content_scroll, ignoring stale active_line"
+    );
+    assert_eq!(
+        app.active_line, 999,
+        "active_line is untouched in cursorless views"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn tree_filter_jump_scrolls_match_into_view() {
     let root = temp_tree();
     // Many files so the only match sits well below a short viewport.

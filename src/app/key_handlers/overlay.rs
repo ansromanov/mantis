@@ -309,6 +309,14 @@ impl App {
         };
         match handle_list_picker_key(g, &key) {
             OverlayKey::Activate => {
+                // Diff and plugin-rendered views have no active-line cursor, so
+                // relative jumps must be based on `content_scroll` there instead.
+                let has_cursor = self.has_text_cursor();
+                let base = if has_cursor {
+                    self.active_line
+                } else {
+                    self.content_scroll
+                };
                 let target = self.goto_line.as_ref().and_then(|g| {
                     let q = g.query.as_str();
                     if q.is_empty() {
@@ -316,10 +324,10 @@ impl App {
                     }
                     if let Some(offset) = q.strip_prefix('+') {
                         let n = offset.parse::<usize>().ok()?;
-                        Some(self.active_line.saturating_add(n))
+                        Some(base.saturating_add(n))
                     } else if let Some(offset) = q.strip_prefix('-') {
                         let n = offset.parse::<usize>().ok()?;
-                        Some(self.active_line.saturating_sub(n))
+                        Some(base.saturating_sub(n))
                     } else {
                         let n = q.parse::<usize>().ok()?;
                         Some(n.saturating_sub(1)) // 1-indexed → 0-indexed
@@ -327,9 +335,15 @@ impl App {
                 });
                 if let Some(line) = target {
                     let max = self.display_line_count().saturating_sub(1);
-                    self.active_line = line.min(max);
-                    self.scroll_active_line_into_view();
+                    let line = line.min(max);
+                    if has_cursor {
+                        self.active_line = line;
+                        self.scroll_active_line_into_view();
+                    } else {
+                        self.set_content_scroll(line);
+                    }
                     self.mark_content_scrolled();
+                    self.mark_session_dirty();
                 }
                 self.goto_line = None;
             }
