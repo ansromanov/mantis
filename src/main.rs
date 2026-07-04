@@ -195,8 +195,21 @@ fn main() -> anyhow::Result<()> {
 /// kitty keyboard protocol, runs the app to completion, then restores the
 /// terminal regardless of how the app exited. This is the only part of startup
 /// that touches the real terminal, so it is not unit-tested.
+/// Restores the terminal on drop so that any early `?` return during setup
+/// (after raw mode is already enabled) still leaves the terminal usable.
+/// Redundant with the explicit restore on the success path, but harmless
+/// since `restore_terminal` is idempotent.
+struct TerminalGuard;
+
+impl Drop for TerminalGuard {
+    fn drop(&mut self) {
+        crate::app::restore_terminal();
+    }
+}
+
 fn launch_tui(root: PathBuf, file: Option<PathBuf>) -> anyhow::Result<()> {
     enable_raw_mode()?;
+    let _guard = TerminalGuard;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
 
@@ -228,10 +241,6 @@ fn launch_tui(root: PathBuf, file: Option<PathBuf>) -> anyhow::Result<()> {
     let mut events: Box<dyn EventSource> = Box::new(CrosstermEvents);
 
     let result = run_app(&mut terminal, root, file, events.as_mut());
-
-    // Normal teardown: share the same best-effort restore so the panic hook and
-    // the graceful path agree.
-    crate::app::restore_terminal();
 
     result
 }

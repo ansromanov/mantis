@@ -550,7 +550,7 @@ impl App {
 /// is silently ignored on error so this can be called from a panic hook or
 /// from regular teardown.
 #[cfg_attr(not(unix), allow(unused_imports))]
-pub fn restore_terminal() {
+pub(crate) fn restore_terminal() {
     use std::io;
 
     use crossterm::cursor::Show;
