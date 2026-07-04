@@ -29,7 +29,7 @@ jobs:
         run: |
           prev_run=$(gh run list --workflow "${{ github.workflow }}" \
             --branch main --status success --limit 1 --json databaseId \
-            --jq '.[0].databaseId' || true)
+            --jq '.[0].databaseId // empty' || true)
           if [ -z "${prev_run:-}" ]; then
             echo "No previous successful run; drift comparison will be skipped."
           elif gh run download "$prev_run" --name criterion-baseline --dir target/criterion; then
