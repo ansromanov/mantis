@@ -603,3 +603,41 @@ fn raw_markdown_still_shows_line_numbers() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn empty_state_shows_orientation_hint_when_no_file_open() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.current_file = None;
+    app.content = Vec::new();
+    app.highlighted = Vec::new();
+    app.virtual_file = None;
+    let out = render_to_string(&mut app);
+    assert!(
+        out.contains("to search") && out.contains("to open a file"),
+        "empty content pane should show the orientation hint; got: {out:?}"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn empty_state_hint_survives_word_wrap_with_line_number_gutter() {
+    // Regression: the hint is appended to content_lines only. wrap_content's
+    // zip(gutters, content) stops at the shorter side, so without a matching
+    // blank gutter row the hint was silently dropped whenever word wrap was
+    // on and the line-number gutter was showing.
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.current_file = None;
+    app.content = Vec::new();
+    app.highlighted = Vec::new();
+    app.virtual_file = None;
+    app.word_wrap = true;
+    app.show_line_numbers = true;
+    let out = render_to_string(&mut app);
+    assert!(
+        out.contains("to search") && out.contains("to open a file"),
+        "orientation hint must not be dropped by word-wrap's gutter/content zip; got: {out:?}"
+    );
+    fs::remove_dir_all(&root).ok();
+}
