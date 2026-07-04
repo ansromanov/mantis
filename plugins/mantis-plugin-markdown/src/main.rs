@@ -20,7 +20,10 @@
 //! | text      | 15 (white)         |
 //!
 //! These can be overridden by sending `on_theme_change` with a different
-//! theme name. The plugin maintains a small dictionary of theme presets.
+//! theme name. The plugin maintains a small dictionary of theme presets,
+//! including truecolor presets for the bundled light themes (`vscode-light`,
+//! `solarized-light`, `catppuccin-latte`, `pink`); unknown theme names still
+//! fall back to the dark default.
 
 use std::io::{self, BufRead, Write};
 use std::path::Path;
@@ -151,6 +154,54 @@ impl ThemeColors {
             text: "38;5;15".into(),
         }
     }
+
+    fn vscode_light() -> Self {
+        ThemeColors {
+            heading1: "38;2;5;80;174".into(),
+            heading2: "38;2;149;56;0".into(),
+            heading3: "38;2;17;99;41".into(),
+            accent: "38;2;0;102;184".into(),
+            dim: "38;2;140;140;140".into(),
+            code: "38;2;215;58;73".into(),
+            text: "38;2;56;56;56".into(),
+        }
+    }
+
+    fn solarized_light() -> Self {
+        ThemeColors {
+            heading1: "38;2;42;161;152".into(),
+            heading2: "38;2;181;137;0".into(),
+            heading3: "38;2;133;153;0".into(),
+            accent: "38;2;38;139;210".into(),
+            dim: "38;2;131;148;150".into(),
+            code: "38;2;181;137;0".into(),
+            text: "38;2;101;123;131".into(),
+        }
+    }
+
+    fn catppuccin_latte() -> Self {
+        ThemeColors {
+            heading1: "38;2;4;165;229".into(),
+            heading2: "38;2;223;142;29".into(),
+            heading3: "38;2;64;160;43".into(),
+            accent: "38;2;30;102;245".into(),
+            dim: "38;2;108;111;133".into(),
+            code: "38;2;223;142;29".into(),
+            text: "38;2;76;79;105".into(),
+        }
+    }
+
+    fn pink() -> Self {
+        ThemeColors {
+            heading1: "38;2;194;24;91".into(),
+            heading2: "38;2;204;93;232".into(),
+            heading3: "38;2;123;31;162".into(),
+            accent: "38;2;214;51;132".into(),
+            dim: "38;2;168;110;130".into(),
+            code: "38;2;204;93;232".into(),
+            text: "38;2;74;26;44".into(),
+        }
+    }
 }
 
 impl PluginState {
@@ -168,6 +219,10 @@ impl PluginState {
             "solarized" => ThemeColors::solarized(),
             "catppuccin" => ThemeColors::catppuccin(),
             "synthwave84" => ThemeColors::synthwave84(),
+            "vscode-light" => ThemeColors::vscode_light(),
+            "solarized-light" => ThemeColors::solarized_light(),
+            "catppuccin-latte" => ThemeColors::catppuccin_latte(),
+            "pink" => ThemeColors::pink(),
             _ => ThemeColors::default_theme(),
         };
         // Re-render the current file if one is open.

@@ -165,6 +165,22 @@ fn theme_change_switches_colors() {
 }
 
 #[test]
+fn light_themes_get_dedicated_dark_text_presets() {
+    let mut state = PluginState::new();
+    for theme_name in ["vscode-light", "solarized-light", "catppuccin-latte", "pink"] {
+        state.handle_theme_change(theme_name);
+        assert_ne!(
+            state.theme.text, "38;2;255;255;255",
+            "{theme_name} text should not fall back to the dark default's white"
+        );
+        assert!(
+            !state.theme.text.contains("38;5;15"),
+            "{theme_name} should not use the dark default's white text"
+        );
+    }
+}
+
+#[test]
 fn set_content_message_produces_valid_json() {
     let lines = vec!["line1".to_string(), "line2".to_string()];
     let mut buf: Vec<u8> = Vec::new();
