@@ -167,7 +167,12 @@ fn theme_change_switches_colors() {
 #[test]
 fn light_themes_get_dedicated_dark_text_presets() {
     let mut state = PluginState::new();
-    for theme_name in ["vscode-light", "solarized-light", "catppuccin-latte", "pink"] {
+    for theme_name in [
+        "vscode-light",
+        "solarized-light",
+        "catppuccin-latte",
+        "pink",
+    ] {
         state.handle_theme_change(theme_name);
         assert_ne!(
             state.theme.text, "38;2;255;255;255",
