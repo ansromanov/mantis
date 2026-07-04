@@ -391,7 +391,7 @@ impl App {
 
     /// Nudges `content_scroll` so `active_line` stays within the visible
     /// viewport after a cursor move. Delegates to the unified helper.
-    fn scroll_active_line_into_view(&mut self) {
+    pub(super) fn scroll_active_line_into_view(&mut self) {
         self.scroll_line_into_view(self.active_line);
     }
 }

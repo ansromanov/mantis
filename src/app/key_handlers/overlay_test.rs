@@ -13,6 +13,8 @@ fn temp_tree() -> PathBuf {
     let dir = std::env::temp_dir().join(format!("tv_overlay_test_{}_{n}", std::process::id()));
     fs::create_dir_all(&dir).unwrap();
     fs::write(dir.join("a.txt"), "hello\n").unwrap();
+    let long: String = (1..=50).map(|i| format!("line {i}\n")).collect();
+    fs::write(dir.join("long.txt"), long).unwrap();
     dir.canonicalize().unwrap()
 }
 
@@ -49,6 +51,77 @@ fn handle_goto_line_key_esc_closes_dialog() {
     app.goto_line = Some(GotoLineState::new());
     app.handle_goto_line_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
     assert!(app.goto_line.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn handle_goto_line_key_activate_moves_active_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.active_line = 0;
+    let mut g = GotoLineState::new();
+    g.query = "20".to_string();
+    app.goto_line = Some(g);
+    app.handle_goto_line_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert!(app.goto_line.is_none());
+    assert_eq!(
+        app.active_line, 19,
+        "1-indexed input lands on the 0-indexed line"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn handle_goto_line_key_activate_relative_plus_is_cursor_relative() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.active_line = 10;
+    let mut g = GotoLineState::new();
+    g.query = "+5".to_string();
+    app.goto_line = Some(g);
+    app.handle_goto_line_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert_eq!(
+        app.active_line, 15,
+        "+n offsets from active_line, not content_scroll"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn handle_goto_line_key_activate_relative_minus_is_cursor_relative() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.active_line = 10;
+    let mut g = GotoLineState::new();
+    g.query = "-3".to_string();
+    app.goto_line = Some(g);
+    app.handle_goto_line_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert_eq!(
+        app.active_line, 7,
+        "-n offsets from active_line, not content_scroll"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn handle_goto_line_key_activate_clamps_to_last_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.active_line = 0;
+    let mut g = GotoLineState::new();
+    g.query = "9999".to_string();
+    app.goto_line = Some(g);
+    app.handle_goto_line_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    let last = app.display_line_count().saturating_sub(1);
+    assert_eq!(app.active_line, last);
     fs::remove_dir_all(&root).ok();
 }
 

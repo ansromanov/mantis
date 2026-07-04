@@ -316,17 +316,19 @@ impl App {
                     }
                     if let Some(offset) = q.strip_prefix('+') {
                         let n = offset.parse::<usize>().ok()?;
-                        Some(self.content_scroll.saturating_add(n))
+                        Some(self.active_line.saturating_add(n))
                     } else if let Some(offset) = q.strip_prefix('-') {
                         let n = offset.parse::<usize>().ok()?;
-                        Some(self.content_scroll.saturating_sub(n))
+                        Some(self.active_line.saturating_sub(n))
                     } else {
                         let n = q.parse::<usize>().ok()?;
                         Some(n.saturating_sub(1)) // 1-indexed → 0-indexed
                     }
                 });
                 if let Some(line) = target {
-                    self.set_content_scroll(line);
+                    let max = self.display_line_count().saturating_sub(1);
+                    self.active_line = line.min(max);
+                    self.scroll_active_line_into_view();
                     self.mark_content_scrolled();
                 }
                 self.goto_line = None;

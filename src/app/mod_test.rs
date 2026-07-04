@@ -1263,6 +1263,7 @@ fn goto_line_key_enter_jumps_to_absolute_line() {
     app.handle_key(KeyEvent::new(KeyCode::Char('5'), KeyModifiers::empty()));
     app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
     assert!(app.goto_line.is_none());
+    assert_eq!(app.active_line, 4, "cursor must land on the requested line");
     assert_eq!(app.content_scroll, 4);
     fs::remove_dir_all(&root).ok();
 }
@@ -1273,13 +1274,16 @@ fn goto_line_key_enter_relative_plus_jump() {
     let mut app = app_for(&root);
     app.focus = Focus::Content;
     app.open_file(&root.join("long.txt"));
-    app.content_scroll = 10;
+    app.active_line = 10;
     app.goto_line = Some(GotoLineState::new());
     app.handle_key(KeyEvent::new(KeyCode::Char('+'), KeyModifiers::empty()));
     app.handle_key(KeyEvent::new(KeyCode::Char('5'), KeyModifiers::empty()));
     app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
     assert!(app.goto_line.is_none());
-    assert_eq!(app.content_scroll, 15);
+    assert_eq!(
+        app.active_line, 15,
+        "+n offsets from the cursor, not the viewport top"
+    );
     fs::remove_dir_all(&root).ok();
 }
 
@@ -1289,13 +1293,16 @@ fn goto_line_key_enter_relative_minus_jump() {
     let mut app = app_for(&root);
     app.focus = Focus::Content;
     app.open_file(&root.join("long.txt"));
-    app.content_scroll = 20;
+    app.active_line = 20;
     app.goto_line = Some(GotoLineState::new());
     app.handle_key(KeyEvent::new(KeyCode::Char('-'), KeyModifiers::empty()));
     app.handle_key(KeyEvent::new(KeyCode::Char('5'), KeyModifiers::empty()));
     app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
     assert!(app.goto_line.is_none());
-    assert_eq!(app.content_scroll, 15);
+    assert_eq!(
+        app.active_line, 15,
+        "-n offsets from the cursor, not the viewport top"
+    );
     fs::remove_dir_all(&root).ok();
 }
 
@@ -1312,6 +1319,8 @@ fn goto_line_key_enter_clamps_to_max() {
     app.handle_key(KeyEvent::new(KeyCode::Char('9'), KeyModifiers::empty()));
     app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
     assert!(app.goto_line.is_none());
+    let last = app.display_line_count().saturating_sub(1);
+    assert_eq!(app.active_line, last);
     assert_eq!(app.content_scroll, 40);
     fs::remove_dir_all(&root).ok();
 }
