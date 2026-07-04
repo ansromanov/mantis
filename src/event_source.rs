@@ -477,7 +477,20 @@ fn parse_csi_u(params: &str, consumed: usize) -> io::Result<Option<(Event, usize
     }
 
     // ---- translate primary code to KeyCode ----
-    let keycode = u32_to_keycode(primary);
+    // When SHIFT is held and the terminal reports a shifted alternate
+    // codepoint, prefer it for the emitted KeyCode::Char (matching
+    // crossterm's CSI-u semantics), so text-input paths that read
+    // `key.code` directly see the shifted character (e.g. `*` not `8`).
+    // CURRENT_ALT_KEYS still carries both variants for layout-independent
+    // keybinding matching.
+    let keycode = if modifiers.contains(KeyModifiers::SHIFT) {
+        match shifted {
+            Some(c) => u32_to_keycode(c as u32),
+            None => u32_to_keycode(primary),
+        }
+    } else {
+        u32_to_keycode(primary)
+    };
 
     // Store alternate keys for the dispatch layer.
     CURRENT_ALT_KEYS.with(|c| c.set(AltKeys { shifted, base }));

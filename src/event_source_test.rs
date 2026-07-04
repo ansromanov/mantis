@@ -306,6 +306,42 @@ fn csi_u_ctrl_modifier_decodes_correctly() {
 }
 
 // ---------------------------------------------------------------------------
+// CSI-u: shifted alternate substituted into KeyCode::Char when SHIFT is set
+// (regression test for #519 — shifted ASCII symbols on kitty-protocol
+// terminals were emitted as their unshifted digit/base character).
+// ---------------------------------------------------------------------------
+
+#[test]
+fn csi_u_shift_uses_shifted_alternate_for_keycode() {
+    // Shift+8 on a US layout: primary='8' (56), shifted='*' (42), modifier=2 (shift).
+    let seq = b"\x1b[56:42;2u";
+    let (ev, _) = parse_ok(seq);
+    let k = key_event(&ev);
+    assert_eq!(k.code, KeyCode::Char('*'));
+    assert!(k.modifiers.contains(KeyModifiers::SHIFT));
+}
+
+#[test]
+fn csi_u_no_shift_keeps_primary_keycode() {
+    // Same codes as above but without the shift modifier: keycode stays '8'.
+    let seq = b"\x1b[56:42;1u";
+    let (ev, _) = parse_ok(seq);
+    let k = key_event(&ev);
+    assert_eq!(k.code, KeyCode::Char('8'));
+    assert!(!k.modifiers.contains(KeyModifiers::SHIFT));
+}
+
+#[test]
+fn csi_u_shift_without_shifted_field_falls_back_to_primary() {
+    // Shift set but no shifted alternate reported: keep the primary codepoint.
+    let seq = b"\x1b[112;2u"; // 'p' + shift, no alternate field
+    let (ev, _) = parse_ok(seq);
+    let k = key_event(&ev);
+    assert_eq!(k.code, KeyCode::Char('p'));
+    assert!(k.modifiers.contains(KeyModifiers::SHIFT));
+}
+
+// ---------------------------------------------------------------------------
 // SGR mouse drag vs moved
 // ---------------------------------------------------------------------------
 
