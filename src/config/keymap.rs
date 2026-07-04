@@ -9,6 +9,13 @@
 //! `parse_binding`; the `Keymap::default()` provides the shipped bindings.
 //! The `matches` method on `KeyBinding` handles the kitty keyboard protocol's
 //! alternate-key reporting for layout-independent matching.
+//!
+//! `bindings_for_action`/`label_for_action`/`labels_for_action` accept only
+//! the canonical action ids declared in `crate::actions::ACTIONS` - one id
+//! per `Keymap` field, no aliases. The command palette and the help overlay
+//! both look bindings up through these same ids, so keeping this match in
+//! sync with `ACTIONS` (enforced by `actions_test.rs`) is what keeps the
+//! three surfaces from drifting apart again.
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use serde::{Deserialize, Deserializer, Serialize};
@@ -130,48 +137,27 @@ pub fn pressed(bindings: &[KeyBinding], key: &KeyEvent) -> bool {
 }
 
 impl Keymap {
-    /// Returns the bindings for an `action_id`, or an empty slice.
+    /// Returns the bindings for a canonical `action_id` (see
+    /// `crate::actions::ACTIONS`), or an empty slice for an unbound or
+    /// palette/menu-only action (e.g. `fold_all`, `show_about`).
     fn bindings_for_action(&self, action_id: &str) -> &[KeyBinding] {
         match action_id {
-            "toggle_help" => &self.help,
-            "toggle_hidden" => &self.toggle_hidden,
-            "open_file_search" => &self.search_files,
-            "open_content_search" => &self.search_content,
-            "reload" => &self.reload,
-            "open_file_history" => &self.file_history,
-            "open_theme_picker" => &self.theme_picker,
-            "toggle_git_mode" => &self.git_mode_toggle,
-            "toggle_git_flat" => &self.git_mode_flat_toggle,
-            "toggle_word_wrap" => &self.toggle_wrap,
-            "toggle_line_numbers" => &self.toggle_line_numbers,
-            "toggle_pretty_json" => &self.toggle_pretty_json,
-            "toggle_blame" => &self.toggle_blame,
-            "toggle_diff_side_by_side" => &self.toggle_diff_side_by_side,
-            "toggle_diff_staged" => &self.toggle_diff_staged,
-            "open_in_editor" => &self.open_in_editor,
-            "fold_toggle" => &self.fold_toggle,
-            "toggle_watch" => &self.toggle_watch,
-            "open_recent_files" => &self.recent_files,
-            "copy_path" => &self.copy_path,
-            "copy_relative_path" => &self.copy_relative_path,
-            "open_plugin_picker" => &self.plugin_picker,
-            "tree_collapse_all" => &self.tree_collapse_all,
-            "tree_expand_all" => &self.tree_expand_all,
-            "go_to_line" => &self.goto_line,
-            "blame_line" => &self.blame_line,
-            "tree_up_dir" => &self.tree_up_dir,
             "help" => &self.help,
-            "quit" => &self.quit,
-            "switch_panel" => &self.switch_panel,
+            "toggle_hidden" => &self.toggle_hidden,
             "search_files" => &self.search_files,
             "find_files" => &self.find_files,
             "search_content" => &self.search_content,
+            "reload" => &self.reload,
+            "switch_panel" => &self.switch_panel,
             "file_history" => &self.file_history,
             "theme_picker" => &self.theme_picker,
+            "quit" => &self.quit,
             "nav_up" => &self.nav_up,
             "nav_down" => &self.nav_down,
             "tree_expand" => &self.tree_expand,
             "tree_collapse" => &self.tree_collapse,
+            "tree_collapse_all" => &self.tree_collapse_all,
+            "tree_expand_all" => &self.tree_expand_all,
             "content_left" => &self.content_left,
             "content_right" => &self.content_right,
             "content_top" => &self.content_top,
@@ -179,15 +165,27 @@ impl Keymap {
             "content_page_up" => &self.content_page_up,
             "content_page_down" => &self.content_page_down,
             "content_reset_col" => &self.content_reset_col,
+            "toggle_wrap" => &self.toggle_wrap,
+            "toggle_line_numbers" => &self.toggle_line_numbers,
+            "toggle_pretty_json" => &self.toggle_pretty_json,
+            "toggle_blame" => &self.toggle_blame,
+            "blame_line" => &self.blame_line,
+            "toggle_diff_side_by_side" => &self.toggle_diff_side_by_side,
+            "toggle_diff_staged" => &self.toggle_diff_staged,
             "diff_hunk_next" => &self.diff_hunk_next,
             "diff_hunk_prev" => &self.diff_hunk_prev,
             "git_mode_toggle" => &self.git_mode_toggle,
             "git_mode_flat_toggle" => &self.git_mode_flat_toggle,
             "command_palette" => &self.command_palette,
+            "open_in_editor" => &self.open_in_editor,
+            "fold_toggle" => &self.fold_toggle,
+            "toggle_watch" => &self.toggle_watch,
             "recent_files" => &self.recent_files,
+            "copy_path" => &self.copy_path,
+            "copy_relative_path" => &self.copy_relative_path,
             "plugin_picker" => &self.plugin_picker,
-            "toggle_wrap" => &self.toggle_wrap,
             "goto_line" => &self.goto_line,
+            "tree_up_dir" => &self.tree_up_dir,
             _ => &[],
         }
     }

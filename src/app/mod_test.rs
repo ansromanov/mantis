@@ -3995,7 +3995,7 @@ fn setup_command(app: &mut App, action_id: &str) {
 fn dispatch_command_toggle_help_toggles() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    setup_command(&mut app, "toggle_help");
+    setup_command(&mut app, "help");
     assert!(!app.show_help);
     app.dispatch_command();
     assert!(app.command_palette.is_none());
@@ -4007,7 +4007,7 @@ fn dispatch_command_toggle_help_toggles() {
 fn dispatch_command_open_file_search_creates_search() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    setup_command(&mut app, "open_file_search");
+    setup_command(&mut app, "search_files");
     assert!(app.search.is_none());
     app.dispatch_command();
     assert!(app.command_palette.is_none());
@@ -4022,7 +4022,7 @@ fn dispatch_command_open_file_search_with_keep_query() {
     let mut app = app_for(&root);
     app.config.search.keep_query = true;
     app.last_search_query = "test".to_string();
-    setup_command(&mut app, "open_file_search");
+    setup_command(&mut app, "search_files");
     app.dispatch_command();
     assert!(app.search.is_some());
     assert_eq!(app.search.as_ref().unwrap().query, "test");
@@ -4033,7 +4033,7 @@ fn dispatch_command_open_file_search_with_keep_query() {
 fn dispatch_command_open_content_search_creates_search() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    setup_command(&mut app, "open_content_search");
+    setup_command(&mut app, "search_content");
     app.dispatch_command();
     assert!(app.command_palette.is_none());
     assert!(app.search.is_some());
@@ -4045,7 +4045,7 @@ fn dispatch_command_open_content_search_creates_search() {
 fn dispatch_command_toggle_word_wrap_toggles() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    setup_command(&mut app, "toggle_word_wrap");
+    setup_command(&mut app, "toggle_wrap");
     let before = app.word_wrap;
     app.content_scroll = 10;
     app.content_hscroll = 5;
@@ -4751,8 +4751,8 @@ fn plugin_picker_nav_down_and_up() {
 fn plugin_picker_command_palette_entry_exists() {
     use crate::command_palette::COMMANDS;
     assert!(
-        COMMANDS.iter().any(|c| c.action_id == "open_plugin_picker"),
-        "command palette must include open_plugin_picker"
+        COMMANDS.iter().any(|c| c.action_id == "plugin_picker"),
+        "command palette must include plugin_picker"
     );
 }
 

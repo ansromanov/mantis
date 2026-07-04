@@ -406,7 +406,7 @@ fn dispatch_command_records_action_in_usage() {
     app.dispatch_command();
     assert_eq!(
         app.command_usage.last_used(),
-        Some("toggle_help"),
+        Some("help"),
         "dispatch_command must update last_used to the dispatched action_id"
     );
     fs::remove_dir_all(&root).ok();

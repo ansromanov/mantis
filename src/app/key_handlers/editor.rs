@@ -2,14 +2,16 @@
 //!
 //! `dispatch_command` maps a selected command-palette entry's `action_id` to the
 //! matching `App` method, so the palette and direct keybindings share one set of
-//! actions. This module also owns suspending the TUI to launch the user's
-//! `$EDITOR` on the current file: it tears down raw mode and the alternate
-//! screen, runs the editor, then restores the terminal and flags `needs_clear`
-//! so the next frame repaints cleanly. Theme switching and the highlighter
-//! rebuild triggered from the palette live here too, alongside the related
-//! terminal-state bookkeeping. `open_release_url` delegates to the shared
-//! `open_in_browser` helper, which guards against spawning the browser when
-//! stdout is not a TTY (piped/headless/CI runs).
+//! canonical ids from `crate::actions::ACTIONS` - no more `open_x`/`x_picker`
+//! aliasing between this match and `Keymap::bindings_for_action`. This module
+//! also owns suspending the TUI to launch the user's `$EDITOR` on the current
+//! file: it tears down raw mode and the alternate screen, runs the editor,
+//! then restores the terminal and flags `needs_clear` so the next frame
+//! repaints cleanly. Theme switching and the highlighter rebuild triggered
+//! from the palette live here too, alongside the related terminal-state
+//! bookkeeping. `open_release_url` delegates to the shared `open_in_browser`
+//! helper, which guards against spawning the browser when stdout is not a TTY
+//! (piped/headless/CI runs).
 
 use crossterm::event::EnableMouseCapture;
 use crossterm::execute;
@@ -38,15 +40,15 @@ impl App {
         }
         self.command_palette = None;
         match action_id {
-            Some("toggle_help") => self.show_help = !self.show_help,
+            Some("help") => self.show_help = !self.show_help,
             Some("toggle_hidden") => {
                 self.show_hidden = !self.show_hidden;
                 self.config.tree.show_hidden = self.show_hidden;
                 self.reload();
                 self.save_config();
             }
-            Some("open_file_search") => self.open_file_search(),
-            Some("open_content_search") => {
+            Some("search_files") => self.open_file_search(),
+            Some("search_content") => {
                 let root = self.root.clone();
                 let changed = self.git_changed_files_set();
                 let mut s = SearchState::new(
@@ -64,22 +66,22 @@ impl App {
                 self.search = Some(s);
             }
             Some("reload") => self.reload(),
-            Some("open_file_history") => self.open_file_history(),
-            Some("open_theme_picker") => {
+            Some("file_history") => self.open_file_history(),
+            Some("theme_picker") => {
                 self.theme_picker = Some(ThemePicker::default());
             }
-            Some("open_plugin_picker") => {
+            Some("plugin_picker") => {
                 let entries = self.plugin_manager.plugin_entries();
                 self.plugin_picker = Some(PluginPicker::new(entries));
             }
-            Some("toggle_git_mode") => self.toggle_git_mode(),
-            Some("toggle_git_flat") if self.git_mode => {
+            Some("git_mode_toggle") => self.toggle_git_mode(),
+            Some("git_mode_flat_toggle") if self.git_mode => {
                 self.git_mode_flat = !self.git_mode_flat;
                 self.rebuild(true);
                 self.try_open_selected();
                 self.save_config();
             }
-            Some("toggle_word_wrap") => {
+            Some("toggle_wrap") => {
                 self.word_wrap = !self.word_wrap;
                 self.config.content.word_wrap = self.word_wrap;
                 self.set_content_scroll(0);
@@ -96,6 +98,13 @@ impl App {
                 self.set_content_scroll(0);
                 self.content_hscroll = 0;
             }
+            Some("toggle_blame") => {
+                if self.has_text_cursor() {
+                    self.show_blame = !self.show_blame;
+                } else {
+                    self.set_status("blame: not available in a diff");
+                }
+            }
             Some("toggle_diff_side_by_side") if self.is_diff => {
                 self.diff_side_by_side = !self.diff_side_by_side;
                 self.config.git.diff.side_by_side = self.diff_side_by_side;
@@ -103,6 +112,16 @@ impl App {
                 self.set_content_scroll(0);
                 self.content_hscroll = 0;
             }
+            Some("toggle_diff_staged") if self.is_diff => {
+                self.diff_mode = self.diff_mode.next();
+                self.config.git.diff.mode = self.diff_mode;
+                self.save_config();
+                if let Some(path) = self.current_file.clone() {
+                    self.show_working_tree_diff(&path);
+                }
+            }
+            Some("diff_hunk_next") if self.is_diff => self.diff_next_hunk(),
+            Some("diff_hunk_prev") if self.is_diff => self.diff_prev_hunk(),
             Some("open_in_editor") => self.open_in_editor(),
             Some("open_config_in_editor") => self.open_config_in_editor(),
             Some("show_about") => self.show_about = !self.show_about,
@@ -129,7 +148,13 @@ impl App {
             Some("tree_collapse_all") => self.collapse_all(),
             Some("tree_expand_all") => self.expand_all(),
             Some("tree_up_dir") => self.tree_up_dir(),
-            Some("go_to_line") if self.focus == Focus::Content => {
+            Some("recent_files") => self.open_recent_files(),
+            Some("toggle_watch") => {
+                self.auto_watch = !self.auto_watch;
+                self.config.content.watch = self.auto_watch;
+                self.save_config();
+            }
+            Some("goto_line") if self.focus == Focus::Content => {
                 self.goto_line = Some(GotoLineState::new());
             }
             _ => {}

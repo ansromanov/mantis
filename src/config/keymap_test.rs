@@ -280,3 +280,57 @@ fn keymap_has_no_toggle_raw_markdown() {
         "toggle_wrap must still match z key",
     );
 }
+
+// -- action id canonicalisation (issue #495) ---------------------------------
+//
+// `bindings_for_action` used to accept both an `x_picker`/`x_toggle`-style id
+// (used by the keymap/help) and an `open_x`/`toggle_x`-style alias (used by
+// the old hand-maintained command palette) for the same field. Those aliases
+// are gone now that the palette derives from the same canonical
+// `crate::actions::ACTIONS` ids the keymap already used.
+
+#[test]
+fn canonical_action_ids_resolve_bindings() {
+    let keymap = Keymap::default();
+    for id in [
+        "help",
+        "search_files",
+        "search_content",
+        "file_history",
+        "theme_picker",
+        "git_mode_toggle",
+        "git_mode_flat_toggle",
+        "toggle_wrap",
+        "recent_files",
+        "plugin_picker",
+        "goto_line",
+    ] {
+        assert!(
+            !keymap.label_for_action(id).is_empty(),
+            "canonical action id '{id}' must resolve to a bound key",
+        );
+    }
+}
+
+#[test]
+fn old_palette_aliases_no_longer_resolve() {
+    let keymap = Keymap::default();
+    for alias in [
+        "toggle_help",
+        "open_file_search",
+        "open_content_search",
+        "open_file_history",
+        "open_theme_picker",
+        "toggle_git_mode",
+        "toggle_git_flat",
+        "toggle_word_wrap",
+        "open_recent_files",
+        "open_plugin_picker",
+        "go_to_line",
+    ] {
+        assert!(
+            keymap.label_for_action(alias).is_empty(),
+            "'{alias}' is a removed alias and must no longer resolve to a binding",
+        );
+    }
+}

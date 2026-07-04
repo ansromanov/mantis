@@ -514,6 +514,49 @@ fn help_scroll_down_reveals_later_sections() {
     );
 }
 
+// -- ACTIONS-derived sections (issue #495) -----------------------------------
+
+/// The Content panel section still shows both meanings of the shared
+/// nav_up/nav_down bindings: tree-panel "move up/down" (from their
+/// `ACTIONS` entry) and content-panel "scroll up/down" (hand-appended in
+/// `keymap_help_sections`, since an `ActionSpec` has only one `help` slot).
+#[test]
+fn help_shows_both_nav_meanings_move_and_scroll() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    let backend = TestBackend::new(80, 200);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(joined.contains("move up"), "Tree panel must list 'move up'");
+    assert!(
+        joined.contains("scroll up"),
+        "Content panel must list 'scroll up'"
+    );
+}
+
+/// New palette entries added for issue #495 (recent_files, toggle_blame) also
+/// have `ACTIONS` help entries and must render in the help overlay.
+#[test]
+fn help_shows_recent_files_and_toggle_blame() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    let backend = TestBackend::new(80, 200);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(
+        joined.contains("recent files picker"),
+        "help must list 'recent files picker', got:\n{joined}"
+    );
+    assert!(
+        joined.contains("toggle git blame gutter"),
+        "help must list 'toggle git blame gutter', got:\n{joined}"
+    );
+}
+
 #[test]
 fn help_shows_no_markdown_entry() {
     let dir = tempfile::tempdir().unwrap();

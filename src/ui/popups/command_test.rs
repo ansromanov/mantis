@@ -33,14 +33,14 @@ fn buffer_rows(terminal: &Terminal<TestBackend>) -> Vec<String> {
 fn pinned_entries_show_star_prefix_when_query_empty() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());
-    // Build a palette with toggle_help (index 0) pinned.
-    let toggle_help_idx = crate::command_palette::COMMANDS
+    // Build a palette with the help action pinned.
+    let help_idx = crate::command_palette::COMMANDS
         .iter()
-        .position(|c| c.action_id == "toggle_help")
-        .expect("toggle_help must be in COMMANDS");
-    let mut order: Vec<usize> = vec![toggle_help_idx];
+        .position(|c| c.action_id == "help")
+        .expect("help must be in COMMANDS");
+    let mut order: Vec<usize> = vec![help_idx];
     for i in 0..crate::command_palette::COMMANDS.len() {
-        if i != toggle_help_idx {
+        if i != help_idx {
             order.push(i);
         }
     }
@@ -63,13 +63,13 @@ fn pinned_entries_show_star_prefix_when_query_empty() {
 fn star_prefix_hidden_when_query_is_typed() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());
-    let toggle_help_idx = crate::command_palette::COMMANDS
+    let help_idx = crate::command_palette::COMMANDS
         .iter()
-        .position(|c| c.action_id == "toggle_help")
-        .expect("toggle_help must be in COMMANDS");
-    let mut order: Vec<usize> = vec![toggle_help_idx];
+        .position(|c| c.action_id == "help")
+        .expect("help must be in COMMANDS");
+    let mut order: Vec<usize> = vec![help_idx];
     for i in 0..crate::command_palette::COMMANDS.len() {
-        if i != toggle_help_idx {
+        if i != help_idx {
             order.push(i);
         }
     }
