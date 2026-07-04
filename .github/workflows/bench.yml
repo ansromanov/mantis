@@ -28,7 +28,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           prev_run=$(gh run list --workflow "${{ github.workflow }}" \
-            --status success --limit 1 --json databaseId \
+            --branch main --status success --limit 1 --json databaseId \
             --jq '.[0].databaseId' || true)
           if [ -z "${prev_run:-}" ]; then
             echo "No previous successful run; drift comparison will be skipped."
