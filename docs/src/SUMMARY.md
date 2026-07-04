@@ -21,4 +21,5 @@
 
 - [Development](development.md)
 - [Plugin Development](plugin-development.md)
+- [Plugin Capability Matrix](plugin-capability-matrix.md)
 - [Roadmap](roadmap.md)
