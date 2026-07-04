@@ -15,9 +15,9 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture, Event},
+    event::{EnableMouseCapture, Event},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{enable_raw_mode, EnterAlternateScreen},
 };
 use ratatui::{backend::Backend, backend::CrosstermBackend, Terminal};
 
@@ -208,6 +208,14 @@ fn launch_tui(root: PathBuf, file: Option<PathBuf>) -> anyhow::Result<()> {
     let mut terminal = Terminal::new(backend)?;
     terminal.hide_cursor()?;
 
+    // Install panic hook right after terminal setup so that any panic (including
+    // abort in release builds) restores the terminal to a usable state.
+    let prev = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        crate::app::restore_terminal();
+        prev(info);
+    }));
+
     // Use a trait-object event source so we can swap between the kitty-aware
     // raw parser (on Unix) and the regular crossterm source.
     #[cfg(unix)]
@@ -221,18 +229,9 @@ fn launch_tui(root: PathBuf, file: Option<PathBuf>) -> anyhow::Result<()> {
 
     let result = run_app(&mut terminal, root, file, events.as_mut());
 
-    // Teardown: reverse order from setup.
-    #[cfg(unix)]
-    if keyboard_enhanced {
-        let _ = event_source::pop_keyboard_enhancement_flags();
-    }
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
+    // Normal teardown: share the same best-effort restore so the panic hook and
+    // the graceful path agree.
+    crate::app::restore_terminal();
 
     result
 }

@@ -544,6 +544,31 @@ impl App {
     }
 }
 
+/// Restores the terminal to a normal state: pops keyboard enhancement flags
+/// (Unix only), disables raw mode, leaves the alternate screen, disables mouse
+/// capture, and shows the cursor. Best-effort and idempotent — each operation
+/// is silently ignored on error so this can be called from a panic hook or
+/// from regular teardown.
+#[cfg_attr(not(unix), allow(unused_imports))]
+pub fn restore_terminal() {
+    use std::io;
+
+    use crossterm::cursor::Show;
+    use crossterm::event::DisableMouseCapture;
+    use crossterm::execute;
+    use crossterm::terminal::{disable_raw_mode, LeaveAlternateScreen};
+
+    #[cfg(unix)]
+    let _ = crate::event_source::pop_keyboard_enhancement_flags();
+    let _ = disable_raw_mode();
+    let _ = execute!(
+        io::stdout(),
+        LeaveAlternateScreen,
+        DisableMouseCapture,
+        Show
+    );
+}
+
 #[cfg(test)]
 #[path = "mod_test.rs"]
 mod tests;

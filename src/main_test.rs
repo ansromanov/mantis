@@ -456,3 +456,11 @@ fn config_error_surfaces_from_invalid_toml() {
     assert!(err.unwrap().contains("mantis.toml"));
     fs::remove_dir_all(&dir).ok();
 }
+
+#[test]
+fn restore_terminal_is_idempotent() {
+    // Calling restore_terminal() multiple times must not panic even when the
+    // terminal is not in raw/alternate-screen mode.
+    crate::app::restore_terminal();
+    crate::app::restore_terminal();
+}
