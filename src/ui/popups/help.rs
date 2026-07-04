@@ -19,7 +19,8 @@
 //! registry entry. The dedicated Git section stays partially hand-assembled
 //! (it interleaves static orientation rows - tree colors, status bar legend -
 //! with keymap-driven rows) but its `GIT_KEYMAP_ENTRIES` ids are all
-//! canonical `ACTIONS` ids, checked by `actions_test.rs`.
+//! canonical `ACTIONS` ids, checked by
+//! `help_test.rs::git_keymap_entries_ids_are_canonical_actions`.
 
 use ratatui::{
     layout::Rect,
@@ -62,9 +63,10 @@ fn keymap_help_sections() -> Vec<(&'static str, Vec<(&'static str, &'static str)
 /// Git-specific keybinding rows rendered in the dedicated Git section.
 /// Each tuple is `(action_id, user-facing description)`; `action_id` must be
 /// a canonical id from `crate::actions::ACTIONS` (checked by
-/// `actions_test.rs`), even though the description here is git-specific
-/// phrasing distinct from that action's `ACTIONS` entry (if it has one).
-const GIT_KEYMAP_ENTRIES: &[(&str, &str)] = &[
+/// `help_test.rs::git_keymap_entries_ids_are_canonical_actions`), even though
+/// the description here is git-specific phrasing distinct from that action's
+/// `ACTIONS` entry (if it has one).
+pub(super) const GIT_KEYMAP_ENTRIES: &[(&str, &str)] = &[
     (
         "git_mode_toggle",
         "show only changed files; each file opens its diff",

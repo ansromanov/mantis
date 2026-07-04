@@ -514,6 +514,20 @@ fn help_scroll_down_reveals_later_sections() {
     );
 }
 
+/// Guards `GIT_KEYMAP_ENTRIES` against drifting from the canonical action
+/// registry - the module doc comment on `help.rs` promises this is enforced.
+#[test]
+fn git_keymap_entries_ids_are_canonical_actions() {
+    use crate::actions::ACTIONS;
+    use crate::ui::popups::help::GIT_KEYMAP_ENTRIES;
+    for &(id, _) in GIT_KEYMAP_ENTRIES {
+        assert!(
+            ACTIONS.iter().any(|a| a.id == id),
+            "'{id}' in GIT_KEYMAP_ENTRIES is not a known ACTIONS id",
+        );
+    }
+}
+
 // -- ACTIONS-derived sections (issue #495) -----------------------------------
 
 /// The Content panel section still shows both meanings of the shared

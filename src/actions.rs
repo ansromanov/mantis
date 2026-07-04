@@ -51,7 +51,7 @@ pub static ACTIONS: &[ActionSpec] = &[
     },
     ActionSpec {
         id: "quit",
-        palette: None,
+        palette: Some("Quit"),
         help: Some(("Global", "quit")),
     },
     ActionSpec {

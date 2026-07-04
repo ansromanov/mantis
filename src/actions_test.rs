@@ -53,46 +53,6 @@ const KEYMAP_FIELD_ACTION_IDS: &[&str] = &[
     "tree_up_dir",
 ];
 
-/// Action ids `app::key_handlers::editor::dispatch_command` has a real match
-/// arm for (not falling through to the `_ => {}` no-op). Every
-/// `ACTIONS` entry with `palette: Some(_)` must appear here, or selecting it
-/// from the Ctrl-P palette would silently do nothing.
-const DISPATCH_HANDLED_IDS: &[&str] = &[
-    "help",
-    "toggle_hidden",
-    "search_files",
-    "search_content",
-    "reload",
-    "file_history",
-    "theme_picker",
-    "plugin_picker",
-    "git_mode_toggle",
-    "git_mode_flat_toggle",
-    "toggle_wrap",
-    "toggle_line_numbers",
-    "toggle_pretty_json",
-    "toggle_blame",
-    "toggle_diff_side_by_side",
-    "toggle_diff_staged",
-    "diff_hunk_next",
-    "diff_hunk_prev",
-    "open_in_editor",
-    "open_config_in_editor",
-    "show_about",
-    "fold_all",
-    "unfold_all",
-    "fold_toggle",
-    "blame_line",
-    "copy_path",
-    "copy_relative_path",
-    "tree_collapse_all",
-    "tree_expand_all",
-    "tree_up_dir",
-    "recent_files",
-    "toggle_watch",
-    "goto_line",
-];
-
 /// Pure-navigation actions that are inherently keymap-only: they should never
 /// need a palette entry, and their help-overlay coverage (if any) is already
 /// captured by their `ACTIONS` entry's `.help` field. Listed here only so the
@@ -112,7 +72,6 @@ const NAV_ONLY_ALLOWLIST: &[&str] = &[
     "content_reset_col",
     "find_files",
     "switch_panel",
-    "quit",
     "command_palette",
 ];
 
@@ -174,26 +133,36 @@ fn every_bound_non_nav_action_has_a_palette_entry() {
     }
 }
 
+/// Every `ACTIONS` entry with `palette: Some(_)` must be reachable through
+/// `App::dispatch_command`'s real match arms - not a hand-maintained list of
+/// ids that could drift from the match itself. `dispatch_command` returns
+/// `true` iff `action_id` matched a literal arm (regardless of that arm's own
+/// state-dependent guard, e.g. `is_diff`), so removing a match arm here fails
+/// this test immediately instead of leaving a stale allowlist green.
 #[test]
 fn every_palette_action_id_is_dispatch_handled() {
+    use crate::app::App;
+    use crate::command_palette::CommandPalette;
+    use crate::config::Config;
+
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = App::new(dir.path().to_path_buf(), Config::default(), None, None).unwrap();
+
     for action in ACTIONS.iter().filter(|a| a.palette.is_some()) {
+        let idx = crate::command_palette::COMMANDS
+            .iter()
+            .position(|c| c.action_id == action.id)
+            .unwrap_or_else(|| panic!("'{}' missing from COMMANDS", action.id));
+        app.command_palette = Some(CommandPalette::default());
+        if let Some(p) = &mut app.command_palette {
+            p.filtered = vec![idx];
+            p.selected = 0;
+        }
         assert!(
-            DISPATCH_HANDLED_IDS.contains(&action.id),
+            app.dispatch_command(),
             "ACTIONS entry '{}' has palette: Some(_) but dispatch_command has \
              no match arm for it - selecting it from Ctrl-P would do nothing",
             action.id,
-        );
-    }
-}
-
-#[test]
-fn dispatch_handled_ids_are_all_real_actions() {
-    // Guards DISPATCH_HANDLED_IDS against typos / stale entries after a
-    // rename in ACTIONS.
-    for &id in DISPATCH_HANDLED_IDS {
-        assert!(
-            ACTIONS.iter().any(|a| a.id == id),
-            "'{id}' in DISPATCH_HANDLED_IDS is not a known ACTIONS id",
         );
     }
 }
@@ -215,13 +184,14 @@ fn no_duplicate_action_ids() {
 fn missing_palette_entries_from_issue_495_are_present() {
     // Regression guard for the specific actions the issue called out as
     // missing from the palette: recent_files, toggle_diff_staged,
-    // diff_hunk_next/prev, toggle_blame.
+    // diff_hunk_next/prev, toggle_blame, quit.
     for id in [
         "recent_files",
         "toggle_diff_staged",
         "diff_hunk_next",
         "diff_hunk_prev",
         "toggle_blame",
+        "quit",
     ] {
         let action = ACTIONS.iter().find(|a| a.id == id);
         assert!(action.is_some(), "'{id}' missing from ACTIONS entirely");
