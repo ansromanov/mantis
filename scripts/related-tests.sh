@@ -13,7 +13,7 @@
 #   src/foo.rs (+ tests/foo_tests.rs present) -> also that integration binary
 #
 # Fallback to __ALL__ on: Cargo.toml/Cargo.lock/mantis.toml, .cargo/config.toml,
-# src/lib.rs, src/main.rs, or when nothing maps to a test.
+# .github/workflows/*, src/lib.rs, src/main.rs, or when nothing maps to a test.
 set -euo pipefail
 
 join_by() { local sep=$1; shift; local out=${1:-}; shift || true; local x; for x in "$@"; do out="$out$sep$x"; done; printf '%s' "$out"; }
