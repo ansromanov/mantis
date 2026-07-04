@@ -63,6 +63,5 @@ src/
 ├── theme.rs            # Theme struct + presets, color parsing
 ├── git.rs              # Shells out to `git` for log/diff/blame
 ├── highlight.rs        # syntect syntax highlighting → ratatui styles
-├── markdown.rs         # pulldown-cmark → styled ratatui spans
 └── release_info.rs     # bundled "what's new" release metadata
 ```

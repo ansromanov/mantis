@@ -800,34 +800,6 @@ fn restored_cursor_clamped_to_content_length() {
     fs::remove_dir_all(&root).ok();
 }
 
-#[cfg(feature = "markdown-core")]
-#[test]
-fn rerender_markdown_if_needed_only_rerenders_on_width_change() {
-    let root = temp_dir();
-    let a = root.join("readme.md");
-    fs::write(&a, "# Title\n\nA long paragraph of text for wrapping.\n").unwrap();
-    let mut app = app_for(&root);
-    app.open_file(&a);
-    assert!(app.is_markdown, "must be in markdown mode");
-    // Seed the markdown_src as the loader would
-    let initial_lines = app.markdown_lines.len();
-    // First call at width 80: triggers re-render, updates markdown_wrap_width
-    app.rerender_markdown_if_needed(80);
-    assert_eq!(app.markdown_wrap_width, 80);
-    let after_first = app.markdown_lines.len();
-    // Second call at same width: no-op, line count unchanged
-    app.rerender_markdown_if_needed(80);
-    assert_eq!(
-        app.markdown_lines.len(),
-        after_first,
-        "same-width call must not re-render"
-    );
-    // Call at different width: triggers re-render
-    app.rerender_markdown_if_needed(40);
-    assert_eq!(app.markdown_wrap_width, 40);
-    fs::remove_dir_all(&root).ok();
-}
-
 #[test]
 fn same_file_reload_does_not_save_cursor_twice() {
     let root = temp_dir();

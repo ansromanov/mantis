@@ -76,3 +76,16 @@ fn line_count_ignores_plugin_content_for_other_file() {
     assert_ne!(app.line_count(), 5);
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn line_count_md_file_uses_virtual_file_not_builtin_markdown() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    let path = root.join("doc.md");
+    fs::write(&path, "line1\nline2\nline3\n").unwrap();
+    app.open_file(&path);
+    // Without the built-in markdown renderer, .md files fall through to
+    // VirtualFile, so line_count reflects the raw file.
+    assert_eq!(app.line_count(), 3);
+    fs::remove_dir_all(&root).ok();
+}

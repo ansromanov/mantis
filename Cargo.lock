@@ -837,7 +837,6 @@ dependencies = [
  "libc",
  "memmap2",
  "notify",
- "pulldown-cmark",
  "ratatui",
  "serde",
  "serde_json",

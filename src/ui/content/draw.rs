@@ -1,7 +1,7 @@
 //! Main content-pane renderer.
 //!
 //! `draw_content` renders the right-hand panel across its four modes: a styled
-//! unified/side-by-side diff (no gutter, no selection), a rendered-markdown view
+//! unified/side-by-side diff (no gutter, no selection), a plugin-rendered view
 //! from precomputed spans, a memory-mapped virtual-file view that highlights
 //! only the visible window on the fly, and an inline fallback for errors,
 //! binaries, and small buffers. It draws the line-number and fold gutters,
@@ -42,7 +42,7 @@ pub(crate) fn format_blame_annotation(bl: &BlameLine) -> String {
 
 /// Renders the content/diff panel. Handles four modes:
 /// - Diff view (styled per-line, no gutter, no selection)
-/// - Markdown rendered view (styled spans from `markdown_lines`)
+/// - Plugin-rendered view (styled spans)
 /// - Virtual file view (mmap-backed, syntax-highlighted on the fly for the visible window)
 /// - Inline fallback view (for errors, binaries, small files)
 pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
@@ -89,43 +89,16 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         return;
     }
 
-    // Pre-wrap markdown before computing line counts so total_lines/visible_end
-    // reflect the post-rerender state. Without this ordering, a terminal-widening
-    // resize can produce fewer wrapped lines than visible_end expects, causing an
-    // out-of-bounds panic in md_lines[scroll..visible_end].
-    if app.word_wrap {
-        let content_width = inner
-            .width
-            .saturating_sub(if app.show_line_numbers {
-                app.line_count().to_string().len() as u16 + 1
-            } else {
-                0
-            })
-            .saturating_sub(if app.show_blame && app.has_text_cursor() {
-                BLAME_COL_WIDTH as u16
-            } else {
-                0
-            }) as usize;
-        app.rerender_markdown_if_needed(content_width);
-    }
-
     let view_height = inner.height as usize;
     let total_lines = app.display_line_count();
     let scroll = app.content_scroll.min(app.content_scroll_max());
     let visible_end = (scroll + view_height).min(total_lines);
 
-    // Rendered-content source: plugin takes precedence over core markdown.
+    // Rendered-content source from plugins.
     let render_lines: Option<&Vec<Vec<(ratatui::style::Style, String)>>> = app
         .current_file
         .as_ref()
-        .and_then(|p| app.plugin_content.get(p))
-        .or({
-            if app.is_markdown && !app.show_raw_markdown && !app.markdown_lines.is_empty() {
-                Some(&app.markdown_lines)
-            } else {
-                None
-            }
-        });
+        .and_then(|p| app.plugin_content.get(p));
 
     let sel = app.selection.as_ref().map(|s| s.normalized());
     let sel_bg = app.theme.selection_bg;
@@ -246,7 +219,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
             .collect();
         (ln_w, gutters, lines, vec![])
     } else if let Some(md_lines) = render_lines {
-        // Rendered content (plugin or core markdown): iterate only the visible
+        // Rendered content (plugin): iterate only the visible
         // window of pre-rendered lines. Line numbers are hidden for rendered
         // content since rendered-line indices don't correspond to source lines
         // (rendering collapses blank lines, strips code fences, etc.). This

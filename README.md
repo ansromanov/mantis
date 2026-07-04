@@ -77,7 +77,6 @@ fills.
 
 **Viewing & rendering**
 - Syntax highlighting for a wide range of languages
-- Markdown rendering — headings, tables, task lists, code blocks (`M` toggles raw)
 - JSON pretty-printing (`J`) for minified files
 - Word wrap, line numbers, and a status bar (line, language, scroll, encoding)
 
@@ -92,7 +91,7 @@ fills.
 - Live theme switching (`t`) — built-in presets, fully recolorable
 - Remappable keybindings and configurable layout via a simple TOML file
 - Nerd Font file-type icons (optional), full mouse support
-- Opt-in plugins — extra languages, icons, and custom overlays
+- Opt-in plugins — extra languages, icons, markdown rendering, and custom overlays
 
 ## Install
 
@@ -158,7 +157,8 @@ docs for the full protocol and manifest (`plugin.toml`) format.
 - [Themes](https://ansromanov.github.io/mantis/themes.html) — presets and every recolorable role
 - [Plugins](https://ansromanov.github.io/mantis/plugins.html) — enable, install, and build plugins
 
-See [`example.md`](example.md) for a document that exercises the markdown renderer.
+See [`example.md`](example.md) for a document that exercises the `markdown` plugin's
+renderer (enable it with `p` in-app, or `[plugins.markdown]` in `mantis.toml`).
 
 ## Development
 

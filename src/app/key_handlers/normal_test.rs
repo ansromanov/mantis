@@ -349,22 +349,6 @@ fn git_mode_flat_toggle_noop_outside_git_mode() {
 }
 
 #[test]
-fn toggle_raw_markdown_noop_on_non_markdown() {
-    let root = temp_tree();
-    let mut app = app_for(&root);
-    app.open_file(&root.join("long.txt"));
-    app.focus = Focus::Content;
-    assert!(!app.is_markdown);
-    app.handle_key(key(KeyCode::Char('M')));
-    assert_eq!(
-        app.status_message.as_ref().map(|sm| sm.text.as_str()),
-        Some("raw toggle: not a markdown file")
-    );
-    assert!(!app.show_raw_markdown);
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
 fn toggle_pretty_json_noop_on_non_json() {
     let root = temp_tree();
     let mut app = app_for(&root);
@@ -401,19 +385,6 @@ fn git_mode_flat_toggle_status_clears_on_valid_keypress() {
     let mut app = app_for(&root);
     app.git_mode = false;
     app.handle_key(key(KeyCode::Char('F')));
-    assert!(app.status_message.is_some());
-    app.handle_key(key(KeyCode::Char('j')));
-    assert!(app.status_message.is_none());
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn toggle_raw_markdown_status_clears_on_valid_keypress() {
-    let root = temp_tree();
-    let mut app = app_for(&root);
-    app.open_file(&root.join("long.txt"));
-    app.focus = Focus::Content;
-    app.handle_key(key(KeyCode::Char('M')));
     assert!(app.status_message.is_some());
     app.handle_key(key(KeyCode::Char('j')));
     assert!(app.status_message.is_none());

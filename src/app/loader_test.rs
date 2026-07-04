@@ -1,5 +1,4 @@
 use super::*;
-use crate::theme::Theme;
 
 fn hl() -> Highlighter {
     Highlighter::with_extra_syntaxes("base16-ocean.dark", &[])
@@ -10,23 +9,11 @@ fn plain_file_uses_virtual_file() {
     let mut f = tempfile::NamedTempFile::with_suffix(".rs").unwrap();
     use std::io::Write;
     f.write_all(b"fn main() {}\n").unwrap();
-    let load = compute_file_load(f.path(), &Theme::default(), &hl());
+    let load = compute_file_load(f.path(), &hl());
     assert!(load.ok);
     assert!(load.virtual_file.is_some());
     assert!(load.highlighted.is_empty());
-    assert!(!load.is_markdown && !load.is_json);
-}
-
-#[cfg(feature = "markdown-core")]
-#[test]
-fn markdown_renders_lines() {
-    let mut f = tempfile::NamedTempFile::with_suffix(".md").unwrap();
-    use std::io::Write;
-    f.write_all(b"# Title\n\nbody\n").unwrap();
-    let load = compute_file_load(f.path(), &Theme::default(), &hl());
-    assert!(load.is_markdown);
-    assert!(load.virtual_file.is_none());
-    assert!(!load.markdown_lines.is_empty());
+    assert!(!load.is_json);
 }
 
 #[test]
@@ -34,7 +21,7 @@ fn json_produces_pretty_view() {
     let mut f = tempfile::NamedTempFile::with_suffix(".json").unwrap();
     use std::io::Write;
     f.write_all(br#"{"a":1,"b":[2,3]}"#).unwrap();
-    let load = compute_file_load(f.path(), &Theme::default(), &hl());
+    let load = compute_file_load(f.path(), &hl());
     assert!(load.is_json);
     assert!(load.show_pretty_json);
     assert!(!load.json_pretty_text.is_empty());
@@ -46,7 +33,7 @@ fn yaml_detects_folds_and_anchors() {
     let mut f = tempfile::NamedTempFile::with_suffix(".yaml").unwrap();
     use std::io::Write;
     f.write_all(b"root: &a\n  key: val\nref: *a\n").unwrap();
-    let load = compute_file_load(f.path(), &Theme::default(), &hl());
+    let load = compute_file_load(f.path(), &hl());
     let yaml = load.yaml.expect("yaml state");
     assert_eq!(yaml.anchor_count, 1);
     assert_eq!(yaml.alias_count, 1);
@@ -55,11 +42,7 @@ fn yaml_detects_folds_and_anchors() {
 
 #[test]
 fn missing_file_is_not_ok() {
-    let load = compute_file_load(
-        std::path::Path::new("/no/such/file.txt"),
-        &Theme::default(),
-        &hl(),
-    );
+    let load = compute_file_load(std::path::Path::new("/no/such/file.txt"), &hl());
     assert!(!load.ok);
     assert!(load.content[0].starts_with("[error:"));
 }
@@ -69,7 +52,7 @@ fn empty_file_message() {
     let mut f = tempfile::NamedTempFile::with_suffix(".md").unwrap();
     use std::io::Write;
     f.write_all(b"").unwrap();
-    let load = compute_file_load(f.path(), &Theme::default(), &hl());
+    let load = compute_file_load(f.path(), &hl());
     assert_eq!(load.content, vec!["[empty file]".to_string()]);
 }
 
@@ -79,30 +62,30 @@ fn ascii_vf_path_sets_encoding_and_line_ending() {
     let mut f = tempfile::NamedTempFile::with_suffix(".rs").unwrap();
     use std::io::Write;
     f.write_all(b"fn main() {}\nlet x = 1;\n").unwrap();
-    let load = compute_file_load(f.path(), &Theme::default(), &hl());
+    let load = compute_file_load(f.path(), &hl());
     assert_eq!(load.encoding.as_deref(), Some("ASCII"));
     assert_eq!(load.line_ending.as_deref(), Some("LF"));
 }
 
 #[test]
 fn utf8_bom_fallback_path_sets_encoding() {
-    // .md extension → fallback path (markdown rendering)
     let mut f = tempfile::NamedTempFile::with_suffix(".md").unwrap();
     use std::io::Write;
     f.write_all(b"\xEF\xBB\xBFhello\nworld\n").unwrap();
-    let load = compute_file_load(f.path(), &Theme::default(), &hl());
+    let load = compute_file_load(f.path(), &hl());
     assert_eq!(load.encoding.as_deref(), Some("UTF-8 BOM"));
 }
 
 #[test]
 fn crlf_content_is_split_and_stripped() {
-    // .md extension → fallback path; CRLF must be normalized before splitting
     let mut f = tempfile::NamedTempFile::with_suffix(".md").unwrap();
     use std::io::Write;
     f.write_all(b"line one\r\nline two\r\n").unwrap();
-    let load = compute_file_load(f.path(), &Theme::default(), &hl());
+    let load = compute_file_load(f.path(), &hl());
     assert_eq!(load.line_ending.as_deref(), Some("CRLF"));
-    assert_eq!(load.content, vec!["line one", "line two"]);
+    let vf = load.virtual_file.expect("virtual file");
+    assert_eq!(vf.line_text(0), Some("line one"));
+    assert_eq!(vf.line_text(1), Some("line two"));
 }
 
 #[test]
@@ -111,7 +94,7 @@ fn binary_file_sets_binary_encoding() {
     let mut f = tempfile::NamedTempFile::with_suffix(".txt").unwrap();
     use std::io::Write;
     f.write_all(b"data\x00binary").unwrap();
-    let load = compute_file_load(f.path(), &Theme::default(), &hl());
+    let load = compute_file_load(f.path(), &hl());
     assert_eq!(load.encoding.as_deref(), Some("BINARY"));
     assert_eq!(load.content, vec!["[binary file]"]);
 }
@@ -164,7 +147,7 @@ fn compute_file_load_sets_syntax_name_for_rust_file() {
     let mut f = tempfile::NamedTempFile::with_suffix(".rs").unwrap();
     use std::io::Write;
     f.write_all(b"fn main() {}\n").unwrap();
-    let load = compute_file_load(f.path(), &Theme::default(), &hl());
+    let load = compute_file_load(f.path(), &hl());
     assert_eq!(load.syntax_name.as_deref(), Some("Rust"));
 }
 
@@ -202,17 +185,6 @@ fn compute_file_load_sets_no_syntax_name_for_unknown_extension() {
     let mut f = tempfile::NamedTempFile::with_suffix(".zzunknown").unwrap();
     use std::io::Write;
     f.write_all(b"hello world\n").unwrap();
-    let load = compute_file_load(f.path(), &Theme::default(), &hl());
+    let load = compute_file_load(f.path(), &hl());
     assert_eq!(load.syntax_name, None);
-}
-
-#[cfg(feature = "markdown-core")]
-#[test]
-fn markdown_file_load_populates_markdown_src() {
-    let mut f = tempfile::NamedTempFile::with_suffix(".md").unwrap();
-    use std::io::Write;
-    f.write_all(b"# Title\n\nbody paragraph\n").unwrap();
-    let load = compute_file_load(f.path(), &Theme::default(), &hl());
-    assert!(load.is_markdown);
-    assert_eq!(load.markdown_src, "# Title\n\nbody paragraph\n");
 }

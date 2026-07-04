@@ -36,8 +36,6 @@ mod fold;
 mod git;
 mod highlight;
 mod list_picker;
-#[cfg(feature = "markdown-core")]
-mod markdown;
 mod plugin;
 mod release_info;
 mod search;

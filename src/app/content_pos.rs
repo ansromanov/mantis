@@ -69,9 +69,6 @@ impl App {
         if self.is_diff {
             return 0;
         }
-        if self.is_markdown && !self.show_raw_markdown && !self.markdown_lines.is_empty() {
-            return 0;
-        }
         if let Some(path) = &self.current_file {
             if self.plugin_content.contains_key(path) {
                 return 0;
@@ -110,19 +107,9 @@ impl App {
                                 .get(physical_idx)
                                 .map(|spans| spans.iter().map(|(_, t)| t.width()).sum())
                                 .unwrap_or(0)
-                        } else if self.is_markdown && !self.show_raw_markdown {
-                            self.markdown_lines
-                                .get(physical_idx)
-                                .map(|spans| spans.iter().map(|(_, t)| t.width()).sum())
-                                .unwrap_or(0)
                         } else {
                             self.line_width(physical_idx).unwrap_or(0)
                         }
-                    } else if self.is_markdown && !self.show_raw_markdown {
-                        self.markdown_lines
-                            .get(physical_idx)
-                            .map(|spans| spans.iter().map(|(_, t)| t.width()).sum())
-                            .unwrap_or(0)
                     } else {
                         self.line_width(physical_idx).unwrap_or(0)
                     };
@@ -166,15 +153,6 @@ impl App {
                     end_col,
                 );
             }
-        }
-        if self.is_markdown && !self.show_raw_markdown && !self.markdown_lines.is_empty() {
-            return spans_selection_text(
-                &self.markdown_lines,
-                start_line,
-                start_col,
-                end_line,
-                end_col,
-            );
         }
         if self.is_json && self.show_pretty_json && !self.json_pretty_text.is_empty() {
             let lines = &self.json_pretty_text;
@@ -283,14 +261,10 @@ impl App {
     }
 
     /// Returns `true` when the content pane uses a text cursor (`active_line`)
-    /// instead of raw scroll. Diff, rendered markdown, and plugin-rendered views
-    /// are cursorless — they scroll directly without an active-line cursor.
+    /// instead of raw scroll. Diff and plugin-rendered views are cursorless —
+    /// they scroll directly without an active-line cursor.
     pub fn has_text_cursor(&self) -> bool {
         if self.is_diff {
-            return false;
-        }
-        // Rendered markdown has no cursor.
-        if self.is_markdown && !self.show_raw_markdown && !self.markdown_lines.is_empty() {
             return false;
         }
         // Plugin-rendered content has no cursor.

@@ -153,13 +153,7 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
             " j/k nav  Enter/l expand  h collapse  / files  f content  t theme  Tab panel  q quit  ? help".to_string()
         }
         Focus::Content => {
-            let md = if app.is_markdown {
-                if app.show_raw_markdown {
-                    "  M render"
-                } else {
-                    "  M raw"
-                }
-            } else if app.is_json && !app.json_pretty_lines.is_empty() {
+            let md = if app.is_json && !app.json_pretty_lines.is_empty() {
                 if app.show_pretty_json {
                     "  J raw"
                 } else {

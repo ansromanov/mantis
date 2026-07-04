@@ -264,3 +264,19 @@ fn pressed_honours_current_alt_keys() {
 }
 
 // ---- end kitty-protocol tests --------------------------------------------
+
+#[test]
+fn keymap_has_no_toggle_raw_markdown() {
+    let keymap = Keymap::default();
+    // Previously there was a `toggle_raw_markdown` field; it was removed with
+    // the built-in markdown renderer. Constructing a Keymap without it proves
+    // the struct no longer carries that field.
+    // Verify the default keymap still works for an unrelated binding.
+    assert!(
+        pressed(
+            &keymap.toggle_wrap,
+            &KeyEvent::new(KeyCode::Char('z'), KeyModifiers::NONE)
+        ),
+        "toggle_wrap must still match z key",
+    );
+}

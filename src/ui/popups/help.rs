@@ -186,10 +186,6 @@ const KEYMAP_SECTIONS: &[HelpSection] = &[
                 desc: "toggle git blame gutter",
             },
             HelpEntry {
-                action_id: "toggle_raw_markdown",
-                desc: "toggle markdown render (md files)",
-            },
-            HelpEntry {
                 action_id: "file_history",
                 desc: "git history of current file",
             },

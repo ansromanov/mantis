@@ -13,16 +13,14 @@ use super::App;
 
 impl App {
     /// Returns the total number of lines in the current content source
-    /// (plugin content, virtual file, raw content, JSON pretty, or markdown).
+    /// (plugin content, virtual file, raw content, or JSON pretty).
     pub fn line_count(&self) -> usize {
         if let Some(path) = &self.current_file {
             if let Some(lines) = self.plugin_content.get(path) {
                 return lines.len();
             }
         }
-        if self.is_markdown && !self.show_raw_markdown && !self.markdown_lines.is_empty() {
-            self.markdown_lines.len()
-        } else if self.is_json && self.show_pretty_json && !self.json_pretty_lines.is_empty() {
+        if self.is_json && self.show_pretty_json && !self.json_pretty_lines.is_empty() {
             self.json_pretty_lines.len()
         } else if let Some(vf) = &self.virtual_file {
             vf.line_count()

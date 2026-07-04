@@ -1,6 +1,6 @@
 //! Background file loader.
 //!
-//! Reading a file from disk, syntax-highlighting it, rendering markdown/JSON,
+//! Reading a file from disk, syntax-highlighting it, rendering JSON,
 //! and shelling out to `git diff` are all expensive enough to cause visible
 //! input lag when done synchronously on every tree-navigation keystroke. This
 //! module moves that work onto a dedicated worker thread: the main thread pushes
@@ -40,14 +40,10 @@ type Spans = Vec<Vec<(Style, String)>>;
 /// CPU-bound highlighting. Applied to the `App` on the main thread by
 /// `App::apply_file_load`.
 pub(super) struct FileLoad {
-    pub is_markdown: bool,
     pub is_json: bool,
     pub virtual_file: Option<VirtualFile>,
     pub content: Vec<String>,
     pub highlighted: Spans,
-    pub markdown_lines: Spans,
-    /// Raw markdown source (full text) so it can be re-rendered on terminal resize.
-    pub markdown_src: String,
     pub json_pretty_text: Vec<String>,
     pub json_pretty_lines: Spans,
     pub show_pretty_json: bool,
@@ -90,15 +86,12 @@ pub(super) struct GitStatusLoad {
 }
 
 impl FileLoad {
-    fn empty(is_markdown: bool, is_json: bool) -> Self {
+    fn empty(is_json: bool) -> Self {
         FileLoad {
-            is_markdown,
             is_json,
             virtual_file: None,
             content: Vec::new(),
             highlighted: Vec::new(),
-            markdown_lines: Vec::new(),
-            markdown_src: String::new(),
             json_pretty_text: Vec::new(),
             json_pretty_lines: Vec::new(),
             show_pretty_json: false,
@@ -111,23 +104,20 @@ impl FileLoad {
     }
 }
 
-/// Reads `path`, detects binary/markdown/json/yaml, and produces the rendered
-/// content. Plain files use a memory-mapped [`VirtualFile`] (highlighted lazily
-/// in the UI); markdown/JSON/YAML are read fully and rendered here. This is the
-/// single source of truth shared by the synchronous and worker code paths.
-#[allow(unused_variables)]
-pub(super) fn compute_file_load(path: &Path, theme: &Theme, hl: &Highlighter) -> FileLoad {
+/// Reads `path`, detects binary/json/yaml, and produces the rendered content.
+/// Plain files use a memory-mapped [`VirtualFile`] (highlighted lazily in the
+/// UI); JSON/YAML are read fully and rendered here. This is the single source
+/// of truth shared by the synchronous and worker code paths.
+pub(super) fn compute_file_load(path: &Path, hl: &Highlighter) -> FileLoad {
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-    let is_markdown = matches!(ext, "md" | "markdown");
     let is_json = ext == "json";
     let is_yaml = matches!(ext, "yaml" | "yml");
 
     // Try memory-mapped virtual file first (lazy, no full content in memory).
-    // Markdown, JSON, and YAML are excluded: they need full content for
-    // rendering/validation.
-    if !is_markdown && !is_json && !is_yaml {
+    // JSON and YAML are excluded: they need full content for rendering.
+    if !is_json && !is_yaml {
         if let Some(vf) = VirtualFile::open(path) {
-            let mut load = FileLoad::empty(false, false);
+            let mut load = FileLoad::empty(false);
             let raw = vf.raw_bytes();
             // VirtualFile::open already verified valid UTF-8, so skip the full
             // re-validation pass; only the BOM/ASCII prefix check is needed.
@@ -139,7 +129,7 @@ pub(super) fn compute_file_load(path: &Path, theme: &Theme, hl: &Highlighter) ->
         }
     }
 
-    let mut load = FileLoad::empty(is_markdown, is_json);
+    let mut load = FileLoad::empty(is_json);
 
     // Fallback: read the file into memory (small files, binary check, etc.).
     let bytes = match std::fs::read(path) {
@@ -200,11 +190,6 @@ pub(super) fn compute_file_load(path: &Path, theme: &Theme, hl: &Highlighter) ->
     }
     load.highlighted = hl.highlight(path, &load.content);
     load.syntax_name = hl.syntax_name(path);
-    #[cfg(feature = "markdown-core")]
-    if is_markdown {
-        load.markdown_src = s.clone();
-        load.markdown_lines = crate::markdown::render(&s, theme);
-    }
     if is_json {
         if let Ok(value) = serde_json::from_str::<serde_json::Value>(&s) {
             if let Ok(pretty) = serde_json::to_string_pretty(&value) {
@@ -334,7 +319,7 @@ impl Loader {
                         hl = Highlighter::with_extra_syntaxes(&theme.syntax, &extra_for_thread);
                     }
                     LoadRequest::File { seq, path } => {
-                        let load = Box::new(compute_file_load(&path, &theme, &hl));
+                        let load = Box::new(compute_file_load(&path, &hl));
                         if res_tx.send(LoadResponse::File { seq, path, load }).is_err() {
                             break;
                         }
