@@ -1,4 +1,4 @@
-version = "0.13.2"
+version = "0.13.3"
 date = "2026-07-04"
 whats_new = """- fix: capture plugin stderr for crash diagnostics (#515)
 - fix: decode multi-byte UTF-8 in RawEventSource for pasted non-ASCII text (#517)
