@@ -5,6 +5,8 @@
 //! fall through to the dispatcher and map `Activate`/`Close` to the
 //! overlay-specific action.
 
+use std::path::PathBuf;
+
 use crossterm::event::{KeyCode, KeyEvent};
 
 use crate::config::static_keys;
@@ -267,16 +269,6 @@ impl App {
         if self
             .tree_filter
             .as_ref()
-            .is_some_and(|f| f.saved_expanded.is_none())
-        {
-            let snapshot = self.expanded.clone();
-            if let Some(f) = self.tree_filter.as_mut() {
-                f.saved_expanded = Some(snapshot);
-            }
-        }
-        if self
-            .tree_filter
-            .as_ref()
             .is_some_and(|f| f.full_paths_cache.is_none())
         {
             let mut all =
@@ -295,9 +287,16 @@ impl App {
             return;
         };
         let query = filter.query.to_lowercase();
-        let paths = filter.full_paths_cache.clone().unwrap_or_default();
+        // Take ownership of the cache instead of cloning it: the filter session
+        // reuses it across every keystroke, so a clone here would allocate a
+        // fresh copy of the whole tree's paths on each edit.
+        let paths = self
+            .tree_filter
+            .as_mut()
+            .and_then(|f| f.full_paths_cache.take())
+            .unwrap_or_default();
 
-        let mut changed = false;
+        let mut to_expand: Vec<PathBuf> = Vec::new();
         for path in &paths {
             let is_match = path
                 .file_name()
@@ -311,13 +310,29 @@ impl App {
                 if p == self.root {
                     break;
                 }
-                if self.expanded.insert(p.to_path_buf()) {
-                    changed = true;
+                if !self.expanded.contains(p) {
+                    to_expand.push(p.to_path_buf());
                 }
                 ancestor = p.parent();
             }
         }
-        if changed {
+
+        if let Some(f) = self.tree_filter.as_mut() {
+            f.full_paths_cache = Some(paths);
+        }
+
+        if !to_expand.is_empty() {
+            if self
+                .tree_filter
+                .as_ref()
+                .is_some_and(|f| f.saved_expanded.is_none())
+            {
+                let snapshot = self.expanded.clone();
+                if let Some(f) = self.tree_filter.as_mut() {
+                    f.saved_expanded = Some(snapshot);
+                }
+            }
+            self.expanded.extend(to_expand);
             self.rebuild(false);
         }
     }
@@ -325,15 +340,17 @@ impl App {
     /// Restores `expanded` to the snapshot taken before the tree filter
     /// auto-expanded any directories, if one was taken. No-op when the
     /// filter never triggered an auto-expansion (e.g. all matches were
-    /// already visible).
+    /// already visible), or when the snapshot matches the current state.
     fn restore_tree_filter_expansion(&mut self) {
         let saved = self
             .tree_filter
             .as_mut()
             .and_then(|f| f.saved_expanded.take());
         if let Some(saved) = saved {
-            self.expanded = saved;
-            self.rebuild(false);
+            if saved != self.expanded {
+                self.expanded = saved;
+                self.rebuild(false);
+            }
         }
     }
 
