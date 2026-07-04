@@ -120,6 +120,29 @@ fn worker_round_trip_returns_matching_seq() {
 }
 
 #[test]
+fn worker_echoes_barrier_after_prior_requests_are_applied() {
+    let mut f = tempfile::NamedTempFile::with_suffix(".rs").unwrap();
+    use std::io::Write;
+    f.write_all(b"let x = 1;\n").unwrap();
+    let loader = Loader::new(&Theme::default(), Vec::new());
+    loader.request(LoadRequest::File {
+        seq: 3,
+        path: f.path().to_path_buf(),
+    });
+    loader.request(LoadRequest::Barrier(42));
+    // Since the request channel is FIFO and single-threaded, the File
+    // response must be observed before the Barrier echo.
+    match loader.rx.recv().expect("worker response") {
+        LoadResponse::File { seq, .. } => assert_eq!(seq, 3),
+        _ => panic!("expected File response before the barrier echo"),
+    }
+    match loader.rx.recv().expect("worker response") {
+        LoadResponse::Barrier(token) => assert_eq!(token, 42),
+        _ => panic!("expected Barrier echo"),
+    }
+}
+
+#[test]
 fn worker_rebuilds_highlighter_on_set_extra_syntaxes_and_keeps_serving() {
     let mut f = tempfile::NamedTempFile::with_suffix(".rs").unwrap();
     use std::io::Write;

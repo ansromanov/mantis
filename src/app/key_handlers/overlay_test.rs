@@ -367,6 +367,7 @@ fn tree_filter_enter_on_file_opens_it() {
         .expect("a.txt must be in the tree");
     app.tree_selected = file_idx;
     app.handle_tree_filter_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    app.pump_loads();
     assert!(app.tree_filter.is_none(), "filter must close on Enter");
     assert_eq!(
         app.current_file.as_deref(),

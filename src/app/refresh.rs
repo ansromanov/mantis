@@ -74,34 +74,43 @@ impl App {
     /// `true` if a file/diff load was applied (so the caller knows to redraw).
     pub(super) fn drain_loads(&mut self) -> bool {
         // Collect first so the immutable borrow of `self.loader` is released
-        // before `apply_*` takes `&mut self`.
+        // before `apply_response` takes `&mut self`.
         let responses: Vec<LoadResponse> =
             std::iter::from_fn(|| self.loader.rx.try_recv().ok()).collect();
         let mut applied = false;
         for resp in responses {
-            match resp {
-                LoadResponse::File { seq, path, load } => {
-                    if seq == self.load_seq {
-                        self.apply_file_load(&path, *load);
-                        self.loading = false;
-                        applied = true;
-                    }
-                }
-                LoadResponse::Diff { seq, path, load } => {
-                    if seq == self.load_seq {
-                        self.apply_diff_load(&path, *load);
-                        self.loading = false;
-                        applied = true;
-                    }
-                }
-                LoadResponse::GitStatus { seq, root, load } => {
-                    if seq == self.git_seq && root == self.root {
-                        self.apply_git_status_load(*load);
-                    }
-                }
-            }
+            applied |= self.apply_response(resp);
         }
         applied
+    }
+
+    /// Applies a single worker response, checking seq/root for staleness.
+    /// Returns `true` when a file or diff load was applied.
+    pub(super) fn apply_response(&mut self, resp: LoadResponse) -> bool {
+        match resp {
+            LoadResponse::File { seq, path, load } => {
+                if seq == self.load_seq {
+                    self.apply_file_load(&path, *load);
+                    self.loading = false;
+                    return true;
+                }
+            }
+            LoadResponse::Diff { seq, path, load } => {
+                if seq == self.load_seq {
+                    self.apply_diff_load(&path, *load);
+                    self.loading = false;
+                    return true;
+                }
+            }
+            LoadResponse::GitStatus { seq, root, load } => {
+                if seq == self.git_seq && root == self.root {
+                    self.apply_git_status_load(*load);
+                }
+            }
+            #[cfg(test)]
+            LoadResponse::Barrier(_) => {}
+        }
+        false
     }
 
     /// Applies a [`GitStatusLoad`] to the app state, updating the status map
@@ -125,57 +134,68 @@ impl App {
         self.load_seq
     }
 
-    /// Dispatches a file open to the background worker (production) or runs it
-    /// synchronously (tests, so assertions can observe content immediately).
+    /// Dispatches a file open to the background worker. Bumps the load
+    /// sequence so any in-flight worker result is treated as stale.
     pub(super) fn request_open_file(&mut self, path: &std::path::Path) {
-        if cfg!(test) {
-            self.open_file(path);
-        } else {
-            let seq = self.invalidate_pending_load();
-            self.loading = true;
-            self.loader.request(LoadRequest::File {
-                seq,
-                path: path.to_path_buf(),
-            });
-        }
+        let seq = self.invalidate_pending_load();
+        self.loading = true;
+        self.loader.request(LoadRequest::File {
+            seq,
+            path: path.to_path_buf(),
+        });
     }
 
-    /// Dispatches a working-tree diff to the background worker (production) or
-    /// runs it synchronously (tests).
+    /// Dispatches a working-tree diff to the background worker. Bumps the load
+    /// sequence so any in-flight worker result is treated as stale.
     pub(super) fn request_working_tree_diff(&mut self, path: &std::path::Path) {
-        if cfg!(test) {
-            self.show_working_tree_diff(path);
-        } else {
-            let seq = self.invalidate_pending_load();
-            self.loading = true;
-            self.loader.request(LoadRequest::Diff {
-                seq,
-                root: self.root.clone(),
-                path: path.to_path_buf(),
-                diff_mode: self.diff_mode,
-            });
-        }
+        let seq = self.invalidate_pending_load();
+        self.loading = true;
+        self.loader.request(LoadRequest::Diff {
+            seq,
+            root: self.root.clone(),
+            path: path.to_path_buf(),
+            diff_mode: self.diff_mode,
+        });
     }
 
-    /// Enqueues a git-status refresh (production) or runs it synchronously
-    /// (tests). Bumps `git_seq` so earlier in-flight results are ignored.
+    /// Enqueues a git-status refresh via the background worker. Bumps
+    /// `git_seq` so earlier in-flight results are ignored.
     pub(super) fn request_git_status_refresh(&mut self) {
         let effective_show_ignored = self.git_show_ignored || self.ignore_gitignore;
-        if cfg!(test) {
-            self.git_status_map = crate::git::repo_status(
-                &self.root,
-                self.git_show_untracked,
-                effective_show_ignored,
-            );
-            self.git_info = crate::git::repo_info(&self.root);
-        } else {
-            self.git_seq = self.git_seq.wrapping_add(1);
-            self.loader.request(LoadRequest::GitStatus {
-                seq: self.git_seq,
-                root: self.root.clone(),
-                include_untracked: self.git_show_untracked,
-                include_ignored: effective_show_ignored,
-            });
+        self.git_seq = self.git_seq.wrapping_add(1);
+        self.loader.request(LoadRequest::GitStatus {
+            seq: self.git_seq,
+            root: self.root.clone(),
+            include_untracked: self.git_show_untracked,
+            include_ignored: effective_show_ignored,
+        });
+    }
+
+    /// Blocks the current thread until the worker thread has processed all
+    /// requests queued before this call and their results have been applied.
+    /// Only available in tests so assertions can observe content/git-state
+    /// immediately after a `request_*` call.
+    ///
+    /// Sends a [`LoadRequest::Barrier`] and applies every response that
+    /// arrives before its echo: since the worker's request channel is FIFO
+    /// and single-threaded, seeing the echo guarantees every prior request
+    /// has already been applied. This is deterministic rather than
+    /// silence-based, so it can't race a worker that's still busy. The
+    /// timeout is only a safety net against a wedged worker thread.
+    #[cfg(test)]
+    pub(crate) fn pump_loads(&mut self) {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static NEXT_BARRIER: AtomicU64 = AtomicU64::new(0);
+        let token = NEXT_BARRIER.fetch_add(1, Ordering::Relaxed);
+        self.loader.request(LoadRequest::Barrier(token));
+        loop {
+            match self.loader.rx.recv_timeout(Duration::from_secs(5)) {
+                Ok(LoadResponse::Barrier(t)) if t == token => break,
+                Ok(resp) => {
+                    self.apply_response(resp);
+                }
+                Err(_) => break,
+            }
         }
     }
 

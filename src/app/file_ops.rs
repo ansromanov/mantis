@@ -6,7 +6,7 @@
 //! as needed), and switches between a file's contents and its working-tree diff
 //! in git mode. Heavy work (reading, highlighting, diffing) is delegated to the
 //! background `loader` via `compute_file_load`/`compute_diff_load`, with
-//! synchronous variants used at startup and in tests. It also installs the
+//! synchronous variants used at startup and for reloads. It also installs the
 //! per-file watcher so an open file auto-reloads when it changes on disk.
 
 use std::path::{Path, PathBuf};
