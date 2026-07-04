@@ -519,6 +519,104 @@ fn csi_tilde_plain_still_works() {
 }
 
 // ---------------------------------------------------------------------------
+// Multi-byte UTF-8 pasted text (#454): non-ASCII bytes must decode to Char,
+// not be dropped one byte per tick.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn utf8_two_byte_char_decodes() {
+    // 'é' = U+00E9 = 0xC3 0xA9
+    let (ev, consumed) = parse_ok("é".as_bytes());
+    assert_eq!(consumed, 2);
+    assert_eq!(key_event(&ev).code, KeyCode::Char('é'));
+}
+
+#[test]
+fn utf8_three_byte_char_decodes() {
+    // 'мир' third char: 'р' = U+0440 = 0xD1 0x80 — use a true 3-byte char instead: '€' = U+20AC.
+    let (ev, consumed) = parse_ok("€".as_bytes());
+    assert_eq!(consumed, 3);
+    assert_eq!(key_event(&ev).code, KeyCode::Char('€'));
+}
+
+#[test]
+fn utf8_four_byte_char_decodes() {
+    // '😀' = U+1F600, 4-byte UTF-8 sequence.
+    let (ev, consumed) = parse_ok("😀".as_bytes());
+    assert_eq!(consumed, 4);
+    assert_eq!(key_event(&ev).code, KeyCode::Char('😀'));
+}
+
+#[test]
+fn utf8_cyrillic_char_decodes() {
+    // 'м' = U+043C, 2-byte UTF-8 sequence.
+    let (ev, consumed) = parse_ok("м".as_bytes());
+    assert_eq!(consumed, 2);
+    assert_eq!(key_event(&ev).code, KeyCode::Char('м'));
+}
+
+#[test]
+fn utf8_incomplete_two_byte_returns_none() {
+    // Lead byte only, continuation byte not yet arrived.
+    let result = parse_event(&[0xC3]).unwrap();
+    assert!(result.is_none());
+}
+
+#[test]
+fn utf8_incomplete_three_byte_returns_none() {
+    let full = "€".as_bytes();
+    let result = parse_event(&full[..2]).unwrap();
+    assert!(result.is_none());
+}
+
+#[test]
+fn utf8_incomplete_four_byte_returns_none() {
+    let full = "😀".as_bytes();
+    for n in 1..4 {
+        let result = parse_event(&full[..n]).unwrap();
+        assert!(result.is_none(), "expected None with {n} of 4 bytes");
+    }
+}
+
+#[test]
+fn utf8_paste_split_across_fill_boundary() {
+    // Simulate the lead byte and continuation byte of 'é' (0xC3 0xA9)
+    // arriving in separate reads, as would happen if a paste straddles two
+    // poll/read cycles. parse_next must wait rather than error/skip.
+    let full = "héllo мир".as_bytes();
+    let split = 2; // "h" + 0xC3 (é's lead byte only), splitting 'é' mid-sequence
+    let mut src = RawEventSource::new();
+
+    src.buf.extend_from_slice(&full[..split]);
+    let mut decoded = String::new();
+    while let Some(ev) = src.parse_next().unwrap() {
+        if let Event::Key(KeyEvent {
+            code: KeyCode::Char(c),
+            ..
+        }) = ev
+        {
+            decoded.push(c);
+        }
+    }
+    // Only 'h' should have decoded so far; the split 'é' must still be buffered.
+    assert_eq!(decoded, "h");
+    assert_eq!(src.buf.len() - src.pos, 1);
+
+    // The rest of the paste arrives in a second read.
+    src.buf.extend_from_slice(&full[split..]);
+    while let Some(ev) = src.parse_next().unwrap() {
+        if let Event::Key(KeyEvent {
+            code: KeyCode::Char(c),
+            ..
+        }) = ev
+        {
+            decoded.push(c);
+        }
+    }
+    assert_eq!(decoded, "héllo мир");
+}
+
+// ---------------------------------------------------------------------------
 // SGR mouse with modifier bits (#455)
 // ---------------------------------------------------------------------------
 
