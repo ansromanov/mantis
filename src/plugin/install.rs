@@ -1,13 +1,13 @@
 //! Plugin installation and default directory discovery.
 //!
-//! Locates the platform-specific plugin directory, finds bundled binary
-//! plugins next to the mantis binary or in cargo target directories, and
-//! installs syntax definitions into `{plugin_dir}/syntaxes/`.
+//! Locates the platform-specific plugin directory, writes out the bundled
+//! binary plugins embedded at compile time, and installs syntax definitions
+//! into `{plugin_dir}/syntaxes/`.
 //!
 //! Bundled binary plugins (`iconize`, `markdown`) are embedded at compile
-//! time via `build.rs` → `$OUT_DIR/plugin_binaries.rs` — no more search-path
-//! dance or fallback `cargo build`. This ensures they are always available
-//! for non-source installs (release artifacts, Homebrew, etc.).
+//! time via `build.rs` → `$OUT_DIR/plugin_binaries.rs` — no search-path dance
+//! or fallback `cargo build` at runtime. This ensures they are always
+//! available for non-source installs (release artifacts, Homebrew, etc.).
 
 include!(concat!(env!("OUT_DIR"), "/plugin_binaries.rs"));
 
