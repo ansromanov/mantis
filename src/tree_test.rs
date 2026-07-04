@@ -113,9 +113,8 @@ fn three_level_nesting_expands_correctly() {
 
 #[test]
 fn collapsed_sibling_dir_children_are_not_walked_deeper_than_one_level() {
-    // A collapsed top-level directory may still have its immediate contents
-    // read by the single-pass walker's filter_entry gating, but nothing
-    // beneath that first level should leak into the output.
+    // A collapsed top-level directory must not have anything beneath its
+    // first level leak into the output.
     let root = temp_dir("collapsed_sibling");
     let collapsed = root.join("collapsed");
     fs::create_dir_all(collapsed.join("nested")).unwrap();
@@ -128,6 +127,35 @@ fn collapsed_sibling_dir_children_are_not_walked_deeper_than_one_level() {
     assert_eq!(names, vec!["collapsed", "visible.txt"]);
     assert!(!names.contains(&"nested"));
     assert!(!names.contains(&"f.txt"));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[cfg(unix)]
+#[test]
+fn collapsed_top_level_dir_contents_are_never_read() {
+    // Regression test: the walker must not descend into a collapsed
+    // top-level directory at all, not even one level, to build the tree. A
+    // permission-denied grandchild inside a collapsed dir must therefore
+    // never surface as a walk error, since the walker never opens it.
+    use std::os::unix::fs::PermissionsExt;
+
+    let root = temp_dir("collapsed_perm");
+    let collapsed = root.join("collapsed");
+    let locked = collapsed.join("locked");
+    fs::create_dir_all(&locked).unwrap();
+    fs::write(root.join("visible.txt"), "").unwrap();
+    fs::set_permissions(&locked, fs::Permissions::from_mode(0o000)).unwrap();
+
+    let expanded = HashSet::from([root.clone()]);
+    let (nodes, errors) = build_visible(&root, &expanded, false, true, &HashSet::new());
+    let names: Vec<&str> = nodes.iter().map(|n| n.name.as_str()).collect();
+    assert_eq!(names, vec!["collapsed", "visible.txt"]);
+    assert_eq!(
+        errors, 0,
+        "a collapsed directory's unreadable children must not surface as walk errors"
+    );
+
+    fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).unwrap();
     fs::remove_dir_all(&root).ok();
 }
 

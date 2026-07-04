@@ -37,31 +37,56 @@ pub fn build_visible(
     ignore_gitignore: bool,
     deleted_files: &HashSet<PathBuf>,
 ) -> (Vec<TreeNode>, usize) {
-    // A single walk over the whole tree, gated by `filter_entry` to only
-    // descend into expanded directories. This builds the gitignore chain
-    // once instead of re-discovering every ancestor's gitignore per
-    // directory (which made the old per-directory-WalkBuilder approach
-    // quadratic in tree depth).
-    let expanded_for_filter = expanded.clone();
     let mut children: HashMap<PathBuf, Vec<DirEntry>> = HashMap::new();
     let mut error_count = 0usize;
 
+    // Root's own children are always visible regardless of expansion, so
+    // list them with a cheap one-level walk instead of gating on `expanded`.
+    for result in WalkBuilder::new(root)
+        .max_depth(Some(1))
+        .hidden(!show_hidden)
+        .git_ignore(!ignore_gitignore)
+        .git_global(!ignore_gitignore)
+        .git_exclude(!ignore_gitignore)
+        .build()
+    {
+        match result {
+            Ok(e) if e.depth() == 1 => {
+                children.entry(root.to_path_buf()).or_default().push(e);
+            }
+            Ok(_) => {}
+            Err(_) => error_count += 1,
+        }
+    }
+
+    // A single deep walk over the rest of the tree, gated by `filter_entry`
+    // to only descend into expanded directories. This builds the gitignore
+    // chain once instead of re-discovering every ancestor's gitignore per
+    // directory (which made the old per-directory-WalkBuilder approach
+    // quadratic in tree depth). Depth-1 recursion is gated on the directory's
+    // own path in `expanded` (not its parent, root, which isn't necessarily
+    // in `expanded` even though root's children are always shown) so a
+    // collapsed top-level directory's contents are never read.
+    let expanded_for_filter = expanded.clone();
     for result in WalkBuilder::new(root)
         .hidden(!show_hidden)
         .git_ignore(!ignore_gitignore)
         .git_global(!ignore_gitignore)
         .git_exclude(!ignore_gitignore)
-        .filter_entry(move |entry| {
-            entry.depth() <= 1
-                || entry
-                    .path()
-                    .parent()
-                    .is_some_and(|p| expanded_for_filter.contains(p))
+        .filter_entry(move |entry| match entry.depth() {
+            0 => true,
+            1 => expanded_for_filter.contains(entry.path()),
+            _ => entry
+                .path()
+                .parent()
+                .is_some_and(|p| expanded_for_filter.contains(p)),
         })
         .build()
     {
         match result {
-            Ok(e) if e.depth() >= 1 => {
+            // Depth-1 entries were already collected by the shallow walk
+            // above; only capture depth >= 2 here to avoid duplicates.
+            Ok(e) if e.depth() >= 2 => {
                 if let Some(parent) = e.path().parent() {
                     children.entry(parent.to_path_buf()).or_default().push(e);
                 }
