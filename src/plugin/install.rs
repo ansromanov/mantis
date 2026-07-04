@@ -128,7 +128,7 @@ pub(crate) fn install_bundled_plugins() {
             binary_name.to_string()
         };
         let plugin_path = dir.join(&binary_filename);
-        if plugin_path.exists() {
+        if plugin_path.exists() || data.is_empty() {
             continue;
         }
         if std::fs::write(&plugin_path, data).is_ok() {
