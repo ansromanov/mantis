@@ -282,6 +282,92 @@ fn remove_retired_plugins_no_ops_on_empty_dir() {
 }
 
 #[test]
+fn install_bundled_plugins_overwrites_stale_binary() {
+    // Regression: a pre-upgrade binary left in place must not survive forever
+    // (issue #533) — install_bundled_plugins must overwrite it with the
+    // embedded copy when the content differs.
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let tmp = fresh_plugin_dir();
+    std::fs::create_dir_all(&tmp).unwrap();
+    let old = std::env::var_os("XDG_CONFIG_HOME");
+    unsafe { std::env::set_var("XDG_CONFIG_HOME", &tmp) };
+
+    let plugins_dir = tmp.join("mantis").join("plugins");
+    std::fs::create_dir_all(&plugins_dir).unwrap();
+    let markdown_name = if cfg!(windows) {
+        "mantis-plugin-markdown.exe"
+    } else {
+        "mantis-plugin-markdown"
+    };
+    let markdown_path = plugins_dir.join(markdown_name);
+    std::fs::write(&markdown_path, b"stale pre-#526 binary").unwrap();
+
+    install_bundled_plugins();
+
+    unsafe {
+        match old {
+            Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
+            None => std::env::remove_var("XDG_CONFIG_HOME"),
+        }
+    }
+
+    let (_, _, embedded) = crate::plugin::install::BUNDLED_PLUGINS
+        .iter()
+        .find(|(name, _, _)| *name == "markdown")
+        .expect("markdown must be a bundled plugin");
+    let installed = std::fs::read(&markdown_path).unwrap();
+    assert_eq!(
+        &installed, embedded,
+        "stale binary must be overwritten with the embedded copy"
+    );
+    std::fs::remove_dir_all(&tmp).ok();
+}
+
+#[test]
+#[cfg(unix)]
+fn install_bundled_plugins_skips_rewrite_when_content_matches() {
+    // If the installed binary already matches the embedded one, install must
+    // leave it alone rather than rewriting it. Proven by giving the existing
+    // file non-executable permissions before running install: if the code
+    // rewrote it (skip check broken), set_executable() would flip it back to
+    // 0o755; if it truly skipped, the permissions stay as set here.
+    use std::os::unix::fs::PermissionsExt;
+
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let tmp = fresh_plugin_dir();
+    std::fs::create_dir_all(&tmp).unwrap();
+    let old = std::env::var_os("XDG_CONFIG_HOME");
+    unsafe { std::env::set_var("XDG_CONFIG_HOME", &tmp) };
+
+    let plugins_dir = tmp.join("mantis").join("plugins");
+    std::fs::create_dir_all(&plugins_dir).unwrap();
+    let markdown_path = plugins_dir.join("mantis-plugin-markdown");
+    let (_, _, embedded) = crate::plugin::install::BUNDLED_PLUGINS
+        .iter()
+        .find(|(name, _, _)| *name == "markdown")
+        .expect("markdown must be a bundled plugin");
+    std::fs::write(&markdown_path, embedded).unwrap();
+    std::fs::set_permissions(&markdown_path, std::fs::Permissions::from_mode(0o644)).unwrap();
+
+    install_bundled_plugins();
+
+    unsafe {
+        match old {
+            Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
+            None => std::env::remove_var("XDG_CONFIG_HOME"),
+        }
+    }
+
+    let perms = std::fs::metadata(&markdown_path).unwrap().permissions();
+    assert_eq!(
+        perms.mode() & 0o777,
+        0o644,
+        "up-to-date binary must not be rewritten (permissions would change if it were)"
+    );
+    std::fs::remove_dir_all(&tmp).ok();
+}
+
+#[test]
 fn install_bundled_plugins_creates_plugin_dir_and_syntaxes() {
     let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let tmp = fresh_plugin_dir();
