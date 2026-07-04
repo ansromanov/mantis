@@ -3,6 +3,7 @@
 //! `GotoLineState`, `TreeFilter`, and `InFileSearch`/`InFileMatch`, plus
 //! their `ListPicker` implementations.
 
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 use fuzzy_matcher::skim::SkimMatcherV2;
@@ -20,6 +21,16 @@ pub struct TreeFilter {
     /// `None` when no cache is built yet or the query is empty.
     /// `Some((query, revision, indices))` where revision matches `App::tree_revision`.
     pub(crate) cached: Option<(String, u64, Vec<usize>)>,
+    /// Snapshot of `App::expanded` taken just before the filter auto-expanded
+    /// any directories, so it can be restored once the filter is dismissed.
+    /// `None` until the first non-empty query triggers an auto-expansion.
+    pub(crate) saved_expanded: Option<HashSet<PathBuf>>,
+    /// Every directory and file path under the tree root, paired with its
+    /// lowercased file name, used to match against the query regardless of
+    /// current expansion state. Built lazily on the first non-empty query and
+    /// reused for the rest of the filter session so keystrokes neither re-walk
+    /// the filesystem nor re-lowercase (re-allocate) every name.
+    pub(crate) full_paths_cache: Option<Vec<(PathBuf, String)>>,
 }
 
 impl TreeFilter {
@@ -28,6 +39,8 @@ impl TreeFilter {
         TreeFilter {
             query: String::new(),
             cached: None,
+            saved_expanded: None,
+            full_paths_cache: None,
         }
     }
 

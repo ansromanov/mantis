@@ -64,6 +64,19 @@ fn generate_large_rs_file(path: &Path, line_count: usize) {
     fs::write(path, content).unwrap();
 }
 
+/// `dirs` sibling subdirectories (collapsed by default) each holding
+/// `files` small files. Used to exercise full-tree matching over entries
+/// that are not in the visible node list.
+fn generate_nested_files(dir: &Path, dirs: usize, files: usize) {
+    for d in 0..dirs {
+        let sub = dir.join(format!("sub{d:03}"));
+        fs::create_dir_all(&sub).unwrap();
+        for i in 0..files {
+            fs::write(sub.join(format!("f{i:04}.rs")), "fn f() {}\n").unwrap();
+        }
+    }
+}
+
 /// A deep directory tree: d0/d1/d2/.../f{i}.rs at each level.
 fn generate_deep_tree(dir: &Path, depth: usize) {
     let mut current = dir.to_path_buf();
@@ -424,6 +437,43 @@ fn bench_tree_redraw(c: &mut Criterion) {
 }
 
 // ---------------------------------------------------------------------------
+// 7. Tree-filter keystroke: full-tree match + auto-expand sync
+// ---------------------------------------------------------------------------
+
+fn bench_tree_filter_sync(c: &mut Criterion) {
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+    let mut group = c.benchmark_group("tree_filter_sync");
+
+    for &(dirs, files) in &[(50usize, 100usize), (100, 200)] {
+        let total = dirs * files;
+        let dir = fixture_dir("filter_sync");
+        generate_nested_files(&dir, dirs, files);
+
+        let mut app = App::new(dir.clone(), Config::default(), None, None).unwrap();
+
+        // Open the filter and type the first char outside the measured loop so
+        // the session's full-tree path cache exists and every subdirectory is
+        // already auto-expanded; each iteration then measures the steady-state
+        // per-keystroke cost (match scan, no rebuild).
+        app.tree_filter = Some(mantis::search::TreeFilter::new());
+        app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::empty()));
+
+        group.bench_with_input(BenchmarkId::new("keystroke", total), &(), |b, _| {
+            b.iter(|| {
+                app.handle_key(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::empty()));
+                app.handle_key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::empty()));
+                black_box(&app.expanded);
+            })
+        });
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    group.finish();
+}
+
+// ---------------------------------------------------------------------------
 // Criterion entry point
 // ---------------------------------------------------------------------------
 
@@ -435,6 +485,7 @@ criterion_group!(
     bench_highlight,
     bench_scroll_redraw,
     bench_tree_redraw,
+    bench_tree_filter_sync,
 );
 
 criterion_main!(benches);

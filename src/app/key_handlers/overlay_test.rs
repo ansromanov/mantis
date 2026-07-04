@@ -501,6 +501,73 @@ fn tree_filter_enter_on_dir_toggles_expansion() {
 }
 
 #[test]
+fn tree_filter_typing_finds_match_in_collapsed_subdirectory() {
+    let root = temp_tree();
+    fs::create_dir_all(root.join("sub")).unwrap();
+    fs::write(root.join("sub").join("needle.txt"), "hidden\n").unwrap();
+    let mut app = app_for(&root);
+    app.tree_filter = Some(TreeFilter::new());
+    assert!(
+        !app.expanded.contains(&root.join("sub")),
+        "sub must not be expanded initially"
+    );
+    for c in "needle".chars() {
+        app.handle_tree_filter_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::empty()));
+    }
+    assert!(
+        app.expanded.contains(&root.join("sub")),
+        "typing a query matching a file in a collapsed dir must auto-expand it"
+    );
+    assert!(
+        app.nodes.iter().any(|n| n.path.ends_with("needle.txt")),
+        "the matching file must now be present in the rebuilt node list"
+    );
+    let sel = &app.nodes[app.tree_selected];
+    assert!(
+        sel.path.ends_with("needle.txt"),
+        "selection must jump to the match"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_filter_esc_restores_previous_expansion_state() {
+    let root = temp_tree();
+    fs::create_dir_all(root.join("sub")).unwrap();
+    fs::write(root.join("sub").join("needle.txt"), "hidden\n").unwrap();
+    let mut app = app_for(&root);
+    app.tree_filter = Some(TreeFilter::new());
+    for c in "needle".chars() {
+        app.handle_tree_filter_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::empty()));
+    }
+    assert!(app.expanded.contains(&root.join("sub")));
+    app.handle_tree_filter_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+    assert!(app.tree_filter.is_none());
+    assert!(
+        !app.expanded.contains(&root.join("sub")),
+        "dismissing the filter must restore the pre-filter expansion state"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_filter_backspace_to_empty_restores_previous_expansion_state() {
+    let root = temp_tree();
+    fs::create_dir_all(root.join("sub")).unwrap();
+    fs::write(root.join("sub").join("needle.txt"), "hidden\n").unwrap();
+    let mut app = app_for(&root);
+    app.tree_filter = Some(TreeFilter::new());
+    app.handle_tree_filter_key(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::empty()));
+    assert!(app.expanded.contains(&root.join("sub")));
+    app.handle_tree_filter_key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::empty()));
+    assert!(
+        !app.expanded.contains(&root.join("sub")),
+        "backspacing the query back to empty must restore prior expansion"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn tree_filter_esc_does_not_activate() {
     let root = temp_tree();
     let mut app = app_for(&root);
