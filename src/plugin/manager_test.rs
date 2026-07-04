@@ -253,9 +253,10 @@ fn register_provider_overwrites_same_plugin() {
     );
 }
 
-/// Serialises tests that set `MANTIS_STATE_DIR` (a process-global env var).
+/// Shared crate-wide lock serialising every test that sets `MANTIS_STATE_DIR`
+/// (a process-global env var) — see [`crate::session::STATE_DIR_ENV_LOCK`].
 #[cfg(unix)]
-static STATE_DIR_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+use crate::session::STATE_DIR_ENV_LOCK as STATE_DIR_LOCK;
 
 #[test]
 #[cfg(unix)]

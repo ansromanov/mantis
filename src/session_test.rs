@@ -1,11 +1,5 @@
-use std::sync::Mutex;
-
 use super::*;
-
-/// Serialises all session tests so `MANTIS_STATE_DIR` (a process-global env
-/// var) is never overwritten by a concurrently-running test — `cargo test`
-/// runs tests on separate threads within the same process by default.
-static SESSION_LOCK: Mutex<()> = Mutex::new(());
+use crate::session::STATE_DIR_ENV_LOCK as SESSION_LOCK;
 
 /// A per-test environment: creates a unique root and state directory under the
 /// system temp directory, then points `MANTIS_STATE_DIR` at the isolated state dir

@@ -278,7 +278,23 @@ impl Plugin {
 fn plugin_log_path(name: &str) -> Option<PathBuf> {
     let dir = crate::session::state_dir()?.join("plugin-logs");
     std::fs::create_dir_all(&dir).ok()?;
-    Some(dir.join(format!("{name}.log")))
+    Some(dir.join(format!("{}.log", sanitize_log_filename(name))))
+}
+
+/// Maps every character other than an ASCII alphanumeric, `-`, or `_` to `_`,
+/// so a plugin name (a `[plugins]` config key, not validated for filesystem
+/// safety) can never contain a path separator or `..` and escape
+/// `plugin-logs/` when used as a single filename component.
+fn sanitize_log_filename(name: &str) -> String {
+    name.chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect()
 }
 
 /// Drains a plugin's stderr, capping the on-disk log at [`STDERR_LOG_CAP`]
@@ -304,11 +320,14 @@ fn drain_stderr<R: std::io::Read>(
         if line_buf.ends_with(b"\n") {
             line_buf.pop();
         }
-        let trimmed = String::from_utf8_lossy(&line_buf).trim().to_string();
-        if trimmed.is_empty() {
+        if line_buf.ends_with(b"\r") {
+            line_buf.pop();
+        }
+        let line = String::from_utf8_lossy(&line_buf).to_string();
+        if line.trim().is_empty() {
             continue;
         }
-        let sanitized = sanitize_line(&trimmed);
+        let sanitized = sanitize_line(&line);
         if sanitized.is_empty() {
             continue;
         }
@@ -335,7 +354,9 @@ const MAX_DISPLAY_STDERR_LEN: usize = 300;
 /// log. Plugin stderr is untrusted output and must never be interpreted by
 /// the terminal.
 fn sanitize_line(s: &str) -> String {
-    s.chars().filter(|c| !c.is_control()).collect()
+    s.chars()
+        .filter(|&c| c == '\t' || !c.is_control())
+        .collect()
 }
 
 /// Truncates `s` to [`MAX_DISPLAY_STDERR_LEN`] characters for display,
