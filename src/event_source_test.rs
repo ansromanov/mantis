@@ -397,7 +397,9 @@ impl PollReader for MockReader {
     }
 
     fn read(&mut self, _buf: &mut [u8]) -> io::Result<usize> {
-        Ok(self.read_counts.pop_front().unwrap_or(0))
+        self.read_counts
+            .pop_front()
+            .ok_or_else(|| io::Error::other("MockReader: unexpected extra read() call"))
     }
 }
 

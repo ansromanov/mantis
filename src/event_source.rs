@@ -92,21 +92,35 @@ struct StdinReader;
 
 impl PollReader for StdinReader {
     fn poll(&mut self, timeout_ms: libc::c_int) -> io::Result<bool> {
-        let mut pfd = libc::pollfd {
-            fd: 0,
-            events: libc::POLLIN,
-            revents: 0,
-        };
-        let ret = unsafe { libc::poll(&mut pfd, 1, timeout_ms) };
-        Ok(ret > 0)
+        loop {
+            let mut pfd = libc::pollfd {
+                fd: 0,
+                events: libc::POLLIN,
+                revents: 0,
+            };
+            let ret = unsafe { libc::poll(&mut pfd, 1, timeout_ms) };
+            if ret < 0 {
+                let err = io::Error::last_os_error();
+                if err.kind() == io::ErrorKind::Interrupted {
+                    continue;
+                }
+                return Err(err);
+            }
+            return Ok(ret > 0 && pfd.revents & libc::POLLIN != 0);
+        }
     }
 
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let n = unsafe { libc::read(0, buf.as_mut_ptr() as *mut libc::c_void, buf.len()) };
-        if n < 0 {
-            Err(io::Error::last_os_error())
-        } else {
-            Ok(n as usize)
+        loop {
+            let n = unsafe { libc::read(0, buf.as_mut_ptr() as *mut libc::c_void, buf.len()) };
+            if n < 0 {
+                let err = io::Error::last_os_error();
+                if err.kind() == io::ErrorKind::Interrupted {
+                    continue;
+                }
+                return Err(err);
+            }
+            return Ok(n as usize);
         }
     }
 }
@@ -159,11 +173,7 @@ impl RawEventSource {
 
         let mut tmp = [0u8; 4096];
         loop {
-            let n = match reader.read(&mut tmp) {
-                Ok(n) => n,
-                Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
-                Err(_) => break, // treat other read errors as "no more data right now"
-            };
+            let n = reader.read(&mut tmp)?;
             if n == 0 {
                 break;
             }
