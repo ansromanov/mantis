@@ -1171,11 +1171,7 @@ fn apply_response_ignores_stale_file_seq() {
     let applied = app.apply_response(LoadResponse::File {
         seq: 4,
         path: stale.path().to_path_buf(),
-        load: Box::new(compute_file_load(
-            stale.path(),
-            &app.theme,
-            &app.highlighter,
-        )),
+        load: Box::new(compute_file_load(stale.path(), &app.highlighter)),
     });
 
     assert!(!applied, "stale seq must not be reported as applied");

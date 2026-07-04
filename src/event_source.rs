@@ -288,10 +288,45 @@ fn parse_event(bytes: &[u8]) -> io::Result<Option<(Event, usize)>> {
             )),
             1,
         ))),
+        // Multi-byte UTF-8 lead byte (2/3/4-byte sequences). Pasted text
+        // arrives as raw UTF-8 rather than CSI-u, so it must be decoded here
+        // or every non-ASCII character is silently dropped (#454).
+        0xC2..=0xF4 => parse_utf8_char(bytes),
         _ => Err(io::Error::new(
             io::ErrorKind::InvalidData,
             format!("unhandled byte 0x{:02X}", bytes[0]),
         )),
+    }
+}
+
+/// Decode a multi-byte UTF-8 character starting at `bytes[0]`.
+///
+/// Returns `Ok(None)` if the sequence is not yet fully buffered (need more
+/// data from the next `fill()`), or `Err` if the continuation bytes are
+/// invalid UTF-8.
+fn parse_utf8_char(bytes: &[u8]) -> io::Result<Option<(Event, usize)>> {
+    let lead = bytes[0];
+    let len = if lead & 0xE0 == 0xC0 {
+        2
+    } else if lead & 0xF0 == 0xE0 {
+        3
+    } else {
+        4
+    };
+
+    if bytes.len() < len {
+        return Ok(None); // incomplete sequence — wait for more bytes
+    }
+
+    match std::str::from_utf8(&bytes[..len]) {
+        Ok(s) => {
+            let c = s.chars().next().ok_or_else(|| invalid("empty utf8"))?;
+            Ok(Some((
+                Event::Key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::empty())),
+                len,
+            )))
+        }
+        Err(_) => Err(invalid("invalid utf8 sequence")),
     }
 }
 
