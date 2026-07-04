@@ -273,3 +273,72 @@ fn repo_status_both_excluded() {
         );
     }
 }
+
+// -- non-ASCII filenames (the -z fix) ---------------------------------------
+
+#[test]
+fn repo_status_non_ascii_filename() {
+    let dir = tempfile::tempdir().unwrap();
+    git(dir.path(), &["init", "-q"]);
+    fs::write(dir.path().join("untracked.txt"), "hello\n").unwrap();
+    // Non-ASCII UTF-8 name — git C-quotes it without -z.
+    fs::write(dir.path().join("файл.txt"), "привет\n").unwrap();
+    let map = repo_status(dir.path(), true, false);
+    let root = repo_root(dir.path());
+    assert!(
+        map.contains_key(&root.join("файл.txt")),
+        "non-ASCII filename should appear in status"
+    );
+    assert!(
+        map.contains_key(&root.join("untracked.txt")),
+        "ASCII filename should still appear"
+    );
+}
+
+#[test]
+fn repo_status_filename_with_spaces() {
+    let dir = tempfile::tempdir().unwrap();
+    git(dir.path(), &["init", "-q"]);
+    fs::write(dir.path().join("prefix.txt"), "data\n").unwrap();
+    // File with leading and trailing spaces (legal on Unix).
+    let spaced_name = "  spaced-file.txt  ";
+    fs::write(dir.path().join(spaced_name), "data\n").unwrap();
+    let map = repo_status(dir.path(), true, false);
+    let root = repo_root(dir.path());
+    assert!(
+        map.contains_key(&root.join("prefix.txt")),
+        "normal filename should appear"
+    );
+    assert!(
+        map.contains_key(&root.join(spaced_name)),
+        "filename with spaces should appear"
+    );
+}
+
+#[test]
+fn repo_status_rename_is_tracked() {
+    let dir = tempfile::tempdir().unwrap();
+    git(dir.path(), &["init", "-q"]);
+    fs::write(dir.path().join("original.txt"), "content\n").unwrap();
+    git(dir.path(), &["add", "original.txt"]);
+    git(dir.path(), &["commit", "-q", "-m", "init"]);
+    // Rename the file (staged).
+    let new_name = "renamed.txt";
+    // `git mv` stages the rename.
+    git(dir.path(), &["mv", "original.txt", new_name]);
+    let map = repo_status(dir.path(), true, false);
+    let root = repo_root(dir.path());
+    assert!(
+        !map.contains_key(&root.join("original.txt")),
+        "original name should not appear (it's renamed away)"
+    );
+    assert!(
+        map.contains_key(&root.join(new_name)),
+        "renamed file should appear in status"
+    );
+    assert_eq!(
+        map.get(&root.join(new_name)),
+        Some(&GitStatus::Modified),
+        "staged rename should be Modified"
+    );
+}
