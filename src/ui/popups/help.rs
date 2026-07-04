@@ -6,6 +6,21 @@
 //! remapped keys are reflected immediately. Sections that cover hardcoded
 //! overlay behaviours (in-file search, search/history popup, visual-line mode)
 //! remain static reference text.
+//!
+//! The `Global`/`Tree panel`/`Content panel` sections are built by
+//! `keymap_help_sections`, which groups `crate::actions::ACTIONS` by its
+//! `.help` field, preserving the order actions first appear in `ACTIONS`.
+//! This replaces the old hand-duplicated `KEYMAP_SECTIONS` table, so a new
+//! action only needs a `help: Some((section, desc))` entry in `ACTIONS` to
+//! show up here. `nav_up`/`nav_down` are the one exception: they are bound
+//! both in the tree panel (move selection) and the content panel (scroll),
+//! and since an `ActionSpec` has only one `help` slot, the Content panel's
+//! second meaning is appended as two hand-written rows rather than a second
+//! registry entry. The dedicated Git section stays partially hand-assembled
+//! (it interleaves static orientation rows - tree colors, status bar legend -
+//! with keymap-driven rows) but its `GIT_KEYMAP_ENTRIES` ids are all
+//! canonical `ACTIONS` ids, checked by
+//! `help_test.rs::git_keymap_entries_ids_are_canonical_actions`.
 
 use ratatui::{
     layout::Rect,
@@ -15,203 +30,43 @@ use ratatui::{
     Frame,
 };
 
+use crate::actions::ACTIONS;
 use crate::app::App;
 
 use super::util::centered_rect;
 
-struct HelpEntry {
-    action_id: &'static str,
-    desc: &'static str,
+/// Groups `ACTIONS`' `.help` entries by section name, preserving both the
+/// order sections first appear and the order of entries within each section.
+fn keymap_help_sections() -> Vec<(&'static str, Vec<(&'static str, &'static str)>)> {
+    let mut sections: Vec<(&'static str, Vec<(&'static str, &'static str)>)> = Vec::new();
+    for action in ACTIONS {
+        let Some((section_name, desc)) = action.help else {
+            continue;
+        };
+        match sections.iter_mut().find(|(name, _)| *name == section_name) {
+            Some((_, entries)) => entries.push((action.id, desc)),
+            None => sections.push((section_name, vec![(action.id, desc)])),
+        }
+    }
+    // nav_up/nav_down are also bound in the content panel (scrolling), a
+    // second meaning `ActionSpec::help` has no room for; append it here.
+    if let Some((_, entries)) = sections
+        .iter_mut()
+        .find(|(name, _)| *name == "Content panel")
+    {
+        entries.insert(0, ("nav_up", "scroll up"));
+        entries.insert(1, ("nav_down", "scroll down"));
+    }
+    sections
 }
-
-struct HelpSection {
-    name: &'static str,
-    entries: &'static [HelpEntry],
-}
-
-/// Keymap-driven help entries. Each entry's key label is queried from the live
-/// `Keymap` so remapped bindings show correctly.
-const KEYMAP_SECTIONS: &[HelpSection] = &[
-    HelpSection {
-        name: "Global",
-        entries: &[
-            HelpEntry {
-                action_id: "help",
-                desc: "toggle this help",
-            },
-            HelpEntry {
-                action_id: "switch_panel",
-                desc: "switch panel",
-            },
-            HelpEntry {
-                action_id: "quit",
-                desc: "quit",
-            },
-            HelpEntry {
-                action_id: "toggle_hidden",
-                desc: "toggle hidden files",
-            },
-            HelpEntry {
-                action_id: "theme_picker",
-                desc: "pick a theme",
-            },
-            HelpEntry {
-                action_id: "plugin_picker",
-                desc: "plugin manager",
-            },
-            HelpEntry {
-                action_id: "git_mode_toggle",
-                desc: "toggle git mode (changed files only + diffs)",
-            },
-            HelpEntry {
-                action_id: "open_in_editor",
-                desc: "open file in $EDITOR",
-            },
-            HelpEntry {
-                action_id: "copy_path",
-                desc: "copy absolute path to clipboard",
-            },
-            HelpEntry {
-                action_id: "copy_relative_path",
-                desc: "copy path relative to tree root to clipboard",
-            },
-            HelpEntry {
-                action_id: "recent_files",
-                desc: "recent files picker",
-            },
-            HelpEntry {
-                action_id: "git_mode_flat_toggle",
-                desc: "toggle git flat/tree view (in git mode)",
-            },
-        ],
-    },
-    HelpSection {
-        name: "Tree panel",
-        entries: &[
-            HelpEntry {
-                action_id: "nav_up",
-                desc: "move up",
-            },
-            HelpEntry {
-                action_id: "nav_down",
-                desc: "move down",
-            },
-            HelpEntry {
-                action_id: "tree_expand",
-                desc: "expand dir / open file",
-            },
-            HelpEntry {
-                action_id: "tree_collapse",
-                desc: "collapse dir",
-            },
-            HelpEntry {
-                action_id: "tree_up_dir",
-                desc: "go up one directory",
-            },
-            HelpEntry {
-                action_id: "tree_collapse_all",
-                desc: "collapse all directories",
-            },
-            HelpEntry {
-                action_id: "tree_expand_all",
-                desc: "expand all directories",
-            },
-            HelpEntry {
-                action_id: "find_files",
-                desc: "global fuzzy file-name picker",
-            },
-            HelpEntry {
-                action_id: "search_files",
-                desc: "tree filter / in-file search",
-            },
-            HelpEntry {
-                action_id: "search_content",
-                desc: "fuzzy content search",
-            },
-            HelpEntry {
-                action_id: "reload",
-                desc: "reload tree",
-            },
-        ],
-    },
-    HelpSection {
-        name: "Content panel",
-        entries: &[
-            HelpEntry {
-                action_id: "nav_up",
-                desc: "scroll up",
-            },
-            HelpEntry {
-                action_id: "nav_down",
-                desc: "scroll down",
-            },
-            HelpEntry {
-                action_id: "content_page_up",
-                desc: "page scroll",
-            },
-            HelpEntry {
-                action_id: "content_page_down",
-                desc: "page scroll",
-            },
-            HelpEntry {
-                action_id: "content_left",
-                desc: "horizontal scroll",
-            },
-            HelpEntry {
-                action_id: "content_right",
-                desc: "horizontal scroll",
-            },
-            HelpEntry {
-                action_id: "content_reset_col",
-                desc: "reset horizontal scroll",
-            },
-            HelpEntry {
-                action_id: "content_top",
-                desc: "go to top",
-            },
-            HelpEntry {
-                action_id: "content_bottom",
-                desc: "go to bottom",
-            },
-            HelpEntry {
-                action_id: "toggle_wrap",
-                desc: "toggle word wrap",
-            },
-            HelpEntry {
-                action_id: "toggle_line_numbers",
-                desc: "toggle line numbers",
-            },
-            HelpEntry {
-                action_id: "toggle_blame",
-                desc: "toggle git blame gutter",
-            },
-            HelpEntry {
-                action_id: "file_history",
-                desc: "git history of current file",
-            },
-            HelpEntry {
-                action_id: "toggle_diff_side_by_side",
-                desc: "toggle side-by-side diff (in a diff)",
-            },
-            HelpEntry {
-                action_id: "diff_hunk_next",
-                desc: "next / previous hunk (in a diff)",
-            },
-            HelpEntry {
-                action_id: "diff_hunk_prev",
-                desc: "next / previous hunk (in a diff)",
-            },
-            HelpEntry {
-                action_id: "fold_toggle",
-                desc: "toggle fold at cursor",
-            },
-        ],
-    },
-];
 
 /// Git-specific keybinding rows rendered in the dedicated Git section.
-/// Each tuple is `(action_id, user-facing description)`.
-const GIT_KEYMAP_ENTRIES: &[(&str, &str)] = &[
+/// Each tuple is `(action_id, user-facing description)`; `action_id` must be
+/// a canonical id from `crate::actions::ACTIONS` (checked by
+/// `help_test.rs::git_keymap_entries_ids_are_canonical_actions`), even though
+/// the description here is git-specific phrasing distinct from that action's
+/// `ACTIONS` entry (if it has one).
+pub(super) const GIT_KEYMAP_ENTRIES: &[(&str, &str)] = &[
     (
         "git_mode_toggle",
         "show only changed files; each file opens its diff",
@@ -243,11 +98,14 @@ const GIT_KEYMAP_ENTRIES: &[(&str, &str)] = &[
 /// Helper: compute the widest key label across all keymap-driven entries so
 /// rows can be aligned with consistent padding. Capped at 14 to keep the
 /// popup compact — unusually long labels are truncated with `…`.
-fn max_key_width(app: &App) -> usize {
+fn max_key_width(
+    app: &App,
+    sections: &[(&'static str, Vec<(&'static str, &'static str)>)],
+) -> usize {
     let mut max_w = 0usize;
-    for section in KEYMAP_SECTIONS {
-        for entry in section.entries {
-            let label = app.keys().labels_for_action(entry.action_id);
+    for (_, entries) in sections {
+        for &(action_id, _) in entries {
+            let label = app.keys().labels_for_action(action_id);
             let w = label.len();
             if w > max_w {
                 max_w = w;
@@ -310,16 +168,17 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
     };
     let gap = Line::from("");
 
-    let key_w = max_key_width(app);
+    let keymap_sections = keymap_help_sections();
+    let key_w = max_key_width(app, &keymap_sections);
 
     let mut rows: Vec<Line> = Vec::new();
-    for section_def in KEYMAP_SECTIONS {
-        rows.push(section(section_def.name));
-        for entry in section_def.entries {
-            let label = app.keys().labels_for_action(entry.action_id);
+    for (section_name, entries) in &keymap_sections {
+        rows.push(section(section_name));
+        for &(action_id, entry_desc) in entries {
+            let label = app.keys().labels_for_action(action_id);
             let display = truncate_label(&label, key_w);
             let padded = format!("  {display:width$}  ", width = key_w);
-            rows.push(Line::from(vec![key_style(padded), desc(entry.desc)]));
+            rows.push(Line::from(vec![key_style(padded), desc(entry_desc)]));
         }
         rows.push(gap.clone());
     }

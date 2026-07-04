@@ -1132,3 +1132,44 @@ fn draw_tree_filter_with_ancestors_includes_parent_dirs() {
     assert!(text.contains("src"), "ancestor dir must be visible");
     assert!(!text.contains("tests"), "non-matching dir must be hidden");
 }
+
+/// The git-mode clean placeholder's exit hint looks up the canonical
+/// `git_mode_toggle` action id (see `crate::actions::ACTIONS`), not the old
+/// `toggle_git_mode` alias the command palette used to use. A remapped
+/// binding must show up here, proving the lookup uses the live keymap under
+/// the canonical id.
+#[test]
+fn draw_tree_git_mode_placeholder_hint_uses_canonical_action_id() {
+    use crate::config::{bind, Config, Keymap};
+    use crate::git::GitHead;
+
+    let cfg = Config {
+        keys: Keymap {
+            git_mode_toggle: bind(&["ctrl+m"]),
+            ..Keymap::default()
+        },
+        git: crate::config::GitConfig {
+            status: false,
+            ..Default::default()
+        },
+        ..Config::default()
+    };
+    let mut app = App::new(PathBuf::from("."), cfg, None, None).unwrap();
+    app.root = PathBuf::from("repo");
+    app.git_mode = true;
+    app.nodes = vec![];
+    app.git_info = Some(crate::git::GitRepoInfo {
+        head: GitHead::Branch("main".to_string()),
+        ahead: 0,
+        behind: 0,
+        total_changed: 0,
+        staged: 0,
+        untracked: 0,
+    });
+    let rows = render_tree(&mut app, 40, 5);
+    let text = all_text(&rows);
+    assert!(
+        text.contains("Ctrl+m"),
+        "remapped git_mode_toggle binding must appear in the placeholder hint, got:\n{text}"
+    );
+}

@@ -23,6 +23,7 @@ use ratatui::{backend::Backend, backend::CrosstermBackend, Terminal};
 
 use crate::app::App;
 
+mod actions;
 mod ansi;
 mod app;
 mod command_palette;

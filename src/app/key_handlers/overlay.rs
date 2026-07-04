@@ -289,7 +289,9 @@ impl App {
             return;
         };
         match handle_list_picker_key(p, &key) {
-            OverlayKey::Activate => self.dispatch_command(),
+            OverlayKey::Activate => {
+                self.dispatch_command();
+            }
             OverlayKey::Close => self.command_palette = None,
             _ => {}
         }

@@ -2,14 +2,16 @@
 //!
 //! `dispatch_command` maps a selected command-palette entry's `action_id` to the
 //! matching `App` method, so the palette and direct keybindings share one set of
-//! actions. This module also owns suspending the TUI to launch the user's
-//! `$EDITOR` on the current file: it tears down raw mode and the alternate
-//! screen, runs the editor, then restores the terminal and flags `needs_clear`
-//! so the next frame repaints cleanly. Theme switching and the highlighter
-//! rebuild triggered from the palette live here too, alongside the related
-//! terminal-state bookkeeping. `open_release_url` delegates to the shared
-//! `open_in_browser` helper, which guards against spawning the browser when
-//! stdout is not a TTY (piped/headless/CI runs).
+//! canonical ids from `crate::actions::ACTIONS` - no more `open_x`/`x_picker`
+//! aliasing between this match and `Keymap::bindings_for_action`. This module
+//! also owns suspending the TUI to launch the user's `$EDITOR` on the current
+//! file: it tears down raw mode and the alternate screen, runs the editor,
+//! then restores the terminal and flags `needs_clear` so the next frame
+//! repaints cleanly. Theme switching and the highlighter rebuild triggered
+//! from the palette live here too, alongside the related terminal-state
+//! bookkeeping. `open_release_url` delegates to the shared `open_in_browser`
+//! helper, which guards against spawning the browser when stdout is not a TTY
+//! (piped/headless/CI runs).
 
 use crossterm::event::EnableMouseCapture;
 use crossterm::execute;
@@ -26,8 +28,13 @@ use crate::theme::{Theme, ThemeConfig};
 use super::super::{diff_line_style, App, Focus};
 
 impl App {
-    /// Executes the selected command from the palette and closes it.
-    pub(crate) fn dispatch_command(&mut self) {
+    /// Executes the selected command from the palette and closes it. Returns
+    /// whether `action_id` matched a known dispatch arm - not whether that
+    /// arm's own state-dependent guard (e.g. `is_diff`) actually fired an
+    /// effect. `actions_test.rs::every_palette_action_id_is_dispatch_handled`
+    /// calls this directly so a removed match arm fails that test instead of
+    /// leaving a hand-maintained id list stale.
+    pub(crate) fn dispatch_command(&mut self) -> bool {
         let action_id = self
             .command_palette
             .as_ref()
@@ -38,15 +45,26 @@ impl App {
         }
         self.command_palette = None;
         match action_id {
-            Some("toggle_help") => self.show_help = !self.show_help,
+            Some("help") => {
+                self.show_help = !self.show_help;
+                true
+            }
+            Some("quit") => {
+                self.should_quit = true;
+                true
+            }
             Some("toggle_hidden") => {
                 self.show_hidden = !self.show_hidden;
                 self.config.tree.show_hidden = self.show_hidden;
                 self.reload();
                 self.save_config();
+                true
             }
-            Some("open_file_search") => self.open_file_search(),
-            Some("open_content_search") => {
+            Some("search_files") => {
+                self.open_file_search();
+                true
+            }
+            Some("search_content") => {
                 let root = self.root.clone();
                 let changed = self.git_changed_files_set();
                 let mut s = SearchState::new(
@@ -62,77 +80,180 @@ impl App {
                     s.refresh_now();
                 }
                 self.search = Some(s);
+                true
             }
-            Some("reload") => self.reload(),
-            Some("open_file_history") => self.open_file_history(),
-            Some("open_theme_picker") => {
+            Some("reload") => {
+                self.reload();
+                true
+            }
+            Some("file_history") => {
+                self.open_file_history();
+                true
+            }
+            Some("theme_picker") => {
                 self.theme_picker = Some(ThemePicker::default());
+                true
             }
-            Some("open_plugin_picker") => {
+            Some("plugin_picker") => {
                 let entries = self.plugin_manager.plugin_entries();
                 self.plugin_picker = Some(PluginPicker::new(entries));
+                true
             }
-            Some("toggle_git_mode") => self.toggle_git_mode(),
-            Some("toggle_git_flat") if self.git_mode => {
-                self.git_mode_flat = !self.git_mode_flat;
-                self.rebuild(true);
-                self.try_open_selected();
-                self.save_config();
+            Some("git_mode_toggle") => {
+                self.toggle_git_mode();
+                true
             }
-            Some("toggle_word_wrap") => {
+            Some("git_mode_flat_toggle") => {
+                if self.git_mode {
+                    self.git_mode_flat = !self.git_mode_flat;
+                    self.rebuild(true);
+                    self.try_open_selected();
+                    self.save_config();
+                }
+                true
+            }
+            Some("toggle_wrap") => {
                 self.word_wrap = !self.word_wrap;
                 self.config.content.word_wrap = self.word_wrap;
                 self.set_content_scroll(0);
                 self.content_hscroll = 0;
                 self.save_config();
+                true
             }
             Some("toggle_line_numbers") => {
                 self.show_line_numbers = !self.show_line_numbers;
                 self.config.content.line_numbers = self.show_line_numbers;
                 self.save_config();
+                true
             }
-            Some("toggle_pretty_json") if self.is_json && !self.json_pretty_lines.is_empty() => {
-                self.show_pretty_json = !self.show_pretty_json;
-                self.set_content_scroll(0);
-                self.content_hscroll = 0;
+            Some("toggle_pretty_json") => {
+                if self.is_json && !self.json_pretty_lines.is_empty() {
+                    self.show_pretty_json = !self.show_pretty_json;
+                    self.set_content_scroll(0);
+                    self.content_hscroll = 0;
+                }
+                true
             }
-            Some("toggle_diff_side_by_side") if self.is_diff => {
-                self.diff_side_by_side = !self.diff_side_by_side;
-                self.config.git.diff.side_by_side = self.diff_side_by_side;
-                self.save_config();
-                self.set_content_scroll(0);
-                self.content_hscroll = 0;
+            Some("toggle_blame") => {
+                if self.has_text_cursor() {
+                    self.show_blame = !self.show_blame;
+                } else {
+                    self.set_status("blame: not available in a diff");
+                }
+                true
             }
-            Some("open_in_editor") => self.open_in_editor(),
-            Some("open_config_in_editor") => self.open_config_in_editor(),
-            Some("show_about") => self.show_about = !self.show_about,
-            Some("fold_all") if !self.fold_regions.is_empty() => {
-                self.fold_all();
-                self.mark_content_scrolled();
+            Some("toggle_diff_side_by_side") => {
+                if self.is_diff {
+                    self.diff_side_by_side = !self.diff_side_by_side;
+                    self.config.git.diff.side_by_side = self.diff_side_by_side;
+                    self.save_config();
+                    self.set_content_scroll(0);
+                    self.content_hscroll = 0;
+                }
+                true
             }
-            Some("unfold_all") if !self.fold_regions.is_empty() => {
-                self.unfold_all();
-                self.mark_content_scrolled();
+            Some("toggle_diff_staged") => {
+                if self.is_diff {
+                    self.diff_mode = self.diff_mode.next();
+                    self.config.git.diff.mode = self.diff_mode;
+                    self.save_config();
+                    if let Some(path) = self.current_file.clone() {
+                        self.show_working_tree_diff(&path);
+                    }
+                }
+                true
             }
-            Some("fold_toggle") if !self.fold_regions.is_empty() => {
-                let phys = self.display_to_physical(self.content_scroll);
-                if let Some(ri) = self.region_idx_at(phys) {
-                    self.toggle_fold_region(ri);
+            Some("diff_hunk_next") => {
+                if self.is_diff {
+                    self.diff_next_hunk();
+                }
+                true
+            }
+            Some("diff_hunk_prev") => {
+                if self.is_diff {
+                    self.diff_prev_hunk();
+                }
+                true
+            }
+            Some("open_in_editor") => {
+                self.open_in_editor();
+                true
+            }
+            Some("open_config_in_editor") => {
+                self.open_config_in_editor();
+                true
+            }
+            Some("show_about") => {
+                self.show_about = !self.show_about;
+                true
+            }
+            Some("fold_all") => {
+                if !self.fold_regions.is_empty() {
+                    self.fold_all();
                     self.mark_content_scrolled();
                 }
+                true
             }
-            Some("blame_line") if self.has_text_cursor() => {
-                self.show_line_blame = !self.show_line_blame;
+            Some("unfold_all") => {
+                if !self.fold_regions.is_empty() {
+                    self.unfold_all();
+                    self.mark_content_scrolled();
+                }
+                true
             }
-            Some("copy_path") => self.copy_path_to_clipboard(false),
-            Some("copy_relative_path") => self.copy_path_to_clipboard(true),
-            Some("tree_collapse_all") => self.collapse_all(),
-            Some("tree_expand_all") => self.expand_all(),
-            Some("tree_up_dir") => self.tree_up_dir(),
-            Some("go_to_line") if self.focus == Focus::Content => {
-                self.goto_line = Some(GotoLineState::new());
+            Some("fold_toggle") => {
+                if !self.fold_regions.is_empty() {
+                    let phys = self.display_to_physical(self.content_scroll);
+                    if let Some(ri) = self.region_idx_at(phys) {
+                        self.toggle_fold_region(ri);
+                        self.mark_content_scrolled();
+                    }
+                }
+                true
             }
-            _ => {}
+            Some("blame_line") => {
+                if self.has_text_cursor() {
+                    self.show_line_blame = !self.show_line_blame;
+                }
+                true
+            }
+            Some("copy_path") => {
+                self.copy_path_to_clipboard(false);
+                true
+            }
+            Some("copy_relative_path") => {
+                self.copy_path_to_clipboard(true);
+                true
+            }
+            Some("tree_collapse_all") => {
+                self.collapse_all();
+                true
+            }
+            Some("tree_expand_all") => {
+                self.expand_all();
+                true
+            }
+            Some("tree_up_dir") => {
+                self.tree_up_dir();
+                true
+            }
+            Some("recent_files") => {
+                self.open_recent_files();
+                true
+            }
+            Some("toggle_watch") => {
+                self.auto_watch = !self.auto_watch;
+                self.config.content.watch = self.auto_watch;
+                self.save_config();
+                true
+            }
+            Some("goto_line") => {
+                if self.focus == Focus::Content {
+                    self.goto_line = Some(GotoLineState::new());
+                }
+                true
+            }
+            _ => false,
         }
     }
 

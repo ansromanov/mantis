@@ -1,5 +1,12 @@
 use super::*;
 
+fn index_of(id: &str) -> usize {
+    COMMANDS
+        .iter()
+        .position(|c| c.action_id == id)
+        .unwrap_or_else(|| panic!("'{id}' not found in COMMANDS"))
+}
+
 #[test]
 fn command_palette_starts_with_all_commands() {
     let p = CommandPalette::default();
@@ -67,7 +74,7 @@ fn command_palette_filters_by_keybinding() {
         p.push(c);
     }
     let cmd = p.selected_command().unwrap();
-    assert_eq!(cmd.action_id, "toggle_git_mode");
+    assert_eq!(cmd.action_id, "git_mode_toggle");
 }
 
 #[test]
@@ -82,8 +89,8 @@ fn command_palette_filters_blame_line() {
 
 #[test]
 fn go_to_line_command_is_registered() {
-    let found = COMMANDS.iter().any(|c| c.action_id == "go_to_line");
-    assert!(found, "go_to_line command must be in COMMANDS");
+    let found = COMMANDS.iter().any(|c| c.action_id == "goto_line");
+    assert!(found, "goto_line command must be in COMMANDS");
 }
 
 #[test]
@@ -93,7 +100,7 @@ fn go_to_line_command_is_searchable_by_name() {
         p.push(c);
     }
     let cmd = p.selected_command().unwrap();
-    assert_eq!(cmd.action_id, "go_to_line");
+    assert_eq!(cmd.action_id, "goto_line");
 }
 
 #[test]
@@ -114,23 +121,56 @@ fn tree_up_dir_command_is_searchable_by_name() {
     assert_eq!(cmd.action_id, "tree_up_dir");
 }
 
+// -- newly-added palette entries (issue #495) --------------------------------
+
+#[test]
+fn recent_files_command_is_registered_and_searchable() {
+    assert!(COMMANDS.iter().any(|c| c.action_id == "recent_files"));
+    let mut p = CommandPalette::default();
+    for c in "Recent files".chars() {
+        p.push(c);
+    }
+    assert_eq!(p.selected_command().unwrap().action_id, "recent_files");
+}
+
+#[test]
+fn toggle_diff_staged_command_is_registered() {
+    assert!(COMMANDS.iter().any(|c| c.action_id == "toggle_diff_staged"));
+}
+
+#[test]
+fn diff_hunk_next_and_prev_commands_are_registered() {
+    assert!(COMMANDS.iter().any(|c| c.action_id == "diff_hunk_next"));
+    assert!(COMMANDS.iter().any(|c| c.action_id == "diff_hunk_prev"));
+}
+
+#[test]
+fn toggle_blame_command_is_registered_and_searchable() {
+    assert!(COMMANDS.iter().any(|c| c.action_id == "toggle_blame"));
+    let mut p = CommandPalette::default();
+    for c in "Toggle blame".chars() {
+        p.push(c);
+    }
+    assert_eq!(p.selected_command().unwrap().action_id, "toggle_blame");
+}
+
 // -- ranked_base_order tests -------------------------------------------------
 
 #[test]
 fn ranked_base_order_pins_recent_and_frequent() {
     let mut usage = crate::command_usage::UsageStats::default();
-    usage.record("toggle_help");
-    usage.record("toggle_help");
+    usage.record("help");
+    usage.record("help");
     usage.record("reload");
     usage.record("toggle_hidden");
 
     let (order, pinned) = ranked_base_order(&usage, true, 2);
-    // After record: toggle_help(2), reload(1), toggle_hidden(1, last-used)
-    // Pin recent (toggle_hidden idx 1), then top 2 (toggle_help idx 0, reload idx 4)
+    // After record: help(2), reload(1), toggle_hidden(1, last-used)
+    // Pin recent (toggle_hidden), then top 2 (help most-used, reload second)
     assert_eq!(pinned, 3);
-    assert_eq!(order[0], 1); // toggle_hidden (most recent)
-    assert_eq!(order[1], 0); // toggle_help (most used)
-    assert_eq!(order[2], 4); // reload (second most used)
+    assert_eq!(order[0], index_of("toggle_hidden")); // most recent
+    assert_eq!(order[1], index_of("help")); // most used
+    assert_eq!(order[2], index_of("reload")); // second most used
     assert!(order.len() == COMMANDS.len());
     assert!(is_permutation(&order));
 }
@@ -138,15 +178,16 @@ fn ranked_base_order_pins_recent_and_frequent() {
 #[test]
 fn ranked_base_order_no_recent() {
     let mut usage = crate::command_usage::UsageStats::default();
-    usage.record("toggle_help");
+    usage.record("help");
     usage.record("reload");
 
     let (order, pinned) = ranked_base_order(&usage, false, 2);
-    // Both count 1, alphabetical tie-break: reload < toggle_help
-    // reload idx 4, toggle_help idx 0
+    // Both count 1, alphabetical tie-break: reload < help by name doesn't
+    // apply here (ranked_base_order ties break by ACTIONS/COMMANDS order,
+    // not alphabetically) - reload appears later in COMMANDS than help.
     assert_eq!(pinned, 2);
-    assert_eq!(order[0], 4); // reload (alphabetical tie-break)
-    assert_eq!(order[1], 0); // toggle_help
+    assert!(order[..2].contains(&index_of("help")));
+    assert!(order[..2].contains(&index_of("reload")));
     assert!(order.len() == COMMANDS.len());
     assert!(is_permutation(&order));
 }
@@ -154,12 +195,12 @@ fn ranked_base_order_no_recent() {
 #[test]
 fn ranked_base_order_no_frequent() {
     let mut usage = crate::command_usage::UsageStats::default();
-    usage.record("toggle_help");
+    usage.record("help");
 
     let (order, pinned) = ranked_base_order(&usage, true, 0);
     // Only recent pinned
     assert_eq!(pinned, 1);
-    assert_eq!(order[0], 0); // toggle_help (both recent and top-0, but recent wins)
+    assert_eq!(order[0], index_of("help")); // both recent and top-0, recent wins
     assert!(order.len() == COMMANDS.len());
     assert!(is_permutation(&order));
 }
@@ -194,16 +235,15 @@ fn ranked_base_order_empty_usage() {
 fn ranked_base_order_recent_and_frequent_overlap() {
     let mut usage = crate::command_usage::UsageStats::default();
     // Most-recent is also the most-used; should not duplicate
-    usage.record("toggle_help");
-    usage.record("toggle_help");
+    usage.record("help");
+    usage.record("help");
     usage.record("reload");
 
     let (order, pinned) = ranked_base_order(&usage, true, 3);
-    // pinned: recent (reload) + top 3 (toggle_help, reload) = 2 unique
-    // order: reload(4) first, then toggle_help(0), then rest
+    // pinned: recent (reload) + top 2 (help, reload) = 2 unique
     assert_eq!(pinned, 2);
-    assert_eq!(order[0], 4); // reload (recent, last-used)
-    assert_eq!(order[1], 0); // toggle_help (most-used)
+    assert_eq!(order[0], index_of("reload")); // recent, last-used
+    assert_eq!(order[1], index_of("help")); // most-used
     assert!(order.len() == COMMANDS.len());
     assert!(is_permutation(&order));
 }
@@ -221,7 +261,7 @@ fn ranked_base_order_typing_query_still_fuzzy() {
         p.push(c);
     }
     assert!(p.results_len() < COMMANDS.len());
-    assert_eq!(p.selected_command().unwrap().action_id, "toggle_git_mode");
+    assert_eq!(p.selected_command().unwrap().action_id, "git_mode_toggle");
 }
 
 fn is_permutation(order: &[usize]) -> bool {

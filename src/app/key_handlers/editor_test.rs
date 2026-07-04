@@ -406,7 +406,7 @@ fn dispatch_command_records_action_in_usage() {
     app.dispatch_command();
     assert_eq!(
         app.command_usage.last_used(),
-        Some("toggle_help"),
+        Some("help"),
         "dispatch_command must update last_used to the dispatched action_id"
     );
     fs::remove_dir_all(&root).ok();
@@ -486,5 +486,35 @@ fn dispatch_command_unknown_action_id_does_not_crash() {
     app.command_palette = Some(palette_with_query("Toggle word wrap"));
     // Dispatch whatever the palette selected — just verify no crash.
     app.dispatch_command();
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn dispatch_command_quit_sets_should_quit() {
+    // "quit" gained a palette entry + dispatch arm in this PR (issue #495's
+    // proposal explicitly called it out as missing from the palette).
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.command_palette = Some(palette_with_query("Quit"));
+    assert!(!app.should_quit);
+    assert!(
+        app.dispatch_command(),
+        "dispatch_command must return true for a real match arm"
+    );
+    assert!(app.should_quit);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn dispatch_command_returns_false_when_nothing_selected() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let mut p = CommandPalette::default();
+    p.filtered.clear();
+    app.command_palette = Some(p);
+    assert!(
+        !app.dispatch_command(),
+        "dispatch_command must return false when no palette selection matches an arm"
+    );
     fs::remove_dir_all(&root).ok();
 }

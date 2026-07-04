@@ -96,7 +96,7 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
                 app.theme.git_dirty,
             )
         };
-        let hint = app.keys().label_for_action("toggle_git_mode");
+        let hint = app.keys().label_for_action("git_mode_toggle");
         let hint_line = if hint.is_empty() {
             Line::from("")
         } else {

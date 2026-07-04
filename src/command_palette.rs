@@ -1,17 +1,22 @@
-//! The Ctrl-P command palette: a static registry of named actions and a
-//! fuzzy-filterable picker over them.
+//! The Ctrl-P command palette: a fuzzy-filterable picker over the
+//! palette-invokable subset of the canonical action registry.
 //!
-//! `COMMANDS` is the canonical list of every palette-invokable action, each
-//! pairing a human-readable `name` with a stable `action_id` string. The
-//! `CommandPalette` picker holds the query, the scored-and-filtered subset, and
-//! the selected index, refreshing via `SkimMatcherV2` as the user types.
-//! Selecting an entry yields its `action_id`, which `app::key_handlers::editor`
-//! dispatches to the matching `App` method - so the palette and direct
-//! keybindings stay a single source of truth. Add new commands here and wire the
+//! `COMMANDS` is derived from `crate::actions::ACTIONS`, keeping only entries
+//! with `palette: Some(_)`, so this module no longer hand-maintains its own
+//! parallel action list. Each entry pairs a human-readable `name` with a
+//! stable `action_id` string. The `CommandPalette` picker holds the query,
+//! the scored-and-filtered subset, and the selected index, refreshing via
+//! `SkimMatcherV2` as the user types. Selecting an entry yields its
+//! `action_id`, which `app::key_handlers::editor` dispatches to the matching
+//! `App` method - so the palette and direct keybindings share one set of
+//! canonical ids. Add new commands to `ACTIONS` (not here) and wire the
 //! `action_id` into that dispatcher.
+
+use std::sync::LazyLock;
 
 use fuzzy_matcher::skim::SkimMatcherV2;
 
+use crate::actions::ACTIONS;
 use crate::config::Keymap;
 use crate::list_picker::ListPicker;
 use crate::search::fuzzy_refilter;
@@ -21,120 +26,18 @@ pub struct CommandEntry {
     pub action_id: &'static str,
 }
 
-pub static COMMANDS: &[CommandEntry] = &[
-    CommandEntry {
-        name: "Toggle help",
-        action_id: "toggle_help",
-    },
-    CommandEntry {
-        name: "Toggle hidden files",
-        action_id: "toggle_hidden",
-    },
-    CommandEntry {
-        name: "Open file search",
-        action_id: "open_file_search",
-    },
-    CommandEntry {
-        name: "Open content search",
-        action_id: "open_content_search",
-    },
-    CommandEntry {
-        name: "Reload",
-        action_id: "reload",
-    },
-    CommandEntry {
-        name: "Open file history",
-        action_id: "open_file_history",
-    },
-    CommandEntry {
-        name: "Open theme picker",
-        action_id: "open_theme_picker",
-    },
-    CommandEntry {
-        name: "Toggle git mode",
-        action_id: "toggle_git_mode",
-    },
-    CommandEntry {
-        name: "Toggle git flat mode",
-        action_id: "toggle_git_flat",
-    },
-    CommandEntry {
-        name: "Toggle word wrap",
-        action_id: "toggle_word_wrap",
-    },
-    CommandEntry {
-        name: "Toggle line numbers",
-        action_id: "toggle_line_numbers",
-    },
-    CommandEntry {
-        name: "Toggle JSON pretty-print",
-        action_id: "toggle_pretty_json",
-    },
-    CommandEntry {
-        name: "Toggle side-by-side diff",
-        action_id: "toggle_diff_side_by_side",
-    },
-    CommandEntry {
-        name: "Open in editor",
-        action_id: "open_in_editor",
-    },
-    CommandEntry {
-        name: "Open config in editor",
-        action_id: "open_config_in_editor",
-    },
-    CommandEntry {
-        name: "Toggle auto watch (reload on file change)",
-        action_id: "toggle_watch",
-    },
-    CommandEntry {
-        name: "About mantis",
-        action_id: "show_about",
-    },
-    CommandEntry {
-        name: "Fold all",
-        action_id: "fold_all",
-    },
-    CommandEntry {
-        name: "Unfold all",
-        action_id: "unfold_all",
-    },
-    CommandEntry {
-        name: "Toggle fold at cursor",
-        action_id: "fold_toggle",
-    },
-    CommandEntry {
-        name: "Copy absolute path",
-        action_id: "copy_path",
-    },
-    CommandEntry {
-        name: "Copy relative path",
-        action_id: "copy_relative_path",
-    },
-    CommandEntry {
-        name: "Blame active line",
-        action_id: "blame_line",
-    },
-    CommandEntry {
-        name: "Open plugin manager",
-        action_id: "open_plugin_picker",
-    },
-    CommandEntry {
-        name: "Collapse all directories",
-        action_id: "tree_collapse_all",
-    },
-    CommandEntry {
-        name: "Expand all directories",
-        action_id: "tree_expand_all",
-    },
-    CommandEntry {
-        name: "Go to line",
-        action_id: "go_to_line",
-    },
-    CommandEntry {
-        name: "Go up one directory",
-        action_id: "tree_up_dir",
-    },
-];
+/// Palette-invokable actions, in `ACTIONS` order.
+pub static COMMANDS: LazyLock<Vec<CommandEntry>> = LazyLock::new(|| {
+    ACTIONS
+        .iter()
+        .filter_map(|a| {
+            a.palette.map(|name| CommandEntry {
+                name,
+                action_id: a.id,
+            })
+        })
+        .collect()
+});
 
 pub struct CommandPalette {
     pub query: String,
