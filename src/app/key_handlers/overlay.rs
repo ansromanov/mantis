@@ -228,18 +228,111 @@ impl App {
         let Some(f) = self.tree_filter.as_mut() else {
             return;
         };
+        let is_query_edit = matches!(key.code, KeyCode::Char(_) | KeyCode::Backspace);
         match handle_list_picker_key(f, &key) {
             OverlayKey::Activate => {
                 self.tree_filter = None;
                 self.activate_selected();
             }
             OverlayKey::Close => {
+                self.restore_tree_filter_expansion();
                 self.tree_filter = None;
             }
             OverlayKey::Handled => {
+                if is_query_edit {
+                    self.sync_tree_filter_expansion();
+                }
                 self.move_tree_filter_selection_to_first_match();
             }
             _ => {}
+        }
+    }
+
+    /// Auto-expands the ancestor chain of every full-tree match for the
+    /// current filter query so matches inside collapsed directories become
+    /// navigable, and rebuilds the visible node list to reflect it. Matching
+    /// walks the whole tree (not just `self.nodes`, which only contains
+    /// currently-visible entries) via a cache built on the filter's first
+    /// non-empty query. Restores the pre-filter expansion state instead when
+    /// the query becomes empty (e.g. backspacing it all out).
+    fn sync_tree_filter_expansion(&mut self) {
+        let Some(filter) = self.tree_filter.as_ref() else {
+            return;
+        };
+        if filter.is_empty() {
+            self.restore_tree_filter_expansion();
+            return;
+        }
+
+        if self
+            .tree_filter
+            .as_ref()
+            .is_some_and(|f| f.saved_expanded.is_none())
+        {
+            let snapshot = self.expanded.clone();
+            if let Some(f) = self.tree_filter.as_mut() {
+                f.saved_expanded = Some(snapshot);
+            }
+        }
+        if self
+            .tree_filter
+            .as_ref()
+            .is_some_and(|f| f.full_paths_cache.is_none())
+        {
+            let mut all = crate::tree::collect_all_dirs(&self.root, self.show_hidden, self.ignore_gitignore);
+            all.extend(crate::tree::collect_all_files(
+                &self.root,
+                self.show_hidden,
+                self.ignore_gitignore,
+            ));
+            if let Some(f) = self.tree_filter.as_mut() {
+                f.full_paths_cache = Some(all);
+            }
+        }
+
+        let Some(filter) = self.tree_filter.as_ref() else {
+            return;
+        };
+        let query = filter.query.to_lowercase();
+        let paths = filter.full_paths_cache.clone().unwrap_or_default();
+
+        let mut changed = false;
+        for path in &paths {
+            let is_match = path
+                .file_name()
+                .map(|n| n.to_string_lossy().to_lowercase().contains(&query))
+                .unwrap_or(false);
+            if !is_match {
+                continue;
+            }
+            let mut ancestor = path.parent();
+            while let Some(p) = ancestor {
+                if p == self.root {
+                    break;
+                }
+                if self.expanded.insert(p.to_path_buf()) {
+                    changed = true;
+                }
+                ancestor = p.parent();
+            }
+        }
+        if changed {
+            self.rebuild(false);
+        }
+    }
+
+    /// Restores `expanded` to the snapshot taken before the tree filter
+    /// auto-expanded any directories, if one was taken. No-op when the
+    /// filter never triggered an auto-expansion (e.g. all matches were
+    /// already visible).
+    fn restore_tree_filter_expansion(&mut self) {
+        let saved = self
+            .tree_filter
+            .as_mut()
+            .and_then(|f| f.saved_expanded.take());
+        if let Some(saved) = saved {
+            self.expanded = saved;
+            self.rebuild(false);
         }
     }
 
