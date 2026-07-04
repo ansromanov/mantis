@@ -1,0 +1,157 @@
+//! Build script for `mantis`.
+//!
+//! Compiles the bundled plugin crates (`mantis-plugin-iconize`,
+//! `mantis-plugin-markdown`), copies their binaries into `$OUT_DIR`, and
+//! generates `$OUT_DIR/plugin_binaries.rs` with `&[u8]` constants built via
+//! `include_bytes!`. This removes the search-path dance from
+//! `install_one_binary` and ensures bundled plugins are always available —
+//! even for non-source installs (release artifacts, Homebrew, etc.).
+//!
+//! The generated file is included by `src/plugin/install.rs` via
+//! `include!(concat!(env!("OUT_DIR"), "/plugin_binaries.rs"))`.
+//!
+//! Rebuilds are gated on `build.rs` and the plugin source files.
+//!
+//! ## Installs without plugin sources
+//!
+//! `cargo install mantis` builds from the published crates.io tarball, which
+//! does not include `plugins/mantis-plugin-*` (they are separate workspace
+//! members and crates.io excludes nested-package directories from a package's
+//! own tarball). When a plugin's source directory is missing, this script
+//! embeds an empty binary for it instead of failing the whole build —
+//! `install_bundled_plugins` skips writing a plugin whose embedded data is
+//! empty, so the outer build still succeeds; it just ships without that
+//! bundled plugin, the same degradation the old search-path installer had.
+//!
+//! ## Lock-free plugin builds
+//!
+//! Plugin crates are compiled into a **dedicated target directory** beneath the
+//! main `target/` (`target/mantis-plugin-build/`) so the inner `cargo build`
+//! does not contend for the file lock that the outer cargo process holds on
+//! the main target directory. Without this, the recursive cargo invocation
+//! deadlocks.
+
+use std::path::PathBuf;
+use std::process::Command;
+
+fn main() {
+    let plugins = &["mantis-plugin-iconize", "mantis-plugin-markdown"];
+
+    let profile = std::env::var("PROFILE").unwrap_or_else(|_| "debug".to_string());
+    let is_release = profile == "release";
+    // Cargo sets TARGET to the triple being built for, which may differ from
+    // the host triple during cross-compilation (e.g. building
+    // x86_64-apple-darwin on an aarch64 macos-latest runner). Plugins must be
+    // built for the same triple or the embedded binaries won't run.
+    let target_triple = std::env::var("TARGET").expect("TARGET must be set by cargo");
+    let is_windows_target = target_triple.contains("windows");
+
+    let target_dir = resolve_target_dir();
+    // Separate target dir for plugin builds so the inner cargo does not
+    // contend for the file lock the outer cargo holds on the main target dir.
+    let plugin_target = target_dir.join("mantis-plugin-build");
+
+    let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR must be set by cargo");
+    let out_path = PathBuf::from(&out_dir).join("plugin_binaries.rs");
+
+    // Signal to cargo when to re-run build.rs
+    println!("cargo:rerun-if-changed=build.rs");
+    for pkg in plugins {
+        let src_dir = format!("plugins/{pkg}/src");
+        println!("cargo:rerun-if-changed=plugins/{pkg}/Cargo.toml");
+        if let Ok(entries) = std::fs::read_dir(&src_dir) {
+            for entry in entries.flatten() {
+                if entry.path().extension().is_some_and(|e| e == "rs") {
+                    println!("cargo:rerun-if-changed={}", entry.path().display());
+                }
+            }
+        }
+    }
+
+    // cargo sets CARGO to the exact binary driving this build; prefer it over
+    // a bare "cargo" so the plugin sub-build uses the same toolchain (matters
+    // under rustup overrides / pinned-toolchain CI where PATH's default
+    // `cargo` may differ from the one actually invoking this build script).
+    let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
+
+    // Build each plugin crate into the dedicated plugin target directory,
+    // for the same target triple as the outer build. Plugins whose source
+    // directory isn't present (e.g. `cargo install mantis`, see module docs)
+    // are skipped rather than failing the build.
+    let mut available = Vec::new();
+    for &pkg in plugins {
+        if !PathBuf::from(format!("plugins/{pkg}/Cargo.toml")).exists() {
+            continue;
+        }
+        available.push(pkg);
+
+        let mut cmd = Command::new(&cargo);
+        cmd.args(["build", "--package", pkg, "--target", &target_triple])
+            .arg("--target-dir")
+            .arg(&plugin_target);
+        if is_release {
+            cmd.arg("--release");
+        }
+        let status = cmd.status().unwrap_or_else(|e| {
+            panic!("failed to execute cargo build for {pkg}: {e}");
+        });
+        assert!(
+            status.success(),
+            "cargo build for {pkg} failed (exit: {})",
+            status,
+        );
+    }
+
+    // Copy binaries into OUT_DIR and generate `include_bytes!` references.
+    // Plugins that were skipped above get an empty embedded slice. Emitting
+    // `include_bytes!` (rather than a `&[u8; N]` literal of one integer per
+    // byte) keeps `plugin_binaries.rs` tiny, which avoids slowing down
+    // compilation of this crate with a multi-megabyte source file.
+    let mut output = String::from("// Generated by build.rs. Do not edit.\n\n");
+
+    for &pkg in plugins {
+        let const_name = pkg.replace('-', "_").to_uppercase();
+        if !available.contains(&pkg) {
+            output.push_str(&format!(
+                "pub(crate) const {}: &[u8] = &[];\n\n",
+                const_name
+            ));
+            continue;
+        }
+        let binary_name = if is_windows_target {
+            format!("{pkg}.exe")
+        } else {
+            pkg.to_string()
+        };
+        let binary_path = plugin_target
+            .join(&target_triple)
+            .join(&profile)
+            .join(&binary_name);
+        let embedded_path = PathBuf::from(&out_dir).join(format!("{pkg}.bin"));
+        std::fs::copy(&binary_path, &embedded_path).unwrap_or_else(|e| {
+            panic!("failed to copy {pkg} binary from {:?}: {e}", binary_path);
+        });
+        output.push_str(&format!(
+            "pub(crate) const {}: &[u8] = include_bytes!({:?});\n\n",
+            const_name, embedded_path,
+        ));
+    }
+
+    std::fs::write(&out_path, &output).unwrap_or_else(|e| {
+        panic!("failed to write {:?}: {e}", out_path);
+    });
+}
+
+/// Resolve the workspace-level `target/` directory.
+///
+/// This crate's `Cargo.toml` is itself the workspace root (it has both
+/// `[package]` and `[workspace]`), so the target dir is `<manifest_dir>/target`
+/// unless overridden by `CARGO_TARGET_DIR`.
+fn resolve_target_dir() -> PathBuf {
+    if let Ok(dir) = std::env::var("CARGO_TARGET_DIR") {
+        return PathBuf::from(dir);
+    }
+    let manifest_dir =
+        std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR must be set by cargo");
+    PathBuf::from(&manifest_dir).join("target")
+}

@@ -153,6 +153,24 @@ fn install_bundled_plugins_creates_iconize_binary() {
             .exists(),
         "terraform.sublime-syntax must be installed"
     );
+    let iconize_name = if cfg!(windows) {
+        "mantis-plugin-iconize.exe"
+    } else {
+        "mantis-plugin-iconize"
+    };
+    let markdown_name = if cfg!(windows) {
+        "mantis-plugin-markdown.exe"
+    } else {
+        "mantis-plugin-markdown"
+    };
+    assert!(
+        plugins_dir.join(iconize_name).exists(),
+        "mantis-plugin-iconize binary must be installed"
+    );
+    assert!(
+        plugins_dir.join(markdown_name).exists(),
+        "mantis-plugin-markdown binary must be installed"
+    );
     std::fs::remove_dir_all(&tmp).ok();
 }
 
