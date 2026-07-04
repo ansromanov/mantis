@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use super::*;
+use crate::plugin::manifest::PluginManifest;
 
 #[test]
 fn load_manifest_from_tempdir() {
@@ -12,7 +13,7 @@ version = "0.1.0"
 description = "A test plugin"
 author = "test"
 entry = "run.sh"
-tv_protocol = "2"
+mantis_protocol = "3"
 "#;
     std::fs::write(dir.join("plugin.toml"), toml).unwrap();
     let manifest = crate::plugin::manifest::load(&dir).unwrap();
@@ -21,7 +22,9 @@ tv_protocol = "2"
     assert_eq!(manifest.description.as_deref(), Some("A test plugin"));
     assert_eq!(manifest.author.as_deref(), Some("test"));
     assert_eq!(manifest.entry, "run.sh");
-    assert_eq!(manifest.tv_protocol, "2");
+    assert_eq!(manifest.mantis_protocol.as_deref(), Some("3"));
+    assert!(manifest.tv_protocol.is_none());
+    assert_eq!(manifest.protocol_version(), Some("3"));
     assert!(manifest.platforms.is_none());
     assert!(manifest.events.is_none());
     assert!(manifest.permissions.is_none());
@@ -38,7 +41,7 @@ version = "2.0.0"
 description = "Full plugin"
 author = "author"
 entry = "main.py"
-tv_protocol = "2"
+mantis_protocol = "3"
 platforms = ["linux", "macos"]
 events = ["on_file_open", "on_keypress"]
 permissions = ["read_files"]
@@ -88,7 +91,7 @@ version = "0.1.0"
 description = "My plugin"
 author = "me"
 entry = "run.sh"
-tv_protocol = "2"
+mantis_protocol = "3"
 "#;
     std::fs::write(sub.join("plugin.toml"), toml).unwrap();
 
@@ -116,7 +119,7 @@ fn discover_populates_events_from_manifest() {
     std::fs::create_dir_all(&sub).unwrap();
     std::fs::write(
         sub.join("plugin.toml"),
-        "name = \"evented\"\nversion = \"0.1.0\"\nentry = \"run.sh\"\ntv_protocol = \"2\"\nevents = [\"on_file_open\", \"on_keypress\"]\n",
+        "name = \"evented\"\nversion = \"0.1.0\"\nentry = \"run.sh\"\nmantis_protocol = \"3\"\nevents = [\"on_file_open\", \"on_keypress\"]\n",
     )
     .unwrap();
 
@@ -125,7 +128,7 @@ fn discover_populates_events_from_manifest() {
     std::fs::create_dir_all(&sub2).unwrap();
     std::fs::write(
         sub2.join("plugin.toml"),
-        "name = \"all-events\"\nversion = \"0.1.0\"\nentry = \"run.sh\"\ntv_protocol = \"2\"\n",
+        "name = \"all-events\"\nversion = \"0.1.0\"\nentry = \"run.sh\"\nmantis_protocol = \"3\"\n",
     )
     .unwrap();
 
@@ -167,7 +170,7 @@ fn discover_filters_by_platform() {
 name = "windows-only"
 version = "0.1.0"
 entry = "tool.exe"
-tv_protocol = "2"
+mantis_protocol = "3"
 platforms = ["windows"]
 "#;
     std::fs::write(sub.join("plugin.toml"), toml).unwrap();
@@ -179,7 +182,7 @@ platforms = ["windows"]
 name = "cross-platform"
 version = "0.1.0"
 entry = "tool.sh"
-tv_protocol = "2"
+mantis_protocol = "3"
 "#;
     std::fs::write(sub2.join("plugin.toml"), toml2).unwrap();
 
@@ -209,7 +212,7 @@ fn discover_sorts_entries_by_name() {
 name = "{name}"
 version = "0.1.0"
 entry = "run.sh"
-tv_protocol = "2"
+mantis_protocol = "3"
 "#
         );
         std::fs::write(sub.join("plugin.toml"), toml).unwrap();
@@ -242,7 +245,7 @@ fn discover_multi_plugin_dir() {
 name = "{name}"
 version = "0.1.0"
 entry = "{entry}"
-tv_protocol = "2"
+mantis_protocol = "3"
 "#
         );
         std::fs::write(sub.join("plugin.toml"), toml).unwrap();
@@ -271,7 +274,7 @@ fn discover_skips_manifest_with_unsafe_name() {
 name = "../escape"
 version = "0.1.0"
 entry = "run.sh"
-tv_protocol = "2"
+mantis_protocol = "3"
 "#;
     std::fs::write(sub.join("plugin.toml"), toml).unwrap();
 
@@ -285,13 +288,13 @@ fn discover_skips_plugin_with_wrong_protocol_version() {
     std::fs::create_dir_all(&dir).unwrap();
 
     // Current-version plugin (should be discovered)
-    let sub = dir.join("good-v2");
+    let sub = dir.join("good-v3");
     std::fs::create_dir_all(&sub).unwrap();
     let toml = r#"
-name = "good-v2"
+name = "good-v3"
 version = "0.1.0"
 entry = "run.sh"
-tv_protocol = "2"
+mantis_protocol = "3"
 "#;
     std::fs::write(sub.join("plugin.toml"), toml).unwrap();
 
@@ -307,20 +310,99 @@ tv_protocol = "1"
     std::fs::write(sub2.join("plugin.toml"), toml2).unwrap();
 
     // Future-version plugin (should be skipped)
-    let sub3 = dir.join("future-v3");
+    let sub3 = dir.join("future-v4");
     std::fs::create_dir_all(&sub3).unwrap();
     let toml3 = r#"
-name = "future-v3"
+name = "future-v4"
 version = "0.2.0"
 entry = "run.sh"
-tv_protocol = "3"
+mantis_protocol = "4"
 "#;
     std::fs::write(sub3.join("plugin.toml"), toml3).unwrap();
 
     let entries = crate::plugin::manifest::discover(&dir);
-    assert_eq!(entries.len(), 1, "only the v2 plugin must be discovered");
-    assert_eq!(entries[0].0, "good-v2");
+    assert_eq!(entries.len(), 1, "only the v3 plugin must be discovered");
+    assert_eq!(entries[0].0, "good-v3");
     std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn discover_accepts_legacy_tv_protocol_alias() {
+    let dir = std::env::temp_dir().join(format!("tv_discover_alias_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+
+    let sub = dir.join("legacy-plugin");
+    std::fs::create_dir_all(&sub).unwrap();
+    let toml = r#"
+name = "legacy-plugin"
+version = "0.1.0"
+entry = "run.sh"
+tv_protocol = "3"
+"#;
+    std::fs::write(sub.join("plugin.toml"), toml).unwrap();
+
+    let entries = crate::plugin::manifest::discover(&dir);
+    assert_eq!(
+        entries.len(),
+        1,
+        "a manifest using only the legacy tv_protocol alias must still be discovered"
+    );
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn protocol_version_prefers_mantis_protocol_when_both_present() {
+    let manifest = PluginManifest {
+        name: "both".into(),
+        version: "0.1.0".into(),
+        description: None,
+        author: None,
+        entry: "run.sh".into(),
+        mantis_protocol: Some("3".into()),
+        tv_protocol: Some("2".into()),
+        platforms: None,
+        events: None,
+        permissions: None,
+    };
+    assert_eq!(
+        manifest.protocol_version(),
+        Some("3"),
+        "mantis_protocol must win when both fields are present"
+    );
+}
+
+#[test]
+fn protocol_version_falls_back_to_tv_protocol_alias() {
+    let manifest = PluginManifest {
+        name: "legacy".into(),
+        version: "0.1.0".into(),
+        description: None,
+        author: None,
+        entry: "run.sh".into(),
+        mantis_protocol: None,
+        tv_protocol: Some("2".into()),
+        platforms: None,
+        events: None,
+        permissions: None,
+    };
+    assert_eq!(manifest.protocol_version(), Some("2"));
+}
+
+#[test]
+fn protocol_version_none_when_neither_field_present() {
+    let manifest = PluginManifest {
+        name: "no-version".into(),
+        version: "0.1.0".into(),
+        description: None,
+        author: None,
+        entry: "run.sh".into(),
+        mantis_protocol: None,
+        tv_protocol: None,
+        platforms: None,
+        events: None,
+        permissions: None,
+    };
+    assert!(manifest.protocol_version().is_none());
 }
 
 #[test]
@@ -330,7 +412,10 @@ fn discover_skips_plugin_with_empty_protocol_version() {
 
     let sub = dir.join("no-version");
     std::fs::create_dir_all(&sub).unwrap();
-    // Missing tv_protocol field — toml fails to deserialize PluginManifest
+    // Missing both mantis_protocol and its tv_protocol alias: the manifest
+    // still parses (both fields are optional), but `protocol_version()`
+    // returns `None`, which never matches `PROTOCOL_VERSION`, so discovery
+    // skips it.
     let toml = r#"
 name = "no-version"
 version = "0.1.0"
@@ -357,7 +442,7 @@ fn discover_platform_match_is_case_insensitive() {
 name = "case-plugin"
 version = "0.1.0"
 entry = "run.sh"
-tv_protocol = "2"
+mantis_protocol = "3"
 platforms = ["{os_upper}"]
 "#
     );

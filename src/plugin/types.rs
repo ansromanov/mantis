@@ -3,6 +3,17 @@
 //! Shared data structures for the plugin system: process vs syntax plugin kinds,
 //! config entries, language provider registrations, and the JSON-line protocol
 //! messages exchanged between `mantis` and plugin subprocesses.
+//!
+//! Protocol 3 additions live here too: [`ToPlugin`] gained `id`/`method`/`params`
+//! fields so it can also carry a `request` event (host → plugin, answered by a
+//! correlated `response` on stdout — see `crate::plugin::process`), and
+//! [`FromPlugin`] gained `id`/`result`/`error` so the reader thread can parse
+//! those `response` lines. [`LanguageProviderRegistration`] gained `priority`
+//! so `PluginManager::provider_for` can break ties between two providers that
+//! register the same extension/capability pair. None of these are `set_*`
+//! state contributions, so they are intentionally absent from
+//! [`PluginContributions`] (see the state teardown contract in
+//! `docs/src/plugin-development.md`).
 
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -102,6 +113,12 @@ pub struct LanguageProviderRegistration {
     pub extensions: Vec<String>,
     /// Capabilities declared by this provider.
     pub capabilities: std::collections::HashSet<Capability>,
+    /// Tie-breaker when two providers register the same extension +
+    /// capability pair (protocol 3+). Higher wins; equal priority keeps
+    /// whichever provider was registered first. Defaults to `0`, so
+    /// protocol 2 plugins (which never send this field) never outrank a
+    /// protocol 3 plugin that explicitly asks for lower priority.
+    pub priority: i64,
 }
 
 /// The color roles a plugin needs to render matching output, sent as
@@ -153,16 +170,47 @@ pub(crate) struct ToPlugin {
     /// so the plugin can verify compatibility.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) protocol_version: Option<String>,
+    /// Request id (protocol 3+). Present only on `request` events; echoed
+    /// back unchanged by the plugin's `response`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) id: Option<u64>,
+    /// Capability-specific method name (protocol 3+). Present only on
+    /// `request` events, e.g. `"fold_regions"`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) method: Option<String>,
+    /// Method-specific parameters (protocol 3+). Present only on `request`
+    /// events.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) params: Option<serde_json::Value>,
 }
 
-/// Message received from a plugin (on its stdout).
+/// The `error` object of a plugin's `response` message (protocol 3+).
+#[derive(Deserialize, Clone, Debug)]
+pub(crate) struct PluginResponseError {
+    pub(crate) message: String,
+}
+
+/// Message received from a plugin (on its stdout). Covers both `action`
+/// messages (the protocol 2 shape) and `response` messages (protocol 3+,
+/// correlated to a host `request` by `id`). The reader thread in
+/// `crate::plugin::process` dispatches on `event` and routes `action` and
+/// `response` messages onto separate channels so a response is never
+/// misinterpreted as an action.
 #[derive(Deserialize)]
 pub(crate) struct FromPlugin {
-    #[allow(dead_code)]
     pub(crate) event: String,
     pub(crate) action: Option<String>,
     #[serde(default)]
     pub(crate) params: serde_json::Value,
+    /// Present on `response` messages: echoes the `id` from the host's `request`.
+    #[serde(default)]
+    pub(crate) id: Option<u64>,
+    /// Present on a successful `response`.
+    #[serde(default)]
+    pub(crate) result: Option<serde_json::Value>,
+    /// Present on a failed `response`.
+    #[serde(default)]
+    pub(crate) error: Option<PluginResponseError>,
 }
 
 /// Tracks what application state a plugin has contributed so that disabling

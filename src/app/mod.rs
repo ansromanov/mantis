@@ -58,7 +58,7 @@ mod util;
 use loader::Loader;
 
 pub use types::{DiffMode, Focus, StatusMessage};
-pub(crate) use types::{HighlightCacheKey, HighlightCacheValue};
+pub(crate) use types::{HighlightCacheKey, HighlightCacheValue, PendingKeypress};
 pub(crate) use util::{deleted_set, diff_line_style, rect_contains};
 
 /// Central application state. Holds the file tree, content buffers, overlay
@@ -281,6 +281,20 @@ pub struct App {
     plugin_is_opening_file: bool,
     /// Most recent plugin message, shown in the status bar.
     pub plugin_message: Option<String>,
+    /// Most recent `plugin_error` action (protocol 3+), shown in the status
+    /// bar with error styling. Distinct from `plugin_message`, which is for
+    /// routine `show_message` text.
+    pub plugin_error: Option<String>,
+    /// A keypress dispatched to `on_keypress` subscribers, awaiting a
+    /// `key_handled` reply before its deadline (protocol 3+). `None` when no
+    /// keypress is currently in flight. See `key_handlers::mod` for where
+    /// this is set and `refresh::process_pending_keypress` for where it is
+    /// resolved.
+    pub(crate) pending_keypress: Option<PendingKeypress>,
+    /// Set to `true` by the `key_handled` action handler when a reply arrives
+    /// for the current `pending_keypress`. Consumed and reset by
+    /// `process_pending_keypress` on the next tick.
+    pub(crate) pending_keypress_handled: bool,
     /// Tracks what application state each plugin has contributed so that
     /// disabling or crashing the plugin tears down exactly its output.
     /// Populated by `handle_plugin_action` and consumed by

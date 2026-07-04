@@ -1125,3 +1125,40 @@ fn right_segment_flush_at_various_widths() {
         );
     }
 }
+
+#[test]
+fn plugin_error_renders_in_bar() {
+    let mut app = make_app();
+    app.plugin_error = Some("[markdown] failed to render (on_file_open)".to_string());
+    let text = render_bar(&app);
+    assert!(
+        text.contains("[markdown] failed to render (on_file_open)"),
+        "plugin_error text should appear in the status bar, got: {text:?}"
+    );
+}
+
+#[test]
+fn plugin_error_absent_by_default() {
+    let app = make_app();
+    assert!(app.plugin_error.is_none());
+    let text = render_bar(&app);
+    assert!(!text.contains("markdown"), "no plugin_error means no badge");
+}
+
+#[test]
+fn plugin_error_outlasts_status_message_on_narrow_bar() {
+    // plugin_error (P_ERR) must survive eliding alongside other error
+    // indicators even when a lower-priority status_message (P_META) does not.
+    let mut app = make_app();
+    app.status_message = Some(StatusMessage::new("hello", std::time::Instant::now()));
+    app.plugin_error = Some("boom".to_string());
+    let text = render_bar_width(&app, 15);
+    assert!(
+        !text.contains("hello"),
+        "status message (P_META) should be elided before plugin_error"
+    );
+    assert!(
+        text.contains("boom"),
+        "plugin_error (P_ERR) must survive eliding, got: {text:?}"
+    );
+}

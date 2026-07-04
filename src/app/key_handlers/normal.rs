@@ -22,7 +22,12 @@ impl App {
     /// Handles all key events when no overlay is active. Dispatches global
     /// actions (quit, help, search, reload, etc.) and routes to tree/content
     /// handlers based on `self.focus`.
-    pub(super) fn handle_normal_key(&mut self, key: KeyEvent) {
+    ///
+    /// `pub(crate)` rather than `pub(super)`: `app::refresh`'s
+    /// `process_pending_keypress`/`preempt_pending_keypress` (protocol 3+
+    /// `on_keypress` key consumption) call this directly from a sibling
+    /// submodule of `key_handlers`, not just from within `key_handlers`.
+    pub(crate) fn handle_normal_key(&mut self, key: KeyEvent) {
         // Clear transient status messages on the next handled keypress.
         self.status_message = None;
 

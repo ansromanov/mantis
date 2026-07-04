@@ -71,6 +71,17 @@ impl StatusMessage {
     }
 }
 
+/// A keypress dispatched to `on_keypress` subscribers (protocol 3+), waiting
+/// to see whether any of them claims it via a `key_handled` action before
+/// `deadline`. If claimed in time, the key is swallowed — no built-in
+/// binding fires for it; if the deadline passes first, normal-mode handling
+/// falls through exactly as it would for a plugin that never replies.
+#[derive(Debug)]
+pub(crate) struct PendingKeypress {
+    pub(crate) key: crossterm::event::KeyEvent,
+    pub(crate) deadline: Instant,
+}
+
 /// Cache key for syntax-highlighted visible window. When all fields match the
 /// current rendering state the cached highlight spans can be reused without
 /// re-invoking syntect.

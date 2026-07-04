@@ -7,6 +7,14 @@
 //! filesystem watcher is installed (reloading only after events go quiet for
 //! `TREE_RELOAD_DEBOUNCE`, to coalesce bursts), with a periodic timer fallback
 //! when no watcher could be installed so the view never goes permanently stale.
+//!
+//! `tick` also resolves any `pending_keypress` (protocol 3+ `on_keypress` key
+//! consumption): once a `key_handled` reply arrives or the deadline passes,
+//! `process_pending_keypress` either swallows the key or falls through to
+//! normal-mode handling, following the same deferred/debounced pattern as the
+//! search debounce below. `handle_plugin_action` grew two protocol 3 cases:
+//! `key_handled` (feeds that resolution) and `plugin_error` (recorded via
+//! `PluginManager` and logged, distinct from routine `show_message` text).
 
 use std::time::Duration;
 
@@ -25,6 +33,7 @@ impl App {
     pub fn tick(&mut self) {
         self.drain_loads();
         self.drain_plugin_actions();
+        self.process_pending_keypress();
         if self.auto_watch && self.drain_file_watch() {
             self.reload_content();
         }
@@ -236,6 +245,41 @@ impl App {
             .request(LoadRequest::SetExtraSyntaxes(self.extra_syntaxes.clone()));
     }
 
+    /// Resolves `pending_keypress` (protocol 3+ `on_keypress` key
+    /// consumption), called once per tick after `drain_plugin_actions` so a
+    /// `key_handled` reply received this tick is seen immediately.
+    ///
+    /// If `pending_keypress_handled` was set (a subscribed plugin replied
+    /// `key_handled: true` for this key), the key is swallowed — cleared
+    /// without running normal-mode handling. Otherwise, once the deadline
+    /// passes, it falls through to `handle_normal_key` exactly as it would
+    /// without any subscriber. A key still within its window is left pending.
+    pub(crate) fn process_pending_keypress(&mut self) {
+        let Some(deadline) = self.pending_keypress.as_ref().map(|p| p.deadline) else {
+            return;
+        };
+        if self.pending_keypress_handled {
+            self.pending_keypress = None;
+            self.pending_keypress_handled = false;
+        } else if deadline <= self.now() {
+            // unwrap: presence just confirmed by the `let Some` above.
+            let key = self.pending_keypress.take().unwrap().key;
+            self.handle_normal_key(key);
+        }
+    }
+
+    /// Immediately resolves a stale `pending_keypress` by falling through to
+    /// normal-mode handling, without waiting for its deadline. Called when a
+    /// new keypress arrives while one is still outstanding (e.g. rapid
+    /// typing within one tick), so no keystroke is dropped waiting on a
+    /// plugin reply that will never reference this new key.
+    pub(crate) fn preempt_pending_keypress(&mut self) {
+        if let Some(pending) = self.pending_keypress.take() {
+            self.pending_keypress_handled = false;
+            self.handle_normal_key(pending.key);
+        }
+    }
+
     /// Drains pending plugin actions and handles known action types.
     fn drain_plugin_actions(&mut self) {
         if self.plugin_manager.is_empty() {
@@ -282,8 +326,49 @@ impl App {
                 self.handle_plugin_register_language_provider(name, params);
             }
             "set_fold_regions" => self.handle_plugin_set_fold_regions(name, params),
+            "key_handled" => self.handle_plugin_key_handled(params),
+            "plugin_error" => self.handle_plugin_error(name, params),
             _ => {}
         }
+    }
+
+    /// Handles a `key_handled` action (protocol 3+): if `handled: true`,
+    /// marks the current `pending_keypress` as claimed so
+    /// `process_pending_keypress` swallows it on the next tick instead of
+    /// falling through to normal-mode handling. A reply that arrives with no
+    /// keypress pending (e.g. a stray or duplicate reply) is a harmless noop.
+    fn handle_plugin_key_handled(&mut self, params: &serde_json::Value) {
+        if params.get("handled").and_then(|v| v.as_bool()) == Some(true) {
+            self.pending_keypress_handled = true;
+        }
+    }
+
+    /// Handles a `plugin_error` action (protocol 3+): records it in the
+    /// plugin's rotating stderr log and via `PluginManager::record_plugin_error`
+    /// (so the plugin picker can badge it), and shows it in the status bar
+    /// with error styling — distinct from routine `show_message` text, which
+    /// this is not treated as.
+    fn handle_plugin_error(&mut self, name: &str, params: &serde_json::Value) {
+        let message = params
+            .get("message")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown error")
+            .to_string();
+        let context = params
+            .get("context")
+            .and_then(|v| v.as_str())
+            .map(str::to_string);
+        let log_line = match &context {
+            Some(c) => format!("[plugin_error] {c}: {message}"),
+            None => format!("[plugin_error] {message}"),
+        };
+        self.plugin_manager.log_plugin_error_line(name, &log_line);
+        self.plugin_manager
+            .record_plugin_error(name, message.clone(), context.clone());
+        self.plugin_error = Some(match &context {
+            Some(c) => format!("[{name}] {message} ({c})"),
+            None => format!("[{name}] {message}"),
+        });
     }
 
     fn handle_plugin_show_message(&mut self, name: &str, params: &serde_json::Value) {
@@ -394,12 +479,16 @@ impl App {
                     .collect()
             })
             .unwrap_or_default();
+        let priority = params.get("priority").and_then(|v| v.as_i64()).unwrap_or(0);
         let reg = crate::plugin::LanguageProviderRegistration {
             plugin_name: name.to_string(),
             extensions,
             capabilities,
+            priority,
         };
-        self.plugin_manager.register_provider(reg);
+        if let Some(warning) = self.plugin_manager.register_provider(reg) {
+            self.plugin_message = Some(warning);
+        }
     }
 
     fn handle_plugin_set_fold_regions(&mut self, name: &str, params: &serde_json::Value) {

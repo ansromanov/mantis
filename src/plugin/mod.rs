@@ -10,7 +10,7 @@
 //!    stdin, so slow or unresponsive plugins cannot block the event loop on
 //!    writes either.
 //!
-//!    Protocol (tv → plugin, one JSON object per line on stdin):
+//!    Protocol (mantis → plugin, one JSON object per line on stdin):
 //!
 //!    ```json
 //!    {"event":"init"}
@@ -19,14 +19,24 @@
 //!    {"event":"on_selection_change","path":"/some/file"}
 //!    {"event":"on_quit"}
 //!    {"event":"shutdown"}
+//!    {"event":"request","id":1,"method":"fold_regions","params":{"path":"/some/file"}}
 //!    ```
 //!
-//!    Protocol (plugin → tv, one JSON object per line on stdout):
+//!    Protocol (plugin → mantis, one JSON object per line on stdout):
 //!
 //!    ```json
 //!    {"event":"action","action":"show_message","params":{"message":"hello"}}
 //!    {"event":"action","action":"open_file","params":{"path":"/tmp/x"}}
+//!    {"event":"action","action":"key_handled","params":{"handled":true}}
+//!    {"event":"action","action":"plugin_error","params":{"message":"failed"}}
+//!    {"event":"response","id":1,"result":{"regions":[[0,5]]}}
 //!    ```
+//!
+//!    The `request`/`response` pair (protocol 3+) is additive to the
+//!    event/action stream: a host `request` is answered by a correlated
+//!    plugin `response` matched on `id`, with a per-plugin timeout if none
+//!    arrives (see `crate::plugin::manager::PluginManager::send_request` and
+//!    `poll_requests`).
 //!
 //! 2. **Syntax plugins** — provide a `.sublime-syntax` file that is loaded
 //!    into the syntect highlighter at startup. No subprocess is spawned.
@@ -37,14 +47,19 @@
 /// Current plugin IPC protocol version.
 ///
 /// Bumped on incompatible protocol changes. Plugins declare their protocol
-/// version in `plugin.toml` via the `tv_protocol` field. Plugins whose
-/// declared version does not match this constant are silently skipped during
-/// discovery to prevent miscommunication.
+/// version in `plugin.toml` via the `mantis_protocol` field (`tv_protocol` is
+/// still accepted as a back-compat alias). Plugins whose declared version
+/// does not match this constant are silently skipped during discovery to
+/// prevent miscommunication.
 ///
 /// History:
 /// - `"1"` — initial protocol (0.7.x releases)
 /// - `"2"` — language providers, event subscriptions, protocol hardening (0.8.x)
-pub(crate) const PROTOCOL_VERSION: &str = "2";
+/// - `"3"` — request/response correlation (`request`/`response` events),
+///   `plugin_error` action, `on_keypress` key consumption (`key_handled`),
+///   `priority` on `register_language_provider`, manifest field renamed
+///   `tv_protocol` -> `mantis_protocol` (alias kept) (0.14.x)
+pub(crate) const PROTOCOL_VERSION: &str = "3";
 
 pub mod install;
 pub mod manifest;

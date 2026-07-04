@@ -9,6 +9,16 @@
 //! wired up here: `normal` (no overlay), `overlay` (search/picker editing),
 //! and `editor` (command dispatch and
 //! external-editor suspend/resume).
+//!
+//! Protocol 3+ key consumption: when at least one running plugin subscribes
+//! to `on_keypress`, a normal-mode key is not handled immediately. Instead
+//! `App::pending_keypress` is set with a `KEY_CONSUME_TIMEOUT` deadline, and
+//! `App::process_pending_keypress` (called once per tick, see `app::refresh`)
+//! decides whether to swallow it (a `key_handled` reply arrived in time) or
+//! fall through to `handle_normal_key` (the deadline passed with no reply).
+//! A new key arriving while one is already pending immediately falls through
+//! the stale one via `App::preempt_pending_keypress` before being dispatched,
+//! so no keystroke is dropped waiting on a plugin that will never see it.
 
 mod editor;
 mod normal;
@@ -24,13 +34,26 @@ mod mod_tests;
 #[path = "normal_test.rs"]
 mod normal_tests;
 
+use std::time::Duration;
+
 use crossterm::event::KeyCode;
 
-use super::App;
+use super::{App, PendingKeypress};
 use crate::config::static_keys;
 
 /// Page size for help popup scrolling (matches `handle_list_picker_key`).
 const HELP_PAGE_SIZE: usize = 10;
+
+/// How long `App` waits for a `key_handled` reply before falling through to
+/// normal-mode handling (protocol 3+ `on_keypress` key consumption). A bit
+/// more than one ~16ms tick, so a plugin gets one full round trip. Longer
+/// under `cfg(test)` so a real spawned subprocess's round trip (fork/exec +
+/// pipe I/O) isn't racing a razor-thin window, matching the `REQUEST_TIMEOUT`
+/// pattern in `crate::plugin::manager`.
+#[cfg(not(test))]
+const KEY_CONSUME_TIMEOUT: Duration = Duration::from_millis(20);
+#[cfg(test)]
+const KEY_CONSUME_TIMEOUT: Duration = Duration::from_secs(2);
 
 impl App {
     /// Dispatches a key event. Overlays (help, theme, history, search) are
@@ -104,7 +127,27 @@ impl App {
         } else if self.goto_line.is_some() {
             self.handle_goto_line_key(key);
         } else {
-            self.plugin_manager.on_keypress(&key);
+            self.dispatch_normal_keypress(key);
+        }
+    }
+
+    /// Dispatches a normal-mode keypress: notifies plugins, then either runs
+    /// the built-in handler immediately (no plugin subscribes to
+    /// `on_keypress`) or defers it for up to `KEY_CONSUME_TIMEOUT` to give a
+    /// subscriber a chance to claim it via `key_handled` (protocol 3+). See
+    /// the module doc for the full deferred-consumption flow.
+    fn dispatch_normal_keypress(&mut self, key: crossterm::event::KeyEvent) {
+        // A previous keypress may still be waiting on a `key_handled` reply
+        // (e.g. rapid typing within one tick); resolve it now by falling
+        // through, so it is never silently dropped.
+        self.preempt_pending_keypress();
+        self.plugin_manager.on_keypress(&key);
+        if self.plugin_manager.has_keypress_subscriber() {
+            self.pending_keypress = Some(PendingKeypress {
+                key,
+                deadline: self.now() + KEY_CONSUME_TIMEOUT,
+            });
+        } else {
             self.handle_normal_key(key);
         }
     }

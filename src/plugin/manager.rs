@@ -4,9 +4,28 @@
 //! instances, and any buffered action responses. It provides the public API
 //! that `App` calls on file-open, keypress, theme-change, selection-change,
 //! and shutdown events.
+//!
+//! Protocol 3 additions: [`PluginManager::send_request`]/[`poll_requests`]
+//! implement the host side of the `request`/`response` correlation (see
+//! `crate::plugin::process`), tracking outstanding requests in
+//! `pending_requests` and timing them out after [`REQUEST_TIMEOUT`] without
+//! killing the plugin. [`provider_for`] now picks the highest-`priority`
+//! registration when several providers claim the same extension +
+//! capability, and [`register_provider`] raises a one-time conflict warning
+//! the first time that happens for a given pair. A `plugin_error` action
+//! (reported via [`record_plugin_error`]) is tracked in `last_plugin_error`,
+//! a struct parallel to the existing crash-diagnostics `last_crash` map, so
+//! it can surface in the plugin picker's badge without marking the plugin
+//! dead.
+//!
+//! [`provider_for`]: PluginManager::provider_for
+//! [`register_provider`]: PluginManager::register_provider
+//! [`record_plugin_error`]: PluginManager::record_plugin_error
+//! [`poll_requests`]: PluginManager::poll_requests
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 use crate::plugin::install::default_plugin_dir;
 use crate::plugin::process::Plugin;
@@ -22,6 +41,30 @@ pub(crate) struct CrashInfo {
     pub(crate) log_path: Option<PathBuf>,
 }
 
+/// Diagnostics captured from a `plugin_error` action (protocol 3+). Parallel
+/// to [`CrashInfo`], but for a *live* plugin reporting a soft failure rather
+/// than a dead one — it never marks the plugin as not running.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub(crate) struct PluginErrorInfo {
+    pub(crate) message: String,
+    pub(crate) context: Option<String>,
+}
+
+/// A `request` awaiting its correlated `response` (protocol 3+).
+struct PendingRequest {
+    plugin_name: String,
+    deadline: Instant,
+}
+
+/// How long the host waits for a plugin's `response` before treating the
+/// request as timed out (surfaced the same way as `plugin_error`, without
+/// killing the plugin). Shortened under `cfg(test)` so timeout tests don't
+/// need multi-hundred-millisecond real sleeps.
+#[cfg(not(test))]
+pub(crate) const REQUEST_TIMEOUT: Duration = Duration::from_millis(300);
+#[cfg(test)]
+pub(crate) const REQUEST_TIMEOUT: Duration = Duration::from_secs(2);
+
 /// Manages discovery, lifecycle, and hook dispatch for all plugins.
 pub(crate) struct PluginManager {
     entries: Vec<(String, PluginEntry)>,
@@ -31,10 +74,23 @@ pub(crate) struct PluginManager {
     /// Diagnostics for the most recent crash of each plugin, keyed by name.
     /// Cleared on a successful manual restart via `activate_one`.
     last_crash: HashMap<String, CrashInfo>,
+    /// Diagnostics for the most recent `plugin_error` action or request
+    /// timeout for each (still-running) plugin, keyed by name. Cleared on a
+    /// successful manual restart via `activate_one`.
+    last_plugin_error: HashMap<String, PluginErrorInfo>,
     spawn_errors: Vec<String>,
     active_theme: Option<String>,
     active_theme_colors: Option<ThemeColorsMsg>,
     provider_registrations: Vec<LanguageProviderRegistration>,
+    /// (extension, capability) pairs that have already produced a conflict
+    /// warning, so the status bar is only told about each conflict once.
+    provider_conflicts_warned: HashSet<(String, Capability)>,
+    /// Counter for allocating `request` ids, incremented per outstanding
+    /// request across all plugins. Never reused while a request with that id
+    /// is outstanding.
+    next_request_id: u64,
+    /// Requests sent via `send_request` awaiting a `response`, keyed by id.
+    pending_requests: HashMap<u64, PendingRequest>,
 }
 
 impl PluginManager {
@@ -45,31 +101,194 @@ impl PluginManager {
             pending_actions: Vec::new(),
             dead_plugins: Vec::new(),
             last_crash: HashMap::new(),
+            last_plugin_error: HashMap::new(),
             spawn_errors: Vec::new(),
             active_theme: None,
             active_theme_colors: None,
             provider_registrations: Vec::new(),
+            provider_conflicts_warned: HashSet::new(),
+            next_request_id: 0,
+            pending_requests: HashMap::new(),
         }
     }
 
-    /// Registers a language provider declaration.
-    pub(crate) fn register_provider(&mut self, reg: LanguageProviderRegistration) {
+    /// Registers a language provider declaration. Returns a one-time
+    /// status-bar warning string the first time this (extension, capability)
+    /// pair conflicts with another plugin's registration — `None` otherwise
+    /// (including on every later registration of an already-warned pair).
+    pub(crate) fn register_provider(
+        &mut self,
+        reg: LanguageProviderRegistration,
+    ) -> Option<String> {
         self.provider_registrations
             .retain(|r| r.plugin_name != reg.plugin_name);
+
+        let mut warning = None;
+        'outer: for ext in &reg.extensions {
+            for cap in &reg.capabilities {
+                let already_warned = self
+                    .provider_conflicts_warned
+                    .contains(&(ext.clone(), cap.clone()));
+                if already_warned {
+                    continue;
+                }
+                let Some(existing) = self.provider_registrations.iter().find(|r| {
+                    r.plugin_name != reg.plugin_name
+                        && r.extensions.iter().any(|e| e == ext)
+                        && r.capabilities.contains(cap)
+                }) else {
+                    continue;
+                };
+                self.provider_conflicts_warned
+                    .insert((ext.clone(), cap.clone()));
+                warning = Some(format!(
+                    "Plugins '{}' and '{}' both register '{}' for .{ext}; higher priority wins",
+                    existing.plugin_name,
+                    reg.plugin_name,
+                    capability_label(cap),
+                ));
+                break 'outer;
+            }
+        }
+
         self.provider_registrations.push(reg);
+        warning
     }
 
-    /// Returns the first registered provider whose extensions include `ext`
-    /// (case-insensitive) and whose capabilities include `cap`, if any.
+    /// Returns the registered provider whose extensions include `ext`
+    /// (case-insensitive) and whose capabilities include `cap`, breaking ties
+    /// between multiple matches by highest `priority`; equal priority keeps
+    /// whichever was registered first (earliest in registration order).
     pub(crate) fn provider_for(
         &self,
         ext: &str,
         cap: &Capability,
     ) -> Option<&LanguageProviderRegistration> {
         let ext_lower = ext.to_ascii_lowercase();
-        self.provider_registrations
+        let mut best: Option<&LanguageProviderRegistration> = None;
+        for reg in self.provider_registrations.iter().filter(|r| {
+            r.extensions.iter().any(|e| e == &ext_lower) && r.capabilities.contains(cap)
+        }) {
+            if best.is_none_or(|cur| reg.priority > cur.priority) {
+                best = Some(reg);
+            }
+        }
+        best
+    }
+
+    /// Sends a `request` to the named running plugin, allocating a fresh id
+    /// and recording it as pending with a [`REQUEST_TIMEOUT`] deadline.
+    /// Returns the allocated id, or `None` if no plugin with that name is
+    /// currently running.
+    #[allow(dead_code)]
+    pub(crate) fn send_request(
+        &mut self,
+        plugin_name: &str,
+        method: &str,
+        params: serde_json::Value,
+    ) -> Option<u64> {
+        let plugin = self.plugins.iter_mut().find(|p| p.name == plugin_name)?;
+        let id = self.next_request_id;
+        self.next_request_id = self.next_request_id.wrapping_add(1);
+        plugin.send(&ToPlugin {
+            event: "request".into(),
+            path: None,
+            key: None,
+            theme: None,
+            colors: None,
+            protocol_version: None,
+            id: Some(id),
+            method: Some(method.to_string()),
+            params: Some(params),
+        });
+        self.pending_requests.insert(
+            id,
+            PendingRequest {
+                plugin_name: plugin_name.to_string(),
+                deadline: Instant::now() + REQUEST_TIMEOUT,
+            },
+        );
+        Some(id)
+    }
+
+    /// Called once per tick to collect completed request/response pairs:
+    /// drains every plugin's buffered `response` messages matched by id, and
+    /// treats any pending request whose deadline has passed as a timeout
+    /// error, recording it exactly like a `plugin_error` (see
+    /// `record_plugin_error`) without killing the plugin. Companion to
+    /// `drain_actions`/`take_actions`.
+    #[allow(dead_code)]
+    pub(crate) fn poll_requests(&mut self) -> Vec<(u64, Result<serde_json::Value, String>)> {
+        let mut results = Vec::new();
+        for plugin in &mut self.plugins {
+            for (id, result) in plugin.drain_responses() {
+                if self.pending_requests.remove(&id).is_some() {
+                    results.push((id, result));
+                }
+                // Unknown or already-timed-out id: silently dropped.
+            }
+        }
+        let now = Instant::now();
+        let expired: Vec<u64> = self
+            .pending_requests
             .iter()
-            .find(|r| r.extensions.iter().any(|e| e == &ext_lower) && r.capabilities.contains(cap))
+            .filter(|(_, pending)| pending.deadline <= now)
+            .map(|(id, _)| *id)
+            .collect();
+        for id in expired {
+            let Some(pending) = self.pending_requests.remove(&id) else {
+                continue;
+            };
+            let message = format!("request {id} to plugin '{}' timed out", pending.plugin_name);
+            self.record_plugin_error(
+                &pending.plugin_name,
+                message.clone(),
+                Some("request".into()),
+            );
+            results.push((id, Err(message)));
+        }
+        results
+    }
+
+    /// Records a `plugin_error` action (or request timeout) for `name`,
+    /// replacing any previous entry, so the plugin picker can badge it and
+    /// the status bar can surface it — without marking the plugin dead.
+    pub(crate) fn record_plugin_error(
+        &mut self,
+        name: &str,
+        message: String,
+        context: Option<String>,
+    ) {
+        self.last_plugin_error
+            .insert(name.to_string(), PluginErrorInfo { message, context });
+    }
+
+    /// Returns the most recently recorded `plugin_error` diagnostics for
+    /// `name`, if any.
+    #[allow(dead_code)]
+    pub(crate) fn plugin_error_for(&self, name: &str) -> Option<&PluginErrorInfo> {
+        self.last_plugin_error.get(name)
+    }
+
+    /// Appends `line` to the named plugin's rotating stderr log, if it has
+    /// one. Used to record a `plugin_error` action's message in the same
+    /// on-disk diagnostics as crash output.
+    pub(crate) fn log_plugin_error_line(&self, name: &str, line: &str) {
+        if let Some(plugin) = self.plugins.iter().find(|p| p.name == name) {
+            if let Some(path) = plugin.log_path() {
+                crate::plugin::process::append_plugin_log_line(&path, line);
+            }
+        }
+    }
+
+    /// Returns `true` if any currently running plugin *explicitly*
+    /// subscribes to `on_keypress` (see `Plugin::wants_key_consumption`), so
+    /// the caller can decide whether to defer normal-mode key handling for a
+    /// chance at `key_handled`. Plugins that receive `on_keypress` only via
+    /// the empty-`events` back-compat wildcard do not count — they never
+    /// asked to gate input and would otherwise delay every keystroke.
+    pub(crate) fn has_keypress_subscriber(&self) -> bool {
+        self.plugins.iter().any(|p| p.wants_key_consumption())
     }
 
     /// Spawns all enabled *process* plugins and sends them the `init` event.
@@ -99,6 +318,9 @@ impl PluginManager {
                 theme: self.active_theme.clone(),
                 colors: self.active_theme_colors.clone(),
                 protocol_version: Some(crate::plugin::PROTOCOL_VERSION.into()),
+                id: None,
+                method: None,
+                params: None,
             });
             self.plugins.push(plugin);
         }
@@ -121,6 +343,9 @@ impl PluginManager {
                 theme: None,
                 colors: None,
                 protocol_version: None,
+                id: None,
+                method: None,
+                params: None,
             });
         }
         for mut plugin in self.plugins.drain(..) {
@@ -142,6 +367,9 @@ impl PluginManager {
                 theme: None,
                 colors: None,
                 protocol_version: None,
+                id: None,
+                method: None,
+                params: None,
             });
         }
     }
@@ -160,6 +388,9 @@ impl PluginManager {
                 theme: None,
                 colors: None,
                 protocol_version: None,
+                id: None,
+                method: None,
+                params: None,
             });
         }
     }
@@ -180,6 +411,9 @@ impl PluginManager {
                 theme: Some(theme_name.into()),
                 colors: self.active_theme_colors.clone(),
                 protocol_version: None,
+                id: None,
+                method: None,
+                params: None,
             });
         }
     }
@@ -198,6 +432,9 @@ impl PluginManager {
                 theme: None,
                 colors: None,
                 protocol_version: None,
+                id: None,
+                method: None,
+                params: None,
             });
         }
     }
@@ -216,6 +453,9 @@ impl PluginManager {
                 theme: None,
                 colors: None,
                 protocol_version: None,
+                id: None,
+                method: None,
+                params: None,
             });
         }
     }
@@ -287,8 +527,9 @@ impl PluginManager {
     /// in order. For process plugins "active" means a running subprocess;
     /// syntax plugins have no subprocess, so their `enabled` flag stands in
     /// (it drives the palette checkbox and is kept current via
-    /// [`set_enabled`]). `crash_badge` is a short diagnostic summary when the
-    /// plugin isn't running and last exited unexpectedly.
+    /// [`set_enabled`]). `crash_badge` is a short diagnostic summary: either
+    /// why the plugin isn't running (it last exited unexpectedly), or — for
+    /// a still-running plugin — the most recent `plugin_error` it reported.
     pub(crate) fn plugin_entries(&self) -> Vec<(String, bool, PluginKind, Option<String>)> {
         self.entries
             .iter()
@@ -301,7 +542,7 @@ impl PluginManager {
                 let crash_badge = if !active {
                     self.last_crash.get(name).map(crash_summary)
                 } else {
-                    None
+                    self.last_plugin_error.get(name).map(plugin_error_summary)
                 };
                 (name.clone(), active, entry.kind.clone(), crash_badge)
             })
@@ -356,6 +597,9 @@ impl PluginManager {
             theme: self.active_theme.clone(),
             colors: self.active_theme_colors.clone(),
             protocol_version: Some(crate::plugin::PROTOCOL_VERSION.into()),
+            id: None,
+            method: None,
+            params: None,
         });
         if let Some(file) = current_file {
             let path_s = file.to_string_lossy().into_owned();
@@ -366,6 +610,9 @@ impl PluginManager {
                 theme: None,
                 colors: None,
                 protocol_version: None,
+                id: None,
+                method: None,
+                params: None,
             });
             plugin.send(&ToPlugin {
                 event: "on_selection_change".into(),
@@ -374,10 +621,14 @@ impl PluginManager {
                 theme: None,
                 colors: None,
                 protocol_version: None,
+                id: None,
+                method: None,
+                params: None,
             });
         }
         self.plugins.push(plugin);
         self.last_crash.remove(name);
+        self.last_plugin_error.remove(name);
         Ok(())
     }
 
@@ -395,6 +646,9 @@ impl PluginManager {
             theme: None,
             colors: None,
             protocol_version: None,
+            id: None,
+            method: None,
+            params: None,
         });
         plugin.close_in_background();
     }
@@ -408,5 +662,27 @@ fn crash_summary(info: &CrashInfo) -> String {
         (Some(line), None) => line.clone(),
         (None, Some(path)) => format!("log: {}", path.display()),
         (None, None) => "exited unexpectedly".to_string(),
+    }
+}
+
+/// Renders a `PluginErrorInfo` into the short summary shown next to a
+/// still-running plugin's entry in the plugin picker (a `!` badge), parallel
+/// to `crash_summary` for dead plugins.
+fn plugin_error_summary(info: &PluginErrorInfo) -> String {
+    match &info.context {
+        Some(context) => format!("{} ({context})", info.message),
+        None => info.message.clone(),
+    }
+}
+
+/// Human-readable label for a capability, used in the provider-conflict
+/// status-bar warning.
+fn capability_label(cap: &Capability) -> &'static str {
+    match cap {
+        Capability::Highlight => "highlight",
+        Capability::Fold => "fold",
+        Capability::Hover => "hover",
+        Capability::Diagnostics => "diagnostics",
+        Capability::Definition => "definition",
     }
 }
