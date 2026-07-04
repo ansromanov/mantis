@@ -17,7 +17,7 @@
 //! `working_tree_diff` (all changes vs HEAD), `staged_diff` (index vs HEAD),
 //! and `unstaged_diff` (worktree vs index).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Mutex, OnceLock};
@@ -426,15 +426,70 @@ pub fn file_diff(repo_dir: &Path, rev: &str, file: &Path) -> Vec<String> {
     }
 }
 
+/// Maximum number of files to keep in the blame cache. Blame is only shown
+/// for the focused file/selection, so a small cache is sufficient.
+const BLAME_CACHE_CAPACITY: usize = 16;
+
 struct CachedBlame {
     mtime: SystemTime,
     lines: Vec<BlameLine>,
 }
 
-static BLAME_CACHE: OnceLock<Mutex<HashMap<PathBuf, CachedBlame>>> = OnceLock::new();
+/// Bounded LRU cache for blame results. Evicts the least-recently-used entry
+/// when the cache exceeds `BLAME_CACHE_CAPACITY`.
+struct BlameCache {
+    map: HashMap<PathBuf, CachedBlame>,
+    order: VecDeque<PathBuf>,
+}
 
-fn blame_cache() -> &'static Mutex<HashMap<PathBuf, CachedBlame>> {
-    BLAME_CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+impl BlameCache {
+    fn new() -> Self {
+        Self {
+            map: HashMap::new(),
+            order: VecDeque::new(),
+        }
+    }
+
+    fn get(&mut self, path: &Path) -> Option<&CachedBlame> {
+        if self.map.contains_key(path) {
+            // Move to back (most-recently-used).
+            let key = path.to_path_buf();
+            if let Some(pos) = self.order.iter().position(|p| p == path) {
+                self.order.remove(pos);
+                self.order.push_back(key);
+            }
+            self.map.get(path)
+        } else {
+            None
+        }
+    }
+
+    fn insert(&mut self, key: PathBuf, value: CachedBlame) {
+        if self.map.contains_key(&key) {
+            // Update existing entry and promote.
+            if let Some(pos) = self.order.iter().position(|p| *p == key) {
+                self.order.remove(pos);
+            }
+            self.order.push_back(key.clone());
+            self.map.insert(key, value);
+            return;
+        }
+
+        if self.map.len() >= BLAME_CACHE_CAPACITY {
+            if let Some(oldest) = self.order.pop_front() {
+                self.map.remove(&oldest);
+            }
+        }
+
+        self.order.push_back(key.clone());
+        self.map.insert(key, value);
+    }
+}
+
+static BLAME_CACHE: OnceLock<Mutex<BlameCache>> = OnceLock::new();
+
+fn blame_cache() -> &'static Mutex<BlameCache> {
+    BLAME_CACHE.get_or_init(|| Mutex::new(BlameCache::new()))
 }
 
 /// Returns per-line git blame annotations for `file` in the repository at
@@ -447,7 +502,7 @@ pub fn file_blame(repo_dir: &Path, file: &Path) -> Vec<BlameLine> {
     };
 
     {
-        let guard = blame_cache().lock().unwrap_or_else(|p| p.into_inner());
+        let mut guard = blame_cache().lock().unwrap_or_else(|p| p.into_inner());
         if let Some(cached) = guard.get(file) {
             if cached.mtime == mtime {
                 return cached.lines.clone();
