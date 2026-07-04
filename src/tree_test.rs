@@ -81,6 +81,57 @@ fn expanded_dir_shows_children_at_depth_1() {
 }
 
 #[test]
+fn three_level_nesting_expands_correctly() {
+    // Regression test for the single-walk rewrite of `build_visible`: entries
+    // must only appear when every ancestor directory up to root is expanded,
+    // and depth tracks the pre-collected `children` map correctly at 3+ levels.
+    let root = temp_dir("deep");
+    let a = root.join("a");
+    let b = a.join("b");
+    fs::create_dir_all(&b).unwrap();
+    fs::write(b.join("deep.txt"), "").unwrap();
+
+    // Neither "a" nor "a/b" expanded: only "a" itself is visible.
+    let expanded = HashSet::from([root.clone()]);
+    let (nodes, _) = build_visible(&root, &expanded, false, true, &HashSet::new());
+    assert_eq!(nodes.len(), 1);
+    assert_eq!(nodes[0].name, "a");
+
+    // "a" expanded but not "a/b": "b" is visible, "deep.txt" is not.
+    let expanded = HashSet::from([root.clone(), a.clone()]);
+    let (nodes, _) = build_visible(&root, &expanded, false, true, &HashSet::new());
+    let names: Vec<&str> = nodes.iter().map(|n| n.name.as_str()).collect();
+    assert_eq!(names, vec!["a", "b"]);
+
+    // Both "a" and "a/b" expanded: "deep.txt" appears at depth 2.
+    let expanded = HashSet::from([root.clone(), a.clone(), b.clone()]);
+    let (nodes, _) = build_visible(&root, &expanded, false, true, &HashSet::new());
+    let deep = nodes.iter().find(|n| n.name == "deep.txt").unwrap();
+    assert_eq!(deep.depth, 2);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn collapsed_sibling_dir_children_are_not_walked_deeper_than_one_level() {
+    // A collapsed top-level directory may still have its immediate contents
+    // read by the single-pass walker's filter_entry gating, but nothing
+    // beneath that first level should leak into the output.
+    let root = temp_dir("collapsed_sibling");
+    let collapsed = root.join("collapsed");
+    fs::create_dir_all(collapsed.join("nested")).unwrap();
+    fs::write(collapsed.join("nested").join("f.txt"), "").unwrap();
+    fs::write(root.join("visible.txt"), "").unwrap();
+
+    let expanded = HashSet::from([root.clone()]);
+    let (nodes, _) = build_visible(&root, &expanded, false, true, &HashSet::new());
+    let names: Vec<&str> = nodes.iter().map(|n| n.name.as_str()).collect();
+    assert_eq!(names, vec!["collapsed", "visible.txt"]);
+    assert!(!names.contains(&"nested"));
+    assert!(!names.contains(&"f.txt"));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn show_hidden_reveals_dotfiles() {
     let root = dir_tree();
     let expanded = HashSet::from([root.clone()]);

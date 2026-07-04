@@ -343,6 +343,87 @@ fn draw_tree_depth_one_node_is_indented() {
 }
 
 #[test]
+fn draw_tree_guide_cache_populated_after_render() {
+    let mut app = make_app(false, HashMap::new());
+    let mut dir_node = make_node("src", true, false);
+    dir_node.depth = 0;
+    let mut file_node = make_node("main.rs", false, false);
+    file_node.depth = 1;
+    app.nodes = vec![dir_node, file_node];
+    assert!(app.tree_guide_cache.is_none());
+    render_tree(&mut app, 40, 5);
+    assert!(
+        app.tree_guide_cache.is_some(),
+        "guide masks must be cached after a render with indent_guides enabled"
+    );
+    let (rev, masks) = app.tree_guide_cache.as_ref().unwrap();
+    assert_eq!(*rev, app.tree_revision);
+    assert_eq!(masks.len(), 2);
+}
+
+#[test]
+fn draw_tree_guide_shows_bar_when_later_sibling_follows_at_shallower_depth() {
+    // dirA/fileA1 has a later depth-0 sibling (dirB), so its depth-0 guide
+    // column must show a vertical bar. dirB/fileB1 is last at depth 0, so its
+    // depth-0 column must be blank.
+    let mut app = make_app(false, HashMap::new());
+    let mut dir_a = make_node("dirA", true, false);
+    dir_a.depth = 0;
+    let mut file_a1 = make_node("a1.rs", false, false);
+    file_a1.depth = 1;
+    let mut dir_b = make_node("dirB", true, false);
+    dir_b.depth = 0;
+    let mut file_b1 = make_node("b1.rs", false, false);
+    file_b1.depth = 1;
+    app.nodes = vec![dir_a, file_a1, dir_b, file_b1];
+
+    let rows = render_tree(&mut app, 40, 8);
+    // a1.rs's row must carry a guide bar in its depth-0 guide cell (the 3
+    // chars right after the left border); b1.rs's must not.
+    let a1_row = rows.iter().find(|r| r.contains("a1.rs")).unwrap();
+    let b1_row = rows.iter().find(|r| r.contains("b1.rs")).unwrap();
+    let guide_cell = |row: &str| -> String { row.chars().skip(1).take(3).collect() };
+    assert_eq!(
+        guide_cell(a1_row),
+        "│  ",
+        "expected guide bar before a1.rs: {a1_row:?}"
+    );
+    assert_eq!(
+        guide_cell(b1_row),
+        "   ",
+        "expected no guide bar before b1.rs: {b1_row:?}"
+    );
+}
+
+#[test]
+fn draw_tree_guide_cache_invalidated_on_tree_revision_bump() {
+    // A stale cache keyed to an old tree_revision must be recomputed, not
+    // reused, once the node list changes shape and the revision is bumped.
+    let mut app = make_app(false, HashMap::new());
+    let mut file_node = make_node("main.rs", false, false);
+    file_node.depth = 1;
+    app.nodes = vec![file_node];
+    render_tree(&mut app, 40, 5);
+    let (_, masks) = app.tree_guide_cache.as_ref().unwrap();
+    assert_eq!(masks.len(), 1);
+
+    app.tree_revision += 1;
+    let mut file_node_1 = make_node("a.rs", false, false);
+    file_node_1.depth = 1;
+    let mut file_node_2 = make_node("b.rs", false, false);
+    file_node_2.depth = 1;
+    app.nodes = vec![file_node_1, file_node_2];
+    render_tree(&mut app, 40, 5);
+    let (rev, masks) = app.tree_guide_cache.as_ref().unwrap();
+    assert_eq!(*rev, app.tree_revision);
+    assert_eq!(
+        masks.len(),
+        2,
+        "cache must be rebuilt for the new node count"
+    );
+}
+
+#[test]
 fn draw_tree_records_tree_area_geometry() {
     let mut app = make_app(false, HashMap::new());
     app.nodes = vec![];

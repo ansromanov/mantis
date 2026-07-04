@@ -101,6 +101,33 @@ fn highlight_cache_populated_after_first_render() {
 }
 
 #[test]
+fn render_virtual_file_highlights_using_current_syntax() {
+    // render_virtual_file's call to `app.highlight_lines` was changed to route
+    // through `app.current_syntax` (resolved once at file-open time) instead
+    // of a path, so the render must still apply real syntax highlighting.
+    let dir = tempfile::TempDir::new().expect("temp dir");
+    std::fs::write(dir.path().join("f.rs"), "fn main() {}\n").unwrap();
+    let mut app = crate::app::App::new(
+        dir.path().to_path_buf(),
+        crate::config::Config::default(),
+        None,
+        None,
+    )
+    .expect("App::new");
+    app.open_file(&dir.path().join("f.rs"));
+    assert_eq!(app.current_syntax.as_deref(), Some("Rust"));
+
+    render(&mut app, |_| {});
+    let (_, spans) = app
+        .content_highlight_cache
+        .borrow()
+        .clone()
+        .expect("cache populated after render");
+    let has_fg = spans.iter().flatten().any(|(s, _)| s.fg.is_some());
+    assert!(has_fg, "Rust file should render with colored spans");
+}
+
+#[test]
 fn highlight_cache_key_stable_on_identical_render() {
     let (mut app, dir) = render_app();
     app.open_file(&dir.path().join("f.txt"));

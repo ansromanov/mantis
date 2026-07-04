@@ -42,6 +42,16 @@ fn app_new_builds_visible_root_tree() {
 }
 
 #[test]
+fn app_new_starts_with_no_tree_guide_cache() {
+    // The indent-guide mask cache is keyed by tree_revision and must start
+    // empty so the first render always computes it fresh.
+    let root = temp_dir();
+    let app = new_app(&root, Config::default());
+    assert!(app.tree_guide_cache.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn app_new_starts_with_no_plugin_contributions() {
     // A freshly constructed App has produced no plugin output yet, so the
     // per-plugin contribution tracker must be empty.
