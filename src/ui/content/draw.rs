@@ -335,6 +335,14 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         )
     };
 
+    // Empty state hint for first-time users: show orientation if no file open.
+    if content_lines.is_empty() && app.current_file.is_none() {
+        content_lines.push(Line::from(Span::styled(
+            " Press / to search, or Enter on a tree item to open a file",
+            Style::default().fg(app.theme.dim),
+        )));
+    }
+
     // Word-wrap expansion: break content + gutters into visual rows so they
     // stay aligned under wrap (ratatui's Wrap can't communicate row count to
     // the gutter Paragraph, causing cumulative drift on each wrapped line).
