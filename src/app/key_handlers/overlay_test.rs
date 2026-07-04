@@ -1,4 +1,5 @@
 use crate::app::{App, Focus};
+use crate::command_palette::{CommandPalette, COMMANDS};
 use crate::config::Config;
 use crate::search::{GotoLineState, InFileSearch, ThemePicker, TreeFilter};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -667,6 +668,36 @@ fn handle_theme_key_query_typing_previews_first_match() {
     assert_eq!(
         app.theme.accent, previewed.accent,
         "query typing must preview the newly matched theme's colors live"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+/// Pressing Enter on a command-palette selection dispatches it through
+/// `dispatch_command`. Uses "quit" as the probed action since it flips a
+/// simple, unambiguous flag (`should_quit`), which stayed keymap-only until
+/// this PR added its palette entry (issue #495).
+#[test]
+fn handle_command_key_enter_dispatches_selected_command() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let idx = COMMANDS
+        .iter()
+        .position(|c| c.action_id == "quit")
+        .expect("quit must be in COMMANDS");
+    app.command_palette = Some(CommandPalette::default());
+    if let Some(p) = &mut app.command_palette {
+        p.filtered = vec![idx];
+        p.selected = 0;
+    }
+    assert!(!app.should_quit);
+    app.handle_command_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert!(
+        app.should_quit,
+        "Enter on the 'quit' palette entry must dispatch it"
+    );
+    assert!(
+        app.command_palette.is_none(),
+        "dispatching a command must close the palette"
     );
     fs::remove_dir_all(&root).ok();
 }

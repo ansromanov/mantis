@@ -488,3 +488,33 @@ fn dispatch_command_unknown_action_id_does_not_crash() {
     app.dispatch_command();
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn dispatch_command_quit_sets_should_quit() {
+    // "quit" gained a palette entry + dispatch arm in this PR (issue #495's
+    // proposal explicitly called it out as missing from the palette).
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.command_palette = Some(palette_with_query("Quit"));
+    assert!(!app.should_quit);
+    assert!(
+        app.dispatch_command(),
+        "dispatch_command must return true for a real match arm"
+    );
+    assert!(app.should_quit);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn dispatch_command_returns_false_when_nothing_selected() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let mut p = CommandPalette::default();
+    p.filtered.clear();
+    app.command_palette = Some(p);
+    assert!(
+        !app.dispatch_command(),
+        "dispatch_command must return false when no palette selection matches an arm"
+    );
+    fs::remove_dir_all(&root).ok();
+}
