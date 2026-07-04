@@ -21,9 +21,9 @@ version = "0.1.0"                    # Required: semver recommended
 description = "git diff on open"     # Optional: one-line description
 author = "ansromanov"                # Optional: author name/handle
 entry = "run.sh"                     # Required: executable relative to this dir
-tv_protocol = "2"                    # Required: IPC protocol version
+mantis_protocol = "3"                # Required: IPC protocol version (tv_protocol still accepted, see below)
 platforms = ["linux", "macos"]       # Optional: OS filter (default: all)
-events = ["on_file_open"]            # Optional: handled events (advisory)
+events = ["on_file_open"]            # Optional: events to subscribe to (empty/absent = all, for back-compat)
 permissions = ["run_git"]            # Optional: required permissions (advisory)
 ```
 
@@ -36,22 +36,24 @@ Fields:
 | `description` | No | One-line description displayed in the picker. |
 | `author` | No | Author name or handle. |
 | `entry` | Yes | Path to the executable, relative to this manifest's directory. |
-| `tv_protocol` | Yes | IPC protocol version (`"2"` for the current protocol). Plugins declaring a different version are skipped. |
+| `mantis_protocol` | Yes | IPC protocol version (`"3"` for the current protocol). Plugins declaring a different version are skipped. The field was named `tv_protocol` through protocol 2 (pre-rename); `mantis_protocol` is the current name and `tv_protocol` remains accepted as an alias — if both are present, `mantis_protocol` wins. New plugins should use `mantis_protocol`. |
 | `platforms` | No | OS filter: list of `"linux"`, `"macos"`, `"windows"`. Absent = all. |
-| `events` | No | Events the plugin handles (advisory, not enforced). |
+| `events` | No | Events this plugin subscribes to; only listed events are sent to it. Empty or absent means all events are sent (back-compat with pre-subscription plugins). |
 | `permissions` | No | Permissions the plugin needs (advisory, shown at install). |
 
 ### Protocol version
 
-The `tv_protocol` field must match the host's expected protocol version.
-Plugins declaring a mismatched version are silently skipped during discovery.
-The host protocol version is also sent to each plugin on the `init` event (see
-below) so the plugin can verify compatibility dynamically.
+The `mantis_protocol` field (or its `tv_protocol` alias) must match the host's
+expected protocol version. Plugins declaring a mismatched version are silently
+skipped during discovery. The host protocol version is also sent to each
+plugin on the `init` event (see below) so the plugin can verify compatibility
+dynamically.
 
 | Version | Release | Changes |
 |---|---|---|
 | `"1"` | 0.7.x | Initial protocol. Events: init, on_file_open, on_keypress, on_selection_change, on_theme_change, on_quit, shutdown. Actions: show_message, open_file, set_content, set_icon_map. Git features (set_file_statuses, set_blame_data, set_status_bar_git_info) were removed in 0.11.22 — git is now built in only. |
 | `"2"` | 0.8.x | Language providers (register_language_provider, set_fold_regions), event subscription (`events` field in manifest), protocol hardening (bounded queues, line caps), `protocol_version` field on init event. `init`/`on_theme_change` additionally carry an optional `colors` object (0.13.x, additive — does not bump this version) with the active theme's actual role colors as `#rrggbb` hex. |
+| `"3"` | proposed (see [#481](https://github.com/ansromanov/mantis/issues/481)) | Request/response correlation (`request`/`response` events) so the host can ask a plugin for something and match the reply; a `plugin_error` action for reporting failures outside the request/response flow; key-consumption semantics for `on_keypress` (`key_handled` action, host waits up to one tick); `priority` field on `register_language_provider` plus a status-bar warning on conflicting registrations; manifest field renamed `tv_protocol` → `mantis_protocol` (alias kept, see above). Protocol 2 plugins (subscription-only, no request/response) remain fully supported — the host only sends `request` events to providers that declared protocol 3. `highlight` capability remains formally reserved and unimplemented: real syntax highlighting continues to flow through syntax plugins (`.sublime-syntax` + syntect), not language providers. |
 
 ### Discovery
 
@@ -138,6 +140,26 @@ human-readable notation: `"q"`, `"ctrl+c"`, `"Enter"`.
 {"event":"on_keypress","key":"ctrl+p"}
 ```
 
+**Key consumption (protocol 3+).** A plugin that has `on_keypress` in its
+manifest `events` list may reply with a `key_handled` action to claim the
+keypress:
+
+```json
+{"event":"action","action":"key_handled","params":{"handled":true}}
+```
+
+When at least one subscribed plugin replies `handled: true`, `mantis` waits
+up to one tick (~16ms) after dispatching `on_keypress` before deciding
+whether to also run its own normal-mode key handling for that key. If any
+reply arrives with `handled: true` within that window, `mantis` swallows the
+key — no built-in binding fires for it. If multiple subscribed plugins
+reply, the first `handled: true` response the host receives within the
+window wins and the key is consumed exactly once; a plugin that doesn't
+reply within the window is treated as not having handled the key. Plugins
+that never send
+`key_handled` behave exactly as under protocol 2 — the keypress always falls
+through to normal handling.
+
 ### `on_selection_change`
 
 Sent when the tree cursor moves to a different entry. `path` is absent if the
@@ -182,6 +204,55 @@ Exit cleanly in response.
 {"event":"shutdown"}
 ```
 
+## Requests: mantis ⇄ plugin (protocol 3+)
+
+Protocol 2 is one-way and fire-and-forget in both directions: the host emits
+events, the plugin emits actions, and neither side can *ask* the other for
+something and wait for a specific reply. Protocol 3 adds a correlated
+request/response pair on top of the existing event/action stream, used for
+capabilities that need an answer to a specific question (e.g. "fold regions
+for this file, now") rather than a broadcast the plugin may or may not act on.
+
+**Host → plugin request**, sent on stdin like any other event:
+
+```json
+{"event":"request","id":42,"method":"fold_regions","params":{"path":"/absolute/path/to/file"}}
+```
+
+**Plugin → host response**, sent on stdout as its own line, alongside (but
+distinct from) `action` lines:
+
+```json
+{"event":"response","id":42,"result":{"regions":[[0,5],[10,20]]}}
+```
+
+or, on failure:
+
+```json
+{"event":"response","id":42,"error":{"message":"failed to parse file"}}
+```
+
+Rules:
+
+- `id` is chosen by the host per outstanding request and must be echoed back
+  unchanged in the response. IDs are not reused while a request is
+  outstanding.
+- Exactly one of `result` / `error` must be present.
+- The host applies a per-plugin timeout to each request (a bounded number of
+  ticks). If no response arrives in time, the host treats it as an error,
+  logs it the same way as a `plugin_error` (see below), and does not kill the
+  plugin — a slow or missed response degrades gracefully rather than being
+  fatal.
+- `request`/`response` is additive to the existing event/action stream, not a
+  replacement: `set_fold_regions` pushed unprompted still works exactly as in
+  protocol 2 for plugins that don't implement requests. The host only sends
+  `request` events to plugins that declared protocol 3 in their manifest.
+
+This is the surface the reserved `hover`, `diagnostics`, and `definition`
+capabilities are expected to use once implemented — each as a `method` name
+on the same `request`/`response` pair, gated by the corresponding capability
+in `register_language_provider`.
+
 ## Actions: plugin → tv (stdout)
 
 Respond with action objects on stdout. Each object must be on a single line.
@@ -195,6 +266,24 @@ Displays a message in the `mantis` status bar.
 ```json
 {"event":"action","action":"show_message","params":{"message":"hello from plugin"}}
 ```
+
+### `plugin_error` (protocol 3+)
+
+Reports a failure that isn't tied to a specific `request`/`response` pair
+(for example, a subscription-only plugin that failed to act on a broadcast
+event). Distinct from `show_message`: it is recorded in the plugin's
+rotating log file (`plugin-logs/<name>.log`) and surfaced with error styling
+in the status bar and plugin picker, rather than treated as routine status
+text.
+
+```json
+{"event":"action","action":"plugin_error","params":{"message":"failed to parse file","context":"on_file_open"}}
+```
+
+Fields:
+- `message` — human-readable error description.
+- `context` — optional free-form string naming the event/method that failed
+  (advisory, shown alongside the message).
 
 ### `open_file`
 
@@ -234,9 +323,11 @@ Fields:
 A process plugin can declare itself as a **language provider** by responding to
 the `init` event with a `register_language_provider` action. This tells `mantis`
 which file extensions the plugin handles and what capabilities it provides.
-Both `highlight` and `fold` flow through a single provider protocol; future
-capabilities (`hover`, `diagnostics`, `definition`) will slot into the same
-surface in a later release without any protocol break.
+`fold` is implemented via push (`set_fold_regions`); `highlight` is formally
+reserved (see below). The reserved capabilities (`hover`, `diagnostics`,
+`definition`) are expected to slot in as `request`/`response` methods (see
+[Requests: mantis ⇄ plugin](#requests-mantis--plugin-protocol-3)) once
+implemented, without a protocol break.
 
 ### Provider contract
 
@@ -251,10 +342,14 @@ lifecycle:
 2. **File routing.** When the user opens a file whose extension matches a
    registered provider, `mantis` routes relevant events (`on_file_open`,
    `on_selection_change`) and capability-driven state requests to that
-   provider. Only the first provider whose extensions match the file's
-   extension receives these events for that file. Currently only `fold`
-   capability drives backend state (fold regions); `highlight` is reserved
-   for future use.
+   provider. When exactly one provider matches an extension+capability pair,
+   it is used. When more than one provider registers the same
+   extension+capability (protocol 3+), the registration with the higher
+   `priority` wins; ties break by registration order (first registered
+   wins). The first time this happens for a given extension+capability pair,
+   `mantis` shows a one-time status-bar warning naming both plugins, so the
+   conflict isn't silent. Currently only `fold` capability drives backend
+   state (fold regions); `highlight` is reserved for future use (see below).
 
 3. **Response.** For each declared capability, the plugin should respond to
    file-related events with the corresponding action:
@@ -283,7 +378,8 @@ file.
 ```json
 {"event":"action","action":"register_language_provider","params":{
   "extensions": ["py", "pyi"],
-  "capabilities": ["fold"]
+  "capabilities": ["fold"],
+  "priority": 10
 }}
 ```
 
@@ -291,6 +387,21 @@ Fields:
 - `extensions` — lowercase file extensions (no leading dot) this provider handles.
 - `capabilities` — one or more of `"highlight"` or `"fold"`. Reserved for
   future use: `"hover"`, `"diagnostics"`, `"definition"`.
+- `priority` — optional signed integer, default `0` (protocol 3+). Used only
+  to break ties when two providers register the same extension+capability
+  pair; higher wins. Absent on protocol 2 plugins, which are treated as
+  priority `0`.
+
+**On `highlight`:** it remains declared but formally reserved as of protocol
+3 — `mantis` accepts the registration and never dispatches anything for it.
+Real syntax highlighting is intentionally not routed through language
+providers; it flows through syntax plugins (`.sublime-syntax` files loaded
+into syntect, see [Syntax plugins](#syntax-plugins) below) or the built-in
+highlighter. This was evaluated as part of the #296 capability audit and
+re-confirmed for v3: provider-driven highlighting would mean re-deriving
+styled spans over IPC per file/edit, which the syntect path already does
+locally and faster. Revisit only if a concrete plugin use case needs
+highlighting decisions syntect's grammar model can't express.
 
 After registering, `mantis` sends `on_file_open` whenever a matching file is
 opened. The plugin should respond with the appropriate action for each declared
