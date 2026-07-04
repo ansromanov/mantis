@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 use std::fs;
-use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use super::*;
@@ -1132,13 +1131,14 @@ fn request_working_tree_diff_supersession_discards_stale_response() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path().to_path_buf();
     let git = |args: &[&str]| {
-        Command::new("git")
+        let status = Command::new("git")
             .arg("-C")
             .arg(&root)
             .args(["-c", "user.email=t@e.x", "-c", "user.name=T"])
             .args(args)
             .status()
             .unwrap();
+        assert!(status.success(), "git {args:?} failed");
     };
     git(&["init", "-q"]);
     fs::write(root.join("a.txt"), "a\n").unwrap();
@@ -1170,11 +1170,14 @@ fn apply_response_ignores_stale_file_seq() {
     app.load_seq = 5;
     app.current_file = None;
 
+    // Contents don't matter: the response is intentionally stale and must
+    // never be applied.
+    let stale = tempfile::NamedTempFile::new().unwrap();
     let applied = app.apply_response(LoadResponse::File {
         seq: 4,
-        path: PathBuf::from("/tmp/stale.txt"),
+        path: stale.path().to_path_buf(),
         load: Box::new(compute_file_load(
-            std::path::Path::new("/tmp/stale.txt"),
+            stale.path(),
             &app.theme,
             &app.highlighter,
         )),

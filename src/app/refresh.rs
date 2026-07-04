@@ -107,6 +107,8 @@ impl App {
                     self.apply_git_status_load(*load);
                 }
             }
+            #[cfg(test)]
+            LoadResponse::Barrier(_) => {}
         }
         false
     }
@@ -170,22 +172,30 @@ impl App {
     }
 
     /// Blocks the current thread until the worker thread has processed all
-    /// pending requests and their results have been applied. Only available
-    /// in tests so assertions can observe content/git-state immediately
-    /// after a `request_*` call.
+    /// requests queued before this call and their results have been applied.
+    /// Only available in tests so assertions can observe content/git-state
+    /// immediately after a `request_*` call.
     ///
-    /// Waits generously for the first response (the worker may be slow to
-    /// schedule on a loaded CI box), then drains any already-queued
-    /// follow-ups with a short poll instead of paying a second full timeout
-    /// for the common case where nothing else is coming.
+    /// Sends a [`LoadRequest::Barrier`] and applies every response that
+    /// arrives before its echo: since the worker's request channel is FIFO
+    /// and single-threaded, seeing the echo guarantees every prior request
+    /// has already been applied. This is deterministic rather than
+    /// silence-based, so it can't race a worker that's still busy. The
+    /// timeout is only a safety net against a wedged worker thread.
     #[cfg(test)]
     pub(crate) fn pump_loads(&mut self) {
-        match self.loader.rx.recv_timeout(Duration::from_millis(500)) {
-            Ok(resp) => self.apply_response(resp),
-            Err(_) => return,
-        };
-        while let Ok(resp) = self.loader.rx.recv_timeout(Duration::from_millis(20)) {
-            self.apply_response(resp);
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static NEXT_BARRIER: AtomicU64 = AtomicU64::new(0);
+        let token = NEXT_BARRIER.fetch_add(1, Ordering::Relaxed);
+        self.loader.request(LoadRequest::Barrier(token));
+        loop {
+            match self.loader.rx.recv_timeout(Duration::from_secs(5)) {
+                Ok(LoadResponse::Barrier(t)) if t == token => break,
+                Ok(resp) => {
+                    self.apply_response(resp);
+                }
+                Err(_) => break,
+            }
         }
     }
 

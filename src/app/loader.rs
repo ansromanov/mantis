@@ -281,6 +281,11 @@ pub(super) enum LoadRequest {
     SetTheme(Box<Theme>),
     /// Rebuild the worker's highlighter with updated syntax definitions.
     SetExtraSyntaxes(Vec<ExtraSyntax>),
+    /// Test-only: echoed back once the worker has drained every request
+    /// queued ahead of it, giving `App::pump_loads` a deterministic
+    /// completion signal instead of a silence-based timeout.
+    #[cfg(test)]
+    Barrier(u64),
     /// Stop the worker (sent on `Loader` drop).
     Shutdown,
 }
@@ -302,6 +307,9 @@ pub(super) enum LoadResponse {
         root: PathBuf,
         load: Box<GitStatusLoad>,
     },
+    /// Test-only: reply to a [`LoadRequest::Barrier`].
+    #[cfg(test)]
+    Barrier(u64),
 }
 
 /// Owns the worker thread and the request/response channels. The worker keeps
@@ -368,6 +376,12 @@ impl Loader {
                     } => {
                         let load = Box::new(compute_diff_load(&root, &path, &theme, diff_mode));
                         if res_tx.send(LoadResponse::Diff { seq, path, load }).is_err() {
+                            break;
+                        }
+                    }
+                    #[cfg(test)]
+                    LoadRequest::Barrier(token) => {
+                        if res_tx.send(LoadResponse::Barrier(token)).is_err() {
                             break;
                         }
                     }
