@@ -611,8 +611,28 @@ fn decode_modifier_mask(mask: u8) -> KeyModifiers {
 // ---------------------------------------------------------------------------
 
 fn parse_csi_tilde(params: &str, consumed: usize) -> io::Result<Option<(Event, usize)>> {
-    // params is everything between '[' and '~'
-    let num: u16 = params.parse().unwrap_or(0);
+    // params is everything between '[' and '~'.
+    // When a modifier is held, terminals send `params = "5;5"` (Ctrl+PageUp),
+    // `params = "3;2"` (Shift+Delete), etc — split on ';' to get the key
+    // number and optional modifier[:event_type].
+    let mut parts = params.split(';');
+    let num_str = parts.next().unwrap_or("0");
+    let num: u16 = num_str.parse().unwrap_or(0);
+
+    let mut modifiers = KeyModifiers::empty();
+    let mut kind = KeyEventKind::Press;
+
+    if let Some(mod_field) = parts.next() {
+        let mut sub = mod_field.split(':');
+        let mask: u8 = sub.next().unwrap_or("0").parse().unwrap_or(0);
+        modifiers = decode_modifier_mask(mask);
+        kind = match sub.next() {
+            Some("2") => KeyEventKind::Repeat,
+            Some("3") => KeyEventKind::Release,
+            _ => KeyEventKind::Press,
+        };
+    }
+
     let code = match num {
         1 | 7 => KeyCode::Home,
         2 | 8 => KeyCode::Insert,
@@ -626,7 +646,15 @@ fn parse_csi_tilde(params: &str, consumed: usize) -> io::Result<Option<(Event, u
         28..=34 => KeyCode::F((num - 13) as u8), // F15-F21
         _ => KeyCode::Null,
     };
-    Ok(Some((key(code), consumed)))
+    Ok(Some((
+        Event::Key(KeyEvent::new_with_kind_and_state(
+            code,
+            modifiers,
+            kind,
+            KeyEventState::empty(),
+        )),
+        consumed,
+    )))
 }
 
 // ---------------------------------------------------------------------------
@@ -672,9 +700,24 @@ fn parse_sgr_mouse(
     let col_str = parts.next().unwrap_or("1");
     let row_str = parts.next().unwrap_or("1");
 
-    let cb: u16 = cb_str.parse().unwrap_or(0);
+    let raw_cb: u16 = cb_str.parse().unwrap_or(0);
     let col: u16 = col_str.parse().unwrap_or(0);
     let row: u16 = row_str.parse().unwrap_or(0);
+
+    // SGR mouse modifier bits in cb: bit 2=Shift (0x04), bit 3=Meta (0x08),
+    // bit 4=Ctrl (0x10). Extract and mask out before button/motion decode.
+    let mut modifiers = KeyModifiers::empty();
+    if raw_cb & 0x04 != 0 {
+        modifiers |= KeyModifiers::SHIFT;
+    }
+    if raw_cb & 0x10 != 0 {
+        modifiers |= KeyModifiers::CONTROL;
+    }
+    // Meta (bit 3) maps to Alt in the terminal world.
+    if raw_cb & 0x08 != 0 {
+        modifiers |= KeyModifiers::ALT;
+    }
+    let cb = raw_cb & !0b11100;
 
     // Button 0-2: press/release determined by final byte (M/m) via default_kind;
     // 0x20: motion (drag); 0x40: scroll (wheel).
@@ -708,7 +751,7 @@ fn parse_sgr_mouse(
             kind,
             column: col.saturating_sub(1),
             row: row.saturating_sub(1),
-            modifiers: KeyModifiers::empty(),
+            modifiers,
         }),
         consumed,
     )))
