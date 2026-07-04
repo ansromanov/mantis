@@ -1,8 +1,29 @@
-version = "0.12.21"
+version = "0.13.0"
 date = "2026-07-04"
-whats_new = """- feat(packaging): add Homebrew formula with auto-update on release (#443)
-- fix: smooth markdown scrolling by pre-wrapping paragraphs (#442)
-- fix(statusbar): allow hiding segments via explicit allowlist (#435) (#437)
-- refactor(keys): centralize fixed modal keys into reserved static_keybindings layer (#440)
-- fix: remove line-number gutter from rendered markdown (#439)"""
-release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.12.0"
+whats_new = """- fix: capture plugin stderr for crash diagnostics (#515)
+- fix: decode multi-byte UTF-8 in RawEventSource for pasted non-ASCII text (#517)
+- docs: add plugin capability matrix (protocol v2 audit) (#516)
+- fix: embed bundled plugin binaries at compile time (#513)
+- refactor: remove cfg!(test) forks in request_open_file/diff/git-status (#512)
+- fix: remove dead markdown-core feature and in-app markdown rendering (#514)
+- Empty content pane gives no orientation hint for first-time users (#505)
+- fix: per-root session files to eliminate concurrent-instance race (#504)
+- fix: install panic hook to restore terminal on panic (#457) (#502)
+- fix: bound blame cache to 16 entries with LRU eviction (#503)
+- fix: use git status --porcelain -z to handle non-ASCII paths correctly (#501)
+- fix: parse modifier params in CSI ~ and SGR mouse sequences (#455) (#500)
+- fix: prevent UI thread blocking on exact-4096 input bursts (#456) (#493)
+- fix: external file truncation SIGBUS (#459) (#494)
+- ci: fix change-detection gates still referencing old name tv.toml (#492)
+- feat: live preview in theme picker (#451) (#488)
+- feat(help): make help overlay scrollable (#476)
+- docs(roadmap): add language-intelligence pillar and plugin-system hardening (#484)
+- fix: remove redundant root slash in breadcrumb render (#474)
+- docs: add product roadmap page (pillars, sequencing, epics) (#475)
+- fix: clean up retired shell-script plugins on upgrade (#297) (#463)
+- fix: raise plugin stdout line cap so large rendered docs aren't dropped (#448)
+- fix: color gitignored files when ignore_gitignore = true (#446) (#447)
+- feat(help): add Git section to the in-app help overlay (#445)
+- docs: add Homebrew installation instructions (#444)
+- chore: bump Homebrew formula to v0.12.0 [skip ci]"""
+release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.13.0"
