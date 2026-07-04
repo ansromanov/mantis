@@ -289,8 +289,13 @@ fn install_bundled_plugins_overwrites_stale_binary() {
     let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let tmp = fresh_plugin_dir();
     std::fs::create_dir_all(&tmp).unwrap();
-    let old = std::env::var_os("XDG_CONFIG_HOME");
-    unsafe { std::env::set_var("XDG_CONFIG_HOME", &tmp) };
+    let config_home_var = if cfg!(windows) {
+        "APPDATA"
+    } else {
+        "XDG_CONFIG_HOME"
+    };
+    let old = std::env::var_os(config_home_var);
+    unsafe { std::env::set_var(config_home_var, &tmp) };
 
     let plugins_dir = tmp.join("mantis").join("plugins");
     std::fs::create_dir_all(&plugins_dir).unwrap();
@@ -306,8 +311,8 @@ fn install_bundled_plugins_overwrites_stale_binary() {
 
     unsafe {
         match old {
-            Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
-            None => std::env::remove_var("XDG_CONFIG_HOME"),
+            Some(v) => std::env::set_var(config_home_var, v),
+            None => std::env::remove_var(config_home_var),
         }
     }
 
@@ -327,10 +332,9 @@ fn install_bundled_plugins_overwrites_stale_binary() {
 #[cfg(unix)]
 fn install_bundled_plugins_skips_rewrite_when_content_matches() {
     // If the installed binary already matches the embedded one, install must
-    // leave it alone rather than rewriting it. Proven by giving the existing
-    // file non-executable permissions before running install: if the code
-    // rewrote it (skip check broken), set_executable() would flip it back to
-    // 0o755; if it truly skipped, the permissions stay as set here.
+    // leave its content alone rather than rewriting it, while still repairing
+    // the executable bit (e.g. lost via a permissions change or a copied
+    // config dir) so the plugin stays spawnable.
     use std::os::unix::fs::PermissionsExt;
 
     let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
@@ -358,11 +362,16 @@ fn install_bundled_plugins_skips_rewrite_when_content_matches() {
         }
     }
 
+    let installed = std::fs::read(&markdown_path).unwrap();
+    assert_eq!(
+        &installed, embedded,
+        "up-to-date binary content must not be rewritten"
+    );
     let perms = std::fs::metadata(&markdown_path).unwrap().permissions();
     assert_eq!(
-        perms.mode() & 0o777,
-        0o644,
-        "up-to-date binary must not be rewritten (permissions would change if it were)"
+        perms.mode() & 0o111,
+        0o111,
+        "up-to-date binary must still be repaired to executable"
     );
     std::fs::remove_dir_all(&tmp).ok();
 }

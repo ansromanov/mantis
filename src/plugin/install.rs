@@ -133,12 +133,13 @@ pub(crate) fn install_bundled_plugins() {
             continue;
         }
         // Bundled plugin names are known ahead of time, so an exact-name
-        // match here is always one of our own binaries, never a
-        // user-authored plugin — safe to overwrite on content mismatch.
+        // match here is treated as one of our own binaries and overwritten
+        // on content mismatch, even if a user placed their own file there.
         let up_to_date = std::fs::read(&plugin_path)
             .map(|existing| existing == *data)
             .unwrap_or(false);
         if up_to_date {
+            set_executable(&plugin_path);
             continue;
         }
         if std::fs::write(&plugin_path, data).is_ok() {
