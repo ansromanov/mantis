@@ -279,7 +279,8 @@ impl App {
             .as_ref()
             .is_some_and(|f| f.full_paths_cache.is_none())
         {
-            let mut all = crate::tree::collect_all_dirs(&self.root, self.show_hidden, self.ignore_gitignore);
+            let mut all =
+                crate::tree::collect_all_dirs(&self.root, self.show_hidden, self.ignore_gitignore);
             all.extend(crate::tree::collect_all_files(
                 &self.root,
                 self.show_hidden,
