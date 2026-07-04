@@ -6,10 +6,9 @@
 //! `$XDG_STATE_HOME/mantis/` on Linux/macOS, `%APPDATA%\\mantis\\`
 //! on Windows) so it survives re-clones and never litters the project tree.
 //!
-//! The on-disk format is a single `sessions.json` mapping canonical root paths
-//! to per-root [`SessionState`] structs. Stale or corrupt entries are silently
-//! ignored on load. The entry is a JSON object keyed by root: each root maps
-//! to a state with `{ expanded, current_file, content_scroll, active_line }`.
+//! Each root gets its own file under `sessions/<hash>.json` so concurrent
+//! mantis instances on different roots never race. A one-time migration
+//! reads the legacy `sessions.json` and creates the per-root files.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -30,16 +29,8 @@ pub struct SessionState {
     pub active_line: usize,
 }
 
-/// On-disk collection of all persisted sessions.
-#[derive(Debug, Serialize, Deserialize)]
-struct SessionFile {
-    version: u32,
-    #[serde(default)]
-    sessions: std::collections::HashMap<String, SessionState>,
-}
-
-const SESSION_FILE_VERSION: u32 = 1;
-const SESSION_FILE_NAME: &str = "sessions.json";
+const SESSION_DIR_NAME: &str = "sessions";
+const LEGACY_FILE_NAME: &str = "sessions.json";
 
 /// Returns the path to the state directory, creating it if absent.
 /// Silently returns `None` when the platform has no suitable state dir.
@@ -49,22 +40,33 @@ pub fn state_dir() -> Option<PathBuf> {
     Some(dir)
 }
 
-/// Returns the path to the sessions JSON file.
+/// Returns the path to the legacy `sessions.json` file (pre-v0.13 format).
+/// Used for migration; tests also write to this path to simulate old-format
+/// session data.
 pub fn sessions_path() -> Option<PathBuf> {
-    state_dir().map(|d| d.join(SESSION_FILE_NAME))
+    state_dir().map(|d| d.join(LEGACY_FILE_NAME))
+}
+
+/// Returns the per-root session file path for `root`, creating the
+/// `sessions/` directory if necessary.
+pub(crate) fn session_path(root: &Path) -> Option<PathBuf> {
+    let dir = state_dir()?.join(SESSION_DIR_NAME);
+    fs::create_dir_all(&dir).ok()?;
+    let hash = hash_root_key(&root_key(root));
+    Some(dir.join(format!("{hash}.json")))
 }
 
 /// Loads session state for `root` from the cache, or returns `None`.
 ///
-/// Stale (path no longer exists) and corrupt entries are silently skipped;
-/// individual fields that reference nonexistent paths inside `root` are
-/// filtered out so restoration never produces dangling references.
+/// Runs a one-time migration of legacy `sessions.json` if present.
+/// Stale entries are silently skipped; individual fields that reference
+/// nonexistent paths inside `root` are filtered out so restoration never
+/// produces dangling references.
 pub fn load(root: &Path) -> Option<SessionState> {
-    let path = sessions_path()?;
+    migrate_legacy();
+    let path = session_path(root)?;
     let raw = fs::read_to_string(&path).ok()?;
-    let file: SessionFile = serde_json::from_str(&raw).ok()?;
-    let key = root_key(root);
-    let mut state: SessionState = file.sessions.get(&key)?.clone();
+    let mut state: SessionState = serde_json::from_str(&raw).ok()?;
 
     // Filter out expanded directories that no longer exist.
     state.expanded.retain(|p| p.starts_with(root) && p.is_dir());
@@ -79,32 +81,80 @@ pub fn load(root: &Path) -> Option<SessionState> {
     Some(state)
 }
 
-/// Saves session state for `root` to the cache.
+/// Saves session state for `root` to its own file.
 ///
-/// This is a full-file write: the entire `sessions.json` is read, the entry
-/// for `root` is upserted, and the file is written back. I/O errors are
-/// silently ignored so a broken state dir never crashes the viewer.
+/// Each root writes only its own file — no read-modify-write race.
+/// I/O errors are silently ignored so a broken state dir never crashes
+/// the viewer.
 pub fn save(root: &Path, state: &SessionState) {
-    let Some(path) = sessions_path() else {
+    migrate_legacy();
+    let Some(path) = session_path(root) else {
         return;
     };
-    let raw = fs::read_to_string(&path).ok();
-    let mut file: SessionFile = raw
-        .as_deref()
-        .and_then(|r| serde_json::from_str(r).ok())
-        .unwrap_or(SessionFile {
-            version: SESSION_FILE_VERSION,
-            sessions: std::collections::HashMap::new(),
-        });
-    file.sessions.insert(root_key(root), state.clone());
-    if let Ok(json) = serde_json::to_string_pretty(&file) {
+    if let Ok(json) = serde_json::to_string_pretty(state) {
         // Write to a sibling temp file then rename so a crash mid-write never
-        // leaves a truncated sessions.json.
+        // leaves a truncated file.
         let tmp = path.with_extension("json.tmp");
         if fs::write(&tmp, &json).is_ok() {
             let _ = fs::rename(&tmp, &path);
         }
     }
+}
+
+/// One-time migration from the legacy single-file format.
+///
+/// Reads `<state_dir>/sessions.json` (if it exists), writes a per-root file
+/// under `sessions/` for each entry, then renames the legacy file to
+/// `sessions.json.migrated` so subsequent calls are no-ops — even when the
+/// legacy file is corrupt or unreadable, the rename prevents repeated I/O.
+fn migrate_legacy() {
+    let legacy = match sessions_path() {
+        Some(p) if p.exists() => p,
+        _ => return,
+    };
+    // Try to read and migrate. Best-effort: if the file is corrupt, we still
+    // rename it so we don't retry every save/load.
+    if let Ok(raw) = fs::read_to_string(&legacy) {
+        // Legacy format: { version: u32, sessions: { "<root>": SessionState, ... } }
+        #[derive(Deserialize)]
+        struct LegacyFile {
+            #[allow(dead_code)]
+            version: u32,
+            #[serde(default)]
+            sessions: std::collections::HashMap<String, SessionState>,
+        }
+        if let Ok(legacy_file) = serde_json::from_str::<LegacyFile>(&raw) {
+            let dir = match state_dir() {
+                Some(d) => d.join(SESSION_DIR_NAME),
+                None => return,
+            };
+            let _ = fs::create_dir_all(&dir);
+            for (key, state) in &legacy_file.sessions {
+                let hash = hash_root_key(key);
+                let p = dir.join(format!("{hash}.json"));
+                if let Ok(json) = serde_json::to_string_pretty(state) {
+                    let tmp = p.with_extension("json.tmp");
+                    if fs::write(&tmp, &json).is_ok() {
+                        let _ = fs::rename(&tmp, &p);
+                    }
+                }
+            }
+        }
+    }
+    // Rename legacy file so migration runs only once
+    let _ = fs::rename(&legacy, legacy.with_extension("json.migrated"));
+}
+
+/// FNV-1a 64-bit hash of the root-key string, formatted as 16 hex chars.
+///
+/// Produces a short, deterministic, filesystem-safe filename for every root.
+fn hash_root_key(key: &str) -> String {
+    let mut hash: u64 = 14695981039346656037;
+    for byte in key.bytes() {
+        hash ^= byte as u64;
+        hash = hash.wrapping_mul(1099511628211);
+    }
+    format!("{:016x}", hash)
 }
 
 /// The key used in the sessions map: the canonical (absolute) root path as a

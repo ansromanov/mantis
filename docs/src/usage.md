@@ -16,8 +16,9 @@ Press `?` at any time for in-app help, and `q` to quit.
 expanded directories, the last open file, scroll position, and git mode.
 State is cached outside the project tree (`~/.local/state/mantis/`
 or `%APPDATA%\mantis\`) so it survives re-clones and never writes
-dotfiles into the repository. To reset the session for a directory, quit
-and delete the `sessions.json` file from the state directory.
+dotfiles into the repository. Each workspace root gets its own file under
+the `sessions/` subdirectory. To reset the session for a directory, quit
+and delete its file from the `sessions/` subdirectory in the state directory.
 
 > 💡 **Can't remember a key?** Press `?` for the help overlay, or `Ctrl+P` to
 > open the command palette and search for an action by name — it shows you the
