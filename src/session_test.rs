@@ -1,4 +1,11 @@
+use std::sync::Mutex;
+
 use super::*;
+
+/// Serialises all session tests so `MANTIS_STATE_DIR` (a process-global env
+/// var) is never overwritten by a concurrently-running test — `cargo test`
+/// runs tests on separate threads within the same process by default.
+static SESSION_LOCK: Mutex<()> = Mutex::new(());
 
 /// A per-test environment: creates a unique root and state directory under the
 /// system temp directory, then points `MANTIS_STATE_DIR` at the isolated state dir
@@ -29,6 +36,7 @@ impl Drop for TestEnv {
 
 #[test]
 fn round_trip_preserves_all_fields() {
+    let _lock = SESSION_LOCK.lock().unwrap();
     let env = TestEnv::new("round_trip");
     let sub = env.root.join("sub");
     fs::create_dir_all(&sub).unwrap();
@@ -48,6 +56,7 @@ fn round_trip_preserves_all_fields() {
 
 #[test]
 fn save_and_load_empty_state() {
+    let _lock = SESSION_LOCK.lock().unwrap();
     let env = TestEnv::new("empty");
     let state = SessionState::default();
     save(&env.root, &state);
@@ -58,12 +67,14 @@ fn save_and_load_empty_state() {
 
 #[test]
 fn load_returns_none_for_missing_key() {
+    let _lock = SESSION_LOCK.lock().unwrap();
     let env = TestEnv::new("missing");
     assert!(load(&env.root).is_none());
 }
 
 #[test]
 fn stale_expanded_dirs_are_filtered() {
+    let _lock = SESSION_LOCK.lock().unwrap();
     let env = TestEnv::new("stale_expanded");
     let gone = env.root.join("gone");
 
@@ -79,6 +90,7 @@ fn stale_expanded_dirs_are_filtered() {
 
 #[test]
 fn stale_current_file_is_filtered() {
+    let _lock = SESSION_LOCK.lock().unwrap();
     let env = TestEnv::new("stale_file");
     let gone = env.root.join("gone.txt");
 
@@ -94,6 +106,7 @@ fn stale_current_file_is_filtered() {
 
 #[test]
 fn corrupt_legacy_file_returns_none() {
+    let _lock = SESSION_LOCK.lock().unwrap();
     let env = TestEnv::new("corrupt_legacy");
     // Write garbage to the isolated sessions.json (legacy format path).
     let legacy = env.state.join("sessions.json");
@@ -112,6 +125,7 @@ fn corrupt_legacy_file_returns_none() {
 
 #[test]
 fn corrupt_per_root_file_returns_none() {
+    let _lock = SESSION_LOCK.lock().unwrap();
     let env = TestEnv::new("corrupt_per_root");
     // First save a valid state so the per-root file exists
     save(&env.root, &SessionState::default());
@@ -130,6 +144,7 @@ fn corrupt_per_root_file_returns_none() {
 
 #[test]
 fn multiple_roots_are_independent() {
+    let _lock = SESSION_LOCK.lock().unwrap();
     let env = TestEnv::new("multi");
 
     let d1 = env.root.join("repo1");
@@ -154,6 +169,7 @@ fn multiple_roots_are_independent() {
 
 #[test]
 fn root_key_normalises_trailing_separator() {
+    let _lock = SESSION_LOCK.lock().unwrap();
     let env = TestEnv::new("trail");
 
     let state = SessionState {
@@ -170,6 +186,7 @@ fn root_key_normalises_trailing_separator() {
 
 #[test]
 fn concurrent_saves_dont_clobber() {
+    let _lock = SESSION_LOCK.lock().unwrap();
     let env = TestEnv::new("concurrent");
 
     let d1 = env.root.join("project_a");
@@ -199,6 +216,7 @@ fn concurrent_saves_dont_clobber() {
 
 #[test]
 fn legacy_migration_preserves_all_roots() {
+    let _lock = SESSION_LOCK.lock().unwrap();
     let env = TestEnv::new("legacy_migrate");
 
     let d1 = env.root.join("alpha");
@@ -232,6 +250,7 @@ fn legacy_migration_preserves_all_roots() {
 
 #[test]
 fn save_load_round_trip_uses_per_root_file() {
+    let _lock = SESSION_LOCK.lock().unwrap();
     let env = TestEnv::new("per_root_path");
 
     let state = SessionState {
