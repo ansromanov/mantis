@@ -11,8 +11,9 @@ use std::path::{Path, PathBuf};
 use crate::plugin::install::default_plugin_dir;
 use crate::plugin::process::Plugin;
 use crate::plugin::types::{
-    Capability, LanguageProviderRegistration, PluginEntry, PluginKind, ToPlugin,
+    Capability, LanguageProviderRegistration, PluginEntry, PluginKind, ThemeColorsMsg, ToPlugin,
 };
+use crate::theme::Theme;
 
 /// Diagnostics captured from a plugin's stderr at the moment it was found dead.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -32,6 +33,7 @@ pub(crate) struct PluginManager {
     last_crash: HashMap<String, CrashInfo>,
     spawn_errors: Vec<String>,
     active_theme: Option<String>,
+    active_theme_colors: Option<ThemeColorsMsg>,
     provider_registrations: Vec<LanguageProviderRegistration>,
 }
 
@@ -45,6 +47,7 @@ impl PluginManager {
             last_crash: HashMap::new(),
             spawn_errors: Vec::new(),
             active_theme: None,
+            active_theme_colors: None,
             provider_registrations: Vec::new(),
         }
     }
@@ -70,8 +73,9 @@ impl PluginManager {
     }
 
     /// Spawns all enabled *process* plugins and sends them the `init` event.
-    pub(crate) fn activate_all(&mut self, theme_name: Option<&str>) {
+    pub(crate) fn activate_all(&mut self, theme_name: Option<&str>, theme: &Theme) {
         self.active_theme = theme_name.map(|s| s.to_string());
+        self.active_theme_colors = Some(ThemeColorsMsg::from(theme));
         let plugin_dir = default_plugin_dir();
         for (name, entry) in &self.entries {
             if !entry.enabled || entry.kind != PluginKind::Process {
@@ -93,6 +97,7 @@ impl PluginManager {
                 path: None,
                 key: None,
                 theme: self.active_theme.clone(),
+                colors: self.active_theme_colors.clone(),
                 protocol_version: Some(crate::plugin::PROTOCOL_VERSION.into()),
             });
             self.plugins.push(plugin);
@@ -114,6 +119,7 @@ impl PluginManager {
                 path: None,
                 key: None,
                 theme: None,
+                colors: None,
                 protocol_version: None,
             });
         }
@@ -134,6 +140,7 @@ impl PluginManager {
                 path: Some(path_s.clone()),
                 key: None,
                 theme: None,
+                colors: None,
                 protocol_version: None,
             });
         }
@@ -151,14 +158,17 @@ impl PluginManager {
                 path: None,
                 key: Some(key_str.clone()),
                 theme: None,
+                colors: None,
                 protocol_version: None,
             });
         }
     }
 
-    /// Sends `on_theme_change` to all subscribed active plugins with the new theme name.
-    pub(crate) fn on_theme_change(&mut self, theme: &str) {
-        self.active_theme = Some(theme.to_string());
+    /// Sends `on_theme_change` to all subscribed active plugins with the new
+    /// theme name and its resolved colors.
+    pub(crate) fn on_theme_change(&mut self, theme_name: &str, theme: &Theme) {
+        self.active_theme = Some(theme_name.to_string());
+        self.active_theme_colors = Some(ThemeColorsMsg::from(theme));
         for plugin in &mut self.plugins {
             if !plugin.subscribes_to("on_theme_change") {
                 continue;
@@ -167,7 +177,8 @@ impl PluginManager {
                 event: "on_theme_change".into(),
                 path: None,
                 key: None,
-                theme: Some(theme.into()),
+                theme: Some(theme_name.into()),
+                colors: self.active_theme_colors.clone(),
                 protocol_version: None,
             });
         }
@@ -185,6 +196,7 @@ impl PluginManager {
                 path: path_s.clone(),
                 key: None,
                 theme: None,
+                colors: None,
                 protocol_version: None,
             });
         }
@@ -202,6 +214,7 @@ impl PluginManager {
                 path: None,
                 key: None,
                 theme: None,
+                colors: None,
                 protocol_version: None,
             });
         }
@@ -341,6 +354,7 @@ impl PluginManager {
             path: None,
             key: None,
             theme: self.active_theme.clone(),
+            colors: self.active_theme_colors.clone(),
             protocol_version: Some(crate::plugin::PROTOCOL_VERSION.into()),
         });
         if let Some(file) = current_file {
@@ -350,6 +364,7 @@ impl PluginManager {
                 path: Some(path_s.clone()),
                 key: None,
                 theme: None,
+                colors: None,
                 protocol_version: None,
             });
             plugin.send(&ToPlugin {
@@ -357,6 +372,7 @@ impl PluginManager {
                 path: Some(path_s),
                 key: None,
                 theme: None,
+                colors: None,
                 protocol_version: None,
             });
         }
@@ -377,6 +393,7 @@ impl PluginManager {
             path: None,
             key: None,
             theme: None,
+            colors: None,
             protocol_version: None,
         });
         plugin.close_in_background();

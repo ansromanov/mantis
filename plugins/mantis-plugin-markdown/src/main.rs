@@ -5,22 +5,16 @@
 //! rendered lines. Responds to `on_theme_change` to re-render with matching
 //! colours, and `on_keypress` for `M` (raw/rendered toggle).
 //!
-//! ## Theme colour mapping
+//! ## Theme colours
 //!
-//! mantis theme colours are mapped to ANSI 256-colour codes:
-//!
-//! | Role      | ANSI colour |
-//! |-----------|-------------|
-//! | heading1  | 81 (light cyan)   |
-//! | heading2  | 229 (light yellow) |
-//! | heading3  | 120 (light green)  |
-//! | accent    | 51 (cyan)          |
-//! | dim       | 243 (dark gray)    |
-//! | code      | 229 (light yellow) |
-//! | text      | 15 (white)         |
-//!
-//! These can be overridden by sending `on_theme_change` with a different
-//! theme name. The plugin maintains a small dictionary of theme presets.
+//! `init` and `on_theme_change` events carry a `colors` object with the
+//! active theme's actual `heading1`/`heading2`/`heading3`/`accent`/`dim`/
+//! `code`/`text` roles as `#rrggbb` hex strings (see
+//! `docs/src/plugin-development.md`). The plugin converts each to a
+//! truecolor (`38;2;R;G;B`) ANSI code, so any theme — built-in or a user's
+//! own `mantis.toml` preset — renders with its real colours, with no
+//! per-theme-name dictionary to keep in sync. If `colors` is absent (an
+//! older host), the plugin falls back to a built-in dark-terminal default.
 
 use std::io::{self, BufRead, Write};
 use std::path::Path;
@@ -48,16 +42,16 @@ fn main() {
         };
         let event = msg["event"].as_str().unwrap_or("");
         match event {
-            "init" => {}
+            "init" => {
+                state.handle_theme_change(msg.get("colors"));
+            }
             "on_file_open" => {
                 if let Some(path) = msg["path"].as_str() {
                     state.handle_open(path, &mut stdout.lock());
                 }
             }
             "on_theme_change" => {
-                if let Some(theme) = msg["theme"].as_str() {
-                    state.handle_theme_change(theme);
-                }
+                state.handle_theme_change(msg.get("colors"));
             }
             "on_keypress" => {
                 if let Some(key) = msg["key"].as_str() {
@@ -92,6 +86,8 @@ struct ThemeColors {
 }
 
 impl ThemeColors {
+    /// Fallback used when the host doesn't send a `colors` object (an older
+    /// protocol version) or a color fails to parse.
     fn default_theme() -> Self {
         ThemeColors {
             heading1: "38;5;81".into(),  // light cyan
@@ -104,53 +100,34 @@ impl ThemeColors {
         }
     }
 
-    fn monokai() -> Self {
-        ThemeColors {
-            heading1: "38;5;81".into(),
-            heading2: "38;5;222".into(),
-            heading3: "38;5;119".into(),
-            accent: "38;5;141".into(),
-            dim: "38;5;242".into(),
-            code: "38;5;222".into(),
-            text: "38;5;15".into(),
-        }
+    /// Builds a truecolor palette from the host's `colors` object (hex
+    /// strings per role). Returns `None` if any role is missing or malformed
+    /// so the caller can fall back to [`default_theme`](Self::default_theme).
+    fn from_json(v: &serde_json::Value) -> Option<Self> {
+        let hex = |role: &str| v[role].as_str().and_then(hex_to_truecolor);
+        Some(ThemeColors {
+            heading1: hex("heading1")?,
+            heading2: hex("heading2")?,
+            heading3: hex("heading3")?,
+            accent: hex("accent")?,
+            dim: hex("dim")?,
+            code: hex("code")?,
+            text: hex("text")?,
+        })
     }
+}
 
-    fn solarized() -> Self {
-        ThemeColors {
-            heading1: "38;5;37".into(),
-            heading2: "38;5;136".into(),
-            heading3: "38;5;64".into(),
-            accent: "38;5;37".into(),
-            dim: "38;5;240".into(),
-            code: "38;5;136".into(),
-            text: "38;5;12".into(),
-        }
+/// Converts a `#rrggbb` hex string to a truecolor ANSI SGR code
+/// (`38;2;R;G;B`). Returns `None` if `hex` isn't a well-formed 6-digit hex.
+fn hex_to_truecolor(hex: &str) -> Option<String> {
+    let h = hex.strip_prefix('#')?;
+    if h.len() != 6 || !h.is_ascii() {
+        return None;
     }
-
-    fn catppuccin() -> Self {
-        ThemeColors {
-            heading1: "38;5;117".into(),
-            heading2: "38;5;222".into(),
-            heading3: "38;5;157".into(),
-            accent: "38;5;183".into(),
-            dim: "38;5;242".into(),
-            code: "38;5;222".into(),
-            text: "38;5;15".into(),
-        }
-    }
-
-    fn synthwave84() -> Self {
-        ThemeColors {
-            heading1: "38;5;213".into(),
-            heading2: "38;5;226".into(),
-            heading3: "38;5;51".into(),
-            accent: "38;5;207".into(),
-            dim: "38;5;243".into(),
-            code: "38;5;226".into(),
-            text: "38;5;15".into(),
-        }
-    }
+    let r = u8::from_str_radix(&h[0..2], 16).ok()?;
+    let g = u8::from_str_radix(&h[2..4], 16).ok()?;
+    let b = u8::from_str_radix(&h[4..6], 16).ok()?;
+    Some(format!("38;2;{r};{g};{b}"))
 }
 
 impl PluginState {
@@ -162,14 +139,10 @@ impl PluginState {
         }
     }
 
-    fn handle_theme_change(&mut self, theme_name: &str) {
-        self.theme = match theme_name {
-            "monokai" => ThemeColors::monokai(),
-            "solarized" => ThemeColors::solarized(),
-            "catppuccin" => ThemeColors::catppuccin(),
-            "synthwave84" => ThemeColors::synthwave84(),
-            _ => ThemeColors::default_theme(),
-        };
+    fn handle_theme_change(&mut self, colors: Option<&serde_json::Value>) {
+        self.theme = colors
+            .and_then(ThemeColors::from_json)
+            .unwrap_or_else(ThemeColors::default_theme);
         // Re-render the current file if one is open.
         if let Some(ref path) = self.current_file.clone() {
             self.handle_open(path, &mut io::stdout().lock());

@@ -107,6 +107,74 @@ fn apply_theme_clears_plugin_content() {
 }
 
 #[test]
+#[cfg(unix)]
+fn apply_theme_sends_new_theme_colors_to_plugins() {
+    // editor.rs's apply_theme hands the newly-resolved Theme to
+    // plugin_manager.on_theme_change so plugins get the new theme's actual
+    // colors, not just its name.
+    use std::io::Write as _;
+    use std::os::unix::fs::PermissionsExt;
+    use std::time::{Duration, Instant};
+
+    let root = temp_tree();
+    let plugin_dir = std::env::temp_dir().join(format!(
+        "tv_editor_theme_colors_{}_{}",
+        std::process::id(),
+        root.file_name().unwrap().to_string_lossy()
+    ));
+    fs::create_dir_all(&plugin_dir).unwrap();
+    let out = plugin_dir.join("recv.txt");
+    let script = plugin_dir.join("rec.sh");
+    let mut f = fs::File::create(&script).unwrap();
+    write!(f, "#!/bin/sh\ncat > \"{}\"\n", out.display()).unwrap();
+    drop(f);
+    fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+
+    let mut cfg = Config::default();
+    cfg.plugins.insert(
+        "rec".to_string(),
+        crate::plugin::PluginEntry {
+            path: script.clone(),
+            enabled: true,
+            ..Default::default()
+        },
+    );
+    let mut app = App::new(root.clone(), cfg, None, None).unwrap();
+
+    let monokai = crate::theme::Theme::load("monokai").expect("monokai theme must load");
+    app.apply_theme("monokai", monokai.clone());
+    app.plugin_manager.deactivate_all();
+
+    let deadline = Instant::now() + Duration::from_secs(3);
+    let contents = loop {
+        if let Ok(s) = fs::read_to_string(&out) {
+            if s.matches(r#""event":"on_theme_change""#).count() >= 1 {
+                break s;
+            }
+        }
+        assert!(
+            Instant::now() < deadline,
+            "plugin never received on_theme_change"
+        );
+        std::thread::sleep(Duration::from_millis(25));
+    };
+    let line = contents
+        .lines()
+        .find(|l| l.contains(r#""event":"on_theme_change""#))
+        .expect("on_theme_change event must be sent");
+    let expected = format!(
+        r#""heading1":"{}""#,
+        crate::theme::color_to_hex(monokai.heading1)
+    );
+    assert!(
+        line.contains(&expected),
+        "on_theme_change colors must reflect the new theme, got: {line}"
+    );
+    fs::remove_dir_all(&root).ok();
+    fs::remove_dir_all(&plugin_dir).ok();
+}
+
+#[test]
 fn toggle_git_flat_noop_when_not_in_git_mode() {
     let root = temp_tree();
     let mut app = app_for(&root);

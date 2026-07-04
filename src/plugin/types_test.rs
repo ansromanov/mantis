@@ -1,5 +1,6 @@
 use super::*;
-use crate::plugin::types::ToPlugin;
+use crate::plugin::types::{ThemeColorsMsg, ToPlugin};
+use crate::theme::{color_to_hex, Theme};
 
 #[test]
 fn plugin_entry_default_is_enabled_process() {
@@ -84,6 +85,7 @@ fn to_plugin_init_serializes_protocol_version() {
         path: None,
         key: None,
         theme: Some("default".into()),
+        colors: None,
         protocol_version: Some("2".into()),
     };
     let json = serde_json::to_string(&msg).unwrap();
@@ -95,12 +97,51 @@ fn to_plugin_init_serializes_protocol_version() {
 }
 
 #[test]
+fn to_plugin_serializes_colors_when_present() {
+    let msg = ToPlugin {
+        event: "on_theme_change".into(),
+        path: None,
+        key: None,
+        theme: Some("default".into()),
+        colors: Some(ThemeColorsMsg::from(&Theme::default())),
+        protocol_version: None,
+    };
+    let json = serde_json::to_string(&msg).unwrap();
+    assert!(json.contains(r#""colors":{"#));
+    assert!(json.contains(r#""heading1":"#));
+    assert!(json.contains(r#""text":"#));
+}
+
+#[test]
+fn to_plugin_omits_colors_when_none() {
+    let msg = ToPlugin {
+        event: "on_keypress".into(),
+        path: None,
+        key: Some("q".into()),
+        theme: None,
+        colors: None,
+        protocol_version: None,
+    };
+    let json = serde_json::to_string(&msg).unwrap();
+    assert!(!json.contains("colors"));
+}
+
+#[test]
+fn theme_colors_msg_converts_real_theme_roles_to_hex() {
+    let theme = Theme::default();
+    let msg = ThemeColorsMsg::from(&theme);
+    assert_eq!(msg.heading1, color_to_hex(theme.heading1));
+    assert_eq!(msg.text, color_to_hex(theme.text));
+}
+
+#[test]
 fn to_plugin_omits_protocol_version_when_none() {
     let msg = ToPlugin {
         event: "on_file_open".into(),
         path: Some("/a/b.rs".into()),
         key: None,
         theme: None,
+        colors: None,
         protocol_version: None,
     };
     let json = serde_json::to_string(&msg).unwrap();

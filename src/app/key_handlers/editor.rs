@@ -239,7 +239,7 @@ impl App {
     /// preserving scroll position.
     pub(crate) fn apply_theme(&mut self, theme_name: &str, theme: Theme) {
         // Notify plugins so they can re-render content with matching colours.
-        self.plugin_manager.on_theme_change(theme_name);
+        self.plugin_manager.on_theme_change(theme_name, &theme);
         self.plugin_content.clear();
         self.plugin_content_text.clear();
         self.theme = theme;

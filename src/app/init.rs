@@ -82,7 +82,7 @@ impl App {
         // in the plugin palette). The manager skips non-Process entries in
         // activate_all/activate_one.
         let mut plugin_manager = PluginManager::new(plugin_entries);
-        plugin_manager.activate_all(cfg.theme.name.as_deref());
+        plugin_manager.activate_all(cfg.theme.name.as_deref(), &theme);
         let plugin_spawn_error = plugin_manager
             .take_spawn_errors()
             .into_iter()

@@ -214,6 +214,24 @@ fn parse_color_invalid_returns_none() {
     assert!(parse_color("rgb(1,2,3)").is_none());
 }
 
+#[test]
+fn color_to_hex_rgb_roundtrips() {
+    assert_eq!(color_to_hex(Color::Rgb(0xaa, 0xbb, 0xcc)), "#aabbcc");
+}
+
+#[test]
+fn color_to_hex_named_colors_are_stable() {
+    assert_eq!(color_to_hex(Color::White), "#ffffff");
+    assert_eq!(color_to_hex(Color::Black), "#000000");
+    assert_eq!(color_to_hex(Color::LightCyan), "#00ffff");
+}
+
+#[test]
+fn color_to_hex_reset_and_indexed_fall_back_to_gray() {
+    assert_eq!(color_to_hex(Color::Reset), "#7f7f7f");
+    assert_eq!(color_to_hex(Color::Indexed(42)), "#7f7f7f");
+}
+
 // ---------------------------------------------------------------------------
 // Theme::from_toml error paths
 // ---------------------------------------------------------------------------
