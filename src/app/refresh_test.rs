@@ -1,8 +1,10 @@
 use std::collections::HashSet;
 use std::fs;
+use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use super::*;
+use crate::app::loader::compute_file_load;
 use crate::app::StatusMessage;
 
 // -- debounce / tick tests ----------------------------------------------------
@@ -1039,16 +1041,16 @@ fn apply_git_status_load_rebuilds_tree_in_git_mode() {
 }
 
 #[test]
-fn request_git_status_refresh_is_sync_in_tests() {
+fn request_git_status_refresh_enqueues_and_applies() {
     let mut app = create_base_app();
     assert!(app.git_status_map.is_empty());
     assert!(app.git_info.is_none());
 
     app.request_git_status_refresh();
+    app.pump_loads();
 
-    // In test builds request_git_status_refresh runs synchronously.
     // For a non-git-repo root the map/info remain empty — the important
-    // thing is the call doesn't crash and the fields are accessible.
+    // thing is the pipeline doesn't crash and the fields are accessible.
     assert!(app.git_status_map.is_empty());
     assert!(app.git_info.is_none());
 }
@@ -1086,12 +1088,102 @@ fn request_git_status_refresh_ignore_gitignore_includes_ignored() {
     assert!(app.git_status_map.is_empty());
 
     app.request_git_status_refresh();
+    app.pump_loads();
 
     let ignored = app.root.join("build.log");
     assert_eq!(
         app.git_status_map.get(&ignored),
         Some(&crate::git::GitStatus::Ignored),
         "request_git_status_refresh with ignore_gitignore=true must include ignored files"
+    );
+}
+
+// -- Supersession (stale worker responses discarded) --------------------------
+
+#[test]
+fn request_open_file_supersession_discards_stale_response() {
+    use std::io::Write;
+    let mut app = create_base_app();
+    let mut a = tempfile::NamedTempFile::with_suffix(".rs").unwrap();
+    a.write_all(b"AAA\n").unwrap();
+    let mut b = tempfile::NamedTempFile::with_suffix(".rs").unwrap();
+    b.write_all(b"BBB\n").unwrap();
+
+    // Two requests fired back-to-back before either is drained: only the
+    // second (latest load_seq) result should ever be applied.
+    app.request_open_file(a.path());
+    app.request_open_file(b.path());
+    app.pump_loads();
+
+    assert_eq!(
+        app.current_file,
+        Some(b.path().to_path_buf()),
+        "only the newest request_open_file must be applied"
+    );
+    // Plain files load lazily via VirtualFile; check its raw bytes rather
+    // than `content` (which stays empty on this path).
+    let vf = app.virtual_file.as_ref().expect("virtual_file must be set");
+    assert_eq!(vf.raw_bytes(), b"BBB\n");
+}
+
+#[test]
+fn request_working_tree_diff_supersession_discards_stale_response() {
+    use std::process::Command;
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().to_path_buf();
+    let git = |args: &[&str]| {
+        Command::new("git")
+            .arg("-C")
+            .arg(&root)
+            .args(["-c", "user.email=t@e.x", "-c", "user.name=T"])
+            .args(args)
+            .status()
+            .unwrap();
+    };
+    git(&["init", "-q"]);
+    fs::write(root.join("a.txt"), "a\n").unwrap();
+    fs::write(root.join("b.txt"), "b\n").unwrap();
+    git(&["add", "."]);
+    git(&["commit", "-q", "-m", "init"]);
+    fs::write(root.join("a.txt"), "a changed\n").unwrap();
+    fs::write(root.join("b.txt"), "b changed\n").unwrap();
+
+    let mut app = create_base_app();
+    app.root = root.canonicalize().unwrap();
+
+    // Two requests fired back-to-back before either is drained: only the
+    // second (latest load_seq) result should ever be applied.
+    app.request_working_tree_diff(&root.join("a.txt"));
+    app.request_working_tree_diff(&root.join("b.txt"));
+    app.pump_loads();
+
+    assert_eq!(
+        app.current_file,
+        Some(root.join("b.txt")),
+        "only the newest request_working_tree_diff must be applied"
+    );
+}
+
+#[test]
+fn apply_response_ignores_stale_file_seq() {
+    let mut app = create_base_app();
+    app.load_seq = 5;
+    app.current_file = None;
+
+    let applied = app.apply_response(LoadResponse::File {
+        seq: 4,
+        path: PathBuf::from("/tmp/stale.txt"),
+        load: Box::new(compute_file_load(
+            std::path::Path::new("/tmp/stale.txt"),
+            &app.theme,
+            &app.highlighter,
+        )),
+    });
+
+    assert!(!applied, "stale seq must not be reported as applied");
+    assert!(
+        app.current_file.is_none(),
+        "stale response must not update current_file"
     );
 }
 

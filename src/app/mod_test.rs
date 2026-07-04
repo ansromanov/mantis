@@ -256,6 +256,7 @@ fn left_click_in_tree_opens_file() {
     let idx = app.nodes.iter().position(|n| !n.is_dir).unwrap();
     let path = app.nodes[idx].path.clone();
     app.handle_mouse(click(1, idx as u16));
+    app.pump_loads();
 
     assert_eq!(app.tree_selected, idx);
     assert_eq!(app.current_file.as_deref(), Some(path.as_path()));
@@ -659,6 +660,7 @@ fn git_mode_opens_working_tree_diff() {
     for _ in 0..file_idx {
         app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
     }
+    app.pump_loads();
 
     assert!(
         app.is_diff,
@@ -687,6 +689,7 @@ fn git_mode_navigation_shows_diff_for_each_file() {
     app.handle_key(ctrl_g());
     // Move to the next file node.
     app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
+    app.pump_loads();
 
     assert!(
         app.is_diff,
@@ -4886,6 +4889,7 @@ fn s_key_cycles_diff_mode_in_diff_view() {
     let mut app = app_for(&root);
     // Enter git mode so the content pane shows a working-tree diff.
     app.handle_key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL));
+    app.pump_loads();
     assert!(app.is_diff, "git mode should show a diff");
     assert_eq!(app.diff_mode, DiffMode::All, "default mode should be All");
 
@@ -4893,6 +4897,7 @@ fn s_key_cycles_diff_mode_in_diff_view() {
 
     // First S: All → Staged
     app.handle_key(KeyEvent::new(KeyCode::Char('S'), KeyModifiers::empty()));
+    app.pump_loads();
     assert_eq!(app.diff_mode, DiffMode::Staged);
     assert!(
         app.is_diff,
@@ -4909,6 +4914,7 @@ fn s_key_cycles_diff_mode_in_diff_view() {
 
     // Second S: Staged → Unstaged
     app.handle_key(KeyEvent::new(KeyCode::Char('S'), KeyModifiers::empty()));
+    app.pump_loads();
     assert_eq!(app.diff_mode, DiffMode::Unstaged);
     assert!(
         app.content_title
@@ -4921,6 +4927,7 @@ fn s_key_cycles_diff_mode_in_diff_view() {
 
     // Third S: Unstaged → All (full cycle)
     app.handle_key(KeyEvent::new(KeyCode::Char('S'), KeyModifiers::empty()));
+    app.pump_loads();
     assert_eq!(app.diff_mode, DiffMode::All);
     assert!(
         app.content_title.as_deref().unwrap_or("").contains("[all]"),

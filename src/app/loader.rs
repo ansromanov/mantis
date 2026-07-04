@@ -10,8 +10,7 @@
 //!
 //! The pure computation lives in [`compute_file_load`] / [`compute_diff_load`]
 //! so the synchronous `App::open_file` / `App::show_working_tree_diff` paths
-//! (used at startup, on reload, and in tests) share exactly the same logic as
-//! the worker.
+//! (used at startup, on reload) share exactly the same logic as the worker.
 //!
 //! `compute_diff_load` accepts a [`crate::app::DiffMode`] parameter to choose
 //! between all-changes, staged, and unstaged diff variants.
