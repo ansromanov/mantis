@@ -42,6 +42,12 @@ fn git_toplevel(dir: &Path) -> Option<PathBuf> {
 
 /// Returns rich git repository info for the directory containing `dir`, or
 /// `None` if not in a git repo or git is unavailable.
+///
+/// Note: this calls `git status --porcelain -b` **without** `-z` for two
+/// reasons: (1) this function only reads branch/HEAD/count info, never
+/// parses paths, so C-quoting is irrelevant, and (2) `-b` output is always
+/// a single branch-header line followed by status entries, and the branch
+/// header contains no quoted paths.
 pub fn repo_info(dir: &Path) -> Option<GitRepoInfo> {
     let root = git_toplevel(dir)?;
 
@@ -168,6 +174,9 @@ fn parse_repo_info(text: &str) -> GitRepoInfo {
 /// Builds an absolute-path → status map for the repository containing `dir`.
 /// Parent directories are included with their highest-priority child status so
 /// collapsed dirs can be colored when they contain changes.
+///
+/// Uses `git status --porcelain -z` so paths are never C-quoted (safe for
+/// non-ASCII, spaces, quotes, and control characters).
 pub fn repo_status(
     dir: &Path,
     include_untracked: bool,
@@ -178,7 +187,9 @@ pub fn repo_status(
     };
 
     let mut cmd = Command::new("git");
-    cmd.arg("-C").arg(&root).arg("status").arg("--porcelain");
+    cmd.arg("-C")
+        .arg(&root)
+        .args(["status", "--porcelain", "-z"]);
     if include_ignored {
         cmd.arg("--ignored");
     }
@@ -187,28 +198,51 @@ pub fn repo_status(
         _ => return HashMap::new(),
     };
 
-    let text = String::from_utf8_lossy(&out.stdout);
     let mut map: HashMap<PathBuf, GitStatus> = HashMap::new();
 
-    for line in text.lines() {
-        if line.len() < 3 {
+    // With -z, each entry is NUL-terminated and paths are never C-quoted.
+    //   Normal:  XY path\0
+    //   Rename:  R  orig_path\0new_path\0
+    let bytes = &out.stdout;
+    let mut segs: Vec<&[u8]> = bytes.split(|&b| b == 0).collect();
+    // The final NUL produces a trailing empty segment; drop it.
+    if segs.last().is_some_and(|s| s.is_empty()) {
+        segs.pop();
+    }
+
+    let mut i = 0;
+    while i < segs.len() {
+        let seg = segs[i];
+        if seg.len() < 3 {
+            i += 1;
             continue;
         }
-        let x = line.as_bytes()[0] as char;
-        let y = line.as_bytes()[1] as char;
-        let path_str = line[3..].trim();
-        let path_str = path_str
-            .find(" -> ")
-            .map_or(path_str, |i| &path_str[i + 4..]);
+
+        let x = seg[0] as char;
+        let y = seg[1] as char;
+        let path_bytes: &[u8] = &seg[3..];
+
+        // With -z, rename entries are R  dest\0src\0 — the destination
+        // (new) path is at seg[3..] and the source (old) path is the next
+        // NUL-delimited segment.  We only need the destination, so consume
+        // the source segment here.
+        if x == 'R' || y == 'R' {
+            i += 1;
+        }
+
+        let path_str = std::str::from_utf8(path_bytes).unwrap_or("");
         let path_str = path_str.trim_end_matches('/');
         if path_str.is_empty() {
+            i += 1;
             continue;
         }
 
         if x == '?' && y == '?' && !include_untracked {
+            i += 1;
             continue;
         }
         if x == '!' && y == '!' && !include_ignored {
+            i += 1;
             continue;
         }
 
@@ -237,6 +271,8 @@ pub fn repo_status(
                 cur = d.parent();
             }
         }
+
+        i += 1;
     }
 
     map
