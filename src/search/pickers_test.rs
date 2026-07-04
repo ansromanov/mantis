@@ -284,6 +284,8 @@ fn goto_line_state_default_is_empty() {
 fn tree_filter_new_has_no_cache() {
     let f = TreeFilter::new();
     assert!(f.cached.is_none());
+    assert!(f.saved_expanded.is_none());
+    assert!(f.full_paths_cache.is_none());
 }
 
 #[test]
