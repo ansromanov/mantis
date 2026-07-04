@@ -523,10 +523,10 @@ fn help_shows_no_markdown_entry() {
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
-    // The built-in markdown renderer was removed; no "raw" or "markdown" toggle
-    // should appear in the help overlay.
+    // The built-in markdown renderer was removed; its help entry description
+    // should no longer appear in the help overlay.
     assert!(
-        !joined.contains("raw markdown"),
-        "help must not mention raw-markdown toggle after built-in renderer removal"
+        !joined.contains("toggle markdown render"),
+        "help must not mention the markdown-render toggle after built-in renderer removal"
     );
 }
