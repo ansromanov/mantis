@@ -5,6 +5,7 @@
 //! fall through to the dispatcher and map `Activate`/`Close` to the
 //! overlay-specific action.
 
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 use crossterm::event::{KeyCode, KeyEvent};
@@ -278,6 +279,18 @@ impl App {
                 self.show_hidden,
                 self.ignore_gitignore,
             ));
+            // Pair each path with its lowercased file name up front so the
+            // per-keystroke matching below is allocation-free.
+            let all: Vec<(PathBuf, String)> = all
+                .into_iter()
+                .map(|p| {
+                    let name = p
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_lowercase())
+                        .unwrap_or_default();
+                    (p, name)
+                })
+                .collect();
             if let Some(f) = self.tree_filter.as_mut() {
                 f.full_paths_cache = Some(all);
             }
@@ -296,13 +309,9 @@ impl App {
             .and_then(|f| f.full_paths_cache.take())
             .unwrap_or_default();
 
-        let mut to_expand: Vec<PathBuf> = Vec::new();
-        for path in &paths {
-            let is_match = path
-                .file_name()
-                .map(|n| n.to_string_lossy().to_lowercase().contains(&query))
-                .unwrap_or(false);
-            if !is_match {
+        let mut to_expand: HashSet<PathBuf> = HashSet::new();
+        for (path, name) in &paths {
+            if !name.contains(&query) {
                 continue;
             }
             let mut ancestor = path.parent();
@@ -310,8 +319,14 @@ impl App {
                 if p == self.root {
                     break;
                 }
+                // An earlier match already recorded this ancestor, and that
+                // walk continued to the root, so the rest of this chain is
+                // recorded too.
+                if to_expand.contains(p) {
+                    break;
+                }
                 if !self.expanded.contains(p) {
-                    to_expand.push(p.to_path_buf());
+                    to_expand.insert(p.to_path_buf());
                 }
                 ancestor = p.parent();
             }

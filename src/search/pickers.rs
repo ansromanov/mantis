@@ -25,11 +25,12 @@ pub struct TreeFilter {
     /// any directories, so it can be restored once the filter is dismissed.
     /// `None` until the first non-empty query triggers an auto-expansion.
     pub(crate) saved_expanded: Option<HashSet<PathBuf>>,
-    /// Every directory and file path under the tree root, used to match
-    /// against the query regardless of current expansion state. Built lazily
-    /// on the first non-empty query and reused for the rest of the filter
-    /// session instead of re-walking the filesystem on every keystroke.
-    pub(crate) full_paths_cache: Option<Vec<PathBuf>>,
+    /// Every directory and file path under the tree root, paired with its
+    /// lowercased file name, used to match against the query regardless of
+    /// current expansion state. Built lazily on the first non-empty query and
+    /// reused for the rest of the filter session so keystrokes neither re-walk
+    /// the filesystem nor re-lowercase (re-allocate) every name.
+    pub(crate) full_paths_cache: Option<Vec<(PathBuf, String)>>,
 }
 
 impl TreeFilter {
