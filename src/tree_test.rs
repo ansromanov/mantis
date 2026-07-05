@@ -187,7 +187,7 @@ fn flat_tree_with_nothing_expanded_does_not_surface_errors_from_unreadable_dirs(
     // grandchild inside a collapsed directory must never be opened or
     // counted as a walk error. Note: this holds whether the deep walk is
     // skipped by the guard above or merely blocked by `filter_entry` at
-    // depth 1, so this test does not by itself prove the guard fires — it
+    // depth 1, so this test does not by itself prove the guard fires - it
     // only asserts the (guard-independent) invariant that collapsed
     // directories' contents are never read.
     use std::os::unix::fs::PermissionsExt;

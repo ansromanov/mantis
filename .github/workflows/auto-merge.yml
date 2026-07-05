@@ -34,4 +34,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR_URL: ${{ github.event.pull_request.html_url }}
-        run: gh pr merge --auto --squash "$PR_URL"
+        run: |
+          state=$(gh pr view "$PR_URL" --json state,isDraft -q '.state + " " + (.isDraft | tostring)')
+          if [ "$state" != "OPEN false" ]; then
+            echo "PR no longer open and ready ($state) after the wait; skipping."
+            exit 0
+          fi
+          gh pr merge --auto --squash "$PR_URL"
