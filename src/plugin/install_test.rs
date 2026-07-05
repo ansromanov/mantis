@@ -44,15 +44,9 @@ fn default_plugin_dir_respects_xdg() {
 }
 
 #[test]
-fn bundled_plugin_entries_all_disabled_and_include_markdown_and_terraform() {
+fn bundled_plugin_entries_markdown_enabled_iconize_and_terraform_disabled() {
     let entries = bundled_plugin_entries();
     assert!(!entries.is_empty(), "must have at least one bundled plugin");
-    for (_, entry) in &entries {
-        assert!(
-            !entry.enabled,
-            "bundled entries must default to enabled=false"
-        );
-    }
     let names: Vec<&str> = entries.iter().map(|(n, _)| n.as_str()).collect();
     assert!(
         names.contains(&"markdown"),
@@ -63,6 +57,16 @@ fn bundled_plugin_entries_all_disabled_and_include_markdown_and_terraform() {
         names.contains(&"terraform"),
         "terraform syntax plugin must be listed"
     );
+    for (name, entry) in &entries {
+        if name == "markdown" {
+            assert!(entry.enabled, "markdown plugin must be enabled by default");
+        } else {
+            assert!(
+                !entry.enabled,
+                "bundled plugin {name} must default to enabled=false"
+            );
+        }
+    }
     // Process entries
     for (name, entry) in &entries {
         if name == "terraform" {
