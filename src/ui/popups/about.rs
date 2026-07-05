@@ -20,6 +20,18 @@ use crate::app::App;
 
 use super::util::centered_rect;
 
+/// Caps how many changelog `entries` are shown within `budget` rows, reserving
+/// one row for a "N more" marker whenever truncation is needed so the marker
+/// itself never overruns the budget. Returns `(shown_entries, remaining_count)`.
+pub(crate) fn fit_changelog<'a>(entries: &'a [&'a str], budget: usize) -> (&'a [&'a str], usize) {
+    if entries.len() <= budget {
+        (entries, 0)
+    } else {
+        let shown = budget.saturating_sub(1);
+        (&entries[..shown], entries.len() - shown)
+    }
+}
+
 pub(crate) fn draw_about(f: &mut Frame, app: &App, area: Rect) {
     let theme = &app.theme;
     let popup = centered_rect(52, 75, area);
@@ -98,10 +110,25 @@ pub(crate) fn draw_about(f: &mut Frame, app: &App, area: Rect) {
                 .fg(theme.accent)
                 .add_modifier(Modifier::UNDERLINED),
         )]));
-        for line in whats_new.lines() {
+
+        // The hint line below must always stay visible, so cap how many
+        // changelog entries we render to whatever's left of `inner`'s height.
+        let reserved = if has_url { 2 } else { 0 };
+        let budget = (inner.height as usize)
+            .saturating_sub(rows.len())
+            .saturating_sub(reserved);
+        let entries: Vec<&str> = whats_new.lines().collect();
+        let (shown, remaining) = fit_changelog(&entries, budget);
+        for line in shown {
             rows.push(Line::from(vec![Span::styled(
                 format!("  {line}"),
                 text_style,
+            )]));
+        }
+        if remaining > 0 {
+            rows.push(Line::from(vec![Span::styled(
+                format!("  ... ({remaining} more, see release page)"),
+                dim,
             )]));
         }
     }
