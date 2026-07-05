@@ -183,6 +183,7 @@ fn event_loop_key_command_palette_toggles() {
     fs::write(dir.join("a.txt"), "hello\n").unwrap();
     let mut app = app_for(&dir);
     assert!(app.command_palette.is_none());
+    // command_palette = ctrl+shift+p, i.e. ctrl + uppercase P.
     app.handle_key(KeyEvent::new(KeyCode::Char('P'), KeyModifiers::CONTROL));
     assert!(app.command_palette.is_some());
     app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));

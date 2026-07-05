@@ -35,6 +35,12 @@ while IFS= read -r f; do
   case "$f" in
     Cargo.toml|Cargo.lock|mantis.toml|.cargo/config.toml|.github/workflows/*) echo __ALL__; exit 0 ;;
     src/lib.rs|src/main.rs) echo __ALL__; exit 0 ;;
+    # src/main.rs declares these via #[path = "..."] with mod names that
+    # don't match the file stem (`mod tests;` / `mod draw_tests;`), so the
+    # generic stem-based mapping below would produce a filter matching no
+    # tests. Map them to their actual module names directly.
+    src/main_test.rs) add_unit "tests" ;;
+    src/main_draw_test.rs) add_unit "draw_tests" ;;
     src/*.rs)
       m=${f#src/}; m=${m%.rs}
       # When a _test.rs file's stem matches the parent directory name
