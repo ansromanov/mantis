@@ -24,7 +24,9 @@ use std::thread::JoinHandle;
 use ratatui::style::Style;
 
 use crate::app::DiffMode;
-use crate::file::{detect_encoding_prefix, detect_line_ending, is_binary_bytes};
+use crate::file::{
+    build_binary_placeholder_content, detect_encoding_prefix, detect_line_ending, is_binary_bytes,
+};
 use crate::fold::FoldRegion;
 use crate::git::GitStatus;
 use crate::highlight::Highlighter;
@@ -164,7 +166,7 @@ pub(super) fn compute_file_load(
         }
     };
     if is_binary_bytes(&bytes) {
-        load.content = vec!["[binary file]".into()];
+        load.content = build_binary_placeholder_content(Some(path), &bytes);
         load.encoding = Some("BINARY".into());
         return load;
     }
@@ -175,8 +177,9 @@ pub(super) fn compute_file_load(
     let enc_prefix = detect_encoding_prefix(&bytes);
     let s = match String::from_utf8(bytes) {
         Ok(s) => s,
-        Err(_) => {
-            load.content = vec!["[binary file]".into()];
+        Err(e) => {
+            let original_bytes = e.into_bytes();
+            load.content = build_binary_placeholder_content(Some(path), &original_bytes);
             load.encoding = Some("BINARY".into());
             return load;
         }

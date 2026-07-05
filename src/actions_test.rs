@@ -44,6 +44,7 @@ const KEYMAP_FIELD_ACTION_IDS: &[&str] = &[
     "git_mode_flat_toggle",
     "command_palette",
     "open_in_editor",
+    "open_external",
     "fold_toggle",
     "toggle_watch",
     "recent_files",

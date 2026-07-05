@@ -937,7 +937,14 @@ fn open_file_binary_shows_binary_placeholder() {
     let bin_path = root.join("data.bin");
     fs::write(&bin_path, [0u8, 1, 2, 3]).unwrap();
     app.open_file(&bin_path);
-    assert_eq!(app.content, vec!["[binary file]"]);
+    assert_eq!(
+        app.content,
+        vec![
+            "[binary file — BIN file, 4 B]".to_string(),
+            "".to_string(),
+            "press o to open with the system default app".to_string()
+        ]
+    );
     assert!(app.highlighted.is_empty());
     fs::remove_dir_all(&root).ok();
 }

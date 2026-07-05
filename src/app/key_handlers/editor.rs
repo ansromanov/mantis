@@ -183,6 +183,10 @@ impl App {
                 self.open_in_editor();
                 true
             }
+            Some("open_external") => {
+                self.open_external_file();
+                true
+            }
             Some("open_config_in_editor") => {
                 self.open_config_in_editor();
                 true
@@ -452,5 +456,38 @@ impl App {
 
         self.config = cfg;
         self.reload();
+    }
+
+    /// Opens the currently selected file in the system default application.
+    pub(super) fn open_external_file(&mut self) {
+        if let Some(p) = self.current_file.clone() {
+            self.open_external(&p);
+        }
+    }
+
+    /// Opens `path` in the system default application.
+    /// When stdout is not a terminal (piped/headless/CI), sets a status message instead.
+    pub(super) fn open_external(&mut self, path: &Path) {
+        if !std::io::stdout().is_terminal() {
+            self.set_status("not opening file (non-interactive)");
+            return;
+        }
+        let path_str = path.to_string_lossy();
+        #[cfg(target_os = "macos")]
+        let res = std::process::Command::new("open").arg(&*path_str).spawn();
+        #[cfg(target_os = "windows")]
+        let res = std::process::Command::new("cmd")
+            .args(["/c", "start", "", &*path_str])
+            .spawn();
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        let res = std::process::Command::new("xdg-open")
+            .arg(&*path_str)
+            .spawn();
+
+        if let Err(e) = res {
+            self.set_status(format!("external open failed: {e}"));
+        } else {
+            self.set_status("opened file externally");
+        }
     }
 }

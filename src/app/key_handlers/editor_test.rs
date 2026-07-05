@@ -397,6 +397,21 @@ fn open_in_browser_non_tty_sets_status() {
 }
 
 #[test]
+fn open_external_non_tty_sets_status() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    assert!(app.status_message.is_none());
+    app.open_external(std::path::Path::new("test.png"));
+    assert!(
+        app.status_message.is_some(),
+        "non-interactive open_external must set a status message"
+    );
+    let msg = app.status_message.as_ref().unwrap();
+    assert!(msg.text.contains("not opening file"));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn dispatch_command_records_action_in_usage() {
     let root = temp_tree();
     let mut app = app_for(&root);

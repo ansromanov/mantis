@@ -16,7 +16,7 @@ use std::io::{self, Read};
 
 use crossterm::tty::IsTty;
 
-use crate::file::is_binary_bytes;
+use crate::file::{build_binary_placeholder_content, is_binary_bytes};
 
 /// How many leading lines are scanned for diff markers. Bounded so a huge
 /// piped file doesn't pay an `O(n)` scan just to rule out being a diff.
@@ -52,7 +52,7 @@ pub struct PagerContent {
 pub fn parse_pager_bytes(bytes: &[u8]) -> PagerContent {
     if is_binary_bytes(bytes) {
         return PagerContent {
-            content: vec!["[binary file]".into()],
+            content: build_binary_placeholder_content(None, bytes),
             is_diff: false,
         };
     }
