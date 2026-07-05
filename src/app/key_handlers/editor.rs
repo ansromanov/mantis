@@ -11,7 +11,8 @@
 //! from the palette live here too, alongside the related terminal-state
 //! bookkeeping. `open_release_url` delegates to the shared `open_in_browser`
 //! helper, which guards against spawning the browser when stdout is not a TTY
-//! (piped/headless/CI runs).
+//! (piped/headless/CI runs). `open_external` guards the same way and shares
+//! the OS-dispatch spawn logic with `open_in_browser` via `spawn_system_open`.
 
 use crossterm::event::EnableMouseCapture;
 use crossterm::execute;
@@ -344,19 +345,7 @@ impl App {
             self.set_status("not opening browser (non-interactive)");
             return;
         }
-        #[cfg(target_os = "macos")]
-        if let Err(e) = std::process::Command::new("open").arg(url).spawn() {
-            self.set_status(format!("browser launch failed: {e}"));
-        }
-        #[cfg(target_os = "windows")]
-        if let Err(e) = std::process::Command::new("cmd")
-            .args(["/c", "start", "", url])
-            .spawn()
-        {
-            self.set_status(format!("browser launch failed: {e}"));
-        }
-        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-        if let Err(e) = std::process::Command::new("xdg-open").arg(url).spawn() {
+        if let Err(e) = spawn_system_open(url.as_ref()) {
             self.set_status(format!("browser launch failed: {e}"));
         }
     }
@@ -472,22 +461,30 @@ impl App {
             self.set_status("not opening file (non-interactive)");
             return;
         }
-        let path_str = path.to_string_lossy();
-        #[cfg(target_os = "macos")]
-        let res = std::process::Command::new("open").arg(&*path_str).spawn();
-        #[cfg(target_os = "windows")]
-        let res = std::process::Command::new("cmd")
-            .args(["/c", "start", "", &*path_str])
-            .spawn();
-        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-        let res = std::process::Command::new("xdg-open")
-            .arg(&*path_str)
-            .spawn();
-
-        if let Err(e) = res {
-            self.set_status(format!("external open failed: {e}"));
-        } else {
-            self.set_status("opened file externally");
+        match spawn_system_open(path.as_os_str()) {
+            Ok(_) => self.set_status("opened file externally"),
+            Err(e) => self.set_status(format!("external open failed: {e}")),
         }
+    }
+}
+
+/// Spawns the OS-appropriate "open with default app" command for `arg`
+/// (a URL or file path): `open` on macOS, `cmd /c start` on Windows, and
+/// `xdg-open` elsewhere. Shared by `open_in_browser` and `open_external`.
+fn spawn_system_open(arg: &std::ffi::OsStr) -> std::io::Result<std::process::Child> {
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open").arg(arg).spawn()
+    }
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("cmd")
+            .args(["/c", "start", ""])
+            .arg(arg)
+            .spawn()
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        std::process::Command::new("xdg-open").arg(arg).spawn()
     }
 }
