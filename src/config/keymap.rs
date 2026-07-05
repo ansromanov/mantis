@@ -358,8 +358,12 @@ pub struct Keymap {
 impl Default for Keymap {
     /// Editor-style defaults (VS Code / Sublime conventions). Single letters
     /// are `tree:`-scoped so the content pane stays letter-free apart from
-    /// the vim motion set (`j k h l g G 0 n N`); content-pane access to the
-    /// remaining toggles goes through modifier combos or the command palette.
+    /// the vim motion set (`j k h l g G 0 n N`) and `M` (markdown raw/rendered
+    /// toggle — bare, unscoped, because the bundled markdown plugin only
+    /// recognizes the literal key `M` over its `on_keypress` event; a rebound
+    /// key is translated back to `M` before being forwarded, see
+    /// `key_handlers::normal::handle_content_key`). All other content-pane
+    /// toggles go through modifier combos or the command palette.
     /// `ctrl+shift+letter` specs are written as `ctrl+<uppercase letter>`;
     /// on terminals without the kitty keyboard protocol they degrade to the
     /// plain-`ctrl` action, which is always the more frequent one.

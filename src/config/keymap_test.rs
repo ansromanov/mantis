@@ -392,8 +392,10 @@ fn pressed_in_honours_scope() {
 }
 
 /// The content pane must stay free of bare letters (for future editing)
-/// except the vim motion set. Tree-structural actions are exempt: their
-/// bindings only dispatch from the tree handler.
+/// except the vim motion set, plus `M` — the bundled markdown plugin only
+/// recognizes the literal key `M`, so `toggle_raw_markdown` is deliberately
+/// unscoped (see the exception noted on `Keymap::default`). Tree-structural
+/// actions are exempt: their bindings only dispatch from the tree handler.
 #[test]
 fn default_content_reachable_letters_are_motions_only() {
     let motions = ['j', 'k', 'h', 'l', 'g', 'G', '0', 'n', 'N', 'M', ' '];

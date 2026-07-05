@@ -239,7 +239,10 @@ pub static ACTIONS: &[ActionSpec] = &[
     ActionSpec {
         id: "toggle_raw_markdown",
         palette: Some("Toggle markdown render (markdown plugin)"),
-        help: Some(("Content panel", "toggle markdown render (md files)")),
+        help: Some((
+            "Content panel",
+            "toggle markdown render (md files, markdown plugin)",
+        )),
     },
     // -- Bound actions with no keymap-section help row -------------------
     // (either purely a Git-section row, sourced from these same ids with
