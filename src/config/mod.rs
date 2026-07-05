@@ -31,6 +31,9 @@ pub(crate) mod validate;
 pub(crate) use keymap::bind;
 pub use keymap::{pressed, pressed_in, BindingScope, Keymap};
 pub use types::{Config, StatusBarConfig};
+// Only referenced in test struct literals.
+#[cfg_attr(not(test), allow(unused_imports))]
+pub use types::UpdatesConfig;
 #[allow(unused_imports)]
 pub use validate::schema_paths;
 // Used by name only in test code (struct literals in *_test helpers).

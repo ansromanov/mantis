@@ -620,3 +620,22 @@ fn app_new_respects_prettify_size_limit_for_json_file() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn app_new_starts_with_no_update_notice_regardless_of_config() {
+    use crate::config::UpdatesConfig;
+
+    let root = temp_dir();
+    for check in [true, false] {
+        let cfg = Config {
+            updates: UpdatesConfig { check },
+            ..Config::default()
+        };
+        let app = new_app(&root, cfg);
+        // check_for_updates() is a no-op in test builds, so App::new must
+        // never surface a stale/fabricated notice regardless of the config.
+        assert!(app.new_version_available.is_none());
+        assert!(app.update_rx.is_none());
+    }
+    fs::remove_dir_all(&root).ok();
+}

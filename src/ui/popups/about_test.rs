@@ -121,3 +121,25 @@ fn fit_changelog_zero_budget_shows_nothing_but_counts_all_as_remaining() {
     assert!(shown.is_empty());
     assert_eq!(remaining, 2);
 }
+
+#[test]
+fn about_shows_update_notice_when_newer_version_available() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    app.new_version_available = Some("v99.0.0".to_string());
+    let text = buffer_text(&app);
+    assert!(text.contains("v99.0.0"), "must show latest version: {text}");
+    assert!(
+        text.contains("is available"),
+        "must hint at the available update: {text}"
+    );
+}
+
+#[test]
+fn about_omits_update_notice_when_no_newer_version() {
+    let dir = tempfile::tempdir().unwrap();
+    let app = make_app(dir.path());
+    assert!(app.new_version_available.is_none());
+    let text = buffer_text(&app);
+    assert!(!text.contains("is available"), "no update, no hint: {text}");
+}
