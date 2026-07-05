@@ -28,6 +28,16 @@ keys that differ from the defaults back to your `mantis.toml`, keeping it small.
 see all available options, open `mantis.default.toml`; to change one, copy that line
 into your `mantis.toml`.
 
+## Live reload
+
+`mantis` watches your `mantis.toml` while running. Saving the file re-reads it and
+hot-reloads most settings (theme, keybindings, tree/content display options)
+immediately — the status bar shows `mantis.toml reloaded`, or the specific problem
+if the file failed to parse or contains unknown keys. Changes to `[plugins]`
+entries can't be applied to an already-running plugin process, so those show
+`mantis.toml changed — restart to apply` instead and take effect on the next
+launch.
+
 ## Options
 
 Options are grouped into tables by area. A few general keys sit at the top

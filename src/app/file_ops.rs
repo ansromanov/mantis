@@ -108,6 +108,30 @@ impl App {
         }
     }
 
+    /// Installs a non-recursive watcher on the parent directory of the config
+    /// file so edits to `mantis.toml` are detected and hot-reloaded. Best-effort:
+    /// if the watcher cannot be installed (e.g. the directory does not exist) the
+    /// fields stay `None` and no live-reload happens — the user simply does not
+    /// get the feature.
+    pub fn install_config_watcher(&mut self) {
+        let Some(ref path) = self.config_path else {
+            return;
+        };
+        let Some(dir) = path.parent() else {
+            return;
+        };
+        let (tx, rx) = std::sync::mpsc::channel();
+        let Ok(mut watcher) = notify::recommended_watcher(move |res| {
+            let _ = tx.send(res);
+        }) else {
+            return;
+        };
+        if watcher.watch(dir, RecursiveMode::NonRecursive).is_ok() {
+            self.config_watcher = Some(watcher);
+            self.config_watch_rx = Some(rx);
+        }
+    }
+
     /// Drains all pending root-watch events and returns `true` if any of them
     /// created, modified, or removed a path since the last check. Access-only
     /// events are ignored so merely reading files doesn't trigger reloads.
@@ -133,6 +157,29 @@ impl App {
     /// file was modified, created, or deleted since the last check.
     pub(super) fn drain_file_watch(&self) -> bool {
         let (Some(rx), Some(watched)) = (&self.file_watch_rx, &self.file_watch_path) else {
+            return false;
+        };
+        let mut changed = false;
+        while let Ok(res) = rx.try_recv() {
+            if let Ok(evt) = res {
+                let affects_watched = evt.paths.iter().any(|p| p == watched);
+                if affects_watched
+                    && matches!(
+                        evt.kind,
+                        EventKind::Modify(_) | EventKind::Create(_) | EventKind::Remove(_)
+                    )
+                {
+                    changed = true;
+                }
+            }
+        }
+        changed
+    }
+
+    /// Drains all pending config-watch events and returns `true` if the config
+    /// file was modified, created, or deleted since the last check.
+    pub(super) fn drain_config_watch(&self) -> bool {
+        let (Some(rx), Some(watched)) = (&self.config_watch_rx, &self.config_path) else {
             return false;
         };
         let mut changed = false;
