@@ -346,7 +346,7 @@ fn git_mode_flat_toggle_noop_outside_git_mode() {
     app.handle_key(key(KeyCode::Char('F')));
     assert_eq!(
         app.status_message.as_ref().map(|sm| sm.text.as_str()),
-        Some("flat view: only in git mode (Ctrl+G)")
+        Some("flat view: only in git mode (Ctrl+Shift+G)")
     );
     assert!(!app.git_mode_flat);
     fs::remove_dir_all(&root).ok();

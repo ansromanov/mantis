@@ -119,27 +119,37 @@ impl KeyBinding {
     }
 
     /// Returns a human-readable label for this binding, e.g. `"Ctrl+P"`,
-    /// `"Q (tree)"`. Panel-scoped bindings get a `" (tree)"`/`" (content)"`
-    /// suffix so help/palette surfaces make clear the key only fires when
-    /// that panel is focused.
+    /// `"Ctrl+Shift+P"`, `"Q (tree)"`. When a modifier is combined with an
+    /// uppercase ASCII letter, an explicit `Shift+` token is inserted so the
+    /// label matches the physical shortcut (kitty-protocol terminals report
+    /// `ctrl+shift+p` as `ctrl+P`; without the `Shift+` token the label would
+    /// misleadingly read `Ctrl+P`, same as the unshifted binding). Panel-scoped
+    /// bindings get a `" (tree)"`/`" (content)"` suffix so help/palette
+    /// surfaces make clear the key only fires when that panel is focused.
     pub fn display(&self) -> String {
-        let key = match self.code {
-            KeyCode::Char(' ') => "Space".to_string(),
-            KeyCode::Char(c) => c.to_string(),
-            KeyCode::Up => "Up".to_string(),
-            KeyCode::Down => "Down".to_string(),
-            KeyCode::Left => "Left".to_string(),
-            KeyCode::Right => "Right".to_string(),
-            KeyCode::Enter => "Enter".to_string(),
-            KeyCode::Tab => "Tab".to_string(),
-            KeyCode::Esc => "Esc".to_string(),
-            KeyCode::Backspace => "Backspace".to_string(),
-            KeyCode::PageUp => "PageUp".to_string(),
-            KeyCode::PageDown => "PageDown".to_string(),
-            KeyCode::Home => "Home".to_string(),
-            KeyCode::End => "End".to_string(),
-            KeyCode::F(n) => format!("F{n}"),
-            ref other => format!("{other:?}"),
+        let (key, shifted) = match self.code {
+            KeyCode::Char(' ') => ("Space".to_string(), false),
+            KeyCode::Char(c) => (c.to_string(), c.is_ascii_uppercase()),
+            KeyCode::Up => ("Up".to_string(), false),
+            KeyCode::Down => ("Down".to_string(), false),
+            KeyCode::Left => ("Left".to_string(), false),
+            KeyCode::Right => ("Right".to_string(), false),
+            KeyCode::Enter => ("Enter".to_string(), false),
+            KeyCode::Tab => ("Tab".to_string(), false),
+            KeyCode::Esc => ("Esc".to_string(), false),
+            KeyCode::Backspace => ("Backspace".to_string(), false),
+            KeyCode::PageUp => ("PageUp".to_string(), false),
+            KeyCode::PageDown => ("PageDown".to_string(), false),
+            KeyCode::Home => ("Home".to_string(), false),
+            KeyCode::End => ("End".to_string(), false),
+            KeyCode::F(n) => (format!("F{n}"), false),
+            ref other => (format!("{other:?}"), false),
+        };
+        let has_modifier = self.ctrl || self.alt || self.super_key;
+        let key = if shifted && has_modifier {
+            format!("Shift+{key}")
+        } else {
+            key
         };
         let base = match (self.ctrl, self.alt, self.super_key) {
             (true, true, false) => format!("Ctrl+Alt+{key}"),
