@@ -926,10 +926,12 @@ fn keybound_actions_are_in_help_overlay() {
     for action in crate::actions::ACTIONS {
         let is_keybound = keys.labels_for_action(action.id) != "—";
         if is_keybound && !allowlist.contains(&action.id) {
-            let quoted_id = format!("\"{}\"", action.id);
+            // Allow the call to wrap across lines, e.g. `row_key_custom(\n    "id",`.
+            let pattern = format!(r#"row_key(_custom)?\s*\(\s*"{}""#, regex::escape(action.id));
+            let re = regex::Regex::new(&pattern).expect("valid regex");
             assert!(
-                help_rs_content.contains(&quoted_id),
-                "Action '{}' is keybound but does not appear as a string literal in src/ui/popups/help.rs",
+                re.is_match(&help_rs_content),
+                "Action '{}' is keybound but is not rendered via row_key/row_key_custom in src/ui/popups/help.rs",
                 action.id
             );
         }
