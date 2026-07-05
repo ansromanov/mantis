@@ -2,11 +2,18 @@ use ratatui::backend::TestBackend;
 use ratatui::Terminal;
 
 use crate::app::App;
-use crate::config::Config;
+use crate::config::{Config, GitConfig};
 use crate::ui::popups::draw_about;
 
 fn make_app(root: &std::path::Path) -> App {
-    App::new(root.to_path_buf(), Config::default(), None, None).unwrap()
+    let cfg = Config {
+        git: GitConfig {
+            status: false,
+            ..Default::default()
+        },
+        ..Config::default()
+    };
+    App::new(root.to_path_buf(), cfg, None, None).unwrap()
 }
 
 fn buffer_text(app: &App) -> String {
@@ -32,15 +39,22 @@ fn about_shows_title_and_close_hint() {
 }
 
 #[test]
-fn about_shows_version_from_cargo_pkg_when_no_release_info() {
+fn about_shows_version_matching_release_selection_logic() {
     let dir = tempfile::tempdir().unwrap();
     let app = make_app(dir.path());
     let text = buffer_text(&app);
-    // RELEASE is only populated at release-build time; in tests it falls back
-    // to the crate's own Cargo.toml version.
+    // Mirrors draw_about's own fallback: release-info version when embedded
+    // metadata is present, otherwise the crate's Cargo.toml version. Asserting
+    // against this same selection (rather than assuming RELEASE is absent in
+    // tests) keeps the test correct whether or not release-info.toml is
+    // populated in the checkout.
+    let expected_version = crate::release_info::RELEASE
+        .as_ref()
+        .map(|r| r.version.as_str())
+        .unwrap_or(env!("CARGO_PKG_VERSION"));
     assert!(
-        text.contains(env!("CARGO_PKG_VERSION")),
-        "must show fallback crate version: {text}"
+        text.contains(expected_version),
+        "must show version {expected_version:?}: {text}"
     );
 }
 
@@ -56,20 +70,28 @@ fn about_shows_license() {
 }
 
 #[test]
-fn about_hides_release_notes_when_no_release_info() {
+fn about_release_notes_visibility_matches_release_info() {
     let dir = tempfile::tempdir().unwrap();
     let app = make_app(dir.path());
     let text = buffer_text(&app);
-    // Without embedded release metadata there is no "what's new" body and no
-    // release-url hint to show.
-    if crate::release_info::RELEASE.is_none() {
-        assert!(
-            !text.contains("What's new"),
-            "must not show 'What's new' without release info: {text}"
-        );
-        assert!(
-            !text.contains("open release in browser"),
-            "must not hint at opening a release url without one: {text}"
-        );
-    }
+
+    let whats_new = crate::release_info::RELEASE
+        .as_ref()
+        .map(|r| r.whats_new.as_str())
+        .unwrap_or("");
+    let has_url = crate::release_info::RELEASE
+        .as_ref()
+        .map(|r| !r.release_url.is_empty())
+        .unwrap_or(false);
+
+    assert_eq!(
+        text.contains("What's new"),
+        !whats_new.is_empty(),
+        "'What's new' section visibility must match whether release-info has a changelog blurb: {text}"
+    );
+    assert_eq!(
+        text.contains("open release in browser"),
+        has_url,
+        "release-url hint visibility must match whether release-info has a release_url: {text}"
+    );
 }

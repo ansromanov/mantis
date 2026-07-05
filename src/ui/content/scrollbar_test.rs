@@ -5,7 +5,7 @@ use ratatui::backend::TestBackend;
 use crate::app::App;
 use crate::config::Config;
 
-use super::draw_content_scrollbar;
+use super::{draw_content_scrollbar, SCROLLBAR_FADE};
 
 fn app_for(root: &std::path::Path) -> App {
     App::new(root.to_path_buf(), Config::default(), None, None).unwrap()
@@ -55,7 +55,7 @@ fn scrollbar_hidden_after_fade_window_elapses() {
     let mut app = app_for(dir.path());
     app.show_scrollbar = true;
     app.content = (0..100).map(|i| format!("line {i}")).collect();
-    app.content_scrolled_at = Instant::now() - Duration::from_millis(3000);
+    app.content_scrolled_at = Instant::now() - (SCROLLBAR_FADE + Duration::from_millis(500));
     let buffer = render(&app, 10, 10);
     assert!(
         !has_thumb(&buffer),
