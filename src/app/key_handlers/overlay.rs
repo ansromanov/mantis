@@ -27,6 +27,24 @@ impl App {
             }
             return;
         }
+        if let Some(toggle) = static_keys::search_toggle(&key) {
+            if let Some(s) = &mut self.search {
+                // Only Content mode reads these flags (see refresh_content); ignore
+                // the key in Files mode so it doesn't reset the selection for a
+                // toggle that would have no visible effect.
+                if s.mode == crate::search::SearchMode::Content {
+                    match toggle {
+                        static_keys::SearchToggle::Regex => s.regex = !s.regex,
+                        static_keys::SearchToggle::CaseSensitive => {
+                            s.case_sensitive = !s.case_sensitive
+                        }
+                        static_keys::SearchToggle::WholeWord => s.whole_word = !s.whole_word,
+                    }
+                    s.refresh_now();
+                }
+            }
+            return;
+        }
         let Some(ref mut s) = self.search else { return };
         match handle_list_picker_key(s, &key) {
             OverlayKey::Activate => self.activate_search_selection(),
@@ -48,6 +66,20 @@ impl App {
         }
         if static_keys::is_prev_match(&key) {
             self.in_file_search_prev();
+            return;
+        }
+        if let Some(toggle) = static_keys::search_toggle(&key) {
+            if let Some(s) = &mut self.in_file_search {
+                match toggle {
+                    static_keys::SearchToggle::Regex => s.regex = !s.regex,
+                    static_keys::SearchToggle::CaseSensitive => {
+                        s.case_sensitive = !s.case_sensitive
+                    }
+                    static_keys::SearchToggle::WholeWord => s.whole_word = !s.whole_word,
+                }
+            }
+            self.refresh_in_file_search();
+            self.scroll_in_file_search_to_current();
             return;
         }
         let Some(ref mut s) = self.in_file_search else {

@@ -59,11 +59,26 @@ pub(crate) fn draw_search(f: &mut Frame, app: &mut App, area: Rect) {
         ])
         .split(inner);
 
-    let hint = if search.mode == SearchMode::Content && search.query.len() < 2 {
-        "  (type 2+ chars)"
+    let query_parts = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Min(0), Constraint::Length(30)])
+        .split(parts[0]);
+
+    let content_min_chars = if search.regex || search.whole_word {
+        1
     } else {
-        ""
+        2
     };
+    let hint =
+        if search.mode == SearchMode::Content && search.query.chars().count() < content_min_chars {
+            if content_min_chars == 1 {
+                "  (type 1+ char)"
+            } else {
+                "  (type 2+ chars)"
+            }
+        } else {
+            ""
+        };
     f.render_widget(
         Paragraph::new(Line::from(vec![
             Span::styled(
@@ -76,7 +91,25 @@ pub(crate) fn draw_search(f: &mut Frame, app: &mut App, area: Rect) {
             Span::styled("█", Style::default().fg(theme.accent_alt)),
             Span::styled(hint, Style::default().fg(theme.dim)),
         ])),
-        parts[0],
+        query_parts[0],
+    );
+
+    let mut toggle_spans = super::util::search_toggle_spans(
+        search.case_sensitive,
+        search.whole_word,
+        search.regex,
+        theme,
+    );
+    let total = search.results_len();
+    let current = if total > 0 { search.selected + 1 } else { 0 };
+    toggle_spans.push(Span::styled(
+        format!("  {}/{}", current, total),
+        Style::default().fg(theme.dim),
+    ));
+
+    f.render_widget(
+        Paragraph::new(Line::from(toggle_spans)).alignment(ratatui::layout::Alignment::Right),
+        query_parts[1],
     );
 
     f.render_widget(

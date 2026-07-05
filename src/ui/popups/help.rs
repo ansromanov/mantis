@@ -277,6 +277,15 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
         ),
         desc("close search"),
     ]));
+    rows.push(Line::from(vec![
+        Span::styled(
+            "  Ctrl+A/W/R      ",
+            Style::default()
+                .fg(theme.accent_alt)
+                .add_modifier(Modifier::BOLD),
+        ),
+        desc("toggle case / whole-word / regex"),
+    ]));
     rows.push(gap.clone());
     rows.push(section("Search / history popup"));
     rows.push(Line::from(vec![
@@ -305,6 +314,15 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
                 .add_modifier(Modifier::BOLD),
         ),
         desc("navigate results"),
+    ]));
+    rows.push(Line::from(vec![
+        Span::styled(
+            "  Ctrl+A/W/R      ",
+            Style::default()
+                .fg(theme.accent_alt)
+                .add_modifier(Modifier::BOLD),
+        ),
+        desc("toggle case / whole-word / regex (content)"),
     ]));
     rows.push(Line::from(vec![
         Span::styled(

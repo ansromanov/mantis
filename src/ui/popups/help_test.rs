@@ -45,6 +45,25 @@ fn help_shows_backspace_tree_up_dir() {
 }
 
 #[test]
+fn help_shows_search_option_toggles() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    let backend = TestBackend::new(80, 100);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(
+        joined.contains("Ctrl+A/W/R"),
+        "help overlay must list the Ctrl+A/W/R search toggles, got:\n{joined}"
+    );
+    assert!(
+        joined.contains("toggle case / whole-word / regex"),
+        "help overlay must describe the search toggles, got:\n{joined}"
+    );
+}
+
+#[test]
 fn help_shows_dot_for_toggle_hidden() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());

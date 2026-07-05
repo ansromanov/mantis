@@ -838,6 +838,7 @@ dependencies = [
  "memmap2",
  "notify",
  "ratatui",
+ "regex",
  "serde",
  "serde_json",
  "serde_yaml",

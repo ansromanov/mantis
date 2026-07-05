@@ -220,3 +220,77 @@ fn search_state_reload_files() {
     assert_eq!(s.file_results.len(), 2);
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn search_state_content_case_sensitive() {
+    let root = search_temp_dir("case_sensitive");
+    fs::create_dir_all(&root).unwrap();
+    fs::write(root.join("a.txt"), "HelloWorld\nhelloworld\n").unwrap();
+
+    let mut s = SearchState::new(&root, false, true, 0, None);
+    s.toggle_mode();
+    for c in "World".chars() {
+        s.push(c);
+    }
+
+    // Case-insensitive by default
+    s.refresh_now();
+    assert_eq!(s.content_results.len(), 2);
+
+    // Case-sensitive
+    s.case_sensitive = true;
+    s.refresh_now();
+    assert_eq!(s.content_results.len(), 1);
+    assert_eq!(s.content_results[0].line, "HelloWorld");
+
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn search_state_content_regex() {
+    let root = search_temp_dir("regex");
+    fs::create_dir_all(&root).unwrap();
+    fs::write(root.join("a.txt"), "abc123xyz\nabc456xyz\n").unwrap();
+
+    let mut s = SearchState::new(&root, false, true, 0, None);
+    s.toggle_mode();
+
+    // literal by default
+    for c in "abc[0-9]+xyz".chars() {
+        s.push(c);
+    }
+    s.refresh_now();
+    assert_eq!(s.content_results.len(), 0);
+
+    // regex enabled
+    s.regex = true;
+    s.refresh_now();
+    assert_eq!(s.content_results.len(), 2);
+
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn search_state_content_whole_word() {
+    let root = search_temp_dir("whole_word");
+    fs::create_dir_all(&root).unwrap();
+    fs::write(root.join("a.txt"), "hello world\nhelloworld\n").unwrap();
+
+    let mut s = SearchState::new(&root, false, true, 0, None);
+    s.toggle_mode();
+    for c in "hello".chars() {
+        s.push(c);
+    }
+
+    // substring by default
+    s.refresh_now();
+    assert_eq!(s.content_results.len(), 2);
+
+    // whole word enabled
+    s.whole_word = true;
+    s.refresh_now();
+    assert_eq!(s.content_results.len(), 1);
+    assert_eq!(s.content_results[0].line, "hello world");
+
+    fs::remove_dir_all(&root).ok();
+}
