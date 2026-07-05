@@ -98,10 +98,31 @@ pub(crate) fn draw_about(f: &mut Frame, app: &App, area: Rect) {
                 .fg(theme.accent)
                 .add_modifier(Modifier::UNDERLINED),
         )]));
-        for line in whats_new.lines() {
+
+        // The hint line below must always stay visible, so cap how many
+        // changelog entries we render to whatever's left of `inner`'s height.
+        let reserved = if has_url { 2 } else { 0 };
+        let budget = (inner.height as usize)
+            .saturating_sub(rows.len())
+            .saturating_sub(reserved);
+        let entries: Vec<&str> = whats_new.lines().collect();
+        // Reserve one extra row for the "N more" marker whenever truncating,
+        // so that marker itself never pushes the hint line off-screen.
+        let shown = if entries.len() > budget {
+            budget.saturating_sub(1)
+        } else {
+            entries.len()
+        };
+        for line in &entries[..shown] {
             rows.push(Line::from(vec![Span::styled(
                 format!("  {line}"),
                 text_style,
+            )]));
+        }
+        if shown < entries.len() {
+            rows.push(Line::from(vec![Span::styled(
+                format!("  ... ({} more, see release page)", entries.len() - shown),
+                dim,
             )]));
         }
     }
