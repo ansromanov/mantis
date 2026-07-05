@@ -105,12 +105,12 @@ impl App {
                         self.help_scroll = usize::MAX;
                     }
                     KeyCode::Right | KeyCode::Char('l') | KeyCode::Tab => {
-                        self.help_tab = (self.help_tab + 1) % 9;
+                        self.help_tab = (self.help_tab + 1) % crate::ui::popups::HELP_TABS.len();
                         self.help_scroll = 0;
                     }
                     KeyCode::Left | KeyCode::Char('h') | KeyCode::BackTab => {
                         self.help_tab = if self.help_tab == 0 {
-                            8
+                            crate::ui::popups::HELP_TABS.len() - 1
                         } else {
                             self.help_tab - 1
                         };

@@ -92,13 +92,46 @@ pub(crate) fn help_tab_ranges(start_x: u16) -> Vec<(u16, u16)> {
     ranges
 }
 
-/// Lookup action description from ACTIONS registry.
+/// Horizontal scroll offset for the tab bar so the active tab stays fully
+/// visible within `available_width` columns. The full tab bar (all 9 tabs)
+/// is wider than most terminal widths, so without scrolling, tabs past the
+/// visible edge would be unreachable by mouse and invisible even though
+/// keyboard cycling can still select them.
+pub(crate) fn help_tab_scroll_offset(help_tab: usize, available_width: u16) -> u16 {
+    let ranges = help_tab_ranges(0);
+    let Some(&(_, total_width)) = ranges.last() else {
+        return 0;
+    };
+    if total_width <= available_width {
+        return 0;
+    }
+    let max_offset = total_width - available_width;
+    let Some(&(start, end)) = ranges.get(help_tab) else {
+        return 0;
+    };
+    let mut offset = if end > available_width {
+        (end - available_width).min(max_offset)
+    } else {
+        0
+    };
+    if start < offset {
+        offset = start;
+    }
+    offset
+}
+
+/// Lookup action description from ACTIONS registry. Falls back to the
+/// palette label when the action has no dedicated `.help` description, so
+/// palette-only actions (e.g. `toggle_watch`, `goto_line`) still render a
+/// readable row instead of a blank description.
 fn action_desc(action_id: &str) -> &'static str {
-    crate::actions::ACTIONS
-        .iter()
-        .find(|a| a.id == action_id)
-        .and_then(|a| a.help)
+    let Some(action) = crate::actions::ACTIONS.iter().find(|a| a.id == action_id) else {
+        return "";
+    };
+    action
+        .help
         .map(|(_, desc)| desc)
+        .or(action.palette)
         .unwrap_or("")
 }
 
@@ -150,7 +183,11 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
             ));
         }
     }
-    f.render_widget(Paragraph::new(Line::from(tab_spans)), tab_bar_area);
+    let tab_scroll = help_tab_scroll_offset(app.help_tab, tab_bar_area.width);
+    f.render_widget(
+        Paragraph::new(Line::from(tab_spans)).scroll((0, tab_scroll)),
+        tab_bar_area,
+    );
 
     // 2. Draw Separator Line
     let h_rule = Line::from(vec![Span::styled(
@@ -406,15 +443,18 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
                 "You can open your configuration file directly in your system's editor:",
             ));
             rows.push(row_static_key(
-                "open_config",
-                "Open configuration file (available via palette)",
+                "open_config_in_editor",
+                "open configuration file (palette only)",
             ));
             rows.push(gap.clone());
             rows.push(section("Configuration Path"));
             rows.push(normal_text("The config file is located at:"));
-            rows.push(normal_text("  - macOS:   ~/.config/mantis/mantis.toml"));
-            rows.push(normal_text("  - Linux:   ~/.config/mantis/mantis.toml"));
-            rows.push(normal_text("  - Windows: %APPDATA%\\mantis\\mantis.toml"));
+            rows.push(normal_text(
+                "  - macOS/Linux: $XDG_CONFIG_HOME/mantis/mantis.toml (defaults to ~/.config/mantis/mantis.toml)",
+            ));
+            rows.push(normal_text(
+                "  - Windows:     %APPDATA%\\mantis\\mantis.toml",
+            ));
             rows.push(gap.clone());
             rows.push(section("Key Options"));
             rows.push(normal_text("  - [tree]: width, show_hidden"));
@@ -449,7 +489,7 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
                 "You can define custom themes in the themes/ directory at:",
             ));
             rows.push(normal_text(
-                "  - macOS/Linux: ~/.config/mantis/themes/*.toml",
+                "  - macOS/Linux: $XDG_CONFIG_HOME/mantis/themes/*.toml (defaults to ~/.config/mantis/themes/*.toml)",
             ));
             rows.push(normal_text(
                 "  - Windows:     %APPDATA%\\mantis\\themes\\*.toml",
@@ -459,10 +499,10 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
             // Plugins
             rows.push(section("Overview"));
             rows.push(normal_text(
-                "Plugins are external processes communicating over standard JSON-RPC",
+                "Plugins are external processes communicating via newline-delimited JSON",
             ));
             rows.push(normal_text(
-                "IPC to extend mantis capabilities (syntax highlighting, language folding).",
+                "events on stdin/stdout to extend mantis capabilities (syntax highlighting, language folding).",
             ));
             rows.push(gap.clone());
             rows.push(section("Plugin Manager"));
@@ -470,7 +510,9 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
             rows.push(gap.clone());
             rows.push(section("Plugin Location"));
             rows.push(normal_text("Plugins are discovered and loaded from:"));
-            rows.push(normal_text("  - macOS/Linux: ~/.config/mantis/plugins/"));
+            rows.push(normal_text(
+                "  - macOS/Linux: $XDG_CONFIG_HOME/mantis/plugins/ (defaults to ~/.config/mantis/plugins/)",
+            ));
             rows.push(normal_text("  - Windows:     %APPDATA%\\mantis\\plugins\\"));
             rows.push(gap.clone());
             rows.push(section("For Developers"));
@@ -524,13 +566,15 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
 
     if max_scroll > 0 {
         let indicator_y = if total_rows > 0 {
-            (app.help_scroll as f64 * (content_area.height as f64 - 2.0) / max_scroll as f64)
+            (app.help_scroll as f64 * content_area.height.saturating_sub(2) as f64
+                / max_scroll as f64)
                 .round() as u16
         } else {
             0
         };
-        let indicator_y =
-            (indicator_y + content_area.y).min(content_area.bottom().saturating_sub(2));
+        let indicator_y = indicator_y
+            .saturating_add(content_area.y)
+            .min(content_area.bottom().saturating_sub(2));
         let indicator_chars = if app.help_scroll == 0 {
             " ▲ "
         } else if app.help_scroll >= max_scroll {

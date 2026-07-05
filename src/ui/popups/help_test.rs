@@ -706,3 +706,133 @@ fn help_mouse_click_tabs_and_outside() {
     });
     assert_eq!(app.help_tab, 1);
 }
+
+/// `toggle_watch` (and other palette-only actions with `help: None`) must
+/// still render a readable description in the help overlay by falling back
+/// to the action's palette label.
+#[test]
+fn help_shows_toggle_watch_description() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    app.help_tab = 2; // Content tab
+    let backend = TestBackend::new(120, 100);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(
+        joined.contains("Toggle auto watch"),
+        "toggle_watch row must fall back to its palette label instead of rendering blank, got:\n{joined}"
+    );
+}
+
+/// The Settings tab must reference the real `open_config_in_editor` action
+/// id, not a nonexistent `open_config` id.
+#[test]
+fn help_settings_tab_references_real_open_config_action() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    app.help_tab = 5; // Settings tab
+    let backend = TestBackend::new(120, 100);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(
+        joined.contains("open configuration file"),
+        "Settings tab must describe opening the config file, got:\n{joined}"
+    );
+    assert!(
+        crate::actions::ACTIONS
+            .iter()
+            .any(|a| a.id == "open_config_in_editor"),
+        "open_config_in_editor must be a real canonical action id"
+    );
+}
+
+/// Config/plugin/theme paths shown in help must reflect `$XDG_CONFIG_HOME`
+/// support, not just the `~/.config` default.
+#[test]
+fn help_paths_mention_xdg_config_home() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    let backend = TestBackend::new(120, 100);
+    let mut terminal = Terminal::new(backend).unwrap();
+
+    app.help_tab = 5; // Settings
+    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
+    let joined = buffer_rows(&terminal).join("\n");
+    assert!(
+        joined.contains("XDG_CONFIG_HOME"),
+        "Settings tab config path must mention $XDG_CONFIG_HOME, got:\n{joined}"
+    );
+
+    app.help_tab = 6; // Themes
+    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
+    let joined = buffer_rows(&terminal).join("\n");
+    assert!(
+        joined.contains("XDG_CONFIG_HOME"),
+        "Themes tab path must mention $XDG_CONFIG_HOME, got:\n{joined}"
+    );
+
+    app.help_tab = 7; // Plugins
+    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
+    let joined = buffer_rows(&terminal).join("\n");
+    assert!(
+        joined.contains("XDG_CONFIG_HOME"),
+        "Plugins tab path must mention $XDG_CONFIG_HOME, got:\n{joined}"
+    );
+    assert!(
+        !joined.contains("standard JSON-RPC"),
+        "Plugins tab must not claim JSON-RPC; the protocol is newline-delimited JSON, got:\n{joined}"
+    );
+}
+
+/// The tab bar is wider than most terminals once all 9 tabs are shown; when
+/// the active tab is scrolled into view, mouse clicks on a neighboring
+/// visible tab must still resolve to the right tab index (i.e. hit-testing
+/// accounts for the same scroll offset used to render the tab bar).
+#[test]
+fn help_mouse_click_reaches_neighbor_of_scrolled_tab() {
+    use crate::ui::popups::help::help_tab_scroll_offset;
+
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    app.show_help = true;
+    app.help_tab = 8; // Mouse tab: far right, requires scrolling on a narrow terminal.
+
+    // Narrow terminal: the full 9-tab bar (110 cols) does not fit.
+    let backend = TestBackend::new(80, 40);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
+
+    let area = app.help_area;
+    let available_width = area.width.saturating_sub(2);
+    let offset = help_tab_scroll_offset(app.help_tab, available_width);
+    assert!(
+        offset > 0,
+        "tab 8 should require a nonzero scroll offset on an 80-col terminal"
+    );
+
+    // Tab 7 ("Plugins") sits immediately to the left of tab 8 and remains
+    // visible in the scrolled view; compute its on-screen column and click it.
+    let ranges = crate::ui::popups::help_tab_ranges(0);
+    let (start7, _) = ranges[7];
+    assert!(
+        start7 >= offset,
+        "tab 7 must still be within the visible scrolled window"
+    );
+    let click_col = area.x + 1 + (start7 - offset);
+
+    app.handle_mouse(MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: click_col,
+        row: area.y + 1,
+        modifiers: KeyModifiers::empty(),
+    });
+    assert_eq!(
+        app.help_tab, 7,
+        "clicking tab 7's on-screen position while the bar is scrolled to show tab 8 \
+         must select tab 7, not whatever tab the unscrolled coordinates would hit"
+    );
+}

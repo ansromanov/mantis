@@ -27,7 +27,7 @@ pub(super) use about::draw_about;
 pub(super) use command::draw_command_palette;
 pub(super) use goto_line::draw_goto_line;
 pub(super) use help::draw_help;
-pub(crate) use help::help_tab_ranges;
+pub(crate) use help::{help_tab_ranges, help_tab_scroll_offset, HELP_TABS};
 pub(super) use history::draw_history;
 pub(super) use in_file::draw_in_file_search;
 pub(super) use line_blame::draw_line_blame;
