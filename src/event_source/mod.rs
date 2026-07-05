@@ -6,6 +6,28 @@
 //! key codes. It acts as the orchestrator that feeds incoming terminal bytes to
 //! specialized parsers to produce structured crossterm events.
 //!
+//! # Why a custom parser exists
+//!
+//! The kitty keyboard protocol sends extra fields in CSI-u sequences that
+//! crossterm 0.28.x strips during parsing: the **shifted alternate** character
+//! (e.g. `*` for a US keyboard's Shift+8) and the **base-layout** character
+//! (the US-physical key that maps to the pressed key on non-Latin layouts).
+//! These fields are needed for layout-independent keybinding matching — without
+//! them, keybindings like `Ctrl+b` fail on Russian or other non-Latin keyboard
+//! layouts. Crossterm's `KeyEvent` did not expose `alternate` / `base_layout_key`
+//! until 0.29+, so mantis maintains its own byte-level parser for the kitty
+//! path and falls back to crossterm's `event::read()` when kitty is unavailable.
+//!
+//! The custom parser duplicates crossterm's internal ESC/CSI parsing for
+//! everything *except* CSI-u alternate-key extraction. Every fix to crossterm's
+//! parser that we also need must be ported here. This is the principal
+//! maintenance cost.
+//!
+//! When the crossterm dependency is upgraded to a version whose `KeyEvent`
+//! exposes alternate key fields AND the version's own parser preserves them
+//! through `event::read()`, the custom parser in `parser::` should be deleted
+//! and replaced with the same `CrosstermEvents` path used on non-Unix.
+//!
 //! Public items:
 //! - [`AltKeys`]: Shifted and physical base key codepoint alternatives.
 //! - [`CURRENT_ALT_KEYS`]: Thread-local alternate keys for the current event.
@@ -21,7 +43,7 @@ use std::io;
 use crossterm::event::Event;
 
 pub(crate) mod mouse;
-pub(crate) mod parser;
+pub mod parser;
 
 // ---------------------------------------------------------------------------
 // Thread-local alternate keys for the current event

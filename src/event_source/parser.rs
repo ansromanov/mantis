@@ -5,8 +5,21 @@
 //! It supports standard ANSI escapes, function key tilde sequences, and the Kitty
 //! keyboard protocol.
 //!
+//! # Consolidation note
+//!
+//! This parser duplicates crossterm's internal ESC/CSI parsing (see the module
+//! doc in [`super`] for why). Shared patterns — particularly the
+//! `modifier[:event_type]` suffix used by CSI-u, CSI tilde, and CSI arrow
+//! sequences — are factored into [`parse_modifier_and_kind`] so that a fix to
+//! the modifier decoding logic applies to all three call sites at once.
+//!
+//! If you add support for a new CSI final byte, check whether its parameter
+//! format includes a modifier field; if so, reuse [`parse_modifier_and_kind`]
+//! rather than inlining the same split-and-decode logic.
+//!
 //! Public (crate) items:
 //! - [`parse_event`]: Parses a single event from raw bytes.
+//! - [`parse_modifier_and_kind`]: Shared CSI modifier+event-type decoder.
 //! - [`decode_modifier_mask`]: Decodes Kitty protocol modifier bitmask.
 
 use std::io;
@@ -23,7 +36,7 @@ use super::{AltKeys, CURRENT_ALT_KEYS};
 ///
 /// Returns `Ok(Some((event, consumed)))` on success, `Ok(None)` for an
 /// incomplete sequence (need more data), or `Err` for an unparseable byte.
-pub(crate) fn parse_event(bytes: &[u8]) -> io::Result<Option<(Event, usize)>> {
+pub fn parse_event(bytes: &[u8]) -> io::Result<Option<(Event, usize)>> {
     if bytes.is_empty() {
         return Ok(None);
     }
@@ -227,27 +240,7 @@ fn parse_csi_u(params: &str, consumed: usize) -> io::Result<Option<(Event, usize
     let base = codes.next().and_then(parse_char);
 
     // ---- modifiers and event type ----
-    let mut modifiers = KeyModifiers::empty();
-    let mut kind = KeyEventKind::Press;
-
-    if let Some(mod_str) = parts.next() {
-        let mod_parts: Vec<&str> = mod_str.split(':').collect();
-        let mask: u8 = mod_parts
-            .first()
-            .copied()
-            .unwrap_or("0")
-            .parse()
-            .unwrap_or(0);
-        modifiers = decode_modifier_mask(mask);
-
-        if let Some(ev_type) = mod_parts.get(1).copied() {
-            kind = match ev_type {
-                "2" => KeyEventKind::Repeat,
-                "3" => KeyEventKind::Release,
-                _ => KeyEventKind::Press,
-            };
-        }
-    }
+    let (modifiers, kind) = parse_modifier_and_kind(parts.next());
 
     // ---- translate primary code to KeyCode ----
     // When SHIFT is held and the terminal reports a shifted alternate
@@ -436,19 +429,7 @@ fn parse_csi_tilde(params: &str, consumed: usize) -> io::Result<Option<(Event, u
     let num_str = parts.next().unwrap_or("0");
     let num: u16 = num_str.parse().unwrap_or(0);
 
-    let mut modifiers = KeyModifiers::empty();
-    let mut kind = KeyEventKind::Press;
-
-    if let Some(mod_field) = parts.next() {
-        let mut sub = mod_field.split(':');
-        let mask: u8 = sub.next().unwrap_or("0").parse().unwrap_or(0);
-        modifiers = decode_modifier_mask(mask);
-        kind = match sub.next() {
-            Some("2") => KeyEventKind::Repeat,
-            Some("3") => KeyEventKind::Release,
-            _ => KeyEventKind::Press,
-        };
-    }
+    let (modifiers, kind) = parse_modifier_and_kind(parts.next());
 
     let code = match num {
         1 | 7 => KeyCode::Home,
@@ -504,18 +485,7 @@ fn key(code: KeyCode) -> Event {
 /// `ESC[1;<mod>[:<event_type>]X` for both press and release. Extract the event
 /// type so release events can be filtered by `handle_key`.
 fn csi_arrow(code: KeyCode, params: &str, consumed: usize) -> io::Result<Option<(Event, usize)>> {
-    let mut modifiers = KeyModifiers::empty();
-    let mut kind = KeyEventKind::Press;
-    if let Some(mod_field) = params.split(';').nth(1) {
-        let mut sub = mod_field.split(':');
-        let mask: u8 = sub.next().unwrap_or("0").parse().unwrap_or(0);
-        modifiers = decode_modifier_mask(mask);
-        kind = match sub.next() {
-            Some("2") => KeyEventKind::Repeat,
-            Some("3") => KeyEventKind::Release,
-            _ => KeyEventKind::Press,
-        };
-    }
+    let (modifiers, kind) = parse_modifier_and_kind(params.split(';').nth(1));
     Ok(Some((
         Event::Key(KeyEvent::new_with_kind_and_state(
             code,
@@ -525,6 +495,27 @@ fn csi_arrow(code: KeyCode, params: &str, consumed: usize) -> io::Result<Option<
         )),
         consumed,
     )))
+}
+
+/// Parse the shared `modifier[:event_type]` suffix from a CSI parameter field.
+///
+/// Used in CSI-u, CSI tilde, and CSI arrow sequences. Returns
+/// `(modifiers, kind)` with defaults of `(empty, Press)` when `field` is
+/// absent, empty, or malformed. The modifier value is a kitty-format bitmask
+/// plus 1 (see [`decode_modifier_mask`]).
+pub(crate) fn parse_modifier_and_kind(field: Option<&str>) -> (KeyModifiers, KeyEventKind) {
+    let Some(field) = field else {
+        return (KeyModifiers::empty(), KeyEventKind::Press);
+    };
+    let mut sub = field.split(':');
+    let mask: u8 = sub.next().unwrap_or("0").parse().unwrap_or(0);
+    let modifiers = decode_modifier_mask(mask);
+    let kind = match sub.next() {
+        Some("2") => KeyEventKind::Repeat,
+        Some("3") => KeyEventKind::Release,
+        _ => KeyEventKind::Press,
+    };
+    (modifiers, kind)
 }
 
 fn invalid(msg: &str) -> io::Error {

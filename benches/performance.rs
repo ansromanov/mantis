@@ -17,6 +17,46 @@ use ratatui::layout::Rect;
 use ratatui::Terminal;
 
 // ---------------------------------------------------------------------------
+// Benchmarks: event parser — exercises the code paths most likely to have
+// correctness regressions (kitty CSI-u, tilde, arrows, plain ASCII).
+// ---------------------------------------------------------------------------
+
+fn bench_event_parser(c: &mut Criterion) {
+    use mantis::event_source::parser::parse_event;
+
+    let csi_u = b"\x1b[1079:1047:112;1u";
+    let csi_tilde = b"\x1b[5;5~";
+    let csi_arrow = b"\x1b[A";
+    let plain_ascii = b"hello world";
+    let utf8_multi = "héllo мир 👋".as_bytes();
+
+    let mut group = c.benchmark_group("event_parser");
+    group.throughput(criterion::Throughput::Bytes(1));
+
+    group.bench_with_input(BenchmarkId::new("csi_u", ""), csi_u, |b, input| {
+        b.iter(|| black_box(parse_event(black_box(input))))
+    });
+    group.bench_with_input(BenchmarkId::new("csi_tilde", ""), csi_tilde, |b, input| {
+        b.iter(|| black_box(parse_event(black_box(input))))
+    });
+    group.bench_with_input(BenchmarkId::new("csi_arrow", ""), csi_arrow, |b, input| {
+        b.iter(|| black_box(parse_event(black_box(input))))
+    });
+    group.bench_with_input(
+        BenchmarkId::new("plain_ascii", ""),
+        plain_ascii,
+        |b, input| b.iter(|| black_box(parse_event(black_box(input)))),
+    );
+    group.bench_with_input(
+        BenchmarkId::new("utf8_multi", ""),
+        utf8_multi,
+        |b, input| b.iter(|| black_box(parse_event(black_box(input)))),
+    );
+
+    group.finish();
+}
+
+// ---------------------------------------------------------------------------
 // Counter for unique temp dir names
 // ---------------------------------------------------------------------------
 
@@ -518,6 +558,7 @@ fn bench_tree_filter_sync(c: &mut Criterion) {
 
 criterion_group!(
     benches,
+    bench_event_parser,
     bench_tree_walk,
     bench_content_search,
     bench_file_open,
