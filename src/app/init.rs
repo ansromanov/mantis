@@ -201,6 +201,8 @@ impl App {
             file_watch_path: None,
             root_watcher: None,
             root_watch_rx: None,
+            config_watcher: None,
+            config_watch_rx: None,
             tree_dirty: false,
             tree_dirty_at: None,
             selection: None,

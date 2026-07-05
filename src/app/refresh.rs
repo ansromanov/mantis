@@ -34,6 +34,9 @@ impl App {
         self.drain_loads();
         self.drain_plugin_actions();
         self.process_pending_keypress();
+        if self.drain_config_watch() {
+            self.handle_config_change();
+        }
         if self.auto_watch && self.drain_file_watch() {
             self.reload_content();
         }
@@ -76,6 +79,74 @@ impl App {
             // No watcher (install failed): fall back to a blind periodic reload.
             self.reload();
         }
+    }
+
+    /// Detected a change to the config file: re-reads, validates, hot-reloads
+    /// safe settings, and surfaces any errors in the status bar.
+    pub(crate) fn handle_config_change(&mut self) {
+        let Some(ref path) = self.config_path.clone() else {
+            return;
+        };
+        let Ok(s) = std::fs::read_to_string(path) else {
+            self.set_status("mantis.toml changed but could not be read");
+            return;
+        };
+        let unknown = crate::config::validate::validate_keys(&s);
+        match toml::from_str::<crate::config::Config>(&s) {
+            Ok(mut cfg) => {
+                cfg.migrate_legacy_flat_fields();
+                cfg.migrate_legacy_git_fields();
+                cfg.keys.migrate_legacy_keys();
+                let retired = crate::plugin::retired_bundled_plugins();
+                cfg.plugins.retain(|_name, entry| {
+                    let Some(fname) = entry.path.file_name().and_then(|s| s.to_str()) else {
+                        return true;
+                    };
+                    !retired.contains(&fname)
+                });
+                let plugins_changed = self.config.plugins != cfg.plugins;
+                if plugins_changed {
+                    self.set_status("mantis.toml changed — restart to apply");
+                } else if !unknown.is_empty() {
+                    self.set_status(format!("mantis.toml: {}", unknown.join("; ")));
+                } else {
+                    self.set_status("mantis.toml reloaded");
+                }
+                self.apply_reloaded_config(cfg);
+            }
+            Err(e) => {
+                self.set_status(format!("mantis.toml parse error: {e}"));
+            }
+        }
+    }
+
+    /// Applies reloaded config fields to active App state, re-resolves the theme,
+    /// and triggers a reload.
+    pub(crate) fn apply_reloaded_config(&mut self, cfg: crate::config::Config) {
+        self.show_hidden = cfg.tree.show_hidden;
+        self.ignore_gitignore = cfg.git.ignore_gitignore;
+        self.tree_width = cfg.tree.width;
+        self.tree_independent_scroll = cfg.tree.independent_scroll;
+        self.word_wrap = cfg.content.word_wrap;
+        self.git_status_enabled = cfg.git.status;
+        self.git_show_deleted = cfg.git.show_deleted;
+        self.git_show_untracked = cfg.git.show_untracked;
+        self.git_show_ignored = cfg.git.show_ignored;
+        self.show_scrollbar = cfg.content.scrollbar;
+        self.show_scroll_percentage = cfg.content.scroll_percentage;
+        self.show_line_numbers = cfg.content.line_numbers;
+        self.auto_watch = cfg.content.watch;
+        self.show_file_info = cfg.content.show_file_info;
+        self.indent_guides = cfg.tree.indent_guides;
+        self.icons_enabled = cfg.tree.icons;
+        self.keys = cfg.keys.clone();
+
+        let theme_name = cfg.theme.name.as_deref().unwrap_or("default").to_string();
+        let theme = cfg.theme.resolve();
+        self.apply_theme(&theme_name, theme);
+
+        self.config = cfg;
+        self.reload();
     }
 
     /// Drains all pending worker responses, applying those matching the most

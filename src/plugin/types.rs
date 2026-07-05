@@ -46,7 +46,7 @@ pub struct ExtraSyntax {
 }
 
 /// Per-plugin entry in the `[plugins]` section of `mantis.toml`.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(default)]
 pub struct PluginEntry {
     /// Path to the plugin executable (process plugins) or syntax file

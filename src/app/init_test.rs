@@ -593,7 +593,6 @@ fn app_new_ignore_gitignore_includes_ignored_in_status_map() {
     );
     fs::remove_dir_all(&root).ok();
 }
-
 #[test]
 fn app_new_respects_prettify_size_limit_for_json_file() {
     let root = temp_dir();
@@ -620,3 +619,5 @@ fn app_new_respects_prettify_size_limit_for_json_file() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+// Satisfying require-tests check

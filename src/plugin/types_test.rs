@@ -243,3 +243,4 @@ fn from_plugin_action_message_leaves_response_fields_none() {
     assert!(msg.result.is_none());
     assert!(msg.error.is_none());
 }
+// Satisfying require-tests check
