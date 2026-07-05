@@ -1,8 +1,9 @@
-version = "0.14.0"
+version = "0.15.0"
 date = "2026-07-05"
-whats_new = """- fix: address PR #551 review comments, delay auto-merge for review (#554)
+whats_new = """- chore: release v0.14.0 [skip ci]
+- fix: address PR #551 review comments, delay auto-merge for review (#554)
 - fix: stop warning on pre-refactor config keys (git_mode, renamed keymap actions) (#555)
 - fix: keep selection highlight visible on the active line (#552)
 - fix: skip build_visible deep walk when nothing is expanded (#551)
 - chore: bump Homebrew formula to v0.14.0 [skip ci]"""
-release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.14.0"
+release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.15.0"
