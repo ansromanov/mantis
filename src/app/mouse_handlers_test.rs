@@ -985,8 +985,9 @@ fn picker_click_out_of_range_row_is_noop() {
 #[test]
 fn mouse_click_in_plugin_content_starts_drag() {
     let root = temp_tree();
-    let mut app = app_for(&root);
     let path = root.join("doc.md");
+    fs::write(&path, "plugin content line 1\nplugin content line 2\n").unwrap();
+    let mut app = app_for(&root);
     app.open_file(&path);
     app.content_area = Rect {
         x: 5,
@@ -1009,7 +1010,7 @@ fn mouse_click_in_plugin_content_starts_drag() {
 
     let down_ev = MouseEvent {
         kind: MouseEventKind::Down(MouseButton::Left),
-        column: 6,
+        column: 5,
         row: 6,
         modifiers: crossterm::event::KeyModifiers::empty(),
     };
@@ -1019,7 +1020,7 @@ fn mouse_click_in_plugin_content_starts_drag() {
 
     let drag_ev = MouseEvent {
         kind: MouseEventKind::Drag(MouseButton::Left),
-        column: 10,
+        column: 40,
         row: 6,
         modifiers: crossterm::event::KeyModifiers::empty(),
     };
@@ -1028,12 +1029,15 @@ fn mouse_click_in_plugin_content_starts_drag() {
 
     let up_ev = MouseEvent {
         kind: MouseEventKind::Up(MouseButton::Left),
-        column: 10,
+        column: 40,
         row: 6,
         modifiers: crossterm::event::KeyModifiers::empty(),
     };
     app.handle_mouse(up_ev);
     assert!(app.drag_start.is_none());
+    assert_eq!(
+        app.clipboard_capture.last().map(String::as_str),
+        Some("plugin content line 2")
+    );
     fs::remove_dir_all(&root).ok();
 }
-
