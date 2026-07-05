@@ -144,7 +144,8 @@ fn event_loop_key_search_toggles_search() {
     // Switch to Content focus + no file so '/' opens SearchState.
     app.focus = crate::app::Focus::Content;
     app.current_file = None;
-    app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
+    // search_files default is ctrl+f ('/' remains as a tree-scoped binding).
+    app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
     assert!(app.search.is_some());
     app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
     assert!(app.search.is_none());
@@ -183,7 +184,8 @@ fn event_loop_key_command_palette_toggles() {
     fs::write(dir.join("a.txt"), "hello\n").unwrap();
     let mut app = app_for(&dir);
     assert!(app.command_palette.is_none());
-    app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL));
+    // command_palette = ctrl+shift+p, i.e. ctrl + uppercase P.
+    app.handle_key(KeyEvent::new(KeyCode::Char('P'), KeyModifiers::CONTROL));
     assert!(app.command_palette.is_some());
     app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
     assert!(app.command_palette.is_none());

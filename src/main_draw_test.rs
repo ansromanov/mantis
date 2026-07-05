@@ -6,7 +6,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::backend::TestBackend;
 
 use crate::app::App;
-use crate::config::Config;
+use crate::config::{bind, Config, Keymap};
 use crate::ui;
 
 fn temp_dir() -> PathBuf {
@@ -66,7 +66,16 @@ fn app_draw_side_by_side_diff_does_not_panic() {
     fs::write(dir.join("f.txt"), "alpha\nBETA changed\ngamma\n").unwrap();
     git(&["commit", "-q", "-am", "change beta"]);
 
-    let mut app = app_for(&dir);
+    // toggle_diff_side_by_side has no default binding (palette-only);
+    // bind it to D for this test so the toggle can be driven by key.
+    let config = Config {
+        keys: Keymap {
+            toggle_diff_side_by_side: bind(&["D"]),
+            ..Keymap::default()
+        },
+        ..Config::default()
+    };
+    let mut app = App::new(dir.clone(), config, None, None).unwrap();
     app.open_file(&dir.join("f.txt"));
     app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::empty()));
     app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
@@ -91,7 +100,8 @@ fn app_draw_with_search_open() {
     let mut app = app_for(&dir);
     app.focus = crate::app::Focus::Content;
     app.current_file = None;
-    app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
+    // search_files default is ctrl+f ('/' remains as a tree-scoped binding).
+    app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
     assert!(app.search.is_some());
     let backend = TestBackend::new(80, 30);
     let mut terminal = ratatui::Terminal::new(backend).unwrap();
@@ -117,7 +127,8 @@ fn app_draw_with_command_palette() {
     let dir = temp_dir();
     fs::write(dir.join("a.txt"), "hello\nworld\n").unwrap();
     let mut app = app_for(&dir);
-    app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL));
+    // command_palette = ctrl+shift+p, i.e. ctrl + uppercase P.
+    app.handle_key(KeyEvent::new(KeyCode::Char('P'), KeyModifiers::CONTROL));
     assert!(app.command_palette.is_some());
     let backend = TestBackend::new(80, 30);
     let mut terminal = ratatui::Terminal::new(backend).unwrap();
@@ -166,7 +177,8 @@ fn app_draw_with_in_file_search() {
     let mut app = app_for(&dir);
     app.open_file(&file_path);
     app.focus = crate::app::Focus::Content;
-    app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
+    // search_files default is ctrl+f ('/' remains as a tree-scoped binding).
+    app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
     assert!(app.in_file_search.is_some());
     let backend = TestBackend::new(80, 30);
     let mut terminal = ratatui::Terminal::new(backend).unwrap();
