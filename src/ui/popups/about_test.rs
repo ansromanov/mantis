@@ -3,6 +3,7 @@ use ratatui::Terminal;
 
 use crate::app::App;
 use crate::config::{Config, GitConfig};
+use crate::ui::popups::about::fit_changelog;
 use crate::ui::popups::draw_about;
 
 fn make_app(root: &std::path::Path) -> App {
@@ -94,4 +95,29 @@ fn about_release_notes_visibility_matches_release_info() {
         has_url,
         "release-url hint visibility must match whether release-info has a release_url: {text}"
     );
+}
+
+#[test]
+fn fit_changelog_keeps_all_entries_within_budget() {
+    let entries = ["a", "b", "c"];
+    let (shown, remaining) = fit_changelog(&entries, 5);
+    assert_eq!(shown, &entries[..]);
+    assert_eq!(remaining, 0);
+}
+
+#[test]
+fn fit_changelog_truncates_and_reserves_a_row_for_the_marker() {
+    let entries = ["a", "b", "c", "d", "e"];
+    // Budget of 3 rows: 2 shown + 1 reserved for the "N more" marker.
+    let (shown, remaining) = fit_changelog(&entries, 3);
+    assert_eq!(shown, &entries[..2]);
+    assert_eq!(remaining, 3);
+}
+
+#[test]
+fn fit_changelog_zero_budget_shows_nothing_but_counts_all_as_remaining() {
+    let entries = ["a", "b"];
+    let (shown, remaining) = fit_changelog(&entries, 0);
+    assert!(shown.is_empty());
+    assert_eq!(remaining, 2);
 }
