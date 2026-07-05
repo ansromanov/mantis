@@ -1,4 +1,5 @@
 use std::fs;
+use std::path::PathBuf;
 use std::time::SystemTime;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -133,4 +134,74 @@ fn save_and_reload_preserves_theme() {
     );
 
     fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn config_schema_snapshot_is_up_to_date() {
+    let snapshot_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("config_schema.snapshot");
+    let actual = mantis::config::schema_paths();
+    let actual_text = actual.join("\n") + "\n";
+
+    if std::env::var("UPDATE_SNAPSHOT").as_deref() == Ok("1") {
+        fs::write(&snapshot_path, &actual_text).unwrap_or_else(|e| {
+            panic!("failed to write snapshot {}: {e}", snapshot_path.display())
+        });
+        return;
+    }
+
+    let expected = fs::read_to_string(&snapshot_path).unwrap_or_else(|e| {
+        panic!(
+            "snapshot file not found at {}: {e}\n\
+             Run `UPDATE_SNAPSHOT=1 cargo test config_schema_snapshot --test config_tests` \
+             to generate it.",
+            snapshot_path.display()
+        )
+    });
+
+    // Filter comment lines from the snapshot for comparison.
+    let expected_paths: Vec<&str> = expected
+        .lines()
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        .collect();
+    let actual_paths: Vec<&str> = actual.iter().map(String::as_str).collect();
+
+    if expected_paths != actual_paths {
+        let only_in_expected: Vec<&str> = expected_paths
+            .iter()
+            .filter(|p| !actual_paths.contains(p))
+            .copied()
+            .collect();
+        let only_in_actual: Vec<&str> = actual_paths
+            .iter()
+            .filter(|p| !expected_paths.contains(p))
+            .copied()
+            .collect();
+
+        let mut msg = String::new();
+        msg.push_str("Config schema has changed!\n\n");
+        if !only_in_expected.is_empty() {
+            msg.push_str(&format!(
+                "Paths REMOVED from schema (must add legacy migration or DEPRECATED_KEYS entry):\n  {}\n\n",
+                only_in_expected.join("\n  ")
+            ));
+        }
+        if !only_in_actual.is_empty() {
+            msg.push_str(&format!(
+                "Paths ADDED to schema:\n  {}\n\n",
+                only_in_actual.join("\n  ")
+            ));
+        }
+        msg.push_str(
+            "To update the snapshot, run:\n  \
+             UPDATE_SNAPSHOT=1 cargo test config_schema_snapshot --test config_tests\n\n\
+             If you REMOVED a path, you MUST also:\n  \
+             1. Add a legacy_* migration field in src/config/types.rs or src/config/keymap.rs\n  \
+             2. Add the old path to DEPRECATED_KEYS in src/config/validate.rs\n  \
+             3. Ensure the old path is accepted without warning by validate_keys",
+        );
+
+        panic!("{msg}");
+    }
 }
