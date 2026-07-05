@@ -8,7 +8,7 @@ mantis path/to/dir  # view a specific directory
 mantis file.md      # open a single file directly
 ```
 
-Press `?` at any time for in-app help, and `q` to quit.
+Press `?` or `F1` for in-app help, and `q` to quit.
 
 ## Pager mode
 
@@ -46,7 +46,7 @@ dotfiles into the repository. Each workspace root gets its own file under
 the `sessions/` subdirectory. To reset the session for a directory, quit
 and delete its file from the `sessions/` subdirectory in the state directory.
 
-> 💡 **Can't remember a key?** Press `?` for the help overlay, or `Ctrl+Shift+P`
+> 💡 **Can't remember a key?** Press `?` or `F1` for the help overlay, or `Ctrl+Shift+P`
 > to open the command palette and search for an action by name — it shows you
 > the shortcut too. New to `mantis`? Start with the [Quick Start](quickstart.md).
 
@@ -66,7 +66,7 @@ These work no matter which panel is focused.
 | Key                    | Action                  |
 | ---------------------- | ----------------------- |
 | `Ctrl+c`, `q` (tree)   | Quit                    |
-| `F1`, `?` (tree)       | Toggle help             |
+| `F1`, `?`              | Toggle help             |
 | `Ctrl+Shift+P`         | Command palette (fuzzy-find any action) |
 | `Tab`                  | Switch panel            |
 | `Ctrl+F`, `/` (tree)   | Tree filter / in-file search |

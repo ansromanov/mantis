@@ -13,9 +13,9 @@ irm https://raw.githubusercontent.com/ansromanov/mantis/main/install.ps1 | iex
 ```
 
 `mantis` is a fast, lightweight tree viewer for reading code in your terminal:
-syntax highlighting, markdown rendering, fuzzy search, and code folding in one
-small binary. No config required, with an optional plugin system when you want
-more. Built with [ratatui](https://ratatui.rs).
+syntax highlighting, fuzzy search, and code folding in one small binary. No
+config required, with an optional plugin system when you want more. Built with
+[ratatui](https://ratatui.rs).
 
 <p align="center">
   <img src="media/intro.png" alt="mantis" width="800">
@@ -25,7 +25,7 @@ more. Built with [ratatui](https://ratatui.rs).
 mantis      # open the current directory and start browsing
 ```
 
-That's it — no setup step. Press `?` for help, `Ctrl+c` to quit.
+That's it — no setup step. Press `F1` for help (or `?`), `Ctrl+c` to quit.
 
 ## Why mantis?
 
@@ -104,7 +104,7 @@ brew tap ansromanov/mantis https://github.com/ansromanov/mantis
 brew install mantis
 ```
 
-With the Rust toolchain: `cargo install mantis`. Or from source:
+From source:
 
 ```sh
 git clone https://github.com/ansromanov/mantis.git
@@ -122,7 +122,7 @@ mantis path/to/dir  # view a specific directory
 mantis file.md      # open a file directly
 ```
 
-Press `?` at any time for in-app help, and `Ctrl+c` to quit. For the full keybinding
+Press `F1` for in-app help (or `?`), and `Ctrl+c` to quit. For the full keybinding
 list and every action name, see the
 [Usage & Keybindings guide](https://ansromanov.github.io/mantis/usage.html) — or
 press `Ctrl+Shift+P` in-app to fuzzy-find any action with its binding.

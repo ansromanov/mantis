@@ -65,7 +65,7 @@ There's a whole page on this — see [Git Features](git.md).
 
 You never have to memorize the keymap:
 
-- Press `?` (or `F1`) for **in-app help** with all the keybindings.
+- Press `F1` (or `?`) for **in-app help** with all the keybindings.
 - Press `Ctrl+Shift+P` for the **command palette** — type what you want to do (e.g.
   "blame", "theme"), and it shows the action *and* its shortcut.
 

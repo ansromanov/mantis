@@ -371,7 +371,7 @@ impl Default for Keymap {
         #[allow(unused_mut)]
         let mut map = Keymap {
             quit: bind(&["ctrl+c", "tree:q"]),
-            help: bind(&["F1", "tree:?"]),
+            help: bind(&["F1", "?"]),
             toggle_hidden: bind(&["tree:."]),
             search_files: bind(&["ctrl+f", "tree:/"]),
             find_files: bind(&["ctrl+p"]),
