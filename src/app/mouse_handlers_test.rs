@@ -981,3 +981,59 @@ fn picker_click_out_of_range_row_is_noop() {
         "out-of-range click must not change selection"
     );
 }
+
+#[test]
+fn mouse_click_in_plugin_content_starts_drag() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let path = root.join("doc.md");
+    app.open_file(&path);
+    app.content_area = Rect {
+        x: 5,
+        y: 5,
+        width: 50,
+        height: 20,
+    };
+
+    let text = vec![
+        "plugin content line 1".to_string(),
+        "plugin content line 2".to_string(),
+    ];
+    let style = ratatui::style::Style::default();
+    let rendered = vec![
+        vec![(style, "plugin content line 1".to_string())],
+        vec![(style, "plugin content line 2".to_string())],
+    ];
+    app.plugin_content_text.insert(path.clone(), text);
+    app.plugin_content.insert(path.clone(), rendered);
+
+    let down_ev = MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: 6,
+        row: 6,
+        modifiers: crossterm::event::KeyModifiers::empty(),
+    };
+    app.handle_mouse(down_ev);
+    assert_eq!(app.focus, crate::app::Focus::Content);
+    assert!(app.drag_start.is_some());
+
+    let drag_ev = MouseEvent {
+        kind: MouseEventKind::Drag(MouseButton::Left),
+        column: 10,
+        row: 6,
+        modifiers: crossterm::event::KeyModifiers::empty(),
+    };
+    app.handle_mouse(drag_ev);
+    assert!(app.selection.is_some());
+
+    let up_ev = MouseEvent {
+        kind: MouseEventKind::Up(MouseButton::Left),
+        column: 10,
+        row: 6,
+        modifiers: crossterm::event::KeyModifiers::empty(),
+    };
+    app.handle_mouse(up_ev);
+    assert!(app.drag_start.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+

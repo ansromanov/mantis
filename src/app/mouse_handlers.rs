@@ -259,10 +259,12 @@ impl App {
                                 return;
                             }
                         }
-                        let can_select = self.has_text_cursor();
+                        let can_select = self.can_mouse_select();
                         if can_select {
                             let pos = self.content_pos(ev.column, ev.row);
-                            self.set_active_line_from_physical(pos.0);
+                            if self.has_text_cursor() {
+                                self.set_active_line_from_physical(pos.0);
+                            }
                             self.drag_start = Some(pos);
                             self.selection = None;
                         }
