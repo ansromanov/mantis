@@ -282,10 +282,14 @@ impl Drop for TerminalGuard {
 }
 
 fn launch_tui(root: PathBuf, initial: InitialContent) -> anyhow::Result<()> {
-    // Pager mode reads fd 0 for content, so keyboard events must come from
-    // the controlling terminal instead (the standard pager trick).
+    // Whenever stdin isn't the terminal (piped/redirected, e.g. `mantis <
+    // /dev/null` or `echo x | mantis some/path`), fd 0 can't supply keyboard
+    // events, regardless of whether pager mode is showing piped content or a
+    // path argument was also given. Checked once up front, before stdin is
+    // read to EOF for pager mode — `isatty` reflects the fd itself, not its
+    // read position, so this stays accurate either way.
     #[cfg(unix)]
-    let pager_mode = matches!(initial, InitialContent::Pager { .. });
+    let stdin_not_tty = pager::is_piped_stdin();
 
     enable_raw_mode()?;
     let _guard = TerminalGuard;
@@ -312,10 +316,10 @@ fn launch_tui(root: PathBuf, initial: InitialContent) -> anyhow::Result<()> {
     // Use a trait-object event source so we can swap between the kitty-aware
     // raw parser (on Unix) and the regular crossterm source. crossterm's own
     // event source already reopens `/dev/tty` when stdin isn't a terminal, so
-    // only the custom raw parser needs the explicit pager-mode fd.
+    // only the custom raw parser needs the explicit fd override.
     #[cfg(unix)]
     let mut events: Box<dyn EventSource> = if keyboard_enhanced {
-        if pager_mode {
+        if stdin_not_tty {
             Box::new(event_source::RawEventSource::for_tty())
         } else {
             Box::new(event_source::RawEventSource::new())

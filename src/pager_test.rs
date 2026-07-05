@@ -8,14 +8,16 @@ use super::*;
 fn parse_pager_bytes_detects_binary() {
     let bytes = b"hello\0world";
     let parsed = parse_pager_bytes(bytes);
-    assert_eq!(parsed.content, vec!["[binary input]".to_string()]);
+    // Matches the file-load convention (`compute_file_load` in `app::loader`)
+    // so binary input reads the same whether it came from a path or a pipe.
+    assert_eq!(parsed.content, vec!["[binary file]".to_string()]);
     assert!(!parsed.is_diff);
 }
 
 #[test]
 fn parse_pager_bytes_empty_input() {
     let parsed = parse_pager_bytes(b"");
-    assert_eq!(parsed.content, vec!["[empty input]".to_string()]);
+    assert_eq!(parsed.content, vec!["[empty file]".to_string()]);
     assert!(!parsed.is_diff);
 }
 

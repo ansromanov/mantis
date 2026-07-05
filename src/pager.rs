@@ -52,7 +52,7 @@ pub struct PagerContent {
 pub fn parse_pager_bytes(bytes: &[u8]) -> PagerContent {
     if is_binary_bytes(bytes) {
         return PagerContent {
-            content: vec!["[binary input]".into()],
+            content: vec!["[binary file]".into()],
             is_diff: false,
         };
     }
@@ -64,7 +64,7 @@ pub fn parse_pager_bytes(bytes: &[u8]) -> PagerContent {
     };
     let mut content: Vec<String> = text.lines().map(|l| l.to_owned()).collect();
     if content.is_empty() {
-        content = vec!["[empty input]".into()];
+        content = vec!["[empty file]".into()];
     }
     let is_diff = looks_like_diff(&content);
     PagerContent { content, is_diff }

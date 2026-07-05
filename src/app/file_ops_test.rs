@@ -896,3 +896,34 @@ fn open_file_search_does_not_restore_query_when_keep_query_disabled() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+// -- set_file_watch -----------------------------------------------------------
+// `pub(super)` (rather than private) so `app::pager::open_pager_content` can
+// clear a stale watcher when loading piped stdin content, which has no path.
+
+#[test]
+fn set_file_watch_some_installs_watcher_on_the_path() {
+    let root = temp_dir();
+    let file = root.join("a.txt");
+    fs::write(&file, "a\n").unwrap();
+    let mut app = app_for(&root);
+    app.set_file_watch(Some(&file));
+    assert_eq!(app.file_watch_path.as_deref(), Some(file.as_path()));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn set_file_watch_none_clears_any_existing_watcher() {
+    let root = temp_dir();
+    let file = root.join("a.txt");
+    fs::write(&file, "a\n").unwrap();
+    let mut app = app_for(&root);
+    app.set_file_watch(Some(&file));
+    assert!(app.file_watch_path.is_some());
+    app.set_file_watch(None);
+    assert!(
+        app.file_watch_path.is_none(),
+        "set_file_watch(None) must clear a previously installed watcher"
+    );
+    fs::remove_dir_all(&root).ok();
+}
