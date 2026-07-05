@@ -1,67 +1,67 @@
-name: Auto-merge
+# name: Auto-merge
 
-# Enables GitHub's native auto-merge on every PR against main. Auto-merge only
-# actually merges once branch protection is satisfied — required status
-# checks green (see ci.yml) and conversations resolved (branch protection:
-# required_conversation_resolution) — so this just removes the manual step of
-# clicking "Enable auto-merge".
-on:
-  pull_request_target:
-    branches: [main]
-    types: [opened, reopened, ready_for_review]
+# # Enables GitHub's native auto-merge on every PR against main. Auto-merge only
+# # actually merges once branch protection is satisfied — required status
+# # checks green (see ci.yml) and conversations resolved (branch protection:
+# # required_conversation_resolution) — so this just removes the manual step of
+# # clicking "Enable auto-merge".
+# on:
+#   pull_request_target:
+#     branches: [main]
+#     types: [opened, reopened, ready_for_review]
 
-permissions:
-  pull-requests: write
-  contents: write
-  issues: write
+# permissions:
+#   pull-requests: write
+#   contents: write
+#   issues: write
 
-jobs:
-  enable-auto-merge:
-    # Skip forked PRs: pull_request_target hands this job a write-scoped
-    # token even when triggered by a fork, and enabling auto-merge is a
-    # write action we don't want to perform based on an untrusted event.
-    if: |
-      github.event.pull_request.draft == false &&
-      github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
-    steps:
-      # Copilot's PR review runs async and can take a couple minutes to land.
-      # It isn't required for merge, and branch protection here has no
-      # required-review check, so nothing else stops auto-merge from firing
-      # (once CI + conversation-resolution checks pass) before the review
-      # comments even exist. A blind sleep can't tell "review not started"
-      # from "review still running", so poll for the review itself instead
-      # of guessing a delay, and skip enabling auto-merge on timeout rather
-      # than proceeding blind.
-      - name: Wait for review to land
-        id: wait
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          for _ in $(seq 1 30); do
-            count=$(gh api "repos/$REPO/pulls/$PR_NUMBER/reviews" \
-              --jq 'map(select(.user.login == "copilot-pull-request-reviewer[bot]")) | length')
-            if [ "$count" -gt 0 ]; then
-              echo "landed=true" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-            sleep 20
-          done
-          echo "landed=false" >> "$GITHUB_OUTPUT"
-      - name: Enable auto-merge (squash)
-        if: steps.wait.outputs.landed == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_URL: ${{ github.event.pull_request.html_url }}
-        run: |
-          state=$(gh pr view "$PR_URL" --json state,isDraft -q '.state + " " + (.isDraft | tostring)')
-          if [ "$state" != "OPEN false" ]; then
-            echo "PR no longer open and ready ($state) after the wait; skipping."
-            exit 0
-          fi
-          gh pr merge --auto --squash "$PR_URL"
-      - name: Report skipped auto-merge
-        if: steps.wait.outputs.landed == 'false'
-        run: echo "No Copilot review landed within the wait window; leaving auto-merge disabled — enable it manually once reviewed."
+# jobs:
+#   enable-auto-merge:
+#     # Skip forked PRs: pull_request_target hands this job a write-scoped
+#     # token even when triggered by a fork, and enabling auto-merge is a
+#     # write action we don't want to perform based on an untrusted event.
+#     if: |
+#       github.event.pull_request.draft == false &&
+#       github.event.pull_request.head.repo.full_name == github.repository
+#     runs-on: ubuntu-latest
+#     steps:
+#       # Copilot's PR review runs async and can take a couple minutes to land.
+#       # It isn't required for merge, and branch protection here has no
+#       # required-review check, so nothing else stops auto-merge from firing
+#       # (once CI + conversation-resolution checks pass) before the review
+#       # comments even exist. A blind sleep can't tell "review not started"
+#       # from "review still running", so poll for the review itself instead
+#       # of guessing a delay, and skip enabling auto-merge on timeout rather
+#       # than proceeding blind.
+#       - name: Wait for review to land
+#         id: wait
+#         env:
+#           GH_TOKEN: ${{ github.token }}
+#           REPO: ${{ github.repository }}
+#           PR_NUMBER: ${{ github.event.pull_request.number }}
+#         run: |
+#           for _ in $(seq 1 30); do
+#             count=$(gh api "repos/$REPO/pulls/$PR_NUMBER/reviews" \
+#               --jq 'map(select(.user.login == "copilot-pull-request-reviewer[bot]")) | length')
+#             if [ "$count" -gt 0 ]; then
+#               echo "landed=true" >> "$GITHUB_OUTPUT"
+#               exit 0
+#             fi
+#             sleep 20
+#           done
+#           echo "landed=false" >> "$GITHUB_OUTPUT"
+#       - name: Enable auto-merge (squash)
+#         if: steps.wait.outputs.landed == 'true'
+#         env:
+#           GH_TOKEN: ${{ github.token }}
+#           PR_URL: ${{ github.event.pull_request.html_url }}
+#         run: |
+#           state=$(gh pr view "$PR_URL" --json state,isDraft -q '.state + " " + (.isDraft | tostring)')
+#           if [ "$state" != "OPEN false" ]; then
+#             echo "PR no longer open and ready ($state) after the wait; skipping."
+#             exit 0
+#           fi
+#           gh pr merge --auto --squash "$PR_URL"
+#       - name: Report skipped auto-merge
+#         if: steps.wait.outputs.landed == 'false'
+#         run: echo "No Copilot review landed within the wait window; leaving auto-merge disabled — enable it manually once reviewed."
