@@ -160,6 +160,84 @@ fn collapsed_top_level_dir_contents_are_never_read() {
 }
 
 #[test]
+fn flat_tree_with_nothing_expanded_skips_deep_walk_but_output_is_unchanged() {
+    // Regression test for the build_visible double-walk fix: when no root
+    // child directory is expanded, the deep walk is skipped entirely (it can
+    // never yield a depth >= 2 entry), but the visible output must be
+    // identical to what the (now-skipped) deep walk would have produced.
+    let root = temp_dir("flat_guard");
+    fs::create_dir_all(root.join("dir_a")).unwrap();
+    fs::create_dir_all(root.join("dir_b")).unwrap();
+    fs::write(root.join("dir_a").join("nested.txt"), "").unwrap();
+    fs::write(root.join("dir_b").join("nested.txt"), "").unwrap();
+    fs::write(root.join("a.txt"), "").unwrap();
+
+    let (nodes, errors) = build_visible(&root, &HashSet::new(), false, true, &HashSet::new());
+    let names: Vec<&str> = nodes.iter().map(|n| n.name.as_str()).collect();
+    assert_eq!(names, vec!["dir_a", "dir_b", "a.txt"]);
+    assert!(nodes.iter().all(|n| n.depth == 0));
+    assert_eq!(errors, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[cfg(unix)]
+#[test]
+fn flat_tree_with_nothing_expanded_does_not_surface_errors_from_unreadable_dirs() {
+    // With `expanded` completely empty (not even root), the guard must skip
+    // the deep walk entirely, so an unreadable grandchild inside a collapsed
+    // directory must never be opened or counted as a walk error.
+    use std::os::unix::fs::PermissionsExt;
+
+    let root = temp_dir("flat_guard_perm");
+    let collapsed = root.join("collapsed");
+    let locked = collapsed.join("locked");
+    fs::create_dir_all(&locked).unwrap();
+    fs::write(root.join("visible.txt"), "").unwrap();
+    fs::set_permissions(&locked, fs::Permissions::from_mode(0o000)).unwrap();
+
+    let (nodes, errors) = build_visible(&root, &HashSet::new(), false, true, &HashSet::new());
+    let names: Vec<&str> = nodes.iter().map(|n| n.name.as_str()).collect();
+    assert_eq!(names, vec!["collapsed", "visible.txt"]);
+    assert_eq!(
+        errors, 0,
+        "the deep walk must be skipped, not just filtered"
+    );
+
+    fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).unwrap();
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn one_expanded_sibling_among_collapsed_dirs_still_triggers_deep_walk() {
+    // Guard must only skip the deep walk when NO root child is expanded; as
+    // soon as one is, the deep walk still runs and reveals its contents while
+    // leaving collapsed siblings untouched.
+    let root = temp_dir("mixed_guard");
+    let expanded_dir = root.join("expanded_dir");
+    let collapsed_dir = root.join("collapsed_dir");
+    fs::create_dir_all(expanded_dir.join("nested")).unwrap();
+    fs::write(expanded_dir.join("nested").join("inner.txt"), "").unwrap();
+    fs::create_dir_all(collapsed_dir.join("nested")).unwrap();
+    fs::write(collapsed_dir.join("nested").join("inner.txt"), "").unwrap();
+
+    let expanded = HashSet::from([expanded_dir.clone(), expanded_dir.join("nested")]);
+    let (nodes, _) = build_visible(&root, &expanded, false, true, &HashSet::new());
+
+    let inner_matches: Vec<&TreeNode> = nodes.iter().filter(|n| n.name == "inner.txt").collect();
+    assert_eq!(
+        inner_matches.len(),
+        1,
+        "only the expanded sibling's inner.txt should surface: {:?}",
+        nodes
+    );
+    assert_eq!(inner_matches[0].depth, 2);
+    assert!(nodes
+        .iter()
+        .any(|n| n.name == "collapsed_dir" && n.depth == 0));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn show_hidden_reveals_dotfiles() {
     let root = dir_tree();
     let expanded = HashSet::from([root.clone()]);
