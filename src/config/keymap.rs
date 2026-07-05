@@ -259,6 +259,19 @@ impl Keymap {
             .collect::<Vec<_>>()
             .join(" / ")
     }
+
+    /// Folds renamed `[keys]` actions from pre-refactor configs into their
+    /// current field, then clears the legacy field so it is never re-serialized.
+    /// Legacy wins over the new name when both are present, matching
+    /// `Config::migrate_legacy_git_fields` (#553).
+    pub fn migrate_legacy_keys(&mut self) {
+        if let Some(v) = self.legacy_yaml_fold_toggle.take() {
+            self.fold_toggle = v;
+        }
+        if let Some(v) = self.legacy_visual_line_blame.take() {
+            self.blame_line = v;
+        }
+    }
 }
 
 /// The complete set of user-rebindable key mappings.
@@ -314,6 +327,14 @@ pub struct Keymap {
     pub plugin_picker: Vec<KeyBinding>,
     pub goto_line: Vec<KeyBinding>,
     pub tree_up_dir: Vec<KeyBinding>,
+
+    // --- deprecated/renamed action keys (read for backward-compat; never written) ---
+    /// Old name for `fold_toggle` (#553).
+    #[serde(default, skip_serializing, rename = "yaml_fold_toggle")]
+    pub legacy_yaml_fold_toggle: Option<Vec<KeyBinding>>,
+    /// Old name for `blame_line` (#553).
+    #[serde(default, skip_serializing, rename = "visual_line_blame")]
+    pub legacy_visual_line_blame: Option<Vec<KeyBinding>>,
 }
 
 impl Default for Keymap {
@@ -371,6 +392,8 @@ impl Default for Keymap {
             plugin_picker: bind(&["tree:p"]),
             goto_line: bind(&["ctrl+g"]),
             tree_up_dir: bind(&["Backspace"]),
+            legacy_yaml_fold_toggle: None,
+            legacy_visual_line_blame: None,
         };
         #[cfg(target_os = "macos")]
         apply_macos_defaults(&mut map);

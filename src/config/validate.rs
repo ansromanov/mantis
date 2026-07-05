@@ -13,9 +13,10 @@
 use super::{Config, StatusBarConfig};
 use crate::theme::ThemeConfig;
 
-/// Old top-level keys that moved into `[git]`. Still accepted (folded by
-/// `migrate_legacy_git_fields`) so existing configs don't warn.
-const DEPRECATED_TOP_LEVEL_KEYS: &[&str] = &[
+/// Deprecated keys accepted without warning, by full dotted path. Either folded
+/// into their new home by a `migrate_legacy_*` step, or genuinely gone and safe
+/// to drop silently.
+const DEPRECATED_KEYS: &[&str] = &[
     // git (#342)
     "git_status",
     "git_show_deleted",
@@ -23,7 +24,7 @@ const DEPRECATED_TOP_LEVEL_KEYS: &[&str] = &[
     "git_show_ignored",
     "ignore_gitignore",
     "diff_mode",
-    // tree/content/search (this issue)
+    // tree/content/search
     "show_hidden",
     "tree_width",
     "tree_independent_scroll",
@@ -38,6 +39,16 @@ const DEPRECATED_TOP_LEVEL_KEYS: &[&str] = &[
     "in_file_search",
     "search_context_lines",
     "keep_search_query",
+    // runtime view-state, never a config value (#553)
+    "git_mode",
+    "git_mode_flat",
+    // [keys] actions renamed or removed by the keymap refactor (#553). The
+    // renamed ones are folded by `Keymap::migrate_legacy_keys`; the removed
+    // ones have no current equivalent and are just dropped.
+    "keys.yaml_fold_toggle",
+    "keys.visual_line_blame",
+    "keys.toggle_raw_markdown",
+    "keys.visual_line_toggle",
 ];
 
 /// Validates the raw TOML against the config schema, returning a message for
@@ -82,8 +93,8 @@ fn collect_unknown(
         };
         match schema.get(key) {
             None => {
-                // Skip known-deprecated top-level keys that migrated into [git].
-                if prefix.is_empty() && DEPRECATED_TOP_LEVEL_KEYS.contains(&key.as_str()) {
+                // Skip known-deprecated keys (moved, renamed, or removed).
+                if DEPRECATED_KEYS.contains(&path.as_str()) {
                     continue;
                 }
                 let names: Vec<&str> = schema.keys().map(String::as_str).collect();
