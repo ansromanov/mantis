@@ -27,6 +27,22 @@ REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 
 Abort with a clear message if no open PR exists for the branch.
 
+**Block any in-flight auto-merge before doing anything else.** Repos with an
+auto-merge workflow (e.g. `.github/workflows/auto-merge.yml`) can enable
+`gh pr merge --auto` mid-review and merge the PR the moment CI + conversation
+checks go green — potentially before this review's fixes or comments land.
+Cancel any queued/in-progress run tied to the PR's head SHA before starting:
+```bash
+HEAD_SHA=$(gh pr view "$PR" --json headRefOid -q .headRefOid)
+gh api "repos/$REPO/actions/runs?head_sha=$HEAD_SHA" \
+  --jq '.workflow_runs[] | select(.status=="in_progress" or .status=="queued") | .id' \
+  | xargs -r -I{} gh api -X POST "repos/$REPO/actions/runs/{}/cancel"
+```
+Confirm the cancel took (`gh api repos/$REPO/actions/runs/<id>/jobs --jq '.jobs[].conclusion'`
+should show `cancelled`). Don't re-enable auto-merge yourself when the review
+finishes — leave that decision to the human; note in the Phase 6 summary that
+it was cancelled and needs a manual `gh pr merge --auto --squash` if still wanted.
+
 ## Phase 1 — Merge-conflict check
 
 ```bash
@@ -109,6 +125,23 @@ path/to/file.rs:<line>: [SEVERITY] Problem. Fix.
 ```
 Severity levels: `BUG` (must fix before merge) | `WARN` (should fix) | `STYLE` (optional).
 
+**File every `BUG`/`WARN` finding as a real PR comment before fixing it.** Don't
+silently patch and move on — each finding needs an auditable, resolvable thread,
+same as a human/Copilot comment gets in Phase 4. Skip filing one only if an
+existing unresolved thread (checked via the Phase 4 query) already covers the
+same issue.
+```bash
+HEAD_SHA=$(gh pr view "$PR" --json headRefOid -q .headRefOid)
+gh api "repos/$REPO/pulls/$PR/comments" \
+  -f body="[SEVERITY] Problem. Fix." \
+  -f commit_id="$HEAD_SHA" \
+  -f path="path/to/file.rs" \
+  -F line=<line> \
+  -f side=RIGHT
+```
+`STYLE` findings are reported inline only (per the rule below) — don't file
+comments for those.
+
 ## Phase 3 — Auto-fix
 
 Apply all `BUG` and `WARN` findings automatically:
@@ -119,6 +152,10 @@ Apply all `BUG` and `WARN` findings automatically:
 5. Commit: `git add -p` each changed file, then commit with a message that lists what was fixed
 
 Do NOT auto-fix `STYLE` findings without explicit user approval.
+
+Comments filed in Phase 2 for these findings become new unresolved threads;
+Phase 5's `just resolve-threads` resolves them once the fix is committed and
+pushed, exactly like pre-existing reviewer threads.
 
 ## Phase 4 — Address PR review comments
 
@@ -170,6 +207,9 @@ Output a structured report:
 ```
 ## PR Review Summary — PR #<N>
 
+### Auto-merge
+<none in-flight | cancelled run <id>, needs manual re-enable>
+
 ### Merge conflicts
 <none | list of files + resolution>
 
@@ -194,5 +234,9 @@ Output a structured report:
 - Never skip `cargo fmt` / `cargo clippy` after editing code.
 - Never push without running `just test-pr` first.
 - Never resolve a thread you did not address in code.
+- File a PR comment for every `BUG`/`WARN` diff finding before fixing it — don't
+  silently patch and move on; the fix needs a resolvable, auditable thread.
+- Cancel any in-flight auto-merge run in Phase 0 before starting the review; never
+  re-enable it yourself afterward.
 - Use `isolation: "worktree"` when spawning any subagent during this flow.
 - If `just test-pr` fails, fix the failure before pushing — do not push a broken branch.
