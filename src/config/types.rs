@@ -60,6 +60,10 @@ pub struct ContentConfig {
     pub watch: bool,
     /// Show encoding and line-ending info in the status bar.
     pub show_file_info: bool,
+    /// Max file size (bytes) for JSON/YAML pretty-printing and fold detection.
+    /// Files exceeding this limit are shown as raw text via memory-mapped I/O
+    /// instead of being pretty-printed or parsed for fold regions.
+    pub prettify_size_limit: usize,
 }
 
 impl Default for ContentConfig {
@@ -71,6 +75,7 @@ impl Default for ContentConfig {
             scroll_percentage: true,
             watch: false,
             show_file_info: true,
+            prettify_size_limit: 10 * 1024 * 1024,
         }
     }
 }

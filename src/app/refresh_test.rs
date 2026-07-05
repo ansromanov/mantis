@@ -371,7 +371,7 @@ fn create_base_app() -> App {
         yaml_error: None,
         yaml_anchor_count: 0,
         yaml_alias_count: 0,
-        loader: crate::app::loader::Loader::new(&Theme::default(), Vec::new()),
+        loader: crate::app::loader::Loader::new(&Theme::default(), Vec::new(), usize::MAX),
         load_seq: 0,
         loading: false,
         git_seq: 0,
@@ -1436,7 +1436,11 @@ fn apply_response_ignores_stale_file_seq() {
     let applied = app.apply_response(LoadResponse::File {
         seq: 4,
         path: stale.path().to_path_buf(),
-        load: Box::new(compute_file_load(stale.path(), &app.highlighter)),
+        load: Box::new(compute_file_load(
+            stale.path(),
+            &app.highlighter,
+            usize::MAX,
+        )),
     });
 
     assert!(!applied, "stale seq must not be reported as applied");

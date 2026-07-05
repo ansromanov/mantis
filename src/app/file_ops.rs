@@ -262,7 +262,11 @@ impl App {
     /// files produce inline messages rather than crashing.
     pub fn open_file(&mut self, path: &Path) {
         self.invalidate_pending_load();
-        let load = compute_file_load(path, &self.highlighter);
+        let load = compute_file_load(
+            path,
+            &self.highlighter,
+            self.config.content.prettify_size_limit,
+        );
         self.apply_file_load(path, load);
     }
 
@@ -316,6 +320,10 @@ impl App {
         }
         // Language provider fold regions override built-in YAML regions.
         self.apply_plugin_fold_regions(path);
+
+        if load.prettify_size_limit_exceeded {
+            self.set_status("too large to pretty-print / fold");
+        }
 
         // Clamp restored cursor to current content bounds.
         if is_new_file && load.ok {

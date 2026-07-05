@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::app::App;
-use crate::config::Config;
+use crate::config::{Config, ContentConfig};
 use crate::search::{InFileSearch, SearchMode};
 
 static COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -924,6 +924,52 @@ fn set_file_watch_none_clears_any_existing_watcher() {
     assert!(
         app.file_watch_path.is_none(),
         "set_file_watch(None) must clear a previously installed watcher"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- prettify_size_limit ------------------------------------------------------
+
+#[test]
+fn large_json_shows_raw_content_with_status_message() {
+    let root = temp_dir();
+    let json = root.join("data.json");
+    let data = serde_json::json!({
+        "items": (0..30).map(|i| format!("val_{}", i)).collect::<Vec<_>>()
+    });
+    fs::write(&json, serde_json::to_string(&data).unwrap()).unwrap();
+
+    // Use a tiny limit so the small test file exceeds it.
+    let cfg = Config {
+        content: ContentConfig {
+            prettify_size_limit: 100,
+            ..Default::default()
+        },
+        ..Config::default()
+    };
+    let mut app = App::new(root.to_path_buf(), cfg, None, None).unwrap();
+    app.open_file(&json);
+
+    assert!(
+        !app.show_pretty_json,
+        "large JSON must not show pretty-printed view"
+    );
+    assert!(
+        app.json_pretty_text.is_empty(),
+        "large JSON must have no pretty-print text"
+    );
+    assert!(
+        app.virtual_file.is_some(),
+        "large JSON must use mmap VirtualFile path"
+    );
+    let sm = app
+        .status_message
+        .as_ref()
+        .expect("status message must be set");
+    assert!(
+        sm.text.contains("too large"),
+        "status message must mention 'too large': got {:?}",
+        sm.text
     );
     fs::remove_dir_all(&root).ok();
 }

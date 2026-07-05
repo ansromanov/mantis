@@ -410,6 +410,36 @@ fn defaults_for_new_tables() {
 }
 
 #[test]
+fn prettify_size_limit_defaults_to_10_mib() {
+    let cfg = Config::default();
+    assert_eq!(cfg.content.prettify_size_limit, 10 * 1024 * 1024);
+}
+
+#[test]
+fn prettify_size_limit_round_trips_through_serde() {
+    let cfg = Config {
+        content: ContentConfig {
+            prettify_size_limit: 5 * 1024 * 1024,
+            ..Default::default()
+        },
+        ..Config::default()
+    };
+    let toml_str = toml::to_string_pretty(&cfg).unwrap();
+    let parsed: Config = toml::from_str(&toml_str).unwrap();
+    assert_eq!(parsed.content.prettify_size_limit, 5 * 1024 * 1024);
+}
+
+#[test]
+fn prettify_size_limit_overridable_via_config() {
+    let toml_str = r#"
+[content]
+prettify_size_limit = 2097152
+"#;
+    let cfg: Config = toml::from_str(toml_str).unwrap();
+    assert_eq!(cfg.content.prettify_size_limit, 2 * 1024 * 1024);
+}
+
+#[test]
 fn statusbar_config_defaults_to_none() {
     let cfg = StatusBarConfig::default();
     assert!(cfg.left.is_none());

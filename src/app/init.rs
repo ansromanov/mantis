@@ -76,7 +76,11 @@ impl App {
         let extra_syntaxes = plugin::load_extra_syntaxes(&plugin_entries);
 
         let highlighter = Highlighter::with_extra_syntaxes(&theme.syntax, &extra_syntaxes);
-        let loader = Loader::new(&theme, extra_syntaxes.clone());
+        let loader = Loader::new(
+            &theme,
+            extra_syntaxes.clone(),
+            cfg.content.prettify_size_limit,
+        );
 
         // Syntax plugins go to the highlighter AND the manager (so they appear
         // in the plugin palette). The manager skips non-Process entries in
