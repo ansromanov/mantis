@@ -1,0 +1,248 @@
+//! Input event polling and raw terminal source management.
+//!
+//! This module coordinates terminal input processing by buffering raw bytes from
+//! standard input, managing keyboard enhancement protocol states (e.g. Kitty
+//! keyboard protocol support), and providing access to thread-local alternate
+//! key codes. It acts as the orchestrator that feeds incoming terminal bytes to
+//! specialized parsers to produce structured crossterm events.
+//!
+//! Public items:
+//! - [`AltKeys`]: Shifted and physical base key codepoint alternatives.
+//! - [`CURRENT_ALT_KEYS`]: Thread-local alternate keys for the current event.
+//! - [`RawEventSource`]: The main buffered, non-blocking event input source.
+//! - [`push_keyboard_enhancement_flags`]: Enable Kitty enhancement support.
+//! - [`pop_keyboard_enhancement_flags`]: Restore standard terminal behavior.
+
+use std::cell::Cell;
+use std::io;
+
+use crossterm::event::Event;
+
+pub(crate) mod mouse;
+pub(crate) mod parser;
+
+// ---------------------------------------------------------------------------
+// Thread-local alternate keys for the current event
+// ---------------------------------------------------------------------------
+
+/// Kitty alternate key codes for the current event: the shifted key and the
+/// US-physical (base-layout) key. Both `None` when the terminal didn't report
+/// them.
+#[derive(Clone, Copy, Default)]
+pub struct AltKeys {
+    pub shifted: Option<char>,
+    pub base: Option<char>,
+}
+
+thread_local! {
+    /// Alternate keycodes for the event currently being dispatched, if the
+    /// terminal provided them via the kitty keyboard protocol.
+    pub static CURRENT_ALT_KEYS: Cell<AltKeys> = const {
+        Cell::new(AltKeys { shifted: None, base: None })
+    };
+}
+
+// ---------------------------------------------------------------------------
+// Keyboard enhancement flag management
+// ---------------------------------------------------------------------------
+
+/// Attempt to enable the kitty keyboard protocol on the terminal.
+///
+/// Returns `true` when the terminal supports it and the flags were
+/// successfully pushed. The caller **must** call
+/// [`pop_keyboard_enhancement_flags`] on teardown.
+pub fn push_keyboard_enhancement_flags() -> io::Result<bool> {
+    let supported = crossterm::terminal::supports_keyboard_enhancement()?;
+    if supported {
+        use crossterm::event::{KeyboardEnhancementFlags, PushKeyboardEnhancementFlags};
+        use crossterm::execute;
+        execute!(
+            io::stdout(),
+            PushKeyboardEnhancementFlags(
+                KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
+                    | KeyboardEnhancementFlags::REPORT_EVENT_TYPES
+                    | KeyboardEnhancementFlags::REPORT_ALTERNATE_KEYS
+                    // Without this, text-producing keys are sent as plain UTF-8
+                    // on press (e.g. Russian `и` for physical `b`), so the
+                    // base-layout alternate key never reaches the dispatcher and
+                    // layout-independent letter bindings fail. Forcing every key
+                    // to a CSI-u escape makes the base-layout field available on
+                    // press. See parse_csi_u / KeyBinding::matches.
+                    | KeyboardEnhancementFlags::REPORT_ALL_KEYS_AS_ESCAPE_CODES
+            )
+        )?;
+    }
+    Ok(supported)
+}
+
+/// Pop the keyboard enhancement flags pushed earlier.
+pub fn pop_keyboard_enhancement_flags() -> io::Result<()> {
+    use crossterm::event::PopKeyboardEnhancementFlags;
+    use crossterm::execute;
+    execute!(io::stdout(), PopKeyboardEnhancementFlags)
+}
+
+// ---------------------------------------------------------------------------
+// Raw event source
+// ---------------------------------------------------------------------------
+
+/// Abstraction for poll+read from a file descriptor, so the
+/// read-until-drained loop in [`RawEventSource::fill_with`] can be
+/// unit-tested without a real stdin.
+trait PollReader {
+    /// Returns `true` when data is available for reading.
+    fn poll(&mut self, timeout_ms: libc::c_int) -> io::Result<bool>;
+    /// Reads into `buf`, returns bytes read (0 = EOF).
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize>;
+}
+
+/// Real [`PollReader`] that reads from fd 0 (stdin).
+struct StdinReader;
+
+impl PollReader for StdinReader {
+    fn poll(&mut self, timeout_ms: libc::c_int) -> io::Result<bool> {
+        loop {
+            let mut pfd = libc::pollfd {
+                fd: 0,
+                events: libc::POLLIN,
+                revents: 0,
+            };
+            let ret = unsafe { libc::poll(&mut pfd, 1, timeout_ms) };
+            if ret < 0 {
+                let err = io::Error::last_os_error();
+                if err.kind() == io::ErrorKind::Interrupted {
+                    continue;
+                }
+                return Err(err);
+            }
+            return Ok(ret > 0 && pfd.revents & libc::POLLIN != 0);
+        }
+    }
+
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        loop {
+            let n = unsafe { libc::read(0, buf.as_mut_ptr() as *mut libc::c_void, buf.len()) };
+            if n < 0 {
+                let err = io::Error::last_os_error();
+                if err.kind() == io::ErrorKind::Interrupted {
+                    continue;
+                }
+                return Err(err);
+            }
+            return Ok(n as usize);
+        }
+    }
+}
+
+/// An [`EventSource`](crate::EventSource) that parses raw terminal bytes so it
+/// can extract kitty-protocol alternate keycodes.
+pub struct RawEventSource {
+    buf: Vec<u8>,
+    pos: usize,
+}
+
+impl Default for RawEventSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl RawEventSource {
+    pub fn new() -> Self {
+        Self {
+            buf: Vec::with_capacity(4096),
+            pos: 0,
+        }
+    }
+
+    /// Fill the internal buffer from stdin with the given poll timeout (ms).
+    /// Use `timeout_ms = 16` for the blocking next-event path and `timeout_ms = 0`
+    /// for the non-blocking try-next-event path.
+    fn fill(&mut self, timeout_ms: libc::c_int) -> io::Result<()> {
+        // Discard already-consumed bytes.
+        if self.pos > 0 {
+            self.buf.drain(..self.pos);
+            self.pos = 0;
+        }
+        self.fill_with(&mut StdinReader, timeout_ms)
+    }
+
+    /// Read from `reader` until no more data is available, using a
+    /// `poll(0)` check before every subsequent read to avoid blocking
+    /// when the first read returned exactly the buffer size
+    /// (fixes #456).
+    fn fill_with(
+        &mut self,
+        reader: &mut dyn PollReader,
+        timeout_ms: libc::c_int,
+    ) -> io::Result<()> {
+        if !reader.poll(timeout_ms)? {
+            return Ok(());
+        }
+
+        let mut tmp = [0u8; 4096];
+        loop {
+            let n = reader.read(&mut tmp)?;
+            if n == 0 {
+                break;
+            }
+            self.buf.extend_from_slice(&tmp[..n]);
+            if n < tmp.len() {
+                break;
+            }
+            // Poll with zero timeout to check if more data is available
+            // without blocking (fixes #456: exact-4096-burst freeze).
+            if !reader.poll(0)? {
+                break;
+            }
+        }
+        Ok(())
+    }
+
+    fn parse_next(&mut self) -> io::Result<Option<Event>> {
+        if self.pos >= self.buf.len() {
+            return Ok(None);
+        }
+
+        let remaining = &self.buf[self.pos..];
+        if remaining.is_empty() {
+            return Ok(None);
+        }
+
+        match parser::parse_event(remaining) {
+            Ok(Some((event, consumed))) => {
+                self.pos += consumed;
+                Ok(Some(event))
+            }
+            Ok(None) => {
+                // Incomplete sequence — leave bytes in buffer for next fill().
+                Ok(None)
+            }
+            Err(_) => {
+                // Unparseable byte: skip it and signal no event (don't crash).
+                self.pos += 1;
+                Ok(None)
+            }
+        }
+    }
+
+    /// Parse and return the next event from the buffer, blocking briefly (16 ms)
+    /// for data when the buffer is empty.
+    pub fn next_raw_event(&mut self) -> io::Result<Option<Event>> {
+        CURRENT_ALT_KEYS.with(|c| c.set(AltKeys::default()));
+        self.fill(16)?;
+        self.parse_next()
+    }
+
+    /// Try to return an already-buffered event without waiting.
+    /// Returns `None` when no event is immediately available.
+    pub fn try_next_raw_event(&mut self) -> io::Result<Option<Event>> {
+        CURRENT_ALT_KEYS.with(|c| c.set(AltKeys::default()));
+        self.fill(0)?;
+        self.parse_next()
+    }
+}
+
+#[cfg(test)]
+#[path = "mod_test.rs"]
+mod tests;
