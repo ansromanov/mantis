@@ -27,23 +27,15 @@ impl App {
             }
             return;
         }
-        if static_keys::is_toggle_regex(&key) {
+        if let Some(toggle) = static_keys::search_toggle(&key) {
             if let Some(s) = &mut self.search {
-                s.regex = !s.regex;
-                s.refresh_now();
-            }
-            return;
-        }
-        if static_keys::is_toggle_case(&key) {
-            if let Some(s) = &mut self.search {
-                s.case_sensitive = !s.case_sensitive;
-                s.refresh_now();
-            }
-            return;
-        }
-        if static_keys::is_toggle_whole_word(&key) {
-            if let Some(s) = &mut self.search {
-                s.whole_word = !s.whole_word;
+                match toggle {
+                    static_keys::SearchToggle::Regex => s.regex = !s.regex,
+                    static_keys::SearchToggle::CaseSensitive => {
+                        s.case_sensitive = !s.case_sensitive
+                    }
+                    static_keys::SearchToggle::WholeWord => s.whole_word = !s.whole_word,
+                }
                 s.refresh_now();
             }
             return;
@@ -71,25 +63,15 @@ impl App {
             self.in_file_search_prev();
             return;
         }
-        if static_keys::is_toggle_regex(&key) {
+        if let Some(toggle) = static_keys::search_toggle(&key) {
             if let Some(s) = &mut self.in_file_search {
-                s.regex = !s.regex;
-            }
-            self.refresh_in_file_search();
-            self.scroll_in_file_search_to_current();
-            return;
-        }
-        if static_keys::is_toggle_case(&key) {
-            if let Some(s) = &mut self.in_file_search {
-                s.case_sensitive = !s.case_sensitive;
-            }
-            self.refresh_in_file_search();
-            self.scroll_in_file_search_to_current();
-            return;
-        }
-        if static_keys::is_toggle_whole_word(&key) {
-            if let Some(s) = &mut self.in_file_search {
-                s.whole_word = !s.whole_word;
+                match toggle {
+                    static_keys::SearchToggle::Regex => s.regex = !s.regex,
+                    static_keys::SearchToggle::CaseSensitive => {
+                        s.case_sensitive = !s.case_sensitive
+                    }
+                    static_keys::SearchToggle::WholeWord => s.whole_word = !s.whole_word,
+                }
             }
             self.refresh_in_file_search();
             self.scroll_in_file_search_to_current();

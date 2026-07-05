@@ -151,8 +151,11 @@ pub struct InFileSearch {
     pub query: String,
     pub matches: Vec<InFileMatch>,
     pub current: usize,
+    /// Interpret the query as a regular expression (Ctrl+R).
     pub regex: bool,
+    /// Match case-sensitively instead of the default insensitive (Ctrl+A).
     pub case_sensitive: bool,
+    /// Match whole words only (Ctrl+W).
     pub whole_word: bool,
 }
 
@@ -193,27 +196,24 @@ impl InFileSearch {
         }
 
         if self.regex || self.whole_word {
-            let pattern = if self.whole_word {
-                if self.regex {
-                    format!(r"\b({})\b", self.query)
-                } else {
-                    format!(r"\b({})\b", regex::escape(&self.query))
-                }
-            } else {
-                self.query.clone()
-            };
-            let mut builder = regex::RegexBuilder::new(&pattern);
-            builder.case_insensitive(!self.case_sensitive);
-            let Ok(re) = builder.build() else {
+            let Some(re) = super::build_search_regex(
+                &self.query,
+                self.regex,
+                self.whole_word,
+                self.case_sensitive,
+            ) else {
                 return;
             };
             for i in 0..line_count {
                 let Some(line) = get_line(i) else { continue };
                 for mat in re.find_iter(&line) {
-                    let byte_start = mat.start();
-                    let byte_end = mat.end();
-                    let char_start = line[..byte_start].chars().count();
-                    let char_len = line[byte_start..byte_end].chars().count();
+                    // A pattern like `x*` matches the empty string at every
+                    // position; zero-length matches are useless as highlights.
+                    if mat.start() == mat.end() {
+                        continue;
+                    }
+                    let char_start = line[..mat.start()].chars().count();
+                    let char_len = line[mat.start()..mat.end()].chars().count();
                     self.matches.push(InFileMatch {
                         line: i,
                         col: char_start,
@@ -235,7 +235,7 @@ impl InFileSearch {
             for i in 0..line_count {
                 let Some(line) = get_line(i) else { continue };
                 let target = if self.case_sensitive {
-                    line.clone()
+                    line
                 } else {
                     line.to_lowercase()
                 };

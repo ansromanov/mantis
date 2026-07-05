@@ -84,39 +84,12 @@ pub(crate) fn draw_search(f: &mut Frame, app: &mut App, area: Rect) {
         query_parts[0],
     );
 
-    let mut toggle_spans = Vec::new();
-    if search.case_sensitive {
-        toggle_spans.push(Span::styled(
-            "[Aa]",
-            Style::default()
-                .fg(theme.accent)
-                .add_modifier(Modifier::BOLD),
-        ));
-    } else {
-        toggle_spans.push(Span::styled("[Aa]", Style::default().fg(theme.dim)));
-    }
-    toggle_spans.push(Span::raw(" "));
-    if search.whole_word {
-        toggle_spans.push(Span::styled(
-            r"[\b]",
-            Style::default()
-                .fg(theme.accent)
-                .add_modifier(Modifier::BOLD),
-        ));
-    } else {
-        toggle_spans.push(Span::styled(r"[\b]", Style::default().fg(theme.dim)));
-    }
-    toggle_spans.push(Span::raw(" "));
-    if search.regex {
-        toggle_spans.push(Span::styled(
-            "[.*]",
-            Style::default()
-                .fg(theme.accent)
-                .add_modifier(Modifier::BOLD),
-        ));
-    } else {
-        toggle_spans.push(Span::styled("[.*]", Style::default().fg(theme.dim)));
-    }
+    let mut toggle_spans = super::util::search_toggle_spans(
+        search.case_sensitive,
+        search.whole_word,
+        search.regex,
+        theme,
+    );
     let total = search.results_len();
     let current = if total > 0 { search.selected + 1 } else { 0 };
     toggle_spans.push(Span::styled(

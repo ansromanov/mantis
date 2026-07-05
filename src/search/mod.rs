@@ -85,9 +85,38 @@ pub struct SearchState {
     /// When `true`, the search index is scoped to a subset of files (e.g. git
     /// mode's changed files). Displayed as "(changed files)" in the overlay title.
     pub scoped: bool,
+    /// Interpret the content query as a regular expression (Ctrl+R).
     pub regex: bool,
+    /// Match case-sensitively instead of the default smart-insensitive (Ctrl+A).
     pub case_sensitive: bool,
+    /// Match whole words only (Ctrl+W).
     pub whole_word: bool,
+}
+
+/// Compiles the regex used when the `regex` or `whole_word` search options are
+/// on, shared by the content search and the in-file search. A non-regex
+/// whole-word query is escaped first. Returns `None` while the pattern is
+/// invalid (e.g. a regex mid-typing), which callers treat as "no matches".
+pub(crate) fn build_search_regex(
+    query: &str,
+    is_regex: bool,
+    whole_word: bool,
+    case_sensitive: bool,
+) -> Option<regex::Regex> {
+    let pattern = if whole_word {
+        let inner = if is_regex {
+            query.to_string()
+        } else {
+            regex::escape(query)
+        };
+        format!(r"\b(?:{inner})\b")
+    } else {
+        query.to_string()
+    };
+    regex::RegexBuilder::new(&pattern)
+        .case_insensitive(!case_sensitive)
+        .build()
+        .ok()
 }
 
 fn filter_changed_paths(paths: &HashSet<PathBuf>, root: &Path) -> Vec<PathBuf> {
@@ -262,72 +291,47 @@ impl SearchState {
             self.content_cache_dirty = false;
         }
         let ctx = self.context_lines;
-        if self.regex || self.whole_word {
-            let pattern = if self.whole_word {
-                if self.regex {
-                    format!(r"\b({})\b", self.query)
-                } else {
-                    format!(r"\b({})\b", regex::escape(&self.query))
-                }
-            } else {
-                self.query.clone()
-            };
-            let mut builder = regex::RegexBuilder::new(&pattern);
-            builder.case_insensitive(!self.case_sensitive);
-            let Ok(re) = builder.build() else {
+        let re = if self.regex || self.whole_word {
+            let Some(re) = build_search_regex(
+                &self.query,
+                self.regex,
+                self.whole_word,
+                self.case_sensitive,
+            ) else {
                 return;
             };
-            for path in &self.all_files {
-                let Some(lines) = self.content_cache.get(path) else {
-                    continue;
-                };
-                for (i, (orig, _)) in lines.iter().enumerate() {
-                    if re.is_match(orig) {
-                        let context = if ctx > 0 {
-                            let end = (i + 1 + ctx).min(lines.len());
-                            lines[i + 1..end].iter().map(|(l, _)| l.clone()).collect()
-                        } else {
-                            Vec::new()
-                        };
-                        self.content_results.push(ContentMatch {
-                            path: path.clone(),
-                            line_num: i + 1,
-                            line: orig.clone(),
-                            context,
-                        });
-                    }
-                }
-            }
+            Some(re)
         } else {
-            let q = if self.case_sensitive {
-                self.query.clone()
-            } else {
-                self.query.to_lowercase()
+            None
+        };
+        let q = if self.case_sensitive {
+            self.query.clone()
+        } else {
+            self.query.to_lowercase()
+        };
+        for path in &self.all_files {
+            let Some(lines) = self.content_cache.get(path) else {
+                continue;
             };
-            for path in &self.all_files {
-                let Some(lines) = self.content_cache.get(path) else {
-                    continue;
+            for (i, (orig, lower)) in lines.iter().enumerate() {
+                let matched = match &re {
+                    Some(re) => re.is_match(orig),
+                    None if self.case_sensitive => orig.contains(&q),
+                    None => lower.contains(&q),
                 };
-                for (i, (orig, lower)) in lines.iter().enumerate() {
-                    let matched = if self.case_sensitive {
-                        orig.contains(&q)
+                if matched {
+                    let context = if ctx > 0 {
+                        let end = (i + 1 + ctx).min(lines.len());
+                        lines[i + 1..end].iter().map(|(l, _)| l.clone()).collect()
                     } else {
-                        lower.contains(&q)
+                        Vec::new()
                     };
-                    if matched {
-                        let context = if ctx > 0 {
-                            let end = (i + 1 + ctx).min(lines.len());
-                            lines[i + 1..end].iter().map(|(l, _)| l.clone()).collect()
-                        } else {
-                            Vec::new()
-                        };
-                        self.content_results.push(ContentMatch {
-                            path: path.clone(),
-                            line_num: i + 1,
-                            line: orig.clone(),
-                            context,
-                        });
-                    }
+                    self.content_results.push(ContentMatch {
+                        path: path.clone(),
+                        line_num: i + 1,
+                        line: orig.clone(),
+                        context,
+                    });
                 }
             }
         }

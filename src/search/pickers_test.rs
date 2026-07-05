@@ -105,7 +105,7 @@ fn in_file_search_regex() {
     s.push('y');
     s.push('z');
 
-    // literal by default (dots don't match wildcard)
+    // literal by default (the character class is not interpreted)
     s.refresh(lines.len(), |i| lines.get(i).cloned());
     assert_eq!(s.matches.len(), 0);
 
@@ -135,6 +135,21 @@ fn in_file_search_whole_word() {
     assert_eq!(s.matches.len(), 1);
     assert_eq!(s.matches[0].line, 0);
     assert_eq!(s.matches[0].col, 0);
+}
+
+#[test]
+fn in_file_search_regex_skips_zero_length_matches() {
+    let mut s = InFileSearch::new();
+    let lines = ["aaa bbb".to_string()];
+    s.regex = true;
+    // `a*` matches the empty string at every position; only the non-empty
+    // "aaa" run should be recorded.
+    s.push('a');
+    s.push('*');
+    s.refresh(lines.len(), |i| lines.get(i).cloned());
+    assert_eq!(s.matches.len(), 1);
+    assert_eq!(s.matches[0].col, 0);
+    assert_eq!(s.matches[0].len, 3);
 }
 
 // -- ThemePicker -----------------------------------------------------------

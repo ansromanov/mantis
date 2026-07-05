@@ -777,41 +777,34 @@ fn handle_search_key_toggles() {
     let s = SearchState::new(&root, false, true, 0, None);
     app.search = Some(s);
 
-    #[cfg(target_os = "macos")]
-    let regex_key = KeyEvent::new(
-        KeyCode::Char('r'),
-        KeyModifiers::CONTROL | KeyModifiers::ALT,
-    );
-    #[cfg(not(target_os = "macos"))]
-    let regex_key = KeyEvent::new(KeyCode::Char('r'), KeyModifiers::ALT);
-
+    let regex_key = KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL);
     assert!(!app.search.as_ref().unwrap().regex);
     app.handle_search_key(regex_key);
     assert!(app.search.as_ref().unwrap().regex);
 
-    #[cfg(target_os = "macos")]
-    let case_key = KeyEvent::new(
-        KeyCode::Char('c'),
-        KeyModifiers::CONTROL | KeyModifiers::ALT,
-    );
-    #[cfg(not(target_os = "macos"))]
-    let case_key = KeyEvent::new(KeyCode::Char('c'), KeyModifiers::ALT);
-
+    let case_key = KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL);
     assert!(!app.search.as_ref().unwrap().case_sensitive);
     app.handle_search_key(case_key);
     assert!(app.search.as_ref().unwrap().case_sensitive);
 
-    #[cfg(target_os = "macos")]
-    let word_key = KeyEvent::new(
-        KeyCode::Char('w'),
-        KeyModifiers::CONTROL | KeyModifiers::ALT,
-    );
-    #[cfg(not(target_os = "macos"))]
-    let word_key = KeyEvent::new(KeyCode::Char('w'), KeyModifiers::ALT);
-
+    let word_key = KeyEvent::new(KeyCode::Char('w'), KeyModifiers::CONTROL);
     assert!(!app.search.as_ref().unwrap().whole_word);
     app.handle_search_key(word_key);
     assert!(app.search.as_ref().unwrap().whole_word);
+
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn handle_search_key_unmodified_letters_type_into_query() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.search = Some(SearchState::new(&root, false, true, 0, None));
+
+    app.handle_search_key(KeyEvent::new(KeyCode::Char('r'), KeyModifiers::empty()));
+    let s = app.search.as_ref().unwrap();
+    assert_eq!(s.query, "r");
+    assert!(!s.regex);
 
     fs::remove_dir_all(&root).ok();
 }
@@ -822,38 +815,17 @@ fn handle_in_file_search_key_toggles() {
     let mut app = app_for(&root);
     app.in_file_search = Some(InFileSearch::new());
 
-    #[cfg(target_os = "macos")]
-    let regex_key = KeyEvent::new(
-        KeyCode::Char('r'),
-        KeyModifiers::CONTROL | KeyModifiers::ALT,
-    );
-    #[cfg(not(target_os = "macos"))]
-    let regex_key = KeyEvent::new(KeyCode::Char('r'), KeyModifiers::ALT);
-
+    let regex_key = KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL);
     assert!(!app.in_file_search.as_ref().unwrap().regex);
     app.handle_in_file_search_key(regex_key);
     assert!(app.in_file_search.as_ref().unwrap().regex);
 
-    #[cfg(target_os = "macos")]
-    let case_key = KeyEvent::new(
-        KeyCode::Char('c'),
-        KeyModifiers::CONTROL | KeyModifiers::ALT,
-    );
-    #[cfg(not(target_os = "macos"))]
-    let case_key = KeyEvent::new(KeyCode::Char('c'), KeyModifiers::ALT);
-
+    let case_key = KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL);
     assert!(!app.in_file_search.as_ref().unwrap().case_sensitive);
     app.handle_in_file_search_key(case_key);
     assert!(app.in_file_search.as_ref().unwrap().case_sensitive);
 
-    #[cfg(target_os = "macos")]
-    let word_key = KeyEvent::new(
-        KeyCode::Char('w'),
-        KeyModifiers::CONTROL | KeyModifiers::ALT,
-    );
-    #[cfg(not(target_os = "macos"))]
-    let word_key = KeyEvent::new(KeyCode::Char('w'), KeyModifiers::ALT);
-
+    let word_key = KeyEvent::new(KeyCode::Char('w'), KeyModifiers::CONTROL);
     assert!(!app.in_file_search.as_ref().unwrap().whole_word);
     app.handle_in_file_search_key(word_key);
     assert!(app.in_file_search.as_ref().unwrap().whole_word);

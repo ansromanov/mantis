@@ -1,7 +1,8 @@
 //! Reserved (non-configurable) modal keys.
 //!
 //! Defines intent-based predicates for keys that are reserved and not user-rewritable:
-//! Esc, Enter, Up/Down, PageUp/PageDown, Backspace, Tab/BackTab, and printable Char.
+//! Esc, Enter, Up/Down, PageUp/PageDown, Backspace, Tab/BackTab, printable Char,
+//! and the search-option toggles (Ctrl+R / Ctrl+A / Ctrl+W).
 //! This is the single source of truth for modal keybindings; all overlays and modals
 //! should use these predicates instead of matching `KeyCode::*` directly.
 
@@ -54,60 +55,29 @@ pub fn is_toggle_modal(key: &KeyEvent) -> bool {
     key.code == KeyCode::Tab
 }
 
-/// Toggle regex search (Alt+R on PC, Cmd+Alt+R or Ctrl+Alt+R on macOS).
-pub fn is_toggle_regex(key: &KeyEvent) -> bool {
-    let matches_char = matches!(key.code, KeyCode::Char('r') | KeyCode::Char('R'));
-    if !matches_char {
-        return false;
-    }
-    #[cfg(target_os = "macos")]
-    {
-        let has_super = key.modifiers.contains(KeyModifiers::SUPER);
-        let has_ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
-        let has_alt = key.modifiers.contains(KeyModifiers::ALT);
-        (has_super || has_ctrl) && has_alt
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        key.modifiers.contains(KeyModifiers::ALT) && !key.modifiers.contains(KeyModifiers::CONTROL)
-    }
+/// Search-option toggles available inside the search overlays.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SearchToggle {
+    /// Regular-expression matching (Ctrl+R).
+    Regex,
+    /// Case-sensitive matching (Ctrl+A, mirroring the `[Aa]` indicator).
+    CaseSensitive,
+    /// Whole-word matching (Ctrl+W).
+    WholeWord,
 }
 
-/// Toggle case-sensitive search (Alt+C on PC, Cmd+Alt+C or Ctrl+Alt+C on macOS).
-pub fn is_toggle_case(key: &KeyEvent) -> bool {
-    let matches_char = matches!(key.code, KeyCode::Char('c') | KeyCode::Char('C'));
-    if !matches_char {
-        return false;
+/// Maps a key event to the search toggle it activates, if any.
+/// Ctrl-only bindings — the Alt modifier is unreliable across terminals
+/// and banned for new bindings.
+pub fn search_toggle(key: &KeyEvent) -> Option<SearchToggle> {
+    if !key.modifiers.contains(KeyModifiers::CONTROL) {
+        return None;
     }
-    #[cfg(target_os = "macos")]
-    {
-        let has_super = key.modifiers.contains(KeyModifiers::SUPER);
-        let has_ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
-        let has_alt = key.modifiers.contains(KeyModifiers::ALT);
-        (has_super || has_ctrl) && has_alt
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        key.modifiers.contains(KeyModifiers::ALT) && !key.modifiers.contains(KeyModifiers::CONTROL)
-    }
-}
-
-/// Toggle whole-word search (Alt+W on PC, Cmd+Alt+W or Ctrl+Alt+W on macOS).
-pub fn is_toggle_whole_word(key: &KeyEvent) -> bool {
-    let matches_char = matches!(key.code, KeyCode::Char('w') | KeyCode::Char('W'));
-    if !matches_char {
-        return false;
-    }
-    #[cfg(target_os = "macos")]
-    {
-        let has_super = key.modifiers.contains(KeyModifiers::SUPER);
-        let has_ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
-        let has_alt = key.modifiers.contains(KeyModifiers::ALT);
-        (has_super || has_ctrl) && has_alt
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        key.modifiers.contains(KeyModifiers::ALT) && !key.modifiers.contains(KeyModifiers::CONTROL)
+    match key.code {
+        KeyCode::Char('r') | KeyCode::Char('R') => Some(SearchToggle::Regex),
+        KeyCode::Char('a') | KeyCode::Char('A') => Some(SearchToggle::CaseSensitive),
+        KeyCode::Char('w') | KeyCode::Char('W') => Some(SearchToggle::WholeWord),
+        _ => None,
     }
 }
 

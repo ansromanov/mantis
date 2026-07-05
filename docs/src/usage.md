@@ -159,9 +159,12 @@ changed files — the popup title shows "(changed files)" to make this visible.
 | `Tab`     | Switch files / content mode     |
 | `Enter`   | Open selected result            |
 | `Esc`     | Close search                    |
-| `Alt+c` (Mac: `Cmd+Alt+c` / `Ctrl+Alt+c`) | Toggle case-sensitivity |
-| `Alt+w` (Mac: `Cmd+Alt+w` / `Ctrl+Alt+w`) | Toggle whole-word match |
-| `Alt+r` (Mac: `Cmd+Alt+r` / `Ctrl+Alt+r`) | Toggle regular expression |
+| `Ctrl+A` | Toggle case-sensitive matching (`[Aa]`) |
+| `Ctrl+W` | Toggle whole-word matching (`[\b]`) |
+| `Ctrl+R` | Toggle regular-expression matching (`[.*]`) |
+
+The toggles apply to content search (`f`) and the in-file search bar (`/`);
+the active options are shown as highlighted `[Aa] [\b] [.*]` indicators.
 
 ## Command palette
 

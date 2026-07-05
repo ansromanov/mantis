@@ -2,7 +2,8 @@
 //!
 //! `draw_in_file_search` renders the incremental within-the-current-file search
 //! as a thin bar near the bottom of the content area (not a centered popup),
-//! showing the query and the current/total match count. It reads the live
+//! showing the query, the current/total match count, and the search-option
+//! indicators (`[Aa] [\b] [.*]`). It reads the live
 //! `InFileSearch` state from `App`; the matches themselves are highlighted in
 //! the content pane by `ui::content::search`, so this module draws only the
 //! prompt/status line. It is a no-op when in-file search is inactive, and its
@@ -76,40 +77,8 @@ pub(crate) fn draw_in_file_search(f: &mut Frame, app: &mut App, area: Rect) {
         );
     }
 
-    let mut toggle_spans = Vec::new();
-    if s.case_sensitive {
-        toggle_spans.push(Span::styled(
-            "[Aa]",
-            Style::default()
-                .fg(theme.accent)
-                .add_modifier(Modifier::BOLD),
-        ));
-    } else {
-        toggle_spans.push(Span::styled("[Aa]", Style::default().fg(theme.dim)));
-    }
-    toggle_spans.push(Span::raw(" "));
-    if s.whole_word {
-        toggle_spans.push(Span::styled(
-            r"[\b]",
-            Style::default()
-                .fg(theme.accent)
-                .add_modifier(Modifier::BOLD),
-        ));
-    } else {
-        toggle_spans.push(Span::styled(r"[\b]", Style::default().fg(theme.dim)));
-    }
-    toggle_spans.push(Span::raw(" "));
-    if s.regex {
-        toggle_spans.push(Span::styled(
-            "[.*]",
-            Style::default()
-                .fg(theme.accent)
-                .add_modifier(Modifier::BOLD),
-        ));
-    } else {
-        toggle_spans.push(Span::styled("[.*]", Style::default().fg(theme.dim)));
-    }
-
+    let toggle_spans =
+        super::util::search_toggle_spans(s.case_sensitive, s.whole_word, s.regex, theme);
     f.render_widget(
         Paragraph::new(Line::from(toggle_spans)).alignment(ratatui::layout::Alignment::Right),
         bar_parts[1],
