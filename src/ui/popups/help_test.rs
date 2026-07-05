@@ -875,3 +875,60 @@ fn help_mouse_click_reaches_neighbor_of_scrolled_tab() {
          must select tab 7, not whatever tab the unscrolled coordinates would hit"
     );
 }
+
+#[test]
+fn help_shows_command_palette_entry() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    let backend = TestBackend::new(120, 100);
+    let mut terminal = Terminal::new(backend).unwrap();
+    app.help_tab = 0; // Getting started tab
+    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(
+        joined.contains("open command palette"),
+        "help must list 'open command palette' for command_palette, got:\n{joined}"
+    );
+}
+
+#[test]
+fn help_shows_goto_line_entry() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    let backend = TestBackend::new(120, 100);
+    let mut terminal = Terminal::new(backend).unwrap();
+    app.help_tab = 1; // Navigation tab
+    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(
+        joined.contains("Go to line"),
+        "help must list 'Go to line' for goto_line, got:\n{joined}"
+    );
+}
+
+/// Verification guard: every action in `ACTIONS` that has a default keybinding
+/// must appear as a string literal (representing its action ID) in `src/ui/popups/help.rs`,
+/// unless explicitly allowlisted as an intentional omission. This prevents any
+/// keybound action from silently missing help coverage in the overlay.
+#[test]
+fn keybound_actions_are_in_help_overlay() {
+    let help_rs_content = std::fs::read_to_string("src/ui/popups/help.rs")
+        .expect("should read src/ui/popups/help.rs");
+
+    let allowlist: &[&str] = &[];
+    let keys = Keymap::default();
+
+    for action in crate::actions::ACTIONS {
+        let is_keybound = keys.labels_for_action(action.id) != "—";
+        if is_keybound && !allowlist.contains(&action.id) {
+            let quoted_id = format!("\"{}\"", action.id);
+            assert!(
+                help_rs_content.contains(&quoted_id),
+                "Action '{}' is keybound but does not appear as a string literal in src/ui/popups/help.rs",
+                action.id
+            );
+        }
+    }
+}

@@ -266,7 +266,7 @@ pub static ACTIONS: &[ActionSpec] = &[
     ActionSpec {
         id: "command_palette",
         palette: None,
-        help: None,
+        help: Some(("Global", "open command palette (all commands + keys)")),
     },
     ActionSpec {
         id: "toggle_watch",
