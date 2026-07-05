@@ -6,6 +6,10 @@
 //! Left/Right arrows, h/l, or Tab/Shift-Tab, and scroll using Up/Down arrows or j/k.
 //! Key columns are built dynamically from the live `Keymap` so that remapped
 //! keys are reflected immediately.
+//!
+//! Each tab ends with a "Full docs" footer pointing at the `docs/src/*.md`
+//! file that covers the topic in depth (see `HELP_DOC_LINKS`) — the sync
+//! strategy between in-app help and the mdbook (#304).
 
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
@@ -28,6 +32,27 @@ pub const HELP_TABS: &[&str] = &[
     "Themes",
     "Plugins",
     "Mouse",
+];
+
+/// `docs/src/*.md` file backing each `HELP_TABS` entry (same index order).
+///
+/// In-app help is a concise operational summary, not a copy of the mdbook —
+/// duplicating full prose in both places would drift silently. Instead each
+/// tab footer points at the doc file that covers it in depth, and
+/// `help_test.rs::help_doc_links_point_to_existing_files` fails the build if
+/// a link starts pointing at a file that was renamed or removed. That test is
+/// the sync strategy: it doesn't catch content drift within a file, but it
+/// guarantees the pointer from help to docs never dangles.
+pub(super) const HELP_DOC_LINKS: &[&str] = &[
+    "introduction.md",
+    "usage.md",
+    "usage.md",
+    "usage.md",
+    "git.md",
+    "configuration.md",
+    "themes.md",
+    "plugins.md",
+    "usage.md",
 ];
 
 /// Git-specific keybinding rows rendered in the dedicated Git section.
@@ -550,6 +575,19 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
             ));
         }
         _ => {}
+    }
+
+    if let Some(&doc_file) = HELP_DOC_LINKS.get(app.help_tab) {
+        rows.push(gap.clone());
+        rows.push(Line::from(vec![
+            Span::styled("Full docs: ", Style::default().fg(theme.dim)),
+            Span::styled(
+                format!("docs/src/{doc_file}"),
+                Style::default()
+                    .fg(theme.dim)
+                    .add_modifier(Modifier::ITALIC),
+            ),
+        ]));
     }
 
     let total_rows = rows.len();

@@ -595,6 +595,24 @@ fn empty_state_shows_orientation_hint_when_no_file_open() {
     fs::remove_dir_all(&root).ok();
 }
 
+/// #304 discoverability: the first-run hint must also point at `?` for help,
+/// since the status bar no longer renders keybinding hints on its own.
+#[test]
+fn empty_state_hint_mentions_help_key() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.current_file = None;
+    app.content = Vec::new();
+    app.highlighted = Vec::new();
+    app.virtual_file = None;
+    let out = render_to_string(&mut app);
+    assert!(
+        out.contains("for help"),
+        "empty content pane hint should point at the help key; got: {out:?}"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
 #[test]
 fn empty_state_hint_survives_word_wrap_with_line_number_gutter() {
     // Regression: the hint is appended to content_lines only. wrap_content's

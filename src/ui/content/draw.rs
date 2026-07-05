@@ -312,11 +312,15 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     if content_lines.is_empty() && app.current_file.is_none() {
         let search_key = app.keys().label_for_action("search_files");
         let open_key = app.keys().label_for_action("tree_expand");
+        let help_key = app.keys().label_for_action("help");
         if !search_key.is_empty() && !open_key.is_empty() {
+            let help_hint = if help_key.is_empty() {
+                String::new()
+            } else {
+                format!(" · {help_key} for help")
+            };
             content_lines.push(Line::from(Span::styled(
-                format!(
-                    " Press {search_key} to search, or {open_key} on a tree item to open a file"
-                ),
+                format!(" Press {search_key} to search, or {open_key} to open a file{help_hint}"),
                 Style::default().fg(app.theme.dim),
             )));
             // Keep ln_lines in sync with content_lines so wrap_content's zip
