@@ -826,7 +826,7 @@ dependencies = [
 
 [[package]]
 name = "mantis"
-version = "0.13.12"
+version = "0.13.14"
 dependencies = [
  "anyhow",
  "arboard",
@@ -838,6 +838,7 @@ dependencies = [
  "memmap2",
  "notify",
  "ratatui",
+ "regex",
  "serde",
  "serde_json",
  "serde_yaml",

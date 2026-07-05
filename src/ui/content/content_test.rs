@@ -104,6 +104,9 @@ fn make_search(matches: Vec<crate::search::InFileMatch>, current: usize) -> InFi
         query: "test".to_string(),
         matches,
         current,
+        regex: false,
+        case_sensitive: false,
+        whole_word: false,
     }
 }
 

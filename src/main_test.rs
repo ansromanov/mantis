@@ -141,7 +141,7 @@ fn event_loop_key_search_toggles_search() {
     fs::write(dir.join("a.txt"), "hello\n").unwrap();
     let mut app = app_for(&dir);
     assert!(app.search.is_none());
-    // Switch to Content focus + no file so '/' opens SearchState.
+    // Switch to Content focus + no file so ctrl+f opens SearchState.
     app.focus = crate::app::Focus::Content;
     app.current_file = None;
     // search_files default is ctrl+f ('/' remains as a tree-scoped binding).
@@ -340,7 +340,12 @@ fn run_app_opens_and_reveals_file() {
     fs::write(&file_path, "hello\nworld\n").unwrap();
     let backend = TestBackend::new(80, 30);
     let mut terminal = ratatui::Terminal::new(backend).unwrap();
-    let mut events = ScriptedEvents::new(vec![key_event('q')]);
+    // Opening a file switches focus to Content, where the tree-scoped `q`
+    // quit binding doesn't apply; use the global ctrl+c binding instead.
+    let mut events = ScriptedEvents::new(vec![Event::Key(KeyEvent::new(
+        KeyCode::Char('c'),
+        KeyModifiers::CONTROL,
+    ))]);
     run_app(&mut terminal, dir.clone(), Some(file_path), &mut events).unwrap();
     fs::remove_dir_all(&dir).ok();
 }

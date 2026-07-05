@@ -231,6 +231,8 @@ impl App {
             session_dirty: false,
             session_dirty_at: None,
             session_last_save: Instant::now(),
+            #[cfg(test)]
+            clipboard_capture: Vec::new(),
         };
 
         // Load session state and apply it over the config-driven defaults.

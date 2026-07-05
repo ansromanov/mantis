@@ -527,6 +527,20 @@ fn app_new_cursor_positions_starts_empty() {
 }
 
 #[test]
+fn app_new_clipboard_capture_starts_empty() {
+    // The test-only clipboard seam (see `copy_to_clipboard` in mod.rs) must
+    // start empty so the first capture assertion in a test reflects only
+    // that test's own clipboard writes.
+    let root = temp_dir();
+    let app = new_app(&root, Config::default());
+    assert!(
+        app.clipboard_capture.is_empty(),
+        "clipboard_capture must start empty on construction"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn app_new_ignore_gitignore_includes_ignored_in_status_map() {
     let root = temp_dir();
     let git = |args: &[&str]| {

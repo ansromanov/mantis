@@ -1,7 +1,8 @@
 //! Reserved (non-configurable) modal keys.
 //!
 //! Defines intent-based predicates for keys that are reserved and not user-rewritable:
-//! Esc, Enter, Up/Down, PageUp/PageDown, Backspace, Tab/BackTab, and printable Char.
+//! Esc, Enter, Up/Down, PageUp/PageDown, Backspace, Tab/BackTab, printable Char,
+//! and the search-option toggles (Ctrl+R / Ctrl+A / Ctrl+W).
 //! This is the single source of truth for modal keybindings; all overlays and modals
 //! should use these predicates instead of matching `KeyCode::*` directly.
 
@@ -52,6 +53,32 @@ pub fn is_delete_char(key: &KeyEvent) -> bool {
 /// Modal overlay toggle (Tab for search: file/content mode toggle).
 pub fn is_toggle_modal(key: &KeyEvent) -> bool {
     key.code == KeyCode::Tab
+}
+
+/// Search-option toggles available inside the search overlays.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SearchToggle {
+    /// Regular-expression matching (Ctrl+R).
+    Regex,
+    /// Case-sensitive matching (Ctrl+A, mirroring the `[Aa]` indicator).
+    CaseSensitive,
+    /// Whole-word matching (Ctrl+W).
+    WholeWord,
+}
+
+/// Maps a key event to the search toggle it activates, if any.
+/// Ctrl-only bindings — the Alt modifier is unreliable across terminals
+/// and banned for new bindings.
+pub fn search_toggle(key: &KeyEvent) -> Option<SearchToggle> {
+    if !key.modifiers.contains(KeyModifiers::CONTROL) {
+        return None;
+    }
+    match key.code {
+        KeyCode::Char('r') | KeyCode::Char('R') => Some(SearchToggle::Regex),
+        KeyCode::Char('a') | KeyCode::Char('A') => Some(SearchToggle::CaseSensitive),
+        KeyCode::Char('w') | KeyCode::Char('W') => Some(SearchToggle::WholeWord),
+        _ => None,
+    }
 }
 
 /// Plugin picker toggle (Space).

@@ -98,3 +98,66 @@ fn test_is_modal_close() {
     assert!(!is_modal_close(&make_key(KeyCode::Char('o'))));
     assert!(!is_modal_close(&make_key(KeyCode::Char('n'))));
 }
+
+#[test]
+fn test_search_toggle_ctrl_bindings() {
+    assert_eq!(
+        search_toggle(&make_key_with_modifier(
+            KeyCode::Char('r'),
+            KeyModifiers::CONTROL
+        )),
+        Some(SearchToggle::Regex)
+    );
+    assert_eq!(
+        search_toggle(&make_key_with_modifier(
+            KeyCode::Char('R'),
+            KeyModifiers::CONTROL | KeyModifiers::SHIFT
+        )),
+        Some(SearchToggle::Regex)
+    );
+    assert_eq!(
+        search_toggle(&make_key_with_modifier(
+            KeyCode::Char('a'),
+            KeyModifiers::CONTROL
+        )),
+        Some(SearchToggle::CaseSensitive)
+    );
+    assert_eq!(
+        search_toggle(&make_key_with_modifier(
+            KeyCode::Char('w'),
+            KeyModifiers::CONTROL
+        )),
+        Some(SearchToggle::WholeWord)
+    );
+}
+
+#[test]
+fn test_search_toggle_requires_ctrl() {
+    // Bare letters must fall through to query input.
+    assert_eq!(search_toggle(&make_key(KeyCode::Char('r'))), None);
+    assert_eq!(search_toggle(&make_key(KeyCode::Char('a'))), None);
+    assert_eq!(search_toggle(&make_key(KeyCode::Char('w'))), None);
+    // Alt is banned for new bindings and must not trigger toggles.
+    assert_eq!(
+        search_toggle(&make_key_with_modifier(
+            KeyCode::Char('r'),
+            KeyModifiers::ALT
+        )),
+        None
+    );
+}
+
+#[test]
+fn test_search_toggle_ignores_other_ctrl_keys() {
+    assert_eq!(
+        search_toggle(&make_key_with_modifier(
+            KeyCode::Char('p'),
+            KeyModifiers::CONTROL
+        )),
+        None
+    );
+    assert_eq!(
+        search_toggle(&make_key_with_modifier(KeyCode::Tab, KeyModifiers::CONTROL)),
+        None
+    );
+}

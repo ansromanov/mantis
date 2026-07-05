@@ -40,3 +40,26 @@ fn draw_in_file_search_some_does_not_panic() {
         .draw(|f| draw_in_file_search(f, &mut app, Rect::new(0, 0, 80, 24)))
         .unwrap();
 }
+
+#[test]
+fn draw_in_file_search_some_renders_toggles() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    let mut s = InFileSearch::new();
+    s.case_sensitive = true;
+    app.in_file_search = Some(s);
+    let backend = TestBackend::new(80, 24);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| draw_in_file_search(f, &mut app, Rect::new(0, 0, 80, 24)))
+        .unwrap();
+    let buffer = terminal.backend().buffer();
+    let mut rendered_text = String::new();
+    for y in 0..24 {
+        for x in 0..80 {
+            rendered_text.push(buffer[(x, y)].symbol().chars().next().unwrap_or(' '));
+        }
+        rendered_text.push('\n');
+    }
+    assert!(rendered_text.contains("[Aa]"));
+}

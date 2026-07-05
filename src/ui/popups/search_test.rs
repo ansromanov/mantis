@@ -94,3 +94,27 @@ fn draw_search_some_does_not_panic() {
         .draw(|f| draw_search(f, &mut app, Rect::new(0, 0, 80, 24)))
         .unwrap();
 }
+
+#[test]
+fn draw_search_renders_toggles() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    let mut s = SearchState::new(dir.path(), false, false, 2, None);
+    s.case_sensitive = true;
+    app.search = Some(s);
+    let backend = TestBackend::new(80, 24);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| draw_search(f, &mut app, Rect::new(0, 0, 80, 24)))
+        .unwrap();
+    let buf = terminal.backend().buffer();
+    let rows: Vec<String> = (0..buf.area.height)
+        .map(|y| {
+            (0..buf.area.width)
+                .map(|x| buf[(x, y)].symbol().to_string())
+                .collect()
+        })
+        .collect();
+    let joined = rows.join("\n");
+    assert!(joined.contains("[Aa]"));
+}

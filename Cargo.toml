@@ -7,7 +7,7 @@ resolver = "2"
 
 [package]
 name = "mantis"
-version = "0.13.12"
+version = "0.13.14"
 edition = "2021"
 description = "A fast terminal file tree viewer with syntax highlighting, fuzzy search, and mouse support."
 license = "GPL-3.0-or-later"
@@ -49,6 +49,7 @@ notify = "6"
 unicode-width = "0.2"
 arboard = "3"
 memmap2 = "0.9"
+regex = "1"
 
 [dev-dependencies]
 tempfile = "3"

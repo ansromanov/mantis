@@ -226,6 +226,45 @@ fn bench_content_search(c: &mut Criterion) {
         fs::remove_dir_all(&dir).ok();
     }
 
+    // Regex + whole-word variant: exercises the compiled-regex matching path
+    // added for the search-option toggles.
+    {
+        let (files, lines_per_file) = (100usize, 100);
+        let dir = fixture_dir("search_regex");
+        generate_search_files(&dir, files, lines_per_file);
+
+        group.bench_with_input(
+            BenchmarkId::new(
+                "refresh_content/regex_whole_word",
+                format!("{files}fx{lines_per_file}l"),
+            ),
+            &dir,
+            |b, dir| {
+                let mut state = SearchState::new(dir, false, true, 0, None);
+                state.toggle_mode();
+                state.regex = true;
+                state.whole_word = true;
+                // Warm the cache
+                state.push('x');
+                state.push('y');
+                state.refresh_now();
+                state.pop();
+                state.pop();
+
+                b.iter(|| {
+                    state.push('b');
+                    state.push('r'); // 2-char query to trigger content search
+                    state.refresh_now();
+                    state.pop();
+                    state.pop();
+                    state.refresh_now();
+                })
+            },
+        );
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
     group.finish();
 }
 

@@ -66,6 +66,92 @@ fn in_file_search_default_is_empty() {
     assert_eq!(s.current, 0);
 }
 
+#[test]
+fn in_file_search_case_sensitive() {
+    let mut s = InFileSearch::new();
+    let lines = ["HelloWorld".to_string(), "helloworld".to_string()];
+    s.push('W');
+    s.push('o');
+    s.push('r');
+    s.push('l');
+    s.push('d');
+
+    // Case-insensitive by default
+    s.refresh(lines.len(), |i| lines.get(i).cloned());
+    assert_eq!(s.matches.len(), 2);
+
+    // Case-sensitive enabled
+    s.case_sensitive = true;
+    s.refresh(lines.len(), |i| lines.get(i).cloned());
+    assert_eq!(s.matches.len(), 1);
+    assert_eq!(s.matches[0].line, 0);
+    assert_eq!(s.matches[0].col, 5);
+}
+
+#[test]
+fn in_file_search_regex() {
+    let mut s = InFileSearch::new();
+    let lines = ["abc123xyz".to_string(), "abc456xyz".to_string()];
+    s.push('a');
+    s.push('b');
+    s.push('c');
+    s.push('[');
+    s.push('0');
+    s.push('-');
+    s.push('9');
+    s.push(']');
+    s.push('+');
+    s.push('x');
+    s.push('y');
+    s.push('z');
+
+    // literal by default (the character class is not interpreted)
+    s.refresh(lines.len(), |i| lines.get(i).cloned());
+    assert_eq!(s.matches.len(), 0);
+
+    // regex enabled
+    s.regex = true;
+    s.refresh(lines.len(), |i| lines.get(i).cloned());
+    assert_eq!(s.matches.len(), 2);
+}
+
+#[test]
+fn in_file_search_whole_word() {
+    let mut s = InFileSearch::new();
+    let lines = ["hello world".to_string(), "helloworld".to_string()];
+    s.push('h');
+    s.push('e');
+    s.push('l');
+    s.push('l');
+    s.push('o');
+
+    // substring by default
+    s.refresh(lines.len(), |i| lines.get(i).cloned());
+    assert_eq!(s.matches.len(), 2);
+
+    // whole word enabled
+    s.whole_word = true;
+    s.refresh(lines.len(), |i| lines.get(i).cloned());
+    assert_eq!(s.matches.len(), 1);
+    assert_eq!(s.matches[0].line, 0);
+    assert_eq!(s.matches[0].col, 0);
+}
+
+#[test]
+fn in_file_search_regex_skips_zero_length_matches() {
+    let mut s = InFileSearch::new();
+    let lines = ["aaa bbb".to_string()];
+    s.regex = true;
+    // `a*` matches the empty string at every position; only the non-empty
+    // "aaa" run should be recorded.
+    s.push('a');
+    s.push('*');
+    s.refresh(lines.len(), |i| lines.get(i).cloned());
+    assert_eq!(s.matches.len(), 1);
+    assert_eq!(s.matches[0].col, 0);
+    assert_eq!(s.matches[0].len, 3);
+}
+
 // -- ThemePicker -----------------------------------------------------------
 
 #[test]
