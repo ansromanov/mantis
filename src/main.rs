@@ -298,7 +298,6 @@ fn launch_tui(root: PathBuf, initial: InitialContent) -> anyhow::Result<()> {
     crate::app::set_alternate_scroll(false);
 
     // Enable kitty keyboard protocol on terminals that support it.
-    #[cfg(unix)]
     let keyboard_enhanced = event_source::push_keyboard_enhancement_flags().unwrap_or(false);
 
     let backend = CrosstermBackend::new(stdout);

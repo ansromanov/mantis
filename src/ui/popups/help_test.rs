@@ -280,6 +280,41 @@ fn help_unbound_action_shows_dash() {
     );
 }
 
+/// On legacy terminals (no kitty keyboard protocol), the overview tab warns
+/// that Ctrl+Shift shortcuts degrade to their plain-Ctrl counterpart.
+#[test]
+fn help_shows_legacy_terminal_warning_when_not_keyboard_enhanced() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    app.keyboard_enhanced = false;
+    let backend = TestBackend::new(80, 75);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(
+        joined.contains("can't distinguish Ctrl+Shift shortcuts"),
+        "help overlay must warn about degraded Ctrl+Shift shortcuts on legacy terminals, got:\n{joined}"
+    );
+}
+
+/// On keyboard-enhanced terminals, the legacy-terminal warning must not show.
+#[test]
+fn help_hides_legacy_terminal_warning_when_keyboard_enhanced() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    app.keyboard_enhanced = true;
+    let backend = TestBackend::new(80, 75);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(
+        !joined.contains("can't distinguish Ctrl+Shift shortcuts"),
+        "help overlay must not show the legacy-terminal warning when keyboard_enhanced, got:\n{joined}"
+    );
+}
+
 // ── scrolling tests ──────────────────────────────────────────────────
 
 #[test]
