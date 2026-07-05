@@ -415,6 +415,9 @@ fn default_content_reachable_letters_are_motions_only() {
                 continue;
             }
             if let KeyCode::Char(c) = b.code {
+                if !c.is_ascii_alphabetic() {
+                    continue;
+                }
                 assert!(
                     motions.contains(&c),
                     "action '{}' binds bare '{}' reachable from the content pane",
