@@ -183,9 +183,13 @@ fn flat_tree_with_nothing_expanded_skips_deep_walk_but_output_is_unchanged() {
 #[cfg(unix)]
 #[test]
 fn flat_tree_with_nothing_expanded_does_not_surface_errors_from_unreadable_dirs() {
-    // With `expanded` completely empty (not even root), the guard must skip
-    // the deep walk entirely, so an unreadable grandchild inside a collapsed
-    // directory must never be opened or counted as a walk error.
+    // With `expanded` completely empty (not even root), an unreadable
+    // grandchild inside a collapsed directory must never be opened or
+    // counted as a walk error. Note: this holds whether the deep walk is
+    // skipped by the guard above or merely blocked by `filter_entry` at
+    // depth 1, so this test does not by itself prove the guard fires — it
+    // only asserts the (guard-independent) invariant that collapsed
+    // directories' contents are never read.
     use std::os::unix::fs::PermissionsExt;
 
     let root = temp_dir("flat_guard_perm");
@@ -200,7 +204,7 @@ fn flat_tree_with_nothing_expanded_does_not_surface_errors_from_unreadable_dirs(
     assert_eq!(names, vec!["collapsed", "visible.txt"]);
     assert_eq!(
         errors, 0,
-        "the deep walk must be skipped, not just filtered"
+        "no walk errors should surface for an unreadable grandchild when nothing is expanded"
     );
 
     fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).unwrap();

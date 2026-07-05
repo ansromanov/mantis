@@ -24,6 +24,12 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
+      # Copilot's PR review runs async and can take a couple minutes to land.
+      # It isn't required for merge, but without this delay auto-merge can
+      # fire (once CI + conversation-resolution checks pass) before the
+      # review comments even exist, orphaning otherwise-actionable feedback.
+      - name: Wait for review to land
+        run: sleep 420
       - name: Enable auto-merge (squash)
         env:
           GH_TOKEN: ${{ github.token }}
