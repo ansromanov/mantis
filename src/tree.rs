@@ -59,40 +59,53 @@ pub fn build_visible(
         }
     }
 
-    // A single deep walk over the rest of the tree, gated by `filter_entry`
-    // to only descend into expanded directories. This builds the gitignore
-    // chain once instead of re-discovering every ancestor's gitignore per
-    // directory (which made the old per-directory-WalkBuilder approach
-    // quadratic in tree depth). Depth-1 recursion is gated on the directory's
-    // own path in `expanded` (not its parent, root, which isn't necessarily
-    // in `expanded` even though root's children are always shown) so a
-    // collapsed top-level directory's contents are never read.
-    let expanded_for_filter = expanded.clone();
-    for result in WalkBuilder::new(root)
-        .hidden(!show_hidden)
-        .git_ignore(!ignore_gitignore)
-        .git_global(!ignore_gitignore)
-        .git_exclude(!ignore_gitignore)
-        .filter_entry(move |entry| match entry.depth() {
-            0 => true,
-            1 => expanded_for_filter.contains(entry.path()),
-            _ => entry
-                .path()
-                .parent()
-                .is_some_and(|p| expanded_for_filter.contains(p)),
-        })
-        .build()
-    {
-        match result {
-            // Depth-1 entries were already collected by the shallow walk
-            // above; only capture depth >= 2 here to avoid duplicates.
-            Ok(e) if e.depth() >= 2 => {
-                if let Some(parent) = e.path().parent() {
-                    children.entry(parent.to_path_buf()).or_default().push(e);
+    // The deep walk can only ever produce a depth >= 2 entry if some root
+    // child directory is expanded (its depth-1 `filter_entry` gate below
+    // rejects everything else). When nothing is expanded, skip it entirely:
+    // it would otherwise re-read and re-stat the whole root directory a
+    // second time for no output, which is the O(2x) cost this guard avoids.
+    let any_expanded_child = children.get(root).is_some_and(|entries| {
+        entries
+            .iter()
+            .any(|e| e.file_type().is_some_and(|t| t.is_dir()) && expanded.contains(e.path()))
+    });
+
+    if any_expanded_child {
+        // A single deep walk over the rest of the tree, gated by `filter_entry`
+        // to only descend into expanded directories. This builds the gitignore
+        // chain once instead of re-discovering every ancestor's gitignore per
+        // directory (which made the old per-directory-WalkBuilder approach
+        // quadratic in tree depth). Depth-1 recursion is gated on the directory's
+        // own path in `expanded` (not its parent, root, which isn't necessarily
+        // in `expanded` even though root's children are always shown) so a
+        // collapsed top-level directory's contents are never read.
+        let expanded_for_filter = expanded.clone();
+        for result in WalkBuilder::new(root)
+            .hidden(!show_hidden)
+            .git_ignore(!ignore_gitignore)
+            .git_global(!ignore_gitignore)
+            .git_exclude(!ignore_gitignore)
+            .filter_entry(move |entry| match entry.depth() {
+                0 => true,
+                1 => expanded_for_filter.contains(entry.path()),
+                _ => entry
+                    .path()
+                    .parent()
+                    .is_some_and(|p| expanded_for_filter.contains(p)),
+            })
+            .build()
+        {
+            match result {
+                // Depth-1 entries were already collected by the shallow walk
+                // above; only capture depth >= 2 here to avoid duplicates.
+                Ok(e) if e.depth() >= 2 => {
+                    if let Some(parent) = e.path().parent() {
+                        children.entry(parent.to_path_buf()).or_default().push(e);
+                    }
                 }
+                Ok(_) => {}
+                Err(_) => error_count += 1,
             }
-            Ok(_) => {}
-            Err(_) => error_count += 1,
         }
     }
 
