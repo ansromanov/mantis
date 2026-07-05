@@ -295,8 +295,18 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
                 "  - Content panel (right): View file contents, diffs, blame, and search.",
             ));
             rows.push(gap.clone());
+            let cmd_palette_keys = app.keys().labels_for_action("command_palette");
+            rows.push(Line::from(vec![Span::styled(
+                format!(
+                    "Actions labeled (palette only) are accessed via the command palette ({}).",
+                    cmd_palette_keys
+                ),
+                Style::default().fg(theme.text),
+            )]));
+            rows.push(gap.clone());
             rows.push(section("Essential Keys"));
             rows.push(row_key("help"));
+            rows.push(row_key("command_palette"));
             rows.push(row_key("switch_panel"));
             rows.push(row_key("quit"));
             rows.push(row_key("open_in_editor"));
@@ -328,6 +338,7 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
             rows.push(row_key("content_left"));
             rows.push(row_key("content_right"));
             rows.push(row_key("content_reset_col"));
+            rows.push(row_key("goto_line"));
             rows.push(gap.clone());
             rows.push(section("Code Folding"));
             rows.push(row_key("fold_toggle"));

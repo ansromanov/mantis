@@ -212,3 +212,12 @@ fn find_files_is_palette_invokable() {
         "find_files must have a palette entry"
     );
 }
+
+#[test]
+fn command_palette_has_help_section() {
+    let action = ACTIONS.iter().find(|a| a.id == "command_palette").unwrap();
+    assert!(
+        action.help.is_some(),
+        "command_palette must have a help section"
+    );
+}

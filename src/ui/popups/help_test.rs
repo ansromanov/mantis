@@ -875,3 +875,65 @@ fn help_mouse_click_reaches_neighbor_of_scrolled_tab() {
          must select tab 7, not whatever tab the unscrolled coordinates would hit"
     );
 }
+
+#[test]
+fn help_shows_command_palette_entry() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    let backend = TestBackend::new(120, 100);
+    let mut terminal = Terminal::new(backend).unwrap();
+    app.help_tab = 0; // Getting started tab
+    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(
+        joined.contains("open command palette"),
+        "help must list 'open command palette' for command_palette, got:\n{joined}"
+    );
+}
+
+#[test]
+fn help_shows_goto_line_entry() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    let backend = TestBackend::new(120, 100);
+    let mut terminal = Terminal::new(backend).unwrap();
+    app.help_tab = 1; // Navigation tab
+    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(
+        joined.contains("Go to line"),
+        "help must list 'Go to line' for goto_line, got:\n{joined}"
+    );
+}
+
+/// Verification guard: every action in `ACTIONS` that has a default keybinding
+/// must be rendered as a row (via `row_key`/`row_key_custom`) in
+/// `src/ui/popups/help.rs`, unless explicitly allowlisted as an intentional
+/// omission. This prevents any keybound action from silently missing help
+/// coverage in the overlay. Checking the specific row-builder call (rather than
+/// any string literal match) avoids false positives from unrelated references
+/// to the action id, e.g. `labels_for_action("id")`.
+#[test]
+fn keybound_actions_are_in_help_overlay() {
+    let help_rs_content = std::fs::read_to_string("src/ui/popups/help.rs")
+        .expect("should read src/ui/popups/help.rs");
+
+    let allowlist: &[&str] = &[];
+    let keys = Keymap::default();
+
+    for action in crate::actions::ACTIONS {
+        let is_keybound = keys.labels_for_action(action.id) != "—";
+        if is_keybound && !allowlist.contains(&action.id) {
+            // Allow the call to wrap across lines, e.g. `row_key_custom(\n    "id",`.
+            let pattern = format!(r#"row_key(_custom)?\s*\(\s*"{}""#, regex::escape(action.id));
+            let re = regex::Regex::new(&pattern).expect("valid regex");
+            assert!(
+                re.is_match(&help_rs_content),
+                "Action '{}' is keybound but is not rendered via row_key/row_key_custom in src/ui/popups/help.rs",
+                action.id
+            );
+        }
+    }
+}
