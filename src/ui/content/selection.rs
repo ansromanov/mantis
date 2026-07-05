@@ -54,3 +54,7 @@ pub(crate) fn apply_selection(
     }
     result
 }
+
+#[cfg(test)]
+#[path = "selection_test.rs"]
+mod tests;
