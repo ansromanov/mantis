@@ -6,6 +6,7 @@
 # in DEPRECATED_KEYS (src/config/validate.rs).
 content
 content.line_numbers
+content.prettify_size_limit
 content.scroll_percentage
 content.scrollbar
 content.show_file_info

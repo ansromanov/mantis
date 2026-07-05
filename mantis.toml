@@ -45,7 +45,7 @@ watch = false                # auto-reload the open file when it changes on disk
                              #   (toggle at runtime with W)
 show_file_info = true        # encoding + line-ending info in the status bar
 prettify_size_limit = 10485760  # max bytes for JSON/YAML pretty-printing;
-                              #   larger files show as raw text (10 MiB default)
+                                 #   larger files show as raw text (10 MiB default)
 
 
 # --- search -----------------------------------------------------------------
