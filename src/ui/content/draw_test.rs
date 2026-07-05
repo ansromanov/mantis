@@ -287,6 +287,29 @@ fn active_line_highlight_returns_when_selection_elsewhere() {
     fs::remove_dir_all(&root).ok();
 }
 
+#[test]
+fn active_line_highlight_returns_when_selection_ends_at_column_zero() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    // Cursor on line 2. Selection spans lines 0-2 but ends at column 0 on
+    // line 2, so apply_selection's half-open range highlights nothing there -
+    // the active-line background must still paint on line 2.
+    app.handle_key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::empty()));
+    app.selection = Some(crate::selection::TextSelection {
+        anchor: (0, 3),
+        active: (2, 0),
+    });
+    assert!(
+        renders_active_line_highlight(&mut app),
+        "active-line highlight must paint when the selection's end-column-0 line \
+         has no actual selection highlight"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
 /// Renders `draw_content` and returns the flattened text of the buffer.
 fn render_to_string(app: &mut App) -> String {
     let backend = TestBackend::new(80, 24);
