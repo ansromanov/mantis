@@ -347,6 +347,10 @@ pub struct App {
     /// assert against this instead of the real system clipboard.
     #[cfg(test)]
     pub(crate) clipboard_capture: Vec<String>,
+    /// Whether a newer version is available.
+    pub new_version_available: Option<String>,
+    /// Background channel receiver for update check results.
+    pub(crate) update_rx: Option<std::sync::mpsc::Receiver<String>>,
 }
 
 impl App {

@@ -6,7 +6,7 @@
 //! owns ratatui rendering, and `config` parses `mantis.toml`. The remaining leaf
 //! modules (`tree`, `git`, `highlight`, `search`, `diff`,
 //! `selection`, `session`, `theme`, `virtual_file`, `fold`, `yaml_fold`, `file`,
-//! `command_palette`, `release_info`, `ansi`, `actions`, `pager`) each provide
+//! `command_palette`, `release_info`, `ansi`, `actions`, `pager`, `update`) each provide
 //! one focused capability consumed by `app`/`ui`. Keep this list in sync with
 //! the directory structure documented in AGENTS.md. `actions` is the
 //! canonical action registry that `command_palette`, `config::keymap`, and
@@ -36,5 +36,6 @@ pub mod session;
 pub mod theme;
 pub mod tree;
 pub mod ui;
+pub mod update;
 pub mod virtual_file;
 pub mod yaml_fold;

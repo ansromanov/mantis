@@ -174,6 +174,20 @@ impl StatusBarConfig {
     }
 }
 
+/// Update-checking configuration, grouped under `[updates]` in the TOML.
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[serde(default)]
+pub struct UpdatesConfig {
+    /// Enable checking for newer releases.
+    pub check: bool,
+}
+
+impl Default for UpdatesConfig {
+    fn default() -> Self {
+        UpdatesConfig { check: true }
+    }
+}
+
 /// The root mantis configuration object.
 ///
 /// Every field carries `#[serde(default)]` so a partial TOML file or an older
@@ -206,6 +220,8 @@ pub struct Config {
     pub git: GitConfig,
     /// Status-bar segment alignment config.
     pub statusbar: StatusBarConfig,
+    /// Grouped update settings.
+    pub updates: UpdatesConfig,
 
     // --- deprecated flat keys (read for backward-compat; never written) ---
     #[serde(default, skip_serializing, rename = "git_status")]
@@ -266,6 +282,8 @@ impl Default for Config {
             plugins: HashMap::new(),
             git: GitConfig::default(),
             statusbar: StatusBarConfig::default(),
+            updates: UpdatesConfig::default(),
+
             legacy_git_status: None,
             legacy_git_show_deleted: None,
             legacy_git_show_untracked: None,

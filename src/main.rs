@@ -46,6 +46,7 @@ mod session;
 mod theme;
 mod tree;
 mod ui;
+mod update;
 mod virtual_file;
 mod yaml_fold;
 
@@ -105,6 +106,7 @@ where
 enum MetaAction {
     Help,
     Version,
+    Update,
 }
 
 impl MetaAction {
@@ -116,6 +118,7 @@ impl MetaAction {
                  Options:\n  \
                  -h, --help, /?      Print this help\n  \
                  -V, --version       Print version\n  \
+                 --update            Self-update to the latest release\n  \
                  --language <lang>   Force the syntax used to highlight piped stdin\n\n\
                  Pager mode: with no <path> and stdin not a terminal, mantis reads\n\
                  stdin instead of a directory - diff-shaped input renders as a\n\
@@ -124,6 +127,7 @@ impl MetaAction {
                  kubectl logs pod | mantis\n"
                 .to_string(),
             MetaAction::Version => format!("v{}\n", env!("CARGO_PKG_VERSION")),
+            MetaAction::Update => String::new(),
         }
     }
 }
@@ -133,6 +137,7 @@ fn meta_action(arg: Option<&Path>) -> Option<MetaAction> {
     match arg.and_then(|p| p.to_str()) {
         Some("--help") | Some("-h") | Some("/?") => Some(MetaAction::Help),
         Some("--version") | Some("-V") => Some(MetaAction::Version),
+        Some("--update") => Some(MetaAction::Update),
         _ => None,
     }
 }
@@ -163,6 +168,8 @@ enum Startup {
         root: PathBuf,
         language: Option<String>,
     },
+    /// Perform the self-update and exit.
+    Update,
 }
 
 /// Decides what to do with the parsed CLI argument. Pure and fully testable:
@@ -174,7 +181,10 @@ fn plan_startup(
     stdin_piped: bool,
 ) -> anyhow::Result<Startup> {
     if let Some(action) = meta_action(arg.as_deref()) {
-        return Ok(Startup::Print(action.message()));
+        match action {
+            MetaAction::Help | MetaAction::Version => return Ok(Startup::Print(action.message())),
+            MetaAction::Update => return Ok(Startup::Update),
+        }
     }
     // Pager mode triggers when no real path argument was given (missing, or
     // flag-like — the same rule `resolve_input_path` uses to fall back to the
@@ -238,6 +248,10 @@ fn main() -> anyhow::Result<()> {
     match plan_startup(parse_args(), parse_language_flag(), stdin_piped)? {
         Startup::Print(message) => {
             print!("{message}");
+            Ok(())
+        }
+        Startup::Update => {
+            crate::update::run_self_update()?;
             Ok(())
         }
         Startup::Launch { root, file } => {

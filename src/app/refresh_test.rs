@@ -398,6 +398,8 @@ fn create_base_app() -> App {
         diff_mode: crate::app::DiffMode::default(),
         goto_line: None,
         tree_filter: None,
+        new_version_available: None,
+        update_rx: None,
     }
 }
 

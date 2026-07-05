@@ -42,6 +42,7 @@ pub(crate) enum StatusSegment {
     Message,
     PluginError,
     Version,
+    Update,
 }
 
 impl StatusSegment {
@@ -58,6 +59,7 @@ impl StatusSegment {
             StatusSegment::Message => "message",
             StatusSegment::PluginError => "pluginerror",
             StatusSegment::Version => "version",
+            StatusSegment::Update => "update",
         }
     }
 
@@ -65,7 +67,7 @@ impl StatusSegment {
     /// (both `left` and `right` are `None`). Explicit mode uses `split_sides`
     /// directly and never calls this.
     fn side(self) -> StatusSide {
-        if ["lnum", "type", "git", "version"].contains(&self.id_str()) {
+        if ["lnum", "type", "git", "version", "update"].contains(&self.id_str()) {
             StatusSide::Right
         } else {
             StatusSide::Left
@@ -324,6 +326,16 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
         segs.push((
             Span::styled(format!(" {err}"), err_style),
             StatusSegment::PluginError,
+            P_ERR,
+        ));
+    }
+
+    // -- Priority 4: update notice --
+    if let Some(ref latest) = app.new_version_available {
+        let update_style = base.fg(app.theme.accent_alt).add_modifier(Modifier::BOLD);
+        segs.push((
+            Span::styled(format!(" [update: {latest}]"), update_style),
+            StatusSegment::Update,
             P_ERR,
         ));
     }

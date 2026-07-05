@@ -102,6 +102,16 @@ pub(crate) fn draw_about(f: &mut Frame, app: &App, area: Rect) {
         Span::styled("GPL-3.0-or-later", text_style),
     ]));
 
+    if let Some(ref latest) = app.new_version_available {
+        rows.push(Line::from(vec![
+            Span::styled("  Update:    ", dim),
+            Span::styled(
+                format!("{latest} is available! (run `mantis --update` to upgrade)"),
+                accent,
+            ),
+        ]));
+    }
+
     if !whats_new.is_empty() {
         rows.push(Line::from(""));
         rows.push(Line::from(vec![Span::styled(

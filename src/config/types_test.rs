@@ -467,3 +467,20 @@ fn statusbar_config_round_trips_explicit_mode() {
     assert_eq!(parsed.statusbar.left, Some(vec!["hint".into()]));
     assert_eq!(parsed.statusbar.right, Some(vec!["version".into()]));
 }
+
+#[test]
+fn updates_check_defaults_to_true() {
+    let cfg = Config::default();
+    assert!(cfg.updates.check);
+}
+
+#[test]
+fn updates_check_round_trips_through_serde() {
+    let cfg = Config {
+        updates: UpdatesConfig { check: false },
+        ..Config::default()
+    };
+    let toml_str = toml::to_string_pretty(&cfg).unwrap();
+    let parsed: Config = toml::from_str(&toml_str).unwrap();
+    assert!(!parsed.updates.check);
+}
