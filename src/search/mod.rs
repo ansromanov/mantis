@@ -85,6 +85,38 @@ pub struct SearchState {
     /// When `true`, the search index is scoped to a subset of files (e.g. git
     /// mode's changed files). Displayed as "(changed files)" in the overlay title.
     pub scoped: bool,
+    /// Interpret the content query as a regular expression (Ctrl+R).
+    pub regex: bool,
+    /// Match case-sensitively instead of the default smart-insensitive (Ctrl+A).
+    pub case_sensitive: bool,
+    /// Match whole words only (Ctrl+W).
+    pub whole_word: bool,
+}
+
+/// Compiles the regex used when the `regex` or `whole_word` search options are
+/// on, shared by the content search and the in-file search. A non-regex
+/// whole-word query is escaped first. Returns `None` while the pattern is
+/// invalid (e.g. a regex mid-typing), which callers treat as "no matches".
+pub(crate) fn build_search_regex(
+    query: &str,
+    is_regex: bool,
+    whole_word: bool,
+    case_sensitive: bool,
+) -> Option<regex::Regex> {
+    let pattern = if whole_word {
+        let inner = if is_regex {
+            query.to_string()
+        } else {
+            regex::escape(query)
+        };
+        format!(r"\b(?:{inner})\b")
+    } else {
+        query.to_string()
+    };
+    regex::RegexBuilder::new(&pattern)
+        .case_insensitive(!case_sensitive)
+        .build()
+        .ok()
 }
 
 fn filter_changed_paths(paths: &HashSet<PathBuf>, root: &Path) -> Vec<PathBuf> {
@@ -123,6 +155,9 @@ impl SearchState {
             pending_refresh: None,
             context_lines,
             scoped: changed_only.is_some(),
+            regex: false,
+            case_sensitive: false,
+            whole_word: false,
         }
     }
 
@@ -226,8 +261,12 @@ impl SearchState {
 
     fn refresh_content(&mut self) {
         self.content_results = Vec::new();
+        // Plain substring search needs 2+ chars to avoid overly broad scans;
+        // regex/whole-word narrow the match enough that a single char (e.g. a
+        // one-letter word, or an anchor like `^`) is still a useful query.
         // Use char count so a single multibyte character doesn't bypass the guard.
-        if self.query.chars().count() < 2 {
+        let min_len = if self.regex || self.whole_word { 1 } else { 2 };
+        if self.query.chars().count() < min_len {
             return;
         }
         // Build cache from disk if dirty (first call or after tree reload).
@@ -255,14 +294,36 @@ impl SearchState {
             }
             self.content_cache_dirty = false;
         }
-        let q = self.query.to_lowercase();
         let ctx = self.context_lines;
+        let re = if self.regex || self.whole_word {
+            let Some(re) = build_search_regex(
+                &self.query,
+                self.regex,
+                self.whole_word,
+                self.case_sensitive,
+            ) else {
+                return;
+            };
+            Some(re)
+        } else {
+            None
+        };
+        let q = if self.case_sensitive {
+            self.query.clone()
+        } else {
+            self.query.to_lowercase()
+        };
         for path in &self.all_files {
             let Some(lines) = self.content_cache.get(path) else {
                 continue;
             };
             for (i, (orig, lower)) in lines.iter().enumerate() {
-                if lower.contains(&q) {
+                let matched = match &re {
+                    Some(re) => re.is_match(orig),
+                    None if self.case_sensitive => orig.contains(&q),
+                    None => lower.contains(&q),
+                };
+                if matched {
                     let context = if ctx > 0 {
                         let end = (i + 1 + ctx).min(lines.len());
                         lines[i + 1..end].iter().map(|(l, _)| l.clone()).collect()

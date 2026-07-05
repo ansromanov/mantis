@@ -1,7 +1,7 @@
 use crate::app::{App, Focus};
 use crate::command_palette::{CommandPalette, COMMANDS};
 use crate::config::Config;
-use crate::search::{GotoLineState, InFileSearch, ThemePicker, TreeFilter};
+use crate::search::{GotoLineState, InFileSearch, SearchState, ThemePicker, TreeFilter};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::Rect;
 use std::fs;
@@ -767,5 +767,92 @@ fn handle_command_key_enter_dispatches_selected_command() {
         app.command_palette.is_none(),
         "dispatching a command must close the palette"
     );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn handle_search_key_toggles() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let mut s = SearchState::new(&root, false, true, 0, None);
+    // The toggles only affect Content-mode search (see refresh_content), so
+    // switch out of the default Files mode before exercising them.
+    s.toggle_mode();
+    app.search = Some(s);
+
+    let regex_key = KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL);
+    assert!(!app.search.as_ref().unwrap().regex);
+    app.handle_search_key(regex_key);
+    assert!(app.search.as_ref().unwrap().regex);
+
+    let case_key = KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL);
+    assert!(!app.search.as_ref().unwrap().case_sensitive);
+    app.handle_search_key(case_key);
+    assert!(app.search.as_ref().unwrap().case_sensitive);
+
+    let word_key = KeyEvent::new(KeyCode::Char('w'), KeyModifiers::CONTROL);
+    assert!(!app.search.as_ref().unwrap().whole_word);
+    app.handle_search_key(word_key);
+    assert!(app.search.as_ref().unwrap().whole_word);
+
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn handle_search_key_unmodified_letters_type_into_query() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.search = Some(SearchState::new(&root, false, true, 0, None));
+
+    app.handle_search_key(KeyEvent::new(KeyCode::Char('r'), KeyModifiers::empty()));
+    let s = app.search.as_ref().unwrap();
+    assert_eq!(s.query, "r");
+    assert!(!s.regex);
+
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn handle_search_key_toggles_are_ignored_in_files_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    // Default mode is Files; the toggles only affect Content search, so
+    // pressing them here must be a no-op (state unchanged, selection intact).
+    let mut s = SearchState::new(&root, false, true, 0, None);
+    s.selected = 3;
+    app.search = Some(s);
+
+    app.handle_search_key(KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL));
+    let s = app.search.as_ref().unwrap();
+    assert!(!s.regex);
+    assert_eq!(
+        s.selected, 3,
+        "toggle must not reset selection in Files mode"
+    );
+
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn handle_in_file_search_key_toggles() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.in_file_search = Some(InFileSearch::new());
+
+    let regex_key = KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL);
+    assert!(!app.in_file_search.as_ref().unwrap().regex);
+    app.handle_in_file_search_key(regex_key);
+    assert!(app.in_file_search.as_ref().unwrap().regex);
+
+    let case_key = KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL);
+    assert!(!app.in_file_search.as_ref().unwrap().case_sensitive);
+    app.handle_in_file_search_key(case_key);
+    assert!(app.in_file_search.as_ref().unwrap().case_sensitive);
+
+    let word_key = KeyEvent::new(KeyCode::Char('w'), KeyModifiers::CONTROL);
+    assert!(!app.in_file_search.as_ref().unwrap().whole_word);
+    app.handle_in_file_search_key(word_key);
+    assert!(app.in_file_search.as_ref().unwrap().whole_word);
+
     fs::remove_dir_all(&root).ok();
 }

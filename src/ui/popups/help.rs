@@ -321,6 +321,10 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
                 "navigate through matching results list",
             ));
             rows.push(row_static_key("Esc", "close the fuzzy search popup"));
+            rows.push(row_static_key(
+                "Ctrl+A/W/R",
+                "toggle case / whole-word / regex (content)",
+            ));
             rows.push(gap.clone());
             rows.push(section("Filters & In-File Search"));
             rows.push(row_key("search_files"));
@@ -331,6 +335,10 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
             rows.push(row_static_key(
                 "n / N",
                 "jump to next / previous match (in-file search)",
+            ));
+            rows.push(row_static_key(
+                "Ctrl+A/W/R",
+                "toggle case / whole-word / regex",
             ));
             rows.push(row_static_key(
                 "Enter / Esc",

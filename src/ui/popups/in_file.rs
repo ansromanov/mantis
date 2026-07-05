@@ -2,14 +2,15 @@
 //!
 //! `draw_in_file_search` renders the incremental within-the-current-file search
 //! as a thin bar near the bottom of the content area (not a centered popup),
-//! showing the query and the current/total match count. It reads the live
+//! showing the query, the current/total match count, and the search-option
+//! indicators (`[Aa] [\b] [.*]`). It reads the live
 //! `InFileSearch` state from `App`; the matches themselves are highlighted in
 //! the content pane by `ui::content::search`, so this module draws only the
 //! prompt/status line. It is a no-op when in-file search is inactive, and its
 //! position tracks the content area so it sits just above the status bar.
 
 use ratatui::{
-    layout::Rect,
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Clear, Paragraph},
@@ -35,10 +36,15 @@ pub(crate) fn draw_in_file_search(f: &mut Frame, app: &mut App, area: Rect) {
     }
     f.render_widget(Clear, bar_rect);
 
+    let bar_parts = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Min(0), Constraint::Length(14)])
+        .split(bar_rect);
+
     let total = s.matches.len();
     let current = if total > 0 { s.current + 1 } else { 0 };
     let suffix = format!(" ({}/{})", current, total);
-    let max_w = bar_rect.width as usize;
+    let max_w = bar_parts[0].width as usize;
     let query_display: String = s
         .query
         .chars()
@@ -52,7 +58,7 @@ pub(crate) fn draw_in_file_search(f: &mut Frame, app: &mut App, area: Rect) {
                 truncated,
                 Style::default().fg(theme.accent_alt).bg(theme.background),
             )])),
-            bar_rect,
+            bar_parts[0],
         );
     } else {
         f.render_widget(
@@ -67,9 +73,16 @@ pub(crate) fn draw_in_file_search(f: &mut Frame, app: &mut App, area: Rect) {
                 Span::styled("█", Style::default().fg(theme.accent_alt)),
                 Span::styled(suffix, Style::default().fg(theme.dim)),
             ])),
-            bar_rect,
+            bar_parts[0],
         );
     }
+
+    let toggle_spans =
+        super::util::search_toggle_spans(s.case_sensitive, s.whole_word, s.regex, theme);
+    f.render_widget(
+        Paragraph::new(Line::from(toggle_spans)).alignment(ratatui::layout::Alignment::Right),
+        bar_parts[1],
+    );
 }
 
 #[cfg(test)]

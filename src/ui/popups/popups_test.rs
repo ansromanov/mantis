@@ -453,6 +453,9 @@ fn draw_in_file_search_with_matches() {
             len: 5,
         }],
         current: 0,
+        regex: false,
+        case_sensitive: false,
+        whole_word: false,
     });
 
     let area = Rect {
@@ -480,6 +483,9 @@ fn draw_in_file_search_no_matches() {
         query: "zzz".into(),
         matches: vec![],
         current: 0,
+        regex: false,
+        case_sensitive: false,
+        whole_word: false,
     });
 
     let area = Rect {
@@ -507,6 +513,9 @@ fn draw_in_file_search_narrow_area_returns_early() {
         query: "x".into(),
         matches: vec![],
         current: 0,
+        regex: false,
+        case_sensitive: false,
+        whole_word: false,
     });
 
     let area = Rect {

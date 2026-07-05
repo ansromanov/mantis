@@ -159,6 +159,12 @@ changed files — the popup title shows "(changed files)" to make this visible.
 | `Tab`     | Switch files / content mode     |
 | `Enter`   | Open selected result            |
 | `Esc`     | Close search                    |
+| `Ctrl+A` | Toggle case-sensitive matching (`[Aa]`) |
+| `Ctrl+W` | Toggle whole-word matching (`[\b]`) |
+| `Ctrl+R` | Toggle regular-expression matching (`[.*]`) |
+
+The toggles apply to content search (`f`) and the in-file search bar (`/`);
+the active options are shown as highlighted `[Aa] [\b] [.*]` indicators.
 
 ## Command palette
 
