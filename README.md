@@ -25,13 +25,13 @@ more. Built with [ratatui](https://ratatui.rs).
 mantis      # open the current directory and start browsing
 ```
 
-That's it — no setup step. Press `?` for help, `q` to quit.
+That's it — no setup step. Press `?` for help, `Ctrl+c` to quit.
 
 ## Why mantis?
 
 `mantis` does one job: **move through a codebase and read it, fast**. It opens in
 milliseconds, needs zero config, and stays out of your way. It is *not* an editor —
-when you want to change something, press `e` to jump into your `$EDITOR`.
+when you want to change something, press `Ctrl+e` to jump into your `$EDITOR`.
 
 | | **mantis** | **Vim / Neovim** | **VS Code** | **Zed** | **Sublime Text** |
 | --- | --- | --- | --- | --- | --- |
@@ -71,24 +71,24 @@ fills.
 - Code folding (`Space`) — collapse/expand blocks, with language-aware fold regions
 
 **Search**
-- Fuzzy file-name search (`/`) — fzf-style, as you type
-- Full-text content search (`f`) across the tree
-- In-file search and go-to-line (`:`)
+- Fuzzy file-name search (`Ctrl+P`) — fzf-style, as you type
+- Full-text content search (`Ctrl+Shift+F`) across the tree
+- In-file search (`Ctrl+F`) and go-to-line (`Ctrl+G`)
 
 **Viewing & rendering**
 - Syntax highlighting for a wide range of languages
-- JSON pretty-printing (`J`) for minified files
+- JSON pretty-printing for minified files
 - Word wrap, line numbers, and a status bar (line, language, scroll, encoding)
 
 **Productivity**
-- Command palette (`Ctrl+P`) — fuzzy-find every action with its keybinding
-- Recent files (`Ctrl+O`), copy path (`y` / `Y`)
-- Open in your `$EDITOR` (`e`) and drop back into `mantis` when you're done
+- Command palette (`Ctrl+Shift+P`) — fuzzy-find every action with its keybinding
+- Recent files (`Ctrl+O`), copy path
+- Open in your `$EDITOR` (`Ctrl+e`) and drop back into `mantis` when you're done
 - Auto-reload on disk change; session persistence (expanded dirs, open file,
   scroll) restored on restart, cached outside the repo
 
 **Customization**
-- Live theme switching (`t`) — built-in presets, fully recolorable
+- Live theme switching — built-in presets, fully recolorable
 - Remappable keybindings and configurable layout via a simple TOML file
 - Nerd Font file-type icons (optional), full mouse support
 - Opt-in plugins — extra languages, icons, markdown rendering, and custom overlays
@@ -122,10 +122,10 @@ mantis path/to/dir  # view a specific directory
 mantis file.md      # open a file directly
 ```
 
-Press `?` at any time for in-app help, and `q` to quit. For the full keybinding
+Press `?` at any time for in-app help, and `Ctrl+c` to quit. For the full keybinding
 list and every action name, see the
 [Usage & Keybindings guide](https://ansromanov.github.io/mantis/usage.html) — or
-press `Ctrl+P` in-app to fuzzy-find any action with its binding.
+press `Ctrl+Shift+P` in-app to fuzzy-find any action with its binding.
 
 ## Plugins
 

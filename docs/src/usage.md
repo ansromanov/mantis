@@ -20,37 +20,46 @@ dotfiles into the repository. Each workspace root gets its own file under
 the `sessions/` subdirectory. To reset the session for a directory, quit
 and delete its file from the `sessions/` subdirectory in the state directory.
 
-> 💡 **Can't remember a key?** Press `?` for the help overlay, or `Ctrl+P` to
-> open the command palette and search for an action by name — it shows you the
-> shortcut too. New to `mantis`? Start with the [Quick Start](quickstart.md).
+> 💡 **Can't remember a key?** Press `?` for the help overlay, or `Ctrl+Shift+P`
+> to open the command palette and search for an action by name — it shows you
+> the shortcut too. New to `mantis`? Start with the [Quick Start](quickstart.md).
+
+Bindings are editor-style (VS Code / Sublime conventions) and fully remappable
+— see [Keybindings](configuration.md#keybindings) for the complete list, the
+macOS (`Cmd`) variants, and the `tree:`/`content:` scoping syntax. The tables
+below cover the shipped defaults; single letters (`q`, `p`, `t`, …) only work
+while the **tree** panel is focused — the content pane's letter keyspace is
+kept free, apart from the vim motions below, for future editing features. Any
+action not listed with a content-pane key is still reachable from the command
+palette (`Ctrl+Shift+P`).
 
 ## Global
 
 These work no matter which panel is focused.
 
-| Key            | Action                  |
-| -------------- | ----------------------- |
-| `q`, `Ctrl+c`  | Quit                    |
-| `?`            | Toggle help             |
-| `Ctrl+P`       | Command palette (fuzzy-find any action) |
-| `Tab`          | Switch panel            |
-| `/`            | Tree filter / in-file search |
-| `Ctrl+F`       | Global fuzzy file-name picker |
-| `f`            | Content (full-text) search |
-| `r`            | Reload tree             |
-| `e`            | Open current file in `$EDITOR` |
-| `y`            | Copy absolute path to clipboard |
-| `Y`            | Copy path relative to tree root to clipboard |
-| `.`            | Toggle hidden files     |
-| `H`            | Git history of current file |
-| `Ctrl+O`       | Recent files (jump to a recently opened file) |
-| `p`            | Plugin palette (enable/disable plugins) |
-| `:`            | Go to line              |
-| `b`            | Toggle git blame (shows author + commit subject inline) |
-| `B`            | Blame the active line   |
-| `t`            | Theme picker            |
-| `Ctrl+G`       | Toggle git mode (changed files + diffs; `/` and `f` search scope to changed files) |
-| `F`            | Toggle flat / tree view in git mode |
+| Key                    | Action                  |
+| ---------------------- | ----------------------- |
+| `Ctrl+c`, `q` (tree)   | Quit                    |
+| `F1`, `?` (tree)       | Toggle help             |
+| `Ctrl+Shift+P`         | Command palette (fuzzy-find any action) |
+| `Tab`                  | Switch panel            |
+| `Ctrl+F`, `/` (tree)   | Tree filter / in-file search |
+| `Ctrl+P`               | Global fuzzy file-name picker |
+| `Ctrl+Shift+F`, `f` (tree) | Content (full-text) search |
+| `Ctrl+r`, `F5`, `r` (tree) | Reload tree         |
+| `Ctrl+e`, `e` (tree)   | Open current file in `$EDITOR` |
+| `y` (tree)             | Copy absolute path to clipboard |
+| `Y` (tree)             | Copy path relative to tree root to clipboard |
+| `.` (tree), `Alt+.`    | Toggle hidden files     |
+| `H` (tree)             | Git history of current file |
+| `Ctrl+O`               | Recent files (jump to a recently opened file) |
+| `p` (tree)             | Plugin palette (enable/disable plugins) |
+| `Ctrl+g`               | Go to line              |
+| `Ctrl+b`               | Toggle git blame (shows author + commit subject inline) |
+| `Ctrl+Shift+B`         | Blame the active line   |
+| `t` (tree)             | Theme picker            |
+| `Ctrl+Shift+G`         | Toggle git mode (changed files + diffs; the pickers above scope to changed files) |
+| `F` (tree), `Alt+g`    | Toggle flat / tree view in git mode |
 
 ## Tree panel
 
@@ -65,26 +74,25 @@ These work no matter which panel is focused.
 
 ## Content panel
 
-The content pane has a **line cursor** (visible as a highlighted full-width row). Use `Up`/`Down` to move it, then press `B` to blame the highlighted line.
+The content pane has a **line cursor** (visible as a highlighted full-width row). Use `Up`/`Down` to move it, then press `Ctrl+Shift+B` to blame the highlighted line.
 
-When git blame is toggled on (`b`), a column appears on the left showing the author name and commit subject for each line. Clicking any cell in this column opens the line-blame popup for that line.
+When git blame is toggled on (`Ctrl+b`), a column appears on the left showing the author name and commit subject for each line. Clicking any cell in this column opens the line-blame popup for that line.
 
 | Key            | Action                       |
-| -------------- | ---------------------------- |
+| -------------- | ----------------------------- |
 | `Up`/`k`, `Down`/`j` | Scroll / move line cursor |
 | `PageUp`/`PageDown`  | Page up / down         |
-| `g`/`Home`, `G`/`End` | Jump to top / bottom   |
+| `Ctrl+Home`/`g`, `Ctrl+End`/`G` | Jump to top / bottom |
 | `Left`/`Right` | Horizontal scroll (when wrap off) |
-| `0`            | Reset horizontal scroll      |
-| `z`            | Toggle word wrap             |
-| `L`            | Toggle line numbers          |
+| `Home`/`0`     | Reset horizontal scroll      |
 | `Space`        | Toggle fold at cursor        |
-| `:`            | Go to line                   |
-| `J`            | Toggle JSON pretty-print     |
-| `B`            | Blame the active line        |
-| `D`            | Toggle side-by-side diff (in a diff) |
-| `S`            | Cycle diff source: all / staged / unstaged (in a diff) |
+| `Ctrl+g`       | Go to line                   |
+| `Ctrl+Shift+B` | Blame the active line        |
 | `n`/`N`        | Next / previous hunk (in a diff) |
+
+Word wrap, line numbers, JSON pretty-print, side-by-side diff, and the
+staged/unstaged diff cycle have no default content-pane key — use the command
+palette (`Ctrl+Shift+P`) or bind one yourself in `mantis.toml`.
 
 ### Rendered plugin content and line numbers
 
@@ -115,30 +123,34 @@ The status bar shows a git summary when inside a repository:
 
 ### Git mode and diff navigation
 
-| Key       | Action |
-| --------- | ------ |
-| `Ctrl+G`  | Toggle git mode — show only changed files; opening a file shows its diff |
-| `F`       | Toggle flat list / nested tree (git mode only) |
-| `D`       | Toggle side-by-side / unified diff |
-| `S`       | Cycle diff source: all (vs HEAD) → staged → unstaged |
-| `n` / `N` | Jump to next / previous change hunk |
-| `B`       | Blame the current line: hash, author, date, summary |
-| `H`       | File history — pick a commit to view its diff |
+| Key                 | Action |
+| ------------------- | ------ |
+| `Ctrl+Shift+G`       | Toggle git mode — show only changed files; opening a file shows its diff |
+| `F` (tree), `Alt+g`  | Toggle flat list / nested tree (git mode only) |
+| `n` / `N`            | Jump to next / previous change hunk |
+| `Ctrl+Shift+B`       | Blame the current line: hash, author, date, summary |
+| `H` (tree)           | File history — pick a commit to view its diff |
+
+Side-by-side diff and the staged/unstaged diff cycle have no default key —
+use the command palette (`Ctrl+Shift+P`) or bind one in `mantis.toml`.
 
 ## Search popup
 
 Three search entry points cover different needs:
 
-- **`Ctrl+F`** — global fuzzy file-name picker. Opens the same file-name search
+- **`Ctrl+P`** — global fuzzy file-name picker. Opens the same file-name search
   from either panel, regardless of focus. Use this when you want to jump to any
   file in the project by name.
-- **`/`** — context-sensitive: in the tree panel it filters file names inline;
-  in the content panel (with a file open) it opens the in-file search bar.
-- **`f`** — fuzzy content search across all files (or changed files in git mode).
+- **`Ctrl+F`** (or `/` in the tree panel) — context-sensitive: in the tree
+  panel it filters file names inline; in the content panel (with a file open)
+  it opens the in-file search bar; otherwise it falls back to the file-name
+  picker.
+- **`Ctrl+Shift+F`** (or `f` in the tree panel) — fuzzy content search across
+  all files (or changed files in git mode).
 
 Open any search popup and just start typing to filter.
-In git mode (`Ctrl+G`), searches are automatically scoped to only the changed
-files — the popup title shows "(changed files)" to make this visible.
+In git mode (`Ctrl+Shift+G`), searches are automatically scoped to only the
+changed files — the popup title shows "(changed files)" to make this visible.
 
 | Key       | Action                          |
 | --------- | ------------------------------- |
@@ -150,22 +162,23 @@ files — the popup title shows "(changed files)" to make this visible.
 
 ## Command palette
 
-Press `Ctrl+P` to open a searchable list of **every** action, each shown next to
-its current keybinding. Type to fuzzy-filter (e.g. "blame", "theme", "json"),
-navigate with `Up`/`Down`, and press `Enter` to run the highlighted command.
-It's the fastest way to discover what `mantis` can do without memorizing keys.
+Press `Ctrl+Shift+P` to open a searchable list of **every** action, each shown
+next to its current keybinding. Type to fuzzy-filter (e.g. "blame", "theme",
+"json"), navigate with `Up`/`Down`, and press `Enter` to run the highlighted
+command. It's the fastest way to discover what `mantis` can do without
+memorizing keys.
 
 ## Git mode history
 
-`H` opens the file's git history in both normal and git mode. The diff of a
-selected commit stays on screen and won't be replaced by live file-watcher
-updates. Press `Esc` or `r` to return to the current file (or the working-tree
-diff in git mode).
+`H` (while the tree is focused) opens the file's git history in both normal
+and git mode. The diff of a selected commit stays on screen and won't be
+replaced by live file-watcher updates. Press `Esc` or reload (`Ctrl+r`/`F5`)
+to return to the current file (or the working-tree diff in git mode).
 
 ## Open in your editor
 
-Press `e` with a file open to launch it in your editor. `mantis` uses `$VISUAL`,
-then `$EDITOR`, falling back to `vim`. The TUI suspends while the editor runs and
+Press `Ctrl+e` (or `e` while the tree is focused) with a file open to launch
+it in your editor. `mantis` uses `$VISUAL`, then `$EDITOR`, falling back to `vim`. The TUI suspends while the editor runs and
 resumes when you exit; the file is reloaded afterwards so you see your changes.
 
 > 💡 `$EDITOR` can include arguments — e.g. `export EDITOR="code --wait"` opens
@@ -195,8 +208,10 @@ their file extension.
 
 ## JSON pretty-printing
 
-Viewing a JSON file? Press `J` to reformat it with indentation for easier
-reading, and `J` again to return to the raw text. Handy for minified `.json`.
+Viewing a JSON file? Use the command palette (`Ctrl+Shift+P` → "Toggle JSON
+pretty-print") to reformat it with indentation for easier reading, and again
+to return to the raw text. Handy for minified `.json`. There's no default key
+for this — bind `toggle_pretty_json` in `mantis.toml` if you want one.
 
 ## Mouse
 

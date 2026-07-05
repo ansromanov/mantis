@@ -29,8 +29,9 @@ fn handle_goto_line_key_open_binding_not_appended_to_query() {
     let mut app = app_for(&root);
     app.focus = Focus::Content;
     app.goto_line = Some(GotoLineState::new());
-    // pressing the open binding ':' while dialog is open should not append to query
-    app.handle_goto_line_key(KeyEvent::new(KeyCode::Char(':'), KeyModifiers::empty()));
+    // pressing the open binding (ctrl+g) while the dialog is open should not
+    // append to the query
+    app.handle_goto_line_key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL));
     assert!(app.goto_line.as_ref().unwrap().query.is_empty());
     fs::remove_dir_all(&root).ok();
 }

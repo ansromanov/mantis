@@ -18,13 +18,13 @@ markdown, fuzzy search, and git diff/blame/history always one keystroke away.
   over SSH.
 - 🌳 **A real tree view.** Navigate folders with the keyboard or mouse,
   respecting your `.gitignore`.
-- 🔍 **Fuzzy & full-text search.** Jump to any file by name (`/`), or search
-  across the contents of every file (`f`) — fzf-style, as you type.
+- 🔍 **Fuzzy & full-text search.** Jump to any file by name (`Ctrl+P`), or search
+  across the contents of every file (`Ctrl+Shift+F`) — fzf-style, as you type.
 - 🎨 **Readable files.** Syntax highlighting for source code, rendered markdown,
   and JSON pretty-printing.
 - 🔧 **Git built in.** Per-line blame, working-tree diffs, file history, and
   status-colored tree entries — no plugins required.
-- ⌨️ **Discoverable.** Press `?` for help or `Ctrl+P` for a searchable command
+- ⌨️ **Discoverable.** Press `?` for help or `Ctrl+Shift+P` for a searchable command
   palette. You don't have to memorize anything.
 
 ## Try it in five seconds
@@ -35,7 +35,7 @@ mantis path/to/dir  # open a specific directory
 mantis file.md      # open a single file directly
 ```
 
-Press `?` any time for in-app help, and `q` to quit.
+Press `?` any time for in-app help, and `Ctrl+c` to quit.
 
 ## Where to go next
 

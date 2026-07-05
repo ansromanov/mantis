@@ -22,9 +22,9 @@ tracking branch exists, using the familiar `↑3 ↓1` summary.
 
 ## Git blame
 
-Press `b` with a file open to toggle **inline blame**. A gutter appears to the
-left of the content showing, for each line, the short commit hash, the author,
-and the date it was last changed. Press `b` again to hide it.
+Press `Ctrl+b` with a file open to toggle **inline blame**. A gutter appears to
+the left of the content showing, for each line, the short commit hash, the
+author, and the date it was last changed. Press `Ctrl+b` again to hide it.
 
 Blame is disabled while you're viewing a diff (it only annotates real file
 content).
@@ -52,21 +52,21 @@ working tree into the content panel — additions in green, deletions in red.
 
 ## Git mode
 
-Press `Ctrl+G` to switch the tree to show **only files with uncommitted changes**
+Press `Ctrl+Shift+G` to switch the tree to show **only files with uncommitted changes**
 (modified, new, deleted, or renamed). Selecting a file shows its working-tree
 diff in the content panel instead of the file contents. The tree title displays a
 `[git]` badge while active — perfect for reviewing everything you're about to
 commit.
 
-Press `Alt+G` inside git mode to toggle between the tree view (directories
+Press `Alt+g` inside git mode to toggle between the tree view (directories
 intact) and a flat, depth-0 list of every changed file with relative paths. Press
-`Alt+G` again to return to the tree view (a no-op outside git mode).
+`Alt+g` again to return to the tree view (a no-op outside git mode).
 
 When the working tree is clean (no uncommitted changes), the tree panel shows a
 "Working tree clean" placeholder instead of an empty list, so you can tell at a
 glance that there is simply nothing to review. If the current directory is not a
 git repository, the placeholder says "Not a git repository" instead. Press
-`Ctrl+G` to exit git mode in either case.
+`Ctrl+Shift+G` to exit git mode in either case.
 
 All directories containing changes are auto-expanded when entering git mode.
 Diffs refresh on the 30-second auto-reload tick and on manual `r`.

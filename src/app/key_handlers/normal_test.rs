@@ -28,6 +28,10 @@ fn key(code: KeyCode) -> KeyEvent {
     KeyEvent::new(code, KeyModifiers::empty())
 }
 
+fn ctrl(c: char) -> KeyEvent {
+    KeyEvent::new(KeyCode::Char(c), KeyModifiers::CONTROL)
+}
+
 // -- active-line navigation --------------------------------------------------
 
 #[test]
@@ -112,9 +116,9 @@ fn blame_line_key_toggles_show_line_blame() {
     app.open_file(&root.join("long.txt"));
     app.focus = Focus::Content;
     assert!(!app.show_line_blame);
-    app.handle_key(key(KeyCode::Char('B')));
+    app.handle_key(ctrl('B'));
     assert!(app.show_line_blame);
-    app.handle_key(key(KeyCode::Char('B')));
+    app.handle_key(ctrl('B'));
     assert!(!app.show_line_blame);
     fs::remove_dir_all(&root).ok();
 }
@@ -125,7 +129,7 @@ fn blame_line_key_noop_in_diff_mode() {
     let mut app = app_for(&root);
     app.focus = Focus::Content;
     app.is_diff = true;
-    app.handle_key(key(KeyCode::Char('B')));
+    app.handle_key(ctrl('B'));
     assert!(!app.show_line_blame);
     fs::remove_dir_all(&root).ok();
 }
@@ -137,7 +141,7 @@ fn blame_line_key_does_not_change_hscroll() {
     app.open_file(&root.join("long.txt"));
     app.focus = Focus::Content;
     app.content_hscroll = 8;
-    app.handle_key(key(KeyCode::Char('B')));
+    app.handle_key(ctrl('B'));
     assert_eq!(app.content_hscroll, 8);
     fs::remove_dir_all(&root).ok();
 }
@@ -237,7 +241,7 @@ fn goto_line_keybinding_opens_dialog_with_content_focus() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.focus = Focus::Content;
-    app.handle_key(key(KeyCode::Char(':')));
+    app.handle_key(ctrl('g'));
     assert!(app.goto_line.is_some());
     fs::remove_dir_all(&root).ok();
 }
@@ -247,7 +251,7 @@ fn goto_line_keybinding_is_noop_with_tree_focus() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.focus = Focus::Tree;
-    app.handle_key(key(KeyCode::Char(':')));
+    app.handle_key(ctrl('g'));
     assert!(app.goto_line.is_none());
     assert_eq!(
         app.status_message.as_ref().map(|sm| sm.text.as_str()),
@@ -261,7 +265,7 @@ fn goto_line_status_clears_on_valid_keypress() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.focus = Focus::Tree;
-    app.handle_key(key(KeyCode::Char(':')));
+    app.handle_key(ctrl('g'));
     assert_eq!(
         app.status_message.as_ref().map(|sm| sm.text.as_str()),
         Some("go to line: switch to the content pane (Tab)")
@@ -355,6 +359,8 @@ fn toggle_pretty_json_noop_on_non_json() {
     app.open_file(&root.join("long.txt"));
     app.focus = Focus::Content;
     assert!(!app.is_json);
+    // toggle_pretty_json ships unbound (palette-only); bind a key for the test.
+    app.keys.toggle_pretty_json = crate::config::bind(&["J"]);
     app.handle_key(key(KeyCode::Char('J')));
     assert_eq!(
         app.status_message.as_ref().map(|sm| sm.text.as_str()),
@@ -370,7 +376,7 @@ fn toggle_blame_noop_in_diff() {
     let mut app = app_for(&root);
     app.focus = Focus::Content;
     app.is_diff = true;
-    app.handle_key(key(KeyCode::Char('b')));
+    app.handle_key(ctrl('b'));
     assert_eq!(
         app.status_message.as_ref().map(|sm| sm.text.as_str()),
         Some("blame: not available in a diff")
@@ -397,6 +403,7 @@ fn toggle_pretty_json_status_clears_on_valid_keypress() {
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
     app.focus = Focus::Content;
+    app.keys.toggle_pretty_json = crate::config::bind(&["J"]);
     app.handle_key(key(KeyCode::Char('J')));
     assert!(app.status_message.is_some());
     app.handle_key(key(KeyCode::Char('j')));
@@ -410,7 +417,7 @@ fn toggle_blame_status_clears_on_valid_keypress() {
     let mut app = app_for(&root);
     app.focus = Focus::Content;
     app.is_diff = true;
-    app.handle_key(key(KeyCode::Char('b')));
+    app.handle_key(ctrl('b'));
     assert!(app.status_message.is_some());
     app.handle_key(key(KeyCode::Char('j')));
     assert!(app.status_message.is_none());
@@ -426,6 +433,8 @@ fn toggle_diff_side_by_side_persists_to_config() {
     app.focus = Focus::Content;
     app.is_diff = true;
     app.diff_side_by_side = false;
+    // toggle_diff_side_by_side ships unbound (palette-only); bind a key.
+    app.keys.toggle_diff_side_by_side = crate::config::bind(&["D"]);
     app.handle_key(key(KeyCode::Char('D')));
     assert!(app.diff_side_by_side, "app field should toggle");
     assert!(
@@ -447,6 +456,8 @@ fn toggle_diff_staged_persists_to_config() {
     app.focus = Focus::Content;
     app.is_diff = true;
     app.diff_mode = DiffMode::All;
+    // toggle_diff_staged ships unbound (palette-only); bind a key.
+    app.keys.toggle_diff_staged = crate::config::bind(&["S"]);
     app.handle_key(key(KeyCode::Char('S')));
     assert_eq!(app.diff_mode, DiffMode::Staged, "should cycle to Staged");
     assert_eq!(
@@ -469,6 +480,8 @@ fn toggle_wrap_persists_to_config() {
     let mut app = app_for(&root);
     app.focus = Focus::Content;
     app.word_wrap = false;
+    // toggle_wrap ships unbound (palette-only); bind a key for the test.
+    app.keys.toggle_wrap = crate::config::bind(&["z"]);
     app.handle_key(key(KeyCode::Char('z')));
     assert!(app.word_wrap, "app field should toggle");
     assert!(
@@ -487,6 +500,8 @@ fn toggle_line_numbers_persists_to_config() {
     let mut app = app_for(&root);
     app.focus = Focus::Content;
     let initial = app.show_line_numbers;
+    // toggle_line_numbers ships unbound (palette-only); bind a key.
+    app.keys.toggle_line_numbers = crate::config::bind(&["L"]);
     app.handle_key(key(KeyCode::Char('L')));
     assert_eq!(app.show_line_numbers, !initial, "app field should toggle");
     assert_eq!(
@@ -636,12 +651,13 @@ fn esc_clears_viewing_revision_in_git_mode() {
 }
 
 #[test]
-fn f_key_scopes_content_search_in_git_mode() {
+fn content_search_key_scopes_search_in_git_mode() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.git_mode = true;
     app.focus = Focus::Content;
-    app.handle_key(key(KeyCode::Char('f')));
+    // search_content = ctrl+shift+f, i.e. ctrl + uppercase F.
+    app.handle_key(ctrl('F'));
     assert!(
         app.search.as_ref().unwrap().scoped,
         "content search must be scoped when git mode is active"
@@ -650,14 +666,31 @@ fn f_key_scopes_content_search_in_git_mode() {
 }
 
 #[test]
-fn f_key_not_scoped_outside_git_mode() {
+fn content_search_key_not_scoped_outside_git_mode() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.focus = Focus::Content;
-    app.handle_key(key(KeyCode::Char('f')));
+    app.handle_key(ctrl('F'));
     assert!(
         !app.search.as_ref().unwrap().scoped,
         "content search must not be scoped outside git mode"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn f_letter_opens_content_search_only_in_tree() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Tree;
+    app.handle_key(key(KeyCode::Char('f')));
+    assert!(app.search.is_some(), "tree:f opens content search");
+    app.search = None;
+    app.focus = Focus::Content;
+    app.handle_key(key(KeyCode::Char('f')));
+    assert!(
+        app.search.is_none(),
+        "bare f must not fire in the content pane (letter-free policy)"
     );
     fs::remove_dir_all(&root).ok();
 }
@@ -814,10 +847,8 @@ fn ctrl_p_opens_palette_with_ranked_order_from_usage() {
     let mut app = app_for(&root);
     // Pre-load usage so help (index 0) is the last-used command.
     app.command_usage.record("help");
-    app.handle_key(KeyEvent::new(
-        KeyCode::Char('p'),
-        crossterm::event::KeyModifiers::CONTROL,
-    ));
+    // command_palette = ctrl+shift+p, i.e. ctrl + uppercase P.
+    app.handle_key(ctrl('P'));
     let palette = app
         .command_palette
         .as_ref()
@@ -833,45 +864,70 @@ fn ctrl_p_opens_palette_with_ranked_order_from_usage() {
     fs::remove_dir_all(&root).ok();
 }
 
-// -- find_files (ctrl+f) ----------------------------------------------------
-
-fn ctrl_f() -> KeyEvent {
-    KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL)
-}
+// -- find_files (ctrl+p) ----------------------------------------------------
 
 #[test]
-fn ctrl_f_opens_file_picker_when_tree_focused() {
+fn ctrl_p_opens_file_picker_when_tree_focused() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.focus = Focus::Tree;
-    app.handle_key(ctrl_f());
+    app.handle_key(ctrl('p'));
     assert!(
         app.search.is_some(),
-        "ctrl+f must open the search picker from Tree focus"
+        "ctrl+p must open the search picker from Tree focus"
     );
     assert_eq!(
         app.search.as_ref().unwrap().mode,
         SearchMode::Files,
-        "ctrl+f must open in Files mode"
+        "ctrl+p must open in Files mode"
     );
     fs::remove_dir_all(&root).ok();
 }
 
 #[test]
-fn ctrl_f_opens_file_picker_when_content_focused_with_file() {
+fn ctrl_p_opens_file_picker_when_content_focused_with_file() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
     app.focus = Focus::Content;
-    app.handle_key(ctrl_f());
+    app.handle_key(ctrl('p'));
     assert!(
         app.search.is_some(),
-        "ctrl+f must open the search picker from Content focus with an open file"
+        "ctrl+p must open the search picker from Content focus with an open file"
     );
     assert_eq!(
         app.search.as_ref().unwrap().mode,
         SearchMode::Files,
-        "ctrl+f must open in Files mode (not in-file search)"
+        "ctrl+p must open in Files mode (not in-file search)"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- search_files (ctrl+f, context-split; `/` is tree-scoped) -----------------
+
+#[test]
+fn ctrl_f_opens_tree_filter_when_tree_focused() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Tree;
+    app.handle_key(ctrl('f'));
+    assert!(
+        app.tree_filter.is_some(),
+        "ctrl+f must open the tree filter from Tree focus"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn ctrl_f_opens_in_file_search_when_content_focused_with_file() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.handle_key(ctrl('f'));
+    assert!(
+        app.in_file_search.is_some(),
+        "ctrl+f must open in-file search from Content focus with an open file"
     );
     fs::remove_dir_all(&root).ok();
 }
@@ -881,15 +937,14 @@ fn ctrl_f_opens_file_picker_when_content_focused_no_file() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.focus = Focus::Content;
-    app.handle_key(ctrl_f());
+    app.current_file = None;
+    app.handle_key(ctrl('f'));
     assert!(
         app.search.is_some(),
-        "ctrl+f must open the search picker from Content focus without a file"
+        "ctrl+f must fall back to the search picker without a file"
     );
     fs::remove_dir_all(&root).ok();
 }
-
-// -- search_files (/) unchanged ----------------------------------------------
 
 #[test]
 fn slash_opens_tree_filter_when_tree_focused() {
@@ -906,15 +961,18 @@ fn slash_opens_tree_filter_when_tree_focused() {
 }
 
 #[test]
-fn slash_opens_in_file_search_when_content_focused_with_file() {
+fn slash_is_inert_when_content_focused() {
+    // `/` is tree-scoped by default: the content pane stays letter-free so
+    // its keyspace remains available for future editing (in-file search is
+    // ctrl+f there).
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
     app.focus = Focus::Content;
     app.handle_key(key(KeyCode::Char('/')));
     assert!(
-        app.in_file_search.is_some(),
-        "/ must open in-file search from Content focus with open file"
+        app.in_file_search.is_none(),
+        "tree-scoped / must not fire in the content pane"
     );
     assert!(app.search.is_none(), "/ must not open the search picker");
     fs::remove_dir_all(&root).ok();
@@ -951,7 +1009,7 @@ fn tree_collapse_on_child_navigates_to_parent_dir() {
 }
 
 #[test]
-fn slash_opens_file_picker_when_content_focused_no_file() {
+fn slash_is_inert_when_content_focused_no_file() {
     // Use an empty directory so App::new() has no file to open, leaving
     // current_file = None.
     let dir = std::env::temp_dir().join(format!(
@@ -967,8 +1025,8 @@ fn slash_opens_file_picker_when_content_focused_no_file() {
     app.focus = Focus::Content;
     app.handle_key(key(KeyCode::Char('/')));
     assert!(
-        app.search.is_some(),
-        "/ must fall back to file picker from Content focus without a file"
+        app.search.is_none(),
+        "tree-scoped / must not fire in the content pane even without a file"
     );
     fs::remove_dir_all(&dir).ok();
 }

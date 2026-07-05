@@ -82,12 +82,18 @@ side_by_side = false         # start the diff view in side-by-side layout
 Every keybinding is remappable. Each action takes a **list** of key specs, so an
 action can have several shortcuts. A spec is a single character (`"q"`, `"?"`,
 `"0"`) or a named key (`Up`, `Down`, `Left`, `Right`, `Enter`, `Tab`, `Esc`,
-`Backspace`, `PageUp`, `PageDown`, `Home`, `End`, `Space`), optionally prefixed
-with modifiers: `"ctrl+c"`.
+`Backspace`, `PageUp`, `PageDown`, `Home`, `End`, `Space`, `F1`-`F12`),
+optionally prefixed with modifiers: `"ctrl+c"`, `"alt+."`, `"cmd+p"` (`cmd` /
+`super` / `command` are all accepted, and map to the platform's Cmd/Super key).
 
-> **No Alt-modified defaults.** The Alt modifier conflicts with terminal-level key
-> processing and is unreliable across terminals. `mantis` does not ship any default
-> `alt+` bindings. Users can still configure them in `mantis.toml` at their own risk.
+> **Panel scoping.** A spec can also carry a `tree:` or `content:` prefix
+> (e.g. `"tree:q"`) to restrict it to that panel; unprefixed specs fire
+> regardless of focus. The shipped defaults scope single-letter shortcuts to
+> the tree panel so the content pane's letter keyspace stays free for future
+> editing features — only a small movement set (`j k h l g G 0 n N`) and
+> modifier/F-key/named-key combos work as content-pane defaults. You can
+> still bind a bare letter to a content-view action yourself; user overrides
+> always take effect regardless of scope.
 
 > **Keyboard layouts.** Keybinding specs are written with Latin characters
 > (e.g. `"ctrl+p"`). On terminals that support the [kitty keyboard
@@ -96,33 +102,39 @@ with modifiers: `"ctrl+c"`.
 > instead of the layout-translated character, so `ctrl+p` works correctly even on
 > non-Latin layouts (Russian, Hebrew, etc.). Terminals without kitty protocol
 > fall back to the logical character — bindings may not trigger as expected on
-> non-Latin layouts in those terminals.
+> non-Latin layouts in those terminals. Terminals without the kitty protocol also
+> can't distinguish `ctrl+shift+<letter>` from `ctrl+<letter>` (written below as
+> `ctrl+<Uppercase letter>`, e.g. `ctrl+P`); the defaults are chosen so that
+> degradation lands on the more frequent action.
+
+Defaults are editor-style (VS Code / Sublime conventions), with vim motions
+kept as tree-panel secondaries:
 
 ```toml
 [keys]
 # global
-quit = ["q", "ctrl+c"]
-help = ["?"]
-command_palette = ["ctrl+p"]
-reload = ["r"]
+quit = ["ctrl+c", "tree:q"]
+help = ["F1", "tree:?"]
+command_palette = ["ctrl+P", "tree:P"]
+reload = ["ctrl+r", "F5", "tree:r"]
 switch_panel = ["Tab"]
-toggle_hidden = ["."]
-theme_picker = ["t"]
-plugin_picker = ["p"]
-open_in_editor = ["e"]
-copy_path = ["y"]
-copy_relative_path = ["Y"]
-toggle_watch = ["W"]
+toggle_hidden = ["tree:.", "alt+."]
+theme_picker = ["tree:t"]
+plugin_picker = ["tree:p"]
+open_in_editor = ["ctrl+e", "tree:e"]
+copy_path = ["tree:y"]
+copy_relative_path = ["tree:Y"]
+toggle_watch = ["tree:W"]
 recent_files = ["ctrl+o"]
-file_history = ["H"]
-goto_line = [":"]
-git_mode_toggle = ["ctrl+g"]
-git_mode_flat_toggle = ["F"]
+file_history = ["tree:H"]
+goto_line = ["ctrl+g"]
+git_mode_toggle = ["ctrl+G"]
+git_mode_flat_toggle = ["tree:F", "alt+g"]
 
 # search
-search_files = ["/"]
-find_files = ["ctrl+f"]
-search_content = ["f"]
+search_files = ["ctrl+f", "tree:/"]
+find_files = ["ctrl+p"]
+search_content = ["ctrl+F", "tree:f"]
 
 # navigation (shared by tree and content panes)
 nav_up = ["Up", "k"]
@@ -139,27 +151,39 @@ fold_toggle = ["Space"]
 # content pane
 content_left = ["Left"]
 content_right = ["Right"]
-content_top = ["g", "Home"]
-content_bottom = ["G", "End"]
+content_top = ["ctrl+Home", "g", "tree:Home"]
+content_bottom = ["ctrl+End", "G", "tree:End"]
 content_page_up = ["PageUp"]
 content_page_down = ["PageDown"]
-content_reset_col = ["0"]
-toggle_wrap = ["z"]
-toggle_line_numbers = ["L"]
-toggle_pretty_json = ["J"]
-toggle_blame = ["b"]
-blame_line = ["B"]
+content_reset_col = ["Home", "0"]
+# toggle_wrap, toggle_line_numbers, toggle_pretty_json,
+# toggle_diff_side_by_side, and toggle_diff_staged have no default binding —
+# they're reachable from the command palette (Ctrl+Shift+P); bind them here
+# if you'd like a dedicated key.
+toggle_blame = ["ctrl+b"]
+blame_line = ["ctrl+B"]
 
 # diff view
-toggle_diff_side_by_side = ["D"]
-toggle_diff_staged = ["S"]
 diff_hunk_next = ["n"]
 diff_hunk_prev = ["N"]
 ```
 
+> **macOS.** `Keymap::default()` layers Cmd-primary bindings for the most
+> frequent actions on top of the table above, keeping every `ctrl+` binding
+> as a fallback (Terminal.app/iTerm2 intercept most `cmd+` shortcuts before
+> `mantis` sees them; kitty/WezTerm/Ghostty forward them): `find_files =
+> ["cmd+p", "ctrl+p"]`, `command_palette = ["cmd+P", "ctrl+P", "tree:P"]`,
+> `search_content = ["cmd+F", "ctrl+F", "tree:f"]`, `search_files = ["cmd+f",
+> "ctrl+f", "tree:/"]`, `reload = ["cmd+r", "ctrl+r", "F5", "tree:r"]`,
+> `recent_files = ["cmd+o", "ctrl+o"]`, `content_top = ["cmd+Up",
+> "ctrl+Home", "g", "tree:Home"]`, `content_bottom = ["cmd+Down", "ctrl+End",
+> "G", "tree:End"]`, `content_reset_col = ["cmd+Left", "Home", "0"]`.
+> `goto_line` and `git_mode_toggle` stay on `ctrl` on every platform, matching
+> mac VS Code.
+
 ## Command palette ranking
 
-When you open the command palette with `ctrl+p` without typing a query, commands
+When you open the command palette with `ctrl+shift+p` without typing a query, commands
 are ranked by recency and frequency rather than shown in a fixed order. The most
 recently used command is pinned at the top; the most frequently used commands
 follow it. Type any character to switch to the usual fuzzy search, which ignores
@@ -192,12 +216,13 @@ Unlisted segments are hidden. Set both to empty lists for an empty bar.
 
 ```toml
 [statusbar]
-# left = ["hint", "badges", "scroll", "lnum", "type", "fileinfo", "git", "errors", "folds", "message"]
+# left = ["badges", "scroll", "lnum", "type", "fileinfo", "git", "errors", "folds", "message"]
 # right = ["lnum", "type", "git", "version"]
 ```
 
-Valid ids: `hint` `badges` `scroll` `lnum` `type` `fileinfo` `git` `errors`
-`folds` `message` `version`.
+Valid ids: `badges` `scroll` `lnum` `type` `fileinfo` `git` `errors`
+`folds` `message` `version`. There is no keybinding-hint segment — the `?`/`F1`
+help overlay and the command palette are the discovery surfaces for bindings.
 
 ## Theme
 

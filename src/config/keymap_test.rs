@@ -274,11 +274,120 @@ fn keymap_has_no_toggle_raw_markdown() {
     // Verify the default keymap still works for an unrelated binding.
     assert!(
         pressed(
-            &keymap.toggle_wrap,
-            &KeyEvent::new(KeyCode::Char('z'), KeyModifiers::NONE)
+            &keymap.reload,
+            &KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL)
         ),
-        "toggle_wrap must still match z key",
+        "reload must match ctrl+r",
     );
+}
+
+// ---- binding scopes, F-keys, and the editor-style defaults (issue #298) ----
+
+#[test]
+fn parses_scope_prefixes() {
+    let t = parse_binding("tree:q").unwrap();
+    assert_eq!(t.scope, BindingScope::Tree);
+    assert_eq!(t.code, KeyCode::Char('q'));
+
+    let c = parse_binding("content:ctrl+b").unwrap();
+    assert_eq!(c.scope, BindingScope::Content);
+    assert!(c.ctrl);
+    assert_eq!(c.code, KeyCode::Char('b'));
+
+    let g = parse_binding("ctrl+c").unwrap();
+    assert_eq!(g.scope, BindingScope::Global);
+}
+
+#[test]
+fn scoped_binding_roundtrips_through_serde() {
+    for spec in ["tree:q", "content:ctrl+b", "ctrl+c", "F5", "tree:?"] {
+        let b = parse_binding(spec).unwrap();
+        let serialized = toml::Value::try_from(b).unwrap();
+        let s = serialized.as_str().unwrap();
+        let back = parse_binding(s).unwrap();
+        assert_eq!(back.scope, b.scope, "scope must roundtrip for {spec}");
+        assert_eq!(back.code, b.code, "code must roundtrip for {spec}");
+        assert_eq!(back.ctrl, b.ctrl, "ctrl must roundtrip for {spec}");
+    }
+}
+
+#[test]
+fn parses_function_keys() {
+    assert_eq!(parse_binding("F1").unwrap().code, KeyCode::F(1));
+    assert_eq!(parse_binding("f5").unwrap().code, KeyCode::F(5));
+    assert_eq!(parse_binding("F12").unwrap().code, KeyCode::F(12));
+    assert!(parse_binding("F13").is_err());
+    assert!(parse_binding("f0").is_err());
+}
+
+#[test]
+fn function_key_display() {
+    assert_eq!(parse_binding("F5").unwrap().display(), "F5");
+    assert_eq!(parse_binding("ctrl+F5").unwrap().display(), "Ctrl+F5");
+}
+
+#[test]
+fn pressed_in_honours_scope() {
+    let binds = bind(&["ctrl+c", "tree:q"]);
+    let q = ev(KeyCode::Char('q'), KeyModifiers::empty());
+    assert!(pressed_in(&binds, &q, BindingScope::Tree));
+    assert!(
+        !pressed_in(&binds, &q, BindingScope::Content),
+        "tree-scoped binding must not fire in the content pane"
+    );
+    let ctrl_c = ev(KeyCode::Char('c'), KeyModifiers::CONTROL);
+    assert!(pressed_in(&binds, &ctrl_c, BindingScope::Content));
+    assert!(pressed_in(&binds, &ctrl_c, BindingScope::Tree));
+    // Scope-agnostic `pressed` matches regardless (overlay contexts).
+    assert!(pressed(&binds, &q));
+}
+
+/// The content pane must stay free of bare letters (for future editing)
+/// except the vim motion set. Tree-structural actions are exempt: their
+/// bindings only dispatch from the tree handler.
+#[test]
+fn default_content_reachable_letters_are_motions_only() {
+    let motions = ['j', 'k', 'h', 'l', 'g', 'G', '0', 'n', 'N', ' '];
+    let tree_structural = [
+        "tree_expand",
+        "tree_collapse",
+        "tree_collapse_all",
+        "tree_expand_all",
+    ];
+    let keymap = Keymap::default();
+    for action in crate::actions::ACTIONS {
+        if tree_structural.contains(&action.id) {
+            continue;
+        }
+        for b in keymap.bindings_for_action(action.id) {
+            if b.scope == BindingScope::Tree || b.ctrl || b.alt || b.super_key {
+                continue;
+            }
+            if let KeyCode::Char(c) = b.code {
+                assert!(
+                    motions.contains(&c),
+                    "action '{}' binds bare '{}' reachable from the content pane",
+                    action.id,
+                    c
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn macos_defaults_add_cmd_primaries_with_ctrl_fallbacks() {
+    let mut map = Keymap::default();
+    apply_macos_defaults(&mut map);
+    let first = &map.find_files[0];
+    assert!(first.super_key, "mac find_files primary must be cmd+p");
+    assert_eq!(first.code, KeyCode::Char('p'));
+    assert!(
+        map.find_files.iter().any(|b| b.ctrl && !b.super_key),
+        "ctrl+p fallback must remain for terminals that swallow cmd"
+    );
+    // goto_line stays on ctrl even on mac (matching mac VS Code).
+    assert!(map.goto_line.iter().all(|b| !b.super_key));
 }
 
 // -- action id canonicalisation (issue #495) ---------------------------------
@@ -300,7 +409,6 @@ fn canonical_action_ids_resolve_bindings() {
         "theme_picker",
         "git_mode_toggle",
         "git_mode_flat_toggle",
-        "toggle_wrap",
         "recent_files",
         "plugin_picker",
         "goto_line",

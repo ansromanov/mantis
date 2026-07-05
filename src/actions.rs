@@ -137,7 +137,7 @@ pub static ACTIONS: &[ActionSpec] = &[
     },
     ActionSpec {
         id: "find_files",
-        palette: None,
+        palette: Some("Find files"),
         help: Some(("Tree panel", "global fuzzy file-name picker")),
     },
     ActionSpec {

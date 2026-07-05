@@ -11,7 +11,7 @@
 
 use crossterm::event::KeyEvent;
 
-use crate::config::{pressed, static_keys};
+use crate::config::{pressed_in, static_keys, BindingScope};
 use crate::search::{
     CommandPalette, GotoLineState, InFileSearch, PluginPicker, SearchState, ThemePicker, TreeFilter,
 };
@@ -52,19 +52,23 @@ impl App {
                 return;
             }
         }
+        let scope = match self.focus {
+            Focus::Tree => BindingScope::Tree,
+            Focus::Content => BindingScope::Content,
+        };
         let k = &self.keys;
-        if pressed(&k.quit, &key) {
+        if pressed_in(&k.quit, &key, scope) {
             self.should_quit = true;
-        } else if pressed(&k.help, &key) {
+        } else if pressed_in(&k.help, &key, scope) {
             self.show_help = !self.show_help;
-        } else if pressed(&k.toggle_hidden, &key) {
+        } else if pressed_in(&k.toggle_hidden, &key, scope) {
             self.show_hidden = !self.show_hidden;
             self.config.tree.show_hidden = self.show_hidden;
             self.reload();
             self.save_config();
-        } else if pressed(&k.find_files, &key) {
+        } else if pressed_in(&k.find_files, &key, scope) {
             self.open_file_search();
-        } else if pressed(&k.search_files, &key) {
+        } else if pressed_in(&k.search_files, &key, scope) {
             if self.focus == Focus::Content
                 && self.current_file.is_some()
                 && self.config.search.in_file_search
@@ -77,10 +81,10 @@ impl App {
             } else {
                 self.open_file_search();
             }
-        } else if pressed(&k.reload, &key) {
+        } else if pressed_in(&k.reload, &key, scope) {
             self.viewing_revision = None;
             self.reload();
-        } else if pressed(&k.search_content, &key) {
+        } else if pressed_in(&k.search_content, &key, scope) {
             let root = self.root.clone();
             let changed = self.git_changed_files_set();
             let mut s = SearchState::new(
@@ -96,16 +100,16 @@ impl App {
                 s.refresh_now();
             }
             self.search = Some(s);
-        } else if pressed(&k.file_history, &key) {
+        } else if pressed_in(&k.file_history, &key, scope) {
             self.open_file_history();
-        } else if pressed(&k.recent_files, &key) {
+        } else if pressed_in(&k.recent_files, &key, scope) {
             self.open_recent_files();
-        } else if pressed(&k.theme_picker, &key) {
+        } else if pressed_in(&k.theme_picker, &key, scope) {
             self.theme_picker = Some(ThemePicker::default());
-        } else if pressed(&k.plugin_picker, &key) {
+        } else if pressed_in(&k.plugin_picker, &key, scope) {
             let entries = self.plugin_manager.plugin_entries();
             self.plugin_picker = Some(PluginPicker::new(entries));
-        } else if pressed(&k.command_palette, &key) {
+        } else if pressed_in(&k.command_palette, &key, scope) {
             self.last_click = None;
             let (base_order, base_pinned) = crate::command_palette::ranked_base_order(
                 &self.command_usage,
@@ -113,33 +117,34 @@ impl App {
                 self.config.palette_frequent_count,
             );
             self.command_palette = Some(CommandPalette::new(&self.keys, base_order, base_pinned));
-        } else if pressed(&k.switch_panel, &key) {
+        } else if pressed_in(&k.switch_panel, &key, scope) {
             self.focus = match self.focus {
                 Focus::Tree => Focus::Content,
                 Focus::Content => Focus::Tree,
             };
-        } else if pressed(&k.git_mode_toggle, &key) {
+        } else if pressed_in(&k.git_mode_toggle, &key, scope) {
             self.toggle_git_mode();
-        } else if pressed(&k.git_mode_flat_toggle, &key) {
+        } else if pressed_in(&k.git_mode_flat_toggle, &key, scope) {
             if self.git_mode {
                 self.git_mode_flat = !self.git_mode_flat;
                 self.rebuild(true);
                 self.try_open_selected();
                 self.save_config();
             } else {
-                self.set_status("flat view: only in git mode (Ctrl+G)");
+                let label = self.keys.label_for_action("git_mode_toggle");
+                self.set_status(format!("flat view: only in git mode ({label})"));
             }
-        } else if pressed(&k.open_in_editor, &key) {
+        } else if pressed_in(&k.open_in_editor, &key, scope) {
             self.open_in_editor();
-        } else if pressed(&k.toggle_watch, &key) {
+        } else if pressed_in(&k.toggle_watch, &key, scope) {
             self.auto_watch = !self.auto_watch;
             self.config.content.watch = self.auto_watch;
             self.save_config();
-        } else if pressed(&k.copy_path, &key) {
+        } else if pressed_in(&k.copy_path, &key, scope) {
             self.copy_path_to_clipboard(false);
-        } else if pressed(&k.copy_relative_path, &key) {
+        } else if pressed_in(&k.copy_relative_path, &key, scope) {
             self.copy_path_to_clipboard(true);
-        } else if pressed(&k.goto_line, &key) {
+        } else if pressed_in(&k.goto_line, &key, scope) {
             if self.focus == Focus::Content {
                 self.goto_line = Some(GotoLineState::new());
             } else {
@@ -155,28 +160,29 @@ impl App {
 
     /// Handles navigation and expand/collapse keys when the tree panel is focused.
     pub(super) fn handle_tree_key(&mut self, key: KeyEvent) {
+        let scope = BindingScope::Tree;
         let k = &self.keys;
-        if pressed(&k.nav_up, &key) {
+        if pressed_in(&k.nav_up, &key, scope) {
             if self.tree_selected > 0 {
                 self.tree_selected -= 1;
                 self.scroll_tree_into_view();
                 self.try_open_selected();
             }
-        } else if pressed(&k.nav_down, &key) {
+        } else if pressed_in(&k.nav_down, &key, scope) {
             if self.tree_selected + 1 < self.nodes.len() {
                 self.tree_selected += 1;
                 self.scroll_tree_into_view();
                 self.try_open_selected();
             }
-        } else if pressed(&k.tree_expand, &key) {
+        } else if pressed_in(&k.tree_expand, &key, scope) {
             self.activate_selected();
-        } else if self.tree_independent_scroll && pressed(&k.content_page_up, &key) {
+        } else if self.tree_independent_scroll && pressed_in(&k.content_page_up, &key, scope) {
             let page = self.tree_page_size();
             self.tree_scroll = self.tree_scroll.saturating_sub(page);
-        } else if self.tree_independent_scroll && pressed(&k.content_page_down, &key) {
+        } else if self.tree_independent_scroll && pressed_in(&k.content_page_down, &key, scope) {
             let page = self.tree_page_size();
             self.tree_scroll = (self.tree_scroll + page).min(self.tree_scroll_max());
-        } else if pressed(&k.content_top, &key) {
+        } else if pressed_in(&k.content_top, &key, scope) {
             if self.tree_independent_scroll {
                 // Move only the viewport; leave the selection where it is.
                 self.tree_scroll = 0;
@@ -185,7 +191,7 @@ impl App {
                 self.scroll_tree_into_view();
                 self.try_open_selected();
             }
-        } else if pressed(&k.content_bottom, &key) {
+        } else if pressed_in(&k.content_bottom, &key, scope) {
             if self.tree_independent_scroll {
                 self.tree_scroll = self.tree_scroll_max();
             } else {
@@ -196,7 +202,7 @@ impl App {
                     self.try_open_selected();
                 }
             }
-        } else if pressed(&k.tree_collapse, &key) {
+        } else if pressed_in(&k.tree_collapse, &key, scope) {
             if let Some(node) = self.nodes.get(self.tree_selected) {
                 let depth = node.depth;
                 let path = node.path.clone();
@@ -221,11 +227,11 @@ impl App {
                 }
                 self.scroll_tree_into_view();
             }
-        } else if pressed(&k.tree_collapse_all, &key) {
+        } else if pressed_in(&k.tree_collapse_all, &key, scope) {
             self.collapse_all();
-        } else if pressed(&k.tree_expand_all, &key) {
+        } else if pressed_in(&k.tree_expand_all, &key, scope) {
             self.expand_all();
-        } else if pressed(&k.tree_up_dir, &key) {
+        } else if pressed_in(&k.tree_up_dir, &key, scope) {
             self.tree_up_dir();
         }
     }
@@ -256,11 +262,12 @@ impl App {
     /// Handles scrolling, wrapping, and markdown-raw toggle keys when the
     /// content panel is focused.
     pub(super) fn handle_content_key(&mut self, key: KeyEvent) {
+        let scope = BindingScope::Content;
         let k = &self.keys;
         let scroll_before = self.content_scroll;
         let hscroll_before = self.content_hscroll;
         let active_line_before = self.active_line;
-        if pressed(&k.toggle_pretty_json, &key) {
+        if pressed_in(&k.toggle_pretty_json, &key, scope) {
             if self.is_json && !self.json_pretty_lines.is_empty() {
                 self.show_pretty_json = !self.show_pretty_json;
                 self.set_content_scroll(0);
@@ -270,54 +277,54 @@ impl App {
             } else {
                 self.set_status("pretty JSON: could not parse");
             }
-        } else if pressed(&k.toggle_blame, &key) {
+        } else if pressed_in(&k.toggle_blame, &key, scope) {
             if self.has_text_cursor() {
                 self.show_blame = !self.show_blame;
             } else {
                 self.set_status("blame: not available in a diff");
             }
-        } else if self.is_diff && pressed(&k.toggle_diff_side_by_side, &key) {
+        } else if self.is_diff && pressed_in(&k.toggle_diff_side_by_side, &key, scope) {
             self.diff_side_by_side = !self.diff_side_by_side;
             self.config.git.diff.side_by_side = self.diff_side_by_side;
             self.save_config();
             self.set_content_scroll(0);
             self.content_hscroll = 0;
-        } else if self.is_diff && pressed(&k.toggle_diff_staged, &key) {
+        } else if self.is_diff && pressed_in(&k.toggle_diff_staged, &key, scope) {
             self.diff_mode = self.diff_mode.next();
             self.config.git.diff.mode = self.diff_mode;
             self.save_config();
             if let Some(path) = self.current_file.clone() {
                 self.show_working_tree_diff(&path);
             }
-        } else if self.is_diff && pressed(&k.diff_hunk_next, &key) {
+        } else if self.is_diff && pressed_in(&k.diff_hunk_next, &key, scope) {
             self.diff_next_hunk();
-        } else if self.is_diff && pressed(&k.diff_hunk_prev, &key) {
+        } else if self.is_diff && pressed_in(&k.diff_hunk_prev, &key, scope) {
             self.diff_prev_hunk();
-        } else if !self.fold_regions.is_empty() && pressed(&k.fold_toggle, &key) {
+        } else if !self.fold_regions.is_empty() && pressed_in(&k.fold_toggle, &key, scope) {
             // Toggle the fold region whose header is at the current scroll position.
             let phys = self.display_to_physical(self.content_scroll);
             if let Some(ri) = self.region_idx_at(phys) {
                 self.toggle_fold_region(ri);
                 self.mark_content_scrolled();
             }
-        } else if pressed(&k.toggle_wrap, &key) {
+        } else if pressed_in(&k.toggle_wrap, &key, scope) {
             self.word_wrap = !self.word_wrap;
             self.config.content.word_wrap = self.word_wrap;
             self.set_content_scroll(0);
             self.content_hscroll = 0;
             self.save_config();
-        } else if pressed(&k.toggle_line_numbers, &key) {
+        } else if pressed_in(&k.toggle_line_numbers, &key, scope) {
             self.show_line_numbers = !self.show_line_numbers;
             self.config.content.line_numbers = self.show_line_numbers;
             self.save_config();
-        } else if self.has_text_cursor() && pressed(&k.nav_up, &key) {
+        } else if self.has_text_cursor() && pressed_in(&k.nav_up, &key, scope) {
             // Move active line up (non-diff content).
             if self.active_line > 0 {
                 self.active_line -= 1;
                 self.scroll_active_line_into_view();
                 self.mark_content_scrolled();
             }
-        } else if self.has_text_cursor() && pressed(&k.nav_down, &key) {
+        } else if self.has_text_cursor() && pressed_in(&k.nav_down, &key, scope) {
             // Move active line down (non-diff content).
             let max = self.display_line_count().saturating_sub(1);
             if self.active_line < max {
@@ -325,32 +332,32 @@ impl App {
                 self.scroll_active_line_into_view();
                 self.mark_content_scrolled();
             }
-        } else if pressed(&k.nav_up, &key) {
+        } else if pressed_in(&k.nav_up, &key, scope) {
             // Cursorless content: fall back to scrolling.
             self.set_content_scroll(self.content_scroll.saturating_sub(1));
-        } else if pressed(&k.nav_down, &key) {
+        } else if pressed_in(&k.nav_down, &key, scope) {
             // Cursorless content: fall back to scrolling.
             self.set_content_scroll(self.content_scroll.saturating_add(1));
-        } else if pressed(&k.content_top, &key) {
+        } else if pressed_in(&k.content_top, &key, scope) {
             if self.has_text_cursor() {
                 self.active_line = 0;
             }
             self.set_content_scroll(0);
-        } else if pressed(&k.content_bottom, &key) {
+        } else if pressed_in(&k.content_bottom, &key, scope) {
             if self.has_text_cursor() {
                 self.active_line = self.display_line_count().saturating_sub(1);
                 self.scroll_active_line_into_view();
             } else {
                 self.set_content_scroll(usize::MAX);
             }
-        } else if pressed(&k.content_page_up, &key) {
+        } else if pressed_in(&k.content_page_up, &key, scope) {
             if self.has_text_cursor() {
                 self.active_line = self.active_line.saturating_sub(self.page_rows());
                 self.scroll_active_line_into_view();
             } else {
                 self.set_content_scroll(self.content_scroll.saturating_sub(self.page_rows()));
             }
-        } else if pressed(&k.content_page_down, &key) {
+        } else if pressed_in(&k.content_page_down, &key, scope) {
             if self.has_text_cursor() {
                 let max = self.display_line_count().saturating_sub(1);
                 self.active_line = (self.active_line + self.page_rows()).min(max);
@@ -358,13 +365,13 @@ impl App {
             } else {
                 self.set_content_scroll(self.content_scroll.saturating_add(self.page_rows()));
             }
-        } else if !self.word_wrap && pressed(&k.content_left, &key) {
+        } else if !self.word_wrap && pressed_in(&k.content_left, &key, scope) {
             self.content_hscroll = self.content_hscroll.saturating_sub(4);
-        } else if !self.word_wrap && pressed(&k.content_right, &key) {
+        } else if !self.word_wrap && pressed_in(&k.content_right, &key, scope) {
             self.content_hscroll += 4;
-        } else if !self.word_wrap && pressed(&k.content_reset_col, &key) {
+        } else if !self.word_wrap && pressed_in(&k.content_reset_col, &key, scope) {
             self.content_hscroll = 0;
-        } else if self.has_text_cursor() && pressed(&k.blame_line, &key) {
+        } else if self.has_text_cursor() && pressed_in(&k.blame_line, &key, scope) {
             self.show_line_blame = !self.show_line_blame;
         }
         if self.content_scroll != scroll_before || self.content_hscroll != hscroll_before {

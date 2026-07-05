@@ -2,11 +2,17 @@
 //!
 //! Defines `KeyBinding` (a single key combination), `Keymap` (the full set of
 //! action→binding mappings), and the parsing/matching machinery (`pressed`,
-//! `bind`, `parse_binding`). Keybinding strings follow the convention
-//! `[modifier+]key` where modifier is `ctrl`, `alt`, `cmd`/`super`, and key is
-//! a single character (preserving case) or a named key like `Enter`, `Up`,
-//! `PageDown`. Serde deserialization of `KeyBinding` goes through
-//! `parse_binding`; the `Keymap::default()` provides the shipped bindings.
+//! `pressed_in`, `bind`, `parse_binding`). Keybinding strings follow the
+//! convention `[scope:][modifier+]key` where scope is `tree` or `content`
+//! (restricting the binding to that focused panel; no scope = global),
+//! modifier is `ctrl`, `alt`, `cmd`/`super`, and key is a single character
+//! (preserving case) or a named key like `Enter`, `Up`, `PageDown`, `F5`.
+//! Serde deserialization of `KeyBinding` goes through `parse_binding`; the
+//! `Keymap::default()` provides the shipped bindings, which differ between
+//! macOS (`cmd+` primaries with `ctrl+` fallbacks) and other platforms.
+//! Default single-letter shortcuts are scoped to the tree panel so the
+//! content pane's letter keyspace stays free for future editing features;
+//! user configs may still bind unscoped letters explicitly.
 //! The `matches` method on `KeyBinding` handles the kitty keyboard protocol's
 //! alternate-key reporting for layout-independent matching.
 //!
@@ -23,13 +29,24 @@ use serde::{Deserialize, Deserializer, Serialize};
 #[cfg(unix)]
 use crate::event_source::CURRENT_ALT_KEYS;
 
-/// A single key combination, e.g. `q`, `ctrl+c`, `alt+.`, `cmd+p`, `PageUp`.
+/// Which focused panel a binding is active in. `Global` bindings fire
+/// everywhere; `Tree`/`Content` bindings only when that panel has focus.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum BindingScope {
+    Global,
+    Tree,
+    Content,
+}
+
+/// A single key combination, e.g. `q`, `ctrl+c`, `alt+.`, `cmd+p`, `PageUp`,
+/// optionally scoped to a panel: `tree:q`, `content:ctrl+b`.
 #[derive(Clone, Copy)]
 pub struct KeyBinding {
     pub code: KeyCode,
     pub ctrl: bool,
     pub alt: bool,
     pub super_key: bool,
+    pub scope: BindingScope,
 }
 
 /// Map a US keyboard base-layout character to its shifted variant.
@@ -118,6 +135,7 @@ impl KeyBinding {
             KeyCode::PageDown => "PageDown".to_string(),
             KeyCode::Home => "Home".to_string(),
             KeyCode::End => "End".to_string(),
+            KeyCode::F(n) => format!("F{n}"),
             ref other => format!("{other:?}"),
         };
         match (self.ctrl, self.alt, self.super_key) {
@@ -131,9 +149,20 @@ impl KeyBinding {
     }
 }
 
-/// Returns true if any binding in the list matches the key event.
+/// Returns true if any binding in the list matches the key event, ignoring
+/// binding scopes. Use in modal/overlay contexts where panel focus is not
+/// meaningful; the main-view dispatch goes through `pressed_in`.
 pub fn pressed(bindings: &[KeyBinding], key: &KeyEvent) -> bool {
     bindings.iter().any(|b| b.matches(key))
+}
+
+/// Returns true if any binding in the list matches the key event and is
+/// active in `scope`: global bindings always are, panel-scoped bindings only
+/// when `scope` is that panel.
+pub fn pressed_in(bindings: &[KeyBinding], key: &KeyEvent, scope: BindingScope) -> bool {
+    bindings
+        .iter()
+        .any(|b| (b.scope == BindingScope::Global || b.scope == scope) && b.matches(key))
 }
 
 impl Keymap {
@@ -270,18 +299,26 @@ pub struct Keymap {
 }
 
 impl Default for Keymap {
+    /// Editor-style defaults (VS Code / Sublime conventions). Single letters
+    /// are `tree:`-scoped so the content pane stays letter-free apart from
+    /// the vim motion set (`j k h l g G 0 n N`); content-pane access to the
+    /// remaining toggles goes through modifier combos or the command palette.
+    /// `ctrl+shift+letter` specs are written as `ctrl+<uppercase letter>`;
+    /// on terminals without the kitty keyboard protocol they degrade to the
+    /// plain-`ctrl` action, which is always the more frequent one.
     fn default() -> Self {
-        Keymap {
-            quit: bind(&["q", "ctrl+c"]),
-            help: bind(&["?"]),
-            toggle_hidden: bind(&[".", "alt+."]),
-            search_files: bind(&["/"]),
-            find_files: bind(&["ctrl+f"]),
-            search_content: bind(&["f"]),
-            reload: bind(&["r"]),
+        #[allow(unused_mut)]
+        let mut map = Keymap {
+            quit: bind(&["ctrl+c", "tree:q"]),
+            help: bind(&["F1", "tree:?"]),
+            toggle_hidden: bind(&["tree:.", "alt+."]),
+            search_files: bind(&["ctrl+f", "tree:/"]),
+            find_files: bind(&["ctrl+p"]),
+            search_content: bind(&["ctrl+F", "tree:f"]),
+            reload: bind(&["ctrl+r", "F5", "tree:r"]),
             switch_panel: bind(&["Tab"]),
-            file_history: bind(&["H"]),
-            theme_picker: bind(&["t"]),
+            file_history: bind(&["tree:H"]),
+            theme_picker: bind(&["tree:t"]),
             nav_up: bind(&["Up", "k"]),
             nav_down: bind(&["Down", "j"]),
             tree_expand: bind(&["Enter", "Right", "l"]),
@@ -290,34 +327,55 @@ impl Default for Keymap {
             tree_expand_all: bind(&["="]),
             content_left: bind(&["Left"]),
             content_right: bind(&["Right"]),
-            content_top: bind(&["g", "Home"]),
-            content_bottom: bind(&["G", "End"]),
+            content_top: bind(&["ctrl+Home", "g", "tree:Home"]),
+            content_bottom: bind(&["ctrl+End", "G", "tree:End"]),
             content_page_up: bind(&["PageUp"]),
             content_page_down: bind(&["PageDown"]),
-            content_reset_col: bind(&["0"]),
-            toggle_wrap: bind(&["z"]),
-            toggle_line_numbers: bind(&["L"]),
-            toggle_pretty_json: bind(&["J"]),
-            toggle_blame: bind(&["b"]),
-            blame_line: bind(&["B"]),
-            toggle_diff_side_by_side: bind(&["D"]),
-            toggle_diff_staged: bind(&["S"]),
+            content_reset_col: bind(&["Home", "0"]),
+            toggle_wrap: Vec::new(),
+            toggle_line_numbers: Vec::new(),
+            toggle_pretty_json: Vec::new(),
+            toggle_blame: bind(&["ctrl+b"]),
+            blame_line: bind(&["ctrl+B"]),
+            toggle_diff_side_by_side: Vec::new(),
+            toggle_diff_staged: Vec::new(),
             diff_hunk_next: bind(&["n"]),
             diff_hunk_prev: bind(&["N"]),
-            git_mode_toggle: bind(&["ctrl+g"]),
-            git_mode_flat_toggle: bind(&["F", "alt+g"]),
-            command_palette: bind(&["ctrl+p"]),
-            open_in_editor: bind(&["e"]),
+            git_mode_toggle: bind(&["ctrl+G"]),
+            git_mode_flat_toggle: bind(&["tree:F", "alt+g"]),
+            command_palette: bind(&["ctrl+P", "tree:P"]),
+            open_in_editor: bind(&["ctrl+e", "tree:e"]),
             fold_toggle: bind(&["Space"]),
-            toggle_watch: bind(&["W"]),
+            toggle_watch: bind(&["tree:W"]),
             recent_files: bind(&["ctrl+o"]),
-            copy_path: bind(&["y"]),
-            copy_relative_path: bind(&["Y"]),
-            plugin_picker: bind(&["p"]),
-            goto_line: bind(&[":"]),
+            copy_path: bind(&["tree:y"]),
+            copy_relative_path: bind(&["tree:Y"]),
+            plugin_picker: bind(&["tree:p"]),
+            goto_line: bind(&["ctrl+g"]),
             tree_up_dir: bind(&["Backspace"]),
-        }
+        };
+        #[cfg(target_os = "macos")]
+        apply_macos_defaults(&mut map);
+        map
     }
+}
+
+/// Layers the macOS defaults over the base map: `cmd+` primaries (matching
+/// mac VS Code) with the cross-platform `ctrl+` bindings kept as fallbacks,
+/// because Terminal.app/iTerm2 intercept most `cmd+` shortcuts while
+/// kitty/WezTerm/Ghostty forward them. `goto_line`/`git_mode_toggle` stay on
+/// `ctrl` — mac VS Code uses `ctrl` for those too.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+pub(crate) fn apply_macos_defaults(map: &mut Keymap) {
+    map.find_files = bind(&["cmd+p", "ctrl+p"]);
+    map.command_palette = bind(&["cmd+P", "ctrl+P", "tree:P"]);
+    map.search_content = bind(&["cmd+F", "ctrl+F", "tree:f"]);
+    map.search_files = bind(&["cmd+f", "ctrl+f", "tree:/"]);
+    map.reload = bind(&["cmd+r", "ctrl+r", "F5", "tree:r"]);
+    map.recent_files = bind(&["cmd+o", "ctrl+o"]);
+    map.content_top = bind(&["cmd+Up", "ctrl+Home", "g", "tree:Home"]);
+    map.content_bottom = bind(&["cmd+Down", "ctrl+End", "G", "tree:End"]);
+    map.content_reset_col = bind(&["cmd+Left", "Home", "0"]);
 }
 
 /// Build a list of bindings from string specs. Panics on an invalid spec, so
@@ -330,7 +388,14 @@ pub(crate) fn bind(specs: &[&str]) -> Vec<KeyBinding> {
 }
 
 pub(crate) fn parse_binding(s: &str) -> Result<KeyBinding, String> {
-    let parts: Vec<&str> = s.split('+').collect();
+    let (scope, spec) = if let Some(rest) = s.strip_prefix("tree:") {
+        (BindingScope::Tree, rest)
+    } else if let Some(rest) = s.strip_prefix("content:") {
+        (BindingScope::Content, rest)
+    } else {
+        (BindingScope::Global, s)
+    };
+    let parts: Vec<&str> = spec.split('+').collect();
     let (mods, key) = parts.split_at(parts.len() - 1);
 
     let mut ctrl = false;
@@ -352,6 +417,7 @@ pub(crate) fn parse_binding(s: &str) -> Result<KeyBinding, String> {
         ctrl,
         alt,
         super_key,
+        scope,
     })
 }
 
@@ -361,7 +427,14 @@ fn parse_keycode(s: &str, full: &str) -> Result<KeyCode, String> {
         return Ok(KeyCode::Char(c));
     }
 
-    let code = match s.to_ascii_lowercase().as_str() {
+    let lower = s.to_ascii_lowercase();
+    if let Some(n) = lower.strip_prefix('f').and_then(|d| d.parse::<u8>().ok()) {
+        if (1..=12).contains(&n) {
+            return Ok(KeyCode::F(n));
+        }
+    }
+
+    let code = match lower.as_str() {
         "up" => KeyCode::Up,
         "down" => KeyCode::Down,
         "left" => KeyCode::Left,
@@ -407,6 +480,7 @@ impl Serialize for KeyBinding {
             KeyCode::PageDown => "PageDown".to_string(),
             KeyCode::Home => "Home".to_string(),
             KeyCode::End => "End".to_string(),
+            KeyCode::F(n) => format!("F{n}"),
             ref other => format!("{other:?}"),
         };
         let spec = match (self.ctrl, self.alt, self.super_key) {
@@ -416,6 +490,11 @@ impl Serialize for KeyBinding {
             (false, false, true) => format!("cmd+{key}"),
             (true, false, true) => format!("ctrl+cmd+{key}"),
             _ => key,
+        };
+        let spec = match self.scope {
+            BindingScope::Global => spec,
+            BindingScope::Tree => format!("tree:{spec}"),
+            BindingScope::Content => format!("content:{spec}"),
         };
         s.serialize_str(&spec)
     }
