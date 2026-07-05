@@ -69,11 +69,11 @@ fn hint_goto_line() {
 }
 
 #[test]
-fn tree_focus_default() {
+fn tree_focus_no_keybinding_hint() {
     let app = make_app();
     let text = render_bar(&app);
-    assert!(text.contains("j/k nav"));
-    assert!(text.contains("v"));
+    assert!(!text.contains("j/k nav"), "keybinding hint was removed");
+    assert!(text.contains(&format!("v{}", env!("CARGO_PKG_VERSION"))));
 }
 
 #[test]
@@ -102,55 +102,16 @@ fn tree_focus_git_flat() {
 }
 
 #[test]
-fn content_focus_default() {
-    let mut app = make_app();
-    app.focus = Focus::Content;
-    let text = render_bar(&app);
-    assert!(text.contains("PgUp/PgDn"));
-    assert!(text.contains("H history"));
-}
-
-#[test]
-fn content_json_pretty() {
-    let mut app = make_app();
-    app.focus = Focus::Content;
-    app.word_wrap = true;
-    app.is_json = true;
-    app.show_pretty_json = true;
-    app.json_pretty_lines = vec![vec![]];
-    let text = render_bar_width(&app, 120);
-    assert!(text.contains("J raw"));
-}
-
-#[test]
-fn content_json_raw() {
+fn content_focus_no_keybinding_hint() {
     let mut app = make_app();
     app.focus = Focus::Content;
     app.is_json = true;
-    app.show_pretty_json = false;
     app.json_pretty_lines = vec![vec![]];
-    let text = render_bar_width(&app, 120);
-    assert!(text.contains("J pretty"));
-}
-
-#[test]
-fn content_word_wrap() {
-    let mut app = make_app();
-    app.focus = Focus::Content;
-    app.word_wrap = true;
     let text = render_bar(&app);
-    assert!(text.contains("z no-wrap"));
-    assert!(!text.contains("h-scroll"));
-}
-
-#[test]
-fn content_no_wrap_hscroll() {
-    let mut app = make_app();
-    app.focus = Focus::Content;
-    app.word_wrap = false;
-    let text = render_bar_width(&app, 120);
-    assert!(text.contains("z wrap"));
-    assert!(text.contains("h-scroll"));
+    assert!(!text.contains("PgUp/PgDn"), "keybinding hint was removed");
+    assert!(!text.contains("H history"));
+    assert!(!text.contains("J pretty"));
+    assert!(!text.contains("z wrap"));
 }
 
 #[test]
@@ -506,16 +467,12 @@ fn narrow5_shows_empty_bar() {
 }
 
 #[test]
-fn narrow20_keeps_version_drops_hint() {
+fn narrow20_keeps_version() {
     let app = make_app();
     let text = render_bar_width(&app, 20);
     assert!(
         text.contains(&format!("v{}", env!("CARGO_PKG_VERSION"))),
         "version should fit at width 20"
-    );
-    assert!(
-        !text.contains("j/k"),
-        "keybinding hint should be elided at width 20"
     );
 }
 
@@ -548,8 +505,8 @@ fn narrow_keeps_git_over_badges() {
         staged: 0,
         untracked: 0,
     });
-    // Total: hint (92) + [hidden] (9) + git (9) + version (7) = 117.
-    // At width 20: drop hint → 25 (still > 20), drop [hidden] (P_INFO=2) → 16 (≤20).
+    // Total: [hidden] (9) + git (9) + version (7) = 25.
+    // At width 20: drop [hidden] (P_INFO=2) → 16 (≤20).
     // Git (P_GIT=3) and version (P_VER=5) stay.
     let text = render_bar_width(&app, 20);
     assert!(text.contains("[main ↑2]"), "git info kept at width 20");
@@ -602,8 +559,8 @@ fn narrow_drops_meta_before_badges() {
     let mut app = make_app();
     app.status_message = Some(StatusMessage::new("hello", std::time::Instant::now()));
     app.show_hidden = true;
-    // Total with all items: hint (~92) + [hidden] (9) + hello (6) + version (7) = 114.
-    // At width 20: drop hint → 22 (still > 20), then drop hello (P_META=1) → 16 (≤20).
+    // Total: [hidden] (9) + hello (6) + version (7) = 22.
+    // At width 20: drop hello (P_META=1) → 16 (≤20).
     // [hidden] (P_INFO=2) and version stay.
     let text = render_bar_width(&app, 20);
     assert!(
@@ -644,8 +601,8 @@ fn fit_segments_zero_max_width() {
     let cfg = StatusBarConfig::default();
     let segs = vec![(
         Span::styled("hello", Style::default()),
-        StatusSegment::Hint,
-        P_HINT,
+        StatusSegment::Badges,
+        P_INFO,
     )];
     let line = fit_two_sided(segs, 0, &cfg);
     assert_eq!(line.width(), 0);
@@ -717,9 +674,9 @@ fn both_none_default_split() {
     };
     let segs = vec![
         (
-            Span::styled("hint", Style::default()),
-            StatusSegment::Hint,
-            P_HINT,
+            Span::styled("badges", Style::default()),
+            StatusSegment::Badges,
+            P_INFO,
         ),
         (
             Span::styled("ver", Style::default()),
@@ -734,7 +691,7 @@ fn both_none_default_split() {
     ];
     let (left, right) = split_sides(segs, &cfg);
     assert_eq!(left.len(), 1);
-    assert_eq!(left[0].content.as_ref(), "hint");
+    assert_eq!(left[0].content.as_ref(), "badges");
     assert_eq!(right.len(), 2);
     assert_eq!(right[0].content.as_ref(), "ver");
     assert_eq!(right[1].content.as_ref(), "git");
@@ -770,27 +727,29 @@ fn explicit_left_right_only_listed_segments_render() {
             ..Default::default()
         },
         statusbar: StatusBarConfig {
-            left: Some(vec!["hint".into()]),
+            left: Some(vec!["badges".into()]),
             right: Some(vec!["version".into()]),
         },
         ..Config::default()
     };
     let mut app = App::new(PathBuf::from("."), cfg, None, None).unwrap();
-    // Enable show_hidden so the badges segment would produce "[hidden]" if rendered.
+    // Enable show_hidden and auto_watch so badges and (unlisted) message
+    // segments have content.
     app.show_hidden = true;
+    app.status_message = Some(StatusMessage::new("hello", std::time::Instant::now()));
     let text = render_bar_width(&app, 200);
-    // Hint on left.
-    assert!(text.contains("j/k nav"), "hint should be visible");
+    // Badges on left.
+    assert!(text.contains("[hidden]"), "badges should be visible");
     // Version on right.
     let version = format!("v{}", env!("CARGO_PKG_VERSION"));
     assert!(
         text.trim_end().ends_with(&version),
         "version should be right-aligned, got {text:?}"
     );
-    // Badges segment not in allowlist → [hidden] must not appear.
+    // Message segment not in allowlist → must not appear.
     assert!(
-        !text.contains("[hidden]"),
-        "badges should be hidden in explicit mode, got {text:?}"
+        !text.contains("hello"),
+        "message should be hidden in explicit mode, got {text:?}"
     );
 }
 
@@ -830,12 +789,13 @@ fn explicit_elision_still_drops_lowest_priority() {
 // ── Alignment tests ───────────────────────────────────────────────────────
 
 #[test]
-fn default_config_hint_starts_at_col_0() {
-    let app = make_app();
+fn default_config_left_segment_starts_at_col_0() {
+    let mut app = make_app();
+    app.show_hidden = true;
     let text = render_bar_width(&app, 200);
     assert!(
-        text.starts_with(" j/k nav"),
-        "hint should start at column 0, got {text:?}"
+        text.starts_with(" [hidden]"),
+        "first left segment should start at column 0, got {text:?}"
     );
 }
 
@@ -857,12 +817,11 @@ fn default_config_lnum_right_side() {
     app.current_file = Some(PathBuf::from("Cargo.toml"));
     app.active_line = 10;
     let text = render_bar_width(&app, 200);
-    // Ln 11 should be on the right side, after padding
-    let hint_end = text.find("? help").unwrap();
+    // Ln 11 should be in the right-anchored block, past the padding gap.
     let lnum_pos = text.find("Ln 11").unwrap();
     assert!(
-        lnum_pos > hint_end,
-        "Ln should be right-aligned after hint, got Ln at {lnum_pos}, hint ends at {hint_end}"
+        lnum_pos > 100,
+        "Ln should be right-aligned, got Ln at {lnum_pos}"
     );
 }
 
@@ -904,11 +863,12 @@ fn custom_right_only_version() {
         },
         statusbar: StatusBarConfig {
             right: Some(vec!["version".into()]),
-            left: Some(vec!["hint".into()]),
+            left: Some(vec!["badges".into()]),
         },
         ..Config::default()
     };
-    let app = App::new(PathBuf::from("."), cfg, None, None).unwrap();
+    let mut app = App::new(PathBuf::from("."), cfg, None, None).unwrap();
+    app.show_hidden = true;
     let text = render_bar_width(&app, 200);
     let version = format!("v{}", env!("CARGO_PKG_VERSION"));
     // Version should be the only right-side segment, at the end.
@@ -916,8 +876,11 @@ fn custom_right_only_version() {
         text.trim_end().ends_with(&version),
         "version should be right-aligned, got {text:?}"
     );
-    // Hint is on left, version on right, everything else hidden.
-    assert!(text.contains("j/k nav"), "hint should be visible on left");
+    // Badges on left, version on right, everything else hidden.
+    assert!(
+        text.contains("[hidden]"),
+        "badges should be visible on left"
+    );
     assert!(
         !text.contains("[main]"),
         "git segment should be hidden in explicit mode"
@@ -937,11 +900,12 @@ fn empty_right_all_left() {
         },
         ..Config::default()
     };
-    let app = App::new(PathBuf::from("."), cfg, None, None).unwrap();
+    let mut app = App::new(PathBuf::from("."), cfg, None, None).unwrap();
+    app.show_hidden = true;
     let text = render_bar_width(&app, 200);
     let version = format!("v{}", env!("CARGO_PKG_VERSION"));
-    // In default mode (both None), version is on the right, hint on left.
-    assert!(text.starts_with(" j/k nav"));
+    // In default mode (both None), version is on the right, badges on left.
+    assert!(text.starts_with(" [hidden]"));
     assert!(text.trim_end().ends_with(&version));
 }
 
@@ -953,15 +917,16 @@ fn nonexistent_id_ignored() {
             ..Default::default()
         },
         statusbar: StatusBarConfig {
-            left: Some(vec!["hint".into()]),
+            left: Some(vec!["badges".into()]),
             right: Some(vec!["nonexistent".into()]),
         },
         ..Config::default()
     };
-    let app = App::new(PathBuf::from("."), cfg, None, None).unwrap();
+    let mut app = App::new(PathBuf::from("."), cfg, None, None).unwrap();
+    app.show_hidden = true;
     let text = render_bar_width(&app, 200);
-    // "nonexistent" doesn't match any built segment; only "hint" (on left) appears.
-    assert!(text.starts_with(" j/k nav"));
+    // "nonexistent" doesn't match any built segment; only badges (left) appear.
+    assert!(text.starts_with(" [hidden]"));
     assert!(!text.contains(&format!("v{}", env!("CARGO_PKG_VERSION"))));
 }
 
@@ -975,9 +940,9 @@ fn split_sides_default_mode_natural_order() {
     // Manually exercise split_sides.
     let segs = vec![
         (
-            Span::styled("hint", Style::default()),
-            StatusSegment::Hint,
-            P_HINT,
+            Span::styled("badges", Style::default()),
+            StatusSegment::Badges,
+            P_INFO,
         ),
         (
             Span::styled("ver", Style::default()),
@@ -992,7 +957,7 @@ fn split_sides_default_mode_natural_order() {
     ];
     let (left, right) = split_sides(segs, &cfg);
     assert_eq!(left.len(), 1);
-    assert_eq!(left[0].content.as_ref(), "hint");
+    assert_eq!(left[0].content.as_ref(), "badges");
     assert_eq!(right.len(), 2);
     assert_eq!(right[0].content.as_ref(), "ver");
     assert_eq!(right[1].content.as_ref(), "git");
@@ -1001,14 +966,14 @@ fn split_sides_default_mode_natural_order() {
 #[test]
 fn split_sides_explicit_mode_order_follows_config() {
     let cfg = StatusBarConfig {
-        left: Some(vec!["git".into(), "hint".into()]),
+        left: Some(vec!["git".into(), "badges".into()]),
         right: Some(vec!["version".into()]),
     };
     let segs = vec![
         (
-            Span::styled("hint", Style::default()),
-            StatusSegment::Hint,
-            P_HINT,
+            Span::styled("badges", Style::default()),
+            StatusSegment::Badges,
+            P_INFO,
         ),
         (
             Span::styled("ver", Style::default()),
@@ -1022,10 +987,10 @@ fn split_sides_explicit_mode_order_follows_config() {
         ),
     ];
     let (left, right) = split_sides(segs, &cfg);
-    // Left order follows config: git before hint.
+    // Left order follows config: git before badges.
     assert_eq!(left.len(), 2);
     assert_eq!(left[0].content.as_ref(), "git");
-    assert_eq!(left[1].content.as_ref(), "hint");
+    assert_eq!(left[1].content.as_ref(), "badges");
     // Right: version.
     assert_eq!(right.len(), 1);
     assert_eq!(right[0].content.as_ref(), "ver");

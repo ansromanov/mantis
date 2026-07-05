@@ -64,6 +64,10 @@ impl App {
                 self.open_file_search();
                 true
             }
+            Some("find_files") => {
+                self.open_file_search();
+                true
+            }
             Some("search_content") => {
                 let root = self.root.clone();
                 let changed = self.git_changed_files_set();

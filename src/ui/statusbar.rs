@@ -9,11 +9,12 @@
 //! drawn last so it always reflects the final per-frame state.
 //!
 //! On narrow terminals the bar elides low-priority segments so it never
-//! overflows `area.width`. Keybinding hints are dropped first, then plugin
-//! and status messages (`P_META`), then fold stats, badges, and file
-//! info (`P_INFO`), then git info; error indicators — including a
-//! `plugin_error` action (protocol 3+, styled distinctly from routine
-//! `show_message` text) — and the version string are always shown.
+//! overflows `area.width`. Plugin and status messages (`P_META`) are dropped
+//! first, then fold stats, badges, and file info (`P_INFO`), then git info;
+//! error indicators — including a `plugin_error` action (protocol 3+, styled
+//! distinctly from routine `show_message` text) — and the version string are
+//! always shown. Keybinding hints are no longer rendered — the `?` help
+//! overlay and the command palette are the discovery surfaces for bindings.
 
 use ratatui::{
     layout::Rect,
@@ -30,7 +31,6 @@ use crate::git::{GitHead, GitRepoInfo};
 /// Named segment identifiers for status-bar alignment.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum StatusSegment {
-    Hint,
     Badges,
     Scroll,
     Lnum,
@@ -47,7 +47,6 @@ pub(crate) enum StatusSegment {
 impl StatusSegment {
     fn id_str(self) -> &'static str {
         match self {
-            StatusSegment::Hint => "hint",
             StatusSegment::Badges => "badges",
             StatusSegment::Scroll => "scroll",
             StatusSegment::Lnum => "lnum",
@@ -81,7 +80,6 @@ enum StatusSide {
 }
 
 /// Priority levels for status-bar segments (higher = kept when eliding).
-const P_HINT: u8 = 0; // keybinding hints
 const P_META: u8 = 1; // plugin/status messages
 const P_INFO: u8 = 2; // fold stats, badges, scroll %, file encoding
 const P_GIT: u8 = 3; // git branch info
@@ -149,44 +147,6 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
     let dim = base.fg(app.theme.dim);
 
     let mut segs: Vec<(Span<'static>, StatusSegment, u8)> = Vec::new();
-
-    // -- Priority 0: keybinding hint (dropped first) --
-    let hint = match app.focus {
-        Focus::Tree => {
-            " j/k nav  Enter/l expand  h collapse  / files  f content  t theme  Tab panel  q quit  ? help".to_string()
-        }
-        Focus::Content => {
-            let md = if app.is_json && !app.json_pretty_lines.is_empty() {
-                if app.show_pretty_json {
-                    "  J raw"
-                } else {
-                    "  J pretty"
-                }
-            } else {
-                ""
-            };
-            let wrap = if app.word_wrap {
-                "  z no-wrap"
-            } else {
-                "  z wrap"
-            };
-            let hscroll = if app.word_wrap {
-                ""
-            } else {
-                "  \u{2190}/\u{2192} h-scroll  0 reset col"
-            };
-            let diff_hint = if app.is_diff {
-                "  S mode  D side-by-side  n/N hunks"
-            } else {
-                ""
-            };
-            format!(
-                " j/k scroll  PgUp/PgDn{}  g/G top/bot  H history  Tab panel  q quit{}{}{}",
-                hscroll, md, wrap, diff_hint
-            )
-        }
-    };
-    segs.push((Span::styled(hint, dim), StatusSegment::Hint, P_HINT));
 
     // -- Priority 2: active-mode badges --
     if matches!(app.focus, Focus::Tree) {

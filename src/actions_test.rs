@@ -70,7 +70,6 @@ const NAV_ONLY_ALLOWLIST: &[&str] = &[
     "content_page_up",
     "content_page_down",
     "content_reset_col",
-    "find_files",
     "switch_panel",
     "command_palette",
 ];
@@ -200,4 +199,15 @@ fn missing_palette_entries_from_issue_495_are_present() {
             "'{id}' must have a palette entry (was reported missing in #495)",
         );
     }
+}
+
+#[test]
+fn find_files_is_palette_invokable() {
+    // With mostly-unbound content-pane toggles (issue #298), the palette is
+    // the guaranteed fallback surface; find_files must be reachable there.
+    let action = ACTIONS.iter().find(|a| a.id == "find_files").unwrap();
+    assert!(
+        action.palette.is_some(),
+        "find_files must have a palette entry"
+    );
 }

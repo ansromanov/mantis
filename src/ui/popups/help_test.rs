@@ -105,8 +105,8 @@ fn help_multi_binding_shows_joined() {
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
     assert!(
-        joined.contains("q / Ctrl+c"),
-        "help should show 'q / Ctrl+c' for quit, got:\n{joined}"
+        joined.contains("Ctrl+c / q"),
+        "help should show 'Ctrl+c / q' for quit, got:\n{joined}"
     );
 }
 

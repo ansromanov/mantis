@@ -54,7 +54,7 @@ src/
 │   ├── popups/         #   search / history / palette / help popups
 │   └── statusbar.rs    #   status bar
 ├── config/             # mantis.toml deserialization, keybinding parsing
-├── command_palette.rs  # Ctrl+P action list + fuzzy matching
+├── command_palette.rs  # Ctrl+Shift+P action list + fuzzy matching
 ├── search.rs           # fuzzy file + full-text content search
 ├── selection.rs        # text selection model
 ├── tree.rs             # Flat Vec<TreeNode> from ignore::WalkBuilder

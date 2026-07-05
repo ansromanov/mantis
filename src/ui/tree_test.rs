@@ -217,7 +217,7 @@ fn draw_tree_git_mode_clean_shows_placeholder() {
         "clean placeholder should show 'No changes to show.'"
     );
     assert!(
-        text.contains("Ctrl+g"),
+        text.contains("Ctrl+Shift+G"),
         "clean placeholder should show the exit binding"
     );
 }

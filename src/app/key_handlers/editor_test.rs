@@ -518,3 +518,21 @@ fn dispatch_command_returns_false_when_nothing_selected() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn dispatch_command_find_files_opens_file_picker() {
+    // find_files gained a palette entry with the #298 keymap rework: on
+    // terminals that swallow its key combos the palette is the fallback path.
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.command_palette = Some(palette_with_query("Find files"));
+    assert!(
+        app.dispatch_command(),
+        "find_files must be a real dispatch arm"
+    );
+    assert!(
+        app.search.is_some(),
+        "find_files must open the search picker"
+    );
+    fs::remove_dir_all(&root).ok();
+}

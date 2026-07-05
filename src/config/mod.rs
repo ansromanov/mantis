@@ -26,8 +26,10 @@ pub mod static_keys;
 mod types;
 mod validate;
 
-// Used in both test and non-test code.
-pub use keymap::{pressed, Keymap};
+// Used by test helpers across modules to inject bindings.
+#[cfg_attr(not(test), allow(unused_imports))]
+pub(crate) use keymap::bind;
+pub use keymap::{pressed, pressed_in, BindingScope, Keymap};
 pub use types::{Config, StatusBarConfig};
 // Used by name only in test code (struct literals in *_test helpers).
 #[cfg_attr(not(test), allow(unused_imports))]
@@ -35,14 +37,10 @@ pub use types::{GitConfig, GitDiffConfig, TreeConfig};
 // Only referenced in doc links or via field access — never named in code.
 #[allow(unused_imports)]
 pub use keymap::KeyBinding;
-#[allow(unused_imports)]
-pub use types::{ContentConfig, SearchConfig};
-// Used in test code across multiple modules.
-#[cfg_attr(not(test), allow(unused_imports))]
-pub(crate) use keymap::bind;
-
 use std::fs;
 use std::path::{Path, PathBuf};
+#[allow(unused_imports)]
+pub use types::{ContentConfig, SearchConfig};
 
 /// Loads config for the given view root. A project-local `mantis.toml` found in
 /// the root or any ancestor takes precedence over the global config; this lets
