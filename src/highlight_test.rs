@@ -151,3 +151,41 @@ fn highlight_range_unknown_syntax_name_falls_back_to_plain_text() {
         "unresolvable syntax name should produce one plain-text span"
     );
 }
+
+#[test]
+fn highlight_stdin_uses_explicit_language_token() {
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[]);
+    let lines = vec!["fn main() {".to_string()];
+    let (spans, name) = h.highlight_stdin(Some("rust"), &lines);
+    assert_eq!(name.as_deref(), Some("Rust"));
+    assert!(
+        spans[0].len() > 1,
+        "expected multiple spans for Rust code, got {}",
+        spans[0].len()
+    );
+}
+
+#[test]
+fn highlight_stdin_falls_back_to_first_line_sniffing() {
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[]);
+    let lines = vec!["#!/usr/bin/env python3".to_string(), "print(1)".to_string()];
+    let (_, name) = h.highlight_stdin(None, &lines);
+    assert_eq!(name.as_deref(), Some("Python"));
+}
+
+#[test]
+fn highlight_stdin_unknown_language_falls_back_to_sniffing() {
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[]);
+    let lines = vec!["#!/usr/bin/env python3".to_string()];
+    let (_, name) = h.highlight_stdin(Some("not-a-real-language"), &lines);
+    assert_eq!(name.as_deref(), Some("Python"));
+}
+
+#[test]
+fn highlight_stdin_plain_text_returns_none_name() {
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[]);
+    let lines = vec!["just some plain text".to_string()];
+    let (spans, name) = h.highlight_stdin(None, &lines);
+    assert_eq!(name, None);
+    assert_eq!(spans[0].len(), 1);
+}

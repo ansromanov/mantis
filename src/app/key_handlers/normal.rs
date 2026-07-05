@@ -69,11 +69,12 @@ impl App {
         } else if pressed_in(&k.find_files, &key, scope) {
             self.open_file_search();
         } else if pressed_in(&k.search_files, &key, scope) {
-            if self.focus == Focus::Content
-                && self.current_file.is_some()
-                && self.config.search.in_file_search
-            {
-                // Content focused with an open file: open the in-file search bar.
+            // A real file (`current_file`) or piped stdin content (pager
+            // mode, which has no backing path but does populate `content`)
+            // both count as "something to search within".
+            let has_content = self.current_file.is_some() || !self.content.is_empty();
+            if self.focus == Focus::Content && has_content && self.config.search.in_file_search {
+                // Content focused with something loaded: open the in-file search bar.
                 self.in_file_search = Some(InFileSearch::new());
             } else if self.focus == Focus::Tree {
                 // Tree focused: open the inline tree name filter.

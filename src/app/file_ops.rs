@@ -67,7 +67,7 @@ impl App {
     /// Sets up a filesystem watcher on the parent directory of `path` so that
     /// `drain_file_watch` can detect external edits. Clears any previous watch.
     /// Watches the parent directory (not the file) to catch atomic-save renames.
-    fn set_file_watch(&mut self, path: Option<&Path>) {
+    pub(super) fn set_file_watch(&mut self, path: Option<&Path>) {
         self.file_watcher = None;
         self.file_watch_rx = None;
         self.file_watch_path = None;

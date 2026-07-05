@@ -107,6 +107,30 @@ impl Highlighter {
         self.highlight_impl(syntax, lines.iter().map(|s| s.as_str()))
     }
 
+    /// Detects a syntax for piped stdin content (pager mode) and highlights
+    /// it. An explicit `--language` name/extension/token takes priority (e.g.
+    /// `rust`, `py`); otherwise syntect's first-line sniffing is used
+    /// (shebangs, `-*- Mode: … -*-`). Falls back to plain text when neither
+    /// matches. Returns the highlighted spans plus the detected syntax name
+    /// (`None` for plain text), mirroring `FileLoad::syntax_name`.
+    pub fn highlight_stdin(
+        &self,
+        language: Option<&str>,
+        lines: &[String],
+    ) -> (Vec<Vec<(Style, String)>>, Option<String>) {
+        let syntax = language
+            .and_then(|l| self.ss.find_syntax_by_token(l))
+            .or_else(|| {
+                lines
+                    .first()
+                    .and_then(|l| self.ss.find_syntax_by_first_line(l))
+            })
+            .unwrap_or_else(|| self.ss.find_syntax_plain_text());
+        let name = (syntax.name != "Plain Text").then(|| syntax.name.clone());
+        let highlighted = self.highlight_impl(syntax, lines.iter().map(|s| s.as_str()));
+        (highlighted, name)
+    }
+
     /// Syntax-highlights a range of lines (as `&str` slices) for virtualization.
     /// Takes the syntax name already resolved at file-open time (see
     /// `syntax_name`) instead of a path, so repeated calls while scrolling

@@ -10,6 +10,32 @@ mantis file.md      # open a single file directly
 
 Press `?` at any time for in-app help, and `q` to quit.
 
+## Pager mode
+
+When no `<path>` is given and stdin is piped rather than a terminal, `mantis`
+reads stdin instead of walking a directory:
+
+```sh
+git diff | mantis          # navigable side-by-side diff
+kubectl logs pod | mantis  # highlighted, searchable log output
+curl -s https://example.com/file.py | mantis --language python
+```
+
+Diff-shaped input (a `diff --git`/`diff --cc` header, an `@@ -` hunk header, or
+a `--- `/`+++ ` file-marker pair) renders through the same side-by-side diff
+view as git mode, starting in side-by-side layout regardless of the
+`[git.diff] side_by_side` setting. Anything else is syntax-highlighted: pass
+`--language <name>` (e.g. `--language rust`) to force it, otherwise mantis
+sniffs the first line the way `syntect` detects shebangs and mode lines.
+
+The tree pane collapses (there is no path driving the view) and focus starts
+in the content pane, but the tree is still there — drag the splitter or
+press `Tab` to browse the working directory alongside the piped content.
+Keyboard input keeps working normally even though stdin is consumed by the
+piped data: mantis reads keys from the controlling terminal instead, the same
+trick `less` uses. Input is read to EOF before the UI starts, so very large
+piped input delays the first frame rather than streaming incrementally.
+
 ## Session persistence
 
 `mantis` automatically remembers your workspace state across restarts:

@@ -10,6 +10,8 @@
 //! - [`AltKeys`]: Shifted and physical base key codepoint alternatives.
 //! - [`CURRENT_ALT_KEYS`]: Thread-local alternate keys for the current event.
 //! - [`RawEventSource`]: The main buffered, non-blocking event input source.
+//!   Reads fd 0 by default (`new`), or a reopened `/dev/tty` in pager mode
+//!   (`for_tty`) so keyboard input keeps working while fd 0 is piped content.
 //! - [`push_keyboard_enhancement_flags`]: Enable Kitty enhancement support.
 //! - [`pop_keyboard_enhancement_flags`]: Restore standard terminal behavior.
 
@@ -96,14 +98,18 @@ trait PollReader {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize>;
 }
 
-/// Real [`PollReader`] that reads from fd 0 (stdin).
-struct StdinReader;
+/// Real [`PollReader`] that reads from a given raw file descriptor: fd 0
+/// (stdin) normally, or a reopened `/dev/tty` in pager mode (see
+/// [`RawEventSource::for_tty`]) where fd 0 is consumed by piped content.
+struct StdinReader {
+    fd: libc::c_int,
+}
 
 impl PollReader for StdinReader {
     fn poll(&mut self, timeout_ms: libc::c_int) -> io::Result<bool> {
         loop {
             let mut pfd = libc::pollfd {
-                fd: 0,
+                fd: self.fd,
                 events: libc::POLLIN,
                 revents: 0,
             };
@@ -121,7 +127,8 @@ impl PollReader for StdinReader {
 
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         loop {
-            let n = unsafe { libc::read(0, buf.as_mut_ptr() as *mut libc::c_void, buf.len()) };
+            let n =
+                unsafe { libc::read(self.fd, buf.as_mut_ptr() as *mut libc::c_void, buf.len()) };
             if n < 0 {
                 let err = io::Error::last_os_error();
                 if err.kind() == io::ErrorKind::Interrupted {
@@ -139,6 +146,11 @@ impl PollReader for StdinReader {
 pub struct RawEventSource {
     buf: Vec<u8>,
     pos: usize,
+    fd: libc::c_int,
+    /// Keeps a reopened `/dev/tty` alive for the source's lifetime when
+    /// reading from the terminal directly rather than fd 0 (see
+    /// [`RawEventSource::for_tty`]). `None` when reading from stdin.
+    _tty_file: Option<std::fs::File>,
 }
 
 impl Default for RawEventSource {
@@ -148,23 +160,56 @@ impl Default for RawEventSource {
 }
 
 impl RawEventSource {
+    /// Reads from fd 0 (stdin), the normal case.
     pub fn new() -> Self {
         Self {
             buf: Vec::with_capacity(4096),
             pos: 0,
+            fd: libc::STDIN_FILENO,
+            _tty_file: None,
         }
     }
 
-    /// Fill the internal buffer from stdin with the given poll timeout (ms).
-    /// Use `timeout_ms = 16` for the blocking next-event path and `timeout_ms = 0`
-    /// for the non-blocking try-next-event path.
+    /// Reads from a reopened `/dev/tty` instead of stdin. Used in pager mode,
+    /// where fd 0 is consumed by piped content (`git diff | mantis`) so
+    /// keyboard input must come from the controlling terminal instead — the
+    /// standard pager trick (`less` does the same). Falls back to stdin if
+    /// `/dev/tty` cannot be opened (e.g. no controlling terminal).
+    pub fn for_tty() -> Self {
+        Self::from_tty_opener(|| {
+            std::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open("/dev/tty")
+        })
+    }
+
+    /// Testable core of `for_tty`: takes the `/dev/tty` open as an injectable
+    /// closure so the fallback path can be exercised without a real terminal.
+    fn from_tty_opener(open: impl FnOnce() -> io::Result<std::fs::File>) -> Self {
+        use std::os::unix::io::AsRawFd;
+        match open() {
+            Ok(file) => Self {
+                buf: Vec::with_capacity(4096),
+                pos: 0,
+                fd: file.as_raw_fd(),
+                _tty_file: Some(file),
+            },
+            Err(_) => Self::new(),
+        }
+    }
+
+    /// Fill the internal buffer from the source fd with the given poll
+    /// timeout (ms). Use `timeout_ms = 16` for the blocking next-event path
+    /// and `timeout_ms = 0` for the non-blocking try-next-event path.
     fn fill(&mut self, timeout_ms: libc::c_int) -> io::Result<()> {
         // Discard already-consumed bytes.
         if self.pos > 0 {
             self.buf.drain(..self.pos);
             self.pos = 0;
         }
-        self.fill_with(&mut StdinReader, timeout_ms)
+        let mut reader = StdinReader { fd: self.fd };
+        self.fill_with(&mut reader, timeout_ms)
     }
 
     /// Read from `reader` until no more data is available, using a

@@ -50,6 +50,7 @@ mod key_handlers;
 mod loader;
 mod mouse_handlers;
 mod navigation;
+mod pager;
 mod plugin_ops;
 mod refresh;
 mod types;

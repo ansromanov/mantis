@@ -328,7 +328,13 @@ fn run_app_builds_and_runs_to_quit() {
     let backend = TestBackend::new(80, 30);
     let mut terminal = ratatui::Terminal::new(backend).unwrap();
     let mut events = ScriptedEvents::new(vec![key_event('q')]);
-    run_app(&mut terminal, dir.clone(), None, &mut events).unwrap();
+    run_app(
+        &mut terminal,
+        dir.clone(),
+        InitialContent::None,
+        &mut events,
+    )
+    .unwrap();
     fs::remove_dir_all(&dir).ok();
 }
 
@@ -345,7 +351,13 @@ fn run_app_opens_and_reveals_file() {
         KeyCode::Char('c'),
         KeyModifiers::CONTROL,
     ))]);
-    run_app(&mut terminal, dir.clone(), Some(file_path), &mut events).unwrap();
+    run_app(
+        &mut terminal,
+        dir.clone(),
+        InitialContent::File(file_path),
+        &mut events,
+    )
+    .unwrap();
     fs::remove_dir_all(&dir).ok();
 }
 
@@ -358,7 +370,13 @@ fn run_app_surfaces_config_error_without_failing() {
     let mut terminal = ratatui::Terminal::new(backend).unwrap();
     let mut events = ScriptedEvents::new(vec![key_event('q')]);
     // A bad config is reported (to stderr) but must not abort the run.
-    run_app(&mut terminal, dir.clone(), None, &mut events).unwrap();
+    run_app(
+        &mut terminal,
+        dir.clone(),
+        InitialContent::None,
+        &mut events,
+    )
+    .unwrap();
     fs::remove_dir_all(&dir).ok();
 }
 
@@ -400,32 +418,32 @@ fn crossterm_events_polls_without_panicking() {
 
 #[test]
 fn plan_startup_help_returns_print() {
-    let startup = plan_startup(Some(PathBuf::from("--help"))).unwrap();
+    let startup = plan_startup(Some(PathBuf::from("--help")), None, false).unwrap();
     match startup {
         Startup::Print(msg) => assert!(msg.contains("Usage: mantis")),
-        Startup::Launch { .. } => panic!("expected Print for --help"),
+        _ => panic!("expected Print for --help"),
     }
 }
 
 #[test]
 fn plan_startup_version_returns_print() {
-    let startup = plan_startup(Some(PathBuf::from("--version"))).unwrap();
+    let startup = plan_startup(Some(PathBuf::from("--version")), None, false).unwrap();
     match startup {
         Startup::Print(msg) => assert!(msg.starts_with('v')),
-        Startup::Launch { .. } => panic!("expected Print for --version"),
+        _ => panic!("expected Print for --version"),
     }
 }
 
 #[test]
 fn plan_startup_directory_returns_launch() {
     let dir = temp_dir();
-    let startup = plan_startup(Some(dir.clone())).unwrap();
+    let startup = plan_startup(Some(dir.clone()), None, false).unwrap();
     match startup {
         Startup::Launch { root, file } => {
             assert_eq!(root, dir);
             assert!(file.is_none());
         }
-        Startup::Print(_) => panic!("expected Launch for a directory"),
+        _ => panic!("expected Launch for a directory"),
     }
     fs::remove_dir_all(&dir).ok();
 }
@@ -436,13 +454,13 @@ fn plan_startup_file_returns_launch_with_file() {
     let file_path = dir.join("a.txt");
     fs::write(&file_path, "hello\n").unwrap();
     let canonical = file_path.canonicalize().unwrap();
-    let startup = plan_startup(Some(canonical.clone())).unwrap();
+    let startup = plan_startup(Some(canonical.clone()), None, false).unwrap();
     match startup {
         Startup::Launch { root, file } => {
             assert_eq!(root, dir);
             assert_eq!(file, Some(canonical));
         }
-        Startup::Print(_) => panic!("expected Launch for a file"),
+        _ => panic!("expected Launch for a file"),
     }
     fs::remove_dir_all(&dir).ok();
 }
@@ -450,7 +468,68 @@ fn plan_startup_file_returns_launch_with_file() {
 #[test]
 fn plan_startup_missing_path_errors() {
     let missing = std::env::temp_dir().join("tv_plan_missing_xyz_98765");
-    assert!(plan_startup(Some(missing)).is_err());
+    assert!(plan_startup(Some(missing), None, false).is_err());
+}
+
+#[test]
+fn plan_startup_piped_stdin_with_no_path_returns_pager() {
+    let startup = plan_startup(None, Some("rust".to_string()), true).unwrap();
+    match startup {
+        Startup::Pager { root, language } => {
+            assert_eq!(root, PathBuf::from(".").canonicalize().unwrap());
+            assert_eq!(language.as_deref(), Some("rust"));
+        }
+        _ => panic!("expected Pager when stdin is piped and no path is given"),
+    }
+}
+
+#[test]
+fn plan_startup_piped_stdin_with_flag_arg_returns_pager() {
+    // A flag-like first arg (e.g. `mantis --language rust < file`) must not be
+    // mistaken for a path argument.
+    let startup = plan_startup(Some(PathBuf::from("--language")), None, true).unwrap();
+    assert!(matches!(startup, Startup::Pager { .. }));
+}
+
+#[test]
+fn plan_startup_piped_stdin_with_real_path_returns_launch() {
+    // An explicit path argument takes precedence over piped stdin.
+    let dir = temp_dir();
+    let startup = plan_startup(Some(dir.clone()), None, true).unwrap();
+    assert!(matches!(startup, Startup::Launch { .. }));
+    fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn plan_startup_no_path_without_piped_stdin_returns_launch() {
+    let startup = plan_startup(None, None, false).unwrap();
+    match startup {
+        Startup::Launch { root, file } => {
+            assert_eq!(root, PathBuf::from(".").canonicalize().unwrap());
+            assert!(file.is_none());
+        }
+        _ => panic!("expected Launch when stdin is a tty"),
+    }
+}
+
+#[test]
+fn parse_language_flag_from_reads_separate_and_equals_forms() {
+    let sep = parse_language_flag_from(
+        ["program", "--language", "rust"]
+            .into_iter()
+            .map(String::from),
+    );
+    assert_eq!(sep.as_deref(), Some("rust"));
+
+    let eq = parse_language_flag_from(
+        ["program", "--language=python"]
+            .into_iter()
+            .map(String::from),
+    );
+    assert_eq!(eq.as_deref(), Some("python"));
+
+    let none = parse_language_flag_from(["program"].into_iter().map(String::from));
+    assert!(none.is_none());
 }
 
 #[test]
