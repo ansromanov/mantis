@@ -1,4 +1,4 @@
-version = "0.13.15"
+version = "0.13.16"
 date = "2026-07-05"
 whats_new = """- fix: add readable light-theme presets to markdown plugin (#526)
 - fix: goto-line places the cursor on the target line (#527)
