@@ -109,8 +109,24 @@ impl KeyBinding {
         } else {
             key.code
         };
+        // On Windows, crossterm derives the reported char's case from
+        // `shift_pressed XOR capslock_on` (see crossterm's
+        // `event::sys::windows::parse`), so with CapsLock on, an unshifted
+        // letter arrives uppercase even though the `SHIFT` modifier bit is
+        // `false`. Re-derive the case from that modifier bit alone so
+        // bindings keep matching regardless of CapsLock state.
         #[cfg(not(unix))]
-        let event_code = key.code;
+        let event_code = match key.code {
+            KeyCode::Char(c) if c.is_ascii_alphabetic() => {
+                let shift = key.modifiers.contains(KeyModifiers::SHIFT);
+                KeyCode::Char(if shift {
+                    c.to_ascii_uppercase()
+                } else {
+                    c.to_ascii_lowercase()
+                })
+            }
+            other => other,
+        };
 
         event_code == self.code
             && key.modifiers.contains(KeyModifiers::CONTROL) == self.ctrl
