@@ -546,6 +546,46 @@ fn help_scroll_down_reveals_later_sections() {
     );
 }
 
+/// Sync-strategy guard (#304): every `HELP_DOC_LINKS` entry must point at a
+/// `docs/src/*.md` file that actually exists, so a rename/deletion in the
+/// mdbook is caught here instead of silently leaving a dangling in-app link.
+#[test]
+fn help_doc_links_point_to_existing_files() {
+    use crate::ui::popups::help::{HELP_DOC_LINKS, HELP_TABS};
+
+    assert_eq!(
+        HELP_DOC_LINKS.len(),
+        HELP_TABS.len(),
+        "HELP_DOC_LINKS must have one entry per HELP_TABS tab"
+    );
+
+    let docs_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("docs/src");
+    for &doc_file in HELP_DOC_LINKS {
+        let path = docs_dir.join(doc_file);
+        assert!(
+            path.exists(),
+            "HELP_DOC_LINKS references '{doc_file}' which does not exist at {}",
+            path.display()
+        );
+    }
+}
+
+/// Each tab renders its "Full docs" footer pointing at the mapped file.
+#[test]
+fn help_shows_full_docs_footer() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    let backend = TestBackend::new(120, 200);
+    let mut terminal = Terminal::new(backend).unwrap();
+    app.help_tab = 4; // Git tab
+    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
+    let joined = buffer_rows(&terminal).join("\n");
+    assert!(
+        joined.contains("Full docs:") && joined.contains("docs/src/git.md"),
+        "Git tab must show a 'Full docs' footer pointing at docs/src/git.md, got:\n{joined}"
+    );
+}
+
 /// Guards `GIT_KEYMAP_ENTRIES` against drifting from the canonical action
 /// registry - the module doc comment on `help.rs` promises this is enforced.
 #[test]
