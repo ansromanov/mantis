@@ -19,7 +19,7 @@ use ratatui::{
 use crate::app::App;
 
 mod content;
-mod popups;
+pub(crate) mod popups;
 mod statusbar;
 pub mod tree;
 

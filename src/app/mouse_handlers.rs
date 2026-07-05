@@ -104,6 +104,32 @@ impl App {
                 MouseEventKind::ScrollUp => {
                     self.help_scroll = self.help_scroll.saturating_sub(WHEEL_STEP);
                 }
+                MouseEventKind::Down(MouseButton::Left) => {
+                    if !rect_contains(self.help_area, ev.column, ev.row) {
+                        self.show_help = false;
+                        self.help_scroll = 0;
+                        self.help_tab = 0;
+                        return;
+                    }
+                    if ev.row == self.help_area.y + 1 && ev.column > self.help_area.x {
+                        let available_width = self.help_area.width.saturating_sub(2);
+                        let offset = crate::ui::popups::help_tab_scroll_offset(
+                            self.help_tab,
+                            available_width,
+                        );
+                        let content_col = (ev.column - (self.help_area.x + 1)) + offset;
+                        let ranges = crate::ui::popups::help_tab_ranges(0);
+                        for (i, (start, end)) in ranges.iter().enumerate() {
+                            if content_col >= *start && content_col < *end {
+                                if self.help_tab != i {
+                                    self.help_tab = i;
+                                    self.help_scroll = 0;
+                                }
+                                return;
+                            }
+                        }
+                    }
+                }
                 _ => {}
             }
             return;

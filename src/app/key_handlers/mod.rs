@@ -83,6 +83,7 @@ impl App {
             if static_keys::is_modal_close(&key) {
                 self.show_help = false;
                 self.help_scroll = 0;
+                self.help_tab = 0;
             } else {
                 match key.code {
                     KeyCode::Up | KeyCode::Char('k') => {
@@ -102,6 +103,18 @@ impl App {
                     }
                     KeyCode::End | KeyCode::Char('G') => {
                         self.help_scroll = usize::MAX;
+                    }
+                    KeyCode::Right | KeyCode::Char('l') | KeyCode::Tab => {
+                        self.help_tab = (self.help_tab + 1) % crate::ui::popups::HELP_TABS.len();
+                        self.help_scroll = 0;
+                    }
+                    KeyCode::Left | KeyCode::Char('h') | KeyCode::BackTab => {
+                        self.help_tab = if self.help_tab == 0 {
+                            crate::ui::popups::HELP_TABS.len() - 1
+                        } else {
+                            self.help_tab - 1
+                        };
+                        self.help_scroll = 0;
                     }
                     _ => {}
                 }

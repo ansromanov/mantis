@@ -140,6 +140,8 @@ impl App {
             tree_width: cfg.tree.width,
             show_help: false,
             help_scroll: 0,
+            help_tab: 0,
+            help_area: ratatui::layout::Rect::default(),
             should_quit: false,
             theme,
             git_status_enabled,

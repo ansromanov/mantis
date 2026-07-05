@@ -147,6 +147,8 @@ pub struct App {
     pub tree_width: u16,
     pub show_help: bool,
     pub help_scroll: usize,
+    pub help_tab: usize,
+    pub help_area: ratatui::layout::Rect,
     pub should_quit: bool,
     pub theme: Theme,
     pub git_status_enabled: bool,
