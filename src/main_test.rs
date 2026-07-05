@@ -333,6 +333,7 @@ fn run_app_builds_and_runs_to_quit() {
         dir.clone(),
         InitialContent::None,
         &mut events,
+        true,
     )
     .unwrap();
     fs::remove_dir_all(&dir).ok();
@@ -356,6 +357,7 @@ fn run_app_opens_and_reveals_file() {
         dir.clone(),
         InitialContent::File(file_path),
         &mut events,
+        true,
     )
     .unwrap();
     fs::remove_dir_all(&dir).ok();
@@ -375,6 +377,7 @@ fn run_app_surfaces_config_error_without_failing() {
         dir.clone(),
         InitialContent::None,
         &mut events,
+        true,
     )
     .unwrap();
     fs::remove_dir_all(&dir).ok();

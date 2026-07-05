@@ -13,7 +13,17 @@
 //! Default single-letter shortcuts are scoped to the tree panel so the
 //! content pane's letter keyspace stays free for future editing features;
 //! user configs may still bind unscoped letters explicitly.
-//! The `matches` method on `KeyBinding` handles the kitty keyboard protocol's
+//! On terminals without the kitty keyboard protocol (legacy: macOS Terminal.app,
+//! plain xterm, SSH), `Ctrl+Letter` and `Ctrl+Shift+Letter` produce the same
+//! event — the terminal can't distinguish them. `KeyBinding::matches` handles
+//! this by falling back to case-insensitive comparison for Ctrl+letter bindings
+//! when no alternate keys are reported. The dispatch order in the key handlers
+//! then gives priority to the non-shift (plain-Ctrl) action, which is the
+//! correct degradation: `Ctrl+G` silently degrades to `Ctrl+g` (goto_line wins
+//! over git_mode_toggle). Affected actions are still reachable through the
+//! command palette (`Ctrl+Shift+P`). The `keyboard_enhanced` field on `App`
+//! records whether the running terminal supports this protocol.
+//! The `matches` method also handles the kitty keyboard protocol's
 //! alternate-key reporting for layout-independent matching.
 //!
 //! `bindings_for_action`/`label_for_action`/`labels_for_action` accept only
@@ -103,6 +113,23 @@ impl KeyBinding {
                 KeyCode::Char(if shift { us_shifted(b) } else { b })
             } else if let Some(s) = alt.shifted {
                 KeyCode::Char(s)
+            } else if self.ctrl {
+                // Legacy terminal: no alternate keys. Ctrl+letter and
+                // Ctrl+Shift+letter both produce the same event on terminals
+                // without keyboard enhancement (macOS Terminal.app, xterm,
+                // SSH). Only uppercase (shift-variant) bindings are expanded
+                // to match the lowercase event — lowercase bindings never
+                // expand to match uppercase events, preserving correct
+                // behavior on enhanced terminals where the protocol reports
+                // case accurately.
+                match (self.code, key.code) {
+                    (KeyCode::Char(bc), KeyCode::Char(ec))
+                        if bc.is_ascii_uppercase() && bc.eq_ignore_ascii_case(&ec) =>
+                    {
+                        self.code
+                    }
+                    _ => key.code,
+                }
             } else {
                 key.code
             }
