@@ -1,4 +1,4 @@
-version = "0.15.1"
+version = "0.15.2"
 date = "2026-07-05"
 whats_new = """- chore: release v0.14.0 [skip ci]
 - fix: address PR #551 review comments, delay auto-merge for review (#554)
