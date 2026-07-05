@@ -246,6 +246,47 @@ fn active_line_moves_with_down_key() {
     fs::remove_dir_all(&root).ok();
 }
 
+#[test]
+fn selection_highlight_survives_on_active_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    // Mouse drag on the active line: anchor and active both on line 0, which
+    // is also the cursor line (active_line = 0 after open).
+    app.selection = Some(crate::selection::TextSelection {
+        anchor: (0, 0),
+        active: (0, 6),
+    });
+    let sel_bg = app.theme.selection_bg;
+    let cells = cells_with_bg(&mut app, sel_bg);
+    assert!(
+        !cells.is_empty(),
+        "selection on the active line must render with selection_bg, \
+         not be clobbered by the active-line highlight"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn active_line_highlight_returns_when_selection_elsewhere() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    // Cursor on line 2; a lingering selection on line 5 only.
+    app.handle_key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::empty()));
+    app.selection = Some(crate::selection::TextSelection {
+        anchor: (5, 0),
+        active: (5, 4),
+    });
+    assert!(
+        renders_active_line_highlight(&mut app),
+        "active-line highlight must still paint when the selection does not cover it"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
 /// Renders `draw_content` and returns the flattened text of the buffer.
 fn render_to_string(app: &mut App) -> String {
     let backend = TestBackend::new(80, 24);

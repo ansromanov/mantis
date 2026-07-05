@@ -356,9 +356,17 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     if app.has_text_cursor() && !app.diff_sbs_active() {
         let active_bg = app.theme.active_line_bg;
         let content_w = inner.width.saturating_sub(ln_width as u16) as usize;
+        // Selection takes visual precedence: when it covers the active line
+        // (always true mid-drag, since the drag anchor sets the cursor), skip
+        // the row background so the selection_bg stays visible. The gutter
+        // caret below still paints — the gutter is never part of a selection.
+        let sel_covers_active = sel.is_some_and(|(start, end)| {
+            let active_physical = app.display_to_physical(app.active_line);
+            start != end && (start.0..=end.0).contains(&active_physical)
+        });
         for (j, line) in content_lines.iter_mut().enumerate() {
             let display_line = visual_to_display.get(j).copied().unwrap_or(0);
-            if scroll + display_line != app.active_line {
+            if sel_covers_active || scroll + display_line != app.active_line {
                 continue;
             }
             // Full-width content highlight
