@@ -224,3 +224,7 @@ pub(crate) fn emphasize(
     }
     spans
 }
+
+#[cfg(test)]
+#[path = "diff_test.rs"]
+mod tests;

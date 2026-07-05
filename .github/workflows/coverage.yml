@@ -1,10 +1,13 @@
 name: Coverage
 
-# On-demand coverage run. Coverage uses an instrumented rebuild that roughly
-# doubles compile time, so it is kept out of the PR and merge paths and run
-# manually instead.
+# On-demand + monthly coverage run. Coverage uses an instrumented rebuild that
+# roughly doubles compile time, so it is kept out of the PR and merge paths.
+# The monthly schedule gives a recurring drift signal without anyone needing
+# to remember to trigger it by hand.
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "0 6 1 * *"
 
 env:
   CARGO_TERM_COLOR: always

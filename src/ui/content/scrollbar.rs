@@ -69,3 +69,7 @@ pub(crate) fn draw_content_scrollbar(
         },
     );
 }
+
+#[cfg(test)]
+#[path = "scrollbar_test.rs"]
+mod tests;

@@ -6,8 +6,9 @@
 //! transient scrollbar overlay), `search` (in-file match highlighting), and
 //! `selection` (text-selection highlighting) - and re-exports `draw_content` for
 //! the UI orchestrator to call. Keep rendering logic in the submodules; this
-//! file only declares them and exposes the single entry point, with co-located
-//! tests in `content_test.rs`.
+//! file only declares them and exposes the single entry point. Cross-cutting
+//! `draw_content` smoke tests live in `content_test.rs`; each submodule has its
+//! own sibling `_test.rs` for its unit-level behavior.
 
 mod diff;
 mod draw;

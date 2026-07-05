@@ -116,3 +116,7 @@ pub(crate) fn draw_about(f: &mut Frame, app: &App, area: Rect) {
 
     f.render_widget(Paragraph::new(rows), inner);
 }
+
+#[cfg(test)]
+#[path = "about_test.rs"]
+mod tests;

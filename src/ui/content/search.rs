@@ -91,3 +91,7 @@ pub(crate) fn apply_search_to_regions(
     }
     result
 }
+
+#[cfg(test)]
+#[path = "search_test.rs"]
+mod tests;
