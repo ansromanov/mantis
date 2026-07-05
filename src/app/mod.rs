@@ -336,6 +336,10 @@ pub struct App {
     session_dirty_at: Option<std::time::Instant>,
     /// Last time the session cache was flushed to disk.
     session_last_save: std::time::Instant,
+    /// Texts captured by `copy_to_clipboard` under test, in call order. Tests
+    /// assert against this instead of the real system clipboard.
+    #[cfg(test)]
+    pub(crate) clipboard_capture: Vec<String>,
 }
 
 impl App {
@@ -464,10 +468,24 @@ impl App {
         if text.is_empty() {
             return;
         }
-        match arboard::Clipboard::new().and_then(|mut cb| cb.set_text(text)) {
+        match self.clipboard_set(text) {
             Ok(()) => self.set_status(format!("copied {label}")),
             Err(e) => self.set_status(format!("clipboard error: {e}")),
         }
+    }
+
+    /// Writes `text` to the system clipboard.
+    #[cfg(not(test))]
+    fn clipboard_set(&mut self, text: String) -> Result<(), arboard::Error> {
+        arboard::Clipboard::new().and_then(|mut cb| cb.set_text(text))
+    }
+
+    /// Test double: captures `text` in `clipboard_capture` so `cargo test`
+    /// never touches (or races on) the real system clipboard.
+    #[cfg(test)]
+    fn clipboard_set(&mut self, text: String) -> Result<(), arboard::Error> {
+        self.clipboard_capture.push(text);
+        Ok(())
     }
 
     /// Returns the set of changed file paths (not directories) when in git mode,

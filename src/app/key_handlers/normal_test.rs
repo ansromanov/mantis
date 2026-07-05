@@ -548,11 +548,10 @@ fn copy_path_directory_from_tree_absolute() {
     app.focus = Focus::Tree;
     let dir_path = app.nodes[0].path.clone();
     app.copy_path_to_clipboard(false);
-    let Ok(mut cb) = arboard::Clipboard::new() else {
-        return;
-    };
-    let Ok(text) = cb.get_text() else { return };
-    assert_eq!(text, dir_path.display().to_string());
+    assert_eq!(
+        app.clipboard_capture.last().map(String::as_str),
+        Some(dir_path.display().to_string().as_str())
+    );
     fs::remove_dir_all(&root).ok();
 }
 
@@ -568,11 +567,10 @@ fn copy_path_directory_from_tree_relative() {
         .display()
         .to_string();
     app.copy_path_to_clipboard(true);
-    let Ok(mut cb) = arboard::Clipboard::new() else {
-        return;
-    };
-    let Ok(text) = cb.get_text() else { return };
-    assert_eq!(text, rel);
+    assert_eq!(
+        app.clipboard_capture.last().map(String::as_str),
+        Some(rel.as_str())
+    );
     fs::remove_dir_all(&root).ok();
 }
 
@@ -583,11 +581,10 @@ fn copy_path_file_from_content_still_works() {
     app.open_file(&root.join("long.txt"));
     app.focus = Focus::Content;
     app.copy_path_to_clipboard(false);
-    let Ok(mut cb) = arboard::Clipboard::new() else {
-        return;
-    };
-    let Ok(text) = cb.get_text() else { return };
-    assert_eq!(text, root.join("long.txt").display().to_string());
+    assert_eq!(
+        app.clipboard_capture.last().map(String::as_str),
+        Some(root.join("long.txt").display().to_string().as_str())
+    );
     fs::remove_dir_all(&root).ok();
 }
 
@@ -598,11 +595,10 @@ fn copy_path_file_from_content_relative() {
     app.open_file(&root.join("long.txt"));
     app.focus = Focus::Content;
     app.copy_path_to_clipboard(true);
-    let Ok(mut cb) = arboard::Clipboard::new() else {
-        return;
-    };
-    let Ok(text) = cb.get_text() else { return };
-    assert_eq!(text, "long.txt");
+    assert_eq!(
+        app.clipboard_capture.last().map(String::as_str),
+        Some("long.txt")
+    );
     fs::remove_dir_all(&root).ok();
 }
 
