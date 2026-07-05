@@ -442,3 +442,59 @@ fn old_palette_aliases_no_longer_resolve() {
         );
     }
 }
+
+// ---- legacy [keys] action renames (#553) -----------------------------------
+
+#[test]
+fn legacy_yaml_fold_toggle_folds_into_fold_toggle() {
+    let toml_str = "yaml_fold_toggle = [\"space\"]\n";
+    let mut keymap: Keymap = toml::from_str(toml_str).unwrap();
+    keymap.migrate_legacy_keys();
+    assert!(pressed(
+        &keymap.fold_toggle,
+        &ev(KeyCode::Char(' '), KeyModifiers::NONE)
+    ));
+    assert!(keymap.legacy_yaml_fold_toggle.is_none());
+}
+
+#[test]
+fn legacy_visual_line_blame_folds_into_blame_line() {
+    let toml_str = "visual_line_blame = [\"b\"]\n";
+    let mut keymap: Keymap = toml::from_str(toml_str).unwrap();
+    keymap.migrate_legacy_keys();
+    assert!(pressed(
+        &keymap.blame_line,
+        &ev(KeyCode::Char('b'), KeyModifiers::NONE)
+    ));
+    assert!(keymap.legacy_visual_line_blame.is_none());
+}
+
+#[test]
+fn legacy_key_wins_when_both_old_and_new_present() {
+    let toml_str = "yaml_fold_toggle = [\"b\"]\nfold_toggle = [\"space\"]\n";
+    let mut keymap: Keymap = toml::from_str(toml_str).unwrap();
+    keymap.migrate_legacy_keys();
+    assert!(pressed(
+        &keymap.fold_toggle,
+        &ev(KeyCode::Char('b'), KeyModifiers::NONE)
+    ));
+    assert!(!pressed(
+        &keymap.fold_toggle,
+        &ev(KeyCode::Char(' '), KeyModifiers::NONE)
+    ));
+}
+
+#[test]
+fn removed_keymap_actions_parse_without_error_and_bind_nothing() {
+    let toml_str = "toggle_raw_markdown = [\"M\"]\nvisual_line_toggle = [\"V\"]\n";
+    let mut keymap: Keymap = toml::from_str(toml_str).unwrap();
+    keymap.migrate_legacy_keys();
+    assert!(!pressed(
+        &keymap.fold_toggle,
+        &ev(KeyCode::Char('M'), KeyModifiers::NONE)
+    ));
+    assert!(!pressed(
+        &keymap.blame_line,
+        &ev(KeyCode::Char('V'), KeyModifiers::NONE)
+    ));
+}
