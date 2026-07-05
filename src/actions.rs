@@ -236,6 +236,11 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Toggle fold at cursor"),
         help: Some(("Content panel", "toggle fold at cursor")),
     },
+    ActionSpec {
+        id: "toggle_raw_markdown",
+        palette: Some("Toggle markdown render (markdown plugin)"),
+        help: Some(("Content panel", "toggle markdown render (md files)")),
+    },
     // -- Bound actions with no keymap-section help row -------------------
     // (either purely a Git-section row, sourced from these same ids with
     // git-specific phrasing, or currently undocumented in the help overlay —

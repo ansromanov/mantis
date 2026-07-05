@@ -248,6 +248,7 @@ impl Keymap {
             "copy_relative_path" => &self.copy_relative_path,
             "plugin_picker" => &self.plugin_picker,
             "goto_line" => &self.goto_line,
+            "toggle_raw_markdown" => &self.toggle_raw_markdown,
             "tree_up_dir" => &self.tree_up_dir,
             _ => &[],
         }
@@ -342,6 +343,7 @@ pub struct Keymap {
     pub copy_relative_path: Vec<KeyBinding>,
     pub plugin_picker: Vec<KeyBinding>,
     pub goto_line: Vec<KeyBinding>,
+    pub toggle_raw_markdown: Vec<KeyBinding>,
     pub tree_up_dir: Vec<KeyBinding>,
 
     // --- deprecated/renamed action keys (read for backward-compat; never written) ---
@@ -407,6 +409,7 @@ impl Default for Keymap {
             copy_relative_path: bind(&["tree:Y"]),
             plugin_picker: bind(&["tree:p"]),
             goto_line: bind(&["ctrl+g"]),
+            toggle_raw_markdown: bind(&["M"]),
             tree_up_dir: bind(&["Backspace"]),
             legacy_yaml_fold_toggle: None,
             legacy_visual_line_blame: None,

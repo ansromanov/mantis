@@ -257,6 +257,20 @@ impl App {
                 }
                 true
             }
+            Some("toggle_raw_markdown") => {
+                if self.plugin_content_active {
+                    let key = crossterm::event::KeyEvent::new(
+                        crossterm::event::KeyCode::Char('M'),
+                        crossterm::event::KeyModifiers::SHIFT,
+                    );
+                    self.plugin_manager.on_keypress(&key);
+                } else {
+                    self.set_status(
+                        "markdown render toggle: not available (current file not plugin-rendered)",
+                    );
+                }
+                true
+            }
             _ => false,
         }
     }

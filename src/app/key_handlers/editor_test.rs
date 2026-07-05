@@ -536,3 +536,26 @@ fn dispatch_command_find_files_opens_file_picker() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn dispatch_command_toggle_raw_markdown() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+
+    // When plugin_content_active is false, it should show a status message
+    app.command_palette = Some(palette_with_query("Toggle markdown render"));
+    assert!(app.dispatch_command());
+    assert!(app
+        .status_message
+        .as_ref()
+        .unwrap()
+        .text
+        .contains("not available"));
+
+    // When plugin_content_active is true, it should run successfully (returns true)
+    app.plugin_content_active = true;
+    app.command_palette = Some(palette_with_query("Toggle markdown render"));
+    assert!(app.dispatch_command());
+
+    fs::remove_dir_all(&root).ok();
+}

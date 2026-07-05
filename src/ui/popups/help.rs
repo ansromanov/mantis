@@ -350,6 +350,7 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
                 "toggle_pretty_json",
                 "toggle pretty-print for JSON files",
             ));
+            rows.push(row_key("toggle_raw_markdown"));
             rows.push(gap.clone());
             rows.push(section("Clipboard Operations"));
             rows.push(row_key("copy_path"));
