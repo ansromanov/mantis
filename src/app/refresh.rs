@@ -262,9 +262,9 @@ impl App {
             self.pending_keypress = None;
             self.pending_keypress_handled = false;
         } else if deadline <= self.now() {
-            // unwrap: presence just confirmed by the `let Some` above.
-            let key = self.pending_keypress.take().unwrap().key;
-            self.handle_normal_key(key);
+            if let Some(pending) = self.pending_keypress.take() {
+                self.handle_normal_key(pending.key);
+            }
         }
     }
 
@@ -338,7 +338,9 @@ impl App {
     /// falling through to normal-mode handling. A reply that arrives with no
     /// keypress pending (e.g. a stray or duplicate reply) is a harmless noop.
     fn handle_plugin_key_handled(&mut self, params: &serde_json::Value) {
-        if params.get("handled").and_then(|v| v.as_bool()) == Some(true) {
+        if self.pending_keypress.is_some()
+            && params.get("handled").and_then(|v| v.as_bool()) == Some(true)
+        {
             self.pending_keypress_handled = true;
         }
     }

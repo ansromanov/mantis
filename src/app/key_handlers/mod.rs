@@ -143,6 +143,10 @@ impl App {
         self.preempt_pending_keypress();
         self.plugin_manager.on_keypress(&key);
         if self.plugin_manager.has_keypress_subscriber() {
+            // A stale `key_handled` reply for an already-resolved keypress
+            // (e.g. one that fell through via deadline before the reply
+            // arrived) must not be misread as claiming this new key.
+            self.pending_keypress_handled = false;
             self.pending_keypress = Some(PendingKeypress {
                 key,
                 deadline: self.now() + KEY_CONSUME_TIMEOUT,

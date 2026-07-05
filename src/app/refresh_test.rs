@@ -685,6 +685,13 @@ fn register_language_provider_conflict_sets_plugin_message() {
 #[test]
 fn key_handled_true_sets_pending_keypress_handled() {
     let mut app = create_base_app();
+    app.pending_keypress = Some(crate::app::PendingKeypress {
+        key: crossterm::event::KeyEvent::new(
+            crossterm::event::KeyCode::Down,
+            crossterm::event::KeyModifiers::empty(),
+        ),
+        deadline: app.now() + Duration::from_secs(60),
+    });
     app.pending_keypress_handled = false;
     app.drain_plugin_actions_for_test(
         "kp-plugin",
@@ -712,6 +719,25 @@ fn key_handled_missing_field_does_not_set_pending_keypress_handled() {
     app.pending_keypress_handled = false;
     app.drain_plugin_actions_for_test("kp-plugin", "key_handled", serde_json::json!({}));
     assert!(!app.pending_keypress_handled);
+}
+
+#[test]
+fn stray_key_handled_reply_with_no_pending_keypress_is_ignored() {
+    // A late `key_handled` reply for a keypress that already fell through
+    // via its deadline (no keypress currently pending) must not be latched,
+    // or it would incorrectly swallow whatever keypress gets deferred next.
+    let mut app = create_base_app();
+    app.pending_keypress = None;
+    app.pending_keypress_handled = false;
+    app.drain_plugin_actions_for_test(
+        "kp-plugin",
+        "key_handled",
+        serde_json::json!({"handled": true}),
+    );
+    assert!(
+        !app.pending_keypress_handled,
+        "a stray reply with nothing pending must not set the handled flag"
+    );
 }
 
 #[test]
