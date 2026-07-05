@@ -7,6 +7,9 @@
 //! filesystem watcher is installed (reloading only after events go quiet for
 //! `TREE_RELOAD_DEBOUNCE`, to coalesce bursts), with a periodic timer fallback
 //! when no watcher could be installed so the view never goes permanently stale.
+//! Config-file (`mantis.toml`) changes follow the same debounce before
+//! `handle_config_change` runs, so an editor's atomic save doesn't trigger
+//! more than one reload.
 //!
 //! `tick` also resolves any `pending_keypress` (protocol 3+ `on_keypress` key
 //! consumption): once a `key_handled` reply arrives or the deadline passes,
@@ -35,7 +38,8 @@ impl App {
         self.drain_plugin_actions();
         self.process_pending_keypress();
         if self.drain_config_watch() {
-            self.handle_config_change();
+            self.config_dirty = true;
+            self.config_dirty_at = Some(self.now());
         }
         if self.auto_watch && self.drain_file_watch() {
             self.reload_content();
@@ -63,6 +67,18 @@ impl App {
             .is_some_and(|sm| sm.expired(Self::STATUS_TTL))
         {
             self.status_message = None;
+        }
+        if self.config_dirty {
+            // Wait for the config file to go quiet before reloading so an atomic
+            // save (temp write + rename) produces one reload, not one per event.
+            let quiet = self
+                .config_dirty_at
+                .is_some_and(|t| t.elapsed() >= Self::TREE_RELOAD_DEBOUNCE);
+            if quiet {
+                self.config_dirty = false;
+                self.config_dirty_at = None;
+                self.handle_config_change();
+            }
         }
         if self.tree_dirty {
             // Wait for the tree to go quiet before reloading so a burst of events

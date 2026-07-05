@@ -358,6 +358,8 @@ fn create_base_app() -> App {
         root_watch_rx: None,
         config_watcher: None,
         config_watch_rx: None,
+        config_dirty: false,
+        config_dirty_at: None,
         tree_dirty: false,
         tree_dirty_at: None,
         selection: None,
