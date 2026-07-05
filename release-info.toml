@@ -1,22 +1,8 @@
 version = "0.14.0"
 date = "2026-07-05"
-whats_new = """- feat: enable auto-merge by default on PRs (#549)
-- feat: pager mode — read piped stdin (git diff | mantis) (#547)
-- test: backfill missing sibling _test.rs companions and schedule coverage runs (#548)
-- fix: update main binary tests to editor-style keymap defaults (#545)
-- feat: implement structured tabbed help overlay (#546)
-- fix: stop clipboard tests from writing to the real system clipboard (#544)
-- feat: content search regex / case-sensitive / whole-word toggles (#543)
-- feat: editor-style keymap defaults (VS Code / Sublime conventions) (#542)
-- feat(plugin): implement protocol v3 (#541)
-- refactor: split event_source.rs into module directory (#540)
-- fix: / tree filter cannot find files in collapsed subdirectories (#538)
-- docs: draft plugin protocol v3 (#539)
-- feat: single action registry unifying palette, keymap, and help (#532)
-- fix(markdown-plugin): assign current_file so re-render paths actually run (#537)
-- fix: overwrite stale bundled plugin binaries on upgrade (#536)
-- perf: fix bench slicing bug, O(depth^2) tree walk, per-frame guide scan, per-redraw syntax I/O (#531)
-- fix: disable alternate-scroll mode to stop wheel-up glitch at top (#529)
-- ci: serialize main-branch version-bump pushes (#530)
-- chore: bump Homebrew formula to v0.13.4 [skip ci]"""
+whats_new = """- fix: address PR #551 review comments, delay auto-merge for review (#554)
+- fix: stop warning on pre-refactor config keys (git_mode, renamed keymap actions) (#555)
+- fix: keep selection highlight visible on the active line (#552)
+- fix: skip build_visible deep walk when nothing is expanded (#551)
+- chore: bump Homebrew formula to v0.14.0 [skip ci]"""
 release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.14.0"
