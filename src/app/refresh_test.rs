@@ -375,6 +375,9 @@ fn create_base_app() -> App {
         plugin_manager: PluginManager::new(Vec::new()),
         plugin_is_opening_file: false,
         plugin_message: None,
+        plugin_error: None,
+        pending_keypress: None,
+        pending_keypress_handled: false,
         plugin_contributions: HashMap::new(),
         plugin_content: HashMap::new(),
         plugin_content_text: HashMap::new(),
@@ -629,6 +632,263 @@ fn register_language_provider_overwrites_prior() {
         app.plugin_manager.provider_for("rs", &cap).is_none(),
         "old extension must no longer be registered after re-registration"
     );
+}
+
+#[test]
+fn register_language_provider_parses_priority_and_defaults_to_zero() {
+    let mut app = create_base_app();
+    app.drain_plugin_actions_for_test(
+        "low",
+        "register_language_provider",
+        serde_json::json!({"extensions": ["rs"], "capabilities": ["fold"]}),
+    );
+    app.drain_plugin_actions_for_test(
+        "high",
+        "register_language_provider",
+        serde_json::json!({"extensions": ["rs"], "capabilities": ["fold"], "priority": 10}),
+    );
+    let cap = crate::plugin::Capability::Fold;
+    let winner = app
+        .plugin_manager
+        .provider_for("rs", &cap)
+        .expect("a provider must be found");
+    assert_eq!(
+        winner.plugin_name, "high",
+        "explicit higher priority must win over the default-0 registration"
+    );
+}
+
+#[test]
+fn register_language_provider_conflict_sets_plugin_message() {
+    let mut app = create_base_app();
+    app.drain_plugin_actions_for_test(
+        "first",
+        "register_language_provider",
+        serde_json::json!({"extensions": ["rs"], "capabilities": ["fold"]}),
+    );
+    assert!(app.plugin_message.is_none());
+    app.drain_plugin_actions_for_test(
+        "second",
+        "register_language_provider",
+        serde_json::json!({"extensions": ["rs"], "capabilities": ["fold"]}),
+    );
+    let msg = app
+        .plugin_message
+        .as_ref()
+        .expect("a conflicting registration must set a status-bar warning");
+    assert!(msg.contains("first"));
+    assert!(msg.contains("second"));
+}
+
+// -- protocol 3: key_handled / plugin_error actions ---------------------------
+
+#[test]
+fn key_handled_true_sets_pending_keypress_handled() {
+    let mut app = create_base_app();
+    app.pending_keypress = Some(crate::app::PendingKeypress {
+        key: crossterm::event::KeyEvent::new(
+            crossterm::event::KeyCode::Down,
+            crossterm::event::KeyModifiers::empty(),
+        ),
+        deadline: app.now() + Duration::from_secs(60),
+    });
+    app.pending_keypress_handled = false;
+    app.drain_plugin_actions_for_test(
+        "kp-plugin",
+        "key_handled",
+        serde_json::json!({"handled": true}),
+    );
+    assert!(app.pending_keypress_handled);
+}
+
+#[test]
+fn key_handled_false_does_not_set_pending_keypress_handled() {
+    let mut app = create_base_app();
+    app.pending_keypress_handled = false;
+    app.drain_plugin_actions_for_test(
+        "kp-plugin",
+        "key_handled",
+        serde_json::json!({"handled": false}),
+    );
+    assert!(!app.pending_keypress_handled);
+}
+
+#[test]
+fn key_handled_missing_field_does_not_set_pending_keypress_handled() {
+    let mut app = create_base_app();
+    app.pending_keypress_handled = false;
+    app.drain_plugin_actions_for_test("kp-plugin", "key_handled", serde_json::json!({}));
+    assert!(!app.pending_keypress_handled);
+}
+
+#[test]
+fn stray_key_handled_reply_with_no_pending_keypress_is_ignored() {
+    // A late `key_handled` reply for a keypress that already fell through
+    // via its deadline (no keypress currently pending) must not be latched,
+    // or it would incorrectly swallow whatever keypress gets deferred next.
+    let mut app = create_base_app();
+    app.pending_keypress = None;
+    app.pending_keypress_handled = false;
+    app.drain_plugin_actions_for_test(
+        "kp-plugin",
+        "key_handled",
+        serde_json::json!({"handled": true}),
+    );
+    assert!(
+        !app.pending_keypress_handled,
+        "a stray reply with nothing pending must not set the handled flag"
+    );
+}
+
+#[test]
+fn process_pending_keypress_swallows_key_when_handled() {
+    let mut app = create_base_app();
+    app.tree_selected = 0;
+    app.pending_keypress = Some(crate::app::PendingKeypress {
+        key: crossterm::event::KeyEvent::new(
+            crossterm::event::KeyCode::Down,
+            crossterm::event::KeyModifiers::empty(),
+        ),
+        deadline: app.now() + Duration::from_secs(60),
+    });
+    app.pending_keypress_handled = true;
+
+    app.process_pending_keypress();
+
+    assert!(
+        app.pending_keypress.is_none(),
+        "a handled keypress must be cleared"
+    );
+    assert!(!app.pending_keypress_handled, "the handled flag must reset");
+    assert_eq!(
+        app.tree_selected, 0,
+        "a swallowed key must not run normal-mode handling"
+    );
+}
+
+#[test]
+fn process_pending_keypress_falls_through_after_deadline() {
+    let mut app = create_base_app();
+    app.nodes = vec![
+        crate::tree::TreeNode {
+            path: "/tmp/a".into(),
+            name: "a".into(),
+            depth: 0,
+            is_dir: false,
+            deleted: false,
+        },
+        crate::tree::TreeNode {
+            path: "/tmp/b".into(),
+            name: "b".into(),
+            depth: 0,
+            is_dir: false,
+            deleted: false,
+        },
+    ];
+    app.tree_selected = 0;
+    app.pending_keypress = Some(crate::app::PendingKeypress {
+        key: crossterm::event::KeyEvent::new(
+            crossterm::event::KeyCode::Down,
+            crossterm::event::KeyModifiers::empty(),
+        ),
+        deadline: Instant::now() - Duration::from_millis(1),
+    });
+    app.pending_keypress_handled = false;
+
+    app.process_pending_keypress();
+
+    assert!(
+        app.pending_keypress.is_none(),
+        "an expired pending keypress must be cleared"
+    );
+    assert_eq!(
+        app.tree_selected, 1,
+        "a keypress past its deadline must fall through to normal-mode handling"
+    );
+}
+
+#[test]
+fn process_pending_keypress_noop_when_none_pending() {
+    let mut app = create_base_app();
+    app.pending_keypress = None;
+    app.pending_keypress_handled = false;
+    // Must not panic when there's nothing pending.
+    app.process_pending_keypress();
+    assert!(app.pending_keypress.is_none());
+}
+
+#[test]
+fn preempt_pending_keypress_falls_through_immediately() {
+    let mut app = create_base_app();
+    app.nodes = vec![
+        crate::tree::TreeNode {
+            path: "/tmp/a".into(),
+            name: "a".into(),
+            depth: 0,
+            is_dir: false,
+            deleted: false,
+        },
+        crate::tree::TreeNode {
+            path: "/tmp/b".into(),
+            name: "b".into(),
+            depth: 0,
+            is_dir: false,
+            deleted: false,
+        },
+    ];
+    app.tree_selected = 0;
+    app.pending_keypress = Some(crate::app::PendingKeypress {
+        key: crossterm::event::KeyEvent::new(
+            crossterm::event::KeyCode::Down,
+            crossterm::event::KeyModifiers::empty(),
+        ),
+        // Deadline far in the future: only an explicit preempt resolves this.
+        deadline: app.now() + Duration::from_secs(60),
+    });
+
+    app.preempt_pending_keypress();
+
+    assert!(app.pending_keypress.is_none());
+    assert_eq!(
+        app.tree_selected, 1,
+        "preempting must run normal-mode handling immediately, not wait for the deadline"
+    );
+}
+
+#[test]
+fn plugin_error_action_sets_plugin_error_distinct_from_plugin_message() {
+    let mut app = create_base_app();
+    app.plugin_message = Some("routine message".into());
+    app.drain_plugin_actions_for_test(
+        "noisy-plugin",
+        "plugin_error",
+        serde_json::json!({"message": "failed to parse file", "context": "on_file_open"}),
+    );
+    let err = app
+        .plugin_error
+        .as_ref()
+        .expect("plugin_error action must set app.plugin_error");
+    assert!(err.contains("noisy-plugin"));
+    assert!(err.contains("failed to parse file"));
+    assert!(err.contains("on_file_open"));
+    assert_eq!(
+        app.plugin_message.as_deref(),
+        Some("routine message"),
+        "plugin_error must not be routed through the routine show_message field"
+    );
+}
+
+#[test]
+fn plugin_error_action_without_context_still_sets_message() {
+    let mut app = create_base_app();
+    app.drain_plugin_actions_for_test(
+        "noisy-plugin",
+        "plugin_error",
+        serde_json::json!({"message": "boom"}),
+    );
+    let err = app.plugin_error.as_ref().expect("must be set");
+    assert!(err.contains("boom"));
+    assert!(err.contains("noisy-plugin"));
 }
 
 #[test]

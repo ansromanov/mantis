@@ -11,8 +11,9 @@
 //! On narrow terminals the bar elides low-priority segments so it never
 //! overflows `area.width`. Keybinding hints are dropped first, then plugin
 //! and status messages (`P_META`), then fold stats, badges, and file
-//! info (`P_INFO`), then git info; error indicators and the version string
-//! are always shown.
+//! info (`P_INFO`), then git info; error indicators — including a
+//! `plugin_error` action (protocol 3+, styled distinctly from routine
+//! `show_message` text) — and the version string are always shown.
 
 use ratatui::{
     layout::Rect,
@@ -39,6 +40,7 @@ pub(crate) enum StatusSegment {
     Errors,
     Folds,
     Message,
+    PluginError,
     Version,
 }
 
@@ -55,6 +57,7 @@ impl StatusSegment {
             StatusSegment::Errors => "errors",
             StatusSegment::Folds => "folds",
             StatusSegment::Message => "message",
+            StatusSegment::PluginError => "pluginerror",
             StatusSegment::Version => "version",
         }
     }
@@ -351,6 +354,17 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
             Span::styled(format!(" {}", sm.text), base.fg(app.theme.accent)),
             StatusSegment::Message,
             P_META,
+        ));
+    }
+    // A `plugin_error` action (protocol 3+) is distinct from routine
+    // `show_message` text: it gets error styling and its own (higher)
+    // priority so it survives eliding on narrow terminals alongside the
+    // other error indicators above.
+    if let Some(ref err) = app.plugin_error {
+        segs.push((
+            Span::styled(format!(" {err}"), err_style),
+            StatusSegment::PluginError,
+            P_ERR,
         ));
     }
 

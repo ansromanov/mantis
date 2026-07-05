@@ -44,7 +44,19 @@ fn send_is_noop_when_no_writer() {
         theme: None,
         colors: None,
         protocol_version: None,
+        id: None,
+        method: None,
+        params: None,
     });
+}
+
+#[test]
+fn drain_responses_returns_empty_when_no_reader() {
+    let mut p = Plugin::new("no-reader".into(), vec![]);
+    assert!(
+        p.drain_responses().is_empty(),
+        "no response channel means no responses"
+    );
 }
 
 #[test]
@@ -397,4 +409,176 @@ fn read_capped_line_caps_when_newline_exactly_at_boundary() {
     let mut buf = Vec::new();
     assert!(!read_capped_line(&mut reader, &mut buf, TEST_CAP));
     assert_eq!(buf.len(), TEST_CAP);
+}
+
+// -- protocol 3: response channel -----------------------------------------
+
+#[test]
+#[cfg(unix)]
+fn drain_responses_receives_response_message() {
+    use std::io::Write as _;
+    use std::os::unix::fs::PermissionsExt;
+    use std::time::{Duration, Instant};
+
+    let dir = std::env::temp_dir().join(format!("tv_response_test_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+
+    let script = dir.join("respond.sh");
+    let mut f = std::fs::File::create(&script).unwrap();
+    write!(
+        f,
+        r#"#!/bin/sh
+echo '{{"event":"response","id":7,"result":{{"ok":true}}}}'
+sleep 1
+"#
+    )
+    .unwrap();
+    drop(f);
+    std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+    let mut p = Plugin::new("responder".into(), vec![]);
+    p.spawn(&script).expect("spawn respond.sh");
+
+    let deadline = Instant::now() + Duration::from_secs(3);
+    let responses = loop {
+        let responses = p.drain_responses();
+        if !responses.is_empty() {
+            break responses;
+        }
+        assert!(Instant::now() < deadline, "response never arrived");
+        std::thread::sleep(Duration::from_millis(25));
+    };
+    assert_eq!(responses.len(), 1);
+    assert_eq!(responses[0].0, 7);
+    assert_eq!(
+        responses[0]
+            .1
+            .as_ref()
+            .unwrap()
+            .get("ok")
+            .and_then(|v| v.as_bool()),
+        Some(true)
+    );
+
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+#[cfg(unix)]
+fn drain_responses_receives_error_response() {
+    use std::io::Write as _;
+    use std::os::unix::fs::PermissionsExt;
+    use std::time::{Duration, Instant};
+
+    let dir = std::env::temp_dir().join(format!("tv_response_err_test_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+
+    let script = dir.join("respond.sh");
+    let mut f = std::fs::File::create(&script).unwrap();
+    write!(
+        f,
+        r#"#!/bin/sh
+echo '{{"event":"response","id":3,"error":{{"message":"boom"}}}}'
+sleep 1
+"#
+    )
+    .unwrap();
+    drop(f);
+    std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+    let mut p = Plugin::new("responder-err".into(), vec![]);
+    p.spawn(&script).expect("spawn respond.sh");
+
+    let deadline = Instant::now() + Duration::from_secs(3);
+    let responses = loop {
+        let responses = p.drain_responses();
+        if !responses.is_empty() {
+            break responses;
+        }
+        assert!(Instant::now() < deadline, "response never arrived");
+        std::thread::sleep(Duration::from_millis(25));
+    };
+    assert_eq!(responses[0].0, 3);
+    assert_eq!(responses[0].1.as_ref().unwrap_err(), "boom");
+
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+#[cfg(unix)]
+fn action_and_response_lines_are_routed_to_separate_channels() {
+    use std::io::Write as _;
+    use std::os::unix::fs::PermissionsExt;
+    use std::time::{Duration, Instant};
+
+    let dir = std::env::temp_dir().join(format!("tv_mixed_channel_test_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+
+    let script = dir.join("mixed.sh");
+    let mut f = std::fs::File::create(&script).unwrap();
+    write!(
+        f,
+        r#"#!/bin/sh
+echo '{{"event":"action","action":"show_message","params":{{"message":"hi"}}}}'
+echo '{{"event":"response","id":1,"result":null}}'
+sleep 1
+"#
+    )
+    .unwrap();
+    drop(f);
+    std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+    let mut p = Plugin::new("mixed".into(), vec![]);
+    p.spawn(&script).expect("spawn mixed.sh");
+
+    let deadline = Instant::now() + Duration::from_secs(3);
+    loop {
+        let (actions, _) = p.drain_actions();
+        let responses = p.drain_responses();
+        if !actions.is_empty() && !responses.is_empty() {
+            assert_eq!(actions[0].0, "show_message");
+            assert_eq!(responses[0].0, 1);
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "action and response never both arrived"
+        );
+        std::thread::sleep(Duration::from_millis(25));
+    }
+
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+// -- protocol 3: plugin_error log appending --------------------------------
+
+#[test]
+fn append_plugin_log_line_creates_and_appends() {
+    let dir = std::env::temp_dir().join(format!("tv_append_log_test_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let log_path = dir.join("p.log");
+
+    crate::plugin::process::append_plugin_log_line(&log_path, "[plugin_error] first");
+    crate::plugin::process::append_plugin_log_line(&log_path, "[plugin_error] second");
+
+    let contents = std::fs::read_to_string(&log_path).unwrap();
+    assert!(contents.contains("first"));
+    assert!(contents.contains("second"));
+
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn append_plugin_log_line_ignores_blank_line() {
+    let dir = std::env::temp_dir().join(format!("tv_append_log_blank_test_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let log_path = dir.join("p.log");
+
+    crate::plugin::process::append_plugin_log_line(&log_path, "   ");
+    assert!(
+        !log_path.exists(),
+        "a blank line must not create the log file"
+    );
+
+    std::fs::remove_dir_all(&dir).ok();
 }

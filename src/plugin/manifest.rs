@@ -15,7 +15,7 @@
 //! description = "git diff on open, git log on H"
 //! author = "ansromanov"
 //! entry = "run.sh"
-//! tv_protocol = "2"
+//! mantis_protocol = "3"
 //! platforms = ["linux", "macos"]
 //! events = ["on_file_open", "on_keypress"]
 //! permissions = ["run_git", "read_files"]
@@ -27,9 +27,12 @@
 //! a plugin only receives the events it lists (empty = all events). `permissions`
 //! is advisory-only in this phase and not enforced.
 //!
-//! The `tv_protocol` field is validated against the host's
+//! The `mantis_protocol` field is validated against the host's
 //! [`PROTOCOL_VERSION`] at discovery time. Plugins declaring a mismatched
-//! version are silently skipped to prevent protocol mismatches.
+//! version are silently skipped to prevent protocol mismatches. The field was
+//! named `tv_protocol` through protocol 2; `tv_protocol` is still accepted as
+//! a back-compat alias (see [`PluginManifest::protocol_version`]), and when
+//! both are present `mantis_protocol` wins.
 
 use std::path::{Path, PathBuf};
 
@@ -53,9 +56,17 @@ pub struct PluginManifest {
     pub author: Option<String>,
     /// Executable path relative to the plugin directory.
     pub entry: String,
-    /// Protocol version string (e.g. `"1"`). Indicates which version of the
-    /// tv plugin IPC protocol this plugin expects.
-    pub tv_protocol: String,
+    /// Protocol version string (e.g. `"3"`). Indicates which version of the
+    /// mantis plugin IPC protocol this plugin expects. Current field name
+    /// (protocol 3+); use [`PluginManifest::protocol_version`] to resolve
+    /// this together with the legacy `tv_protocol` alias below.
+    #[serde(default)]
+    pub mantis_protocol: Option<String>,
+    /// Legacy name for [`PluginManifest::mantis_protocol`], accepted for
+    /// back-compat with manifests written against protocol 1/2. Ignored when
+    /// `mantis_protocol` is also present.
+    #[serde(default)]
+    pub tv_protocol: Option<String>,
     /// Optional list of platforms this plugin supports. If absent, all
     /// platforms are assumed. Values use Rust's `std::env::consts::OS`
     /// conventions: `"linux"`, `"macos"`, `"windows"`.
@@ -68,6 +79,17 @@ pub struct PluginManifest {
     /// Permissions this plugin requires (advisory only, not enforced).
     #[serde(default)]
     pub permissions: Option<Vec<String>>,
+}
+
+impl PluginManifest {
+    /// Resolves the effective protocol version, preferring `mantis_protocol`
+    /// over its legacy `tv_protocol` alias when both are present. Returns
+    /// `None` when neither field is set (an invalid manifest).
+    pub fn protocol_version(&self) -> Option<&str> {
+        self.mantis_protocol
+            .as_deref()
+            .or(self.tv_protocol.as_deref())
+    }
 }
 
 /// Loads a `PluginManifest` from the `plugin.toml` file inside `dir`.
@@ -111,7 +133,7 @@ pub fn discover(plugin_dir: &Path) -> Vec<(String, PluginEntry)> {
         if !is_safe_name(&manifest.name) || !is_safe_entry(&manifest.entry) {
             continue;
         }
-        if manifest.tv_protocol != crate::plugin::PROTOCOL_VERSION {
+        if manifest.protocol_version() != Some(crate::plugin::PROTOCOL_VERSION) {
             continue;
         }
         if let Some(ref platforms) = manifest.platforms {

@@ -1,8 +1,20 @@
 //! Plugin subprocess lifecycle: spawn, send, drain, close.
 //!
 //! Each active process plugin gets a `Plugin` struct holding the child process
-//! handle plus background reader (stdout → action channel) and writer (send
-//! queue → stdin) threads.
+//! handle plus background reader (stdout → action/response channels) and
+//! writer (send queue → stdin) threads.
+//!
+//! Protocol 3 adds a `response` message shape (`{"event":"response","id":..}`)
+//! alongside the existing `action` shape on the same stdout stream. The
+//! reader thread dispatches on `event` and routes the two onto **separate**
+//! mpsc channels — `action_rx` (drained by `drain_actions`, unchanged since
+//! protocol 2) and `response_rx` (drained by `drain_responses`, new) — so a
+//! `response` line can never be misrouted into the action-drain path that
+//! `PluginManager::take_actions` consumes, and vice versa.
+//!
+//! [`append_plugin_log_line`] lets the manager append a `plugin_error`
+//! action's message to the same rotating on-disk log that [`drain_stderr`]
+//! writes crash diagnostics to, so both kinds of failure end up in one place.
 
 use std::io::{BufRead, Write};
 use std::path::{Path, PathBuf};
@@ -33,6 +45,10 @@ pub(crate) struct Plugin {
     /// Sends serialised JSON lines to the plugin's stdin via the writer thread.
     write_tx: Option<std::sync::mpsc::SyncSender<String>>,
     action_rx: Option<std::sync::mpsc::Receiver<(String, serde_json::Value)>>,
+    /// Receives `response` messages (protocol 3+), keyed by the `id` the host
+    /// chose when sending the matching `request`. Separate from `action_rx`
+    /// so a `response` line is never misrouted into the action-drain path.
+    response_rx: Option<std::sync::mpsc::Receiver<(u64, Result<serde_json::Value, String>)>>,
     _reader_thread: Option<std::thread::JoinHandle<()>>,
     _writer_thread: Option<std::thread::JoinHandle<()>>,
     _stderr_thread: Option<std::thread::JoinHandle<()>>,
@@ -51,6 +67,7 @@ impl Plugin {
             child: None,
             write_tx: None,
             action_rx: None,
+            response_rx: None,
             _reader_thread: None,
             _writer_thread: None,
             _stderr_thread: None,
@@ -78,6 +95,19 @@ impl Plugin {
         self.subscribed_events.is_empty() || self.subscribed_events.iter().any(|e| e == event)
     }
 
+    /// Returns `true` only if this plugin *explicitly* listed `on_keypress`
+    /// in its manifest `events`. Unlike `subscribes_to`, an empty/absent
+    /// `events` list does NOT count here: that back-compat wildcard means
+    /// "deliver every event to me," not "I want to gate key handling." Most
+    /// plugins (e.g. bundled `iconize`/`markdown`) never set `events` and
+    /// have no opinion on keys at all — treating them as key-consumption
+    /// candidates would silently delay every keystroke in the host by up to
+    /// `KEY_CONSUME_TIMEOUT` for a plugin that will never reply
+    /// `key_handled`. Only a plugin that opts in by name should gate input.
+    pub(crate) fn wants_key_consumption(&self) -> bool {
+        self.subscribed_events.iter().any(|e| e == "on_keypress")
+    }
+
     pub(crate) fn spawn(&mut self, path: &Path) -> Result<(), String> {
         let mut child = Command::new(path)
             .stdin(Stdio::piped())
@@ -100,6 +130,7 @@ impl Plugin {
             .ok_or_else(|| format!("no stderr for plugin '{}'", self.name))?;
 
         let (read_tx, read_rx) = std::sync::mpsc::sync_channel(1024);
+        let (resp_tx, resp_rx) = std::sync::mpsc::sync_channel(256);
         let name_for_reader = self.name.clone();
         let read_handle = std::thread::Builder::new()
             .name(format!("plugin-reader-{}", name_for_reader))
@@ -126,10 +157,22 @@ impl Plugin {
                         continue;
                     }
                     if let Ok(msg) = serde_json::from_str::<FromPlugin>(&trimmed) {
-                        if msg.event == "action" {
-                            if let Some(action) = msg.action {
-                                let _ = read_tx.try_send((action, msg.params));
+                        match msg.event.as_str() {
+                            "action" => {
+                                if let Some(action) = msg.action {
+                                    let _ = read_tx.try_send((action, msg.params));
+                                }
                             }
+                            "response" => {
+                                if let Some(id) = msg.id {
+                                    let result = match msg.error {
+                                        Some(err) => Err(err.message),
+                                        None => Ok(msg.result.unwrap_or(serde_json::Value::Null)),
+                                    };
+                                    let _ = resp_tx.try_send((id, result));
+                                }
+                            }
+                            _ => {}
                         }
                     }
                 }
@@ -163,6 +206,7 @@ impl Plugin {
         self.child = Some(child);
         self.write_tx = Some(write_tx);
         self.action_rx = Some(read_rx);
+        self.response_rx = Some(resp_rx);
         self._reader_thread = Some(read_handle);
         self._writer_thread = Some(write_handle);
         self._stderr_thread = Some(stderr_handle);
@@ -207,6 +251,25 @@ impl Plugin {
             }
         }
         (actions, false)
+    }
+
+    /// Non-blockingly drains buffered `response` messages (protocol 3+),
+    /// each tagged with the request `id` it answers. Companion to
+    /// `drain_actions`, on the separate `response_rx` channel populated by
+    /// the reader thread so responses are never misrouted into the action
+    /// path. Unlike `drain_actions`, disconnection here is not itself a
+    /// death signal — `drain_actions` (on the same underlying reader thread)
+    /// already reports that.
+    #[allow(dead_code)]
+    pub(crate) fn drain_responses(&mut self) -> Vec<(u64, Result<serde_json::Value, String>)> {
+        let mut responses = Vec::new();
+        let Some(ref rx) = self.response_rx else {
+            return responses;
+        };
+        while let Ok(item) = rx.try_recv() {
+            responses.push(item);
+        }
+        responses
     }
 
     /// Drops the write channel (so the writer thread flushes and exits), then
@@ -295,6 +358,27 @@ fn sanitize_log_filename(name: &str) -> String {
             }
         })
         .collect()
+}
+
+/// Appends a single sanitized line to `log_path`, enforcing the same
+/// [`STDERR_LOG_CAP`] used by [`drain_stderr`]. Used by `PluginManager` to
+/// record a `plugin_error` action's message in the plugin's on-disk log,
+/// even though it arrives on the action channel rather than stderr — a
+/// read-modify-write rather than a true append, but infrequent enough
+/// (one call per `plugin_error` action) that this is not a concern.
+pub(crate) fn append_plugin_log_line(log_path: &Path, line: &str) {
+    if line.trim().is_empty() {
+        return;
+    }
+    let sanitized = sanitize_line(line);
+    if sanitized.trim().is_empty() {
+        return;
+    }
+    let mut buf = std::fs::read(log_path).unwrap_or_default();
+    buf.extend_from_slice(sanitized.as_bytes());
+    buf.push(b'\n');
+    cap_log_buf(&mut buf, STDERR_LOG_CAP);
+    let _ = std::fs::write(log_path, &buf);
 }
 
 /// Drains a plugin's stderr, capping the on-disk log at [`STDERR_LOG_CAP`]
