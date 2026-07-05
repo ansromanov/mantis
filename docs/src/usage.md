@@ -50,7 +50,7 @@ These work no matter which panel is focused.
 | `Ctrl+e`, `e` (tree)   | Open current file in `$EDITOR` |
 | `y` (tree)             | Copy absolute path to clipboard |
 | `Y` (tree)             | Copy path relative to tree root to clipboard |
-| `.` (tree), `Alt+.`    | Toggle hidden files     |
+| `.` (tree)             | Toggle hidden files     |
 | `H` (tree)             | Git history of current file |
 | `Ctrl+O`               | Recent files (jump to a recently opened file) |
 | `p` (tree)             | Plugin palette (enable/disable plugins) |
@@ -59,7 +59,7 @@ These work no matter which panel is focused.
 | `Ctrl+Shift+B`         | Blame the active line   |
 | `t` (tree)             | Theme picker            |
 | `Ctrl+Shift+G`         | Toggle git mode (changed files + diffs; the pickers above scope to changed files) |
-| `F` (tree), `Alt+g`    | Toggle flat / tree view in git mode |
+| `F` (tree)             | Toggle flat / tree view in git mode |
 
 ## Tree panel
 
@@ -126,7 +126,7 @@ The status bar shows a git summary when inside a repository:
 | Key                 | Action |
 | ------------------- | ------ |
 | `Ctrl+Shift+G`       | Toggle git mode — show only changed files; opening a file shows its diff |
-| `F` (tree), `Alt+g`  | Toggle flat list / nested tree (git mode only) |
+| `F` (tree)           | Toggle flat list / nested tree (git mode only) |
 | `n` / `N`            | Jump to next / previous change hunk |
 | `Ctrl+Shift+B`       | Blame the current line: hash, author, date, summary |
 | `H` (tree)           | File history — pick a commit to view its diff |

@@ -167,8 +167,8 @@ markdown   = { path = "mantis-plugin-markdown" }
 ```
 
 > **Note:** Git features are built into `mantis` natively — no plugin required.
-> Git status colors, blame, file history (`H`), and working-tree diffs all work
-> without any plugin enabled.
+> Git status colors, blame, file history (`H`, while the tree is focused), and
+> working-tree diffs all work without any plugin enabled.
 
 ### Auto-removal of retired plugins
 

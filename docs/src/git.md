@@ -58,9 +58,10 @@ diff in the content panel instead of the file contents. The tree title displays 
 `[git]` badge while active — perfect for reviewing everything you're about to
 commit.
 
-Press `Alt+g` inside git mode to toggle between the tree view (directories
-intact) and a flat, depth-0 list of every changed file with relative paths. Press
-`Alt+g` again to return to the tree view (a no-op outside git mode).
+Press `F` (while the tree is focused) inside git mode to toggle between the
+tree view (directories intact) and a flat, depth-0 list of every changed file
+with relative paths. Press `F` again to return to the tree view (a no-op
+outside git mode).
 
 When the working tree is clean (no uncommitted changes), the tree panel shows a
 "Working tree clean" placeholder instead of an empty list, so you can tell at a

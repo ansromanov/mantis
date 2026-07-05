@@ -118,7 +118,10 @@ impl KeyBinding {
             && key.modifiers.contains(KeyModifiers::SUPER) == self.super_key
     }
 
-    /// Returns a human-readable label for this binding, e.g. `"Ctrl+P"`, `"Alt+."`.
+    /// Returns a human-readable label for this binding, e.g. `"Ctrl+P"`,
+    /// `"Q (tree)"`. Panel-scoped bindings get a `" (tree)"`/`" (content)"`
+    /// suffix so help/palette surfaces make clear the key only fires when
+    /// that panel is focused.
     pub fn display(&self) -> String {
         let key = match self.code {
             KeyCode::Char(' ') => "Space".to_string(),
@@ -138,13 +141,18 @@ impl KeyBinding {
             KeyCode::F(n) => format!("F{n}"),
             ref other => format!("{other:?}"),
         };
-        match (self.ctrl, self.alt, self.super_key) {
+        let base = match (self.ctrl, self.alt, self.super_key) {
             (true, true, false) => format!("Ctrl+Alt+{key}"),
             (true, false, false) => format!("Ctrl+{key}"),
             (false, true, false) => format!("Alt+{key}"),
             (false, false, true) => format!("Cmd+{key}"),
             (true, false, true) => format!("Ctrl+Cmd+{key}"),
             _ => key,
+        };
+        match self.scope {
+            BindingScope::Global => base,
+            BindingScope::Tree => format!("{base} (tree)"),
+            BindingScope::Content => format!("{base} (content)"),
         }
     }
 }
@@ -311,7 +319,7 @@ impl Default for Keymap {
         let mut map = Keymap {
             quit: bind(&["ctrl+c", "tree:q"]),
             help: bind(&["F1", "tree:?"]),
-            toggle_hidden: bind(&["tree:.", "alt+."]),
+            toggle_hidden: bind(&["tree:."]),
             search_files: bind(&["ctrl+f", "tree:/"]),
             find_files: bind(&["ctrl+p"]),
             search_content: bind(&["ctrl+F", "tree:f"]),
@@ -342,7 +350,7 @@ impl Default for Keymap {
             diff_hunk_next: bind(&["n"]),
             diff_hunk_prev: bind(&["N"]),
             git_mode_toggle: bind(&["ctrl+G"]),
-            git_mode_flat_toggle: bind(&["tree:F", "alt+g"]),
+            git_mode_flat_toggle: bind(&["tree:F"]),
             command_palette: bind(&["ctrl+P", "tree:P"]),
             open_in_editor: bind(&["ctrl+e", "tree:e"]),
             fold_toggle: bind(&["Space"]),
