@@ -115,6 +115,7 @@ When git blame is toggled on (`Ctrl+b`), a column appears on the left showing th
 | `Ctrl+g`       | Go to line                   |
 | `Ctrl+Shift+B` | Blame the active line        |
 | `n`/`N`        | Next / previous hunk (in a diff) |
+| `M`            | Toggle raw/rendered markdown (provided by markdown plugin) |
 
 Word wrap, line numbers, JSON pretty-print, side-by-side diff, and the
 staged/unstaged diff cycle have no default content-pane key — use the command
@@ -123,6 +124,8 @@ palette (`Ctrl+Shift+P`) or bind one yourself in `mantis.toml`.
 ### Rendered plugin content and line numbers
 
 `mantis` has no built-in markdown renderer; install and enable the `markdown` plugin (`p` in-app, or `[plugins.markdown]` in `mantis.toml`) for rendered Markdown. When a plugin renders a file's content, line numbers are hidden in the gutter. This is by design: rendered content collapses blank lines, strips code fences, and restructures formatting, so rendered-line numbers don't correspond to source-file line numbers.
+
+When the markdown plugin is active and rendering a file, you can press `M` (or run "Toggle markdown render (markdown plugin)" from the command palette) to toggle between the raw file content and the rendered view.
 
 ## Git features
 

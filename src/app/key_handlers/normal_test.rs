@@ -511,6 +511,24 @@ fn toggle_line_numbers_persists_to_config() {
     fs::remove_dir_all(&root).ok();
 }
 
+#[test]
+fn toggle_raw_markdown_not_active_shows_status() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Content;
+
+    // By default, the plugin is not active. Pressing 'M' should show a status message.
+    app.handle_key(key(KeyCode::Char('M')));
+    assert!(app
+        .status_message
+        .as_ref()
+        .unwrap()
+        .text
+        .contains("not available"));
+
+    fs::remove_dir_all(&root).ok();
+}
+
 // -- copy path ---------------------------------------------------------------
 
 #[test]

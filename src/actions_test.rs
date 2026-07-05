@@ -33,6 +33,7 @@ const KEYMAP_FIELD_ACTION_IDS: &[&str] = &[
     "toggle_wrap",
     "toggle_line_numbers",
     "toggle_pretty_json",
+    "toggle_raw_markdown",
     "toggle_blame",
     "blame_line",
     "toggle_diff_side_by_side",

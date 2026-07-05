@@ -319,18 +319,14 @@ fn matches_still_distinguishes_shift_without_capslock() {
 }
 
 #[test]
-fn keymap_has_no_toggle_raw_markdown() {
+fn keymap_has_toggle_raw_markdown() {
     let keymap = Keymap::default();
-    // Previously there was a `toggle_raw_markdown` field; it was removed with
-    // the built-in markdown renderer. Constructing a Keymap without it proves
-    // the struct no longer carries that field.
-    // Verify the default keymap still works for an unrelated binding.
     assert!(
         pressed(
-            &keymap.reload,
-            &KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL)
+            &keymap.toggle_raw_markdown,
+            &KeyEvent::new(KeyCode::Char('M'), KeyModifiers::SHIFT)
         ),
-        "reload must match ctrl+r",
+        "toggle_raw_markdown must match M",
     );
 }
 
@@ -396,11 +392,13 @@ fn pressed_in_honours_scope() {
 }
 
 /// The content pane must stay free of bare letters (for future editing)
-/// except the vim motion set. Tree-structural actions are exempt: their
-/// bindings only dispatch from the tree handler.
+/// except the vim motion set, plus `M` — the bundled markdown plugin only
+/// recognizes the literal key `M`, so `toggle_raw_markdown` is deliberately
+/// unscoped (see the exception noted on `Keymap::default`). Tree-structural
+/// actions are exempt: their bindings only dispatch from the tree handler.
 #[test]
 fn default_content_reachable_letters_are_motions_only() {
-    let motions = ['j', 'k', 'h', 'l', 'g', 'G', '0', 'n', 'N', ' '];
+    let motions = ['j', 'k', 'h', 'l', 'g', 'G', '0', 'n', 'N', 'M', ' '];
     let tree_structural = [
         "tree_expand",
         "tree_collapse",
@@ -539,13 +537,9 @@ fn legacy_key_wins_when_both_old_and_new_present() {
 
 #[test]
 fn removed_keymap_actions_parse_without_error_and_bind_nothing() {
-    let toml_str = "toggle_raw_markdown = [\"M\"]\nvisual_line_toggle = [\"V\"]\n";
+    let toml_str = "visual_line_toggle = [\"V\"]\n";
     let mut keymap: Keymap = toml::from_str(toml_str).unwrap();
     keymap.migrate_legacy_keys();
-    assert!(!pressed(
-        &keymap.fold_toggle,
-        &ev(KeyCode::Char('M'), KeyModifiers::NONE)
-    ));
     assert!(!pressed(
         &keymap.blame_line,
         &ev(KeyCode::Char('V'), KeyModifiers::NONE)

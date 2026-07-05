@@ -652,7 +652,7 @@ fn help_shows_recent_files_and_toggle_blame() {
 }
 
 #[test]
-fn help_shows_no_markdown_entry() {
+fn help_shows_markdown_entry() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());
     let backend = TestBackend::new(200, 200);
@@ -661,11 +661,10 @@ fn help_shows_no_markdown_entry() {
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
-    // The built-in markdown renderer was removed; its help entry description
-    // should no longer appear in the help overlay.
+    // The markdown-render toggle should appear in the help overlay.
     assert!(
-        !joined.contains("toggle markdown render"),
-        "help must not mention the markdown-render toggle after built-in renderer removal"
+        joined.contains("toggle markdown render"),
+        "help must list the markdown-render toggle, got:\n{joined}"
     );
 }
 

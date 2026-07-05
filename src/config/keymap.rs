@@ -248,6 +248,7 @@ impl Keymap {
             "copy_relative_path" => &self.copy_relative_path,
             "plugin_picker" => &self.plugin_picker,
             "goto_line" => &self.goto_line,
+            "toggle_raw_markdown" => &self.toggle_raw_markdown,
             "tree_up_dir" => &self.tree_up_dir,
             _ => &[],
         }
@@ -342,6 +343,7 @@ pub struct Keymap {
     pub copy_relative_path: Vec<KeyBinding>,
     pub plugin_picker: Vec<KeyBinding>,
     pub goto_line: Vec<KeyBinding>,
+    pub toggle_raw_markdown: Vec<KeyBinding>,
     pub tree_up_dir: Vec<KeyBinding>,
 
     // --- deprecated/renamed action keys (read for backward-compat; never written) ---
@@ -356,8 +358,12 @@ pub struct Keymap {
 impl Default for Keymap {
     /// Editor-style defaults (VS Code / Sublime conventions). Single letters
     /// are `tree:`-scoped so the content pane stays letter-free apart from
-    /// the vim motion set (`j k h l g G 0 n N`); content-pane access to the
-    /// remaining toggles goes through modifier combos or the command palette.
+    /// the vim motion set (`j k h l g G 0 n N`) and `M` (markdown raw/rendered
+    /// toggle — bare, unscoped, because the bundled markdown plugin only
+    /// recognizes the literal key `M` over its `on_keypress` event; a rebound
+    /// key is translated back to `M` before being forwarded, see
+    /// `key_handlers::normal::handle_content_key`). All other content-pane
+    /// toggles go through modifier combos or the command palette.
     /// `ctrl+shift+letter` specs are written as `ctrl+<uppercase letter>`;
     /// on terminals without the kitty keyboard protocol they degrade to the
     /// plain-`ctrl` action, which is always the more frequent one.
@@ -407,6 +413,7 @@ impl Default for Keymap {
             copy_relative_path: bind(&["tree:Y"]),
             plugin_picker: bind(&["tree:p"]),
             goto_line: bind(&["ctrl+g"]),
+            toggle_raw_markdown: bind(&["M"]),
             tree_up_dir: bind(&["Backspace"]),
             legacy_yaml_fold_toggle: None,
             legacy_visual_line_blame: None,

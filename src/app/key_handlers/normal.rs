@@ -278,6 +278,21 @@ impl App {
             } else {
                 self.set_status("pretty JSON: could not parse");
             }
+        } else if pressed_in(&k.toggle_raw_markdown, &key, scope) {
+            if self.plugin_content_active {
+                let key_str = crate::plugin::key_event_to_string(&key);
+                if key_str != "M" {
+                    let m_key = crossterm::event::KeyEvent::new(
+                        crossterm::event::KeyCode::Char('M'),
+                        crossterm::event::KeyModifiers::SHIFT,
+                    );
+                    self.plugin_manager.on_keypress(&m_key);
+                }
+            } else {
+                self.set_status(
+                    "markdown render toggle: not available (current file not plugin-rendered)",
+                );
+            }
         } else if pressed_in(&k.toggle_blame, &key, scope) {
             if self.has_text_cursor() {
                 self.show_blame = !self.show_blame;
