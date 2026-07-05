@@ -909,9 +909,12 @@ fn help_shows_goto_line_entry() {
 }
 
 /// Verification guard: every action in `ACTIONS` that has a default keybinding
-/// must appear as a string literal (representing its action ID) in `src/ui/popups/help.rs`,
-/// unless explicitly allowlisted as an intentional omission. This prevents any
-/// keybound action from silently missing help coverage in the overlay.
+/// must be rendered as a row (via `row_key`/`row_key_custom`) in
+/// `src/ui/popups/help.rs`, unless explicitly allowlisted as an intentional
+/// omission. This prevents any keybound action from silently missing help
+/// coverage in the overlay. Checking the specific row-builder call (rather than
+/// any string literal match) avoids false positives from unrelated references
+/// to the action id, e.g. `labels_for_action("id")`.
 #[test]
 fn keybound_actions_are_in_help_overlay() {
     let help_rs_content = std::fs::read_to_string("src/ui/popups/help.rs")
