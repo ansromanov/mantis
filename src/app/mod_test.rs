@@ -4920,6 +4920,10 @@ fn copy_to_clipboard_empty_text_is_noop() {
         app.status_message.is_none(),
         "empty text must not set a status message"
     );
+    assert!(
+        app.clipboard_capture.is_empty(),
+        "empty text must not reach the clipboard"
+    );
     fs::remove_dir_all(&root).ok();
 }
 
@@ -4929,13 +4933,8 @@ fn copy_to_clipboard_sets_status() {
     let mut app = app_for(&root);
     app.copy_to_clipboard("hello".to_string(), "test");
     let sm = app.status_message.as_ref().expect("status must be set");
-    // Either success or failure — both produce a status message (old mouse
-    // path was silent on failure, new path always reports).
-    assert!(
-        sm.text.starts_with("copied ") || sm.text.starts_with("clipboard error:"),
-        "unexpected status text: {:?}",
-        sm.text
-    );
+    assert_eq!(sm.text, "copied test");
+    assert_eq!(app.clipboard_capture, vec!["hello".to_string()]);
     fs::remove_dir_all(&root).ok();
 }
 

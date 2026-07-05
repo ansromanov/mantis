@@ -390,6 +390,7 @@ fn create_base_app() -> App {
         session_dirty: false,
         session_dirty_at: None,
         session_last_save: std::time::Instant::now(),
+        clipboard_capture: Vec::new(),
         command_usage: crate::command_usage::UsageStats::default(),
         diff_mode: crate::app::DiffMode::default(),
         goto_line: None,
