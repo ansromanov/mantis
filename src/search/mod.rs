@@ -261,8 +261,12 @@ impl SearchState {
 
     fn refresh_content(&mut self) {
         self.content_results = Vec::new();
+        // Plain substring search needs 2+ chars to avoid overly broad scans;
+        // regex/whole-word narrow the match enough that a single char (e.g. a
+        // one-letter word, or an anchor like `^`) is still a useful query.
         // Use char count so a single multibyte character doesn't bypass the guard.
-        if self.query.chars().count() < 2 {
+        let min_len = if self.regex || self.whole_word { 1 } else { 2 };
+        if self.query.chars().count() < min_len {
             return;
         }
         // Build cache from disk if dirty (first call or after tree reload).

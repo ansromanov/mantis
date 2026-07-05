@@ -64,11 +64,21 @@ pub(crate) fn draw_search(f: &mut Frame, app: &mut App, area: Rect) {
         .constraints([Constraint::Min(0), Constraint::Length(30)])
         .split(parts[0]);
 
-    let hint = if search.mode == SearchMode::Content && search.query.len() < 2 {
-        "  (type 2+ chars)"
+    let content_min_chars = if search.regex || search.whole_word {
+        1
     } else {
-        ""
+        2
     };
+    let hint =
+        if search.mode == SearchMode::Content && search.query.chars().count() < content_min_chars {
+            if content_min_chars == 1 {
+                "  (type 1+ char)"
+            } else {
+                "  (type 2+ chars)"
+            }
+        } else {
+            ""
+        };
     f.render_widget(
         Paragraph::new(Line::from(vec![
             Span::styled(

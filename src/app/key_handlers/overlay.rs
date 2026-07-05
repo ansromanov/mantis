@@ -29,14 +29,19 @@ impl App {
         }
         if let Some(toggle) = static_keys::search_toggle(&key) {
             if let Some(s) = &mut self.search {
-                match toggle {
-                    static_keys::SearchToggle::Regex => s.regex = !s.regex,
-                    static_keys::SearchToggle::CaseSensitive => {
-                        s.case_sensitive = !s.case_sensitive
+                // Only Content mode reads these flags (see refresh_content); ignore
+                // the key in Files mode so it doesn't reset the selection for a
+                // toggle that would have no visible effect.
+                if s.mode == crate::search::SearchMode::Content {
+                    match toggle {
+                        static_keys::SearchToggle::Regex => s.regex = !s.regex,
+                        static_keys::SearchToggle::CaseSensitive => {
+                            s.case_sensitive = !s.case_sensitive
+                        }
+                        static_keys::SearchToggle::WholeWord => s.whole_word = !s.whole_word,
                     }
-                    static_keys::SearchToggle::WholeWord => s.whole_word = !s.whole_word,
+                    s.refresh_now();
                 }
-                s.refresh_now();
             }
             return;
         }

@@ -774,7 +774,10 @@ fn handle_command_key_enter_dispatches_selected_command() {
 fn handle_search_key_toggles() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    let s = SearchState::new(&root, false, true, 0, None);
+    let mut s = SearchState::new(&root, false, true, 0, None);
+    // The toggles only affect Content-mode search (see refresh_content), so
+    // switch out of the default Files mode before exercising them.
+    s.toggle_mode();
     app.search = Some(s);
 
     let regex_key = KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL);
@@ -805,6 +808,27 @@ fn handle_search_key_unmodified_letters_type_into_query() {
     let s = app.search.as_ref().unwrap();
     assert_eq!(s.query, "r");
     assert!(!s.regex);
+
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn handle_search_key_toggles_are_ignored_in_files_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    // Default mode is Files; the toggles only affect Content search, so
+    // pressing them here must be a no-op (state unchanged, selection intact).
+    let mut s = SearchState::new(&root, false, true, 0, None);
+    s.selected = 3;
+    app.search = Some(s);
+
+    app.handle_search_key(KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL));
+    let s = app.search.as_ref().unwrap();
+    assert!(!s.regex);
+    assert_eq!(
+        s.selected, 3,
+        "toggle must not reset selection in Files mode"
+    );
 
     fs::remove_dir_all(&root).ok();
 }
