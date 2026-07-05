@@ -180,6 +180,45 @@ fn help_overlay_wheel_up_does_not_underflow() {
 }
 
 #[test]
+fn help_overlay_mouse_click_actions() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.show_help = true;
+    app.help_area = Rect {
+        x: 10,
+        y: 10,
+        width: 80,
+        height: 20,
+    };
+    app.help_tab = 0;
+
+    // Left click outside: should close help overlay and reset tab
+    app.handle_mouse(MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: 5,
+        row: 5,
+        modifiers: crossterm::event::KeyModifiers::empty(),
+    });
+    assert!(!app.show_help);
+    assert_eq!(app.help_tab, 0);
+
+    // Reopen help
+    app.show_help = true;
+    // Click on Tab 1 "Navigation" (ranges are computed from help_area.x + 1 which is 11)
+    let ranges = crate::ui::popups::help_tab_ranges(11);
+    let nav_tab_x = ranges[1].0;
+    app.handle_mouse(MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: nav_tab_x,
+        row: 11, // help_area.y + 1
+        modifiers: crossterm::event::KeyModifiers::empty(),
+    });
+    assert_eq!(app.help_tab, 1);
+
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn wheel_over_tree_scrolls_without_moving_cursor() {
     let root = temp_tree();
     // Create enough files so the tree overflows a 1-row viewport.

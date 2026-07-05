@@ -94,14 +94,22 @@ fn draw_help_overlay() {
     app.show_help = true;
     let backend = TestBackend::new(80, 100);
     let mut terminal = Terminal::new(backend).unwrap();
+
+    // Tab 0: Getting started
+    app.help_tab = 0;
     terminal.draw(|f| super::draw(f, &mut app)).unwrap();
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
     assert!(joined.contains("Help"));
-    assert!(joined.contains("Global"));
-    assert!(joined.contains("Tree panel"));
-    assert!(joined.contains("Content panel"));
-    assert!(joined.contains("In-file search"));
+    assert!(joined.contains("Getting started"));
+    assert!(joined.contains("Welcome to mantis!"));
+
+    // Tab 1: Navigation
+    app.help_tab = 1;
+    terminal.draw(|f| super::draw(f, &mut app)).unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(joined.contains("Tree Panel Navigation"));
 }
 
 #[test]

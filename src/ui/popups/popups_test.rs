@@ -384,22 +384,37 @@ fn draw_theme_with_filter() {
 fn draw_help_all_sections() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());
-
     let backend = TestBackend::new(80, 100);
     let mut terminal = Terminal::new(backend).unwrap();
+
+    // Tab 0: Getting started
+    app.help_tab = 0;
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
     assert!(joined.contains("Help"));
-    assert!(joined.contains("Global"));
-    assert!(joined.contains("Tree panel"));
-    assert!(joined.contains("Content panel"));
-    assert!(joined.contains("In-file search"));
-    assert!(joined.contains("Search / history popup"));
     assert!(joined.contains("toggle this help"));
-    assert!(joined.contains("tree filter / in-file search"));
-    assert!(joined.contains("global fuzzy file-name picker"));
+
+    // Tab 1: Navigation
+    app.help_tab = 1;
+    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(joined.contains("Tree Panel Navigation"));
+
+    // Tab 2: Content
+    app.help_tab = 2;
+    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
     assert!(joined.contains("toggle word wrap"));
+
+    // Tab 3: Search
+    app.help_tab = 3;
+    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(joined.contains("global fuzzy file-name picker"));
 }
 
 // ── draw_in_file_search_none ─────────────────────────────────────────────

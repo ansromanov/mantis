@@ -479,6 +479,10 @@ fn help_scroll_initialises_to_zero() {
         app.help_scroll, 0,
         "help_scroll must start at zero so the help popup opens unscrolled"
     );
+    assert_eq!(
+        app.help_tab, 0,
+        "help_tab must start at zero (Getting started tab)"
+    );
     fs::remove_dir_all(&root).ok();
 }
 

@@ -1,71 +1,40 @@
 //! The help popup.
 //!
 //! `draw_help` renders a centered, bordered overlay listing the application's
-//! keybindings and actions grouped by area (navigation, content, search, git,
-//! and so on). Key columns are built dynamically from the live `Keymap` so that
-//! remapped keys are reflected immediately. Sections that cover hardcoded
-//! overlay behaviours (in-file search, search/history popup, visual-line mode)
-//! remain static reference text.
-//!
-//! The `Global`/`Tree panel`/`Content panel` sections are built by
-//! `keymap_help_sections`, which groups `crate::actions::ACTIONS` by its
-//! `.help` field, preserving the order actions first appear in `ACTIONS`.
-//! This replaces the old hand-duplicated `KEYMAP_SECTIONS` table, so a new
-//! action only needs a `help: Some((section, desc))` entry in `ACTIONS` to
-//! show up here. `nav_up`/`nav_down` are the one exception: they are bound
-//! both in the tree panel (move selection) and the content panel (scroll),
-//! and since an `ActionSpec` has only one `help` slot, the Content panel's
-//! second meaning is appended as two hand-written rows rather than a second
-//! registry entry. The dedicated Git section stays partially hand-assembled
-//! (it interleaves static orientation rows - tree colors, status bar legend -
-//! with keymap-driven rows) but its `GIT_KEYMAP_ENTRIES` ids are all
-//! canonical `ACTIONS` ids, checked by
-//! `help_test.rs::git_keymap_entries_ids_are_canonical_actions`.
+//! keybindings and actions grouped by tab (Getting started, Navigation, Content,
+//! Search, Git, Settings, Themes, Plugins, Mouse). The user can switch tabs using
+//! Left/Right arrows, h/l, or Tab/Shift-Tab, and scroll using Up/Down arrows or j/k.
+//! Key columns are built dynamically from the live `Keymap` so that remapped
+//! keys are reflected immediately.
 
 use ratatui::{
-    layout::Rect,
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Paragraph},
     Frame,
 };
 
-use crate::actions::ACTIONS;
+use super::util::centered_rect;
 use crate::app::App;
 
-use super::util::centered_rect;
-
-/// Groups `ACTIONS`' `.help` entries by section name, preserving both the
-/// order sections first appear and the order of entries within each section.
-fn keymap_help_sections() -> Vec<(&'static str, Vec<(&'static str, &'static str)>)> {
-    let mut sections: Vec<(&'static str, Vec<(&'static str, &'static str)>)> = Vec::new();
-    for action in ACTIONS {
-        let Some((section_name, desc)) = action.help else {
-            continue;
-        };
-        match sections.iter_mut().find(|(name, _)| *name == section_name) {
-            Some((_, entries)) => entries.push((action.id, desc)),
-            None => sections.push((section_name, vec![(action.id, desc)])),
-        }
-    }
-    // nav_up/nav_down are also bound in the content panel (scrolling), a
-    // second meaning `ActionSpec::help` has no room for; append it here.
-    if let Some((_, entries)) = sections
-        .iter_mut()
-        .find(|(name, _)| *name == "Content panel")
-    {
-        entries.insert(0, ("nav_up", "scroll up"));
-        entries.insert(1, ("nav_down", "scroll down"));
-    }
-    sections
-}
+pub const HELP_TABS: &[&str] = &[
+    "Getting started",
+    "Navigation",
+    "Content",
+    "Search",
+    "Git",
+    "Settings",
+    "Themes",
+    "Plugins",
+    "Mouse",
+];
 
 /// Git-specific keybinding rows rendered in the dedicated Git section.
 /// Each tuple is `(action_id, user-facing description)`; `action_id` must be
 /// a canonical id from `crate::actions::ACTIONS` (checked by
-/// `help_test.rs::git_keymap_entries_ids_are_canonical_actions`), even though
-/// the description here is git-specific phrasing distinct from that action's
-/// `ACTIONS` entry (if it has one).
+/// `help_test.rs::git_keymap_entries_ids_are_canonical_actions`).
+#[allow(dead_code)]
 pub(super) const GIT_KEYMAP_ENTRIES: &[(&str, &str)] = &[
     (
         "git_mode_toggle",
@@ -95,33 +64,6 @@ pub(super) const GIT_KEYMAP_ENTRIES: &[(&str, &str)] = &[
     ),
 ];
 
-/// Helper: compute the widest key label across all keymap-driven entries so
-/// rows can be aligned with consistent padding. Capped at 14 to keep the
-/// popup compact — unusually long labels are truncated with `…`.
-fn max_key_width(
-    app: &App,
-    sections: &[(&'static str, Vec<(&'static str, &'static str)>)],
-) -> usize {
-    let mut max_w = 0usize;
-    for (_, entries) in sections {
-        for &(action_id, _) in entries {
-            let label = app.keys().labels_for_action(action_id);
-            let w = label.len();
-            if w > max_w {
-                max_w = w;
-            }
-        }
-    }
-    for &(action_id, _) in GIT_KEYMAP_ENTRIES {
-        let label = app.keys().labels_for_action(action_id);
-        let w = label.len();
-        if w > max_w {
-            max_w = w;
-        }
-    }
-    max_w.min(14)
-}
-
 /// Truncate a label to at most `max_len` chars, adding `…` when it exceeds.
 fn truncate_label(label: &str, max_len: usize) -> String {
     if label.len() <= max_len {
@@ -135,9 +77,35 @@ fn truncate_label(label: &str, max_len: usize) -> String {
     }
 }
 
+/// Calculate the click ranges for each tab relative to the starting x coordinate.
+pub(crate) fn help_tab_ranges(start_x: u16) -> Vec<(u16, u16)> {
+    let mut current_x = start_x;
+    let mut ranges = Vec::new();
+    for (i, tab_name) in HELP_TABS.iter().enumerate() {
+        if i > 0 {
+            current_x += 3; // for " · "
+        }
+        let length = (tab_name.len() + 2) as u16; // for " {} "
+        ranges.push((current_x, current_x + length));
+        current_x += length;
+    }
+    ranges
+}
+
+/// Lookup action description from ACTIONS registry.
+fn action_desc(action_id: &str) -> &'static str {
+    crate::actions::ACTIONS
+        .iter()
+        .find(|a| a.id == action_id)
+        .and_then(|a| a.help)
+        .map(|(_, desc)| desc)
+        .unwrap_or("")
+}
+
 pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
     let theme = &app.theme;
-    let popup = centered_rect(72, 80, area);
+    let popup = centered_rect(80, 80, area);
+    app.help_area = popup;
     f.render_widget(Clear, popup);
 
     let block = Block::default()
@@ -149,6 +117,50 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
     let inner = block.inner(popup);
     f.render_widget(block, popup);
 
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1), // tab bar
+            Constraint::Length(1), // separator rule
+            Constraint::Min(0),    // scrollable content
+        ])
+        .split(inner);
+
+    let tab_bar_area = chunks[0];
+    let separator_area = chunks[1];
+    let content_area = chunks[2];
+
+    // 1. Draw Tab Bar
+    let mut tab_spans = Vec::new();
+    for (i, &tab_name) in HELP_TABS.iter().enumerate() {
+        if i > 0 {
+            tab_spans.push(Span::styled(" · ", Style::default().fg(theme.dim)));
+        }
+        if i == app.help_tab {
+            tab_spans.push(Span::styled(
+                format!(" {} ", tab_name),
+                Style::default()
+                    .fg(theme.accent)
+                    .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+            ));
+        } else {
+            tab_spans.push(Span::styled(
+                format!(" {} ", tab_name),
+                Style::default().fg(theme.text).add_modifier(Modifier::DIM),
+            ));
+        }
+    }
+    f.render_widget(Paragraph::new(Line::from(tab_spans)), tab_bar_area);
+
+    // 2. Draw Separator Line
+    let h_rule = Line::from(vec![Span::styled(
+        "─".repeat(separator_area.width as usize),
+        Style::default().fg(theme.dim),
+    )]);
+    f.render_widget(Paragraph::new(h_rule), separator_area);
+
+    // 3. Build Content Rows for Active Tab
+    let key_w = 16;
     let key_style = |k: String| {
         Span::styled(
             k,
@@ -158,6 +170,14 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
         )
     };
     let desc = |d: &'static str| Span::styled(d, Style::default().fg(theme.text));
+    let bold_text = |s: &'static str| {
+        Line::from(vec![Span::styled(
+            s,
+            Style::default().fg(theme.text).add_modifier(Modifier::BOLD),
+        )])
+    };
+    let normal_text =
+        |s: &'static str| Line::from(vec![Span::styled(s, Style::default().fg(theme.text))]);
     let section = |s: &'static str| {
         Line::from(vec![Span::styled(
             s,
@@ -168,156 +188,322 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
     };
     let gap = Line::from("");
 
-    let keymap_sections = keymap_help_sections();
-    let key_w = max_key_width(app, &keymap_sections);
-
-    let mut rows: Vec<Line> = Vec::new();
-    for (section_name, entries) in &keymap_sections {
-        rows.push(section(section_name));
-        for &(action_id, entry_desc) in entries {
-            let label = app.keys().labels_for_action(action_id);
-            let display = truncate_label(&label, key_w);
-            let padded = format!("  {display:width$}  ", width = key_w);
-            rows.push(Line::from(vec![key_style(padded), desc(entry_desc)]));
-        }
-        rows.push(gap.clone());
-    }
-
-    // Git section — static orientation rows followed by keymap-driven bindings.
-    rows.push(section("Git"));
-    let static_key_span = |label: &'static str| {
-        Span::styled(
-            format!("  {:<width$}  ", label, width = key_w),
-            Style::default()
-                .fg(theme.accent_alt)
-                .add_modifier(Modifier::BOLD),
-        )
-    };
-    let indent_span = || {
-        Span::styled(
-            format!("  {:<width$}  ", "", width = key_w),
-            Style::default().fg(theme.accent_alt),
-        )
-    };
-    rows.push(Line::from(vec![
-        static_key_span("Tree colors"),
-        desc("green = new   yellow = modified   red = deleted   gray = ignored"),
-    ]));
-    rows.push(Line::from(vec![
-        indent_span(),
-        desc("a folder takes the color of changes inside it"),
-    ]));
-    rows.push(Line::from(vec![
-        static_key_span("Status bar"),
-        desc("[branch  +ahead -behind  N changed]"),
-    ]));
-    for &(action_id, description) in GIT_KEYMAP_ENTRIES {
+    let row_key = |action_id: &str| {
         let label = app.keys().labels_for_action(action_id);
         let display = truncate_label(&label, key_w);
         let padded = format!("  {display:width$}  ", width = key_w);
-        rows.push(Line::from(vec![key_style(padded), desc(description)]));
-    }
-    rows.push(gap.clone());
+        let entry_desc = action_desc(action_id);
+        Line::from(vec![key_style(padded), desc(entry_desc)])
+    };
 
-    // Non-keymap sections — hardcoded overlay behaviours, kept as static text.
-    rows.push(section("Visual-line mode"));
-    rows.push(Line::from(vec![
-        Span::styled(
-            "  j/k / ↑↓       ",
-            Style::default()
-                .fg(theme.accent_alt)
-                .add_modifier(Modifier::BOLD),
-        ),
-        desc("extend selection"),
-    ]));
-    rows.push(Line::from(vec![
-        Span::styled(
-            "  g / G           ",
-            Style::default()
-                .fg(theme.accent_alt)
-                .add_modifier(Modifier::BOLD),
-        ),
-        desc("extend to top / bottom"),
-    ]));
-    rows.push(Line::from(vec![
-        Span::styled(
-            "  b               ",
-            Style::default()
-                .fg(theme.accent_alt)
-                .add_modifier(Modifier::BOLD),
-        ),
-        desc("blame selected lines"),
-    ]));
-    rows.push(Line::from(vec![
-        Span::styled(
-            "  Esc             ",
-            Style::default()
-                .fg(theme.accent_alt)
-                .add_modifier(Modifier::BOLD),
-        ),
-        desc("exit visual-line mode"),
-    ]));
-    rows.push(gap.clone());
-    rows.push(section("In-file search"));
-    rows.push(Line::from(vec![
-        Span::styled(
-            "  n / N           ",
-            Style::default()
-                .fg(theme.accent_alt)
-                .add_modifier(Modifier::BOLD),
-        ),
-        desc("next / previous match"),
-    ]));
-    rows.push(Line::from(vec![
-        Span::styled(
-            "  Enter / Esc     ",
-            Style::default()
-                .fg(theme.accent_alt)
-                .add_modifier(Modifier::BOLD),
-        ),
-        desc("close search"),
-    ]));
-    rows.push(gap.clone());
-    rows.push(section("Search / history popup"));
-    rows.push(Line::from(vec![
-        Span::styled(
-            "  Tab             ",
-            Style::default()
-                .fg(theme.accent_alt)
-                .add_modifier(Modifier::BOLD),
-        ),
-        desc("switch files ↔ content mode"),
-    ]));
-    rows.push(Line::from(vec![
-        Span::styled(
-            "  Enter           ",
-            Style::default()
-                .fg(theme.accent_alt)
-                .add_modifier(Modifier::BOLD),
-        ),
-        desc("open result / show diff"),
-    ]));
-    rows.push(Line::from(vec![
-        Span::styled(
-            "  ↑↓              ",
-            Style::default()
-                .fg(theme.accent_alt)
-                .add_modifier(Modifier::BOLD),
-        ),
-        desc("navigate results"),
-    ]));
-    rows.push(Line::from(vec![
-        Span::styled(
-            "  Esc             ",
-            Style::default()
-                .fg(theme.accent_alt)
-                .add_modifier(Modifier::BOLD),
-        ),
-        desc("close popup"),
-    ]));
+    let row_key_custom = |action_id: &str, entry_desc: &'static str| {
+        let label = app.keys().labels_for_action(action_id);
+        let display = truncate_label(&label, key_w);
+        let padded = format!("  {display:width$}  ", width = key_w);
+        Line::from(vec![key_style(padded), desc(entry_desc)])
+    };
+
+    let row_static_key = |key_label: &'static str, entry_desc: &'static str| {
+        let padded = format!("  {key_label:width$}  ", width = key_w);
+        Line::from(vec![key_style(padded), desc(entry_desc)])
+    };
+
+    let mut rows: Vec<Line> = Vec::new();
+    match app.help_tab {
+        0 => {
+            // Getting started
+            rows.push(bold_text("Welcome to mantis!"));
+            rows.push(gap.clone());
+            rows.push(normal_text(
+                "mantis is a terminal-based file tree viewer and content previewer.",
+            ));
+            rows.push(normal_text(
+                "It features zero-config file browsing, syntax highlighting, fuzzy search,",
+            ));
+            rows.push(normal_text("and git integration."));
+            rows.push(gap.clone());
+            rows.push(section("Basic Concept"));
+            rows.push(normal_text(
+                "The layout is divided into two primary panels:",
+            ));
+            rows.push(normal_text(
+                "  - Tree panel (left): Browse directory tree, expand/collapse folders.",
+            ));
+            rows.push(normal_text(
+                "  - Content panel (right): View file contents, diffs, blame, and search.",
+            ));
+            rows.push(gap.clone());
+            rows.push(section("Essential Keys"));
+            rows.push(row_key("help"));
+            rows.push(row_key("switch_panel"));
+            rows.push(row_key("quit"));
+            rows.push(row_key("open_in_editor"));
+            rows.push(row_key("recent_files"));
+            rows.push(row_key("toggle_hidden"));
+        }
+        1 => {
+            // Navigation
+            rows.push(section("Panel Focus"));
+            rows.push(row_key("switch_panel"));
+            rows.push(gap.clone());
+            rows.push(section("Tree Panel Navigation"));
+            rows.push(row_key("nav_up"));
+            rows.push(row_key("nav_down"));
+            rows.push(row_key("tree_expand"));
+            rows.push(row_key("tree_collapse"));
+            rows.push(row_key("tree_up_dir"));
+            rows.push(row_key("tree_collapse_all"));
+            rows.push(row_key("tree_expand_all"));
+            rows.push(row_key("reload"));
+            rows.push(gap.clone());
+            rows.push(section("Content Panel Navigation"));
+            rows.push(row_key_custom("nav_up", "scroll up"));
+            rows.push(row_key_custom("nav_down", "scroll down"));
+            rows.push(row_key("content_page_up"));
+            rows.push(row_key("content_page_down"));
+            rows.push(row_key("content_top"));
+            rows.push(row_key("content_bottom"));
+            rows.push(row_key("content_left"));
+            rows.push(row_key("content_right"));
+            rows.push(row_key("content_reset_col"));
+            rows.push(gap.clone());
+            rows.push(section("Code Folding"));
+            rows.push(row_key("fold_toggle"));
+            rows.push(row_static_key(
+                "fold_all",
+                "fold all regions in file (palette only)",
+            ));
+            rows.push(row_static_key(
+                "unfold_all",
+                "unfold all regions in file (palette only)",
+            ));
+        }
+        2 => {
+            // Content
+            rows.push(section("Display Options"));
+            rows.push(row_key("toggle_wrap"));
+            rows.push(row_key("toggle_line_numbers"));
+            rows.push(row_key("toggle_watch"));
+            rows.push(row_static_key(
+                "toggle_pretty_json",
+                "toggle pretty-print for JSON files",
+            ));
+            rows.push(gap.clone());
+            rows.push(section("Clipboard Operations"));
+            rows.push(row_key("copy_path"));
+            rows.push(row_key("copy_relative_path"));
+            rows.push(gap.clone());
+            rows.push(section("File Previews"));
+            rows.push(normal_text(
+                "  - Binary files are automatically detected and previewed with size info.",
+            ));
+            rows.push(normal_text(
+                "  - File encoding and line endings are probed on loading.",
+            ));
+        }
+        3 => {
+            // Search
+            rows.push(section("Fuzzy Pickers"));
+            rows.push(row_key("find_files"));
+            rows.push(row_key("search_content"));
+            rows.push(gap.clone());
+            rows.push(section("Fuzzy Picker Controls"));
+            rows.push(row_static_key(
+                "Tab",
+                "switch between results list and content preview",
+            ));
+            rows.push(row_static_key(
+                "Enter",
+                "open selected result / reveal matching line",
+            ));
+            rows.push(row_static_key(
+                "Up / Down",
+                "navigate through matching results list",
+            ));
+            rows.push(row_static_key("Esc", "close the fuzzy search popup"));
+            rows.push(gap.clone());
+            rows.push(section("Filters & In-File Search"));
+            rows.push(row_key("search_files"));
+            rows.push(row_static_key(
+                "/",
+                "start incremental search inside current file",
+            ));
+            rows.push(row_static_key(
+                "n / N",
+                "jump to next / previous match (in-file search)",
+            ));
+            rows.push(row_static_key(
+                "Enter / Esc",
+                "close the in-file search bar",
+            ));
+        }
+        4 => {
+            // Git
+            rows.push(section("Overview"));
+            rows.push(normal_text(
+                "mantis integrates with git to show repo changes:",
+            ));
+            rows.push(Line::from(vec![
+                Span::styled("  Tree colors:  ", Style::default().fg(theme.accent_alt)),
+                desc("green = new   yellow = modified   red = deleted   gray = ignored"),
+            ]));
+            rows.push(normal_text(
+                "  A folder takes the color of changes inside it.",
+            ));
+            rows.push(Line::from(vec![
+                Span::styled("  Status bar:   ", Style::default().fg(theme.accent_alt)),
+                desc("[branch  +ahead -behind  N changed]"),
+            ]));
+            rows.push(gap.clone());
+            rows.push(section("Git Modes"));
+            rows.push(row_key_custom(
+                "git_mode_toggle",
+                "show only changed files; each file opens its diff",
+            ));
+            rows.push(row_key("git_mode_flat_toggle"));
+            rows.push(gap.clone());
+            rows.push(section("Diff Views & Navigation"));
+            rows.push(row_key_custom(
+                "toggle_diff_side_by_side",
+                "toggle side-by-side / unified diff",
+            ));
+            rows.push(row_key_custom(
+                "toggle_diff_staged",
+                "cycle diff source: all (vs HEAD) -> staged -> unstaged",
+            ));
+            rows.push(row_key_custom("diff_hunk_next", "jump to next change hunk"));
+            rows.push(row_key_custom(
+                "diff_hunk_prev",
+                "jump to previous change hunk",
+            ));
+            rows.push(gap.clone());
+            rows.push(section("History & Blame"));
+            rows.push(row_key("toggle_blame"));
+            rows.push(row_key_custom(
+                "blame_line",
+                "blame current line: hash  author  when  summary",
+            ));
+            rows.push(row_key_custom(
+                "file_history",
+                "pick a commit -> view its diff vs your working tree",
+            ));
+        }
+        5 => {
+            // Settings
+            rows.push(section("Configuration File"));
+            rows.push(normal_text(
+                "mantis settings are managed in a mantis.toml configuration file.",
+            ));
+            rows.push(normal_text(
+                "You can open your configuration file directly in your system's editor:",
+            ));
+            rows.push(row_static_key(
+                "open_config",
+                "Open configuration file (available via palette)",
+            ));
+            rows.push(gap.clone());
+            rows.push(section("Configuration Path"));
+            rows.push(normal_text("The config file is located at:"));
+            rows.push(normal_text("  - macOS:   ~/.config/mantis/mantis.toml"));
+            rows.push(normal_text("  - Linux:   ~/.config/mantis/mantis.toml"));
+            rows.push(normal_text("  - Windows: %APPDATA%\\mantis\\mantis.toml"));
+            rows.push(gap.clone());
+            rows.push(section("Key Options"));
+            rows.push(normal_text("  - [tree]: width, show_hidden"));
+            rows.push(normal_text(
+                "  - [content]: line_numbers, word_wrap, scrollbar, tab_width",
+            ));
+            rows.push(normal_text("  - [git]: ignore_gitignore"));
+            rows.push(normal_text(
+                "  - [keys]: custom keybindings mapping any action to keys",
+            ));
+        }
+        6 => {
+            // Themes
+            rows.push(section("Theme Selection"));
+            rows.push(row_key("theme_picker"));
+            rows.push(gap.clone());
+            rows.push(section("Built-in Presets"));
+            rows.push(normal_text("  - default: Classic dark/gray layout"));
+            rows.push(normal_text(
+                "  - monokai: High contrast vintage code colors",
+            ));
+            rows.push(normal_text(
+                "  - solarized: Balanced light/dark solarized palette",
+            ));
+            rows.push(normal_text(
+                "  - catppuccin: Pastel color scheme (Catppuccin Macchiato)",
+            ));
+            rows.push(normal_text("  - synthwave84: Retro neon colors"));
+            rows.push(gap.clone());
+            rows.push(section("Custom Themes"));
+            rows.push(normal_text(
+                "You can define custom themes in the themes/ directory at:",
+            ));
+            rows.push(normal_text(
+                "  - macOS/Linux: ~/.config/mantis/themes/*.toml",
+            ));
+            rows.push(normal_text(
+                "  - Windows:     %APPDATA%\\mantis\\themes\\*.toml",
+            ));
+        }
+        7 => {
+            // Plugins
+            rows.push(section("Overview"));
+            rows.push(normal_text(
+                "Plugins are external processes communicating over standard JSON-RPC",
+            ));
+            rows.push(normal_text(
+                "IPC to extend mantis capabilities (syntax highlighting, language folding).",
+            ));
+            rows.push(gap.clone());
+            rows.push(section("Plugin Manager"));
+            rows.push(row_key("plugin_picker"));
+            rows.push(gap.clone());
+            rows.push(section("Plugin Location"));
+            rows.push(normal_text("Plugins are discovered and loaded from:"));
+            rows.push(normal_text("  - macOS/Linux: ~/.config/mantis/plugins/"));
+            rows.push(normal_text("  - Windows:     %APPDATA%\\mantis\\plugins\\"));
+            rows.push(gap.clone());
+            rows.push(section("For Developers"));
+            rows.push(normal_text(
+                "Refer to the plugin development guidelines in the online mdbook",
+            ));
+            rows.push(normal_text(
+                "or at docs/src/plugin-development.md in the repository.",
+            ));
+        }
+        8 => {
+            // Mouse
+            rows.push(section("General Actions"));
+            rows.push(row_static_key(
+                "Left-Click",
+                "Focus a panel / select a file or folder",
+            ));
+            rows.push(row_static_key(
+                "Double-Click",
+                "Set clicked folder as the new tree root (if on folder)",
+            ));
+            rows.push(row_static_key(
+                "Scroll Wheel",
+                "Scroll up / down in the hovered/focused panel",
+            ));
+            rows.push(gap.clone());
+            rows.push(section("Breadcrumb Actions"));
+            rows.push(row_static_key(
+                "Single-Click",
+                "Hover highlight path components",
+            ));
+            rows.push(row_static_key(
+                "Double-Click",
+                "Set clicked breadcrumb folder as the new tree root",
+            ));
+        }
+        _ => {}
+    }
 
     let total_rows = rows.len();
-    let visible = inner.height as usize;
+    let visible = content_area.height as usize;
     let max_scroll = total_rows.saturating_sub(visible);
     if app.help_scroll > max_scroll {
         app.help_scroll = max_scroll;
@@ -325,17 +511,18 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
 
     f.render_widget(
         Paragraph::new(rows).scroll((app.help_scroll as u16, 0)),
-        inner,
+        content_area,
     );
 
     if max_scroll > 0 {
         let indicator_y = if total_rows > 0 {
-            (app.help_scroll as f64 * (inner.height as f64 - 2.0) / max_scroll as f64).round()
-                as u16
+            (app.help_scroll as f64 * (content_area.height as f64 - 2.0) / max_scroll as f64)
+                .round() as u16
         } else {
             0
         };
-        let indicator_y = (indicator_y + inner.y).min(inner.bottom().saturating_sub(2));
+        let indicator_y =
+            (indicator_y + content_area.y).min(content_area.bottom().saturating_sub(2));
         let indicator_chars = if app.help_scroll == 0 {
             " ▲ "
         } else if app.help_scroll >= max_scroll {
@@ -349,7 +536,7 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
                 Style::default().fg(theme.dim),
             ))),
             Rect {
-                x: inner.right().saturating_sub(3),
+                x: content_area.right().saturating_sub(3),
                 y: indicator_y,
                 width: 3,
                 height: 1,
