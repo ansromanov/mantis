@@ -98,3 +98,117 @@ fn test_is_modal_close() {
     assert!(!is_modal_close(&make_key(KeyCode::Char('o'))));
     assert!(!is_modal_close(&make_key(KeyCode::Char('n'))));
 }
+
+#[test]
+fn test_is_toggle_regex() {
+    #[cfg(target_os = "macos")]
+    {
+        assert!(is_toggle_regex(&make_key_with_modifier(
+            KeyCode::Char('r'),
+            KeyModifiers::CONTROL | KeyModifiers::ALT
+        )));
+        assert!(is_toggle_regex(&make_key_with_modifier(
+            KeyCode::Char('R'),
+            KeyModifiers::CONTROL | KeyModifiers::ALT
+        )));
+        assert!(is_toggle_regex(&make_key_with_modifier(
+            KeyCode::Char('r'),
+            KeyModifiers::SUPER | KeyModifiers::ALT
+        )));
+        assert!(!is_toggle_regex(&make_key_with_modifier(
+            KeyCode::Char('r'),
+            KeyModifiers::ALT
+        )));
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        assert!(is_toggle_regex(&make_key_with_modifier(
+            KeyCode::Char('r'),
+            KeyModifiers::ALT
+        )));
+        assert!(is_toggle_regex(&make_key_with_modifier(
+            KeyCode::Char('R'),
+            KeyModifiers::ALT
+        )));
+        assert!(!is_toggle_regex(&make_key_with_modifier(
+            KeyCode::Char('r'),
+            KeyModifiers::CONTROL
+        )));
+    }
+}
+
+#[test]
+fn test_is_toggle_case() {
+    #[cfg(target_os = "macos")]
+    {
+        assert!(is_toggle_case(&make_key_with_modifier(
+            KeyCode::Char('c'),
+            KeyModifiers::CONTROL | KeyModifiers::ALT
+        )));
+        assert!(is_toggle_case(&make_key_with_modifier(
+            KeyCode::Char('C'),
+            KeyModifiers::CONTROL | KeyModifiers::ALT
+        )));
+        assert!(is_toggle_case(&make_key_with_modifier(
+            KeyCode::Char('c'),
+            KeyModifiers::SUPER | KeyModifiers::ALT
+        )));
+        assert!(!is_toggle_case(&make_key_with_modifier(
+            KeyCode::Char('c'),
+            KeyModifiers::ALT
+        )));
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        assert!(is_toggle_case(&make_key_with_modifier(
+            KeyCode::Char('c'),
+            KeyModifiers::ALT
+        )));
+        assert!(is_toggle_case(&make_key_with_modifier(
+            KeyCode::Char('C'),
+            KeyModifiers::ALT
+        )));
+        assert!(!is_toggle_case(&make_key_with_modifier(
+            KeyCode::Char('c'),
+            KeyModifiers::CONTROL
+        )));
+    }
+}
+
+#[test]
+fn test_is_toggle_whole_word() {
+    #[cfg(target_os = "macos")]
+    {
+        assert!(is_toggle_whole_word(&make_key_with_modifier(
+            KeyCode::Char('w'),
+            KeyModifiers::CONTROL | KeyModifiers::ALT
+        )));
+        assert!(is_toggle_whole_word(&make_key_with_modifier(
+            KeyCode::Char('W'),
+            KeyModifiers::CONTROL | KeyModifiers::ALT
+        )));
+        assert!(is_toggle_whole_word(&make_key_with_modifier(
+            KeyCode::Char('w'),
+            KeyModifiers::SUPER | KeyModifiers::ALT
+        )));
+        assert!(!is_toggle_whole_word(&make_key_with_modifier(
+            KeyCode::Char('w'),
+            KeyModifiers::ALT
+        )));
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        assert!(is_toggle_whole_word(&make_key_with_modifier(
+            KeyCode::Char('w'),
+            KeyModifiers::ALT
+        )));
+        assert!(is_toggle_whole_word(&make_key_with_modifier(
+            KeyCode::Char('W'),
+            KeyModifiers::ALT
+        )));
+        assert!(!is_toggle_whole_word(&make_key_with_modifier(
+            KeyCode::Char('w'),
+            KeyModifiers::CONTROL
+        )));
+    }
+}

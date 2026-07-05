@@ -9,7 +9,7 @@
 //! position tracks the content area so it sits just above the status bar.
 
 use ratatui::{
-    layout::Rect,
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Clear, Paragraph},
@@ -35,10 +35,15 @@ pub(crate) fn draw_in_file_search(f: &mut Frame, app: &mut App, area: Rect) {
     }
     f.render_widget(Clear, bar_rect);
 
+    let bar_parts = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Min(0), Constraint::Length(14)])
+        .split(bar_rect);
+
     let total = s.matches.len();
     let current = if total > 0 { s.current + 1 } else { 0 };
     let suffix = format!(" ({}/{})", current, total);
-    let max_w = bar_rect.width as usize;
+    let max_w = bar_parts[0].width as usize;
     let query_display: String = s
         .query
         .chars()
@@ -52,7 +57,7 @@ pub(crate) fn draw_in_file_search(f: &mut Frame, app: &mut App, area: Rect) {
                 truncated,
                 Style::default().fg(theme.accent_alt).bg(theme.background),
             )])),
-            bar_rect,
+            bar_parts[0],
         );
     } else {
         f.render_widget(
@@ -67,9 +72,48 @@ pub(crate) fn draw_in_file_search(f: &mut Frame, app: &mut App, area: Rect) {
                 Span::styled("█", Style::default().fg(theme.accent_alt)),
                 Span::styled(suffix, Style::default().fg(theme.dim)),
             ])),
-            bar_rect,
+            bar_parts[0],
         );
     }
+
+    let mut toggle_spans = Vec::new();
+    if s.case_sensitive {
+        toggle_spans.push(Span::styled(
+            "[Aa]",
+            Style::default()
+                .fg(theme.accent)
+                .add_modifier(Modifier::BOLD),
+        ));
+    } else {
+        toggle_spans.push(Span::styled("[Aa]", Style::default().fg(theme.dim)));
+    }
+    toggle_spans.push(Span::raw(" "));
+    if s.whole_word {
+        toggle_spans.push(Span::styled(
+            r"[\b]",
+            Style::default()
+                .fg(theme.accent)
+                .add_modifier(Modifier::BOLD),
+        ));
+    } else {
+        toggle_spans.push(Span::styled(r"[\b]", Style::default().fg(theme.dim)));
+    }
+    toggle_spans.push(Span::raw(" "));
+    if s.regex {
+        toggle_spans.push(Span::styled(
+            "[.*]",
+            Style::default()
+                .fg(theme.accent)
+                .add_modifier(Modifier::BOLD),
+        ));
+    } else {
+        toggle_spans.push(Span::styled("[.*]", Style::default().fg(theme.dim)));
+    }
+
+    f.render_widget(
+        Paragraph::new(Line::from(toggle_spans)).alignment(ratatui::layout::Alignment::Right),
+        bar_parts[1],
+    );
 }
 
 #[cfg(test)]

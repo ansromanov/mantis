@@ -27,6 +27,27 @@ impl App {
             }
             return;
         }
+        if static_keys::is_toggle_regex(&key) {
+            if let Some(s) = &mut self.search {
+                s.regex = !s.regex;
+                s.refresh_now();
+            }
+            return;
+        }
+        if static_keys::is_toggle_case(&key) {
+            if let Some(s) = &mut self.search {
+                s.case_sensitive = !s.case_sensitive;
+                s.refresh_now();
+            }
+            return;
+        }
+        if static_keys::is_toggle_whole_word(&key) {
+            if let Some(s) = &mut self.search {
+                s.whole_word = !s.whole_word;
+                s.refresh_now();
+            }
+            return;
+        }
         let Some(ref mut s) = self.search else { return };
         match handle_list_picker_key(s, &key) {
             OverlayKey::Activate => self.activate_search_selection(),
@@ -48,6 +69,30 @@ impl App {
         }
         if static_keys::is_prev_match(&key) {
             self.in_file_search_prev();
+            return;
+        }
+        if static_keys::is_toggle_regex(&key) {
+            if let Some(s) = &mut self.in_file_search {
+                s.regex = !s.regex;
+            }
+            self.refresh_in_file_search();
+            self.scroll_in_file_search_to_current();
+            return;
+        }
+        if static_keys::is_toggle_case(&key) {
+            if let Some(s) = &mut self.in_file_search {
+                s.case_sensitive = !s.case_sensitive;
+            }
+            self.refresh_in_file_search();
+            self.scroll_in_file_search_to_current();
+            return;
+        }
+        if static_keys::is_toggle_whole_word(&key) {
+            if let Some(s) = &mut self.in_file_search {
+                s.whole_word = !s.whole_word;
+            }
+            self.refresh_in_file_search();
+            self.scroll_in_file_search_to_current();
             return;
         }
         let Some(ref mut s) = self.in_file_search else {

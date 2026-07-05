@@ -151,6 +151,9 @@ pub struct InFileSearch {
     pub query: String,
     pub matches: Vec<InFileMatch>,
     pub current: usize,
+    pub regex: bool,
+    pub case_sensitive: bool,
+    pub whole_word: bool,
 }
 
 impl Default for InFileSearch {
@@ -165,6 +168,9 @@ impl InFileSearch {
             query: String::new(),
             matches: Vec::new(),
             current: 0,
+            regex: false,
+            case_sensitive: false,
+            whole_word: false,
         }
     }
 
@@ -185,24 +191,66 @@ impl InFileSearch {
         if self.query.is_empty() {
             return;
         }
-        let q_lower: Vec<char> = self.query.to_lowercase().chars().collect();
-        let q_char_len = q_lower.len();
-        if q_char_len == 0 {
-            return;
-        }
-        for i in 0..line_count {
-            let Some(line) = get_line(i) else { continue };
-            let line_lower: Vec<char> = line.to_lowercase().chars().collect();
-            if line_lower.len() < q_char_len {
-                continue;
-            }
-            for start in 0..=line_lower.len() - q_char_len {
-                if line_lower[start..start + q_char_len] == q_lower[..] {
+
+        if self.regex || self.whole_word {
+            let pattern = if self.whole_word {
+                if self.regex {
+                    format!(r"\b({})\b", self.query)
+                } else {
+                    format!(r"\b({})\b", regex::escape(&self.query))
+                }
+            } else {
+                self.query.clone()
+            };
+            let mut builder = regex::RegexBuilder::new(&pattern);
+            builder.case_insensitive(!self.case_sensitive);
+            let Ok(re) = builder.build() else {
+                return;
+            };
+            for i in 0..line_count {
+                let Some(line) = get_line(i) else { continue };
+                for mat in re.find_iter(&line) {
+                    let byte_start = mat.start();
+                    let byte_end = mat.end();
+                    let char_start = line[..byte_start].chars().count();
+                    let char_len = line[byte_start..byte_end].chars().count();
                     self.matches.push(InFileMatch {
                         line: i,
-                        col: start,
-                        len: q_char_len,
+                        col: char_start,
+                        len: char_len,
                     });
+                }
+            }
+        } else {
+            let q = if self.case_sensitive {
+                self.query.clone()
+            } else {
+                self.query.to_lowercase()
+            };
+            let q_chars: Vec<char> = q.chars().collect();
+            let q_char_len = q_chars.len();
+            if q_char_len == 0 {
+                return;
+            }
+            for i in 0..line_count {
+                let Some(line) = get_line(i) else { continue };
+                let target = if self.case_sensitive {
+                    line.clone()
+                } else {
+                    line.to_lowercase()
+                };
+                let target_chars: Vec<char> = target.chars().collect();
+                if target_chars.len() < q_char_len {
+                    continue;
+                }
+                for start in 0..=target_chars.len() - q_char_len {
+                    if target_chars[start..start + q_char_len] == q_chars[..] {
+                        self.matches.push(InFileMatch {
+                            line: i,
+                            col: start,
+                            len: q_char_len,
+                        });
+                    }
                 }
             }
         }

@@ -54,6 +54,63 @@ pub fn is_toggle_modal(key: &KeyEvent) -> bool {
     key.code == KeyCode::Tab
 }
 
+/// Toggle regex search (Alt+R on PC, Cmd+Alt+R or Ctrl+Alt+R on macOS).
+pub fn is_toggle_regex(key: &KeyEvent) -> bool {
+    let matches_char = matches!(key.code, KeyCode::Char('r') | KeyCode::Char('R'));
+    if !matches_char {
+        return false;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let has_super = key.modifiers.contains(KeyModifiers::SUPER);
+        let has_ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+        let has_alt = key.modifiers.contains(KeyModifiers::ALT);
+        (has_super || has_ctrl) && has_alt
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        key.modifiers.contains(KeyModifiers::ALT) && !key.modifiers.contains(KeyModifiers::CONTROL)
+    }
+}
+
+/// Toggle case-sensitive search (Alt+C on PC, Cmd+Alt+C or Ctrl+Alt+C on macOS).
+pub fn is_toggle_case(key: &KeyEvent) -> bool {
+    let matches_char = matches!(key.code, KeyCode::Char('c') | KeyCode::Char('C'));
+    if !matches_char {
+        return false;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let has_super = key.modifiers.contains(KeyModifiers::SUPER);
+        let has_ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+        let has_alt = key.modifiers.contains(KeyModifiers::ALT);
+        (has_super || has_ctrl) && has_alt
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        key.modifiers.contains(KeyModifiers::ALT) && !key.modifiers.contains(KeyModifiers::CONTROL)
+    }
+}
+
+/// Toggle whole-word search (Alt+W on PC, Cmd+Alt+W or Ctrl+Alt+W on macOS).
+pub fn is_toggle_whole_word(key: &KeyEvent) -> bool {
+    let matches_char = matches!(key.code, KeyCode::Char('w') | KeyCode::Char('W'));
+    if !matches_char {
+        return false;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let has_super = key.modifiers.contains(KeyModifiers::SUPER);
+        let has_ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+        let has_alt = key.modifiers.contains(KeyModifiers::ALT);
+        (has_super || has_ctrl) && has_alt
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        key.modifiers.contains(KeyModifiers::ALT) && !key.modifiers.contains(KeyModifiers::CONTROL)
+    }
+}
+
 /// Plugin picker toggle (Space).
 pub fn is_toggle_selection(key: &KeyEvent) -> bool {
     key.code == KeyCode::Char(' ')

@@ -85,6 +85,9 @@ pub struct SearchState {
     /// When `true`, the search index is scoped to a subset of files (e.g. git
     /// mode's changed files). Displayed as "(changed files)" in the overlay title.
     pub scoped: bool,
+    pub regex: bool,
+    pub case_sensitive: bool,
+    pub whole_word: bool,
 }
 
 fn filter_changed_paths(paths: &HashSet<PathBuf>, root: &Path) -> Vec<PathBuf> {
@@ -123,6 +126,9 @@ impl SearchState {
             pending_refresh: None,
             context_lines,
             scoped: changed_only.is_some(),
+            regex: false,
+            case_sensitive: false,
+            whole_word: false,
         }
     }
 
@@ -255,26 +261,73 @@ impl SearchState {
             }
             self.content_cache_dirty = false;
         }
-        let q = self.query.to_lowercase();
         let ctx = self.context_lines;
-        for path in &self.all_files {
-            let Some(lines) = self.content_cache.get(path) else {
-                continue;
+        if self.regex || self.whole_word {
+            let pattern = if self.whole_word {
+                if self.regex {
+                    format!(r"\b({})\b", self.query)
+                } else {
+                    format!(r"\b({})\b", regex::escape(&self.query))
+                }
+            } else {
+                self.query.clone()
             };
-            for (i, (orig, lower)) in lines.iter().enumerate() {
-                if lower.contains(&q) {
-                    let context = if ctx > 0 {
-                        let end = (i + 1 + ctx).min(lines.len());
-                        lines[i + 1..end].iter().map(|(l, _)| l.clone()).collect()
+            let mut builder = regex::RegexBuilder::new(&pattern);
+            builder.case_insensitive(!self.case_sensitive);
+            let Ok(re) = builder.build() else {
+                return;
+            };
+            for path in &self.all_files {
+                let Some(lines) = self.content_cache.get(path) else {
+                    continue;
+                };
+                for (i, (orig, _)) in lines.iter().enumerate() {
+                    if re.is_match(orig) {
+                        let context = if ctx > 0 {
+                            let end = (i + 1 + ctx).min(lines.len());
+                            lines[i + 1..end].iter().map(|(l, _)| l.clone()).collect()
+                        } else {
+                            Vec::new()
+                        };
+                        self.content_results.push(ContentMatch {
+                            path: path.clone(),
+                            line_num: i + 1,
+                            line: orig.clone(),
+                            context,
+                        });
+                    }
+                }
+            }
+        } else {
+            let q = if self.case_sensitive {
+                self.query.clone()
+            } else {
+                self.query.to_lowercase()
+            };
+            for path in &self.all_files {
+                let Some(lines) = self.content_cache.get(path) else {
+                    continue;
+                };
+                for (i, (orig, lower)) in lines.iter().enumerate() {
+                    let matched = if self.case_sensitive {
+                        orig.contains(&q)
                     } else {
-                        Vec::new()
+                        lower.contains(&q)
                     };
-                    self.content_results.push(ContentMatch {
-                        path: path.clone(),
-                        line_num: i + 1,
-                        line: orig.clone(),
-                        context,
-                    });
+                    if matched {
+                        let context = if ctx > 0 {
+                            let end = (i + 1 + ctx).min(lines.len());
+                            lines[i + 1..end].iter().map(|(l, _)| l.clone()).collect()
+                        } else {
+                            Vec::new()
+                        };
+                        self.content_results.push(ContentMatch {
+                            path: path.clone(),
+                            line_num: i + 1,
+                            line: orig.clone(),
+                            context,
+                        });
+                    }
                 }
             }
         }

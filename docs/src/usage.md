@@ -159,6 +159,9 @@ changed files — the popup title shows "(changed files)" to make this visible.
 | `Tab`     | Switch files / content mode     |
 | `Enter`   | Open selected result            |
 | `Esc`     | Close search                    |
+| `Alt+c` (Mac: `Cmd+Alt+c` / `Ctrl+Alt+c`) | Toggle case-sensitivity |
+| `Alt+w` (Mac: `Cmd+Alt+w` / `Ctrl+Alt+w`) | Toggle whole-word match |
+| `Alt+r` (Mac: `Cmd+Alt+r` / `Ctrl+Alt+r`) | Toggle regular expression |
 
 ## Command palette
 

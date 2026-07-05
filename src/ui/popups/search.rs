@@ -59,6 +59,11 @@ pub(crate) fn draw_search(f: &mut Frame, app: &mut App, area: Rect) {
         ])
         .split(inner);
 
+    let query_parts = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Min(0), Constraint::Length(30)])
+        .split(parts[0]);
+
     let hint = if search.mode == SearchMode::Content && search.query.len() < 2 {
         "  (type 2+ chars)"
     } else {
@@ -76,7 +81,52 @@ pub(crate) fn draw_search(f: &mut Frame, app: &mut App, area: Rect) {
             Span::styled("█", Style::default().fg(theme.accent_alt)),
             Span::styled(hint, Style::default().fg(theme.dim)),
         ])),
-        parts[0],
+        query_parts[0],
+    );
+
+    let mut toggle_spans = Vec::new();
+    if search.case_sensitive {
+        toggle_spans.push(Span::styled(
+            "[Aa]",
+            Style::default()
+                .fg(theme.accent)
+                .add_modifier(Modifier::BOLD),
+        ));
+    } else {
+        toggle_spans.push(Span::styled("[Aa]", Style::default().fg(theme.dim)));
+    }
+    toggle_spans.push(Span::raw(" "));
+    if search.whole_word {
+        toggle_spans.push(Span::styled(
+            r"[\b]",
+            Style::default()
+                .fg(theme.accent)
+                .add_modifier(Modifier::BOLD),
+        ));
+    } else {
+        toggle_spans.push(Span::styled(r"[\b]", Style::default().fg(theme.dim)));
+    }
+    toggle_spans.push(Span::raw(" "));
+    if search.regex {
+        toggle_spans.push(Span::styled(
+            "[.*]",
+            Style::default()
+                .fg(theme.accent)
+                .add_modifier(Modifier::BOLD),
+        ));
+    } else {
+        toggle_spans.push(Span::styled("[.*]", Style::default().fg(theme.dim)));
+    }
+    let total = search.results_len();
+    let current = if total > 0 { search.selected + 1 } else { 0 };
+    toggle_spans.push(Span::styled(
+        format!("  {}/{}", current, total),
+        Style::default().fg(theme.dim),
+    ));
+
+    f.render_widget(
+        Paragraph::new(Line::from(toggle_spans)).alignment(ratatui::layout::Alignment::Right),
+        query_parts[1],
     );
 
     f.render_widget(
