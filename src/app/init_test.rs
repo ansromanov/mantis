@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use super::*;
 use crate::app::DiffMode;
-use crate::config::Config;
+use crate::config::{Config, ContentConfig};
 
 fn temp_dir() -> PathBuf {
     static COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -590,6 +590,33 @@ fn app_new_ignore_gitignore_includes_ignored_in_status_map() {
         app.git_status_map.get(&ignored),
         Some(&crate::git::GitStatus::Ignored),
         "ignore_gitignore=true must seed ignored entries even when show_ignored=false"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn app_new_respects_prettify_size_limit_for_json_file() {
+    let root = temp_dir();
+    let json = root.join("data.json");
+    let data = serde_json::json!({
+        "items": (0..20).map(|i| format!("val_{}", i)).collect::<Vec<_>>()
+    });
+    fs::write(&json, serde_json::to_string(&data).unwrap()).unwrap();
+
+    // Config with a very small limit so the test JSON exceeds it.
+    let cfg = Config {
+        content: ContentConfig {
+            prettify_size_limit: 50,
+            ..Default::default()
+        },
+        ..Config::default()
+    };
+    let app = new_app(&root, cfg);
+    // The constructor opens the first selected file (data.json).
+    // With the low limit it must be shown as raw content.
+    assert!(
+        !app.show_pretty_json,
+        "JSON exceeding prettify_size_limit must not be pretty-printed"
     );
     fs::remove_dir_all(&root).ok();
 }

@@ -59,6 +59,8 @@ scrollbar = true             # show a scrollbar
 scroll_percentage = true     # show scroll-position percentage
 watch = false                # auto-reload the open file when it changes on disk
 show_file_info = true        # encoding + line-ending info in the status bar
+prettify_size_limit = 10485760  # max bytes for JSON/YAML pretty-printing;
+                                 #   larger files show as raw text (10 MiB default)
 
 [search]
 in_file_search = true        # enable in-file incremental search via `/`

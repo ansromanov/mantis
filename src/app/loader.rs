@@ -47,6 +47,9 @@ pub(super) struct FileLoad {
     pub json_pretty_lines: Spans,
     pub show_pretty_json: bool,
     pub yaml: Option<YamlLoad>,
+    /// `true` when the file size exceeds the configured `prettify_size_limit`
+    /// and JSON/YAML pretty-printing / fold detection was skipped.
+    pub prettify_size_limit_exceeded: bool,
     /// `false` when the file could not be read; `current_file` is cleared so the
     /// inline `[error: …]` message stands alone.
     pub ok: bool,
@@ -95,6 +98,7 @@ impl FileLoad {
             json_pretty_lines: Vec::new(),
             show_pretty_json: false,
             yaml: None,
+            prettify_size_limit_exceeded: false,
             ok: true,
             encoding: None,
             line_ending: None,
@@ -107,16 +111,35 @@ impl FileLoad {
 /// Plain files use a memory-mapped [`VirtualFile`] (highlighted lazily in the
 /// UI); JSON/YAML are read fully and rendered here. This is the single source
 /// of truth shared by the synchronous and worker code paths.
-pub(super) fn compute_file_load(path: &Path, hl: &Highlighter) -> FileLoad {
+///
+/// `prettify_size_limit` is the maximum file size (bytes) for which
+/// JSON/YAML pretty-printing and fold-region detection are performed. Files
+/// exceeding this threshold are loaded via the mmap path and shown as raw
+/// content, with `prettify_size_limit_exceeded` set on the returned structure.
+pub(super) fn compute_file_load(
+    path: &Path,
+    hl: &Highlighter,
+    prettify_size_limit: usize,
+) -> FileLoad {
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
     let is_json = ext == "json";
     let is_yaml = matches!(ext, "yaml" | "yml");
 
+    // Check whether this JSON/YAML file exceeds the pretty-print size limit.
+    let too_large = if is_json || is_yaml {
+        std::fs::metadata(path)
+            .ok()
+            .is_some_and(|meta| meta.len() > prettify_size_limit as u64)
+    } else {
+        false
+    };
+
     // Try memory-mapped virtual file first (lazy, no full content in memory).
-    // JSON and YAML are excluded: they need full content for rendering.
-    if !is_json && !is_yaml {
+    // JSON and YAML are excluded (they need full content for rendering) unless
+    // the file exceeds the prettify size limit.
+    if (!is_json && !is_yaml) || too_large {
         if let Some(vf) = VirtualFile::open(path) {
-            let mut load = FileLoad::empty(false);
+            let mut load = FileLoad::empty(is_json);
             let raw = vf.raw_bytes();
             // VirtualFile::open already verified valid UTF-8, so skip the full
             // re-validation pass; only the BOM/ASCII prefix check is needed.
@@ -124,6 +147,7 @@ pub(super) fn compute_file_load(path: &Path, hl: &Highlighter) -> FileLoad {
             load.line_ending = detect_line_ending(raw).map(|s| s.to_string());
             load.syntax_name = hl.syntax_name(path);
             load.virtual_file = Some(vf);
+            load.prettify_size_limit_exceeded = too_large;
             return load;
         }
     }
@@ -171,6 +195,15 @@ pub(super) fn compute_file_load(path: &Path, hl: &Highlighter) -> FileLoad {
     load.content = s.lines().map(|l| l.to_owned()).collect();
     if load.content.is_empty() {
         load.content = vec!["[empty file]".into()];
+        return load;
+    }
+
+    // Skip YAML/JSON processing when the file exceeds the prettify size limit;
+    // the mmap path above should have handled this, but guard the fallback too.
+    if too_large {
+        load.prettify_size_limit_exceeded = true;
+        load.highlighted = hl.highlight(path, &load.content);
+        load.syntax_name = hl.syntax_name(path);
         return load;
     }
 
@@ -307,7 +340,11 @@ pub(super) struct Loader {
 }
 
 impl Loader {
-    pub fn new(theme: &Theme, extra_syntaxes: Vec<ExtraSyntax>) -> Self {
+    pub fn new(
+        theme: &Theme,
+        extra_syntaxes: Vec<ExtraSyntax>,
+        prettify_size_limit: usize,
+    ) -> Self {
         let (req_tx, req_rx) = std::sync::mpsc::channel::<LoadRequest>();
         let (res_tx, res_rx) = std::sync::mpsc::channel::<LoadResponse>();
         let mut extra_for_thread = Arc::new(extra_syntaxes);
@@ -326,7 +363,7 @@ impl Loader {
                         hl = Highlighter::with_extra_syntaxes(&theme.syntax, &extra_for_thread);
                     }
                     LoadRequest::File { seq, path } => {
-                        let load = Box::new(compute_file_load(&path, &hl));
+                        let load = Box::new(compute_file_load(&path, &hl, prettify_size_limit));
                         if res_tx.send(LoadResponse::File { seq, path, load }).is_err() {
                             break;
                         }
