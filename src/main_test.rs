@@ -144,7 +144,6 @@ fn event_loop_key_search_toggles_search() {
     // Switch to Content focus + no file so ctrl+f opens SearchState.
     app.focus = crate::app::Focus::Content;
     app.current_file = None;
-    // search_files default is ctrl+f ('/' remains as a tree-scoped binding).
     app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
     assert!(app.search.is_some());
     app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
