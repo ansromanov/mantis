@@ -265,6 +265,59 @@ fn pressed_honours_current_alt_keys() {
 
 // ---- end kitty-protocol tests --------------------------------------------
 
+// ---- Windows CapsLock normalization ---------------------------------------
+//
+// crossterm's Windows backend derives a key event's reported char case from
+// `shift_pressed XOR capslock_on`, so with CapsLock on, an unshifted letter
+// arrives as an uppercase `KeyCode::Char` even though the `SHIFT` modifier
+// bit is `false`. `KeyBinding::matches` must re-derive the letter's case from
+// the `SHIFT` modifier alone (which crossterm reports independently of
+// CapsLock) rather than trusting the char's case, or every lowercase-letter
+// binding silently stops matching whenever CapsLock is on.
+
+#[test]
+#[cfg(not(unix))]
+fn matches_ignores_capslock_for_lowercase_binding() {
+    let b = parse_binding("ctrl+p").unwrap();
+    // CapsLock on, no physical Shift: crossterm reports Char('P') + CONTROL
+    // (no SHIFT bit). The lowercase-spec binding must still match.
+    assert!(b.matches(&ev(KeyCode::Char('P'), KeyModifiers::CONTROL)));
+}
+
+#[test]
+#[cfg(not(unix))]
+fn matches_ignores_capslock_for_uppercase_binding() {
+    let b = parse_binding("ctrl+P").unwrap();
+    // CapsLock *and* physical Shift held together: shift_pressed XOR
+    // capslock_on cancels out, so crossterm reports Char('p') + CONTROL +
+    // SHIFT. The uppercase-spec (Ctrl+Shift+P) binding must still match.
+    assert!(b.matches(&ev(
+        KeyCode::Char('p'),
+        KeyModifiers::CONTROL | KeyModifiers::SHIFT
+    )));
+}
+
+#[test]
+#[cfg(not(unix))]
+fn matches_still_distinguishes_shift_without_capslock() {
+    // No CapsLock involved: plain case-per-modifier behavior must be
+    // preserved so `ctrl+f` and `ctrl+F` remain distinct bindings.
+    let lower = parse_binding("ctrl+f").unwrap();
+    let upper = parse_binding("ctrl+F").unwrap();
+
+    assert!(lower.matches(&ev(KeyCode::Char('f'), KeyModifiers::CONTROL)));
+    assert!(!upper.matches(&ev(KeyCode::Char('f'), KeyModifiers::CONTROL)));
+
+    assert!(upper.matches(&ev(
+        KeyCode::Char('F'),
+        KeyModifiers::CONTROL | KeyModifiers::SHIFT
+    )));
+    assert!(!lower.matches(&ev(
+        KeyCode::Char('F'),
+        KeyModifiers::CONTROL | KeyModifiers::SHIFT
+    )));
+}
+
 #[test]
 fn keymap_has_no_toggle_raw_markdown() {
     let keymap = Keymap::default();
