@@ -25,7 +25,7 @@ config required, with an optional plugin system when you want more. Built with
 mantis      # open the current directory and start browsing
 ```
 
-That's it — no setup step. Press `F1` for help (or `?` while the tree is focused), `Ctrl+c` to quit.
+That's it — no setup step. Press `F1` for help (or `?`), `Ctrl+c` to quit.
 
 ## Why mantis?
 
@@ -122,7 +122,7 @@ mantis path/to/dir  # view a specific directory
 mantis file.md      # open a file directly
 ```
 
-Press `F1` for in-app help (or `?` while the tree is focused), and `Ctrl+c` to quit. For the full keybinding
+Press `F1` for in-app help (or `?`), and `Ctrl+c` to quit. For the full keybinding
 list and every action name, see the
 [Usage & Keybindings guide](https://ansromanov.github.io/mantis/usage.html) — or
 press `Ctrl+Shift+P` in-app to fuzzy-find any action with its binding.
