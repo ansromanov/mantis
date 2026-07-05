@@ -9,6 +9,9 @@ use crate::app::{App, Focus};
 use crate::config::Config;
 use crate::search::SearchMode;
 
+#[cfg(unix)]
+use crate::event_source::{AltKeys, CURRENT_ALT_KEYS};
+
 static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 fn temp_tree() -> PathBuf {
@@ -243,6 +246,35 @@ fn goto_line_keybinding_opens_dialog_with_content_focus() {
     app.focus = Focus::Content;
     app.handle_key(ctrl('g'));
     assert!(app.goto_line.is_some());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn goto_line_wins_over_git_mode_on_legacy_terminal() {
+    // On terminals without kitty keyboard protocol, Ctrl+G (lowercase) could
+    // match both goto_line (ctrl+g) and git_mode_toggle (ctrl+G). The dispatch
+    // order must prefer goto_line so the plain-Ctrl action wins.
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    #[cfg(unix)]
+    CURRENT_ALT_KEYS.with(|c| {
+        c.set(AltKeys {
+            shifted: None,
+            base: None,
+        })
+    });
+    app.handle_key(ctrl('g'));
+    assert!(
+        app.goto_line.is_some(),
+        "goto_line dialog must open when ctrl+g is pressed on a legacy terminal"
+    );
+    assert!(
+        !app.git_mode,
+        "git_mode must NOT be toggled when ctrl+g fires goto_line on a legacy terminal"
+    );
+    #[cfg(unix)]
+    CURRENT_ALT_KEYS.with(|c| c.set(AltKeys::default()));
     fs::remove_dir_all(&root).ok();
 }
 

@@ -123,6 +123,14 @@ impl App {
                 Focus::Tree => Focus::Content,
                 Focus::Content => Focus::Tree,
             };
+        } else if pressed_in(&k.goto_line, &key, scope) {
+            // goto_line (Ctrl+g) checked before git_mode_toggle (Ctrl+G)
+            // so on legacy terminals the plain-Ctrl action wins.
+            if self.focus == Focus::Content {
+                self.goto_line = Some(GotoLineState::new());
+            } else {
+                self.set_status("go to line: switch to the content pane (Tab)");
+            }
         } else if pressed_in(&k.git_mode_toggle, &key, scope) {
             self.toggle_git_mode();
         } else if pressed_in(&k.git_mode_flat_toggle, &key, scope) {
@@ -145,12 +153,6 @@ impl App {
             self.copy_path_to_clipboard(false);
         } else if pressed_in(&k.copy_relative_path, &key, scope) {
             self.copy_path_to_clipboard(true);
-        } else if pressed_in(&k.goto_line, &key, scope) {
-            if self.focus == Focus::Content {
-                self.goto_line = Some(GotoLineState::new());
-            } else {
-                self.set_status("go to line: switch to the content pane (Tab)");
-            }
         } else {
             match self.focus {
                 Focus::Tree => self.handle_tree_key(key),

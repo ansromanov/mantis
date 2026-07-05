@@ -263,7 +263,110 @@ fn pressed_honours_current_alt_keys() {
     reset_alt();
 }
 
-// ---- end kitty-protocol tests --------------------------------------------
+// ---- legacy terminal fallback (no keyboard enhancement) --------------------
+//
+// On legacy terminals (macOS Terminal.app, plain xterm, SSH) without the kitty
+// keyboard protocol, Ctrl+Letter and Ctrl+Shift+Letter produce identical events:
+// both send the lowercase char with the CONTROL modifier. `KeyBinding::matches`
+// must accept either case for Ctrl+letter bindings when no alt-keys are reported
+// — otherwise the shift-variant binding (e.g. ctrl+G for git_mode_toggle) can
+// never fire.
+
+#[test]
+#[cfg(unix)]
+fn legacy_terminal_ctrl_uppercase_matches_lowercase_event() {
+    // ctrl+G (uppercase = Ctrl+Shift+G on enhanced terminals) must match
+    // a lowercase 'g' with CONTROL on legacy terminals.
+    let binding = parse_binding("ctrl+G").unwrap();
+    let event = ev(KeyCode::Char('g'), KeyModifiers::CONTROL);
+
+    reset_alt();
+    assert!(
+        binding.matches(&event),
+        "ctrl+G must match Char('g')+CONTROL on a legacy terminal"
+    );
+}
+
+#[test]
+#[cfg(unix)]
+fn legacy_terminal_ctrl_lowercase_still_matches_lowercase() {
+    // ctrl+g (lowercase) must still match normally on legacy terminals.
+    let binding = parse_binding("ctrl+g").unwrap();
+    let event = ev(KeyCode::Char('g'), KeyModifiers::CONTROL);
+
+    reset_alt();
+    assert!(binding.matches(&event));
+}
+
+#[test]
+#[cfg(unix)]
+fn legacy_terminal_ctrl_binding_rejects_different_char() {
+    // ctrl+g must NOT match a different letter on legacy terminals.
+    let binding = parse_binding("ctrl+g").unwrap();
+    let event = ev(KeyCode::Char('x'), KeyModifiers::CONTROL);
+
+    reset_alt();
+    assert!(!binding.matches(&event));
+}
+
+#[test]
+#[cfg(unix)]
+fn legacy_terminal_unmodified_binding_not_affected() {
+    // Non-ctrl bindings (e.g. 'G' for content_bottom) must NOT become
+    // case-insensitive on legacy terminals. 'G' should only match 'G'.
+    let binding = parse_binding("G").unwrap();
+    let event = ev(KeyCode::Char('g'), KeyModifiers::empty());
+
+    reset_alt();
+    assert!(
+        !binding.matches(&event),
+        "unmodified 'G' must NOT match lowercase 'g' on a legacy terminal"
+    );
+}
+
+#[test]
+#[cfg(unix)]
+fn legacy_terminal_ctrl_uppercase_does_not_match_when_alt_keys_present() {
+    // On an enhanced terminal with alt-keys, ctrl+G must NOT match
+    // a lowercase 'g' — they are distinct events when the protocol works.
+    let binding = parse_binding("ctrl+G").unwrap();
+    let event = ev(KeyCode::Char('g'), KeyModifiers::CONTROL);
+
+    set_alt(Some('G'), Some('g'));
+    assert!(
+        !binding.matches(&event),
+        "ctrl+G must NOT match Char('g') when alt-keys are available"
+    );
+    reset_alt();
+}
+
+#[test]
+#[cfg(unix)]
+fn legacy_terminal_lowercase_ctrl_does_not_match_uppercase_event() {
+    // Lowercase ctrl bindings must NOT match uppercase events on legacy
+    // terminals — that would break enhanced terminal dispatch where the
+    // protocol correctly distinguishes case.
+    let binding = parse_binding("ctrl+g").unwrap();
+    let event = ev(KeyCode::Char('G'), KeyModifiers::CONTROL);
+
+    reset_alt();
+    assert!(
+        !binding.matches(&event),
+        "ctrl+g must NOT match Char('G')+CONTROL on a legacy terminal"
+    );
+}
+
+#[test]
+#[cfg(unix)]
+fn legacy_terminal_pressed_returns_false_without_match() {
+    let bindings = bind(&["ctrl+G"]);
+    let event = ev(KeyCode::Char('x'), KeyModifiers::CONTROL);
+
+    reset_alt();
+    assert!(!pressed(&bindings, &event));
+}
+
+// ---- end legacy terminal tests -------------------------------------------
 
 // ---- Windows CapsLock normalization ---------------------------------------
 //

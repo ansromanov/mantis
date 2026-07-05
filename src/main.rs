@@ -330,7 +330,13 @@ fn launch_tui(root: PathBuf, initial: InitialContent) -> anyhow::Result<()> {
     #[cfg(not(unix))]
     let mut events: Box<dyn EventSource> = Box::new(CrosstermEvents);
 
-    let result = run_app(&mut terminal, root, initial, events.as_mut());
+    let result = run_app(
+        &mut terminal,
+        root,
+        initial,
+        events.as_mut(),
+        keyboard_enhanced,
+    );
 
     result
 }
@@ -344,9 +350,16 @@ fn run_app(
     root: PathBuf,
     initial: InitialContent,
     events: &mut dyn EventSource,
+    keyboard_enhanced: bool,
 ) -> anyhow::Result<()> {
     let (cfg, cfg_path, cfg_error) = config::load(&root);
     let mut app = App::new(root, cfg, cfg_path, cfg_error)?;
+    app.keyboard_enhanced = keyboard_enhanced;
+    if !keyboard_enhanced {
+        app.set_status(
+            "terminal can't distinguish Ctrl+Shift shortcuts — some keys degraded (see ? help)",
+        );
+    }
     match initial {
         InitialContent::File(file) => app.open_and_reveal(&file),
         InitialContent::Pager { parsed, language } => app.open_pager_content(parsed, language),

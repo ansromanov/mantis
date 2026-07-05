@@ -36,6 +36,49 @@ piped data: mantis reads keys from the controlling terminal instead, the same
 trick `less` uses. Input is read to EOF before the UI starts, so very large
 piped input delays the first frame rather than streaming incrementally.
 
+## Terminal compatibility
+
+### Keyboard enhancement
+
+Modern terminals distinguish `Ctrl+Letter` from `Ctrl+Shift+Letter` via the
+kitty keyboard protocol (CSI-u). Legacy terminals (macOS Terminal.app, plain
+xterm, many SSH setups) send the same byte for both — `Ctrl+G` and
+`Ctrl+Shift+G` are indistinguishable.
+
+mantis detects your terminal's capability at startup. When the kitty protocol
+is **not** available, the plain-`Ctrl` binding takes priority for conflicting
+keys (e.g. `Ctrl+g` opens the go-to-line dialog rather than `Ctrl+Shift+G`
+toggling git mode). Shift-variant actions remain accessible through the command
+palette (`Ctrl+Shift+P` — which itself degrades to `Ctrl+P` followed by typing
+the action name).
+
+| Terminal | Keyboard enhancement | Shift+Ctrl support | Full mouse support |
+|---|---|---|---|
+| kitty | ✓ Full | ✓ | ✓ |
+| WezTerm | ✓ Full | ✓ | ✓ |
+| Ghostty | ✓ Full | ✓ | ✓ |
+| Alacritty 0.15+ | ✓ Full | ✓ | ✓ |
+| Windows Terminal | ✓ Full | ✓ | ✓ |
+| iTerm2 | ✓ Partial¹ | ✓ | ✓ |
+| macOS Terminal.app | ✗ | ✗ | ✓ |
+| xterm (plain) | ✗ | ✗ | Partial² |
+| Most SSH clients | ✗ | ✗ | Depends on client |
+| tmux (inside any terminal) | ✗ | ✗ | ✗ |
+
+¹ iTerm2 supports CSI-u (disambiguation + event types) but may not report
+alternate keys for all keyboard layouts. Shift+Ctrl combos work reliably on US
+layouts.
+
+² xterm supports mouse events but the generic mouse protocol (SGR 1006) lacks
+drag and release tracking. Enable `xterm-mouse` in tmux or `XTerm*decTerminalID:
+> 280` for full SGR mouse.
+
+On terminals without keyboard enhancement, mantis shows a one-time notice and
+notes the limitation in the in-app help (`?` → Getting started).
+
+The best terminals for full mantis keyboard support are **kitty, WezTerm,
+Ghostty, Alacritty 0.15+**, and **Windows Terminal**.
+
 ## Session persistence
 
 `mantis` automatically remembers your workspace state across restarts:
