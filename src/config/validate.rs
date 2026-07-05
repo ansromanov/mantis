@@ -51,6 +51,48 @@ const DEPRECATED_KEYS: &[&str] = &[
     "keys.visual_line_toggle",
 ];
 
+/// Returns the canonical set of recognized config paths as dotted strings
+/// (e.g. `"tree.show_hidden"`, `"keys.quit"`), sorted alphabetically.
+/// This is the schema that `validate_keys` checks against, excluding deprecated
+/// and legacy paths. The result is the source of truth for the CI-enforced
+/// snapshot test in `tests/config_tests.rs` — any removal must be accompanied
+/// by a `legacy_*` migration or an entry in `DEPRECATED_KEYS`.
+#[cfg_attr(not(test), allow(dead_code))]
+pub fn schema_paths() -> Vec<String> {
+    let mut paths = Vec::new();
+    collect_schema_paths(&schema_table(), "", &mut paths);
+    // `plugins` is a known top-level key whose contents are user-defined
+    // (plugin names as keys). The schema table omits it when the map is
+    // empty, but it is always a valid config path.
+    if !paths
+        .iter()
+        .any(|p| p == "plugins" || p.starts_with("plugins."))
+    {
+        paths.push("plugins".to_string());
+    }
+    paths.sort();
+    paths
+}
+
+/// Recursively walks a `toml::Table` schema and collects every dotted path.
+/// Does not recurse into `plugins` (user-defined keys).
+#[cfg_attr(not(test), allow(dead_code))]
+fn collect_schema_paths(table: &toml::Table, prefix: &str, out: &mut Vec<String>) {
+    for (key, val) in table {
+        let path = if prefix.is_empty() {
+            key.clone()
+        } else {
+            format!("{prefix}.{key}")
+        };
+        out.push(path.clone());
+        if let Some(sub) = val.as_table() {
+            if key != "plugins" {
+                collect_schema_paths(sub, &path, out);
+            }
+        }
+    }
+}
+
 /// Validates the raw TOML against the config schema, returning a message for
 /// every unrecognized key (with a nearest-match suggestion where one is close
 /// enough). Keys are reported by full path, e.g. `keys.qiut` or `theme.acent`.

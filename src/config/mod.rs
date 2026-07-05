@@ -24,13 +24,15 @@
 mod keymap;
 pub mod static_keys;
 mod types;
-mod validate;
+pub(crate) mod validate;
 
 // Used by test helpers across modules to inject bindings.
 #[cfg_attr(not(test), allow(unused_imports))]
 pub(crate) use keymap::bind;
 pub use keymap::{pressed, pressed_in, BindingScope, Keymap};
 pub use types::{Config, StatusBarConfig};
+#[allow(unused_imports)]
+pub use validate::schema_paths;
 // Used by name only in test code (struct literals in *_test helpers).
 #[cfg_attr(not(test), allow(unused_imports))]
 pub use types::{GitConfig, GitDiffConfig, TreeConfig};
