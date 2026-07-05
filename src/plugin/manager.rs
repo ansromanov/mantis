@@ -58,8 +58,9 @@ struct PendingRequest {
 
 /// How long the host waits for a plugin's `response` before treating the
 /// request as timed out (surfaced the same way as `plugin_error`, without
-/// killing the plugin). Shortened under `cfg(test)` so timeout tests don't
-/// need multi-hundred-millisecond real sleeps.
+/// killing the plugin). Lengthened under `cfg(test)` so a real spawned
+/// subprocess's round trip (fork/exec + pipe I/O) under parallel
+/// test-suite load isn't racing a razor-thin window.
 #[cfg(not(test))]
 pub(crate) const REQUEST_TIMEOUT: Duration = Duration::from_millis(300);
 #[cfg(test)]

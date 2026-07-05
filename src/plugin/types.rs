@@ -115,9 +115,10 @@ pub struct LanguageProviderRegistration {
     pub capabilities: std::collections::HashSet<Capability>,
     /// Tie-breaker when two providers register the same extension +
     /// capability pair (protocol 3+). Higher wins; equal priority keeps
-    /// whichever provider was registered first. Defaults to `0`, so
-    /// protocol 2 plugins (which never send this field) never outrank a
-    /// protocol 3 plugin that explicitly asks for lower priority.
+    /// whichever provider was registered first. Defaults to `0`, matching
+    /// what a plugin that never sends this field is treated as — such a
+    /// plugin can still be outranked by one that explicitly asks for a
+    /// higher priority, or itself outrank one asking for a lower priority.
     pub priority: i64,
 }
 
