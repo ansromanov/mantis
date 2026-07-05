@@ -430,3 +430,264 @@ fn utf8_paste_split_across_fill_boundary() {
     }
     assert_eq!(decoded, "héllo мир");
 }
+
+// ---------------------------------------------------------------------------
+// parse_modifier_and_kind: shared helper used by CSI-u, CSI tilde, and
+// CSI arrows
+// ---------------------------------------------------------------------------
+
+#[test]
+fn modifier_kind_absent_returns_empty_press() {
+    let (m, k) = parse_modifier_and_kind(None);
+    assert!(m.is_empty());
+    assert_eq!(k, KeyEventKind::Press);
+}
+
+#[test]
+fn modifier_kind_empty_string_returns_empty_press() {
+    let (m, k) = parse_modifier_and_kind(Some(""));
+    assert!(m.is_empty());
+    assert_eq!(k, KeyEventKind::Press);
+}
+
+#[test]
+fn modifier_kind_nomod_returns_empty_press() {
+    let (m, k) = parse_modifier_and_kind(Some("1"));
+    assert!(m.is_empty());
+    assert_eq!(k, KeyEventKind::Press);
+}
+
+#[test]
+fn modifier_kind_shift_modifier() {
+    let (m, k) = parse_modifier_and_kind(Some("2"));
+    assert!(m.contains(KeyModifiers::SHIFT));
+    assert!(!m.contains(KeyModifiers::CONTROL));
+    assert_eq!(k, KeyEventKind::Press);
+}
+
+#[test]
+fn modifier_kind_ctrl_alt_shift() {
+    // bitmask 1+2+4 = 7, +1 = 8
+    let (m, k) = parse_modifier_and_kind(Some("8"));
+    assert!(m.contains(KeyModifiers::SHIFT));
+    assert!(m.contains(KeyModifiers::ALT));
+    assert!(m.contains(KeyModifiers::CONTROL));
+    assert_eq!(k, KeyEventKind::Press);
+}
+
+#[test]
+fn modifier_kind_super_only() {
+    // super = bit 3 (0x08), +1 = 9
+    let (m, k) = parse_modifier_and_kind(Some("9"));
+    assert!(m.contains(KeyModifiers::SUPER));
+    assert!(!m.contains(KeyModifiers::SHIFT));
+    assert_eq!(k, KeyEventKind::Press);
+}
+
+#[test]
+fn modifier_kind_repeat_event() {
+    let (m, k) = parse_modifier_and_kind(Some("1:2"));
+    assert!(m.is_empty());
+    assert_eq!(k, KeyEventKind::Repeat);
+}
+
+#[test]
+fn modifier_kind_release_event() {
+    let (m, k) = parse_modifier_and_kind(Some("1:3"));
+    assert!(m.is_empty());
+    assert_eq!(k, KeyEventKind::Release);
+}
+
+#[test]
+fn modifier_kind_unknown_event_falls_back_to_press() {
+    let (m, k) = parse_modifier_and_kind(Some("1:42"));
+    assert!(m.is_empty());
+    assert_eq!(k, KeyEventKind::Press);
+}
+
+#[test]
+fn modifier_kind_bad_modifier_value_falls_back_to_empty() {
+    let (m, _k) = parse_modifier_and_kind(Some("not_a_number:3"));
+    assert!(m.is_empty());
+}
+
+// ---------------------------------------------------------------------------
+// SS3 function keys (ESC O P/Q/R/S for F1-F4)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn ss3_f1_f4_sequences() {
+    let cases = [
+        (b"\x1bOP", KeyCode::F(1)),
+        (b"\x1bOQ", KeyCode::F(2)),
+        (b"\x1bOR", KeyCode::F(3)),
+        (b"\x1bOS", KeyCode::F(4)),
+    ];
+    for (seq, expected) in &cases {
+        let (ev, consumed) = parse_ok(*seq);
+        assert_eq!(consumed, 3);
+        assert_eq!(key_event(&ev).code, *expected, "SS3 {seq:02x?}");
+    }
+}
+
+#[test]
+fn ss3_arrow_keys() {
+    let cases = [
+        (b"\x1bOA", KeyCode::Up),
+        (b"\x1bOB", KeyCode::Down),
+        (b"\x1bOC", KeyCode::Right),
+        (b"\x1bOD", KeyCode::Left),
+    ];
+    for (seq, expected) in &cases {
+        let (ev, _) = parse_ok(*seq);
+        assert_eq!(key_event(&ev).code, *expected, "SS3 arrow {seq:02x?}");
+    }
+}
+
+#[test]
+fn ss3_home_end() {
+    let cases = [(b"\x1bOH", KeyCode::Home), (b"\x1bOF", KeyCode::End)];
+    for (seq, expected) in &cases {
+        let (ev, _) = parse_ok(*seq);
+        assert_eq!(key_event(&ev).code, *expected, "SS3 home/end {seq:02x?}");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CSI sequences for Home, End, BackTab, and focus events
+// ---------------------------------------------------------------------------
+
+#[test]
+fn csi_home() {
+    let (ev, consumed) = parse_ok(b"\x1b[H");
+    assert_eq!(consumed, 3);
+    assert_eq!(key_event(&ev).code, KeyCode::Home);
+}
+
+#[test]
+fn csi_end() {
+    let (ev, consumed) = parse_ok(b"\x1b[F");
+    assert_eq!(consumed, 3);
+    assert_eq!(key_event(&ev).code, KeyCode::End);
+}
+
+#[test]
+fn csi_backtab() {
+    let (ev, consumed) = parse_ok(b"\x1b[Z");
+    assert_eq!(consumed, 3);
+    assert_eq!(key_event(&ev).code, KeyCode::BackTab);
+}
+
+#[test]
+fn csi_focus_gained() {
+    let (ev, _) = parse_ok(b"\x1b[I");
+    assert!(matches!(ev, Event::FocusGained));
+}
+
+#[test]
+fn csi_focus_lost() {
+    let (ev, _) = parse_ok(b"\x1b[O");
+    assert!(matches!(ev, Event::FocusLost));
+}
+
+// ---------------------------------------------------------------------------
+// CSI tilde key range edge cases
+// ---------------------------------------------------------------------------
+
+#[test]
+fn csi_tilde_home() {
+    // ESC [ 1 ~ → Home
+    let (ev, _) = parse_ok(b"\x1b[1~");
+    assert_eq!(key_event(&ev).code, KeyCode::Home);
+}
+
+#[test]
+fn csi_tilde_insert() {
+    // ESC [ 2 ~ → Insert
+    let (ev, _) = parse_ok(b"\x1b[2~");
+    assert_eq!(key_event(&ev).code, KeyCode::Insert);
+}
+
+#[test]
+fn csi_tilde_delete() {
+    // ESC [ 3 ~ → Delete
+    let (ev, _) = parse_ok(b"\x1b[3~");
+    assert_eq!(key_event(&ev).code, KeyCode::Delete);
+}
+
+#[test]
+fn csi_tilde_end() {
+    // ESC [ 4 ~ → End (also 10~ → End from old terminals)
+    let (ev, _) = parse_ok(b"\x1b[4~");
+    assert_eq!(key_event(&ev).code, KeyCode::End);
+    let (ev, _) = parse_ok(b"\x1b[10~");
+    assert_eq!(key_event(&ev).code, KeyCode::End);
+}
+
+#[test]
+fn csi_tilde_unknown_num_falls_back_to_null() {
+    // ESC [ 999 ~ → no mapping → Null
+    let (ev, _) = parse_ok(b"\x1b[999~");
+    assert_eq!(key_event(&ev).code, KeyCode::Null);
+}
+
+#[test]
+fn csi_tilde_bad_num_falls_back_to_null() {
+    // ESC [ abc ~ → parse fails → Null
+    let (ev, _) = parse_ok(b"\x1b[abc~");
+    assert_eq!(key_event(&ev).code, KeyCode::Null);
+}
+
+// ---------------------------------------------------------------------------
+// Unhandled CSI final bytes are consumed as Null
+// ---------------------------------------------------------------------------
+
+#[test]
+fn csi_unhandled_final_byte_is_consumed() {
+    // ESC [ 1 ; 2 p → 'p' is a valid final byte but not handled → Null
+    let (ev, consumed) = parse_ok(b"\x1b[1;2p");
+    assert_eq!(consumed, 6);
+    assert_eq!(key_event(&ev).code, KeyCode::Null);
+}
+
+// ---------------------------------------------------------------------------
+// Ctrl+K cluster: 0x0B maps to Ctrl+K
+// ---------------------------------------------------------------------------
+
+#[test]
+fn ctrl_k_byte_produces_ctrl_k() {
+    let (ev, consumed) = parse_ok(&[0x0B]);
+    assert_eq!(consumed, 1);
+    assert_eq!(key_event(&ev).code, KeyCode::Char('k'));
+    assert!(key_event(&ev).modifiers.contains(KeyModifiers::CONTROL));
+}
+
+// ---------------------------------------------------------------------------
+// Plain ESC followed by a non-sequence byte: ESC key (consumes 1 byte)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn esc_followed_by_space_returns_esc_key() {
+    // ESC followed by a space (non-CSI/SS3) → Esc event, consumes 1 byte
+    let (ev, consumed) = parse_ok(b"\x1b ");
+    assert_eq!(consumed, 1);
+    assert_eq!(key_event(&ev).code, KeyCode::Esc);
+}
+
+// ---------------------------------------------------------------------------
+// Alt-prefix behavior: ESC followed by a non-CSI/SS3 byte produces Esc event
+// consuming only the ESC; the next byte is parsed as a separate event.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn esc_then_printable_are_separate_events() {
+    // ESC 'x' (2 bytes) → first pass consumes 1 byte (Esc), leaving 'x'
+    let (ev1, c1) = parse_ok(b"\x1bx");
+    assert_eq!(key_event(&ev1).code, KeyCode::Esc);
+    assert_eq!(c1, 1);
+
+    // The remaining 'x' is then parsed as a separate event
+    let (ev2, c2) = parse_ok(b"x");
+    assert_eq!(key_event(&ev2).code, KeyCode::Char('x'));
+    assert_eq!(c2, 1);
+}
