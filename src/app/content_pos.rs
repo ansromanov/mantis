@@ -286,6 +286,12 @@ impl App {
         true
     }
 
+    /// Returns `true` if mouse text selection can be initiated on the content.
+    /// Plugin-rendered views support selection but diff views do not.
+    pub fn can_mouse_select(&self) -> bool {
+        !self.is_diff
+    }
+
     /// Unified scroll-into-view helper: nudges `content_scroll` so the given
     /// `display_line` becomes visible. No-op when already visible.
     pub fn scroll_line_into_view(&mut self, display_line: usize) {

@@ -254,6 +254,37 @@ fn has_text_cursor_false_for_plugin_content() {
     fs::remove_dir_all(&root).ok();
 }
 
+// -- can_mouse_select tests --
+
+#[test]
+fn can_mouse_select_true_for_normal_text() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.is_diff = false;
+    assert!(app.can_mouse_select());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn can_mouse_select_false_for_diff() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.is_diff = true;
+    assert!(!app.can_mouse_select());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn can_mouse_select_true_for_plugin_content() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.is_diff = false;
+    let path = root.join("doc.md");
+    seed_plugin(&mut app, path, &["plugin content"]);
+    assert!(app.can_mouse_select());
+    fs::remove_dir_all(&root).ok();
+}
+
 // -- set_active_line_from_physical tests --
 
 #[test]
