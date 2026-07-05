@@ -136,3 +136,39 @@ fn fill_with_empty_read_is_eof() {
     src.fill_with(&mut reader, 16).expect("fill must not error");
     assert!(src.buf.is_empty());
 }
+
+// ---------------------------------------------------------------------------
+// for_tty / from_tty_opener: pager-mode fd selection (#489)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn new_reads_from_stdin_fd() {
+    let src = RawEventSource::new();
+    assert_eq!(src.fd, libc::STDIN_FILENO);
+    assert!(src._tty_file.is_none());
+}
+
+#[test]
+fn from_tty_opener_falls_back_to_stdin_on_open_failure() {
+    let src = RawEventSource::from_tty_opener(|| Err(io::Error::other("no controlling terminal")));
+    assert_eq!(src.fd, libc::STDIN_FILENO);
+    assert!(src._tty_file.is_none());
+}
+
+#[test]
+fn from_tty_opener_reads_through_the_opened_fd() {
+    // A regular file stands in for `/dev/tty`: it exercises the real fd
+    // plumbing (poll/read via `self.fd`, not hardcoded fd 0) without needing
+    // an actual controlling terminal in the test environment.
+    let mut file = tempfile::tempfile().expect("create temp file");
+    use std::io::{Seek, SeekFrom, Write};
+    file.write_all(b"q").unwrap();
+    file.seek(SeekFrom::Start(0)).unwrap();
+
+    let mut src = RawEventSource::from_tty_opener(move || Ok(file));
+    assert!(src._tty_file.is_some());
+    assert_ne!(src.fd, libc::STDIN_FILENO);
+
+    let ev = src.next_raw_event().expect("must not error");
+    assert!(ev.is_some(), "event must be read through the injected fd");
+}

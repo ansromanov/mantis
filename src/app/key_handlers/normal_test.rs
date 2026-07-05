@@ -943,6 +943,28 @@ fn ctrl_f_opens_file_picker_when_content_focused_no_file() {
 }
 
 #[test]
+fn ctrl_f_opens_in_file_search_for_pager_content_without_a_path() {
+    // Piped stdin content (pager mode) has no backing path, but `content` is
+    // populated, so it must still support in-file search rather than falling
+    // back to the (irrelevant, since there's no tree) file picker.
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_pager_content(
+        crate::pager::PagerContent {
+            content: vec!["one".to_string(), "two".to_string()],
+            is_diff: false,
+        },
+        None,
+    );
+    app.handle_key(ctrl('f'));
+    assert!(
+        app.in_file_search.is_some(),
+        "ctrl+f must open in-file search for loaded pager content"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn slash_opens_tree_filter_when_tree_focused() {
     let root = temp_tree();
     let mut app = app_for(&root);

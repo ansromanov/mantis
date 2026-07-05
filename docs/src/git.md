@@ -78,3 +78,15 @@ Diffs refresh on the 30-second auto-reload tick and on manual `r`.
 git_status = true        # colour tree entries by git status (default: true)
 git_show_deleted = false # show ghost nodes for deleted tracked files (default: false)
 ```
+
+## Using mantis as `git`'s pager
+
+`mantis` can read a diff from stdin (see [Pager mode](usage.md#pager-mode)),
+so it works as a drop-in side-by-side pager for `git diff`, `git show`, and
+`git log -p`:
+
+```sh
+git diff | mantis                      # one-off
+GIT_PAGER=mantis git log -p            # one-off, any pager-using command
+git config --global core.pager mantis  # every git command, permanently
+```

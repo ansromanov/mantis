@@ -37,6 +37,7 @@ mod fold;
 mod git;
 mod highlight;
 mod list_picker;
+mod pager;
 mod plugin;
 mod release_info;
 mod search;
@@ -75,6 +76,31 @@ where
     args.into_iter().nth(1).map(PathBuf::from)
 }
 
+/// Returns the value of a `--language <lang>`/`--language=<lang>` flag among
+/// the process arguments, if present. Used to force syntax highlighting for
+/// piped stdin content (pager mode) when first-line sniffing isn't enough.
+fn parse_language_flag() -> Option<String> {
+    parse_language_flag_from(std::env::args())
+}
+
+/// Parses the `--language` flag from an iterator of strings. Extracted for
+/// testability, mirroring `parse_args_from`.
+fn parse_language_flag_from<I>(args: I) -> Option<String>
+where
+    I: IntoIterator<Item = String>,
+{
+    let mut iter = args.into_iter();
+    while let Some(a) = iter.next() {
+        if let Some(v) = a.strip_prefix("--language=") {
+            return Some(v.to_string());
+        }
+        if a == "--language" {
+            return iter.next();
+        }
+    }
+    None
+}
+
 /// A meta CLI action that prints information and exits before launching the UI.
 enum MetaAction {
     Help,
@@ -88,8 +114,14 @@ impl MetaAction {
             MetaAction::Help => "Usage: mantis [<path>]\n  \
                  <path>  File or directory to open (default: current dir)\n\n\
                  Options:\n  \
-                 -h, --help, /?    Print this help\n  \
-                 -V, --version     Print version\n"
+                 -h, --help, /?      Print this help\n  \
+                 -V, --version       Print version\n  \
+                 --language <lang>   Force the syntax used to highlight piped stdin\n\n\
+                 Pager mode: with no <path> and stdin not a terminal, mantis reads\n\
+                 stdin instead of a directory - diff-shaped input renders as a\n\
+                 navigable side-by-side diff, anything else is syntax-highlighted:\n  \
+                 git diff | mantis\n  \
+                 kubectl logs pod | mantis\n"
                 .to_string(),
             MetaAction::Version => format!("v{}\n", env!("CARGO_PKG_VERSION")),
         }
@@ -115,7 +147,8 @@ fn resolve_input_path(arg: Option<PathBuf>) -> anyhow::Result<PathBuf> {
 }
 
 /// What `main` should do once arguments are parsed: either print a meta message
-/// (help/version) and exit, or launch the TUI rooted at `root`.
+/// (help/version) and exit, launch the TUI rooted at `root`, or read piped
+/// stdin into a pager view.
 enum Startup {
     /// Print this text to stdout and exit successfully.
     Print(String),
@@ -124,14 +157,34 @@ enum Startup {
         root: PathBuf,
         file: Option<PathBuf>,
     },
+    /// Read stdin into the content pane instead of walking a directory
+    /// (`git diff | mantis`). `root` still anchors the (collapsed) tree pane.
+    Pager {
+        root: PathBuf,
+        language: Option<String>,
+    },
 }
 
 /// Decides what to do with the parsed CLI argument. Pure and fully testable:
-/// the only side-effecting work (terminal setup, the event loop) is deferred to
-/// `main` based on the returned `Startup`.
-fn plan_startup(arg: Option<PathBuf>) -> anyhow::Result<Startup> {
+/// the only side-effecting work (terminal setup, reading stdin, the event
+/// loop) is deferred to `main` based on the returned `Startup`.
+fn plan_startup(
+    arg: Option<PathBuf>,
+    language: Option<String>,
+    stdin_piped: bool,
+) -> anyhow::Result<Startup> {
     if let Some(action) = meta_action(arg.as_deref()) {
         return Ok(Startup::Print(action.message()));
+    }
+    // Pager mode triggers when no real path argument was given (missing, or
+    // flag-like — the same rule `resolve_input_path` uses to fall back to the
+    // current dir) and stdin is a pipe rather than a terminal.
+    let has_path_arg = arg
+        .as_deref()
+        .is_some_and(|a| !a.to_string_lossy().starts_with('-'));
+    if stdin_piped && !has_path_arg {
+        let root = resolve_input_path(None)?;
+        return Ok(Startup::Pager { root, language });
     }
     let (root, file) = resolve_root_and_file(&resolve_input_path(arg)?);
     Ok(Startup::Launch { root, file })
@@ -181,13 +234,35 @@ impl EventSource for event_source::RawEventSource {
 }
 
 fn main() -> anyhow::Result<()> {
-    match plan_startup(parse_args())? {
+    let stdin_piped = pager::is_piped_stdin();
+    match plan_startup(parse_args(), parse_language_flag(), stdin_piped)? {
         Startup::Print(message) => {
             print!("{message}");
             Ok(())
         }
-        Startup::Launch { root, file } => launch_tui(root, file),
+        Startup::Launch { root, file } => {
+            let initial = file.map_or(InitialContent::None, InitialContent::File);
+            launch_tui(root, initial)
+        }
+        Startup::Pager { root, language } => {
+            // Read stdin to EOF before touching the terminal, mirroring how
+            // `less`/`git`'s built-in pager behave.
+            let bytes = pager::read_stdin_bytes()?;
+            let parsed = pager::parse_pager_bytes(&bytes);
+            launch_tui(root, InitialContent::Pager { parsed, language })
+        }
     }
+}
+
+/// What the content pane should show right after startup: nothing (default),
+/// a revealed path argument, or parsed piped-stdin content (pager mode).
+enum InitialContent {
+    None,
+    File(PathBuf),
+    Pager {
+        parsed: pager::PagerContent,
+        language: Option<String>,
+    },
 }
 
 /// Puts the terminal into raw/alternate-screen mode, optionally enables the
@@ -206,7 +281,16 @@ impl Drop for TerminalGuard {
     }
 }
 
-fn launch_tui(root: PathBuf, file: Option<PathBuf>) -> anyhow::Result<()> {
+fn launch_tui(root: PathBuf, initial: InitialContent) -> anyhow::Result<()> {
+    // Whenever stdin isn't the terminal (piped/redirected, e.g. `mantis <
+    // /dev/null` or `echo x | mantis some/path`), fd 0 can't supply keyboard
+    // events, regardless of whether pager mode is showing piped content or a
+    // path argument was also given. Checked once up front, before stdin is
+    // read to EOF for pager mode — `isatty` reflects the fd itself, not its
+    // read position, so this stays accurate either way.
+    #[cfg(unix)]
+    let stdin_not_tty = pager::is_piped_stdin();
+
     enable_raw_mode()?;
     let _guard = TerminalGuard;
     let mut stdout = io::stdout();
@@ -230,34 +314,43 @@ fn launch_tui(root: PathBuf, file: Option<PathBuf>) -> anyhow::Result<()> {
     }));
 
     // Use a trait-object event source so we can swap between the kitty-aware
-    // raw parser (on Unix) and the regular crossterm source.
+    // raw parser (on Unix) and the regular crossterm source. crossterm's own
+    // event source already reopens `/dev/tty` when stdin isn't a terminal, so
+    // only the custom raw parser needs the explicit fd override.
     #[cfg(unix)]
     let mut events: Box<dyn EventSource> = if keyboard_enhanced {
-        Box::new(event_source::RawEventSource::new())
+        if stdin_not_tty {
+            Box::new(event_source::RawEventSource::for_tty())
+        } else {
+            Box::new(event_source::RawEventSource::new())
+        }
     } else {
         Box::new(CrosstermEvents)
     };
     #[cfg(not(unix))]
     let mut events: Box<dyn EventSource> = Box::new(CrosstermEvents);
 
-    let result = run_app(&mut terminal, root, file, events.as_mut());
+    let result = run_app(&mut terminal, root, initial, events.as_mut());
 
     result
 }
 
-/// Builds the app for `root` (optionally revealing `file`), runs the event loop
-/// against `terminal`, and reports any config error after the loop exits.
-/// Generic over the backend so tests can drive it with `TestBackend`.
+/// Builds the app for `root`, applies `initial` (a revealed file, piped
+/// stdin content, or nothing), runs the event loop against `terminal`, and
+/// reports any config error after the loop exits. Generic over the backend
+/// so tests can drive it with `TestBackend`.
 fn run_app(
     terminal: &mut Terminal<impl Backend>,
     root: PathBuf,
-    file: Option<PathBuf>,
+    initial: InitialContent,
     events: &mut dyn EventSource,
 ) -> anyhow::Result<()> {
     let (cfg, cfg_path, cfg_error) = config::load(&root);
     let mut app = App::new(root, cfg, cfg_path, cfg_error)?;
-    if let Some(file) = file {
-        app.open_and_reveal(&file);
+    match initial {
+        InitialContent::File(file) => app.open_and_reveal(&file),
+        InitialContent::Pager { parsed, language } => app.open_pager_content(parsed, language),
+        InitialContent::None => {}
     }
     // Drive tree/git refreshes from filesystem events rather than a blind timer.
     app.watch_root();
