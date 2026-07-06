@@ -61,8 +61,8 @@ cargo run -- ./e2e/data
 | **2. Binary Files** | Select `binary_sample.bin`. | Displays the binary placeholder: `[binary file — BIN file, 25 B]` and shows instructions. |
 | **3. JSON Pretty Print** | Select `json_sample.json`. | The minified JSON is pretty-printed across multiple lines, highlighted, and supports folding. |
 | **4. YAML Folding** | Select `yaml_sample.yml`. Focus content pane (Tab). Move cursor to a parent line (e.g. `production:`) and press `Space`. | The block collapses. Gutter shows folding indicators (`+` / `-`). Scrolling is adjusted correctly. |
-| **5. Word Wrap** | Select `long_lines.txt`. Press `w` (or configured wrap toggle key). | Long lines wrap cleanly at terminal edge, line numbers align to physical lines, no horizontal scroll needed. |
+| **5. Word Wrap** | Select `long_lines.txt`. Toggle word wrap via the command palette (`Ctrl+P` and type `wrap`) or by pressing its keybinding (if configured). | Long lines wrap cleanly at terminal edge, line numbers align to physical lines, no horizontal scroll needed. |
 | **6. Search** | Select `rust_sample.rs`. Press `/` to open search. Type `Rectangle`. Press Enter. Press `n`/`N` to cycle. | Selection highlights and cursor jumps to each matching keyword. |
 | **7. Status Bar** | Check status bar while cycling files. | Correct file names, encoding (e.g., `UTF-8 BOM` for `bom_utf8_sample.txt`), line endings (`CRLF` for `crlf_sample.txt`), and syntax names. |
-| **8. Git Diffs** | Press `g` to enter git mode (if in git repository) or view diff history by pressing `H`. Press `d` to toggle side-by-side diff. | Displays diff correctly. Side-by-side mode splits left/right panels. |
+| **8. Git Diffs** | Press `Ctrl+D` to enter git mode (if in git repository) or view diff history by pressing `H` (from the tree). Toggle side-by-side diff via the command palette. | Displays diff correctly. Side-by-side mode splits left/right panels. |
 | **9. Resizing** | Resize the terminal window while running `mantis`. | Viewport adapts immediately without crashing or breaking layout boundary lines. |
