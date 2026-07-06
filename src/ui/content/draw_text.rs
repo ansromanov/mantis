@@ -182,7 +182,13 @@ pub(crate) fn render_virtual_file<'a>(
                         if physical_idx >= sl && physical_idx <= el {
                             let col_start = if physical_idx == sl { sc } else { 0 };
                             let col_end = if physical_idx == el { ec } else { usize::MAX };
-                            apply_selection(&regions_owned, col_start, col_end, sel_bg)
+                            apply_selection(
+                                &regions_owned,
+                                col_start,
+                                col_end,
+                                sel_bg,
+                                app.theme.is_monochrome(),
+                            )
                         } else {
                             regions_owned
                                 .iter()
@@ -206,7 +212,13 @@ pub(crate) fn render_virtual_file<'a>(
                 if physical_idx >= sl && physical_idx <= el {
                     let col_start = if physical_idx == sl { sc } else { 0 };
                     let col_end = if physical_idx == el { ec } else { usize::MAX };
-                    apply_selection(&region, col_start, col_end, sel_bg)
+                    apply_selection(
+                        &region,
+                        col_start,
+                        col_end,
+                        sel_bg,
+                        app.theme.is_monochrome(),
+                    )
                 } else {
                     vec![Span::raw(text.to_string())]
                 }
@@ -337,7 +349,13 @@ pub(crate) fn render_inline_fallback<'a>(
                         if physical_idx >= sl && physical_idx <= el {
                             let col_start = if physical_idx == sl { sc } else { 0 };
                             let col_end = if physical_idx == el { ec } else { usize::MAX };
-                            apply_selection(&regions_owned, col_start, col_end, sel_bg)
+                            apply_selection(
+                                &regions_owned,
+                                col_start,
+                                col_end,
+                                sel_bg,
+                                app.theme.is_monochrome(),
+                            )
                         } else {
                             regions_owned
                                 .iter()
@@ -365,7 +383,13 @@ pub(crate) fn render_inline_fallback<'a>(
                 if physical_idx >= sl && physical_idx <= el {
                     let col_start = if physical_idx == sl { sc } else { 0 };
                     let col_end = if physical_idx == el { ec } else { usize::MAX };
-                    apply_selection(&region, col_start, col_end, sel_bg)
+                    apply_selection(
+                        &region,
+                        col_start,
+                        col_end,
+                        sel_bg,
+                        app.theme.is_monochrome(),
+                    )
                 } else {
                     vec![Span::raw(text.to_string())]
                 }

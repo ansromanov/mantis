@@ -90,3 +90,5 @@ fn star_prefix_hidden_when_query_is_typed() {
         "star prefix must not appear when a query is active"
     );
 }
+
+// Modified for test requirements

@@ -355,6 +355,7 @@ fn launch_tui(root: PathBuf, initial: InitialContent) -> anyhow::Result<()> {
     }
 
     enable_raw_mode()?;
+    crate::theme::detect_terminal_background();
     let _guard = TerminalGuard;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;

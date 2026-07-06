@@ -169,7 +169,10 @@ impl Highlighter {
 /// Converts a syntect style (foreground + font-style flags) into ratatui
 /// Style with corresponding modifiers (bold, italic, underlined).
 fn to_ratatui(s: SynStyle) -> Style {
-    let mut style = Style::default().fg(syn_color(s.foreground));
+    let mut style = Style::default();
+    if !crate::theme::no_color_active() {
+        style = style.fg(syn_color(s.foreground));
+    }
     if s.font_style.contains(FontStyle::BOLD) {
         style = style.add_modifier(Modifier::BOLD);
     }

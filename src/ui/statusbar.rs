@@ -90,7 +90,11 @@ const P_VER: u8 = 5; // version string
 
 pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
     let theme = &app.theme;
-    let base = Style::default().bg(theme.selection_bg).fg(theme.text);
+    let base = if theme.is_monochrome() {
+        Style::default().add_modifier(Modifier::REVERSED)
+    } else {
+        Style::default().bg(theme.selection_bg).fg(theme.text)
+    };
 
     let line = if app.goto_line.is_some() {
         overlay_line(

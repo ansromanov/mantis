@@ -16,6 +16,7 @@ colors but use your terminal's background instead.
 ```toml
 [theme]
 name = "catppuccin"           # built-in preset to start from
+auto_detect = true            # true = pick vscode-light or default preset based on terminal background
 
 # Optional per-role overrides on top of the preset:
 transparent_background = false  # true = use terminal's background instead of the preset's

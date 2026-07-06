@@ -314,11 +314,8 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
         })
         .collect();
 
-    let list = List::new(items).highlight_style(
-        Style::default()
-            .bg(theme.selection_bg)
-            .add_modifier(Modifier::BOLD),
-    );
+    let list =
+        List::new(items).highlight_style(theme.selection_style().add_modifier(Modifier::BOLD));
 
     let mut state = ListState::default();
     if n > 0 && sel_in_view >= offset && sel_in_view < end {

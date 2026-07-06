@@ -198,7 +198,13 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                     if logical_idx >= sl && logical_idx <= el {
                         let col_start = if logical_idx == sl { sc } else { 0 };
                         let col_end = if logical_idx == el { ec } else { usize::MAX };
-                        Line::from(apply_selection(&regions_owned, col_start, col_end, sel_bg))
+                        Line::from(apply_selection(
+                            &regions_owned,
+                            col_start,
+                            col_end,
+                            sel_bg,
+                            app.theme.is_monochrome(),
+                        ))
                     } else {
                         Line::from(
                             regions_owned
@@ -257,7 +263,13 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                     if logical_idx >= sl && logical_idx <= el {
                         let col_start = if logical_idx == sl { sc } else { 0 };
                         let col_end = if logical_idx == el { ec } else { usize::MAX };
-                        Line::from(apply_selection(&regions_owned, col_start, col_end, sel_bg))
+                        Line::from(apply_selection(
+                            &regions_owned,
+                            col_start,
+                            col_end,
+                            sel_bg,
+                            app.theme.is_monochrome(),
+                        ))
                     } else {
                         Line::from(
                             regions_owned

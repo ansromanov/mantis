@@ -86,12 +86,8 @@ pub(crate) fn draw_history(f: &mut Frame, app: &mut App, area: Rect) {
         })
         .collect();
 
-    let list = List::new(items).highlight_style(
-        Style::default()
-            .bg(theme.selection_bg)
-            .fg(theme.selection_fg)
-            .add_modifier(Modifier::BOLD),
-    );
+    let list =
+        List::new(items).highlight_style(theme.selection_style().add_modifier(Modifier::BOLD));
 
     let mut state = ListState::default();
     if history.results_len() > 0 {

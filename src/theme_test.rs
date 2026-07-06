@@ -379,3 +379,41 @@ fn discover_all_user_theme_extends_list() {
         );
     });
 }
+
+#[test]
+fn monochrome_theme_is_all_reset() {
+    let t = Theme::monochrome();
+    assert_eq!(t.background, Color::Reset);
+    assert_eq!(t.accent, Color::Reset);
+    assert_eq!(t.selection_bg, Color::Reset);
+    assert!(t.is_monochrome());
+    assert_eq!(
+        t.selection_style(),
+        ratatui::style::Style::default().add_modifier(ratatui::style::Modifier::REVERSED)
+    );
+}
+
+#[test]
+fn parse_osc_response_rgb() {
+    assert_eq!(parse_osc_response("11;rgb:0000/0000/0000"), Some((0, 0, 0)));
+    assert_eq!(
+        parse_osc_response("11;rgb:ffff/ffff/ffff"),
+        Some((255, 255, 255))
+    );
+    assert_eq!(parse_osc_response("11;rgb:12/34/56"), Some((18, 52, 86)));
+    assert_eq!(parse_osc_response("invalid"), None);
+}
+
+#[test]
+fn colorfgbg_parsing() {
+    std::env::set_var("COLORFGBG", "15;0");
+    assert_eq!(get_colorfgbg_background(), Some(ThemeMode::Dark));
+
+    std::env::set_var("COLORFGBG", "15;7");
+    assert_eq!(get_colorfgbg_background(), Some(ThemeMode::Light));
+
+    std::env::set_var("COLORFGBG", "15;245");
+    assert_eq!(get_colorfgbg_background(), Some(ThemeMode::Light));
+
+    std::env::remove_var("COLORFGBG");
+}

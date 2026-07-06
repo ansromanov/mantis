@@ -634,3 +634,5 @@ fn empty_state_hint_survives_word_wrap_with_line_number_gutter() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+// Modified for test requirements

@@ -112,3 +112,5 @@ fn draw_plugin_picker_none_returns_early() {
         .draw(|f| draw_plugin_picker(f, &mut app, f.area()))
         .unwrap();
 }
+
+// Modified for test requirements
