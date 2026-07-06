@@ -160,6 +160,7 @@ diff_hunk_prev = ["N"]
 # ("cyan", "reset") or hex ("#aabbcc").
 # [theme]
 # name = "default"                  # preset to load
+# auto_detect = true                # automatically pick light/dark default theme based on background
 # transparent_background = false    # true = let the terminal background show
 # syntax = "base16-ocean.dark"      # syntect highlighting theme
 #

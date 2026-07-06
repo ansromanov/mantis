@@ -189,3 +189,18 @@ fn highlight_stdin_plain_text_returns_none_name() {
     assert_eq!(name, None);
     assert_eq!(spans[0].len(), 1);
 }
+
+#[test]
+fn to_ratatui_respects_no_color() {
+    std::env::set_var("MANTIS_TEST_NO_COLOR", "1");
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[]);
+    let result = h.highlight(Path::new("main.rs"), &["fn main() {".to_string()]);
+    assert!(result[0].len() > 1);
+    for (style, _) in &result[0] {
+        assert!(
+            style.fg.is_none(),
+            "no foreground color should be set when NO_COLOR is active"
+        );
+    }
+    std::env::remove_var("MANTIS_TEST_NO_COLOR");
+}

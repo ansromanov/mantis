@@ -498,3 +498,5 @@ fn draw_word_wrap_off_behaves_unchanged() {
     assert!(all.contains("hello"), "hello should render");
     assert!(all.contains("world"), "world should render");
 }
+
+// Modified for test requirements

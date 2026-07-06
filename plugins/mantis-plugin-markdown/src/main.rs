@@ -174,8 +174,31 @@ impl PluginState {
     }
 }
 
+fn no_color_active() -> bool {
+    if cfg!(test) {
+        std::env::var_os("MANTIS_TEST_NO_COLOR").is_some()
+    } else {
+        std::env::var_os("NO_COLOR").is_some() || std::env::var("TERM").as_deref() == Ok("dumb")
+    }
+}
+
 fn ansi(code: &str, text: &str) -> String {
-    format!("\x1b[{code}m{text}\x1b[0m")
+    if no_color_active() {
+        let mut modifiers = Vec::new();
+        if code.split(';').any(|s| s == "1") {
+            modifiers.push("1");
+        }
+        if code.split(';').any(|s| s == "4") {
+            modifiers.push("4");
+        }
+        if modifiers.is_empty() {
+            text.to_string()
+        } else {
+            format!("\x1b[{}m{}\x1b[0m", modifiers.join(";"), text)
+        }
+    } else {
+        format!("\x1b[{code}m{text}\x1b[0m")
+    }
 }
 
 fn render_to_ansi(src: &str, theme: &ThemeColors) -> Vec<String> {
@@ -266,13 +289,21 @@ fn render_to_ansi(src: &str, theme: &ThemeColors) -> Vec<String> {
             Event::End(Tag::CodeBlock(_)) => {
                 in_code = false;
                 if !code_buf.is_empty() {
-                    let dim = &theme.dim;
-                    let code = &theme.code;
-                    lines.push(format!("\x1b[{dim}m  ┌──\x1b[0m"));
-                    for cl in code_buf.drain(..) {
-                        lines.push(format!("\x1b[{dim}m  │ \x1b[0m\x1b[{code}m{cl}\x1b[0m"));
+                    if no_color_active() {
+                        lines.push("  ┌──".to_string());
+                        for cl in code_buf.drain(..) {
+                            lines.push(format!("  │ {cl}"));
+                        }
+                        lines.push("  └──".to_string());
+                    } else {
+                        let dim = &theme.dim;
+                        let code = &theme.code;
+                        lines.push(format!("\x1b[{dim}m  ┌──\x1b[0m"));
+                        for cl in code_buf.drain(..) {
+                            lines.push(format!("\x1b[{dim}m  │ \x1b[0m\x1b[{code}m{cl}\x1b[0m"));
+                        }
+                        lines.push(format!("\x1b[{dim}m  └──\x1b[0m"));
                     }
-                    lines.push(format!("\x1b[{dim}m  └──\x1b[0m"));
                 }
                 lines.push(String::new());
             }
@@ -291,7 +322,11 @@ fn render_to_ansi(src: &str, theme: &ThemeColors) -> Vec<String> {
             Event::Start(Tag::Item) => {
                 flush_line(&mut lines, &mut current, bq_depth, theme);
                 let indent = "  ".repeat(list_depth.saturating_sub(1));
-                current = format!("\x1b[{accent}m{indent}• \x1b[0m", accent = theme.accent);
+                if no_color_active() {
+                    current = format!("{indent}• ");
+                } else {
+                    current = format!("\x1b[{accent}m{indent}• \x1b[0m", accent = theme.accent);
+                }
             }
             Event::End(Tag::Item) => {
                 flush_line(&mut lines, &mut current, bq_depth, theme);
@@ -361,10 +396,14 @@ fn render_to_ansi(src: &str, theme: &ThemeColors) -> Vec<String> {
                 // `current` directly — lines hasn't been flushed yet.
                 let indent = "  ".repeat(list_depth.saturating_sub(1));
                 let marker = if checked { "☑" } else { "☐" };
-                current = format!(
-                    "\x1b[{accent}m{indent}{marker} \x1b[0m",
-                    accent = theme.accent
-                );
+                if no_color_active() {
+                    current = format!("{indent}{marker} ");
+                } else {
+                    current = format!(
+                        "\x1b[{accent}m{indent}{marker} \x1b[0m",
+                        accent = theme.accent
+                    );
+                }
             }
             _ => {}
         }
@@ -453,33 +492,55 @@ fn render_table_ansi(
     let dim = &theme.dim;
     let header = format!("1;{}", theme.heading1);
 
-    out.push(format!(
-        "\x1b[{dim}m{}\x1b[0m",
-        table_border('┌', '─', '┬', '┐', &col_widths)
-    ));
-    for (is_header, cells) in rows {
-        let style = if *is_header { &header } else { "" };
-        let mut line = format!("\x1b[{dim}m│\x1b[0m");
-        for (i, w) in col_widths.iter().enumerate() {
-            let text = cells.get(i).map(|s| s.as_str()).unwrap_or("");
-            let align = aligns.get(i).copied().unwrap_or(Alignment::None);
-            let padded = pad_width(text, *w, align);
-            line.push_str(&format!(
-                "\x1b[{style}m {padded} \x1b[0m\x1b[{dim}m│\x1b[0m"
-            ));
+    if no_color_active() {
+        out.push(table_border('┌', '─', '┬', '┐', &col_widths));
+        for (is_header, cells) in rows {
+            let mut line = String::from("│");
+            for (i, w) in col_widths.iter().enumerate() {
+                let text = cells.get(i).map(|s| s.as_str()).unwrap_or("");
+                let align = aligns.get(i).copied().unwrap_or(Alignment::None);
+                let padded = pad_width(text, *w, align);
+                if *is_header {
+                    line.push_str(&format!(" \x1b[1m{padded}\x1b[0m │"));
+                } else {
+                    line.push_str(&format!(" {padded} │"));
+                }
+            }
+            out.push(line);
+            if *is_header {
+                out.push(table_border('├', '─', '┼', '┤', &col_widths));
+            }
         }
-        out.push(line);
-        if *is_header {
-            out.push(format!(
-                "\x1b[{dim}m{}\x1b[0m",
-                table_border('├', '─', '┼', '┤', &col_widths)
-            ));
+        out.push(table_border('└', '─', '┴', '┘', &col_widths));
+    } else {
+        out.push(format!(
+            "\x1b[{dim}m{}\x1b[0m",
+            table_border('┌', '─', '┬', '┐', &col_widths)
+        ));
+        for (is_header, cells) in rows {
+            let style = if *is_header { &header } else { "" };
+            let mut line = format!("\x1b[{dim}m│\x1b[0m");
+            for (i, w) in col_widths.iter().enumerate() {
+                let text = cells.get(i).map(|s| s.as_str()).unwrap_or("");
+                let align = aligns.get(i).copied().unwrap_or(Alignment::None);
+                let padded = pad_width(text, *w, align);
+                line.push_str(&format!(
+                    "\x1b[{style}m {padded} \x1b[0m\x1b[{dim}m│\x1b[0m"
+                ));
+            }
+            out.push(line);
+            if *is_header {
+                out.push(format!(
+                    "\x1b[{dim}m{}\x1b[0m",
+                    table_border('├', '─', '┼', '┤', &col_widths)
+                ));
+            }
         }
+        out.push(format!(
+            "\x1b[{dim}m{}\x1b[0m",
+            table_border('└', '─', '┴', '┘', &col_widths)
+        ));
     }
-    out.push(format!(
-        "\x1b[{dim}m{}\x1b[0m",
-        table_border('└', '─', '┴', '┘', &col_widths)
-    ));
     out.push(String::new());
 }
 

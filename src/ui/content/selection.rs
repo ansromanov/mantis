@@ -20,6 +20,7 @@ pub(crate) fn apply_selection(
     col_start: usize,
     col_end: usize,
     sel_bg: Color,
+    is_monochrome: bool,
 ) -> Vec<Span<'static>> {
     let mut result = Vec::new();
     let mut col = 0;
@@ -39,9 +40,15 @@ pub(crate) fn apply_selection(
             ));
         }
         if before_end < hl_end {
+            let mut s = *style;
+            if is_monochrome {
+                s = s.add_modifier(ratatui::style::Modifier::REVERSED);
+            } else {
+                s = s.bg(sel_bg);
+            }
             result.push(Span::styled(
                 chars[before_end..hl_end].iter().collect::<String>(),
-                style.bg(sel_bg),
+                s,
             ));
         }
         if hl_end < span_len {

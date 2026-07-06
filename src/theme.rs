@@ -12,6 +12,7 @@
 
 use std::collections::HashMap;
 use std::fs;
+use std::io::IsTerminal;
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
@@ -50,7 +51,17 @@ pub struct Theme {
 
 impl Default for Theme {
     fn default() -> Self {
-        Theme::load("default").expect("default theme should always load")
+        if no_color_active() {
+            Theme::monochrome()
+        } else {
+            let base_name = match get_detected_background() {
+                Some(ThemeMode::Light) => "vscode-light",
+                _ => "default",
+            };
+            Theme::load(base_name).unwrap_or_else(|| {
+                Theme::load("default").expect("default theme should always load")
+            })
+        }
     }
 }
 
@@ -150,6 +161,54 @@ impl Theme {
             active_line_bg,
             syntax: tf.syntax,
         })
+    }
+
+    /// Returns a minimal monochrome theme with no colors.
+    pub fn monochrome() -> Self {
+        Theme {
+            background: Color::Reset,
+            accent: Color::Reset,
+            accent_alt: Color::Reset,
+            dim: Color::Reset,
+            text: Color::Reset,
+            dir: Color::Reset,
+            file: Color::Reset,
+            selection_bg: Color::Reset,
+            selection_fg: Color::Reset,
+            heading1: Color::Reset,
+            heading2: Color::Reset,
+            heading3: Color::Reset,
+            code: Color::Reset,
+            diff_add: Color::Reset,
+            diff_del: Color::Reset,
+            git_clean: Color::Reset,
+            git_dirty: Color::Reset,
+            git_conflict: Color::Reset,
+            git_progress: Color::Reset,
+            breadcrumb_fg: Color::Reset,
+            breadcrumb_bg: Color::Reset,
+            active_line_bg: Color::Reset,
+            syntax: String::new(),
+        }
+    }
+
+    /// Returns `true` if the theme is monochrome.
+    pub fn is_monochrome(&self) -> bool {
+        self.selection_bg == Color::Reset
+            && self.background == Color::Reset
+            && self.accent == Color::Reset
+            && self.text == Color::Reset
+    }
+
+    /// Returns the selection style for the theme.
+    pub fn selection_style(&self) -> ratatui::style::Style {
+        if self.is_monochrome() {
+            ratatui::style::Style::default().add_modifier(ratatui::style::Modifier::REVERSED)
+        } else {
+            ratatui::style::Style::default()
+                .bg(self.selection_bg)
+                .fg(self.selection_fg)
+        }
     }
 
     /// Load a theme by name. Tries the user themes directory first, then
@@ -299,6 +358,7 @@ pub fn install_embedded_themes() {
 #[serde(default)]
 pub struct ThemeConfig {
     pub name: Option<String>,
+    pub auto_detect: Option<bool>,
     /// When `true`, overrides the preset's background with `Color::Reset` so
     /// the terminal's own background shows through.
     pub transparent_background: Option<bool>,
@@ -336,6 +396,7 @@ impl ThemeConfig {
     pub(crate) fn schema() -> Self {
         ThemeConfig {
             name: Some(String::new()),
+            auto_detect: Some(true),
             transparent_background: Some(false),
             accent: Some(String::new()),
             accent_alt: Some(String::new()),
@@ -373,11 +434,29 @@ impl ThemeConfig {
     /// Builds a runtime `Theme`: starts from the named theme (or the default),
     /// then applies any per-role overrides. Unknown/invalid values are ignored.
     pub fn resolve(&self) -> Theme {
+        if no_color_active() {
+            return Theme::monochrome();
+        }
+        let auto_detect = self.auto_detect.unwrap_or(true);
+        let base_name = if let Some(ref name) = self.name {
+            name.as_str()
+        } else if auto_detect {
+            match get_detected_background() {
+                Some(ThemeMode::Light) => "vscode-light",
+                _ => "default",
+            }
+        } else {
+            "default"
+        };
         let d = self
             .name
             .as_deref()
             .and_then(Theme::load)
-            .unwrap_or_default();
+            .unwrap_or_else(|| {
+                Theme::load(base_name).unwrap_or_else(|| {
+                    Theme::load("default").expect("default theme should always load")
+                })
+            });
         let col =
             |o: &Option<String>, def: Color| o.as_deref().and_then(parse_color).unwrap_or(def);
         let background = if self.transparent_background == Some(true) {
@@ -478,6 +557,149 @@ fn parse_hex(s: &str) -> Option<Color> {
     let g = u8::from_str_radix(&h[2..4], 16).ok()?;
     let b = u8::from_str_radix(&h[4..6], 16).ok()?;
     Some(Color::Rgb(r, g, b))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ThemeMode {
+    Dark,
+    Light,
+}
+
+static DETECTED_BACKGROUND: OnceLock<ThemeMode> = OnceLock::new();
+
+pub fn get_detected_background() -> Option<ThemeMode> {
+    DETECTED_BACKGROUND.get().copied()
+}
+
+pub fn detect_terminal_background() {
+    let mode = get_colorfgbg_background()
+        .or_else(query_osc_11)
+        .unwrap_or(ThemeMode::Dark);
+    let _ = DETECTED_BACKGROUND.set(mode);
+}
+
+fn get_colorfgbg_background() -> Option<ThemeMode> {
+    if let Ok(var) = std::env::var("COLORFGBG") {
+        let parts: Vec<&str> = var.split(';').collect();
+        if parts.len() >= 2 {
+            if let Ok(bg_idx) = parts[1].parse::<u32>() {
+                if bg_idx == 7 || (9..=15).contains(&bg_idx) || bg_idx >= 244 {
+                    return Some(ThemeMode::Light);
+                } else {
+                    return Some(ThemeMode::Dark);
+                }
+            }
+        }
+    }
+    None
+}
+
+#[cfg(unix)]
+fn query_osc_11() -> Option<ThemeMode> {
+    use std::io::Write;
+    use std::time::{Duration, Instant};
+
+    // Stdin/stdout must be terminals
+    if !std::io::stdin().is_terminal() || !std::io::stdout().is_terminal() {
+        return None;
+    }
+
+    // Write OSC 11 query
+    let mut stdout = std::io::stdout();
+    write!(stdout, "\x1b]11;?\x07").ok()?;
+    stdout.flush().ok()?;
+
+    // Read with timeout
+    let start_time = Instant::now();
+    let timeout = Duration::from_millis(50);
+    let mut buffer = Vec::new();
+
+    let mut poll_fd = libc::pollfd {
+        fd: 0, // stdin
+        events: libc::POLLIN,
+        revents: 0,
+    };
+
+    while start_time.elapsed() < timeout {
+        let remaining = timeout
+            .checked_sub(start_time.elapsed())
+            .unwrap_or(Duration::ZERO);
+        let ret = unsafe { libc::poll(&mut poll_fd, 1, remaining.as_millis() as libc::c_int) };
+        if ret > 0 && (poll_fd.revents & libc::POLLIN) != 0 {
+            let mut byte = 0u8;
+            let n = unsafe { libc::read(0, &mut byte as *mut u8 as *mut libc::c_void, 1) };
+            if n > 0 {
+                buffer.push(byte);
+                if byte == 0x07 {
+                    break;
+                }
+                if buffer.len() >= 2
+                    && buffer[buffer.len() - 2] == 0x1b
+                    && buffer[buffer.len() - 1] == b'\\'
+                {
+                    break;
+                }
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+
+    let resp = String::from_utf8_lossy(&buffer);
+    let (r, g, b) = parse_osc_response(&resp)?;
+    let y = (2126 * r as u32 + 7152 * g as u32 + 722 * b as u32) / 10000;
+    if y > 128 {
+        Some(ThemeMode::Light)
+    } else {
+        Some(ThemeMode::Dark)
+    }
+}
+
+#[cfg(not(unix))]
+fn query_osc_11() -> Option<ThemeMode> {
+    None
+}
+
+fn parse_osc_response(resp: &str) -> Option<(u8, u8, u8)> {
+    let rgb_start = resp.find("rgb:")?;
+    let content = &resp[rgb_start + 4..];
+    let mut parts = Vec::new();
+    let mut current = String::new();
+    for c in content.chars() {
+        if c.is_ascii_hexdigit() {
+            current.push(c);
+        } else if c == '/' {
+            parts.push(current);
+            current = String::new();
+        } else {
+            break;
+        }
+    }
+    if !current.is_empty() {
+        parts.push(current);
+    }
+    if parts.len() != 3 {
+        return None;
+    }
+    let mut rgb = [0u8; 3];
+    for i in 0..3 {
+        let part = &parts[i];
+        if part.len() < 2 {
+            return None;
+        }
+        rgb[i] = u8::from_str_radix(&part[0..2], 16).ok()?;
+    }
+    Some((rgb[0], rgb[1], rgb[2]))
+}
+
+pub fn no_color_active() -> bool {
+    if cfg!(test) {
+        std::env::var_os("MANTIS_TEST_NO_COLOR").is_some()
+    } else {
+        std::env::var_os("NO_COLOR").is_some() || std::env::var("TERM").as_deref() == Ok("dumb")
+    }
 }
 
 #[cfg(test)]

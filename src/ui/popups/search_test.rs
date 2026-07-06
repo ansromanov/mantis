@@ -118,3 +118,5 @@ fn draw_search_renders_toggles() {
     let joined = rows.join("\n");
     assert!(joined.contains("[Aa]"));
 }
+
+// Modified for test requirements

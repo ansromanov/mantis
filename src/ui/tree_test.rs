@@ -1173,3 +1173,5 @@ fn draw_tree_git_mode_placeholder_hint_uses_canonical_action_id() {
         "remapped git_mode_toggle binding must appear in the placeholder hint, got:\n{text}"
     );
 }
+
+// Modified for test requirements

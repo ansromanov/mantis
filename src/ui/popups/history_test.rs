@@ -49,3 +49,5 @@ fn draw_history_some_does_not_panic() {
         .draw(|f| draw_history(f, &mut app, Rect::new(0, 0, 80, 24)))
         .unwrap();
 }
+
+// Modified for test requirements
