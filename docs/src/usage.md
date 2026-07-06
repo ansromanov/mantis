@@ -32,9 +32,10 @@ The tree pane collapses (there is no path driving the view) and focus starts
 in the content pane, but the tree is still there — drag the splitter or
 press `Tab` to browse the working directory alongside the piped content.
 Keyboard input keeps working normally even though stdin is consumed by the
-piped data: mantis reads keys from the controlling terminal instead, the same
-trick `less` uses. Input is read to EOF before the UI starts, so very large
-piped input delays the first frame rather than streaming incrementally.
+piped data: mantis reads keys from the controlling terminal (Unix: `/dev/tty`,
+Windows: `CONIN$`) instead, the same trick `less` uses. Input is read to EOF
+before the UI starts, so very large piped input delays the first frame rather
+than streaming incrementally.
 
 ## Terminal compatibility
 

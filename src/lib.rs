@@ -20,7 +20,6 @@ pub mod command_palette;
 pub mod command_usage;
 pub mod config;
 pub mod diff;
-#[cfg(unix)]
 pub mod event_source;
 pub mod file;
 pub mod fold;
