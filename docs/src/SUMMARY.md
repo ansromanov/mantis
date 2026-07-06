@@ -20,6 +20,7 @@
 # Reference
 
 - [Development](development.md)
+- [End-to-End Testing](e2e-testing.md)
 - [Plugin Development](plugin-development.md)
 - [Plugin Capability Matrix](plugin-capability-matrix.md)
 - [Roadmap](roadmap.md)

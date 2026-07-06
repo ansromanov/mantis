@@ -1,0 +1,10 @@
+﻿This file starts with a UTF-8 BOM.
+BOM line 2.
+BOM line 3.
+BOM line 4.
+BOM line 5.
+BOM line 6.
+BOM line 7.
+BOM line 8.
+BOM line 9.
+BOM line 10.

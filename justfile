@@ -106,6 +106,11 @@ install: release
 test *args:
     cargo test {{args}}
 
+# run automated E2E tests (integration tests + whole-binary TUI smoke test)
+test-e2e:
+    cargo test --test e2e_tests
+    python3 scripts/ci-e2e.py
+
 # run only tests related to files changed vs origin/main (fast path for PRs)
 # falls back to the full suite when broad files (Cargo.toml, lib.rs, …) change
 test-pr:

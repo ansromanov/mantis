@@ -135,5 +135,8 @@ jobs:
             cargo nextest run --profile ci --all -E '${{ steps.select.outputs.filter }}'
           fi
 
+      - name: Run E2E whole-binary smoke test
+        run: python3 scripts/ci-e2e.py
+
       - name: Require sibling _test.rs (backstop for --no-verify)
         run: bash scripts/require-tests.sh < changed_files.txt

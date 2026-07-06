@@ -65,6 +65,10 @@ jobs:
         if: steps.changes.outputs.code == 'true'
         run: cargo nextest run --profile ci --all
 
+      - name: Run E2E whole-binary smoke test
+        if: steps.changes.outputs.code == 'true'
+        run: python3 scripts/ci-e2e.py
+
       - name: Job summary
         if: steps.changes.outputs.code == 'true' && always()
         uses: mikepenz/action-junit-report@v4
