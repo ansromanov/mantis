@@ -442,6 +442,7 @@ fn breadcrumb_double_click_on_compact_dotdot_changes_root() {
     let root = tree_with_dir();
     let mut app = app_for(&root);
     let parent = root.parent().expect("temp dir has a parent").to_path_buf();
+    app.initial_root = parent.clone();
 
     // Simulate a compact breadcrumb: a ".." segment pointing to the parent,
     // followed by the root segment.

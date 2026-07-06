@@ -651,3 +651,11 @@ fn telemetry_enabled_when_configured() {
     assert!(state.path().join("telemetry").join("events.jsonl").exists());
     std::env::remove_var("MANTIS_STATE_DIR");
 }
+
+#[test]
+fn app_new_initializes_initial_root() {
+    let root = temp_dir();
+    let app = new_app(&root, Config::default());
+    assert_eq!(app.initial_root, root);
+    fs::remove_dir_all(&root).ok();
+}

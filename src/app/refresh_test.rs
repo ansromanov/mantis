@@ -253,6 +253,7 @@ fn create_base_app() -> App {
 
     App {
         root: PathBuf::from("/tmp"),
+        initial_root: PathBuf::from("/tmp"),
         nodes: Vec::new(),
         expanded: HashSet::new(),
         tree_selected: 0,

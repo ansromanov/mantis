@@ -96,6 +96,7 @@ impl App {
             crate::update::check_for_updates(cfg.updates.check);
 
         let mut app = App {
+            initial_root: root.clone(),
             root,
             nodes,
             expanded,
@@ -259,6 +260,11 @@ impl App {
             for dir in &s.expanded {
                 if dir.starts_with(&app.root) && dir.is_dir() {
                     app.expanded.insert(dir.clone());
+                }
+            }
+            if let Some(ref ir) = s.initial_root {
+                if ir.exists() {
+                    app.initial_root = ir.clone();
                 }
             }
         }

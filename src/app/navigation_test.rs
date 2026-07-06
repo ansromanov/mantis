@@ -21,7 +21,7 @@ fn temp_tree() -> PathBuf {
 fn deep_tree() -> PathBuf {
     static COUNTER: AtomicUsize = AtomicUsize::new(0);
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-    let dir = std::env::temp_dir().join(format!("tv_nav_test_{}_{n}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("tv_nav_test_deep_{}_{n}", std::process::id()));
     fs::create_dir_all(dir.join("sub1").join("sub2").join("sub3")).unwrap();
     fs::write(dir.join("top.txt"), "top\n").unwrap();
     fs::write(dir.join("sub1").join("mid.txt"), "mid\n").unwrap();
@@ -288,10 +288,11 @@ fn navigate_to_breadcrumb_outside_root_changes_root() {
     let root = deep_tree();
     let mut app = app_for(&root);
     let orig_root = root.clone();
+    let parent = root.parent().expect("temp dir has a parent").to_path_buf();
+    app.initial_root = parent.clone();
 
     // Navigate to a parent of the current root (simulating clicking ".." in
     // the breadcrumb). This should change the viewer root to the parent.
-    let parent = root.parent().expect("temp dir has a parent").to_path_buf();
     app.navigate_to_breadcrumb(&parent);
 
     assert_eq!(app.root, parent, "root should change to parent");
@@ -476,13 +477,15 @@ fn tree_up_dir_from_top_level_file_changes_root() {
         .position(|n| n.path == root.join("a.txt"))
         .expect("a.txt node");
     app.tree_selected = file_idx;
-    let parent = root.parent().expect("root has a parent").to_path_buf();
     app.tree_up_dir();
-    // A file at root level: up goes to root's parent (changes root)
+    // Under the new clamp rules, we cannot go up past initial_root.
     assert_eq!(
-        app.root, parent,
-        "tree_up_dir from top-level file should change root to parent, got {:?}",
-        app.root
+        app.root, orig_root,
+        "tree_up_dir from top-level file should NOT change root past initial_root"
+    );
+    assert_eq!(
+        app.status_message.as_ref().map(|sm| sm.text.as_str()),
+        Some("Already at root")
     );
     fs::remove_dir_all(&orig_root).ok();
 }
@@ -492,19 +495,18 @@ fn tree_up_dir_from_nested_dir_changes_root() {
     let root = temp_tree();
     let mut app = app_for(&root);
     let orig_root = root.clone();
-    // "sub" is a dir directly in root → parent is root → change root
+    // "sub" is a dir directly in root → parent is root → target is root.
+    // Under the new clamp rules, we cannot go up past initial_root, so root remains orig_root.
     let sub_idx = app
         .nodes
         .iter()
         .position(|n| n.path == root.join("sub"))
         .expect("sub dir node");
     app.tree_selected = sub_idx;
-    let parent = root.parent().expect("root has a parent").to_path_buf();
     app.tree_up_dir();
-    // Sub's parent is root → set_root to root's parent
     assert_eq!(
-        app.root, parent,
-        "tree_up_dir from sub should change root to parent"
+        app.root, orig_root,
+        "tree_up_dir from sub should not change root past initial_root"
     );
     fs::remove_dir_all(&orig_root).ok();
 }
@@ -548,12 +550,12 @@ fn tree_up_dir_from_nested_selection_goes_to_ancestor_then_root() {
         "second up: should select sub1, got {:?}",
         app.nodes.get(app.tree_selected).map(|n| &n.path)
     );
-    // Go up: containing dir is sub1 → parent is root → change root to root's parent
-    let parent = root.parent().expect("root has a parent").to_path_buf();
+    // Go up: containing dir is sub1 → parent is root → target is root.
+    // Under the new clamp rules, we cannot go up past initial_root, so root remains orig_root.
     app.tree_up_dir();
     assert_eq!(
-        app.root, parent,
-        "third up: should change root to root's parent"
+        app.root, orig_root,
+        "third up: should clamp to initial root"
     );
     fs::remove_dir_all(&orig_root).ok();
 }
@@ -669,12 +671,18 @@ fn set_root_clears_viewing_revision() {
     let root = temp_tree();
     let mut app = app_for(&root);
     let orig_root = root.clone();
-    // Select a.txt (directly at root) so tree_up_dir triggers set_root.
+    // Descend to sub so app.root is root/sub and set_root actually executes on going up
+    let sub = root.join("sub");
+    let sub_idx = app.nodes.iter().position(|n| n.path == sub).unwrap();
+    app.tree_selected = sub_idx;
+    app.descend_to_selected();
+
+    // Select c.txt (directly at sub) so tree_up_dir triggers set_root.
     let file_idx = app
         .nodes
         .iter()
-        .position(|n| n.path == root.join("a.txt"))
-        .expect("a.txt node");
+        .position(|n| n.path == sub.join("c.txt"))
+        .expect("c.txt node");
     app.tree_selected = file_idx;
     app.viewing_revision = Some("abc1234".to_string());
     app.tree_up_dir();
@@ -702,16 +710,24 @@ fn toggle_git_mode_requests_async_status_refresh_when_enabled() {
 fn set_root_refreshes_git_status_when_enabled() {
     let root = temp_tree();
     let mut app = app_for(&root);
+    let orig_root = root.clone();
     app.git_status_enabled = true;
     // Seed a stale entry so we can verify the refresh cleared it.
     app.git_status_map
         .insert(root.join("stale.txt"), crate::git::GitStatus::Modified);
-    // tree_up_dir on a file at root triggers set_root(parent).
+
+    // Descend to sub so app.root is root/sub and set_root actually executes on going up
+    let sub = root.join("sub");
+    let sub_idx = app.nodes.iter().position(|n| n.path == sub).unwrap();
+    app.tree_selected = sub_idx;
+    app.descend_to_selected();
+
+    // tree_up_dir on a file inside sub triggers set_root(root).
     let file_idx = app
         .nodes
         .iter()
-        .position(|n| n.path == root.join("a.txt"))
-        .expect("a.txt node");
+        .position(|n| n.path == sub.join("c.txt"))
+        .expect("c.txt node");
     app.tree_selected = file_idx;
     app.tree_up_dir();
     app.pump_loads();
@@ -720,7 +736,7 @@ fn set_root_refreshes_git_status_when_enabled() {
         app.git_status_map.is_empty(),
         "set_root must replace stale git status with fresh scan"
     );
-    fs::remove_dir_all(&root).ok();
+    fs::remove_dir_all(&orig_root).ok();
 }
 
 #[test]
@@ -769,13 +785,20 @@ fn set_root_clears_plugin_content_active_path() {
     let root = temp_tree();
     let mut app = app_for(&root);
     let orig_root = root.clone();
+
+    // Descend to sub so app.root is root/sub and set_root actually executes on going up
+    let sub = root.join("sub");
+    let sub_idx = app.nodes.iter().position(|n| n.path == sub).unwrap();
+    app.tree_selected = sub_idx;
+    app.descend_to_selected();
+
     let file_idx = app
         .nodes
         .iter()
-        .position(|n| n.path == root.join("a.txt"))
-        .expect("a.txt node");
+        .position(|n| n.path == sub.join("c.txt"))
+        .expect("c.txt node");
     app.tree_selected = file_idx;
-    app.plugin_content_active_path = Some(root.join("a.txt"));
+    app.plugin_content_active_path = Some(sub.join("c.txt"));
     app.tree_up_dir();
     assert!(
         app.plugin_content_active_path.is_none(),

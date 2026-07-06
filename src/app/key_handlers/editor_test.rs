@@ -11,8 +11,9 @@ static COUNTER: AtomicUsize = AtomicUsize::new(0);
 fn temp_tree() -> PathBuf {
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
     let dir = std::env::temp_dir().join(format!("tv_editor_key_{}_{n}", std::process::id()));
-    fs::create_dir_all(&dir).unwrap();
+    fs::create_dir_all(dir.join("sub")).unwrap();
     fs::write(dir.join("a.txt"), "line1\nline2\n").unwrap();
+    fs::write(dir.join("sub").join("c.txt"), "nested\n").unwrap();
     dir.canonicalize().unwrap()
 }
 
@@ -216,18 +217,24 @@ fn tree_up_dir_command_changes_root_for_top_level_file() {
     let root = temp_tree();
     let orig_root = root.clone();
     let mut app = app_for(&root);
+    // Descend to sub
+    let sub = root.join("sub");
+    let sub_idx = app.nodes.iter().position(|n| n.path == sub).unwrap();
+    app.tree_selected = sub_idx;
+    app.descend_to_selected();
+
+    // Now app.root is sub. Select c.txt inside sub.
     let file_idx = app
         .nodes
         .iter()
-        .position(|n| n.path == root.join("a.txt"))
-        .expect("a.txt");
+        .position(|n| n.path == sub.join("c.txt"))
+        .expect("c.txt");
     app.tree_selected = file_idx;
     app.command_palette = Some(palette_with_query("Go up one"));
     app.dispatch_command();
-    let parent = root.parent().expect("root has parent").to_path_buf();
     assert_eq!(
-        app.root, parent,
-        "tree_up_dir via command palette must change root"
+        app.root, orig_root,
+        "tree_up_dir via command palette must change root back to initial_root"
     );
     fs::remove_dir_all(&orig_root).ok();
 }

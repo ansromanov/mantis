@@ -41,6 +41,7 @@ fn round_trip_preserves_all_fields() {
         current_file: Some(env.root.join("f.txt")),
         content_scroll: 10,
         active_line: 12,
+        initial_root: None,
     };
 
     save(&env.root, &state);
@@ -252,6 +253,7 @@ fn save_load_round_trip_uses_per_root_file() {
         current_file: None,
         content_scroll: 3,
         active_line: 0,
+        initial_root: None,
     };
     save(&env.root, &state);
 
