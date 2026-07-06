@@ -1,4 +1,4 @@
-version = "0.15.10"
+version = "0.15.11"
 date = "2026-07-06"
 whats_new = """- feat: add light-background terminal detection and NO_COLOR support (#597)
 - fix: implement pager mode keyboard input on Windows via CONIN$ (#596)
