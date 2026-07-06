@@ -158,22 +158,22 @@ fn install_bundled_plugins_creates_iconize_binary() {
         "terraform.sublime-syntax must be installed"
     );
     let iconize_name = if cfg!(windows) {
-        "mantis-plugin-iconize.exe"
+        "iconize.exe"
     } else {
-        "mantis-plugin-iconize"
+        "iconize"
     };
     let markdown_name = if cfg!(windows) {
-        "mantis-plugin-markdown.exe"
+        "markdown.exe"
     } else {
-        "mantis-plugin-markdown"
+        "markdown"
     };
     assert!(
         plugins_dir.join(iconize_name).exists(),
-        "mantis-plugin-iconize binary must be installed"
+        "iconize binary must be installed"
     );
     assert!(
         plugins_dir.join(markdown_name).exists(),
-        "mantis-plugin-markdown binary must be installed"
+        "markdown binary must be installed"
     );
     std::fs::remove_dir_all(&tmp).ok();
 }
@@ -304,9 +304,9 @@ fn install_bundled_plugins_overwrites_stale_binary() {
     let plugins_dir = tmp.join("mantis").join("plugins");
     std::fs::create_dir_all(&plugins_dir).unwrap();
     let markdown_name = if cfg!(windows) {
-        "mantis-plugin-markdown.exe"
+        "markdown.exe"
     } else {
-        "mantis-plugin-markdown"
+        "markdown"
     };
     let markdown_path = plugins_dir.join(markdown_name);
     std::fs::write(&markdown_path, b"stale pre-#526 binary").unwrap();
@@ -349,7 +349,7 @@ fn install_bundled_plugins_skips_rewrite_when_content_matches() {
 
     let plugins_dir = tmp.join("mantis").join("plugins");
     std::fs::create_dir_all(&plugins_dir).unwrap();
-    let markdown_path = plugins_dir.join("mantis-plugin-markdown");
+    let markdown_path = plugins_dir.join("markdown");
     let (_, _, embedded) = crate::plugin::install::BUNDLED_PLUGINS
         .iter()
         .find(|(name, _, _)| *name == "markdown")
@@ -410,5 +410,114 @@ fn install_bundled_plugins_creates_plugin_dir_and_syntaxes() {
             .exists(),
         "terraform.sublime-syntax must be installed"
     );
+    std::fs::remove_dir_all(&tmp).ok();
+}
+
+#[test]
+fn install_bundled_plugins_migrates_old_paths() {
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let tmp = fresh_plugin_dir();
+    std::fs::create_dir_all(&tmp).unwrap();
+    let config_home_var = if cfg!(windows) {
+        "APPDATA"
+    } else {
+        "XDG_CONFIG_HOME"
+    };
+    let old = std::env::var_os(config_home_var);
+    unsafe { std::env::set_var(config_home_var, &tmp) };
+
+    let plugins_dir = tmp.join("mantis").join("plugins");
+    std::fs::create_dir_all(&plugins_dir).unwrap();
+
+    // Create old binaries
+    let old_markdown_name = if cfg!(windows) {
+        "mantis-plugin-markdown.exe"
+    } else {
+        "mantis-plugin-markdown"
+    };
+    let old_iconize_name = if cfg!(windows) {
+        "mantis-plugin-iconize.exe"
+    } else {
+        "mantis-plugin-iconize"
+    };
+    std::fs::write(plugins_dir.join(old_markdown_name), b"old md binary").unwrap();
+    std::fs::write(plugins_dir.join(old_iconize_name), b"old iconize binary").unwrap();
+
+    // Run install, which should clean up retired/old binaries and write new ones
+    install_bundled_plugins();
+
+    unsafe {
+        match old {
+            Some(v) => std::env::set_var(config_home_var, v),
+            None => std::env::remove_var(config_home_var),
+        }
+    }
+
+    // Verify old binaries were deleted
+    assert!(
+        !plugins_dir.join(old_markdown_name).exists(),
+        "old markdown binary must be deleted"
+    );
+    assert!(
+        !plugins_dir.join(old_iconize_name).exists(),
+        "old iconize binary must be deleted"
+    );
+
+    // Verify new binaries exist
+    let new_markdown_name = if cfg!(windows) {
+        "markdown.exe"
+    } else {
+        "markdown"
+    };
+    let new_iconize_name = if cfg!(windows) {
+        "iconize.exe"
+    } else {
+        "iconize"
+    };
+    assert!(
+        plugins_dir.join(new_markdown_name).exists(),
+        "new markdown binary must exist"
+    );
+    assert!(
+        plugins_dir.join(new_iconize_name).exists(),
+        "new iconize binary must exist"
+    );
+
+    // Verify config entry path migration
+    let toml_str = r#"
+[plugins.markdown]
+enabled = false
+path = "mantis-plugin-markdown"
+
+[plugins.iconize]
+enabled = true
+path = "mantis-plugin-iconize.exe"
+"#;
+    let mut config: crate::config::Config = toml::from_str(toml_str).unwrap();
+    config.migrate_legacy_plugin_paths();
+
+    let md_entry = config.plugins.get("markdown").unwrap();
+    assert_eq!(md_entry.path.to_str().unwrap(), "markdown");
+    assert!(!md_entry.enabled);
+
+    let ic_entry = config.plugins.get("iconize").unwrap();
+    assert!(
+        ic_entry.path.to_str().unwrap() == "iconize"
+            || ic_entry.path.to_str().unwrap() == "iconize.exe"
+    );
+    assert!(ic_entry.enabled);
+
+    // Verify config entry key migration
+    let toml_str_key = r#"
+[plugins.mantis-plugin-markdown]
+enabled = false
+path = "mantis-plugin-markdown"
+"#;
+    let mut config_key: crate::config::Config = toml::from_str(toml_str_key).unwrap();
+    config_key.migrate_legacy_plugin_paths();
+    let md_entry_key = config_key.plugins.get("markdown").unwrap();
+    assert_eq!(md_entry_key.path.to_str().unwrap(), "markdown");
+    assert!(!md_entry_key.enabled);
+
     std::fs::remove_dir_all(&tmp).ok();
 }

@@ -386,6 +386,43 @@ impl Config {
             }
         }
     }
+
+    /// Migrates old process plugin paths (e.g. `mantis-plugin-markdown` -> `markdown`)
+    /// on load, keeping any custom config like `enabled` intact.
+    pub fn migrate_legacy_plugin_paths(&mut self) {
+        // 1. Rename any plugins map keys from "mantis-plugin-*" to bare names
+        let old_keys: Vec<String> = self
+            .plugins
+            .keys()
+            .filter(|k| *k == "mantis-plugin-markdown" || *k == "mantis-plugin-iconize")
+            .cloned()
+            .collect();
+        for old_key in old_keys {
+            if let Some(entry) = self.plugins.remove(&old_key) {
+                let new_key = if old_key == "mantis-plugin-markdown" {
+                    "markdown".to_string()
+                } else {
+                    "iconize".to_string()
+                };
+                self.plugins.entry(new_key).or_insert(entry);
+            }
+        }
+
+        // 2. Migrate the path inside each entry
+        for entry in self.plugins.values_mut() {
+            if let Some(fname) = entry.path.file_name().and_then(|s| s.to_str()) {
+                if fname == "mantis-plugin-markdown" {
+                    entry.path.set_file_name("markdown");
+                } else if fname == "mantis-plugin-markdown.exe" {
+                    entry.path.set_file_name("markdown.exe");
+                } else if fname == "mantis-plugin-iconize" {
+                    entry.path.set_file_name("iconize");
+                } else if fname == "mantis-plugin-iconize.exe" {
+                    entry.path.set_file_name("iconize.exe");
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]

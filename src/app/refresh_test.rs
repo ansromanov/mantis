@@ -1632,3 +1632,27 @@ enabled = true
         status.text
     );
 }
+
+#[test]
+fn test_handle_config_change_migrates_plugin_paths() {
+    let mut app = create_base_app();
+
+    // Create a temporary mantis.toml config file
+    let dir = tempfile::tempdir().expect("tempdir");
+    let config_path = dir.path().join("mantis.toml");
+
+    // Write a config with old plugin paths
+    let toml_content = r#"
+[plugins.markdown]
+enabled = false
+path = "mantis-plugin-markdown"
+"#;
+    std::fs::write(&config_path, toml_content).expect("write config");
+
+    app.config_path = Some(config_path);
+    app.handle_config_change();
+
+    // Verify migrated plugin config
+    let entry = app.config.plugins.get("markdown").expect("markdown entry");
+    assert_eq!(entry.path.to_str().unwrap(), "markdown");
+}

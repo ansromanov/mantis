@@ -1,7 +1,7 @@
 [workspace]
 members = [
-    "plugins/mantis-plugin-markdown",
-    "plugins/mantis-plugin-iconize",
+    "plugins/markdown",
+    "plugins/iconize",
 ]
 resolver = "2"
 

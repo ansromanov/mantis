@@ -1,5 +1,5 @@
 [package]
-name = "mantis-plugin-markdown"
+name = "markdown"
 version = "0.1.0"
 edition = "2021"
 description = "Bundled markdown renderer plugin for mantis. Renders .md files to ANSI escape codes."

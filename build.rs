@@ -1,7 +1,7 @@
 //! Build script for `mantis`.
 //!
-//! Compiles the bundled plugin crates (`mantis-plugin-iconize`,
-//! `mantis-plugin-markdown`), copies their binaries into `$OUT_DIR`, and
+//! Compiles the bundled plugin crates (`iconize`,
+//! `markdown`), copies their binaries into `$OUT_DIR`, and
 //! generates `$OUT_DIR/plugin_binaries.rs` with `&[u8]` constants built via
 //! `include_bytes!`. This removes the search-path dance from
 //! `install_one_binary` and ensures bundled plugins are always available —
@@ -35,7 +35,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 fn main() {
-    let plugins = &["mantis-plugin-iconize", "mantis-plugin-markdown"];
+    let plugins = &["iconize", "markdown"];
 
     let profile = std::env::var("PROFILE").unwrap_or_else(|_| "debug".to_string());
     let is_release = profile == "release";

@@ -53,8 +53,8 @@ version history in [Plugin Development](plugin-development.md) only.
 
 | Plugin | Kind | Actions sent | Capabilities registered |
 |---|---|---|---|
-| `mantis-plugin-iconize` | process | `set_icon_map` | none |
-| `mantis-plugin-markdown` | process | `set_content` | none |
+| `iconize` | process | `set_icon_map` | none |
+| `markdown` | process | `set_content` | none |
 | `terraform` | syntax | none (no subprocess) | n/a — extends syntect directly |
 
 ## Gaps and follow-ups

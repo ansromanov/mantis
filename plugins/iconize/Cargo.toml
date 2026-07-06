@@ -1,5 +1,5 @@
 [package]
-name = "mantis-plugin-iconize"
+name = "iconize"
 version = "0.1.0"
 edition = "2021"
 description = "Bundled iconize plugin for mantis. Provides Nerd Font file-type icon glyphs."
