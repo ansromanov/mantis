@@ -1098,3 +1098,17 @@ fn slash_is_inert_when_content_focused_no_file() {
     );
     fs::remove_dir_all(&dir).ok();
 }
+
+#[test]
+fn normal_key_o_triggers_open_external() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    assert!(app.status_message.is_none());
+    app.handle_key(key(KeyCode::Char('o')));
+    assert!(app.status_message.is_some());
+    let msg = app.status_message.as_ref().unwrap();
+    assert!(msg.text.contains("not opening file"));
+    fs::remove_dir_all(&root).ok();
+}

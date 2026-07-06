@@ -145,6 +145,8 @@ impl App {
             }
         } else if pressed_in(&k.open_in_editor, &key, scope) {
             self.open_in_editor();
+        } else if pressed_in(&k.open_external, &key, scope) {
+            self.open_external_file();
         } else if pressed_in(&k.toggle_watch, &key, scope) {
             self.auto_watch = !self.auto_watch;
             self.config.content.watch = self.auto_watch;

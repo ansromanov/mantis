@@ -96,7 +96,14 @@ fn binary_file_sets_binary_encoding() {
     f.write_all(b"data\x00binary").unwrap();
     let load = compute_file_load(f.path(), &hl(), usize::MAX);
     assert_eq!(load.encoding.as_deref(), Some("BINARY"));
-    assert_eq!(load.content, vec!["[binary file]"]);
+    assert_eq!(
+        load.content,
+        vec![
+            "[binary file — TXT file, 11 B]".to_string(),
+            "".to_string(),
+            "press o to open with the system default app".to_string()
+        ]
+    );
 }
 
 #[test]

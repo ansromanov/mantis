@@ -10,7 +10,10 @@ fn parse_pager_bytes_detects_binary() {
     let parsed = parse_pager_bytes(bytes);
     // Matches the file-load convention (`compute_file_load` in `app::loader`)
     // so binary input reads the same whether it came from a path or a pipe.
-    assert_eq!(parsed.content, vec!["[binary file]".to_string()]);
+    assert_eq!(
+        parsed.content,
+        vec!["[binary file — unknown type, 11 B]".to_string()]
+    );
     assert!(!parsed.is_diff);
 }
 

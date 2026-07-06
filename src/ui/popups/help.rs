@@ -310,6 +310,7 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
             rows.push(row_key("switch_panel"));
             rows.push(row_key("quit"));
             rows.push(row_key("open_in_editor"));
+            rows.push(row_key("open_external"));
             rows.push(row_key("recent_files"));
             rows.push(row_key("toggle_hidden"));
             rows.push(gap.clone());
