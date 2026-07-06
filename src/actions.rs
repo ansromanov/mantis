@@ -80,6 +80,11 @@ pub static ACTIONS: &[ActionSpec] = &[
         help: Some(("Global", "open file in $EDITOR")),
     },
     ActionSpec {
+        id: "open_external",
+        palette: Some("Open with default app"),
+        help: Some(("Global", "open file with system default app")),
+    },
+    ActionSpec {
         id: "copy_path",
         palette: Some("Copy absolute path"),
         help: Some(("Global", "copy absolute path to clipboard")),

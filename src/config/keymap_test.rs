@@ -495,13 +495,13 @@ fn pressed_in_honours_scope() {
 }
 
 /// The content pane must stay free of bare letters (for future editing)
-/// except the vim motion set, plus `M` — the bundled markdown plugin only
-/// recognizes the literal key `M`, so `toggle_raw_markdown` is deliberately
-/// unscoped (see the exception noted on `Keymap::default`). Tree-structural
-/// actions are exempt: their bindings only dispatch from the tree handler.
+/// except the vim motion set, plus `M` and `o` — the bundled markdown plugin
+/// only recognizes the literal key `M`, and `o` is used to open files
+/// externally. Tree-structural actions are exempt: their bindings only
+/// dispatch from the tree handler.
 #[test]
 fn default_content_reachable_letters_are_motions_only() {
-    let motions = ['j', 'k', 'h', 'l', 'g', 'G', '0', 'n', 'N', 'M', ' '];
+    let motions = ['j', 'k', 'h', 'l', 'g', 'G', '0', 'n', 'N', 'M', ' ', 'o'];
     let tree_structural = [
         "tree_expand",
         "tree_collapse",
@@ -649,5 +649,14 @@ fn removed_keymap_actions_parse_without_error_and_bind_nothing() {
     assert!(!pressed(
         &keymap.blame_line,
         &ev(KeyCode::Char('V'), KeyModifiers::NONE)
+    ));
+}
+
+#[test]
+fn default_keymap_includes_open_external() {
+    let keymap = Keymap::default();
+    assert!(pressed(
+        &keymap.open_external,
+        &ev(KeyCode::Char('o'), KeyModifiers::NONE)
     ));
 }

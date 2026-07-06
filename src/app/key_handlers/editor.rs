@@ -11,7 +11,8 @@
 //! from the palette live here too, alongside the related terminal-state
 //! bookkeeping. `open_release_url` delegates to the shared `open_in_browser`
 //! helper, which guards against spawning the browser when stdout is not a TTY
-//! (piped/headless/CI runs).
+//! (piped/headless/CI runs). `open_external` guards the same way and shares
+//! the OS-dispatch spawn logic with `open_in_browser` via `spawn_system_open`.
 
 use crossterm::event::EnableMouseCapture;
 use crossterm::execute;
@@ -182,6 +183,10 @@ impl App {
                 self.open_in_editor();
                 true
             }
+            Some("open_external") => {
+                self.open_external_file();
+                true
+            }
             Some("open_config_in_editor") => {
                 self.open_config_in_editor();
                 true
@@ -339,19 +344,7 @@ impl App {
             self.set_status("not opening browser (non-interactive)");
             return;
         }
-        #[cfg(target_os = "macos")]
-        if let Err(e) = std::process::Command::new("open").arg(url).spawn() {
-            self.set_status(format!("browser launch failed: {e}"));
-        }
-        #[cfg(target_os = "windows")]
-        if let Err(e) = std::process::Command::new("cmd")
-            .args(["/c", "start", "", url])
-            .spawn()
-        {
-            self.set_status(format!("browser launch failed: {e}"));
-        }
-        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-        if let Err(e) = std::process::Command::new("xdg-open").arg(url).spawn() {
+        if let Err(e) = spawn_system_open(url.as_ref()) {
             self.set_status(format!("browser launch failed: {e}"));
         }
     }
@@ -413,5 +406,45 @@ impl App {
             self.launch_editor(&p);
             self.handle_config_change();
         }
+    }
+    /// Opens the currently selected file in the system default application.
+    pub(super) fn open_external_file(&mut self) {
+        if let Some(p) = self.current_file.clone() {
+            self.open_external(&p);
+        }
+    }
+
+    /// Opens `path` in the system default application.
+    /// When stdout is not a terminal (piped/headless/CI), sets a status message instead.
+    pub(super) fn open_external(&mut self, path: &Path) {
+        if !std::io::stdout().is_terminal() {
+            self.set_status("not opening file (non-interactive)");
+            return;
+        }
+        match spawn_system_open(path.as_os_str()) {
+            Ok(_) => self.set_status("opened file externally"),
+            Err(e) => self.set_status(format!("external open failed: {e}")),
+        }
+    }
+}
+
+/// Spawns the OS-appropriate "open with default app" command for `arg`
+/// (a URL or file path): `open` on macOS, `cmd /c start` on Windows, and
+/// `xdg-open` elsewhere. Shared by `open_in_browser` and `open_external`.
+fn spawn_system_open(arg: &std::ffi::OsStr) -> std::io::Result<std::process::Child> {
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open").arg(arg).spawn()
+    }
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("cmd")
+            .args(["/c", "start", ""])
+            .arg(arg)
+            .spawn()
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        std::process::Command::new("xdg-open").arg(arg).spawn()
     }
 }

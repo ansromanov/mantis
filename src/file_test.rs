@@ -86,3 +86,29 @@ fn line_ending_cr_only() {
 fn line_ending_mixed_lf_and_crlf() {
     assert_eq!(detect_line_ending(b"a\nb\r\nc\r"), Some("mixed"));
 }
+
+#[test]
+fn format_size_works() {
+    assert_eq!(format_size(100), "100 B");
+    assert_eq!(format_size(1024), "1.0 KiB");
+    assert_eq!(format_size(1024 * 1024), "1.0 MiB");
+    assert_eq!(format_size(1572864), "1.5 MiB");
+}
+
+#[test]
+fn build_binary_placeholder_content_works() {
+    let png_magic = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+    let path = Path::new("test.png");
+    let content = build_binary_placeholder_content(Some(path), png_magic);
+    assert_eq!(content[0], "[binary file — PNG image, 8 B]");
+    assert_eq!(content[2], "press o to open with the system default app");
+
+    let unknown_magic = &[0u8; 12];
+    let no_ext_path = Path::new("test");
+    let content2 = build_binary_placeholder_content(Some(no_ext_path), unknown_magic);
+    assert_eq!(content2[0], "[binary file — unknown type, 12 B]");
+
+    let content_no_path = build_binary_placeholder_content(None, png_magic);
+    assert_eq!(content_no_path.len(), 1);
+    assert_eq!(content_no_path[0], "[binary file — PNG image, 8 B]");
+}

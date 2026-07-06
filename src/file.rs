@@ -9,6 +9,8 @@
 //! All three are consumed by the file loader and virtual-file reader so the
 //! info can be shown in the statusbar.
 
+use std::path::Path;
+
 /// Number of leading bytes scanned for a NUL when classifying a file.
 const SCAN_LEN: usize = 8192;
 
@@ -75,6 +77,68 @@ pub fn detect_line_ending(bytes: &[u8]) -> Option<&'static str> {
         (false, false, false) => None,
         _ => Some("mixed"),
     }
+}
+
+/// Formats a byte size in a human-readable format.
+fn format_size(bytes: u64) -> String {
+    if bytes < 1024 {
+        format!("{} B", bytes)
+    } else if bytes < 1024 * 1024 {
+        format!("{:.1} KiB", bytes as f64 / 1024.0)
+    } else if bytes < 1024 * 1024 * 1024 {
+        format!("{:.1} MiB", bytes as f64 / (1024.0 * 1024.0))
+    } else {
+        format!("{:.1} GiB", bytes as f64 / (1024.0 * 1024.0 * 1024.0))
+    }
+}
+
+/// Generates a descriptive placeholder content list for a binary file.
+pub fn build_binary_placeholder_content(path: Option<&Path>, bytes: &[u8]) -> Vec<String> {
+    let type_str = if bytes.starts_with(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) {
+        "PNG image".to_string()
+    } else if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        "JPEG image".to_string()
+    } else if bytes.starts_with(b"GIF89a") || bytes.starts_with(b"GIF87a") {
+        "GIF image".to_string()
+    } else if bytes.starts_with(b"%PDF-") {
+        "PDF document".to_string()
+    } else if bytes.starts_with(&[0x50, 0x4B, 0x03, 0x04]) {
+        "ZIP archive".to_string()
+    } else if bytes.starts_with(&[0x1F, 0x8B]) {
+        "GZIP archive".to_string()
+    } else if bytes.starts_with(b"MZ") {
+        "executable".to_string()
+    } else if bytes.starts_with(&[0x7F, 0x45, 0x4C, 0x46]) {
+        "ELF binary".to_string()
+    } else if bytes.starts_with(b"SQLite format 3\0") {
+        "SQLite database".to_string()
+    } else if let Some(ext) = path.and_then(|p| p.extension()).and_then(|e| e.to_str()) {
+        match ext.to_lowercase().as_str() {
+            "png" => "PNG image".to_string(),
+            "jpg" | "jpeg" => "JPEG image".to_string(),
+            "gif" => "GIF image".to_string(),
+            "pdf" => "PDF document".to_string(),
+            "zip" => "ZIP archive".to_string(),
+            "gz" | "tgz" => "GZIP archive".to_string(),
+            "tar" => "TAR archive".to_string(),
+            "exe" => "executable".to_string(),
+            "dll" | "so" | "dylib" => "shared library".to_string(),
+            "mp3" | "wav" | "ogg" | "flac" => "audio file".to_string(),
+            "mp4" | "mkv" | "avi" | "mov" | "webm" => "video file".to_string(),
+            "woff" | "woff2" | "ttf" | "otf" => "font file".to_string(),
+            other => format!("{} file", other.to_uppercase()),
+        }
+    } else {
+        "unknown type".to_string()
+    };
+
+    let size_str = format_size(bytes.len() as u64);
+    let mut content = vec![format!("[binary file — {}, {}]", type_str, size_str)];
+    if path.is_some() {
+        content.push("".into());
+        content.push("press o to open with the system default app".into());
+    }
+    content
 }
 
 #[cfg(test)]

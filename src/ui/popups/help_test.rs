@@ -943,6 +943,22 @@ fn help_shows_goto_line_entry() {
     );
 }
 
+#[test]
+fn help_shows_open_external() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    let backend = TestBackend::new(80, 75);
+    let mut terminal = Terminal::new(backend).unwrap();
+    app.help_tab = 0;
+    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(
+        joined.contains("open file with system default app"),
+        "help overlay must list 'open file with system default app', got:\n{joined}"
+    );
+}
+
 /// Verification guard: every action in `ACTIONS` that has a default keybinding
 /// must be rendered as a row (via `row_key`/`row_key_custom`) in
 /// `src/ui/popups/help.rs`, unless explicitly allowlisted as an intentional
