@@ -1,4 +1,4 @@
-# Design: per-language fold plugins (rust/go/python)
+# Design: per-language provider plugins (rust/go/python), fold as first capability
 
 Issue: [#483](https://github.com/ansromanov/mantis/issues/483) (first checklist
 item of epic #482).
@@ -47,17 +47,27 @@ Both functions are pure (`&str` in, `Vec<FoldRegion>` out) — no IPC, no App
 state — so they're unit-testable the same way `yaml_fold.rs` is today, and
 callable from any plugin binary that depends on the `mantis` lib crate.
 
-### Three new bundled plugin crates
+### Three new bundled *language* plugin crates (not fold-specific)
+
+These are **general per-language provider plugins** — `rust`, `go`,
+`python` — not single-purpose fold plugins. Fold is the first capability
+each implements, because it's the only capability the host currently routes
+(`highlight` is formally reserved and flows through syntax plugins instead,
+per `plugin-development.md`; `hover`/`diagnostics`/`definition` are reserved
+for a future protocol-v3 request/response method). When the host grows a
+new capability these plugins can register it too, without restructuring —
+they are the Rust/Go/Python language provider, not a "Rust/Go/Python fold
+tool" that happens to exist.
 
 Each is a thin process-plugin binary under `plugins/`, following the
 `mantis-plugin-markdown` pattern (stdin/stdout JSON loop), added as a new
 workspace member:
 
-| Crate | Extensions | Detector called |
-|---|---|---|
-| `plugins/mantis-plugin-fold-rust` | `rs` | `mantis::fold_detectors::brace_fold` |
-| `plugins/mantis-plugin-fold-go` | `go` | `mantis::fold_detectors::brace_fold` |
-| `plugins/mantis-plugin-fold-python` | `py`, `pyi` | `mantis::fold_detectors::indent_fold` |
+| Crate | Extensions | Capabilities (today) | Detector called |
+|---|---|---|---|
+| `plugins/mantis-plugin-rust` | `rs` | `fold` | `mantis::fold_detectors::brace_fold` |
+| `plugins/mantis-plugin-go` | `go` | `fold` | `mantis::fold_detectors::brace_fold` |
+| `plugins/mantis-plugin-python` | `py`, `pyi` | `fold` | `mantis::fold_detectors::indent_fold` |
 
 Each crate's `Cargo.toml` depends on `mantis = { path = "../.." }` (the
 existing `[lib] name = "mantis"` target) plus `serde_json`. Protocol
@@ -80,8 +90,10 @@ plan is dropped entirely; there's no collision to break.
 ### Bundling wiring (host side)
 
 - Add the 3 crates to `[workspace] members` in the root `Cargo.toml`.
-- Add 3 entries to `BUNDLED_PLUGINS` in `src/plugin/install.rs`, following
-  the existing `(name, binary_name, include_bytes!(...))` shape used for
+- Add 3 entries to `BUNDLED_PLUGINS` in `src/plugin/install.rs`:
+  `("rust", "mantis-plugin-rust", ...)`, `("go", "mantis-plugin-go", ...)`,
+  `("python", "mantis-plugin-python", ...)`, following the existing
+  `(name, binary_name, include_bytes!(...))` shape used for
   `iconize`/`markdown`. Same install path: compiled into the host binary,
   auto-installed to the plugin dir on first run, appear in the plugin
   picker, **default disabled** — user opts in via picker or `mantis.toml`,
