@@ -31,6 +31,8 @@ keys.content_page_up
 keys.content_reset_col
 keys.content_right
 keys.content_top
+keys.copy_file
+keys.copy_line
 keys.copy_path
 keys.copy_relative_path
 keys.diff_hunk_next
@@ -44,6 +46,7 @@ keys.goto_line
 keys.help
 keys.nav_down
 keys.nav_up
+keys.open_external
 keys.open_in_editor
 keys.plugin_picker
 keys.quit
