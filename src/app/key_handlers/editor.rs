@@ -233,6 +233,14 @@ impl App {
                 self.copy_path_to_clipboard(true);
                 true
             }
+            Some("copy_line") => {
+                self.copy_line_or_selection();
+                true
+            }
+            Some("copy_file") => {
+                self.copy_file_content();
+                true
+            }
             Some("tree_collapse_all") => {
                 self.collapse_all();
                 true

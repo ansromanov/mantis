@@ -391,6 +391,10 @@ impl App {
             self.content_hscroll += 4;
         } else if !self.word_wrap && pressed_in(&k.content_reset_col, &key, scope) {
             self.content_hscroll = 0;
+        } else if pressed_in(&k.copy_line, &key, scope) {
+            self.copy_line_or_selection();
+        } else if pressed_in(&k.copy_file, &key, scope) {
+            self.copy_file_content();
         } else if self.has_text_cursor() && pressed_in(&k.blame_line, &key, scope) {
             self.show_line_blame = !self.show_line_blame;
         }
@@ -400,6 +404,38 @@ impl App {
         if self.content_scroll != scroll_before || self.active_line != active_line_before {
             self.mark_session_dirty();
         }
+    }
+
+    /// Copies the current line (or the active text selection if one exists)
+    /// to the clipboard.
+    pub(crate) fn copy_line_or_selection(&mut self) {
+        if let Some(sel) = &self.selection {
+            if !sel.is_empty() {
+                let text = self.selection_text();
+                if !text.is_empty() {
+                    self.copy_to_clipboard(text, "selection");
+                }
+                return;
+            }
+        }
+        let phys = self.display_to_physical(self.active_line);
+        let text = self.line_text(phys).unwrap_or("").to_string();
+        self.copy_to_clipboard(text, "line");
+    }
+
+    /// Copies the entire file content to the clipboard.
+    pub(crate) fn copy_file_content(&mut self) {
+        let total = self.line_count();
+        let mut result = String::new();
+        for i in 0..total {
+            if let Some(line) = self.line_text(i) {
+                if !result.is_empty() {
+                    result.push('\n');
+                }
+                result.push_str(line);
+            }
+        }
+        self.copy_to_clipboard(result, "file");
     }
 
     pub(crate) fn copy_path_to_clipboard(&mut self, relative: bool) {

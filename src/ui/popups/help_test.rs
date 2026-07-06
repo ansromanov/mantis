@@ -967,6 +967,29 @@ fn help_shows_open_external() {
 /// any string literal match) avoids false positives from unrelated references
 /// to the action id, e.g. `labels_for_action("id")`.
 #[test]
+fn help_clipboard_section_lists_copy_line_and_copy_file() {
+    // Verify that the help overlay's clipboard operations section renders
+    // the copy_line and copy_file action rows.
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    app.show_help = true;
+    app.help_tab = 2; // Content panel tab
+    let terminal = &mut Terminal::new(TestBackend::new(120, 40)).unwrap();
+    terminal.draw(|f| crate::ui::draw(f, &mut app)).unwrap();
+    let rows = buffer_rows(terminal);
+    let joined: String = rows.join("\n");
+    assert!(
+        joined.contains("copy current line"),
+        "help must list copy_line action, got:\n{joined}"
+    );
+    assert!(
+        joined.contains("copy entire file"),
+        "help must list copy_file action, got:\n{joined}"
+    );
+    dir.close().unwrap();
+}
+
+#[test]
 fn keybound_actions_are_in_help_overlay() {
     let help_rs_content = std::fs::read_to_string("src/ui/popups/help.rs")
         .expect("should read src/ui/popups/help.rs");

@@ -95,6 +95,19 @@ pub static ACTIONS: &[ActionSpec] = &[
         help: Some(("Global", "copy path relative to tree root to clipboard")),
     },
     ActionSpec {
+        id: "copy_line",
+        palette: Some("Copy line or selection"),
+        help: Some((
+            "Content panel",
+            "copy current line (or selection if any) to clipboard",
+        )),
+    },
+    ActionSpec {
+        id: "copy_file",
+        palette: Some("Copy entire file"),
+        help: Some(("Content panel", "copy entire file content to clipboard")),
+    },
+    ActionSpec {
         id: "recent_files",
         palette: Some("Recent files"),
         help: Some(("Global", "recent files picker")),

@@ -31,6 +31,8 @@ keys.content_page_up
 keys.content_reset_col
 keys.content_right
 keys.content_top
+keys.copy_file
+keys.copy_line
 keys.copy_path
 keys.copy_relative_path
 keys.diff_hunk_next
