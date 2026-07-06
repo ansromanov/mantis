@@ -332,10 +332,12 @@ fn launch_tui(root: PathBuf, initial: InitialContent) -> anyhow::Result<()> {
     // On Windows, when stdin is piped, reopen CONIN$ so that crossterm's
     // event system reads from the console input buffer (not the consumed
     // pipe). Must happen before enable_raw_mode so console modes are set on
-    // the new handle.
+    // the new handle. Falls back to the (degraded) default keyboard input
+    // if CONIN$ can't be opened, mirroring the Unix `for_tty` fallback
+    // rather than aborting startup over it.
     #[cfg(windows)]
     if stdin_not_tty {
-        redirect_stdin_to_console()?;
+        let _ = redirect_stdin_to_console();
     }
 
     enable_raw_mode()?;
