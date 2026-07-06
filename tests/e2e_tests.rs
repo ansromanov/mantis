@@ -5,10 +5,7 @@ use mantis::config::Config;
 use mantis::search::InFileSearch;
 
 fn get_test_dir() -> PathBuf {
-    std::env::current_dir()
-        .unwrap()
-        .join("e2e")
-        .join("data")
+    std::env::current_dir().unwrap().join("e2e").join("data")
 }
 
 fn init_app() -> App {
@@ -48,7 +45,10 @@ fn test_rust_highlighting_and_search() {
     s.push('l');
     s.push('e');
     s.refresh(lines.len(), |idx| lines.get(idx).cloned());
-    assert!(!s.matches.is_empty(), "expected to find 'Rectangle' in rust_sample.rs");
+    assert!(
+        !s.matches.is_empty(),
+        "expected to find 'Rectangle' in rust_sample.rs"
+    );
     // Check that match spans are correct
     for m in &s.matches {
         let line_content = &lines[m.line];
@@ -69,7 +69,10 @@ fn test_yaml_folding_and_anchors() {
     assert_eq!(app.yaml_alias_count, 2);
 
     // Check fold regions are detected
-    assert!(!app.fold_regions.is_empty(), "expected YAML fold regions to be detected");
+    assert!(
+        !app.fold_regions.is_empty(),
+        "expected YAML fold regions to be detected"
+    );
 
     // Fold all and check physical/display line mapping
     app.fold_all();
@@ -99,7 +102,7 @@ fn test_json_prettify() {
 #[test]
 fn test_python_and_markdown_loading() {
     let mut app = init_app();
-    
+
     // Python
     let py_file = get_test_dir().join("python_sample.py");
     app.open_file(&py_file);
@@ -121,7 +124,10 @@ fn test_crlf_normalization() {
 
     assert_eq!(app.file_line_ending.as_deref(), Some("CRLF"));
     for line in &app.content {
-        assert!(!line.contains('\r'), "CRLF sample content should be normalized to LF");
+        assert!(
+            !line.contains('\r'),
+            "CRLF sample content should be normalized to LF"
+        );
     }
 }
 
@@ -142,7 +148,11 @@ fn test_binary_detection() {
 
     assert_eq!(app.file_encoding.as_deref(), Some("BINARY"));
     assert!(!app.content.is_empty());
-    assert!(app.content[0].contains("[binary file"), "expected binary placeholder, got: {}", app.content[0]);
+    assert!(
+        app.content[0].contains("[binary file"),
+        "expected binary placeholder, got: {}",
+        app.content[0]
+    );
 }
 
 #[test]
