@@ -237,6 +237,18 @@ pub struct App {
     /// which case `tick` falls back to the periodic reload.
     root_watcher: Option<RecommendedWatcher>,
     root_watch_rx: Option<Receiver<notify::Result<notify::Event>>>,
+    /// Watcher on the config file (`mantis.toml`) so that edits to keybindings,
+    /// theme, or other settings are detected and hot-reloaded (or a restart
+    /// hint is shown). `None` when no config path was provided.
+    #[allow(dead_code)]
+    config_watcher: Option<RecommendedWatcher>,
+    config_watch_rx: Option<Receiver<notify::Result<notify::Event>>>,
+    /// A relevant config-file event was seen and a debounced reload is due.
+    config_dirty: bool,
+    /// Instant of the most recent config-watch event, used to debounce bursts
+    /// (e.g. an editor's atomic temp-write-then-rename save) into a single
+    /// reload once the config file goes quiet, mirroring `tree_dirty_at`.
+    config_dirty_at: Option<Instant>,
     /// A relevant root filesystem event was seen and a debounced reload is due.
     tree_dirty: bool,
     /// Instant of the most recent root event, used to debounce bursts (e.g. a

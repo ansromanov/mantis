@@ -21,7 +21,6 @@ use crossterm::terminal::{enable_raw_mode, EnterAlternateScreen};
 use std::io::IsTerminal;
 use std::path::Path;
 
-use crate::config;
 use crate::highlight::Highlighter;
 use crate::search::{GotoLineState, PluginPicker, SearchState, ThemePicker};
 use crate::theme::{Theme, ThemeConfig};
@@ -405,48 +404,9 @@ impl App {
     fn open_config_in_editor(&mut self) {
         if let Some(p) = self.config_path.clone() {
             self.launch_editor(&p);
-            self.reload_config();
+            self.handle_config_change();
         }
     }
-
-    /// Re-reads the config file and applies all changed fields to App state,
-    /// then rebuilds the tree and reloads the current file. Silently ignores
-    /// read or parse errors so a mid-edit save doesn't crash the app.
-    fn reload_config(&mut self) {
-        let Some(path) = self.config_path.clone() else {
-            return;
-        };
-        let Ok(s) = std::fs::read_to_string(&path) else {
-            return;
-        };
-        let Ok(mut cfg) = toml::from_str::<config::Config>(&s) else {
-            return;
-        };
-        cfg.migrate_legacy_flat_fields();
-        cfg.migrate_legacy_git_fields();
-
-        self.show_hidden = cfg.tree.show_hidden;
-        self.ignore_gitignore = cfg.git.ignore_gitignore;
-        self.tree_width = cfg.tree.width;
-        self.tree_independent_scroll = cfg.tree.independent_scroll;
-        self.word_wrap = cfg.content.word_wrap;
-        self.git_status_enabled = cfg.git.status;
-        self.git_show_deleted = cfg.git.show_deleted;
-        self.git_show_untracked = cfg.git.show_untracked;
-        self.git_show_ignored = cfg.git.show_ignored;
-        self.show_scrollbar = cfg.content.scrollbar;
-        self.show_scroll_percentage = cfg.content.scroll_percentage;
-        self.keys = cfg.keys.clone();
-        self.icons_enabled = cfg.tree.icons;
-
-        let theme_name = cfg.theme.name.as_deref().unwrap_or("default").to_string();
-        let theme = cfg.theme.resolve();
-        self.apply_theme(&theme_name, theme);
-
-        self.config = cfg;
-        self.reload();
-    }
-
     /// Opens the currently selected file in the system default application.
     pub(super) fn open_external_file(&mut self) {
         if let Some(p) = self.current_file.clone() {

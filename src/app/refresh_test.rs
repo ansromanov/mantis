@@ -356,6 +356,10 @@ fn create_base_app() -> App {
         file_watch_path: None,
         root_watcher: None,
         root_watch_rx: None,
+        config_watcher: None,
+        config_watch_rx: None,
+        config_dirty: false,
+        config_dirty_at: None,
         tree_dirty: false,
         tree_dirty_at: None,
         selection: None,
@@ -1538,4 +1542,92 @@ fn drain_plugin_actions_surfaces_crash_diagnostics_in_plugin_message() {
 
     std::env::remove_var("MANTIS_STATE_DIR");
     fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn test_handle_config_change_reloads_safe_settings() {
+    let mut app = create_base_app();
+
+    // Create a temporary mantis.toml config file
+    let dir = tempfile::tempdir().expect("tempdir");
+    let config_path = dir.path().join("mantis.toml");
+
+    // Write a new config with safe settings changed
+    let toml_content = r#"
+[tree]
+show_hidden = true
+width = 42
+indent_guides = true
+icons = true
+
+[content]
+word_wrap = true
+line_numbers = false
+scrollbar = false
+scroll_percentage = true
+watch = true
+show_file_info = true
+"#;
+    std::fs::write(&config_path, toml_content).expect("write config");
+
+    app.config_path = Some(config_path);
+    app.handle_config_change();
+
+    // Verify that safe settings are hot-reloaded
+    assert!(app.show_hidden);
+    assert_eq!(app.tree_width, 42);
+    assert!(app.word_wrap);
+    assert!(!app.show_line_numbers);
+    assert!(!app.show_scrollbar);
+    assert!(app.auto_watch);
+
+    // Status message should indicate config is reloaded
+    let status = app.status_message.as_ref().expect("status message");
+    assert!(
+        status.text.contains("reloaded"),
+        "got status: {:?}",
+        status.text
+    );
+}
+
+#[test]
+fn test_handle_config_change_warns_on_plugins_changed() {
+    let mut app = create_base_app();
+
+    // Let's set some default plugins first
+    use crate::plugin::PluginEntry;
+    use std::collections::HashMap;
+    let mut plugins = HashMap::new();
+    plugins.insert(
+        "test_plugin".to_string(),
+        PluginEntry {
+            path: std::path::PathBuf::from("/bin/true"),
+            enabled: true,
+            ..Default::default()
+        },
+    );
+    app.config.plugins = plugins;
+
+    // Create a temporary mantis.toml config file
+    let dir = tempfile::tempdir().expect("tempdir");
+    let config_path = dir.path().join("mantis.toml");
+
+    // Write a config with plugins changed
+    let toml_content = r#"
+[plugins.test_plugin]
+path = "/bin/false"
+enabled = true
+"#;
+    std::fs::write(&config_path, toml_content).expect("write config");
+
+    app.config_path = Some(config_path);
+    app.handle_config_change();
+
+    // Status message should indicate that a restart is required
+    let status = app.status_message.as_ref().expect("status message");
+    assert!(
+        status.text.contains("restart to apply"),
+        "got status: {:?}",
+        status.text
+    );
 }
