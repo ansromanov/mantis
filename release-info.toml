@@ -1,4 +1,4 @@
-version = "0.15.9"
+version = "0.15.10"
 date = "2026-07-06"
 whats_new = """- feat: watch and hot-reload config changes on the fly (#592)
 - fix: add prettify_size_limit to avoid loading large JSON/YAML fully into memory (#589)
