@@ -1,6 +1,12 @@
 version = "0.15.10"
 date = "2026-07-06"
-whats_new = """- feat: watch and hot-reload config changes on the fly (#592)
+whats_new = """- feat: add light-background terminal detection and NO_COLOR support (#597)
+- fix: implement pager mode keyboard input on Windows via CONIN$ (#596)
+- test: cover update-notice wiring in init/statusbar/about (#594)
+- feat: copy line/selection to clipboard in content pane (#595)
+- feat: richer binary-file placeholder — size, type, open-externally (#593)
+- chore: release v0.15.5 [skip ci]
+- feat: watch and hot-reload config changes on the fly (#592)
 - fix: add prettify_size_limit to avoid loading large JSON/YAML fully into memory (#589)
 - disable (#591)
 - ci: config/keymap rename compatibility gate - no silent binding loss on upgrade (#590)
@@ -16,4 +22,4 @@ whats_new = """- feat: watch and hot-reload config changes on the fly (#592)
 - fix: make keyboard shortcuts CapsLock-insensitive on Windows (#580)
 - feat: help discoverability hint + docs sync guard (#304) (#556)
 - chore: bump Homebrew formula to v0.15.0 [skip ci]"""
-release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.15.5"
+release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.15.10"
