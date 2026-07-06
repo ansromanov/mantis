@@ -74,14 +74,14 @@ fn icons_false_round_trips_through_serde() {
 // -- find_files keybinding ---------------------------------------------------
 
 #[test]
-fn find_files_defaults_to_ctrl_p() {
+fn find_files_defaults_to_ctrl_t() {
     let cfg = Config::default();
     assert!(
         cfg.keys
             .find_files
             .iter()
-            .any(|b| { b.matches(&KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL)) }),
-        "default find_files must include ctrl+p"
+            .any(|b| { b.matches(&KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL)) }),
+        "default find_files must include ctrl+t"
     );
 }
 
@@ -118,8 +118,8 @@ fn find_files_without_config_key_gets_default_from_serde_container() {
         cfg.keys
             .find_files
             .iter()
-            .any(|b| { b.matches(&KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL)) }),
-        "omitted find_files must default to ctrl+p via serde container default"
+            .any(|b| { b.matches(&KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL)) }),
+        "omitted find_files must default to ctrl+t via serde container default"
     );
 }
 

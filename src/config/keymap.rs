@@ -13,16 +13,15 @@
 //! Default single-letter shortcuts are scoped to the tree panel so the
 //! content pane's letter keyspace stays free for future editing features;
 //! user configs may still bind unscoped letters explicitly.
-//! On terminals without the kitty keyboard protocol (legacy: macOS Terminal.app,
-//! plain xterm, SSH), `Ctrl+Letter` and `Ctrl+Shift+Letter` produce the same
-//! event — the terminal can't distinguish them. `KeyBinding::matches` handles
-//! this by falling back to case-insensitive comparison for Ctrl+letter bindings
-//! when no alternate keys are reported. The dispatch order in the key handlers
-//! then gives priority to the non-shift (plain-Ctrl) action, which is the
-//! correct degradation: `Ctrl+G` silently degrades to `Ctrl+g` (goto_line wins
-//! over git_mode_toggle). Affected actions are still reachable through the
-//! command palette (`Ctrl+Shift+P`). The `keyboard_enhanced` field on `App`
-//! records whether the running terminal supports this protocol.
+//! Ctrl+Shift combinations are not supported: kitty reserves `ctrl+shift` as
+//! its `kitty_mod` shortcut prefix, Windows Terminal binds Ctrl+Shift+P/F for
+//! its own palette and search, and legacy terminals (macOS Terminal.app, plain
+//! xterm, SSH) can't distinguish `Ctrl+Shift+Letter` from `Ctrl+Letter` at all.
+//! Every default binding therefore uses plain `ctrl+<lowercase letter>`,
+//! Shift via char case on unmodified keys, or named keys. Modifier+letter
+//! bindings are matched case-insensitively (and `parse_binding` normalizes
+//! them to lowercase), so CapsLock, a held Shift, or a config written as
+//! `ctrl+P`/`ctrl+shift+p` all resolve to the same `ctrl+p` action.
 //! The `matches` method also handles the kitty keyboard protocol's
 //! alternate-key reporting for layout-independent matching.
 //!
@@ -113,23 +112,6 @@ impl KeyBinding {
                 KeyCode::Char(if shift { us_shifted(b) } else { b })
             } else if let Some(s) = alt.shifted {
                 KeyCode::Char(s)
-            } else if self.ctrl {
-                // Legacy terminal: no alternate keys. Ctrl+letter and
-                // Ctrl+Shift+letter both produce the same event on terminals
-                // without keyboard enhancement (macOS Terminal.app, xterm,
-                // SSH). Only uppercase (shift-variant) bindings are expanded
-                // to match the lowercase event — lowercase bindings never
-                // expand to match uppercase events, preserving correct
-                // behavior on enhanced terminals where the protocol reports
-                // case accurately.
-                match (self.code, key.code) {
-                    (KeyCode::Char(bc), KeyCode::Char(ec))
-                        if bc.is_ascii_uppercase() && bc.eq_ignore_ascii_case(&ec) =>
-                    {
-                        self.code
-                    }
-                    _ => key.code,
-                }
             } else {
                 key.code
             }
@@ -155,44 +137,52 @@ impl KeyBinding {
             other => other,
         };
 
-        event_code == self.code
+        // Modifier+letter bindings match case-insensitively: Ctrl+Shift
+        // combos are unsupported (terminals reserve or conflate them), so
+        // the char case carries no meaning once a modifier is held — this
+        // also makes the bindings immune to CapsLock and a stray Shift.
+        let code_matches = match (self.code, event_code) {
+            (KeyCode::Char(b), KeyCode::Char(e))
+                if (self.ctrl || self.alt || self.super_key) && b.is_ascii_alphabetic() =>
+            {
+                b.eq_ignore_ascii_case(&e)
+            }
+            (b, e) => b == e,
+        };
+        code_matches
             && key.modifiers.contains(KeyModifiers::CONTROL) == self.ctrl
             && key.modifiers.contains(KeyModifiers::ALT) == self.alt
             && key.modifiers.contains(KeyModifiers::SUPER) == self.super_key
     }
 
     /// Returns a human-readable label for this binding, e.g. `"Ctrl+P"`,
-    /// `"Ctrl+Shift+P"`, `"Q (tree)"`. When a modifier is combined with an
-    /// uppercase ASCII letter, an explicit `Shift+` token is inserted so the
-    /// label matches the physical shortcut (kitty-protocol terminals report
-    /// `ctrl+shift+p` as `ctrl+P`; without the `Shift+` token the label would
-    /// misleadingly read `Ctrl+P`, same as the unshifted binding). Panel-scoped
-    /// bindings get a `" (tree)"`/`" (content)"` suffix so help/palette
-    /// surfaces make clear the key only fires when that panel is focused.
+    /// `"Q (tree)"`. Modifier+letter bindings are normalized to lowercase and
+    /// matched case-insensitively, so the letter is shown uppercase in the
+    /// conventional shortcut style. Panel-scoped bindings get a
+    /// `" (tree)"`/`" (content)"` suffix so help/palette surfaces make clear
+    /// the key only fires when that panel is focused.
     pub fn display(&self) -> String {
-        let (key, shifted) = match self.code {
-            KeyCode::Char(' ') => ("Space".to_string(), false),
-            KeyCode::Char(c) => (c.to_string(), c.is_ascii_uppercase()),
-            KeyCode::Up => ("Up".to_string(), false),
-            KeyCode::Down => ("Down".to_string(), false),
-            KeyCode::Left => ("Left".to_string(), false),
-            KeyCode::Right => ("Right".to_string(), false),
-            KeyCode::Enter => ("Enter".to_string(), false),
-            KeyCode::Tab => ("Tab".to_string(), false),
-            KeyCode::Esc => ("Esc".to_string(), false),
-            KeyCode::Backspace => ("Backspace".to_string(), false),
-            KeyCode::PageUp => ("PageUp".to_string(), false),
-            KeyCode::PageDown => ("PageDown".to_string(), false),
-            KeyCode::Home => ("Home".to_string(), false),
-            KeyCode::End => ("End".to_string(), false),
-            KeyCode::F(n) => (format!("F{n}"), false),
-            ref other => (format!("{other:?}"), false),
-        };
         let has_modifier = self.ctrl || self.alt || self.super_key;
-        let key = if shifted && has_modifier {
-            format!("Shift+{key}")
-        } else {
-            key
+        let key = match self.code {
+            KeyCode::Char(' ') => "Space".to_string(),
+            KeyCode::Char(c) if has_modifier && c.is_ascii_alphabetic() => {
+                c.to_ascii_uppercase().to_string()
+            }
+            KeyCode::Char(c) => c.to_string(),
+            KeyCode::Up => "Up".to_string(),
+            KeyCode::Down => "Down".to_string(),
+            KeyCode::Left => "Left".to_string(),
+            KeyCode::Right => "Right".to_string(),
+            KeyCode::Enter => "Enter".to_string(),
+            KeyCode::Tab => "Tab".to_string(),
+            KeyCode::Esc => "Esc".to_string(),
+            KeyCode::Backspace => "Backspace".to_string(),
+            KeyCode::PageUp => "PageUp".to_string(),
+            KeyCode::PageDown => "PageDown".to_string(),
+            KeyCode::Home => "Home".to_string(),
+            KeyCode::End => "End".to_string(),
+            KeyCode::F(n) => format!("F{n}"),
+            ref other => format!("{other:?}"),
         };
         let base = match (self.ctrl, self.alt, self.super_key) {
             (true, true, false) => format!("Ctrl+Alt+{key}"),
@@ -391,24 +381,27 @@ pub struct Keymap {
 impl Default for Keymap {
     /// Editor-style defaults (VS Code / Sublime conventions). Single letters
     /// are `tree:`-scoped so the content pane stays letter-free apart from
-    /// the vim motion set (`j k h l g G 0 n N`) and `M` (markdown raw/rendered
+    /// the vim motion set (`j k h l g G 0 n N`), the copy/blame pairs
+    /// (`content:y`/`content:Y`, `content:B`), and `M` (markdown raw/rendered
     /// toggle — bare, unscoped, because the bundled markdown plugin only
     /// recognizes the literal key `M` over its `on_keypress` event; a rebound
     /// key is translated back to `M` before being forwarded, see
     /// `key_handlers::normal::handle_content_key`). All other content-pane
     /// toggles go through modifier combos or the command palette.
-    /// `ctrl+shift+letter` specs are written as `ctrl+<uppercase letter>`;
-    /// on terminals without the kitty keyboard protocol they degrade to the
-    /// plain-`ctrl` action, which is always the more frequent one.
+    /// No default uses Ctrl+Shift (kitty's `kitty_mod`, Windows Terminal's
+    /// own palette/search, indistinguishable from plain Ctrl on legacy
+    /// terminals), the Alt modifier (unreliable across terminals), F-keys
+    /// beyond the F1/F5 conveniences (poor macOS ergonomics), or the
+    /// terminal-critical Ctrl+S/Q/Z/L combinations.
     fn default() -> Self {
         #[allow(unused_mut)]
         let mut map = Keymap {
             quit: bind(&["ctrl+c", "tree:q"]),
             help: bind(&["F1", "?"]),
             toggle_hidden: bind(&["tree:."]),
-            search_files: bind(&["ctrl+f", "tree:/"]),
-            find_files: bind(&["ctrl+p"]),
-            search_content: bind(&["ctrl+F", "tree:f"]),
+            search_files: bind(&["/"]),
+            find_files: bind(&["ctrl+t"]),
+            search_content: bind(&["ctrl+f", "tree:f"]),
             reload: bind(&["ctrl+r", "F5", "tree:r"]),
             switch_panel: bind(&["Tab"]),
             file_history: bind(&["tree:H"]),
@@ -430,14 +423,14 @@ impl Default for Keymap {
             toggle_line_numbers: Vec::new(),
             toggle_pretty_json: Vec::new(),
             toggle_blame: bind(&["ctrl+b"]),
-            blame_line: bind(&["ctrl+B"]),
+            blame_line: bind(&["content:B"]),
             toggle_diff_side_by_side: Vec::new(),
             toggle_diff_staged: Vec::new(),
             diff_hunk_next: bind(&["n"]),
             diff_hunk_prev: bind(&["N"]),
-            git_mode_toggle: bind(&["ctrl+G"]),
+            git_mode_toggle: bind(&["ctrl+d"]),
             git_mode_flat_toggle: bind(&["tree:F"]),
-            command_palette: bind(&["ctrl+P", "tree:P"]),
+            command_palette: bind(&["ctrl+p", "tree:P"]),
             open_in_editor: bind(&["ctrl+e", "tree:e"]),
             open_external: bind(&["o"]),
             fold_toggle: bind(&["Space"]),
@@ -460,17 +453,16 @@ impl Default for Keymap {
     }
 }
 
-/// Layers the macOS defaults over the base map: `cmd+` primaries (matching
-/// mac VS Code) with the cross-platform `ctrl+` bindings kept as fallbacks,
-/// because Terminal.app/iTerm2 intercept most `cmd+` shortcuts while
+/// Layers the macOS defaults over the base map: `cmd+` primaries with the
+/// cross-platform `ctrl+` bindings kept as fallbacks, because
+/// Terminal.app/iTerm2 intercept most `cmd+` shortcuts while
 /// kitty/WezTerm/Ghostty forward them. `goto_line`/`git_mode_toggle` stay on
-/// `ctrl` — mac VS Code uses `ctrl` for those too.
+/// `ctrl` only.
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub(crate) fn apply_macos_defaults(map: &mut Keymap) {
-    map.find_files = bind(&["cmd+p", "ctrl+p"]);
-    map.command_palette = bind(&["cmd+P", "ctrl+P", "tree:P"]);
-    map.search_content = bind(&["cmd+F", "ctrl+F", "tree:f"]);
-    map.search_files = bind(&["cmd+f", "ctrl+f", "tree:/"]);
+    map.find_files = bind(&["cmd+t", "ctrl+t"]);
+    map.command_palette = bind(&["cmd+p", "ctrl+p", "tree:P"]);
+    map.search_content = bind(&["cmd+f", "ctrl+f", "tree:f"]);
     map.reload = bind(&["cmd+r", "ctrl+r", "F5", "tree:r"]);
     map.recent_files = bind(&["cmd+o", "ctrl+o"]);
     map.content_top = bind(&["cmd+Up", "ctrl+Home", "g", "tree:Home"]);
@@ -512,8 +504,18 @@ pub(crate) fn parse_binding(s: &str) -> Result<KeyBinding, String> {
         }
     }
 
+    let mut code = parse_keycode(key[0], s)?;
+    // Modifier+letter bindings are case-insensitive (Ctrl+Shift combos are
+    // unsupported); normalize to lowercase so `ctrl+P`, `ctrl+shift+p`, and
+    // `ctrl+p` in a config all serialize and match identically.
+    if ctrl || alt || super_key {
+        if let KeyCode::Char(c) = code {
+            code = KeyCode::Char(c.to_ascii_lowercase());
+        }
+    }
+
     Ok(KeyBinding {
-        code: parse_keycode(key[0], s)?,
+        code,
         ctrl,
         alt,
         super_key,

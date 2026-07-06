@@ -263,120 +263,75 @@ fn pressed_honours_current_alt_keys() {
     reset_alt();
 }
 
-// ---- legacy terminal fallback (no keyboard enhancement) --------------------
+// ---- case-insensitive modifier+letter matching ------------------------------
 //
-// On legacy terminals (macOS Terminal.app, plain xterm, SSH) without the kitty
-// keyboard protocol, Ctrl+Letter and Ctrl+Shift+Letter produce identical events:
-// both send the lowercase char with the CONTROL modifier. `KeyBinding::matches`
-// must accept either case for Ctrl+letter bindings when no alt-keys are reported
-// — otherwise the shift-variant binding (e.g. ctrl+G for git_mode_toggle) can
-// never fire.
+// Ctrl+Shift combinations are unsupported (kitty reserves ctrl+shift as
+// kitty_mod, Windows Terminal binds Ctrl+Shift+P/F itself, legacy terminals
+// can't report them). Modifier+letter bindings therefore match
+// case-insensitively and `parse_binding` normalizes them to lowercase, making
+// them immune to CapsLock, a held Shift, and config-spec case.
 
 #[test]
-#[cfg(unix)]
-fn legacy_terminal_ctrl_uppercase_matches_lowercase_event() {
-    // ctrl+G (uppercase = Ctrl+Shift+G on enhanced terminals) must match
-    // a lowercase 'g' with CONTROL on legacy terminals.
-    let binding = parse_binding("ctrl+G").unwrap();
-    let event = ev(KeyCode::Char('g'), KeyModifiers::CONTROL);
-
-    reset_alt();
-    assert!(
-        binding.matches(&event),
-        "ctrl+G must match Char('g')+CONTROL on a legacy terminal"
+fn parse_normalizes_modifier_letter_to_lowercase() {
+    assert_eq!(parse_binding("ctrl+P").unwrap().code, KeyCode::Char('p'));
+    assert_eq!(
+        parse_binding("ctrl+shift+p").unwrap().code,
+        KeyCode::Char('p')
     );
+    assert_eq!(parse_binding("cmd+F").unwrap().code, KeyCode::Char('f'));
+    // Unmodified letters keep their case (Shift is encoded in char case).
+    assert_eq!(parse_binding("G").unwrap().code, KeyCode::Char('G'));
 }
 
 #[test]
-#[cfg(unix)]
-fn legacy_terminal_ctrl_lowercase_still_matches_lowercase() {
-    // ctrl+g (lowercase) must still match normally on legacy terminals.
-    let binding = parse_binding("ctrl+g").unwrap();
-    let event = ev(KeyCode::Char('g'), KeyModifiers::CONTROL);
-
+fn ctrl_binding_matches_either_case_event() {
+    #[cfg(unix)]
     reset_alt();
-    assert!(binding.matches(&event));
+    let b = parse_binding("ctrl+p").unwrap();
+    // Plain press.
+    assert!(b.matches(&ev(KeyCode::Char('p'), KeyModifiers::CONTROL)));
+    // Shift held (enhanced terminal reports uppercase + SHIFT).
+    assert!(b.matches(&ev(
+        KeyCode::Char('P'),
+        KeyModifiers::CONTROL | KeyModifiers::SHIFT
+    )));
+    // CapsLock on (uppercase char, no SHIFT bit).
+    assert!(b.matches(&ev(KeyCode::Char('P'), KeyModifiers::CONTROL)));
 }
 
 #[test]
-#[cfg(unix)]
-fn legacy_terminal_ctrl_binding_rejects_different_char() {
-    // ctrl+g must NOT match a different letter on legacy terminals.
-    let binding = parse_binding("ctrl+g").unwrap();
-    let event = ev(KeyCode::Char('x'), KeyModifiers::CONTROL);
-
+fn ctrl_binding_rejects_different_char() {
+    #[cfg(unix)]
     reset_alt();
-    assert!(!binding.matches(&event));
+    let binding = parse_binding("ctrl+g").unwrap();
+    assert!(!binding.matches(&ev(KeyCode::Char('x'), KeyModifiers::CONTROL)));
 }
 
 #[test]
 #[cfg(unix)]
-fn legacy_terminal_unmodified_binding_not_affected() {
-    // Non-ctrl bindings (e.g. 'G' for content_bottom) must NOT become
-    // case-insensitive on legacy terminals. 'G' should only match 'G'.
+fn unmodified_binding_stays_case_sensitive() {
+    // Non-modifier bindings (e.g. 'G' for content_bottom) must NOT become
+    // case-insensitive — char case is how Shift is encoded for them.
+    reset_alt();
     let binding = parse_binding("G").unwrap();
-    let event = ev(KeyCode::Char('g'), KeyModifiers::empty());
-
-    reset_alt();
-    assert!(
-        !binding.matches(&event),
-        "unmodified 'G' must NOT match lowercase 'g' on a legacy terminal"
-    );
+    assert!(!binding.matches(&ev(KeyCode::Char('g'), KeyModifiers::empty())));
 }
 
 #[test]
 #[cfg(unix)]
-fn legacy_terminal_ctrl_uppercase_does_not_match_when_alt_keys_present() {
-    // On an enhanced terminal with alt-keys, ctrl+G must NOT match
-    // a lowercase 'g' — they are distinct events when the protocol works.
-    let binding = parse_binding("ctrl+G").unwrap();
-    let event = ev(KeyCode::Char('g'), KeyModifiers::CONTROL);
-
-    set_alt(Some('G'), Some('g'));
-    assert!(
-        !binding.matches(&event),
-        "ctrl+G must NOT match Char('g') when alt-keys are available"
+fn ctrl_binding_matches_shifted_event_with_alt_keys() {
+    // Enhanced terminal, Shift held: alt-keys report base 'p', event carries
+    // SHIFT, so the base resolves to 'P' — the ctrl+p binding must still fire.
+    let binding = parse_binding("ctrl+p").unwrap();
+    let event = ev(
+        KeyCode::Char('P'),
+        KeyModifiers::CONTROL | KeyModifiers::SHIFT,
     );
+
+    set_alt(Some('P'), Some('p'));
+    assert!(binding.matches(&event));
     reset_alt();
 }
-
-#[test]
-#[cfg(unix)]
-fn legacy_terminal_lowercase_ctrl_does_not_match_uppercase_event() {
-    // Lowercase ctrl bindings must NOT match uppercase events on legacy
-    // terminals — that would break enhanced terminal dispatch where the
-    // protocol correctly distinguishes case.
-    let binding = parse_binding("ctrl+g").unwrap();
-    let event = ev(KeyCode::Char('G'), KeyModifiers::CONTROL);
-
-    reset_alt();
-    assert!(
-        !binding.matches(&event),
-        "ctrl+g must NOT match Char('G')+CONTROL on a legacy terminal"
-    );
-}
-
-#[test]
-#[cfg(unix)]
-fn legacy_terminal_pressed_returns_false_without_match() {
-    let bindings = bind(&["ctrl+G"]);
-    let event = ev(KeyCode::Char('x'), KeyModifiers::CONTROL);
-
-    reset_alt();
-    assert!(!pressed(&bindings, &event));
-}
-
-// ---- end legacy terminal tests -------------------------------------------
-
-// ---- Windows CapsLock normalization ---------------------------------------
-//
-// crossterm's Windows backend derives a key event's reported char case from
-// `shift_pressed XOR capslock_on`, so with CapsLock on, an unshifted letter
-// arrives as an uppercase `KeyCode::Char` even though the `SHIFT` modifier
-// bit is `false`. `KeyBinding::matches` must re-derive the letter's case from
-// the `SHIFT` modifier alone (which crossterm reports independently of
-// CapsLock) rather than trusting the char's case, or every lowercase-letter
-// binding silently stops matching whenever CapsLock is on.
 
 #[test]
 #[cfg(not(unix))]
@@ -385,40 +340,6 @@ fn matches_ignores_capslock_for_lowercase_binding() {
     // CapsLock on, no physical Shift: crossterm reports Char('P') + CONTROL
     // (no SHIFT bit). The lowercase-spec binding must still match.
     assert!(b.matches(&ev(KeyCode::Char('P'), KeyModifiers::CONTROL)));
-}
-
-#[test]
-#[cfg(not(unix))]
-fn matches_ignores_capslock_for_uppercase_binding() {
-    let b = parse_binding("ctrl+P").unwrap();
-    // CapsLock *and* physical Shift held together: shift_pressed XOR
-    // capslock_on cancels out, so crossterm reports Char('p') + CONTROL +
-    // SHIFT. The uppercase-spec (Ctrl+Shift+P) binding must still match.
-    assert!(b.matches(&ev(
-        KeyCode::Char('p'),
-        KeyModifiers::CONTROL | KeyModifiers::SHIFT
-    )));
-}
-
-#[test]
-#[cfg(not(unix))]
-fn matches_still_distinguishes_shift_without_capslock() {
-    // No CapsLock involved: plain case-per-modifier behavior must be
-    // preserved so `ctrl+f` and `ctrl+F` remain distinct bindings.
-    let lower = parse_binding("ctrl+f").unwrap();
-    let upper = parse_binding("ctrl+F").unwrap();
-
-    assert!(lower.matches(&ev(KeyCode::Char('f'), KeyModifiers::CONTROL)));
-    assert!(!upper.matches(&ev(KeyCode::Char('f'), KeyModifiers::CONTROL)));
-
-    assert!(upper.matches(&ev(
-        KeyCode::Char('F'),
-        KeyModifiers::CONTROL | KeyModifiers::SHIFT
-    )));
-    assert!(!lower.matches(&ev(
-        KeyCode::Char('F'),
-        KeyModifiers::CONTROL | KeyModifiers::SHIFT
-    )));
 }
 
 #[test]
@@ -497,13 +418,14 @@ fn pressed_in_honours_scope() {
 /// The content pane must stay free of bare letters (for future editing)
 /// except the vim motion set, plus `M` and `o` — the bundled markdown plugin
 /// only recognizes the literal key `M`, and `o` is used to open files
-/// externally — plus `y`/`Y` for copy-line/copy-file clipboard operations.
+/// externally — plus `y`/`Y` for copy-line/copy-file clipboard operations
+/// and `B` for blame-line (the Shift pair of the `ctrl+b` blame toggle).
 /// Tree-structural actions are exempt: their bindings only dispatch from the
 /// tree handler.
 #[test]
 fn default_content_reachable_letters_are_motions_only() {
     let motions = [
-        'j', 'k', 'h', 'l', 'g', 'G', '0', 'n', 'N', 'M', 'o', 'y', 'Y', ' ',
+        'j', 'k', 'h', 'l', 'g', 'G', '0', 'n', 'N', 'M', 'o', 'y', 'Y', 'B', ' ',
     ];
     let tree_structural = [
         "tree_expand",
@@ -540,14 +462,88 @@ fn macos_defaults_add_cmd_primaries_with_ctrl_fallbacks() {
     let mut map = Keymap::default();
     apply_macos_defaults(&mut map);
     let first = &map.find_files[0];
-    assert!(first.super_key, "mac find_files primary must be cmd+p");
-    assert_eq!(first.code, KeyCode::Char('p'));
+    assert!(first.super_key, "mac find_files primary must be cmd+t");
+    assert_eq!(first.code, KeyCode::Char('t'));
     assert!(
         map.find_files.iter().any(|b| b.ctrl && !b.super_key),
-        "ctrl+p fallback must remain for terminals that swallow cmd"
+        "ctrl+t fallback must remain for terminals that swallow cmd"
     );
+    let palette = &map.command_palette[0];
+    assert!(palette.super_key, "mac palette primary must be cmd+p");
+    assert_eq!(palette.code, KeyCode::Char('p'));
     // goto_line stays on ctrl even on mac (matching mac VS Code).
     assert!(map.goto_line.iter().all(|b| !b.super_key));
+}
+
+// ---- stable cross-terminal defaults (no Ctrl+Shift) -------------------------
+
+/// No default binding may use an uppercase letter together with a modifier
+/// (the old Ctrl+Shift encoding) — those combos are reserved by kitty
+/// (`kitty_mod`) and Windows Terminal, and legacy terminals can't report them.
+#[test]
+fn no_default_binding_uses_ctrl_shift() {
+    let keymap = Keymap::default();
+    for action in crate::actions::ACTIONS {
+        for b in keymap.bindings_for_action(action.id) {
+            if b.ctrl || b.alt || b.super_key {
+                if let KeyCode::Char(c) = b.code {
+                    assert!(
+                        !c.is_ascii_uppercase(),
+                        "action '{}' binds a modifier+uppercase (Ctrl+Shift-style) combo '{}'",
+                        action.id,
+                        b.display()
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn stable_default_bindings() {
+    #[cfg(unix)]
+    reset_alt();
+    let keymap = Keymap::default();
+    let ctrl = |c: char| ev(KeyCode::Char(c), KeyModifiers::CONTROL);
+    assert!(
+        pressed(&keymap.command_palette, &ctrl('p')),
+        "command palette must open on ctrl+p in any panel"
+    );
+    assert!(
+        pressed(&keymap.search_content, &ctrl('f')),
+        "content search must open on ctrl+f"
+    );
+    assert!(
+        pressed(&keymap.find_files, &ctrl('t')),
+        "file finder must open on ctrl+t"
+    );
+    assert!(
+        pressed(&keymap.git_mode_toggle, &ctrl('d')),
+        "git mode must toggle on ctrl+d"
+    );
+    assert!(
+        pressed_in(
+            &keymap.blame_line,
+            &ev(KeyCode::Char('B'), KeyModifiers::SHIFT),
+            BindingScope::Content
+        ),
+        "blame line must fire on Shift+B in the content pane"
+    );
+    // search_files is the contextual `/`: tree filter or in-file search.
+    assert!(pressed_in(
+        &keymap.search_files,
+        &ev(KeyCode::Char('/'), KeyModifiers::empty()),
+        BindingScope::Tree
+    ));
+    assert!(pressed_in(
+        &keymap.search_files,
+        &ev(KeyCode::Char('/'), KeyModifiers::empty()),
+        BindingScope::Content
+    ));
+    assert!(
+        !pressed_in(&keymap.search_files, &ctrl('f'), BindingScope::Content),
+        "ctrl+f now belongs to search_content, not search_files"
+    );
 }
 
 // -- action id canonicalisation (issue #495) ---------------------------------

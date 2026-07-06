@@ -418,11 +418,10 @@ fn scroll_wheel_scrolls_content() {
 }
 
 fn open_file_search(app: &mut App) {
-    // Focus content with no file open so Ctrl+F falls through to the full
-    // filesystem search picker rather than the in-file search or tree filter.
+    // find_files (ctrl+t) opens the Files search picker from any focus.
     app.focus = Focus::Content;
     app.current_file = None;
-    app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
+    app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
     assert!(app.search.is_some());
     app.search_area = full_rect();
     app.search_offset = 0;
@@ -594,8 +593,8 @@ fn temp_git_with_changes() -> PathBuf {
     dir.canonicalize().unwrap()
 }
 
-fn ctrl_g() -> KeyEvent {
-    KeyEvent::new(KeyCode::Char('G'), KeyModifiers::CONTROL)
+fn ctrl_d() -> KeyEvent {
+    KeyEvent::new(KeyCode::Char('d'), KeyModifiers::CONTROL)
 }
 
 fn flat_key() -> KeyEvent {
@@ -607,7 +606,7 @@ fn git_mode_filters_tree_to_changed_files() {
     let root = temp_git_with_changes();
     let mut app = app_for(&root);
 
-    app.handle_key(ctrl_g());
+    app.handle_key(ctrl_d());
 
     assert!(app.git_mode);
     let names: Vec<&str> = app.nodes.iter().map(|n| n.name.as_str()).collect();
@@ -624,8 +623,8 @@ fn git_mode_toggle_off_restores_unchanged_files() {
     let root = temp_git_with_changes();
     let mut app = app_for(&root);
 
-    app.handle_key(ctrl_g()); // on
-    app.handle_key(ctrl_g()); // off
+    app.handle_key(ctrl_d()); // on
+    app.handle_key(ctrl_d()); // off
 
     assert!(!app.git_mode);
     assert!(!app.is_diff, "should restore file content view");
@@ -645,7 +644,7 @@ fn git_mode_auto_expands_dirs_with_changes() {
         "sub/ starts collapsed"
     );
 
-    app.handle_key(ctrl_g());
+    app.handle_key(ctrl_d());
 
     assert!(
         app.expanded.contains(&root.join("sub")),
@@ -663,7 +662,7 @@ fn git_mode_opens_working_tree_diff() {
     let root = temp_git_with_changes();
     let mut app = app_for(&root);
 
-    app.handle_key(ctrl_g());
+    app.handle_key(ctrl_d());
 
     // Navigate past any leading directory nodes to land on a file.
     // (tree.rs sorts dirs first, so sub/ may be at index 0.)
@@ -701,7 +700,7 @@ fn git_mode_navigation_shows_diff_for_each_file() {
     let root = temp_git_with_changes();
     let mut app = app_for(&root);
 
-    app.handle_key(ctrl_g());
+    app.handle_key(ctrl_d());
     // Move to the next file node.
     app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
     app.pump_loads();
@@ -718,7 +717,7 @@ fn git_mode_flat_shows_depth_zero_files() {
     let root = temp_git_with_changes();
     let mut app = app_for(&root);
 
-    app.handle_key(ctrl_g());
+    app.handle_key(ctrl_d());
     app.handle_key(flat_key());
 
     assert!(app.git_mode_flat);
@@ -739,7 +738,7 @@ fn git_mode_flat_toggle_returns_to_tree_view() {
     let root = temp_git_with_changes();
     let mut app = app_for(&root);
 
-    app.handle_key(ctrl_g());
+    app.handle_key(ctrl_d());
     app.handle_key(flat_key()); // flat
     app.handle_key(flat_key()); // back to tree
 
@@ -756,13 +755,13 @@ fn git_mode_flat_toggle_returns_to_tree_view() {
 fn git_mode_search_is_scoped_to_changed_files() {
     let root = temp_git_with_changes();
     let mut app = app_for(&root);
-    app.handle_key(ctrl_g());
+    app.handle_key(ctrl_d());
     assert!(app.git_mode);
 
-    // Open file search (Ctrl+F with content focus, no file open).
+    // Open the Files search picker (ctrl+t).
     app.focus = Focus::Content;
     app.current_file = None;
-    app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
+    app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
     let search = app.search.as_ref().unwrap();
     assert!(search.scoped, "search must be scoped in git mode");
 
@@ -797,7 +796,7 @@ fn git_mode_search_is_not_scoped_outside_git_mode() {
 
     app.focus = Focus::Content;
     app.current_file = None;
-    app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
+    app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
     let search = app.search.as_ref().unwrap();
     assert!(!search.scoped, "search must NOT be scoped outside git mode");
     // Unchanged file must appear.
@@ -826,7 +825,7 @@ fn git_changed_files_set_returns_none_outside_git_mode() {
 fn git_changed_files_set_returns_files_in_git_mode() {
     let root = temp_git_with_changes();
     let mut app = app_for(&root);
-    app.handle_key(ctrl_g());
+    app.handle_key(ctrl_d());
     let set = app.git_changed_files_set();
     assert!(set.is_some());
     let set = set.unwrap();
@@ -841,14 +840,14 @@ fn git_changed_files_set_returns_files_in_git_mode() {
 fn git_mode_empty_changed_set_gives_empty_search() {
     let root = temp_tree(); // not a git repo, no git status
     let mut app = app_for(&root);
-    app.handle_key(ctrl_g());
+    app.handle_key(ctrl_d());
     assert!(app.git_mode);
     // git_status_map should be empty since this is not a git repo.
     assert!(app.git_status_map.is_empty() || app.nodes.is_empty());
 
     app.focus = Focus::Content;
     app.current_file = None;
-    app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
+    app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
     if let Some(search) = app.search.as_ref() {
         assert!(search.scoped);
         assert!(
@@ -879,7 +878,7 @@ fn git_mode_outside_repo_gives_empty_tree() {
     let root = temp_tree(); // not a git repo
     let mut app = app_for(&root);
 
-    app.handle_key(ctrl_g());
+    app.handle_key(ctrl_d());
 
     assert!(app.git_mode);
     assert!(
@@ -1394,7 +1393,7 @@ fn search_key_esc_closes() {
     let mut app = app_for(&root);
     app.focus = Focus::Content;
     app.current_file = None;
-    app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
+    app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
     assert!(app.search.is_some());
     app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
     assert!(app.search.is_none());
@@ -1407,7 +1406,7 @@ fn search_key_tab_toggles_mode() {
     let mut app = app_for(&root);
     app.focus = Focus::Content;
     app.current_file = None;
-    app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
+    app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
     app.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::empty()));
     assert_eq!(app.search.as_ref().unwrap().mode, SearchMode::Content);
     app.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::empty()));
@@ -1423,7 +1422,7 @@ fn in_file_search_esc_closes() {
     let mut app = app_for(&root);
     app.open_file(&root.join("a.txt"));
     app.focus = Focus::Content;
-    app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
+    app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
     assert!(app.in_file_search.is_some());
     app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
     assert!(app.in_file_search.is_none());
@@ -1436,7 +1435,7 @@ fn in_file_search_enter_closes() {
     let mut app = app_for(&root);
     app.open_file(&root.join("a.txt"));
     app.focus = Focus::Content;
-    app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
+    app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
     assert!(app.in_file_search.is_some());
     app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
     assert!(app.in_file_search.is_none());
@@ -1544,7 +1543,7 @@ fn search_mouse_scroll_down_up() {
     let mut app = app_for(&root);
     app.focus = Focus::Content;
     app.current_file = None;
-    app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
+    app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
     app.search_area = Rect {
         x: 0,
         y: 0,
@@ -1612,7 +1611,7 @@ fn theme_mouse_scroll_down_up() {
 // -- command_palette -------------------------------------------------------
 
 #[test]
-fn command_palette_ctrl_shift_p_opens() {
+fn command_palette_ctrl_p_opens() {
     let root = temp_tree();
     let mut app = app_for(&root);
     assert!(app.command_palette.is_none());
@@ -2075,7 +2074,7 @@ fn search_key_enter_activates_and_closes() {
     let mut app = app_for(&root);
     app.focus = Focus::Content;
     app.current_file = None;
-    app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
+    app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
     app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
     assert!(app.search.is_none());
     fs::remove_dir_all(&root).ok();
@@ -2087,7 +2086,7 @@ fn search_key_up_down_navigation() {
     let mut app = app_for(&root);
     app.focus = Focus::Content;
     app.current_file = None;
-    app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
+    app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
     let max = app.search.as_ref().unwrap().results_len().saturating_sub(1);
     app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
     assert_eq!(app.search.as_ref().unwrap().selected, 1.min(max));
@@ -2102,7 +2101,7 @@ fn search_key_up_stays_at_zero() {
     let mut app = app_for(&root);
     app.focus = Focus::Content;
     app.current_file = None;
-    app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
+    app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
     app.handle_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()));
     assert_eq!(app.search.as_ref().unwrap().selected, 0);
     fs::remove_dir_all(&root).ok();
@@ -2114,7 +2113,7 @@ fn search_key_down_stays_at_boundary() {
     let mut app = app_for(&root);
     app.focus = Focus::Content;
     app.current_file = None;
-    app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
+    app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
     let s = app.search.as_mut().unwrap();
     let max = s.results_len().saturating_sub(1);
     if max == 0 {
@@ -2134,7 +2133,7 @@ fn search_key_backspace_and_char() {
     let mut app = app_for(&root);
     app.focus = Focus::Content;
     app.current_file = None;
-    app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
+    app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
     app.handle_key(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::empty()));
     assert_eq!(app.search.as_ref().unwrap().query, "a");
     app.handle_key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::empty()));
@@ -2177,7 +2176,7 @@ fn in_file_search_opens_when_content_focused() {
     let mut app = app_for(&root);
     app.open_file(&root.join("a.txt"));
     app.focus = Focus::Content;
-    app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
+    app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
     assert!(app.in_file_search.is_some());
     fs::remove_dir_all(&root).ok();
 }
@@ -2448,10 +2447,10 @@ fn normal_key_search_files_content_focus_opens_in_file_search() {
     let mut app = app_for(&root);
     app.open_file(&root.join("a.txt"));
     app.focus = Focus::Content;
-    app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
+    app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
     assert!(
         app.in_file_search.is_some(),
-        "with content focus + file open, Ctrl+F should open in-file search"
+        "with content focus + file open, / should open in-file search"
     );
     fs::remove_dir_all(&root).ok();
 }
@@ -3459,7 +3458,7 @@ fn search_mouse_click_outside_area_closes() {
     let mut app = app_for(&root);
     app.focus = Focus::Content;
     app.current_file = None;
-    app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
+    app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
     app.search_area = Rect {
         x: 5,
         y: 5,
@@ -3477,7 +3476,7 @@ fn search_mouse_click_out_of_range_index_noop() {
     let mut app = app_for(&root);
     app.focus = Focus::Content;
     app.current_file = None;
-    app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
+    app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
     app.search_area = Rect {
         x: 0,
         y: 0,
@@ -4377,7 +4376,7 @@ fn search_mouse_scroll_up_at_zero() {
     let mut app = app_for(&root);
     app.focus = Focus::Content;
     app.current_file = None;
-    app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
+    app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
     app.search_area = full_rect();
     app.search_offset = 0;
     if app.search.as_ref().unwrap().results_len() > 0 {
@@ -4563,7 +4562,7 @@ fn search_key_unrecognized_key_is_noop() {
     let mut app = app_for(&root);
     app.focus = Focus::Content;
     app.current_file = None;
-    app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
+    app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
     assert!(app.search.is_some());
     let selected = app.search.as_ref().unwrap().selected;
     // F-key should hit the _ => {} catch-all
@@ -4615,7 +4614,7 @@ fn in_file_search_unrecognized_key_is_noop() {
     let mut app = app_for(&root);
     app.open_file(&root.join("a.txt"));
     app.focus = Focus::Content;
-    app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
+    app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
     assert!(app.in_file_search.is_some());
     let current = app.in_file_search.as_ref().unwrap().current;
     app.handle_key(KeyEvent::new(KeyCode::F(5), KeyModifiers::empty()));
@@ -4848,7 +4847,7 @@ fn s_key_cycles_diff_mode_in_diff_view() {
     let root = temp_git_for_diff_mode();
     let mut app = app_for(&root);
     // Enter git mode so the content pane shows a working-tree diff.
-    app.handle_key(KeyEvent::new(KeyCode::Char('G'), KeyModifiers::CONTROL));
+    app.handle_key(ctrl_d());
     app.pump_loads();
     assert!(app.is_diff, "git mode should show a diff");
     assert_eq!(app.diff_mode, DiffMode::All, "default mode should be All");

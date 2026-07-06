@@ -119,9 +119,9 @@ fn blame_line_key_toggles_show_line_blame() {
     app.open_file(&root.join("long.txt"));
     app.focus = Focus::Content;
     assert!(!app.show_line_blame);
-    app.handle_key(ctrl('B'));
+    app.handle_key(key(KeyCode::Char('B')));
     assert!(app.show_line_blame);
-    app.handle_key(ctrl('B'));
+    app.handle_key(key(KeyCode::Char('B')));
     assert!(!app.show_line_blame);
     fs::remove_dir_all(&root).ok();
 }
@@ -132,7 +132,7 @@ fn blame_line_key_noop_in_diff_mode() {
     let mut app = app_for(&root);
     app.focus = Focus::Content;
     app.is_diff = true;
-    app.handle_key(ctrl('B'));
+    app.handle_key(key(KeyCode::Char('B')));
     assert!(!app.show_line_blame);
     fs::remove_dir_all(&root).ok();
 }
@@ -144,7 +144,7 @@ fn blame_line_key_does_not_change_hscroll() {
     app.open_file(&root.join("long.txt"));
     app.focus = Focus::Content;
     app.content_hscroll = 8;
-    app.handle_key(ctrl('B'));
+    app.handle_key(key(KeyCode::Char('B')));
     assert_eq!(app.content_hscroll, 8);
     fs::remove_dir_all(&root).ok();
 }
@@ -250,10 +250,9 @@ fn goto_line_keybinding_opens_dialog_with_content_focus() {
 }
 
 #[test]
-fn goto_line_wins_over_git_mode_on_legacy_terminal() {
-    // On terminals without kitty keyboard protocol, Ctrl+G (lowercase) could
-    // match both goto_line (ctrl+g) and git_mode_toggle (ctrl+G). The dispatch
-    // order must prefer goto_line so the plain-Ctrl action wins.
+fn ctrl_g_opens_goto_line_not_git_mode() {
+    // goto_line owns ctrl+g; git_mode_toggle lives on ctrl+d — the two must
+    // never collide regardless of terminal capabilities.
     let root = temp_tree();
     let mut app = app_for(&root);
     app.focus = Focus::Content;
@@ -267,12 +266,9 @@ fn goto_line_wins_over_git_mode_on_legacy_terminal() {
     app.handle_key(ctrl('g'));
     assert!(
         app.goto_line.is_some(),
-        "goto_line dialog must open when ctrl+g is pressed on a legacy terminal"
+        "goto_line dialog must open when ctrl+g is pressed"
     );
-    assert!(
-        !app.git_mode,
-        "git_mode must NOT be toggled when ctrl+g fires goto_line on a legacy terminal"
-    );
+    assert!(!app.git_mode, "git_mode must NOT be toggled by ctrl+g");
     #[cfg(unix)]
     CURRENT_ALT_KEYS.with(|c| c.set(AltKeys::default()));
     fs::remove_dir_all(&root).ok();
@@ -378,7 +374,7 @@ fn git_mode_flat_toggle_noop_outside_git_mode() {
     app.handle_key(key(KeyCode::Char('F')));
     assert_eq!(
         app.status_message.as_ref().map(|sm| sm.text.as_str()),
-        Some("flat view: only in git mode (Ctrl+Shift+G)")
+        Some("flat view: only in git mode (Ctrl+D)")
     );
     assert!(!app.git_mode_flat);
     fs::remove_dir_all(&root).ok();
@@ -808,7 +804,7 @@ fn content_search_key_scopes_search_in_git_mode() {
     let mut app = app_for(&root);
     app.git_mode = true;
     app.focus = Focus::Content;
-    // search_content = ctrl+shift+f, i.e. ctrl + uppercase F.
+    // search_content = ctrl+f; uppercase event must match case-insensitively.
     app.handle_key(ctrl('F'));
     assert!(
         app.search.as_ref().unwrap().scoped,
@@ -999,7 +995,7 @@ fn ctrl_p_opens_palette_with_ranked_order_from_usage() {
     let mut app = app_for(&root);
     // Pre-load usage so help (index 0) is the last-used command.
     app.command_usage.record("help");
-    // command_palette = ctrl+shift+p, i.e. ctrl + uppercase P.
+    // command_palette = ctrl+p; uppercase event must match case-insensitively.
     app.handle_key(ctrl('P'));
     let palette = app
         .command_palette
@@ -1016,90 +1012,90 @@ fn ctrl_p_opens_palette_with_ranked_order_from_usage() {
     fs::remove_dir_all(&root).ok();
 }
 
-// -- find_files (ctrl+p) ----------------------------------------------------
+// -- find_files (ctrl+t) ----------------------------------------------------
 
 #[test]
-fn ctrl_p_opens_file_picker_when_tree_focused() {
+fn ctrl_t_opens_file_picker_when_tree_focused() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.focus = Focus::Tree;
-    app.handle_key(ctrl('p'));
+    app.handle_key(ctrl('t'));
     assert!(
         app.search.is_some(),
-        "ctrl+p must open the search picker from Tree focus"
+        "ctrl+t must open the search picker from Tree focus"
     );
     assert_eq!(
         app.search.as_ref().unwrap().mode,
         SearchMode::Files,
-        "ctrl+p must open in Files mode"
+        "ctrl+t must open in Files mode"
     );
     fs::remove_dir_all(&root).ok();
 }
 
 #[test]
-fn ctrl_p_opens_file_picker_when_content_focused_with_file() {
+fn ctrl_t_opens_file_picker_when_content_focused_with_file() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
     app.focus = Focus::Content;
-    app.handle_key(ctrl('p'));
+    app.handle_key(ctrl('t'));
     assert!(
         app.search.is_some(),
-        "ctrl+p must open the search picker from Content focus with an open file"
+        "ctrl+t must open the search picker from Content focus with an open file"
     );
     assert_eq!(
         app.search.as_ref().unwrap().mode,
         SearchMode::Files,
-        "ctrl+p must open in Files mode (not in-file search)"
+        "ctrl+t must open in Files mode (not in-file search)"
     );
     fs::remove_dir_all(&root).ok();
 }
 
-// -- search_files (ctrl+f, context-split; `/` is tree-scoped) -----------------
+// -- search_files (`/`, context-split) ----------------------------------------
 
 #[test]
-fn ctrl_f_opens_tree_filter_when_tree_focused() {
+fn slash_opens_tree_filter_when_tree_focused() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.focus = Focus::Tree;
-    app.handle_key(ctrl('f'));
+    app.handle_key(key(KeyCode::Char('/')));
     assert!(
         app.tree_filter.is_some(),
-        "ctrl+f must open the tree filter from Tree focus"
+        "/ must open the tree filter from Tree focus"
     );
     fs::remove_dir_all(&root).ok();
 }
 
 #[test]
-fn ctrl_f_opens_in_file_search_when_content_focused_with_file() {
+fn slash_opens_in_file_search_when_content_focused_with_file() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
     app.focus = Focus::Content;
-    app.handle_key(ctrl('f'));
+    app.handle_key(key(KeyCode::Char('/')));
     assert!(
         app.in_file_search.is_some(),
-        "ctrl+f must open in-file search from Content focus with an open file"
+        "/ must open in-file search from Content focus with an open file"
     );
     fs::remove_dir_all(&root).ok();
 }
 
 #[test]
-fn ctrl_f_opens_file_picker_when_content_focused_no_file() {
+fn slash_opens_file_picker_when_content_focused_no_file() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.focus = Focus::Content;
     app.current_file = None;
-    app.handle_key(ctrl('f'));
+    app.handle_key(key(KeyCode::Char('/')));
     assert!(
         app.search.is_some(),
-        "ctrl+f must fall back to the search picker without a file"
+        "/ must fall back to the search picker without a file"
     );
     fs::remove_dir_all(&root).ok();
 }
 
 #[test]
-fn ctrl_f_opens_in_file_search_for_pager_content_without_a_path() {
+fn slash_opens_in_file_search_for_pager_content_without_a_path() {
     // Piped stdin content (pager mode) has no backing path, but `content` is
     // populated, so it must still support in-file search rather than falling
     // back to the (irrelevant, since there's no tree) file picker.
@@ -1112,43 +1108,11 @@ fn ctrl_f_opens_in_file_search_for_pager_content_without_a_path() {
         },
         None,
     );
-    app.handle_key(ctrl('f'));
+    app.handle_key(key(KeyCode::Char('/')));
     assert!(
         app.in_file_search.is_some(),
-        "ctrl+f must open in-file search for loaded pager content"
+        "/ must open in-file search for loaded pager content"
     );
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn slash_opens_tree_filter_when_tree_focused() {
-    let root = temp_tree();
-    let mut app = app_for(&root);
-    app.focus = Focus::Tree;
-    app.handle_key(key(KeyCode::Char('/')));
-    assert!(
-        app.tree_filter.is_some(),
-        "/ must open tree filter from Tree focus"
-    );
-    assert!(app.search.is_none(), "/ must not open the search picker");
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn slash_is_inert_when_content_focused() {
-    // `/` is tree-scoped by default: the content pane stays letter-free so
-    // its keyspace remains available for future editing (in-file search is
-    // ctrl+f there).
-    let root = temp_tree();
-    let mut app = app_for(&root);
-    app.open_file(&root.join("long.txt"));
-    app.focus = Focus::Content;
-    app.handle_key(key(KeyCode::Char('/')));
-    assert!(
-        app.in_file_search.is_none(),
-        "tree-scoped / must not fire in the content pane"
-    );
-    assert!(app.search.is_none(), "/ must not open the search picker");
     fs::remove_dir_all(&root).ok();
 }
 
@@ -1180,29 +1144,6 @@ fn tree_collapse_on_child_navigates_to_parent_dir() {
         "Left on nested child must jump to parent dir"
     );
     fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn slash_is_inert_when_content_focused_no_file() {
-    // Use an empty directory so App::new() has no file to open, leaving
-    // current_file = None.
-    let dir = std::env::temp_dir().join(format!(
-        "tv_slash_empty_{}_{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_nanos())
-            .unwrap_or(0)
-    ));
-    fs::create_dir_all(&dir).unwrap();
-    let mut app = app_for(&dir);
-    app.focus = Focus::Content;
-    app.handle_key(key(KeyCode::Char('/')));
-    assert!(
-        app.search.is_none(),
-        "tree-scoped / must not fire in the content pane even without a file"
-    );
-    fs::remove_dir_all(&dir).ok();
 }
 
 #[test]

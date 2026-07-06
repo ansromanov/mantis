@@ -42,8 +42,9 @@ fn test_is_prev_match() {
     assert!(is_prev_match(&make_key(KeyCode::Up)));
     assert!(is_prev_match(&make_key(KeyCode::BackTab)));
     assert!(is_prev_match(&make_key(KeyCode::Char('N'))));
-    assert!(is_prev_match(&make_key_with_modifier(
-        KeyCode::Char('P'),
+    // Ctrl+P is the command palette, never search navigation.
+    assert!(!is_prev_match(&make_key_with_modifier(
+        KeyCode::Char('p'),
         KeyModifiers::CONTROL
     )));
     assert!(!is_prev_match(&make_key(KeyCode::Char('P')))); // P without Ctrl

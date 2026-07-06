@@ -41,34 +41,34 @@ than streaming incrementally.
 
 ### Keyboard enhancement
 
-Modern terminals distinguish `Ctrl+Letter` from `Ctrl+Shift+Letter` via the
-kitty keyboard protocol (CSI-u). Legacy terminals (macOS Terminal.app, plain
-xterm, many SSH setups) send the same byte for both — `Ctrl+G` and
-`Ctrl+Shift+G` are indistinguishable.
+Every default binding uses plain `Ctrl+letter`, a bare/Shift letter, or a
+named key — combinations that work identically on every terminal and OS.
+Ctrl+Shift combinations are deliberately not used: kitty reserves
+`ctrl+shift` for its own shortcuts (`kitty_mod`), Windows Terminal binds
+`Ctrl+Shift+P`/`Ctrl+Shift+F` itself, and legacy terminals (macOS
+Terminal.app, plain xterm, many SSH setups) can't even distinguish them from
+plain `Ctrl`. Modifier bindings are matched case-insensitively, so CapsLock
+or a stray Shift never breaks a shortcut.
 
-mantis detects your terminal's capability at startup. When the kitty protocol
-is **not** available, the plain-`Ctrl` binding takes priority for conflicting
-keys (e.g. `Ctrl+g` opens the go-to-line dialog rather than `Ctrl+Shift+G`
-toggling git mode). Shift-variant actions remain accessible through the command
-palette (`Ctrl+Shift+P` — which itself degrades to `Ctrl+P` followed by typing
-the action name).
+On terminals with the kitty keyboard protocol (CSI-u), mantis additionally
+matches bindings by physical key position, so shortcuts work on non-Latin
+keyboard layouts.
 
-| Terminal | Keyboard enhancement | Shift+Ctrl support | Full mouse support |
-|---|---|---|---|
-| kitty | ✓ Full | ✓ | ✓ |
-| WezTerm | ✓ Full | ✓ | ✓ |
-| Ghostty | ✓ Full | ✓ | ✓ |
-| Alacritty 0.15+ | ✓ Full | ✓ | ✓ |
-| Windows Terminal | ✓ Full | ✓ | ✓ |
-| iTerm2 | ✓ Partial¹ | ✓ | ✓ |
-| macOS Terminal.app | ✗ | ✗ | ✓ |
-| xterm (plain) | ✗ | ✗ | Partial² |
-| Most SSH clients | ✗ | ✗ | Depends on client |
-| tmux (inside any terminal) | ✗ | ✗ | ✗ |
+| Terminal | Keyboard enhancement (layout independence) | Full mouse support |
+|---|---|---|
+| kitty | ✓ Full | ✓ |
+| WezTerm | ✓ Full | ✓ |
+| Ghostty | ✓ Full | ✓ |
+| Alacritty 0.15+ | ✓ Full | ✓ |
+| Windows Terminal | ✓ Full | ✓ |
+| iTerm2 | ✓ Partial¹ | ✓ |
+| macOS Terminal.app | ✗ | ✓ |
+| xterm (plain) | ✗ | Partial² |
+| Most SSH clients | ✗ | Depends on client |
+| tmux (inside any terminal) | ✗ | ✗ |
 
 ¹ iTerm2 supports CSI-u (disambiguation + event types) but may not report
-alternate keys for all keyboard layouts. Shift+Ctrl combos work reliably on US
-layouts.
+alternate keys for all keyboard layouts.
 
 ² xterm supports mouse events but the generic mouse protocol (SGR 1006) lacks
 drag and release tracking. Enable `xterm-mouse` in tmux or `XTerm*decTerminalID:
@@ -90,7 +90,7 @@ dotfiles into the repository. Each workspace root gets its own file under
 the `sessions/` subdirectory. To reset the session for a directory, quit
 and delete its file from the `sessions/` subdirectory in the state directory.
 
-> 💡 **Can't remember a key?** Press `?` or `F1` for the help overlay, or `Ctrl+Shift+P`
+> 💡 **Can't remember a key?** Press `?` or `F1` for the help overlay, or `Ctrl+P`
 > to open the command palette and search for an action by name — it shows you
 > the shortcut too. New to `mantis`? Start with the [Quick Start](quickstart.md).
 
@@ -101,7 +101,7 @@ below cover the shipped defaults; single letters (`q`, `p`, `t`, …) only work
 while the **tree** panel is focused — the content pane's letter keyspace is
 kept free, apart from the vim motions below, for future editing features. Any
 action not listed with a content-pane key is still reachable from the command
-palette (`Ctrl+Shift+P`).
+palette (`Ctrl+P`).
 
 ## Global
 
@@ -111,11 +111,11 @@ These work no matter which panel is focused.
 | ---------------------- | ----------------------- |
 | `Ctrl+c`, `q` (tree)   | Quit                    |
 | `F1`, `?`              | Toggle help             |
-| `Ctrl+Shift+P`         | Command palette (fuzzy-find any action) |
+| `Ctrl+P`               | Command palette (fuzzy-find any action) |
 | `Tab`                  | Switch panel            |
-| `Ctrl+F`, `/` (tree)   | Tree filter / in-file search |
-| `Ctrl+P`               | Global fuzzy file-name picker |
-| `Ctrl+Shift+F`, `f` (tree) | Content (full-text) search |
+| `/`                    | Tree filter (tree) / in-file search (content) |
+| `Ctrl+T`               | Global fuzzy file-name picker |
+| `Ctrl+F`, `f` (tree)   | Content (full-text) search |
 | `Ctrl+r`, `F5`, `r` (tree) | Reload tree         |
 | `Ctrl+e`, `e` (tree)   | Open current file in `$EDITOR` |
 | `y` (tree)             | Copy absolute path to clipboard |
@@ -128,9 +128,9 @@ These work no matter which panel is focused.
 | `p` (tree)             | Plugin palette (enable/disable plugins) |
 | `Ctrl+g`               | Go to line              |
 | `Ctrl+b`               | Toggle git blame (shows author + commit subject inline) |
-| `Ctrl+Shift+B`         | Blame the active line   |
+| `B` (content)          | Blame the active line   |
 | `t` (tree)             | Theme picker            |
-| `Ctrl+Shift+G`         | Toggle git mode (changed files + diffs; the pickers above scope to changed files) |
+| `Ctrl+D`               | Toggle git mode (changed files + diffs; the pickers above scope to changed files) |
 | `F` (tree)             | Toggle flat / tree view in git mode |
 
 ## Tree panel
@@ -146,7 +146,7 @@ These work no matter which panel is focused.
 
 ## Content panel
 
-The content pane has a **line cursor** (visible as a highlighted full-width row). Use `Up`/`Down` to move it, then press `Ctrl+Shift+B` to blame the highlighted line.
+The content pane has a **line cursor** (visible as a highlighted full-width row). Use `Up`/`Down` to move it, then press `B` to blame the highlighted line.
 
 When git blame is toggled on (`Ctrl+b`), a column appears on the left showing the author name and commit subject for each line. Clicking any cell in this column opens the line-blame popup for that line.
 
@@ -159,13 +159,14 @@ When git blame is toggled on (`Ctrl+b`), a column appears on the left showing th
 | `Home`/`0`     | Reset horizontal scroll      |
 | `Space`        | Toggle fold at cursor        |
 | `Ctrl+g`       | Go to line                   |
-| `Ctrl+Shift+B` | Blame the active line        |
+| `B`            | Blame the active line        |
+| `/`            | In-file search               |
 | `n`/`N`        | Next / previous hunk (in a diff) |
 | `M`            | Toggle raw/rendered markdown (provided by markdown plugin) |
 
 Word wrap, line numbers, JSON pretty-print, side-by-side diff, and the
 staged/unstaged diff cycle have no default content-pane key — use the command
-palette (`Ctrl+Shift+P`) or bind one yourself in `mantis.toml`.
+palette (`Ctrl+P`) or bind one yourself in `mantis.toml`.
 
 ### Rendered plugin content and line numbers
 
@@ -200,31 +201,30 @@ The status bar shows a git summary when inside a repository:
 
 | Key                 | Action |
 | ------------------- | ------ |
-| `Ctrl+Shift+G`       | Toggle git mode — show only changed files; opening a file shows its diff |
+| `Ctrl+D`             | Toggle git mode — show only changed files; opening a file shows its diff |
 | `F` (tree)           | Toggle flat list / nested tree (git mode only) |
 | `n` / `N`            | Jump to next / previous change hunk |
-| `Ctrl+Shift+B`       | Blame the current line: hash, author, date, summary |
+| `B` (content)        | Blame the current line: hash, author, date, summary |
 | `H` (tree)           | File history — pick a commit to view its diff |
 
 Side-by-side diff and the staged/unstaged diff cycle have no default key —
-use the command palette (`Ctrl+Shift+P`) or bind one in `mantis.toml`.
+use the command palette (`Ctrl+P`) or bind one in `mantis.toml`.
 
 ## Search popup
 
 Three search entry points cover different needs:
 
-- **`Ctrl+P`** — global fuzzy file-name picker. Opens the same file-name search
+- **`Ctrl+T`** — global fuzzy file-name picker. Opens the same file-name search
   from either panel, regardless of focus. Use this when you want to jump to any
   file in the project by name.
-- **`Ctrl+F`** (or `/` in the tree panel) — context-sensitive: in the tree
-  panel it filters file names inline; in the content panel (with a file open)
-  it opens the in-file search bar; otherwise it falls back to the file-name
-  picker.
-- **`Ctrl+Shift+F`** (or `f` in the tree panel) — fuzzy content search across
+- **`/`** — context-sensitive: in the tree panel it filters file names inline;
+  in the content panel (with a file open) it opens the in-file search bar;
+  otherwise it falls back to the file-name picker.
+- **`Ctrl+F`** (or `f` in the tree panel) — fuzzy content search across
   all files (or changed files in git mode).
 
 Open any search popup and just start typing to filter.
-In git mode (`Ctrl+Shift+G`), searches are automatically scoped to only the
+In git mode (`Ctrl+D`), searches are automatically scoped to only the
 changed files — the popup title shows "(changed files)" to make this visible.
 
 | Key       | Action                          |
@@ -243,7 +243,7 @@ the active options are shown as highlighted `[Aa] [\b] [.*]` indicators.
 
 ## Command palette
 
-Press `Ctrl+Shift+P` to open a searchable list of **every** action, each shown
+Press `Ctrl+P` to open a searchable list of **every** action, each shown
 next to its current keybinding. Type to fuzzy-filter (e.g. "blame", "theme",
 "json"), navigate with `Up`/`Down`, and press `Enter` to run the highlighted
 command. It's the fastest way to discover what `mantis` can do without
@@ -289,7 +289,7 @@ their file extension.
 
 ## JSON pretty-printing
 
-Viewing a JSON file? Use the command palette (`Ctrl+Shift+P` → "Toggle JSON
+Viewing a JSON file? Use the command palette (`Ctrl+P` → "Toggle JSON
 pretty-print") to reformat it with indentation for easier reading, and again
 to return to the raw text. Handy for minified `.json`. There's no default key
 for this — bind `toggle_pretty_json` in `mantis.toml` if you want one.

@@ -114,10 +114,16 @@ optionally prefixed with modifiers: `"ctrl+c"`, `"alt+."`, `"cmd+p"` (`cmd` /
 > instead of the layout-translated character, so `ctrl+p` works correctly even on
 > non-Latin layouts (Russian, Hebrew, etc.). Terminals without kitty protocol
 > fall back to the logical character — bindings may not trigger as expected on
-> non-Latin layouts in those terminals. Terminals without the kitty protocol also
-> can't distinguish `ctrl+shift+<letter>` from `ctrl+<letter>` (written below as
-> `ctrl+<Uppercase letter>`, e.g. `ctrl+P`); the defaults are chosen so that
-> degradation lands on the more frequent action.
+> non-Latin layouts in those terminals.
+
+> **No Ctrl+Shift combinations.** Ctrl+Shift shortcuts are unsupported: kitty
+> reserves `ctrl+shift` as its own shortcut prefix (`kitty_mod`), Windows
+> Terminal binds `Ctrl+Shift+P`/`Ctrl+Shift+F` for its palette and search, and
+> legacy terminals can't distinguish `ctrl+shift+<letter>` from
+> `ctrl+<letter>` at all. Modifier+letter specs are therefore
+> **case-insensitive**: `"ctrl+P"`, `"ctrl+shift+p"`, and `"ctrl+p"` all mean
+> the same binding, which also fires with CapsLock on or Shift held. (Char
+> case still encodes Shift for *unmodified* keys: `"G"` is Shift+G.)
 
 Defaults are editor-style (VS Code / Sublime conventions), with vim motions
 kept as tree-panel secondaries:
@@ -126,8 +132,8 @@ kept as tree-panel secondaries:
 [keys]
 # global
 quit = ["ctrl+c", "tree:q"]
-help = ["F1", "tree:?"]
-command_palette = ["ctrl+P", "tree:P"]
+help = ["F1", "?"]
+command_palette = ["ctrl+p", "tree:P"]
 reload = ["ctrl+r", "F5", "tree:r"]
 switch_panel = ["Tab"]
 toggle_hidden = ["tree:."]
@@ -142,13 +148,13 @@ toggle_watch = ["tree:W"]
 recent_files = ["ctrl+o"]
 file_history = ["tree:H"]
 goto_line = ["ctrl+g"]
-git_mode_toggle = ["ctrl+G"]
+git_mode_toggle = ["ctrl+d"]
 git_mode_flat_toggle = ["tree:F"]
 
 # search
-search_files = ["ctrl+f", "tree:/"]
-find_files = ["ctrl+p"]
-search_content = ["ctrl+F", "tree:f"]
+search_files = ["/"]          # contextual: tree filter / in-file search
+find_files = ["ctrl+t"]
+search_content = ["ctrl+f", "tree:f"]
 
 # navigation (shared by tree and content panes)
 nav_up = ["Up", "k"]
@@ -172,10 +178,10 @@ content_page_down = ["PageDown"]
 content_reset_col = ["Home", "0"]
 # toggle_wrap, toggle_line_numbers, toggle_pretty_json,
 # toggle_diff_side_by_side, and toggle_diff_staged have no default binding —
-# they're reachable from the command palette (Ctrl+Shift+P); bind them here
+# they're reachable from the command palette (Ctrl+P); bind them here
 # if you'd like a dedicated key.
 toggle_blame = ["ctrl+b"]
-blame_line = ["ctrl+B"]
+blame_line = ["content:B"]
 
 # diff view
 diff_hunk_next = ["n"]
@@ -186,18 +192,17 @@ diff_hunk_prev = ["N"]
 > frequent actions on top of the table above, keeping every `ctrl+` binding
 > as a fallback (Terminal.app/iTerm2 intercept most `cmd+` shortcuts before
 > `mantis` sees them; kitty/WezTerm/Ghostty forward them): `find_files =
-> ["cmd+p", "ctrl+p"]`, `command_palette = ["cmd+P", "ctrl+P", "tree:P"]`,
-> `search_content = ["cmd+F", "ctrl+F", "tree:f"]`, `search_files = ["cmd+f",
-> "ctrl+f", "tree:/"]`, `reload = ["cmd+r", "ctrl+r", "F5", "tree:r"]`,
-> `recent_files = ["cmd+o", "ctrl+o"]`, `content_top = ["cmd+Up",
-> "ctrl+Home", "g", "tree:Home"]`, `content_bottom = ["cmd+Down", "ctrl+End",
-> "G", "tree:End"]`, `content_reset_col = ["cmd+Left", "Home", "0"]`.
-> `goto_line` and `git_mode_toggle` stay on `ctrl` on every platform, matching
-> mac VS Code.
+> ["cmd+t", "ctrl+t"]`, `command_palette = ["cmd+p", "ctrl+p", "tree:P"]`,
+> `search_content = ["cmd+f", "ctrl+f", "tree:f"]`, `reload = ["cmd+r",
+> "ctrl+r", "F5", "tree:r"]`, `recent_files = ["cmd+o", "ctrl+o"]`,
+> `content_top = ["cmd+Up", "ctrl+Home", "g", "tree:Home"]`, `content_bottom
+> = ["cmd+Down", "ctrl+End", "G", "tree:End"]`, `content_reset_col =
+> ["cmd+Left", "Home", "0"]`. `goto_line` and `git_mode_toggle` stay on
+> `ctrl` on every platform.
 
 ## Command palette ranking
 
-When you open the command palette with `ctrl+shift+p` without typing a query, commands
+When you open the command palette with `ctrl+p` without typing a query, commands
 are ranked by recency and frequency rather than shown in a fixed order. The most
 recently used command is pinned at the top; the most frequently used commands
 follow it. Type any character to switch to the usual fuzzy search, which ignores

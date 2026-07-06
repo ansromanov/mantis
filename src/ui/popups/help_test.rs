@@ -112,8 +112,8 @@ fn help_remapped_key_shows_new_binding() {
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
     assert!(
-        joined.contains("Ctrl+t"),
-        "help with remapped theme_picker to Ctrl+T should show 'Ctrl+t', got:\n{joined}"
+        joined.contains("Ctrl+T"),
+        "help with remapped theme_picker to ctrl+t should show 'Ctrl+T', got:\n{joined}"
     );
 }
 
@@ -128,8 +128,8 @@ fn help_multi_binding_shows_joined() {
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
     assert!(
-        joined.contains("Ctrl+c / q"),
-        "help should show 'Ctrl+c / q' for quit, got:\n{joined}"
+        joined.contains("Ctrl+C / q"),
+        "help should show 'Ctrl+C / q' for quit, got:\n{joined}"
     );
 }
 
@@ -255,8 +255,8 @@ fn help_git_section_remapped_blame_line() {
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
     assert!(
-        joined.contains("Ctrl+b"),
-        "help with remapped blame_line to Ctrl+B should show 'Ctrl+b', got:\n{joined}"
+        joined.contains("Ctrl+B"),
+        "help with remapped blame_line to ctrl+b should show 'Ctrl+B', got:\n{joined}"
     );
 }
 
@@ -280,38 +280,20 @@ fn help_unbound_action_shows_dash() {
     );
 }
 
-/// On legacy terminals (no kitty keyboard protocol), the overview tab warns
-/// that Ctrl+Shift shortcuts degrade to their plain-Ctrl counterpart.
+/// Ctrl+Shift bindings are unsupported; the overview tab never shows a
+/// legacy-terminal degradation warning.
 #[test]
-fn help_shows_legacy_terminal_warning_when_not_keyboard_enhanced() {
+fn help_never_shows_legacy_terminal_warning() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());
-    app.keyboard_enhanced = false;
     let backend = TestBackend::new(80, 75);
     let mut terminal = Terminal::new(backend).unwrap();
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
     assert!(
-        joined.contains("can't distinguish Ctrl+Shift shortcuts"),
-        "help overlay must warn about degraded Ctrl+Shift shortcuts on legacy terminals, got:\n{joined}"
-    );
-}
-
-/// On keyboard-enhanced terminals, the legacy-terminal warning must not show.
-#[test]
-fn help_hides_legacy_terminal_warning_when_keyboard_enhanced() {
-    let dir = tempfile::tempdir().unwrap();
-    let mut app = make_app(dir.path());
-    app.keyboard_enhanced = true;
-    let backend = TestBackend::new(80, 75);
-    let mut terminal = Terminal::new(backend).unwrap();
-    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
-    let rows = buffer_rows(&terminal);
-    let joined = rows.join("\n");
-    assert!(
-        !joined.contains("can't distinguish Ctrl+Shift shortcuts"),
-        "help overlay must not show the legacy-terminal warning when keyboard_enhanced, got:\n{joined}"
+        !joined.contains("Ctrl+Shift"),
+        "help overlay must not reference Ctrl+Shift shortcuts, got:\n{joined}"
     );
 }
 

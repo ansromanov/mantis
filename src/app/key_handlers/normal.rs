@@ -124,8 +124,6 @@ impl App {
                 Focus::Content => Focus::Tree,
             };
         } else if pressed_in(&k.goto_line, &key, scope) {
-            // goto_line (Ctrl+g) checked before git_mode_toggle (Ctrl+G)
-            // so on legacy terminals the plain-Ctrl action wins.
             if self.focus == Focus::Content {
                 self.goto_line = Some(GotoLineState::new());
             } else {

@@ -657,10 +657,10 @@ fn toggle_git_mode_key_flips_git_mode_flag() {
     let root = temp_tree();
     let mut app = app_for(&root);
     assert!(!app.git_mode);
-    app.handle_key(KeyEvent::new(KeyCode::Char('G'), KeyModifiers::CONTROL));
-    assert!(app.git_mode, "Ctrl+Shift+G must enable git mode");
-    app.handle_key(KeyEvent::new(KeyCode::Char('G'), KeyModifiers::CONTROL));
-    assert!(!app.git_mode, "second Ctrl+Shift+G must disable git mode");
+    app.handle_key(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::CONTROL));
+    assert!(app.git_mode, "Ctrl+D must enable git mode");
+    app.handle_key(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::CONTROL));
+    assert!(!app.git_mode, "second Ctrl+D must disable git mode");
     fs::remove_dir_all(&root).ok();
 }
 

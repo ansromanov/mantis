@@ -188,10 +188,6 @@ pub struct App {
     /// Fallback icon for file types not in `icon_map`.
     pub icon_fallback: String,
     keys: Keymap,
-    /// Whether the running terminal supports the kitty keyboard protocol
-    /// (CSI-u). When `false`, `Ctrl+Letter` and `Ctrl+Shift+Letter` are
-    /// indistinguishable and the plain-Ctrl binding wins in dispatch order.
-    pub(crate) keyboard_enhanced: bool,
     pub config: Config,
     config_path: Option<std::path::PathBuf>,
     // Geometry captured during the last render, used to map mouse events.

@@ -29,14 +29,14 @@ pub fn is_page_down(key: &KeyEvent) -> bool {
     key.code == KeyCode::PageDown
 }
 
-/// In-file search navigation: previous match (Up, N, BackTab, Ctrl+P).
+/// In-file search navigation: previous match (Up, N, BackTab).
+/// Deliberately no Ctrl+P: that is the command palette, which must stay
+/// reachable while the search bar is open.
 pub fn is_prev_match(key: &KeyEvent) -> bool {
-    match key.code {
-        KeyCode::Up | KeyCode::BackTab => true,
-        KeyCode::Char('N') => true,
-        KeyCode::Char('P') => key.modifiers.intersects(KeyModifiers::CONTROL),
-        _ => false,
-    }
+    matches!(
+        key.code,
+        KeyCode::Up | KeyCode::BackTab | KeyCode::Char('N')
+    )
 }
 
 /// In-file search navigation: next match (Down, n, Tab).
