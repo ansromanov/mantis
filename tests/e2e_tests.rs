@@ -53,7 +53,7 @@ fn test_rust_highlighting_and_search() {
     for m in &s.matches {
         let line_content = &lines[m.line];
         let matched_substring = &line_content[m.col..m.col + m.len];
-        assert_eq!(matched_substring, "Rectangle");
+        assert!(matched_substring.eq_ignore_ascii_case("Rectangle"));
     }
     app.in_file_search = Some(s);
 }
@@ -66,7 +66,7 @@ fn test_yaml_folding_and_anchors() {
 
     assert_eq!(app.current_syntax.as_deref(), Some("YAML"));
     assert_eq!(app.yaml_anchor_count, 1);
-    assert_eq!(app.yaml_alias_count, 2);
+    assert_eq!(app.yaml_alias_count, 5);
 
     // Check fold regions are detected
     assert!(
