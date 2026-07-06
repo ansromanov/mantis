@@ -389,6 +389,8 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
             rows.push(section("Clipboard Operations"));
             rows.push(row_key("copy_path"));
             rows.push(row_key("copy_relative_path"));
+            rows.push(row_key("copy_line"));
+            rows.push(row_key("copy_file"));
             rows.push(gap.clone());
             rows.push(section("File Previews"));
             rows.push(normal_text(

@@ -574,4 +574,45 @@ fn dispatch_command_toggle_raw_markdown() {
 
     fs::remove_dir_all(&root).ok();
 }
+// -- copy_line / copy_file via command palette --------------------------------
+
+#[test]
+fn dispatch_command_copy_line_via_palette() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt"));
+    app.focus = Focus::Content;
+    app.active_line = 0;
+    app.command_palette = Some(palette_with_query("Copy line or selection"));
+    assert!(
+        app.dispatch_command(),
+        "copy_line must be a real dispatch arm"
+    );
+    assert_eq!(
+        app.clipboard_capture.last().map(String::as_str),
+        Some("line1"),
+        "copy_line must copy the active line text",
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn dispatch_command_copy_file_via_palette() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt"));
+    app.focus = Focus::Content;
+    app.command_palette = Some(palette_with_query("Copy entire file"));
+    assert!(
+        app.dispatch_command(),
+        "copy_file must be a real dispatch arm"
+    );
+    assert_eq!(
+        app.clipboard_capture.last().map(String::as_str),
+        Some("line1\nline2"),
+        "copy_file must copy all lines",
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
 // Satisfying require-tests check

@@ -119,6 +119,8 @@ These work no matter which panel is focused.
 | `Ctrl+e`, `e` (tree)   | Open current file in `$EDITOR` |
 | `y` (tree)             | Copy absolute path to clipboard |
 | `Y` (tree)             | Copy path relative to tree root to clipboard |
+| `y` (content)          | Copy current line (or selection if any) to clipboard |
+| `Y` (content)          | Copy entire file content to clipboard |
 | `.` (tree)             | Toggle hidden files     |
 | `H` (tree)             | Git history of current file |
 | `Ctrl+O`               | Recent files (jump to a recently opened file) |
