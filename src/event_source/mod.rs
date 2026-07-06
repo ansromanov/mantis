@@ -31,9 +31,11 @@
 //! Public items:
 //! - [`AltKeys`]: Shifted and physical base key codepoint alternatives.
 //! - [`CURRENT_ALT_KEYS`]: Thread-local alternate keys for the current event.
-//! - [`RawEventSource`]: The main buffered, non-blocking event input source.
-//!   Reads fd 0 by default (`new`), or a reopened `/dev/tty` in pager mode
-//!   (`for_tty`) so keyboard input keeps working while fd 0 is piped content.
+//! - [`RawEventSource`]: The main buffered, non-blocking event input source
+//!   (Unix only). Reads fd 0 by default (`new`), or a reopened `/dev/tty` in
+//!   pager mode (`for_tty`) so keyboard input keeps working while fd 0 is
+//!   piped content. On Windows, pager mode reopens `CONIN$` instead (see
+//!   [`crate::redirect_stdin_to_console`]).
 //! - [`push_keyboard_enhancement_flags`]: Enable Kitty enhancement support.
 //! - [`pop_keyboard_enhancement_flags`]: Restore standard terminal behavior.
 
@@ -107,12 +109,13 @@ pub fn pop_keyboard_enhancement_flags() -> io::Result<()> {
 }
 
 // ---------------------------------------------------------------------------
-// Raw event source
+// Raw event source (Unix only)
 // ---------------------------------------------------------------------------
 
 /// Abstraction for poll+read from a file descriptor, so the
 /// read-until-drained loop in [`RawEventSource::fill_with`] can be
 /// unit-tested without a real stdin.
+#[cfg(unix)]
 trait PollReader {
     /// Returns `true` when data is available for reading.
     fn poll(&mut self, timeout_ms: libc::c_int) -> io::Result<bool>;
@@ -123,10 +126,12 @@ trait PollReader {
 /// Real [`PollReader`] that reads from a given raw file descriptor: fd 0
 /// (stdin) normally, or a reopened `/dev/tty` in pager mode (see
 /// [`RawEventSource::for_tty`]) where fd 0 is consumed by piped content.
+#[cfg(unix)]
 struct StdinReader {
     fd: libc::c_int,
 }
 
+#[cfg(unix)]
 impl PollReader for StdinReader {
     fn poll(&mut self, timeout_ms: libc::c_int) -> io::Result<bool> {
         loop {
@@ -165,6 +170,7 @@ impl PollReader for StdinReader {
 
 /// An [`EventSource`](crate::EventSource) that parses raw terminal bytes so it
 /// can extract kitty-protocol alternate keycodes.
+#[cfg(unix)]
 pub struct RawEventSource {
     buf: Vec<u8>,
     pos: usize,
@@ -175,12 +181,14 @@ pub struct RawEventSource {
     _tty_file: Option<std::fs::File>,
 }
 
+#[cfg(unix)]
 impl Default for RawEventSource {
     fn default() -> Self {
         Self::new()
     }
 }
 
+#[cfg(unix)]
 impl RawEventSource {
     /// Reads from fd 0 (stdin), the normal case.
     pub fn new() -> Self {
@@ -310,6 +318,6 @@ impl RawEventSource {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 #[path = "mod_test.rs"]
 mod tests;

@@ -30,7 +30,6 @@ mod command_palette;
 mod command_usage;
 mod config;
 mod diff;
-#[cfg(unix)]
 mod event_source;
 mod file;
 mod fold;
@@ -233,6 +232,46 @@ impl EventSource for event_source::RawEventSource {
     }
 }
 
+/// On Windows, when stdin is piped (pager mode), redirect the process's
+/// standard input handle to `CONIN$` (the console input device) so that
+/// crossterm's event system continues to receive keyboard input after the
+/// pipe has been drained. Mirrors the Unix `/dev/tty` reopening trick that
+/// `less` and other pagers use.
+#[cfg(windows)]
+fn redirect_stdin_to_console() -> io::Result<()> {
+    use std::os::windows::io::AsRawHandle;
+
+    // Open the console input device. "CONIN$" is the canonical Windows device
+    // path for the console input buffer, analogous to `/dev/tty` on Unix.
+    let conin = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open("CONIN$")
+        .map_err(|e| io::Error::new(e.kind(), format!("failed to open CONIN$: {e}")))?;
+
+    let handle = conin.as_raw_handle();
+
+    // Replace the process's stdin handle so that subsequent calls to
+    // GetStdHandle(STD_INPUT_HANDLE) — including crossterm's internal ones
+    // for event polling — read from the console rather than the drained pipe.
+    const STD_INPUT_HANDLE: u32 = 0xFFFFFFF6u32; // (DWORD)-10
+    extern "system" {
+        fn SetStdHandle(nStdHandle: u32, hHandle: *mut std::ffi::c_void) -> i32;
+    }
+
+    unsafe {
+        if SetStdHandle(STD_INPUT_HANDLE, handle) == 0 {
+            return Err(io::Error::last_os_error());
+        }
+    }
+
+    // Leak the File handle to keep CONIN$ open for the process lifetime.
+    // SetStdHandle does not take ownership, so without this the handle would
+    // be closed when `conin` drops, leaving STD_INPUT_HANDLE dangling.
+    std::mem::forget(conin);
+    Ok(())
+}
+
 fn main() -> anyhow::Result<()> {
     let stdin_piped = pager::is_piped_stdin();
     match plan_startup(parse_args(), parse_language_flag(), stdin_piped)? {
@@ -288,8 +327,16 @@ fn launch_tui(root: PathBuf, initial: InitialContent) -> anyhow::Result<()> {
     // path argument was also given. Checked once up front, before stdin is
     // read to EOF for pager mode — `isatty` reflects the fd itself, not its
     // read position, so this stays accurate either way.
-    #[cfg(unix)]
     let stdin_not_tty = pager::is_piped_stdin();
+
+    // On Windows, when stdin is piped, reopen CONIN$ so that crossterm's
+    // event system reads from the console input buffer (not the consumed
+    // pipe). Must happen before enable_raw_mode so console modes are set on
+    // the new handle.
+    #[cfg(windows)]
+    if stdin_not_tty {
+        redirect_stdin_to_console()?;
+    }
 
     enable_raw_mode()?;
     let _guard = TerminalGuard;

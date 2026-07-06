@@ -624,7 +624,6 @@ pub(crate) fn restore_terminal() {
     use crossterm::execute;
     use crossterm::terminal::{disable_raw_mode, LeaveAlternateScreen};
 
-    #[cfg(unix)]
     let _ = crate::event_source::pop_keyboard_enhancement_flags();
     let _ = disable_raw_mode();
     let _ = execute!(
