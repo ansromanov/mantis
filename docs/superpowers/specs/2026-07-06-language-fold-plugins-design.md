@@ -61,13 +61,16 @@ tool" that happens to exist.
 
 Each is a thin process-plugin binary under `plugins/`, following the
 `mantis-plugin-markdown` pattern (stdin/stdout JSON loop), added as a new
-workspace member:
+workspace member. Directory and crate names carry no `mantis-plugin-`
+prefix — bare language names, matching the `plugins/terraform` precedent
+(package = binary = dir name; binaries only ever land in the plugin dir,
+so no PATH collision with real toolchains):
 
 | Crate | Extensions | Capabilities (today) | Detector called |
 |---|---|---|---|
-| `plugins/mantis-plugin-rust` | `rs` | `fold` | `mantis::fold_detectors::brace_fold` |
-| `plugins/mantis-plugin-go` | `go` | `fold` | `mantis::fold_detectors::brace_fold` |
-| `plugins/mantis-plugin-python` | `py`, `pyi` | `fold` | `mantis::fold_detectors::indent_fold` |
+| `plugins/rust` | `rs` | `fold` | `mantis::fold_detectors::brace_fold` |
+| `plugins/go` | `go` | `fold` | `mantis::fold_detectors::brace_fold` |
+| `plugins/python` | `py`, `pyi` | `fold` | `mantis::fold_detectors::indent_fold` |
 
 Each crate's `Cargo.toml` depends on `mantis = { path = "../.." }` (the
 existing `[lib] name = "mantis"` target) plus `serde_json`. Protocol
@@ -91,8 +94,8 @@ plan is dropped entirely; there's no collision to break.
 
 - Add the 3 crates to `[workspace] members` in the root `Cargo.toml`.
 - Add 3 entries to `BUNDLED_PLUGINS` in `src/plugin/install.rs`:
-  `("rust", "mantis-plugin-rust", ...)`, `("go", "mantis-plugin-go", ...)`,
-  `("python", "mantis-plugin-python", ...)`, following the existing
+  `("rust", "rust", ...)`, `("go", "go", ...)`,
+  `("python", "python", ...)`, following the existing
   `(name, binary_name, include_bytes!(...))` shape used for
   `iconize`/`markdown`. Same install path: compiled into the host binary,
   auto-installed to the plugin dir on first run, appear in the plugin
