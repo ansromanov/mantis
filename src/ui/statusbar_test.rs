@@ -4,7 +4,7 @@ use crate::config::Config;
 use crate::git::{GitHead, GitRepoInfo};
 use crate::search::{GotoLineState, HistoryState, SearchState, ThemePicker};
 use ratatui::backend::TestBackend;
-use ratatui::style::Style;
+use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::Span;
 use ratatui::Terminal;
 use std::path::{Path, PathBuf};
@@ -1125,6 +1125,28 @@ fn plugin_error_outlasts_status_message_on_narrow_bar() {
     assert!(
         text.contains("boom"),
         "plugin_error (P_ERR) must survive eliding, got: {text:?}"
+    );
+}
+
+#[test]
+fn monochrome_theme_uses_reversed_modifier_not_bg_color() {
+    let mut app = make_app();
+    app.theme = crate::theme::Theme::monochrome();
+    let backend = TestBackend::new(20, 1);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| draw_statusbar(f, &app, f.area()))
+        .unwrap();
+    let buf = terminal.backend().buffer();
+    let cell = &buf[(0, 0)];
+    assert_eq!(
+        cell.bg,
+        Color::Reset,
+        "monochrome bar must not set a bg color"
+    );
+    assert!(
+        cell.modifier.contains(Modifier::REVERSED),
+        "monochrome bar must use REVERSED instead of a background color"
     );
 }
 
