@@ -70,10 +70,7 @@ fn command_palette_filters_by_name() {
 #[test]
 fn command_palette_filters_by_keybinding() {
     let mut p = CommandPalette::default();
-    // Exact case matters here: "Ctrl+G" (git_mode_toggle) and "Ctrl+g"
-    // (goto_line) differ only by the shift state baked into the binding's
-    // char case, so the query must match case to disambiguate them.
-    for c in "Ctrl+G".chars() {
+    for c in "Ctrl+D".chars() {
         p.push(c);
     }
     let cmd = p.selected_command().unwrap();

@@ -71,9 +71,9 @@ fills.
 - Code folding (`Space`) — collapse/expand blocks, with language-aware fold regions
 
 **Search**
-- Fuzzy file-name search (`Ctrl+P`) — fzf-style, as you type
-- Full-text content search (`Ctrl+Shift+F`) across the tree
-- In-file search (`Ctrl+F`) and go-to-line (`Ctrl+G`)
+- Fuzzy file-name search (`Ctrl+T`) — fzf-style, as you type
+- Full-text content search (`Ctrl+F`) across the tree
+- In-file search (`/`) and go-to-line (`Ctrl+G`)
 
 **Viewing & rendering**
 - Syntax highlighting for a wide range of languages
@@ -81,7 +81,7 @@ fills.
 - Word wrap, line numbers, and a status bar (line, language, scroll, encoding)
 
 **Productivity**
-- Command palette (`Ctrl+Shift+P`) — fuzzy-find every action with its keybinding
+- Command palette (`Ctrl+P`) — fuzzy-find every action with its keybinding
 - Recent files (`Ctrl+O`), copy path
 - Open in your `$EDITOR` (`Ctrl+e`) and drop back into `mantis` when you're done
 - Auto-reload on disk change; session persistence (expanded dirs, open file,
@@ -125,7 +125,7 @@ mantis file.md      # open a file directly
 Press `F1` for in-app help (or `?`), and `Ctrl+c` to quit. For the full keybinding
 list and every action name, see the
 [Usage & Keybindings guide](https://ansromanov.github.io/mantis/usage.html) — or
-press `Ctrl+Shift+P` in-app to fuzzy-find any action with its binding.
+press `Ctrl+P` in-app to fuzzy-find any action with its binding.
 
 ## Plugins
 

@@ -217,7 +217,7 @@ fn draw_tree_git_mode_clean_shows_placeholder() {
         "clean placeholder should show 'No changes to show.'"
     );
     assert!(
-        text.contains("Ctrl+Shift+G"),
+        text.contains("Ctrl+D"),
         "clean placeholder should show the exit binding"
     );
 }
@@ -1169,7 +1169,7 @@ fn draw_tree_git_mode_placeholder_hint_uses_canonical_action_id() {
     let rows = render_tree(&mut app, 40, 5);
     let text = all_text(&rows);
     assert!(
-        text.contains("Ctrl+m"),
+        text.contains("Ctrl+M"),
         "remapped git_mode_toggle binding must appear in the placeholder hint, got:\n{text}"
     );
 }

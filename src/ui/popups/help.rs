@@ -314,27 +314,6 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
             rows.push(row_key("recent_files"));
             rows.push(row_key("toggle_hidden"));
             rows.push(gap.clone());
-            if !app.keyboard_enhanced {
-                rows.push(Line::from(vec![
-                    Span::styled("  \u{26A0} ", Style::default().fg(theme.diff_del)),
-                    Span::styled(
-                        "Your terminal can't distinguish Ctrl+Shift shortcuts.",
-                        Style::default().fg(theme.text),
-                    ),
-                ]));
-                rows.push(normal_text(
-                    "  The plain-Ctrl binding takes priority for conflicting keys.",
-                ));
-                rows.push(normal_text(
-                    "  Shift-variant actions (e.g. Ctrl+Shift+G, Ctrl+Shift+B) are",
-                ));
-                rows.push(normal_text(
-                    "  still accessible from the command palette (Ctrl+Shift+P).",
-                ));
-                rows.push(normal_text(
-                    "  Switch to kitty, WezTerm, or Ghostty for full keyboard support.",
-                ));
-            }
         }
         1 => {
             // Navigation

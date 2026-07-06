@@ -141,7 +141,7 @@ fn event_loop_key_search_toggles_search() {
     fs::write(dir.join("a.txt"), "hello\n").unwrap();
     let mut app = app_for(&dir);
     assert!(app.search.is_none());
-    // Switch to Content focus + no file so ctrl+f opens SearchState.
+    // ctrl+f opens the full-text content search overlay.
     app.focus = crate::app::Focus::Content;
     app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
@@ -183,7 +183,8 @@ fn event_loop_key_command_palette_toggles() {
     fs::write(dir.join("a.txt"), "hello\n").unwrap();
     let mut app = app_for(&dir);
     assert!(app.command_palette.is_none());
-    // command_palette = ctrl+shift+p, i.e. ctrl + uppercase P.
+    // command_palette = ctrl+p; matching is case-insensitive so an
+    // uppercase event (CapsLock / stray Shift) must open it too.
     app.handle_key(KeyEvent::new(KeyCode::Char('P'), KeyModifiers::CONTROL));
     assert!(app.command_palette.is_some());
     app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
@@ -333,7 +334,6 @@ fn run_app_builds_and_runs_to_quit() {
         dir.clone(),
         InitialContent::None,
         &mut events,
-        true,
     )
     .unwrap();
     fs::remove_dir_all(&dir).ok();
@@ -357,7 +357,6 @@ fn run_app_opens_and_reveals_file() {
         dir.clone(),
         InitialContent::File(file_path),
         &mut events,
-        true,
     )
     .unwrap();
     fs::remove_dir_all(&dir).ok();
@@ -377,7 +376,6 @@ fn run_app_surfaces_config_error_without_failing() {
         dir.clone(),
         InitialContent::None,
         &mut events,
-        true,
     )
     .unwrap();
     fs::remove_dir_all(&dir).ok();

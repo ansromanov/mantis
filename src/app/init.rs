@@ -176,7 +176,6 @@ impl App {
             icon_dir_closed: String::new(),
             icon_fallback: String::new(),
             keys: cfg.keys,
-            keyboard_enhanced: true,
             config: saved_config,
             config_path,
             tree_area: ratatui::layout::Rect::default(),

@@ -52,7 +52,7 @@ working tree into the content panel — additions in green, deletions in red.
 
 ## Git mode
 
-Press `Ctrl+Shift+G` to switch the tree to show **only files with uncommitted changes**
+Press `Ctrl+D` to switch the tree to show **only files with uncommitted changes**
 (modified, new, deleted, or renamed). Selecting a file shows its working-tree
 diff in the content panel instead of the file contents. The tree title displays a
 `[git]` badge while active — perfect for reviewing everything you're about to
@@ -67,7 +67,7 @@ When the working tree is clean (no uncommitted changes), the tree panel shows a
 "Working tree clean" placeholder instead of an empty list, so you can tell at a
 glance that there is simply nothing to review. If the current directory is not a
 git repository, the placeholder says "Not a git repository" instead. Press
-`Ctrl+Shift+G` to exit git mode in either case.
+`Ctrl+D` to exit git mode in either case.
 
 All directories containing changes are auto-expanded when entering git mode.
 Diffs refresh on the 30-second auto-reload tick and on manual `r`.

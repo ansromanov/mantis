@@ -498,17 +498,6 @@ fn plugin_content_active_path_initialises_to_none() {
 }
 
 #[test]
-fn app_new_keyboard_enhanced_defaults_to_true() {
-    let root = temp_dir();
-    let app = new_app(&root, Config::default());
-    assert!(
-        app.keyboard_enhanced,
-        "keyboard_enhanced must default to true so enhanced-terminals see no degradation"
-    );
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
 fn app_new_tree_revision_starts_at_zero() {
     let root = temp_dir();
     let app = new_app(&root, Config::default());

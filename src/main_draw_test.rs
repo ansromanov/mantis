@@ -100,7 +100,7 @@ fn app_draw_with_search_open() {
     let mut app = app_for(&dir);
     app.focus = crate::app::Focus::Content;
     app.current_file = None;
-    // search_files default is ctrl+f ('/' remains as a tree-scoped binding).
+    // ctrl+f opens the full-text content search overlay.
     app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
     assert!(app.search.is_some());
     let backend = TestBackend::new(80, 30);
@@ -127,7 +127,7 @@ fn app_draw_with_command_palette() {
     let dir = temp_dir();
     fs::write(dir.join("a.txt"), "hello\nworld\n").unwrap();
     let mut app = app_for(&dir);
-    // command_palette = ctrl+shift+p, i.e. ctrl + uppercase P.
+    // command_palette = ctrl+p (case-insensitive: uppercase event matches).
     app.handle_key(KeyEvent::new(KeyCode::Char('P'), KeyModifiers::CONTROL));
     assert!(app.command_palette.is_some());
     let backend = TestBackend::new(80, 30);
@@ -177,8 +177,9 @@ fn app_draw_with_in_file_search() {
     let mut app = app_for(&dir);
     app.open_file(&file_path);
     app.focus = crate::app::Focus::Content;
-    // search_files default is ctrl+f ('/' remains as a tree-scoped binding).
-    app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
+    // search_files is `/`: with content focused and a file open it becomes
+    // the in-file search bar.
+    app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
     assert!(app.in_file_search.is_some());
     let backend = TestBackend::new(80, 30);
     let mut terminal = ratatui::Terminal::new(backend).unwrap();
