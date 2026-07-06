@@ -175,10 +175,7 @@ impl PluginState {
 }
 
 fn no_color_active() -> bool {
-    let in_test = cfg!(test)
-        || std::env::var_os("CARGO_MANIFEST_DIR").is_some()
-        || std::env::var_os("NEXTEST").is_some();
-    if in_test {
+    if cfg!(test) {
         std::env::var_os("MANTIS_TEST_NO_COLOR").is_some()
     } else {
         std::env::var_os("NO_COLOR").is_some() || std::env::var("TERM").as_deref() == Ok("dumb")

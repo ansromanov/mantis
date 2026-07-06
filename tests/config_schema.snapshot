@@ -1,3 +1,9 @@
+# Config schema snapshot — do not edit manually.
+# This file is the CI-enforced list of all recognised config paths.
+# Run `UPDATE_SNAPSHOT=1 cargo test config_schema_snapshot --test config_tests`
+# to regenerate after adding, removing, or renaming a config path.
+# Any removal MUST be accompanied by either a legacy_* migration or an entry
+# in DEPRECATED_KEYS (src/config/validate.rs).
 content
 content.line_numbers
 content.prettify_size_limit
