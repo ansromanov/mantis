@@ -8,15 +8,15 @@ To ensure that releases do not introduce regressions (especially regarding termi
 
 A dedicated test dataset is located in the `e2e/data/` directory. It contains static sample files representing different edge cases and supported file types:
 
-- **[rust_sample.rs](file:///home/dbt/projects/mantis1/e2e/data/rust_sample.rs)**: Rust code structure to verify syntax highlighting, search, and line numbers.
-- **[json_sample.json](file:///home/dbt/projects/mantis1/e2e/data/json_sample.json)**: Minified JSON to verify automatic pretty-printing.
-- **[yaml_sample.yml](file:///home/dbt/projects/mantis1/e2e/data/yaml_sample.yml)**: Nested YAML with anchors (`&`) and aliases (`*`) to verify indentation-based folding and counts.
-- **[python_sample.py](file:///home/dbt/projects/mantis1/e2e/data/python_sample.py)**: Python source file.
-- **[markdown_sample.md](file:///home/dbt/projects/mantis1/e2e/data/markdown_sample.md)**: Markdown document.
-- **[long_lines.txt](file:///home/dbt/projects/mantis1/e2e/data/long_lines.txt)**: Extremely long lines of text to verify word-wrapping behavior.
-- **[crlf_sample.txt](file:///home/dbt/projects/mantis1/e2e/data/crlf_sample.txt)**: Text file with Windows (`\r\n`) line endings to verify normalization to LF.
-- **[bom_utf8_sample.txt](file:///home/dbt/projects/mantis1/e2e/data/bom_utf8_sample.txt)**: UTF-8 file with a Byte Order Mark (BOM) to verify BOM detection.
-- **[binary_sample.bin](file:///home/dbt/projects/mantis1/e2e/data/binary_sample.bin)**: Binary data containing NUL bytes to verify binary placeholder rendering.
+- **[rust_sample.rs](../../e2e/data/rust_sample.rs)**: Rust code structure to verify syntax highlighting, search, and line numbers.
+- **[json_sample.json](../../e2e/data/json_sample.json)**: Minified JSON to verify automatic pretty-printing.
+- **[yaml_sample.yml](../../e2e/data/yaml_sample.yml)**: Nested YAML with anchors (`&`) and aliases (`*`) to verify indentation-based folding and counts.
+- **[python_sample.py](../../e2e/data/python_sample.py)**: Python source file.
+- **[markdown_sample.md](../../e2e/data/markdown_sample.md)**: Markdown document.
+- **[long_lines.txt](../../e2e/data/long_lines.txt)**: Extremely long lines of text to verify word-wrapping behavior.
+- **[crlf_sample.txt](../../e2e/data/crlf_sample.txt)**: Text file with Windows (`\r\n`) line endings to verify normalization to LF.
+- **[bom_utf8_sample.txt](../../e2e/data/bom_utf8_sample.txt)**: UTF-8 file with a Byte Order Mark (BOM) to verify BOM detection.
+- **[binary_sample.bin](../../e2e/data/binary_sample.bin)**: Binary data containing NUL bytes to verify binary placeholder rendering.
 
 ---
 
@@ -58,7 +58,7 @@ cargo run -- ./e2e/data
 | Category | Steps to Execute | Expected Behavior |
 |---|---|---|
 | **1. File Tree & Nav** | Navigate tree with Up/Down arrows or mouse scroll wheel. Double-click or press Enter on directories. | Smooth movement without cursor drift or overlaps. |
-| **2. Binary Files** | Select `binary_sample.bin`. | Displays the binary placeholder: `[binary file — BIN file, 25 B]` and shows instructions. |
+| **2. Binary Files** | Select `binary_sample.bin`. | Displays the binary placeholder: `[binary file — BIN file, 125 B]` and shows instructions. |
 | **3. JSON Pretty Print** | Select `json_sample.json`. | The minified JSON is pretty-printed across multiple lines, highlighted, and supports folding. |
 | **4. YAML Folding** | Select `yaml_sample.yml`. Focus content pane (Tab). Move cursor to a parent line (e.g. `production:`) and press `Space`. | The block collapses. Gutter shows folding indicators (`+` / `-`). Scrolling is adjusted correctly. |
 | **5. Word Wrap** | Select `long_lines.txt`. Toggle word wrap via the command palette (`Ctrl+P` and type `wrap`) or by pressing its keybinding (if configured). | Long lines wrap cleanly at terminal edge, line numbers align to physical lines, no horizontal scroll needed. |

@@ -113,6 +113,11 @@ def run_e2e_test():
                 return True
             else:
                 print("Mantis failed to exit cleanly or exited with non-zero status.")
+                try:
+                    os.kill(pid, 9)
+                    os.waitpid(pid, 0)
+                except ChildProcessError:
+                    pass
                 return False
 
         except Exception as e:
