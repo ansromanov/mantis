@@ -299,6 +299,8 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
                 if !icon.is_empty() {
                     spans.push(Span::styled(icon.as_str(), name_style));
                     spans.push(Span::styled(" ", name_style));
+                } else {
+                    spans.push(Span::styled("  ", name_style));
                 }
             }
 

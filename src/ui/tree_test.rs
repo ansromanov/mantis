@@ -397,6 +397,37 @@ fn draw_tree_dirs_still_show_arrows_when_icon_fields_empty() {
 }
 
 #[test]
+fn draw_tree_file_with_no_matching_icon_stays_aligned_with_dir_row() {
+    // Only dir icons configured; icon_map/icon_fallback stay empty, so the
+    // file node's icon lookup resolves to "". icons_active is still true
+    // (dir icons are non-empty), so the arrow is suppressed — the icon
+    // fallback padding must fill that column instead, or the file name
+    // shifts left of where a dir's name starts.
+    let mut app = make_app(false, HashMap::new());
+    app.icons_enabled = true;
+    app.icon_dir_open = "\u{f07c}".to_string();
+    app.icon_dir_closed = "\u{f07b}".to_string();
+    app.nodes = vec![
+        make_node("src", true, false),
+        make_node("main.rs", false, false),
+    ];
+    let rows = render_tree(&mut app, 40, 5);
+    // Rows are built one terminal cell per char, so the *character* offset of
+    // a match is its column — byte offset would be thrown off by multi-byte
+    // glyphs (border char, icon) and give a false mismatch.
+    let column_of = |needle: &str| {
+        rows.iter()
+            .find_map(|r| r.find(needle).map(|byte_idx| r[..byte_idx].chars().count()))
+    };
+    let dir_name_col = column_of("src").expect("dir row must contain 'src'");
+    let file_name_col = column_of("main.rs").expect("file row must contain 'main.rs'");
+    assert_eq!(
+        dir_name_col, file_name_col,
+        "file name must start in the same column as dir name when icon is empty"
+    );
+}
+
+#[test]
 fn draw_tree_depth_one_node_is_indented() {
     let mut app = make_app(false, HashMap::new());
     let mut node = make_node("mod.rs", false, false);
