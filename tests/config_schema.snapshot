@@ -44,6 +44,7 @@ keys.goto_line
 keys.help
 keys.nav_down
 keys.nav_up
+keys.open_external
 keys.open_in_editor
 keys.plugin_picker
 keys.quit
