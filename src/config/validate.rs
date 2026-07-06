@@ -97,7 +97,7 @@ fn collect_schema_paths(table: &toml::Table, prefix: &str, out: &mut Vec<String>
 /// every unrecognized key (with a nearest-match suggestion where one is close
 /// enough). Keys are reported by full path, e.g. `keys.qiut` or `theme.acent`.
 /// Returns an empty list for a fully valid config.
-pub(super) fn validate_keys(src: &str) -> Vec<String> {
+pub(crate) fn validate_keys(src: &str) -> Vec<String> {
     let Ok(actual) = src.parse::<toml::Table>() else {
         return Vec::new(); // unparseable input is handled by the caller's error path
     };

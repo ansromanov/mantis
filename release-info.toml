@@ -1,9 +1,19 @@
-version = "0.15.4"
+version = "0.15.5"
 date = "2026-07-05"
-whats_new = """- chore: release v0.14.0 [skip ci]
-- fix: address PR #551 review comments, delay auto-merge for review (#554)
-- fix: stop warning on pre-refactor config keys (git_mode, renamed keymap actions) (#555)
-- fix: keep selection highlight visible on the active line (#552)
-- fix: skip build_visible deep walk when nothing is expanded (#551)
-- chore: bump Homebrew formula to v0.14.0 [skip ci]"""
-release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.15.0"
+whats_new = """- feat: watch and hot-reload config changes on the fly (#592)
+- fix: add prettify_size_limit to avoid loading large JSON/YAML fully into memory (#589)
+- disable (#591)
+- ci: config/keymap rename compatibility gate - no silent binding loss on upgrade (#590)
+- feat: enable bundled markdown plugin by default (#574) (#588)
+- refactor: consolidate RawEventSource escape-sequence parser (#577) (#587)
+- fix: Ctrl+Shift keybindings silently broken on legacy terminals (#561) (#586)
+- docs: fix stale README claims about markdown, global ?, and cargo install (#585)
+- fix: add issues: write permission to auto-merge workflow (#584)
+- feat: add command palette and goto line to help overlay (#579)
+- fix: restore discoverability of markdown raw/rendered toggle (#559) (#581)
+- chore: pr-review skill files findings as PR comments, guards auto-merge (#582)
+- fix: support mouse text selection on plugin-rendered markdown (#578)
+- fix: make keyboard shortcuts CapsLock-insensitive on Windows (#580)
+- feat: help discoverability hint + docs sync guard (#304) (#556)
+- chore: bump Homebrew formula to v0.15.0 [skip ci]"""
+release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.15.5"

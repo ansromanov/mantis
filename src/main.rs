@@ -380,6 +380,7 @@ fn run_app(
     }
     // Drive tree/git refreshes from filesystem events rather than a blind timer.
     app.watch_root();
+    app.install_config_watcher();
 
     let loop_result = run_event_loop(terminal, &mut app, events);
 

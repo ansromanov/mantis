@@ -927,6 +927,66 @@ fn set_file_watch_none_clears_any_existing_watcher() {
     );
     fs::remove_dir_all(&root).ok();
 }
+// -- config watcher -----------------------------------------------------------
+
+#[test]
+fn install_config_watcher_installs_when_config_path_present() {
+    let root = temp_dir();
+    let mut app = app_for(&root);
+    app.config_path = Some(root.join("mantis.toml"));
+    app.install_config_watcher();
+    assert!(
+        app.config_watch_rx.is_some(),
+        "install_config_watcher must install a watcher when config_path's parent exists"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn install_config_watcher_noop_without_config_path() {
+    let root = temp_dir();
+    let mut app = app_for(&root);
+    assert!(app.config_path.is_none());
+    app.install_config_watcher();
+    assert!(
+        app.config_watch_rx.is_none(),
+        "install_config_watcher must stay a no-op when there is no config_path"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn drain_config_watch_detects_write_to_watched_file_only() {
+    let root = temp_dir();
+    let config_path = root.join("mantis.toml");
+    let mut app = app_for(&root);
+    app.config_path = Some(config_path.clone());
+    app.install_config_watcher();
+
+    // A write to an unrelated file in the same watched directory must not be
+    // reported as a config change.
+    fs::write(root.join("unrelated.txt"), "x").unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(200));
+    assert!(
+        !app.drain_config_watch(),
+        "drain_config_watch must ignore events for paths other than config_path"
+    );
+
+    // A write to the watched config file itself must be detected.
+    fs::write(&config_path, "tree.show_hidden = true\n").unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+    loop {
+        if app.drain_config_watch() {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "drain_config_watch never reported the write to config_path"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(25));
+    }
+    fs::remove_dir_all(&root).ok();
+}
 
 // -- prettify_size_limit ------------------------------------------------------
 

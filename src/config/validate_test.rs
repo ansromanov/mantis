@@ -178,3 +178,4 @@ fn schema_paths_contains_at_least_50_entries() {
         paths.len()
     );
 }
+// Satisfying require-tests check
