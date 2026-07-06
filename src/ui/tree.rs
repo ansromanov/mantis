@@ -251,23 +251,27 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
             }
 
             let is_open = node.is_dir && app.expanded.contains(&node.path);
-            let arrow = if node.is_dir {
-                if is_open {
-                    "▼ "
-                } else {
-                    "▶ "
-                }
-            } else {
-                "  "
-            };
-            spans.push(Span::styled(arrow, name_style));
 
-            if app.icons_enabled
+            let icons_active = app.icons_enabled
                 && (!app.icon_map.is_empty()
                     || !app.icon_fallback.is_empty()
                     || !app.icon_dir_open.is_empty()
-                    || !app.icon_dir_closed.is_empty())
-            {
+                    || !app.icon_dir_closed.is_empty());
+
+            if !icons_active {
+                let arrow = if node.is_dir {
+                    if is_open {
+                        "▼ "
+                    } else {
+                        "▶ "
+                    }
+                } else {
+                    "  "
+                };
+                spans.push(Span::styled(arrow, name_style));
+            }
+
+            if icons_active {
                 let icon = if node.is_dir {
                     if is_open {
                         &app.icon_dir_open

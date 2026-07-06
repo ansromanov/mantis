@@ -324,6 +324,78 @@ fn draw_tree_file_node_has_no_arrow() {
     assert!(text.contains("main.rs"));
 }
 
+fn make_app_with_icons() -> App {
+    let mut app = make_app(false, HashMap::new());
+    app.icons_enabled = true;
+    app.icon_dir_open = "\u{f07c}".to_string();
+    app.icon_dir_closed = "\u{f07b}".to_string();
+    app.icon_map
+        .insert("rs".to_string(), "\u{e795}".to_string());
+    app
+}
+
+#[test]
+fn draw_tree_collapsed_dir_hides_arrow_when_icons_active() {
+    let mut app = make_app_with_icons();
+    let node = make_node("src", true, false);
+    app.nodes = vec![node];
+    let rows = render_tree(&mut app, 40, 5);
+    let text = all_text(&rows);
+    assert!(
+        !text.contains('▶'),
+        "collapsed dir must not show ▶ when icons active"
+    );
+    assert!(
+        !text.contains('▼'),
+        "collapsed dir must not show ▼ when icons active"
+    );
+}
+
+#[test]
+fn draw_tree_expanded_dir_hides_arrow_when_icons_active() {
+    let mut app = make_app_with_icons();
+    let node = make_node("src", true, false);
+    app.expanded.insert(node.path.clone());
+    app.nodes = vec![node];
+    let rows = render_tree(&mut app, 40, 5);
+    let text = all_text(&rows);
+    assert!(
+        !text.contains('▶'),
+        "expanded dir must not show ▶ when icons active"
+    );
+    assert!(
+        !text.contains('▼'),
+        "expanded dir must not show ▼ when icons active"
+    );
+}
+
+#[test]
+fn draw_tree_dirs_still_show_arrows_when_icons_disabled() {
+    let mut app = make_app_with_icons();
+    app.icons_enabled = false;
+    let node = make_node("src", true, false);
+    app.nodes = vec![node];
+    let rows = render_tree(&mut app, 40, 5);
+    assert!(
+        all_text(&rows).contains('▶'),
+        "collapsed dir must show ▶ when icons disabled"
+    );
+}
+
+#[test]
+fn draw_tree_dirs_still_show_arrows_when_icon_fields_empty() {
+    let mut app = make_app(false, HashMap::new());
+    app.icons_enabled = true;
+    // icon maps are all empty — condition is false, arrows must remain
+    let node = make_node("src", true, false);
+    app.nodes = vec![node];
+    let rows = render_tree(&mut app, 40, 5);
+    assert!(
+        all_text(&rows).contains('▶'),
+        "collapsed dir must show ▶ when icon fields empty"
+    );
+}
+
 #[test]
 fn draw_tree_depth_one_node_is_indented() {
     let mut app = make_app(false, HashMap::new());
