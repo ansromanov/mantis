@@ -652,6 +652,112 @@ fn copy_path_file_from_content_relative() {
     fs::remove_dir_all(&root).ok();
 }
 
+// -- copy line / copy file --------------------------------------------------
+
+#[test]
+fn copy_line_copies_active_line_text() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.active_line = 2; // "line 3" (0-indexed, display coords)
+    app.copy_line_or_selection();
+    assert_eq!(
+        app.clipboard_capture.last().map(String::as_str),
+        Some("line 3"),
+    );
+    let sm = app.status_message.as_ref().expect("status must be set");
+    assert_eq!(sm.text, "copied line");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn copy_line_with_selection_copies_selection() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    // Set a selection spanning "line 2\nline 3" (cols 0..6 on each line)
+    app.selection = Some(crate::selection::TextSelection {
+        anchor: (1, 0),
+        active: (2, 6),
+    });
+    app.active_line = 2;
+    app.copy_line_or_selection();
+    assert_eq!(
+        app.clipboard_capture.last().map(String::as_str),
+        Some("line 2\nline 3"),
+    );
+    let sm = app.status_message.as_ref().expect("status must be set");
+    assert_eq!(sm.text, "copied selection");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn copy_line_empty_selection_still_copies_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.active_line = 0;
+    // Empty selection (anchor == active) should be treated as no selection.
+    app.selection = Some(crate::selection::TextSelection {
+        anchor: (0, 0),
+        active: (0, 0),
+    });
+    app.copy_line_or_selection();
+    assert_eq!(
+        app.clipboard_capture.last().map(String::as_str),
+        Some("line 1"),
+        "empty selection should fall back to copying the active line",
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn copy_file_copies_entire_content() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.copy_file_content();
+    // long.txt has 50 lines: "line 1" .. "line 50"
+    let expected: String = (1..=50)
+        .map(|i| format!("line {i}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert_eq!(
+        app.clipboard_capture.last().map(String::as_str),
+        Some(expected.as_str()),
+    );
+    let sm = app.status_message.as_ref().expect("status must be set");
+    assert_eq!(sm.text, "copied file");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn copy_line_uses_display_to_physical_when_folded() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    use std::collections::HashSet;
+    // Simulate a fold: region covering lines 2..4 (physical) is folded.
+    app.fold_regions = vec![crate::fold::FoldRegion { start: 2, end: 4 }];
+    let mut folded = HashSet::new();
+    folded.insert(0); // region index 0 is folded
+    app.fold_display_map = crate::fold::build_display_map(&app.fold_regions, &folded, 50);
+    // After folding, display line 3 maps to physical line 5 (0-indexed).
+    app.active_line = 3;
+    app.copy_line_or_selection();
+    assert_eq!(
+        app.clipboard_capture.last().map(String::as_str),
+        Some("line 6"), // physical line 5 (0-indexed) is "line 6"
+        "copy_line must fold to the correct physical line",
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
 #[test]
 fn git_mode_flat_toggle_flips_flag_when_in_git_mode() {
     let root = temp_tree();

@@ -497,11 +497,14 @@ fn pressed_in_honours_scope() {
 /// The content pane must stay free of bare letters (for future editing)
 /// except the vim motion set, plus `M` and `o` — the bundled markdown plugin
 /// only recognizes the literal key `M`, and `o` is used to open files
-/// externally. Tree-structural actions are exempt: their bindings only
-/// dispatch from the tree handler.
+/// externally — plus `y`/`Y` for copy-line/copy-file clipboard operations.
+/// Tree-structural actions are exempt: their bindings only dispatch from the
+/// tree handler.
 #[test]
 fn default_content_reachable_letters_are_motions_only() {
-    let motions = ['j', 'k', 'h', 'l', 'g', 'G', '0', 'n', 'N', 'M', ' ', 'o'];
+    let motions = [
+        'j', 'k', 'h', 'l', 'g', 'G', '0', 'n', 'N', 'M', 'o', 'y', 'Y', ' ',
+    ];
     let tree_structural = [
         "tree_expand",
         "tree_collapse",
@@ -639,6 +642,30 @@ fn legacy_key_wins_when_both_old_and_new_present() {
         &keymap.fold_toggle,
         &ev(KeyCode::Char(' '), KeyModifiers::NONE)
     ));
+}
+
+#[test]
+fn copy_line_default_binding_is_content_y() {
+    let keymap = Keymap::default();
+    assert!(
+        pressed(
+            &keymap.copy_line,
+            &ev(KeyCode::Char('y'), KeyModifiers::NONE),
+        ),
+        "copy_line must match bare 'y' in content scope"
+    );
+}
+
+#[test]
+fn copy_file_default_binding_is_content_shift_y() {
+    let keymap = Keymap::default();
+    assert!(
+        pressed(
+            &keymap.copy_file,
+            &ev(KeyCode::Char('Y'), KeyModifiers::NONE),
+        ),
+        "copy_file must match 'Y' in content scope"
+    );
 }
 
 #[test]

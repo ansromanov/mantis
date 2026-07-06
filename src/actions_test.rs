@@ -50,6 +50,8 @@ const KEYMAP_FIELD_ACTION_IDS: &[&str] = &[
     "recent_files",
     "copy_path",
     "copy_relative_path",
+    "copy_line",
+    "copy_file",
     "plugin_picker",
     "goto_line",
     "tree_up_dir",
