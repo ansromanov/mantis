@@ -1,0 +1,26 @@
+# Sample YAML file for Mantis E2E testing
+# Tests: Indentation-based folding, anchors, and aliases
+
+defaults: &default_settings
+  timeout: 30
+  retries: 3
+  debug: false
+
+production:
+  <<: *default_settings
+  debug: false
+  database:
+    host: prod-db.example.com
+    port: 5432
+    username: admin
+    password: super-secret-password-123
+    pools:
+      - read-only
+      - read-write
+
+development:
+  <<: *default_settings
+  debug: true
+  database:
+    host: localhost
+    port: 5432

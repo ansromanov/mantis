@@ -1,0 +1,1 @@
+{"name":"mantis","version":"0.15.10","description":"A fast terminal file tree viewer","repository":{"type":"git","url":"https://github.com/ansromanov/mantis"},"dependencies":{"ratatui":"0.28","crossterm":"0.28.1"},"keywords":["tui","terminal","viewer","rust"]}
