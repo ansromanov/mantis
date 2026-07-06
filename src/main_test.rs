@@ -438,6 +438,18 @@ fn plan_startup_version_returns_print() {
 }
 
 #[test]
+fn plan_startup_update_returns_update() {
+    let startup = plan_startup(Some(PathBuf::from("--update")), None, false).unwrap();
+    assert!(matches!(startup, Startup::Update));
+}
+
+#[test]
+fn meta_action_recognizes_update_flag() {
+    let arg = PathBuf::from("--update");
+    assert!(matches!(meta_action(Some(&arg)), Some(MetaAction::Update)));
+}
+
+#[test]
 fn plan_startup_directory_returns_launch() {
     let dir = temp_dir();
     let startup = plan_startup(Some(dir.clone()), None, false).unwrap();

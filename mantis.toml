@@ -75,10 +75,16 @@ side_by_side = false         # start the diff view in side-by-side layout
 # everything else left. Either set: explicit allowlist — only listed ids
 # render on their configured side, in listed order; unlisted ids are hidden.
 # Set both to empty lists for an empty bar.
-# Valid ids: hint badges scroll lnum type fileinfo git errors folds message version
+# Valid ids: hint badges scroll lnum type fileinfo git errors folds message version update
 [statusbar]
 # left = ["hint", "badges", "scroll", "lnum", "type", "fileinfo", "git", "errors", "folds", "message"]
-# right = ["lnum", "type", "git", "version"]
+# right = ["lnum", "type", "git", "version", "update"]
+
+
+# --- updates ----------------------------------------------------------------
+# Optional background update check.
+[updates]
+check = true                 # check for newer releases (at most once per day)
 
 
 # --- keybindings ------------------------------------------------------------

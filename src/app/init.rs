@@ -92,6 +92,9 @@ impl App {
             .into_iter()
             .next()
             .map(|e| format!("[plugin] {e}"));
+        let (new_version_available, update_rx) =
+            crate::update::check_for_updates(cfg.updates.check);
+
         let mut app = App {
             root,
             nodes,
@@ -244,6 +247,8 @@ impl App {
             session_last_save: Instant::now(),
             #[cfg(test)]
             clipboard_capture: Vec::new(),
+            new_version_available,
+            update_rx,
         };
 
         // Load session state and apply it over the config-driven defaults.

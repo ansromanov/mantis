@@ -1127,3 +1127,25 @@ fn plugin_error_outlasts_status_message_on_narrow_bar() {
         "plugin_error (P_ERR) must survive eliding, got: {text:?}"
     );
 }
+
+#[test]
+fn update_notice_renders_in_bar_when_newer_version_available() {
+    let mut app = make_app();
+    app.new_version_available = Some("v99.0.0".to_string());
+    let text = render_bar(&app);
+    assert!(
+        text.contains("v99.0.0"),
+        "update notice should appear in the status bar, got: {text:?}"
+    );
+}
+
+#[test]
+fn update_notice_absent_by_default() {
+    let app = make_app();
+    assert!(app.new_version_available.is_none());
+    let text = render_bar(&app);
+    assert!(
+        !text.contains("update:"),
+        "no notice means no update segment"
+    );
+}

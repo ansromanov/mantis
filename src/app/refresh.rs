@@ -35,6 +35,10 @@ impl App {
     /// periodic reload so the view never goes permanently stale.
     pub fn tick(&mut self) {
         self.drain_loads();
+        if let Some(latest) = self.update_rx.as_ref().and_then(|rx| rx.try_recv().ok()) {
+            self.new_version_available = Some(latest);
+            self.update_rx = None;
+        }
         self.drain_plugin_actions();
         self.process_pending_keypress();
         if self.drain_config_watch() {
