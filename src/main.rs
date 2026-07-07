@@ -398,9 +398,7 @@ fn launch_tui(root: PathBuf, initial: InitialContent) -> anyhow::Result<()> {
     #[cfg(not(unix))]
     let _ = keyboard_enhanced;
 
-    let result = run_app(&mut terminal, root, initial, events.as_mut());
-
-    result
+    run_app(&mut terminal, root, initial, events.as_mut())
 }
 
 /// Builds the app for `root`, applies `initial` (a revealed file, piped

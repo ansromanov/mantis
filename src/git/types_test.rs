@@ -52,6 +52,7 @@ fn git_repo_info_is_dirty_true_when_changed() {
 
 #[test]
 fn status_priority_ordering() {
+    assert!(status_priority(GitStatus::Renamed) > status_priority(GitStatus::Modified));
     assert!(status_priority(GitStatus::Modified) > status_priority(GitStatus::New));
     assert!(status_priority(GitStatus::New) > status_priority(GitStatus::Deleted));
     assert!(status_priority(GitStatus::Deleted) > status_priority(GitStatus::Ignored));
@@ -125,4 +126,5 @@ fn git_status_derives_debug() {
     assert_eq!(format!("{:?}", GitStatus::Modified), "Modified");
     assert_eq!(format!("{:?}", GitStatus::Deleted), "Deleted");
     assert_eq!(format!("{:?}", GitStatus::Ignored), "Ignored");
+    assert_eq!(format!("{:?}", GitStatus::Renamed), "Renamed");
 }

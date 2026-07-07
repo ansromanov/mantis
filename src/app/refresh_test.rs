@@ -312,6 +312,8 @@ fn create_base_app() -> App {
         git_status_map: HashMap::new(),
         git_mode: false,
         git_mode_flat: false,
+        compare_base: None,
+        compare_input: None,
         show_scrollbar: false,
         show_scroll_percentage: false,
         show_line_numbers: false,

@@ -289,6 +289,29 @@ fn temp_git_with_history() -> PathBuf {
 }
 
 #[test]
+fn show_working_tree_diff_uses_compare_base_when_set() {
+    let root = temp_git_with_history();
+    let mut app = app_for(&root);
+
+    app.git_mode = true;
+    app.compare_base = Some("HEAD~1".to_string());
+    app.open_file(&root.join("tracked.txt"));
+    app.show_working_tree_diff(&root.join("tracked.txt"));
+
+    assert!(app.is_diff);
+    let title = app.content_title.clone().unwrap_or_default();
+    assert!(
+        title.contains("diff HEAD~1"),
+        "compare mode should title the diff with the compare revision: {title:?}"
+    );
+    let content = app.content.join("\n");
+    assert!(
+        content.contains("v1") || content.contains("v3"),
+        "diff against HEAD~1 should show the change from v1 to the working tree: {content:?}"
+    );
+}
+
+#[test]
 fn viewing_revision_persists_across_reload_content_in_git_mode() {
     let root = temp_git_with_history();
     let mut app = app_for(&root);

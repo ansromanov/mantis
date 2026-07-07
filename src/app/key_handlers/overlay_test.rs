@@ -1,7 +1,9 @@
 use crate::app::{App, Focus};
 use crate::command_palette::{CommandPalette, COMMANDS};
 use crate::config::Config;
-use crate::search::{GotoLineState, InFileSearch, SearchState, ThemePicker, TreeFilter};
+use crate::search::{
+    CompareModeInput, GotoLineState, InFileSearch, SearchState, ThemePicker, TreeFilter,
+};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::Rect;
 use std::fs;
@@ -148,6 +150,75 @@ fn handle_goto_line_key_activate_relative_uses_content_scroll_without_cursor() {
         app.active_line, 999,
         "active_line is untouched in cursorless views"
     );
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- Compare-input prompt ----------------------------------------------------
+
+#[test]
+fn handle_compare_input_key_esc_closes_without_entering_compare_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.compare_input = Some(CompareModeInput::new());
+    app.handle_compare_input_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+    assert!(app.compare_input.is_none());
+    assert!(app.compare_base.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn handle_compare_input_key_char_appends_to_query() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.compare_input = Some(CompareModeInput::new());
+    for c in "HEAD~3".chars() {
+        app.handle_compare_input_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::empty()));
+    }
+    assert_eq!(app.compare_input.as_ref().unwrap().query, "HEAD~3");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn handle_compare_input_key_j_and_k_are_typed_not_treated_as_nav() {
+    // This is a free-text revision input, not a list picker: 'j'/'k' must be
+    // typed literally (e.g. a branch named `jira-1234` or `kai/feature`)
+    // rather than swallowed as vim-style navigation.
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.compare_input = Some(CompareModeInput::new());
+    app.handle_compare_input_key(KeyEvent::new(KeyCode::Char('k'), KeyModifiers::empty()));
+    app.handle_compare_input_key(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::empty()));
+    app.handle_compare_input_key(KeyEvent::new(KeyCode::Char('i'), KeyModifiers::empty()));
+    assert_eq!(app.compare_input.as_ref().unwrap().query, "kai");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn handle_compare_input_key_enter_with_empty_query_closes_without_entering() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.compare_input = Some(CompareModeInput::new());
+    app.handle_compare_input_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert!(app.compare_input.is_none());
+    assert!(
+        app.compare_base.is_none(),
+        "empty revision must not enter compare mode"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn handle_compare_input_key_enter_with_query_enters_compare_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.compare_input = Some(CompareModeInput::new());
+    for c in "HEAD".chars() {
+        app.handle_compare_input_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::empty()));
+    }
+    app.handle_compare_input_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert!(app.compare_input.is_none());
+    assert_eq!(app.compare_base.as_deref(), Some("HEAD"));
+    assert!(app.git_mode, "entering compare mode should enable git mode");
     fs::remove_dir_all(&root).ok();
 }
 

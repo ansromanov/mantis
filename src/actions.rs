@@ -301,6 +301,11 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Go to line"),
         help: None,
     },
+    ActionSpec {
+        id: "compare_against",
+        palette: Some("Compare against a revision"),
+        help: None,
+    },
     // -- Palette/menu-only actions: no keymap binding --------------------
     ActionSpec {
         id: "open_config_in_editor",

@@ -667,6 +667,52 @@ fn toggle_git_mode_key_flips_git_mode_flag() {
 }
 
 #[test]
+fn enter_compare_mode_sets_compare_base_and_enables_git_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.enter_compare_mode("HEAD~3".to_string());
+    assert_eq!(app.compare_base.as_deref(), Some("HEAD~3"));
+    assert!(app.git_mode);
+    assert!(!app.git_mode_flat);
+    assert!(app.git_status_enabled);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn toggle_git_mode_off_clears_compare_base() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.enter_compare_mode("HEAD~3".to_string());
+    app.toggle_git_mode();
+    assert!(app.compare_base.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn toggle_git_mode_off_after_compare_mode_refreshes_stale_status_map() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.enter_compare_mode("HEAD~3".to_string());
+    // Simulate a stale range-status entry left over from compare mode (this
+    // repo isn't a real git repo, so `apply_range_status_load` never actually
+    // populated it — we seed it directly to reproduce the leftover state).
+    app.git_status_map.insert(
+        root.join("stale_compare.txt"),
+        crate::git::GitStatus::Renamed,
+    );
+
+    app.toggle_git_mode();
+    app.pump_loads();
+
+    assert!(
+        !app.git_status_map
+            .contains_key(&root.join("stale_compare.txt")),
+        "exiting compare mode must refresh git_status_map, not leave stale compare-mode data"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn set_root_clears_viewing_revision() {
     let root = temp_tree();
     let mut app = app_for(&root);

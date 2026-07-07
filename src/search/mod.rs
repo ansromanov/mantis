@@ -20,8 +20,8 @@ pub use history::HistoryState;
 // target (it is used only by test code and as a field type of `InFileSearch`).
 #[allow(unused_imports)]
 pub use pickers::{
-    GotoLineState, InFileMatch, InFileSearch, PluginPicker, RecentFilesState, ThemePicker,
-    TreeFilter,
+    CompareModeInput, GotoLineState, InFileMatch, InFileSearch, PluginPicker, RecentFilesState,
+    ThemePicker, TreeFilter,
 };
 
 use std::collections::{HashMap, HashSet};

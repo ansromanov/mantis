@@ -13,6 +13,8 @@ pub enum GitStatus {
     Modified,
     Deleted,
     Ignored,
+    /// File was renamed (only produced by `range_status`, never by `repo_status`).
+    Renamed,
 }
 
 /// The current HEAD state of the repository.
@@ -81,6 +83,7 @@ pub struct BlameLine {
 
 pub(crate) fn status_priority(s: GitStatus) -> u8 {
     match s {
+        GitStatus::Renamed => 4,
         GitStatus::Modified => 3,
         GitStatus::New => 2,
         GitStatus::Deleted => 1,

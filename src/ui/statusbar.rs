@@ -171,6 +171,13 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
             };
             segs.push((Span::styled(label, badge), StatusSegment::Badges, P_INFO));
         }
+        if let Some(ref base) = app.compare_base {
+            segs.push((
+                Span::styled(format!(" [compare: {base}]"), badge),
+                StatusSegment::Badges,
+                P_INFO,
+            ));
+        }
     }
     if app.auto_watch {
         segs.push((

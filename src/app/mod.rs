@@ -15,6 +15,14 @@
 //! when `is_diff` is `true`: `All` (default, `git diff HEAD`), `Staged`
 //! (`git diff --cached`), or `Unstaged` (`git diff`). The active mode is cycled
 //! with the `S` keybinding and is reflected in the content title badge.
+//!
+//! When `compare_base` is `Some(rev)`, the app is in compare mode: the tree
+//! shows only files changed between `rev` and the working tree, and opening a
+//! file shows `git diff <rev> -- <file>` instead of the usual working-tree diff.
+//! Compare mode is entered via the command palette's `compare_against` action,
+//! which opens a prompt (`compare_input`, see `key_handlers/overlay.rs`) for
+//! the target revision. Exiting git mode (Esc / toggle) clears `compare_base`
+//! and returns to normal browsing.
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -32,8 +40,8 @@ use crate::git::GitStatus;
 use crate::highlight::Highlighter;
 use crate::plugin::{ExtraSyntax, PluginContributions, PluginManager};
 use crate::search::{
-    CommandPalette, GotoLineState, HistoryState, InFileSearch, PluginPicker, RecentFilesState,
-    SearchState, ThemePicker, TreeFilter,
+    CommandPalette, CompareModeInput, GotoLineState, HistoryState, InFileSearch, PluginPicker,
+    RecentFilesState, SearchState, ThemePicker, TreeFilter,
 };
 use crate::selection::TextSelection;
 use crate::theme::Theme;
@@ -164,6 +172,13 @@ pub struct App {
     pub git_status_map: HashMap<PathBuf, GitStatus>,
     pub git_mode: bool,
     pub git_mode_flat: bool,
+    /// When `Some(rev)`, the tree and content pane show changes between `rev`
+    /// and the working tree (compare mode). Set from the command palette (or
+    /// the history overlay). Cleared when exiting git mode.
+    pub compare_base: Option<String>,
+    /// State for the compare-against-revision input prompt. `Some` while the
+    /// prompt is open (user typing a revision); `None` otherwise.
+    pub compare_input: Option<CompareModeInput>,
     pub show_scrollbar: bool,
     pub show_scroll_percentage: bool,
     pub show_line_numbers: bool,

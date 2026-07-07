@@ -173,6 +173,7 @@ impl App {
     /// production) if needed, auto-expands changed directories, rebuilds the
     /// tree, and shows the working-tree diff for the selected file. Disabling
     /// restores the full tree and re-opens the current file as plain content.
+    /// Exiting compare mode also clears `compare_base`.
     pub(super) fn toggle_git_mode(&mut self) {
         self.git_mode = !self.git_mode;
         self.mark_session_dirty();
@@ -186,6 +187,14 @@ impl App {
             self.rebuild(true);
             self.try_open_selected();
         } else {
+            if self.compare_base.take().is_some() && self.git_status_enabled {
+                // `git_status_map` currently holds range-status data (diffed
+                // against the compare revision). Refresh it now so a later
+                // `toggle_git_mode` back on shows real git status instead of
+                // stale compare-mode data (the `git_status_enabled` guard
+                // there only refreshes when status was previously disabled).
+                self.request_git_status_refresh();
+            }
             self.rebuild(true);
             // Re-open the current file as normal content instead of a diff.
             if let Some(path) = self.current_file.clone() {
@@ -195,6 +204,24 @@ impl App {
             }
         }
         self.save_config();
+    }
+
+    /// Enters compare mode: compares the current working tree against `rev`.
+    /// Sets `git_mode`, populates `git_status_map` with the range diff, expands
+    /// changed directories, and opens the selected file's diff.
+    pub fn enter_compare_mode(&mut self, rev: String) {
+        self.compare_base = Some(rev.clone());
+        self.git_mode = true;
+        self.git_mode_flat = false;
+        if !self.git_status_enabled {
+            self.git_status_enabled = true;
+        }
+        self.request_range_status(rev);
+        self.expand_git_dirs();
+        self.rebuild(true);
+        self.try_open_selected();
+        self.focus = crate::app::Focus::Tree;
+        self.mark_session_dirty();
     }
 
     /// Acts on the currently selected node: toggles a directory's fold state,

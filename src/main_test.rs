@@ -452,7 +452,7 @@ fn plan_startup_directory_returns_launch() {
     let dir = temp_dir();
     let startup = plan_startup(Some(dir.clone()), None, false).unwrap();
     match startup {
-        Startup::Launch { root, file } => {
+        Startup::Launch { root, file, .. } => {
             assert_eq!(root, dir);
             assert!(file.is_none());
         }
@@ -469,7 +469,7 @@ fn plan_startup_file_returns_launch_with_file() {
     let canonical = file_path.canonicalize().unwrap();
     let startup = plan_startup(Some(canonical.clone()), None, false).unwrap();
     match startup {
-        Startup::Launch { root, file } => {
+        Startup::Launch { root, file, .. } => {
             assert_eq!(root, dir);
             assert_eq!(file, Some(canonical));
         }
@@ -517,7 +517,7 @@ fn plan_startup_piped_stdin_with_real_path_returns_launch() {
 fn plan_startup_no_path_without_piped_stdin_returns_launch() {
     let startup = plan_startup(None, None, false).unwrap();
     match startup {
-        Startup::Launch { root, file } => {
+        Startup::Launch { root, file, .. } => {
             assert_eq!(root, PathBuf::from(".").canonicalize().unwrap());
             assert!(file.is_none());
         }

@@ -11,6 +11,7 @@
 
 mod about;
 mod command;
+mod compare_input;
 mod goto_line;
 mod help;
 mod history;
@@ -25,6 +26,7 @@ mod util;
 
 pub(super) use about::draw_about;
 pub(super) use command::draw_command_palette;
+pub(super) use compare_input::draw_compare_input;
 pub(super) use goto_line::draw_goto_line;
 pub(super) use help::draw_help;
 pub(crate) use help::{help_tab_ranges, help_tab_scroll_offset, HELP_TABS};

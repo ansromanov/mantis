@@ -67,6 +67,10 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         popups::draw_tree_filter(f, app, horiz[0]);
     }
 
+    if app.compare_input.is_some() {
+        popups::draw_compare_input(f, app, horiz[1]);
+    }
+
     if app.goto_line.is_some() {
         popups::draw_goto_line(f, app, horiz[1]);
     }
