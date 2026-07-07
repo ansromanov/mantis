@@ -93,6 +93,24 @@ fn tree_focus_git_mode() {
 }
 
 #[test]
+fn tree_focus_compare_badge_shows_revision() {
+    let mut app = make_app();
+    app.git_mode = true;
+    app.compare_base = Some("HEAD~3".to_string());
+    let text = render_bar_width(&app, 120);
+    assert!(text.contains("[compare: HEAD~3]"));
+}
+
+#[test]
+fn tree_focus_compare_badge_hidden_when_not_comparing() {
+    let mut app = make_app();
+    app.git_mode = true;
+    app.compare_base = None;
+    let text = render_bar_width(&app, 120);
+    assert!(!text.contains("[compare:"));
+}
+
+#[test]
 fn tree_focus_git_flat() {
     let mut app = make_app();
     app.git_mode = true;

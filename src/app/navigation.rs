@@ -187,7 +187,14 @@ impl App {
             self.rebuild(true);
             self.try_open_selected();
         } else {
-            self.compare_base = None;
+            if self.compare_base.take().is_some() && self.git_status_enabled {
+                // `git_status_map` currently holds range-status data (diffed
+                // against the compare revision). Refresh it now so a later
+                // `toggle_git_mode` back on shows real git status instead of
+                // stale compare-mode data (the `git_status_enabled` guard
+                // there only refreshes when status was previously disabled).
+                self.request_git_status_refresh();
+            }
             self.rebuild(true);
             // Re-open the current file as normal content instead of a diff.
             if let Some(path) = self.current_file.clone() {

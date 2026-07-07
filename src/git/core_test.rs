@@ -344,6 +344,104 @@ fn repo_status_rename_is_tracked() {
     );
 }
 
+// -- range_status (compare mode) --------------------------------------------
+
+#[test]
+fn range_status_reports_added_modified_deleted_renamed() {
+    let dir = tempfile::tempdir().unwrap();
+    git(dir.path(), &["init", "-q"]);
+    fs::write(dir.path().join("modified.txt"), "v1\n").unwrap();
+    fs::write(dir.path().join("deleted.txt"), "bye\n").unwrap();
+    fs::write(dir.path().join("original.txt"), "content\n").unwrap();
+    git(dir.path(), &["add", "-A"]);
+    git(dir.path(), &["commit", "-q", "-m", "base"]);
+    let base = "HEAD".to_string();
+
+    fs::write(dir.path().join("modified.txt"), "v2\n").unwrap();
+    fs::remove_file(dir.path().join("deleted.txt")).unwrap();
+    fs::write(dir.path().join("added.txt"), "new\n").unwrap();
+    git(dir.path(), &["mv", "original.txt", "renamed.txt"]);
+    git(dir.path(), &["add", "-A"]);
+
+    let map = range_status(dir.path(), &base).expect("range_status should succeed");
+    let root = repo_root(dir.path());
+    assert_eq!(
+        map.get(&root.join("modified.txt")),
+        Some(&GitStatus::Modified)
+    );
+    assert_eq!(
+        map.get(&root.join("deleted.txt")),
+        Some(&GitStatus::Deleted)
+    );
+    assert_eq!(map.get(&root.join("added.txt")), Some(&GitStatus::New));
+    assert_eq!(
+        map.get(&root.join("renamed.txt")),
+        Some(&GitStatus::Renamed)
+    );
+    assert!(
+        !map.contains_key(&root.join("original.txt")),
+        "old path of a rename should not appear"
+    );
+}
+
+#[test]
+fn range_status_unknown_revision_is_err() {
+    let dir = tempfile::tempdir().unwrap();
+    git(dir.path(), &["init", "-q"]);
+    fs::write(dir.path().join("tracked.txt"), "hello\n").unwrap();
+    git(dir.path(), &["add", "tracked.txt"]);
+    git(dir.path(), &["commit", "-q", "-m", "init"]);
+
+    let result = range_status(dir.path(), "not-a-real-revision");
+    assert!(result.is_err(), "unknown revision should return Err");
+}
+
+#[test]
+fn range_status_dash_prefixed_revision_does_not_leak_as_git_flag() {
+    let dir = tempfile::tempdir().unwrap();
+    git(dir.path(), &["init", "-q"]);
+    fs::write(dir.path().join("tracked.txt"), "hello\n").unwrap();
+    git(dir.path(), &["add", "tracked.txt"]);
+    git(dir.path(), &["commit", "-q", "-m", "init"]);
+
+    // A revision string starting with `-` must not be interpreted as a git
+    // option (e.g. `--cached`); it should just fail to resolve as a revision.
+    let result = range_status(dir.path(), "--cached");
+    assert!(result.is_err());
+}
+
+/// Regression test for a parser desync: an unhandled status char (here `T`,
+/// type-change) has its *own path* starting with a status letter (`M`). A
+/// buggy parser that skips only the status segment (not the path segment)
+/// for unhandled statuses would misread that path as a bogus new status
+/// entry, consuming the real next entry's status char as its own "path" and
+/// losing the real next entry entirely.
+#[test]
+fn range_status_unhandled_status_does_not_desync_following_entries() {
+    let dir = tempfile::tempdir().unwrap();
+    git(dir.path(), &["init", "-q"]);
+    // Path starts with 'M' so a buggy parser misreads it as a bogus Modified entry.
+    fs::write(dir.path().join("Mtypechange.txt"), "content\n").unwrap();
+    fs::write(dir.path().join("Zreal.txt"), "v1\n").unwrap();
+    git(dir.path(), &["add", "-A"]);
+    git(dir.path(), &["commit", "-q", "-m", "base"]);
+    let base = "HEAD".to_string();
+
+    // Type-change: regular file -> symlink (git reports status 'T').
+    fs::remove_file(dir.path().join("Mtypechange.txt")).unwrap();
+    std::os::unix::fs::symlink("Zreal.txt", dir.path().join("Mtypechange.txt")).unwrap();
+    fs::write(dir.path().join("Zreal.txt"), "v2\n").unwrap();
+    git(dir.path(), &["add", "-A"]);
+
+    let map = range_status(dir.path(), &base).expect("range_status should succeed");
+    let root = repo_root(dir.path());
+    assert_eq!(
+        map.get(&root.join("Zreal.txt")),
+        Some(&GitStatus::Modified),
+        "the real entry following an unhandled type-change status must still parse correctly"
+    );
+}
+
 // -- blame cache (bounded LRU) -----------------------------------------------
 
 #[test]

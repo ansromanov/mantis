@@ -245,3 +245,16 @@ fn bug_report_action_is_palette_only() {
         "palette-only: no keymap field expected"
     );
 }
+
+#[test]
+fn compare_against_action_is_palette_only() {
+    let action = ACTIONS
+        .iter()
+        .find(|a| a.id == "compare_against")
+        .expect("compare_against must be registered");
+    assert!(action.palette.is_some(), "reachable via Ctrl-P");
+    assert!(
+        !KEYMAP_FIELD_ACTION_IDS.contains(&"compare_against"),
+        "palette-only: no keymap field expected"
+    );
+}

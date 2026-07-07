@@ -208,9 +208,14 @@ impl App {
                     self.apply_git_status_load(*load);
                 }
             }
-            LoadResponse::RangeStatus { seq, root, load } => {
+            LoadResponse::RangeStatus {
+                seq,
+                root,
+                load,
+                error,
+            } => {
                 if seq == self.git_seq && root == self.root {
-                    self.apply_range_status_load(*load);
+                    self.apply_range_status_load(*load, error);
                 }
             }
             #[cfg(test)]
@@ -232,14 +237,22 @@ impl App {
     }
 
     /// Applies a range-status load (from `git diff --name-status <rev>`),
-    /// used in compare mode. When in git mode, expands git dirs and rebuilds
-    /// the tree so only changed files are shown.
-    pub(super) fn apply_range_status_load(&mut self, load: GitStatusLoad) {
+    /// used in compare mode. When in git mode, expands git dirs, rebuilds the
+    /// tree so only changed files are shown, and opens the first selected
+    /// file's diff (the tree was empty when compare mode was entered, so the
+    /// initial `try_open_selected` had nothing to select). Surfaces `error`
+    /// (e.g. an unknown revision) as a status message instead of silently
+    /// leaving an empty tree.
+    pub(super) fn apply_range_status_load(&mut self, load: GitStatusLoad, error: Option<String>) {
         self.git_status_map = load.status_map;
         self.git_info = load.info;
         if self.git_mode {
             self.expand_git_dirs();
             self.rebuild(false);
+            self.try_open_selected();
+        }
+        if let Some(e) = error {
+            self.set_status(format!("compare: {e}"));
         }
     }
 

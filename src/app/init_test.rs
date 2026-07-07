@@ -290,6 +290,16 @@ fn app_new_starts_in_normal_mode() {
 }
 
 #[test]
+fn app_new_starts_with_no_compare_mode() {
+    let root = temp_dir();
+    fs::write(root.join("f.txt"), "x\n").unwrap();
+    let app = new_app(&root, Config::default());
+    assert!(app.compare_base.is_none());
+    assert!(app.compare_input.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn app_new_session_git_mode_ignored() {
     let root = temp_dir();
     fs::write(root.join("f.txt"), "x\n").unwrap();

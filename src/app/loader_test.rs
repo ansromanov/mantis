@@ -204,6 +204,72 @@ fn git_status_worker_round_trip_returns_matching_seq() {
 }
 
 #[test]
+fn range_status_worker_round_trip_reports_error_outside_repo() {
+    let loader = Loader::new(&Theme::default(), Vec::new(), usize::MAX);
+    loader.request(LoadRequest::RangeStatus {
+        seq: 7,
+        root: std::path::PathBuf::from("/nonexistent"),
+        rev: "HEAD".to_string(),
+    });
+    let resp = loader.rx.recv().expect("worker response");
+    match resp {
+        LoadResponse::RangeStatus {
+            seq,
+            root,
+            load,
+            error,
+        } => {
+            assert_eq!(seq, 7);
+            assert_eq!(root, std::path::PathBuf::from("/nonexistent"));
+            assert!(load.status_map.is_empty());
+            assert!(error.is_some(), "not a git repo should surface an error");
+        }
+        _ => panic!("expected RangeStatus response"),
+    }
+}
+
+#[test]
+fn range_status_worker_round_trip_succeeds_in_real_repo() {
+    let dir = tempfile::tempdir().unwrap();
+    let git = |args: &[&str]| {
+        std::process::Command::new("git")
+            .arg("-C")
+            .arg(dir.path())
+            .args(["-c", "user.email=t@e.x", "-c", "user.name=T"])
+            .args(args)
+            .status()
+            .unwrap();
+    };
+    git(&["init", "-q"]);
+    std::fs::write(dir.path().join("f.txt"), "v1\n").unwrap();
+    git(&["add", "f.txt"]);
+    git(&["commit", "-q", "-m", "init"]);
+    std::fs::write(dir.path().join("f.txt"), "v2\n").unwrap();
+
+    let loader = Loader::new(&Theme::default(), Vec::new(), usize::MAX);
+    loader.request(LoadRequest::RangeStatus {
+        seq: 3,
+        root: dir.path().to_path_buf(),
+        rev: "HEAD".to_string(),
+    });
+    let resp = loader.rx.recv().expect("worker response");
+    match resp {
+        LoadResponse::RangeStatus {
+            seq, load, error, ..
+        } => {
+            assert_eq!(seq, 3);
+            assert!(error.is_none());
+            let root = dir.path().canonicalize().unwrap();
+            assert_eq!(
+                load.status_map.get(&root.join("f.txt")),
+                Some(&crate::git::GitStatus::Modified)
+            );
+        }
+        _ => panic!("expected RangeStatus response"),
+    }
+}
+
+#[test]
 fn compute_git_status_load_outside_repo() {
     let load = compute_git_status_load(std::path::Path::new("/nonexistent"), true, false);
     assert!(load.status_map.is_empty());

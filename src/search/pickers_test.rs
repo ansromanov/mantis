@@ -364,6 +364,61 @@ fn goto_line_state_default_is_empty() {
     assert!(s.query.is_empty());
 }
 
+// -- CompareModeInput ---------------------------------------------------------
+
+#[test]
+fn compare_mode_input_new_is_empty() {
+    let s = CompareModeInput::new();
+    assert!(s.query.is_empty());
+}
+
+#[test]
+fn compare_mode_input_default_is_empty() {
+    let s = CompareModeInput::default();
+    assert!(s.query.is_empty());
+}
+
+#[test]
+fn compare_mode_input_push_appends() {
+    let mut s = CompareModeInput::new();
+    s.push('H');
+    s.push('E');
+    s.push('A');
+    s.push('D');
+    assert_eq!(s.query, "HEAD");
+}
+
+#[test]
+fn compare_mode_input_pop_removes() {
+    let mut s = CompareModeInput::new();
+    s.push('a');
+    s.push('b');
+    s.pop();
+    assert_eq!(s.query, "a");
+    s.pop();
+    assert!(s.query.is_empty());
+}
+
+#[test]
+fn compare_mode_input_list_picker_has_no_selectable_results() {
+    let mut s = CompareModeInput::new();
+    assert_eq!(ListPicker::results_len(&s), 0);
+    assert_eq!(ListPicker::selected(&s), 0);
+    ListPicker::set_selected(&mut s, 5);
+    assert_eq!(ListPicker::selected(&s), 0, "set_selected is a no-op");
+}
+
+#[test]
+fn compare_mode_input_list_picker_query_methods_delegate() {
+    let mut s = CompareModeInput::new();
+    assert!(ListPicker::query_is_empty(&s));
+    ListPicker::query_push(&mut s, 'x');
+    assert_eq!(s.query, "x");
+    assert!(!ListPicker::query_is_empty(&s));
+    ListPicker::query_pop(&mut s);
+    assert!(s.query.is_empty());
+}
+
 // -- TreeFilter --------------------------------------------------------------
 
 #[test]

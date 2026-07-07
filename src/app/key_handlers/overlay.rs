@@ -461,6 +461,14 @@ impl App {
         let Some(ref mut m) = self.compare_input else {
             return;
         };
+        // This is a free-text revision input, not a list picker: the shared
+        // dispatcher's vim-style j/k navigation would otherwise swallow those
+        // characters instead of typing them (e.g. a branch named `jira-1234`
+        // or `kai/feature` couldn't be entered).
+        if let KeyCode::Char(c @ ('j' | 'k')) = key.code {
+            m.push(c);
+            return;
+        }
         match handle_list_picker_key(m, &key) {
             OverlayKey::Activate => {
                 let rev = self.compare_input.as_ref().map(|m| m.query.clone());

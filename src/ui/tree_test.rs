@@ -113,6 +113,25 @@ fn git_status_enabled_but_path_not_in_map_uses_default() {
     assert_eq!(color, default_theme().file);
 }
 
+#[test]
+fn git_status_renamed_file_uses_accent_alt() {
+    let node = make_node("renamed.rs", false, false);
+    let mut map = HashMap::new();
+    map.insert(PathBuf::from("renamed.rs"), GitStatus::Renamed);
+    let app = make_app(true, map);
+    let (color, _) = git_status_style(&node, &app, &default_theme());
+    assert_eq!(color, default_theme().accent_alt);
+}
+
+#[test]
+fn git_status_badge_label_maps_each_status() {
+    assert_eq!(git_status_badge_label(&GitStatus::New), Some("A"));
+    assert_eq!(git_status_badge_label(&GitStatus::Modified), Some("M"));
+    assert_eq!(git_status_badge_label(&GitStatus::Deleted), Some("D"));
+    assert_eq!(git_status_badge_label(&GitStatus::Renamed), Some("R"));
+    assert_eq!(git_status_badge_label(&GitStatus::Ignored), None);
+}
+
 // ---------------------------------------------------------------------------
 // draw_tree rendering tests
 // ---------------------------------------------------------------------------

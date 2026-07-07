@@ -287,19 +287,24 @@ pub fn repo_status(
 ///
 /// Parent directories are included with their highest-priority child status so
 /// collapsed dirs can be colored when they contain changes.
-pub fn range_status(dir: &Path, rev: &str) -> HashMap<PathBuf, GitStatus> {
+///
+/// Returns `Err` with a message describing the failure (e.g. an unknown
+/// revision) so the caller can surface it to the user instead of silently
+/// showing an empty compare view.
+pub fn range_status(dir: &Path, rev: &str) -> Result<HashMap<PathBuf, GitStatus>, String> {
     let Some(root) = git_toplevel(dir) else {
-        return HashMap::new();
+        return Err("not a git repository".to_string());
     };
 
     let out = Command::new("git")
         .arg("-C")
         .arg(&root)
-        .args(["diff", "--name-status", "-z", rev])
+        .args(["diff", "--name-status", "-z", "--end-of-options", rev])
         .output();
     let out = match out {
         Ok(o) if o.status.success() => o,
-        _ => return HashMap::new(),
+        Ok(o) => return Err(String::from_utf8_lossy(&o.stderr).trim().to_string()),
+        Err(e) => return Err(e.to_string()),
     };
 
     let mut map: HashMap<PathBuf, GitStatus> = HashMap::new();
@@ -326,7 +331,10 @@ pub fn range_status(dir: &Path, rev: &str) -> HashMap<PathBuf, GitStatus> {
             'R' => GitStatus::Renamed,
             'C' => GitStatus::New,
             _ => {
-                i += 1;
+                // Unrecognised status (e.g. type-change 'T', unmerged 'U'):
+                // skip both the status and its path segment so the stream
+                // stays aligned for the next entry.
+                i += 2;
                 continue;
             }
         };
@@ -365,7 +373,7 @@ pub fn range_status(dir: &Path, rev: &str) -> HashMap<PathBuf, GitStatus> {
         i += 1;
     }
 
-    map
+    Ok(map)
 }
 
 /// Returns the working-tree diff for `file` compared to HEAD, as lines.
@@ -495,7 +503,7 @@ pub fn file_diff(repo_dir: &Path, rev: &str, file: &Path) -> Vec<String> {
     let output = Command::new("git")
         .arg("-C")
         .arg(repo_dir)
-        .args(["diff", "--no-color", rev, "--"])
+        .args(["diff", "--no-color", "--end-of-options", rev, "--"])
         .arg(file)
         .output();
 

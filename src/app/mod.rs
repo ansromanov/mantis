@@ -19,9 +19,10 @@
 //! When `compare_base` is `Some(rev)`, the app is in compare mode: the tree
 //! shows only files changed between `rev` and the working tree, and opening a
 //! file shows `git diff <rev> -- <file>` instead of the usual working-tree diff.
-//! Compare mode is either entered via the `--diff <rev>` CLI flag, or from the
-//! commit history overlay (see `history.rs`). Exiting git mode (Esc / toggle)
-//! clears `compare_base` and returns to normal browsing.
+//! Compare mode is entered via the command palette's `compare_against` action,
+//! which opens a prompt (`compare_input`, see `key_handlers/overlay.rs`) for
+//! the target revision. Exiting git mode (Esc / toggle) clears `compare_base`
+//! and returns to normal browsing.
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};

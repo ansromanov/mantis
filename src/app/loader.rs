@@ -352,6 +352,9 @@ pub(super) enum LoadResponse {
         seq: u64,
         root: PathBuf,
         load: Box<GitStatusLoad>,
+        /// Set when `range_status` failed (e.g. an unknown revision), so the
+        /// app can surface it instead of silently showing an empty tree.
+        error: Option<String>,
     },
     /// Test-only: reply to a [`LoadRequest::Barrier`].
     #[cfg(test)]
@@ -437,7 +440,10 @@ impl Loader {
                         }
                     }
                     LoadRequest::RangeStatus { seq, root, rev } => {
-                        let status_map = crate::git::range_status(&root, &rev);
+                        let (status_map, error) = match crate::git::range_status(&root, &rev) {
+                            Ok(m) => (m, None),
+                            Err(e) => (HashMap::new(), Some(e)),
+                        };
                         let info = crate::git::repo_info(&root);
                         let load = Box::new(GitStatusLoad { status_map, info });
                         if res_tx
@@ -445,6 +451,7 @@ impl Loader {
                                 seq,
                                 root: root.clone(),
                                 load,
+                                error,
                             })
                             .is_err()
                         {

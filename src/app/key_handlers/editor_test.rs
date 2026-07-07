@@ -213,6 +213,29 @@ fn go_to_line_command_no_op_when_tree_focused() {
 }
 
 #[test]
+fn compare_against_command_opens_input_prompt() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.command_palette = Some(palette_with_query("Compare against a revision"));
+    assert!(app.dispatch_command());
+    assert!(app.compare_input.is_some());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn compare_against_command_starts_with_empty_query() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.command_palette = Some(palette_with_query("Compare against a revision"));
+    app.dispatch_command();
+    assert_eq!(
+        app.compare_input.as_ref().map(|s| s.query.as_str()),
+        Some("")
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn tree_up_dir_command_changes_root_for_top_level_file() {
     let root = temp_tree();
     let orig_root = root.clone();
