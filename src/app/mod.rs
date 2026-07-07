@@ -603,6 +603,20 @@ impl App {
         }
     }
 
+    /// Flips `[telemetry] enabled`, rebuilds the live `Telemetry` handle to
+    /// match (spawning or tearing down its writer thread), persists the
+    /// change, and reports the new state in the status bar.
+    pub(crate) fn toggle_telemetry(&mut self) {
+        let enabled = !self.config.telemetry.enabled;
+        self.config.telemetry.enabled = enabled;
+        self.telemetry = crate::telemetry::Telemetry::new(enabled);
+        self.save_config();
+        self.set_status(format!(
+            "telemetry {}",
+            if enabled { "enabled" } else { "disabled" }
+        ));
+    }
+
     /// Collects an anonymous diagnostic report and saves it under the state
     /// directory, surfacing the saved path (or the failure) in the status bar.
     pub(crate) fn save_bug_report(&mut self) {

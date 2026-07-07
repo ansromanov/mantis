@@ -36,12 +36,16 @@ environment variables beyond the terminal whitelist above.
 
 ## Telemetry
 
-Telemetry is **disabled by default** and must be explicitly enabled:
+Telemetry is **disabled by default**. Toggle it from the command palette
+(`Ctrl+P` → **"Toggle telemetry"**) — the status bar confirms the new state
+and the setting persists to `mantis.toml`:
 
 ```toml
 [telemetry]
 enabled = true
 ```
+
+You can also set this key by hand instead of using the palette.
 
 When enabled, whitelisted events are appended to a local JSONL log under
 `<state dir>/telemetry/` (`events.jsonl`, rotated at 1 MiB, at most five

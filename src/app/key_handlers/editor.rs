@@ -68,6 +68,10 @@ impl App {
                 self.bug_report = Some(crate::search::BugReportState::new());
                 true
             }
+            Some("toggle_telemetry") => {
+                self.toggle_telemetry();
+                true
+            }
             Some("quit") => {
                 self.should_quit = true;
                 true
