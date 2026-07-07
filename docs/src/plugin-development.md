@@ -318,6 +318,9 @@ Fields:
 - `fallback` — glyph used when no extension key matches
 - `icons` — map of extension/filename → glyph
 
+Once icons are active, the tree's `▶`/`▼` expand/collapse arrows are suppressed —
+the `dir_open`/`dir_closed` glyph substitutes as the expansion indicator instead.
+
 ## Language providers
 
 A process plugin can declare itself as a **language provider** by responding to
