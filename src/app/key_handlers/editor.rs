@@ -42,11 +42,20 @@ impl App {
         if let Some(id) = action_id {
             self.command_usage.record(id);
             self.command_usage.save();
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::ActionInvoked {
+                    action: id,
+                    source: crate::telemetry::ActionSource::Palette,
+                });
         }
         self.command_palette = None;
         match action_id {
             Some("help") => {
                 self.show_help = !self.show_help;
+                true
+            }
+            Some("bug_report") => {
+                self.save_bug_report();
                 true
             }
             Some("quit") => {

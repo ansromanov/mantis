@@ -616,3 +616,59 @@ fn dispatch_command_copy_file_via_palette() {
 }
 
 // Satisfying require-tests check
+
+#[test]
+fn dispatch_bug_report_saves_report_and_sets_status() {
+    let _guard = crate::session::STATE_DIR_ENV_LOCK.lock().unwrap();
+    let state = tempfile::tempdir().unwrap();
+    std::env::set_var("MANTIS_STATE_DIR", state.path());
+
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let mut p = CommandPalette::default();
+    for c in "Report a bug".chars() {
+        p.push(c);
+    }
+    app.command_palette = Some(p);
+    assert!(app.dispatch_command());
+
+    let msg = app
+        .status_message
+        .as_ref()
+        .expect("status set")
+        .text
+        .clone();
+    assert!(msg.starts_with("bug report saved:"), "got: {msg}");
+    let dir = state.path().join("bug-reports");
+    assert_eq!(fs::read_dir(&dir).unwrap().count(), 1);
+    std::env::remove_var("MANTIS_STATE_DIR");
+}
+
+#[test]
+fn dispatch_records_palette_action_in_telemetry_when_enabled() {
+    let _guard = crate::session::STATE_DIR_ENV_LOCK.lock().unwrap();
+    let state = tempfile::tempdir().unwrap();
+    std::env::set_var("MANTIS_STATE_DIR", state.path());
+
+    let root = temp_tree();
+    let cfg = Config {
+        telemetry: crate::config::TelemetryConfig { enabled: true },
+        ..Config::default()
+    };
+    let mut app = App::new(root.clone(), cfg, None, None).unwrap();
+    let mut p = CommandPalette::default();
+    for c in "Toggle help".chars() {
+        p.push(c);
+    }
+    app.command_palette = Some(p);
+    assert!(app.dispatch_command());
+    drop(app); // flush the telemetry writer
+
+    let raw = fs::read_to_string(state.path().join("telemetry").join("events.jsonl")).unwrap();
+    assert!(
+        raw.lines()
+            .any(|l| l.contains("\"action_invoked\"") && l.contains("\"help\"")),
+        "palette dispatch must be recorded: {raw}"
+    );
+    std::env::remove_var("MANTIS_STATE_DIR");
+}

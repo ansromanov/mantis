@@ -131,6 +131,7 @@ impl App {
             tree_filter: None,
             goto_line: None,
             command_usage: crate::command_usage::UsageStats::load(),
+            telemetry: crate::telemetry::Telemetry::new(cfg.telemetry.enabled),
             command_palette: None,
             history: None,
             theme_picker: None,
