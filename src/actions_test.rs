@@ -258,3 +258,43 @@ fn compare_against_action_is_palette_only() {
         "palette-only: no keymap field expected"
     );
 }
+
+// -- category & description tests -------------------------------------------
+
+#[test]
+fn every_palette_entry_has_category() {
+    for action in ACTIONS.iter().filter(|a| a.palette.is_some()) {
+        assert!(
+            action.category.is_some(),
+            "action '{}' has palette entry but no category",
+            action.id,
+        );
+    }
+}
+
+#[test]
+fn every_palette_entry_has_description() {
+    for action in ACTIONS.iter().filter(|a| a.palette.is_some()) {
+        assert!(
+            action.description.is_some(),
+            "action '{}' has palette entry but no description",
+            action.id,
+        );
+    }
+}
+
+#[test]
+fn navigation_actions_have_no_category_or_description() {
+    for action in ACTIONS.iter().filter(|a| a.palette.is_none()) {
+        assert!(
+            action.category.is_none(),
+            "action '{}' has no palette entry but has a category",
+            action.id,
+        );
+        assert!(
+            action.description.is_none(),
+            "action '{}' has no palette entry but has a description",
+            action.id,
+        );
+    }
+}
