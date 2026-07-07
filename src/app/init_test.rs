@@ -696,3 +696,38 @@ fn app_new_ignores_stale_initial_root_not_an_ancestor_of_launch_root() {
     fs::remove_dir_all(&unrelated).ok();
     fs::remove_dir_all(&state_dir).ok();
 }
+
+#[test]
+fn app_new_ignores_stale_initial_root_that_is_ancestor_of_launch_root() {
+    // A stale `initial_root` that is an ancestor of (but not equal to) the
+    // current launch root must also be rejected: `starts_with` alone would
+    // wrongly accept it, letting the up-dir clamp restore a wider stale
+    // boundary than the directory mantis was actually launched with.
+    let _lock = crate::session::STATE_DIR_ENV_LOCK.lock().unwrap();
+    let ancestor = temp_dir();
+    let root = ancestor.join("nested");
+    fs::create_dir_all(&root).unwrap();
+    let state_dir = temp_dir();
+    std::env::set_var("MANTIS_STATE_DIR", &state_dir);
+
+    crate::session::save(
+        &root,
+        &crate::session::SessionState {
+            expanded: Vec::new(),
+            current_file: None,
+            content_scroll: 0,
+            active_line: 0,
+            initial_root: Some(ancestor.clone()),
+        },
+    );
+
+    let app = new_app(&root, Config::default());
+    std::env::remove_var("MANTIS_STATE_DIR");
+
+    assert_eq!(
+        app.initial_root, root,
+        "initial_root from an ancestor-only stale session must be ignored"
+    );
+    fs::remove_dir_all(&ancestor).ok();
+    fs::remove_dir_all(&state_dir).ok();
+}

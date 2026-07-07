@@ -263,7 +263,7 @@ impl App {
                 }
             }
             if let Some(ref ir) = s.initial_root {
-                if ir.exists() && app.root.starts_with(ir) {
+                if ir.exists() && *ir == app.root {
                     app.initial_root = ir.clone();
                 }
             }
