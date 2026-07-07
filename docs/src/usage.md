@@ -295,9 +295,9 @@ detector, and language plugins that supply per-file-type regions over the
 [plugin protocol](plugins.md). Plugin regions override the built-in output for
 their file extension.
 
-Note that code folding for mainstream languages like Rust (`.rs`), Go (`.go`), and
-Python (`.py`) is provided by their respective language provider plugins. You must
-explicitly enable these plugins in `mantis.toml` (or via the plugin manager popup) for
+Note that folding for a mainstream language like Rust (`.rs`) can be provided by a
+language provider plugin — the bundled `rust` plugin registers this way. You must
+explicitly enable such plugins in `mantis.toml` (or via the plugin manager popup) for
 folding to work on those files.
 
 ## JSON pretty-printing

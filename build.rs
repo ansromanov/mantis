@@ -48,7 +48,9 @@ fn main() {
                 const_name
             ));
         }
-        std::fs::write(&out_path, &output).unwrap();
+        std::fs::write(&out_path, &output).unwrap_or_else(|e| {
+            panic!("failed to write {:?}: {e}", out_path);
+        });
         return;
     }
 
