@@ -257,7 +257,6 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
                     || !app.icon_fallback.is_empty()
                     || !app.icon_dir_open.is_empty()
                     || !app.icon_dir_closed.is_empty());
-
             if !icons_active {
                 let arrow = if node.is_dir {
                     if is_open {

@@ -869,6 +869,112 @@ fn draw_tree_icon_enabled_empty_map_omits_icons() {
 }
 
 #[test]
+fn draw_tree_icon_enabled_collapsed_dir_hides_arrow() {
+    let mut app = make_app(false, HashMap::new());
+    app.icons_enabled = true;
+    app.icon_dir_open = "\u{f07c}".to_string();
+    app.icon_dir_closed = "\u{f07b}".to_string();
+    let node = make_node("src", true, false);
+    app.nodes = vec![node];
+    let rows = render_tree(&mut app, 40, 5);
+    let text = all_text(&rows);
+    assert!(
+        !text.contains('▶'),
+        "collapsed dir must not show ▶ when icons active"
+    );
+    assert!(
+        text.contains('\u{f07b}'),
+        "collapsed dir should show dir_closed icon"
+    );
+}
+
+#[test]
+fn draw_tree_icon_enabled_expanded_dir_hides_arrow() {
+    let mut app = make_app(false, HashMap::new());
+    app.icons_enabled = true;
+    app.icon_dir_open = "\u{f07c}".to_string();
+    app.icon_dir_closed = "\u{f07b}".to_string();
+    let node = make_node("src", true, false);
+    app.expanded.insert(node.path.clone());
+    app.nodes = vec![node];
+    let rows = render_tree(&mut app, 40, 5);
+    let text = all_text(&rows);
+    assert!(
+        !text.contains('▼'),
+        "expanded dir must not show ▼ when icons active"
+    );
+    assert!(
+        text.contains('\u{f07c}'),
+        "expanded dir should show dir_open icon"
+    );
+}
+
+#[test]
+fn draw_tree_icon_enabled_file_has_no_arrow() {
+    let mut app = make_app(false, HashMap::new());
+    app.icons_enabled = true;
+    app.icon_map
+        .insert("rs".to_string(), "\u{e7a8}".to_string());
+    app.icon_fallback = "\u{f15b}".to_string();
+    app.nodes = vec![make_node("main.rs", false, false)];
+    let rows = render_tree(&mut app, 40, 5);
+    let text = all_text(&rows);
+    assert!(
+        !text.contains('▶'),
+        "file must not show ▶ when icons active"
+    );
+    assert!(
+        !text.contains('▼'),
+        "file must not show ▼ when icons active"
+    );
+    assert!(text.contains('\u{e7a8}'), "file should show its icon");
+    assert!(text.contains("main.rs"));
+}
+
+#[test]
+fn draw_tree_icon_enabled_empty_fields_still_shows_arrow() {
+    let mut app = make_app(false, HashMap::new());
+    app.icons_enabled = true;
+    // All icon fields empty — condition is false, arrows must remain.
+    let node = make_node("src", true, false);
+    app.nodes = vec![node];
+    let rows = render_tree(&mut app, 40, 5);
+    let text = all_text(&rows);
+    assert!(
+        text.contains('▶'),
+        "collapsed dir must show ▶ when icon fields are all empty"
+    );
+}
+
+#[test]
+fn draw_tree_icon_enabled_restores_arrow_after_clear() {
+    // Simulate runtime plugin disable: icons_enabled stays true but
+    // all glyph fields are cleared → arrows must come back.
+    let mut app = make_app(false, HashMap::new());
+    app.icons_enabled = true;
+    app.icon_dir_open = "\u{f07c}".to_string();
+    app.icon_dir_closed = "\u{f07b}".to_string();
+    let node = make_node("src", true, false);
+    app.nodes = vec![node];
+
+    // First render with icons active — arrow hidden
+    let rows = render_tree(&mut app, 40, 5);
+    let text = all_text(&rows);
+    assert!(!text.contains('▶'), "arrow hidden while icons active");
+
+    // Clear icon fields — simulate plugin disable teardown
+    app.icon_dir_open.clear();
+    app.icon_dir_closed.clear();
+
+    let rows = render_tree(&mut app, 40, 5);
+    let text = all_text(&rows);
+    assert!(
+        text.contains('▶'),
+        "arrow restored after icon fields cleared"
+    );
+}
+
+#[test]
 fn draw_tree_icons_disabled_omits_icon_glyph() {
     let mut app = make_app(false, HashMap::new());
     app.icons_enabled = false;
