@@ -553,6 +553,67 @@ fn bench_tree_filter_sync(c: &mut Criterion) {
 }
 
 // ---------------------------------------------------------------------------
+// Benchmark: brace_fold — large synthetic source with nested blocks
+// ---------------------------------------------------------------------------
+
+fn generate_brace_source(line_count: usize) -> String {
+    let mut content = String::with_capacity(line_count * 40);
+    // Top-level function for every 10 lines
+    for chunk in 0..line_count / 10 {
+        content.push_str(&format!("fn func_{chunk}() {{\n"));
+        for i in 0..9 {
+            match i % 3 {
+                0 => content.push_str(&format!("    let x_{i} = {i};\n")),
+                1 => content.push_str(&format!("    if x_{i} > 0 {{ process(x_{i}); }}\n")),
+                _ => content.push_str("    // comment with }\n"),
+            }
+        }
+        content.push_str("}\n\n");
+    }
+    content
+}
+
+fn generate_indent_source(line_count: usize) -> String {
+    let mut content = String::with_capacity(line_count * 40);
+    // A top-level class with many methods
+    content.push_str("class App:\n");
+    for i in 0..line_count.saturating_sub(1) / 20 {
+        content.push_str(&format!("    def method_{i}(self):\n"));
+        for j in 0..19 {
+            match j % 4 {
+                0 => content.push_str(&format!("        x_{j} = {j}\n")),
+                1 => content.push_str(&format!("        if x_{j} > 0:\n")),
+                2 => content.push_str(&format!("            result = x_{j} * 2\n")),
+                _ => content.push_str("        return result\n"),
+            }
+        }
+    }
+    content
+}
+
+fn bench_brace_fold(c: &mut Criterion) {
+    let mut group = c.benchmark_group("brace_fold");
+    for &lines in &[100, 1_000, 10_000] {
+        let src = generate_brace_source(lines);
+        group.bench_with_input(BenchmarkId::new("brace_fold", lines), &src, |b, src| {
+            b.iter(|| black_box(mantis::fold_detectors::brace_fold(black_box(src))))
+        });
+    }
+    group.finish();
+}
+
+fn bench_indent_fold(c: &mut Criterion) {
+    let mut group = c.benchmark_group("indent_fold");
+    for &lines in &[100, 1_000, 10_000] {
+        let src = generate_indent_source(lines);
+        group.bench_with_input(BenchmarkId::new("indent_fold", lines), &src, |b, src| {
+            b.iter(|| black_box(mantis::fold_detectors::indent_fold(black_box(src))))
+        });
+    }
+    group.finish();
+}
+
+// ---------------------------------------------------------------------------
 // Criterion entry point
 // ---------------------------------------------------------------------------
 
@@ -566,6 +627,8 @@ criterion_group!(
     bench_scroll_redraw,
     bench_tree_redraw,
     bench_tree_filter_sync,
+    bench_brace_fold,
+    bench_indent_fold,
 );
 
 criterion_main!(benches);

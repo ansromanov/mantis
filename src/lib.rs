@@ -25,6 +25,7 @@ pub mod diff;
 pub mod event_source;
 pub mod file;
 pub mod fold;
+pub mod fold_detectors;
 pub mod git;
 pub mod highlight;
 pub mod list_picker;
