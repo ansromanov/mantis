@@ -167,40 +167,43 @@ impl App {
         let k = &self.keys;
 
         // When full-file blame is active, navigation keys move the content cursor
-        // (active_line) instead of tree selection.
+        // (active_line) instead of tree selection. Mirrors the cursor-movement
+        // branches in handle_content_key, including the before/after diff that
+        // marks the session dirty and the scrollbar transient — so the cursor
+        // position persists across quit/reopen the same way it does when the
+        // content panel is focused.
         if self.show_blame && self.has_text_cursor() {
+            let scroll_before = self.content_scroll;
+            let active_line_before = self.active_line;
             if pressed_in(&k.nav_up, &key, scope) {
                 if self.active_line > 0 {
                     self.active_line -= 1;
                     self.scroll_active_line_into_view();
-                    self.scroll_blame_into_view();
-                    self.mark_content_scrolled();
                 }
             } else if pressed_in(&k.nav_down, &key, scope) {
                 let max = self.display_line_count().saturating_sub(1);
                 if self.active_line < max {
                     self.active_line += 1;
                     self.scroll_active_line_into_view();
-                    self.scroll_blame_into_view();
-                    self.mark_content_scrolled();
                 }
             } else if pressed_in(&k.content_top, &key, scope) {
                 self.active_line = 0;
                 self.set_content_scroll(0);
-                self.scroll_blame_into_view();
             } else if pressed_in(&k.content_bottom, &key, scope) {
                 self.active_line = self.display_line_count().saturating_sub(1);
                 self.scroll_active_line_into_view();
-                self.scroll_blame_into_view();
             } else if pressed_in(&k.content_page_up, &key, scope) {
                 self.active_line = self.active_line.saturating_sub(self.page_rows());
                 self.scroll_active_line_into_view();
-                self.scroll_blame_into_view();
             } else if pressed_in(&k.content_page_down, &key, scope) {
                 let max = self.display_line_count().saturating_sub(1);
                 self.active_line = (self.active_line + self.page_rows()).min(max);
                 self.scroll_active_line_into_view();
+            }
+            if self.content_scroll != scroll_before || self.active_line != active_line_before {
                 self.scroll_blame_into_view();
+                self.mark_content_scrolled();
+                self.mark_session_dirty();
             }
             return;
         }

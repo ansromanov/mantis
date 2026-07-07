@@ -22,9 +22,16 @@ tracking branch exists, using the familiar `↑3 ↓1` summary.
 
 ## Git blame
 
-Press `Ctrl+b` with a file open to toggle **inline blame**. A gutter appears to
-the left of the content showing, for each line, the short commit hash, the
-author, and the date it was last changed. Press `Ctrl+b` again to hide it.
+Press `Ctrl+b` with a file open to toggle **full-file blame**. The tree panel
+is replaced by a dedicated blame pane listing every line's short commit hash,
+author, relative date, and subject. Navigate it with the usual tree
+keys (`↑`/`↓`, `PageUp`/`PageDown`, `g`/`G`) — they move the cursor through
+the file instead of the tree selection while the pane is open. Press `Ctrl+b`
+again (or `Esc`) to close it and return to the tree.
+
+Press `B` with the content panel focused to toggle a **single-line blame
+bar** at the bottom of the tree panel, showing the commit hash, author, date,
+and subject for the current cursor line.
 
 Blame is disabled while you're viewing a diff (it only annotates real file
 content).
