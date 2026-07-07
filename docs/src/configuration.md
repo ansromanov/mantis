@@ -87,6 +87,9 @@ ignore_gitignore = false     # respect .gitignore when listing files
 [git.diff]
 mode = "all"                 # default diff source: "all" (vs HEAD) | "staged" | "unstaged"
 side_by_side = false         # start the diff view in side-by-side layout
+
+[telemetry]
+enabled = false              # anonymous, local-only usage log — see Telemetry & Bug Reports
 ```
 
 ## Keybindings

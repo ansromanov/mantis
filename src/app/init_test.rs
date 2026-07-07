@@ -627,3 +627,27 @@ fn app_new_starts_with_no_update_notice_regardless_of_config() {
     }
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn telemetry_disabled_by_default() {
+    let dir = temp_dir();
+    let app = new_app(&dir, Config::default());
+    assert!(!app.telemetry.is_enabled());
+}
+
+#[test]
+fn telemetry_enabled_when_configured() {
+    let _guard = crate::session::STATE_DIR_ENV_LOCK.lock().unwrap();
+    let state = tempfile::tempdir().unwrap();
+    std::env::set_var("MANTIS_STATE_DIR", state.path());
+    let dir = temp_dir();
+    let cfg = Config {
+        telemetry: crate::config::TelemetryConfig { enabled: true },
+        ..Config::default()
+    };
+    let app = new_app(&dir, cfg);
+    assert!(app.telemetry.is_enabled());
+    drop(app);
+    assert!(state.path().join("telemetry").join("events.jsonl").exists());
+    std::env::remove_var("MANTIS_STATE_DIR");
+}

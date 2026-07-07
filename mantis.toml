@@ -87,6 +87,15 @@ side_by_side = false         # start the diff view in side-by-side layout
 check = true                 # check for newer releases (at most once per day)
 
 
+# --- telemetry --------------------------------------------------------------
+# Anonymous, local-only usage telemetry. When enabled, whitelisted events
+# (session start/end, invoked command ids) are appended to a size-capped log
+# under the state directory (see the Telemetry doc page). Nothing is ever
+# sent anywhere, and no paths, file names, or typed text are recorded.
+[telemetry]
+enabled = false              # collect anonymous usage events locally
+
+
 # --- keybindings ------------------------------------------------------------
 # Each action takes a list of key specs. A spec is a single character ("q",
 # "?", "0") or a named key (Up Down Left Right Enter Tab Esc Backspace PageUp

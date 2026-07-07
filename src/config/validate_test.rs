@@ -133,6 +133,9 @@ fn schema_paths_includes_all_known_config_paths() {
     // Statusbar
     assert!(paths.contains(&"statusbar.left".to_string()));
     assert!(paths.contains(&"statusbar.right".to_string()));
+
+    // Telemetry
+    assert!(paths.contains(&"telemetry.enabled".to_string()));
 }
 
 #[test]

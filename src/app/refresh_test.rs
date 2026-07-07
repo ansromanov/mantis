@@ -398,6 +398,7 @@ fn create_base_app() -> App {
         session_last_save: std::time::Instant::now(),
         clipboard_capture: Vec::new(),
         command_usage: crate::command_usage::UsageStats::default(),
+        telemetry: crate::telemetry::Telemetry::disabled(),
         diff_mode: crate::app::DiffMode::default(),
         goto_line: None,
         tree_filter: None,

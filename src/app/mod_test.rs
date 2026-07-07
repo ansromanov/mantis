@@ -5056,3 +5056,30 @@ fn save_config_no_status_on_success() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn save_bug_report_surfaces_saved_path_in_status() {
+    let _guard = crate::session::STATE_DIR_ENV_LOCK.lock().unwrap();
+    let state = tempfile::tempdir().unwrap();
+    std::env::set_var("MANTIS_STATE_DIR", state.path());
+
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.save_bug_report();
+
+    let msg = app
+        .status_message
+        .as_ref()
+        .expect("status set")
+        .text
+        .clone();
+    assert!(msg.starts_with("bug report saved:"), "got: {msg}");
+    let saved: Vec<_> = fs::read_dir(state.path().join("bug-reports"))
+        .unwrap()
+        .flatten()
+        .collect();
+    assert_eq!(saved.len(), 1);
+    let body = fs::read_to_string(saved[0].path()).unwrap();
+    assert!(body.contains("## mantis diagnostic report"));
+    std::env::remove_var("MANTIS_STATE_DIR");
+}

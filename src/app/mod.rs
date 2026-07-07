@@ -111,6 +111,9 @@ pub struct App {
     /// Side-by-side rows parsed from the current diff; empty for non-diffs.
     pub diff_rows: Vec<crate::diff::DiffRow>,
     pub command_usage: crate::command_usage::UsageStats,
+    /// Opt-in local telemetry handle; a no-op when `[telemetry]` is disabled.
+    /// Dropping it (with `App`) flushes and joins the writer thread.
+    pub telemetry: crate::telemetry::Telemetry,
     pub content_title: Option<String>,
     pub focus: Focus,
     pub search: Option<SearchState>,
@@ -479,6 +482,16 @@ impl App {
     pub fn set_status(&mut self, msg: impl Into<String>) {
         let sm = StatusMessage::new(msg, self.now());
         self.status_message = Some(sm);
+    }
+
+    /// Collects an anonymous diagnostic report and saves it under the state
+    /// directory, surfacing the saved path (or the failure) in the status bar.
+    pub(crate) fn save_bug_report(&mut self) {
+        let report = crate::diagnostics::DiagnosticReport::collect(self);
+        match report.save() {
+            Ok(path) => self.set_status(format!("bug report saved: {}", path.display())),
+            Err(e) => self.set_status(format!("bug report failed: {e}")),
+        }
     }
 
     /// Copies `text` to the system clipboard, reporting success or failure in the

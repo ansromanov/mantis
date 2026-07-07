@@ -188,6 +188,15 @@ impl Default for UpdatesConfig {
     }
 }
 
+/// Local telemetry configuration, grouped under `[telemetry]` in the TOML.
+#[derive(Serialize, Deserialize, Clone, PartialEq, Default)]
+#[serde(default)]
+pub struct TelemetryConfig {
+    /// Collect anonymous usage events into a local, size-capped log under the
+    /// state directory. Nothing is ever sent anywhere. Disabled by default.
+    pub enabled: bool,
+}
+
 /// The root mantis configuration object.
 ///
 /// Every field carries `#[serde(default)]` so a partial TOML file or an older
@@ -222,6 +231,8 @@ pub struct Config {
     pub statusbar: StatusBarConfig,
     /// Grouped update settings.
     pub updates: UpdatesConfig,
+    /// Grouped local-telemetry settings.
+    pub telemetry: TelemetryConfig,
 
     // --- deprecated flat keys (read for backward-compat; never written) ---
     #[serde(default, skip_serializing, rename = "git_status")]
@@ -283,6 +294,7 @@ impl Default for Config {
             git: GitConfig::default(),
             statusbar: StatusBarConfig::default(),
             updates: UpdatesConfig::default(),
+            telemetry: TelemetryConfig::default(),
 
             legacy_git_status: None,
             legacy_git_show_deleted: None,

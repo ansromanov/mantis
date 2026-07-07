@@ -148,6 +148,12 @@ fn every_palette_action_id_is_dispatch_handled() {
     use crate::command_palette::CommandPalette;
     use crate::config::Config;
 
+    // Dispatch arms run for real (bug_report writes a file, command usage
+    // saves), so point the state dir at an isolated temp directory.
+    let _guard = crate::session::STATE_DIR_ENV_LOCK.lock().unwrap();
+    let state = tempfile::tempdir().unwrap();
+    std::env::set_var("MANTIS_STATE_DIR", state.path());
+
     let dir = tempfile::tempdir().unwrap();
     let mut app = App::new(dir.path().to_path_buf(), Config::default(), None, None).unwrap();
 
@@ -168,6 +174,8 @@ fn every_palette_action_id_is_dispatch_handled() {
             action.id,
         );
     }
+    drop(app);
+    std::env::remove_var("MANTIS_STATE_DIR");
 }
 
 #[test]
@@ -222,5 +230,18 @@ fn command_palette_has_help_section() {
     assert!(
         action.help.is_some(),
         "command_palette must have a help section"
+    );
+}
+
+#[test]
+fn bug_report_action_is_palette_only() {
+    let action = ACTIONS
+        .iter()
+        .find(|a| a.id == "bug_report")
+        .expect("bug_report must be registered");
+    assert!(action.palette.is_some(), "reachable via Ctrl-P");
+    assert!(
+        !KEYMAP_FIELD_ACTION_IDS.contains(&"bug_report"),
+        "palette-only: no keymap field expected"
     );
 }
