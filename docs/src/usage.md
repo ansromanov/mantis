@@ -127,8 +127,8 @@ These work no matter which panel is focused.
 | `Ctrl+O`               | Recent files (jump to a recently opened file) |
 | `p` (tree)             | Plugin palette (enable/disable plugins) |
 | `Ctrl+g`               | Go to line              |
-| `Ctrl+b`               | Toggle git blame (shows author + commit subject inline) |
-| `B` (content)          | Blame the active line   |
+| `Ctrl+b`               | Toggle full-file blame (dedicated pane replacing the tree) |
+| `B` (content)          | Toggle single-line blame bar for the active line |
 | `t` (tree)             | Theme picker            |
 | `Ctrl+D`               | Toggle git mode (changed files + diffs; the pickers above scope to changed files) |
 | `F` (tree)             | Toggle flat / tree view in git mode |
@@ -146,9 +146,9 @@ These work no matter which panel is focused.
 
 ## Content panel
 
-The content pane has a **line cursor** (visible as a highlighted full-width row). Use `Up`/`Down` to move it, then press `B` to blame the highlighted line.
+The content pane has a **line cursor** (visible as a highlighted full-width row). Use `Up`/`Down` to move it, then press `B` to show a single-line blame bar for the highlighted line.
 
-When git blame is toggled on (`Ctrl+b`), a column appears on the left showing the author name and commit subject for each line. Clicking any cell in this column opens the line-blame popup for that line.
+When full-file blame is toggled on (`Ctrl+b`), the tree panel is replaced by a dedicated blame pane listing every line's commit hash, author, date, and subject, kept in sync with the content cursor. Clicking a row in the blame pane jumps the cursor there and opens the single-line blame bar.
 
 | Key            | Action                       |
 | -------------- | ----------------------------- |

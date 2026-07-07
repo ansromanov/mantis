@@ -10,13 +10,27 @@ use ratatui::Terminal;
 use std::path::{Path, PathBuf};
 
 fn make_app() -> App {
-    let cfg = Config {
+    let mut cfg = Config {
         git: crate::config::GitConfig {
             status: false,
             ..Default::default()
         },
         ..Config::default()
     };
+    // The bundled `markdown` plugin is enabled by default and gets spawned as
+    // a real subprocess in `App::new`. On a machine where it hasn't been
+    // installed to the platform plugin dir (e.g. a fresh CI runner), the spawn
+    // fails and the error — which includes the plugin name — lands in
+    // `app.plugin_message`, leaking into the status bar text these tests
+    // assert against. Disable it explicitly so these tests don't depend on
+    // real plugin-binary installation state.
+    cfg.plugins.insert(
+        "markdown".to_string(),
+        crate::plugin::PluginEntry {
+            enabled: false,
+            ..Default::default()
+        },
+    );
     App::new(PathBuf::from("."), cfg, None, None).unwrap()
 }
 

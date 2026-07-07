@@ -18,7 +18,6 @@ use crate::app::App;
 use crate::search::InFileSearch;
 use crate::virtual_file::VirtualFile;
 
-use super::draw::BLAME_COL_WIDTH;
 use super::search::apply_search_to_regions;
 use super::selection::apply_selection;
 
@@ -31,9 +30,6 @@ pub(crate) fn render_virtual_file<'a>(
     inner: Rect,
     scroll: usize,
     visible_end: usize,
-    blame_annotations: &'a [String],
-    blame_width: usize,
-    blame_style: Style,
     show_ln: bool,
     in_file_search: Option<&'a InFileSearch>,
     sel: Option<((usize, usize), (usize, usize))>,
@@ -120,13 +116,6 @@ pub(crate) fn render_virtual_file<'a>(
                 ""
             };
             let mut spans = Vec::new();
-            if blame_width > 0 {
-                let annotation = blame_annotations
-                    .get(phys)
-                    .cloned()
-                    .unwrap_or_else(|| " ".repeat(BLAME_COL_WIDTH));
-                spans.push(Span::styled(annotation, blame_style));
-            }
             if fold_gw > 0 {
                 spans.push(Span::styled(fold_marker.to_string(), fold_marker_style));
             }
@@ -229,12 +218,7 @@ pub(crate) fn render_virtual_file<'a>(
         })
         .collect();
     let ln_w = if show_ln { lw + 1 } else { 0 };
-    (
-        blame_width + fold_gw + ln_w,
-        gutters,
-        content,
-        new_fold_gutter_rows,
-    )
+    (fold_gw + ln_w, gutters, content, new_fold_gutter_rows)
 }
 
 /// Renders content from the inline `content`/`highlighted` buffers (errors,
@@ -246,9 +230,6 @@ pub(crate) fn render_inline_fallback<'a>(
     inner: Rect,
     scroll: usize,
     visible_end: usize,
-    blame_annotations: &'a [String],
-    blame_width: usize,
-    blame_style: Style,
     show_ln: bool,
     in_file_search: Option<&'a InFileSearch>,
     sel: Option<((usize, usize), (usize, usize))>,
@@ -286,13 +267,6 @@ pub(crate) fn render_inline_fallback<'a>(
                 ""
             };
             let mut spans = Vec::new();
-            if blame_width > 0 {
-                let annotation = blame_annotations
-                    .get(phys)
-                    .cloned()
-                    .unwrap_or_else(|| " ".repeat(BLAME_COL_WIDTH));
-                spans.push(Span::styled(annotation, blame_style));
-            }
             if fold_gw > 0 {
                 spans.push(Span::styled(fold_marker.to_string(), ln_style));
             }
@@ -400,12 +374,7 @@ pub(crate) fn render_inline_fallback<'a>(
         })
         .collect();
     let ln_w = if show_ln { lw + 1 } else { 0 };
-    (
-        blame_width + fold_gw + ln_w,
-        gutters,
-        content,
-        inline_fold_gutter_rows,
-    )
+    (fold_gw + ln_w, gutters, content, inline_fold_gutter_rows)
 }
 
 // ── Word-wrap helpers ────────────────────────────────────────────────────

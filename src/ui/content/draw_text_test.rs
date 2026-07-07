@@ -150,18 +150,6 @@ fn highlight_cache_key_stable_on_identical_render() {
 }
 
 #[test]
-fn blame_col_width_constant_is_37() {
-    // draw_text.rs previously defined BLAME_COL_WIDTH=26 locally; it now
-    // imports the shared constant from draw.rs which is 37. Assert the value
-    // so any future accidental revert is caught immediately.
-    assert_eq!(
-        crate::ui::content::draw::BLAME_COL_WIDTH,
-        37,
-        "shared BLAME_COL_WIDTH must be 37 (not the old 26)"
-    );
-}
-
-#[test]
 fn render_inline_fallback_with_blame_does_not_panic() {
     let (mut app, _dir) = render_app();
     let screen = render(&mut app, |app| {

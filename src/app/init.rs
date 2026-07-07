@@ -167,7 +167,7 @@ impl App {
             show_scroll_percentage: cfg.content.scroll_percentage,
             show_line_numbers: cfg.content.line_numbers,
             show_blame: false,
-            blame_col_width: 0,
+            blame_scroll: 0,
             show_about: false,
             walk_errors,
             config_error,

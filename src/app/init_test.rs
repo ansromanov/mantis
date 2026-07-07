@@ -471,12 +471,12 @@ fn app_new_command_usage_starts_empty() {
 }
 
 #[test]
-fn blame_col_width_initialises_to_zero() {
+fn blame_scroll_initialises_to_zero() {
     let root = temp_dir();
     let app = new_app(&root, Config::default());
     assert_eq!(
-        app.blame_col_width, 0,
-        "blame_col_width must be zero until a render populates it"
+        app.blame_scroll, 0,
+        "blame_scroll must be zero until a blame pane render populates it"
     );
     fs::remove_dir_all(&root).ok();
 }

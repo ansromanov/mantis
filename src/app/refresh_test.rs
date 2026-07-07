@@ -318,7 +318,7 @@ fn create_base_app() -> App {
         show_scroll_percentage: false,
         show_line_numbers: false,
         show_blame: false,
-        blame_col_width: 0,
+        blame_scroll: 0,
         show_about: false,
         walk_errors: 0,
         config_error: None,

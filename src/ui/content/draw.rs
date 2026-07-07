@@ -19,26 +19,12 @@ use ratatui::{
 use unicode_width::UnicodeWidthStr;
 
 use crate::app::{App, Focus};
-use crate::git::BlameLine;
 
 use super::diff::draw_side_by_side_diff;
 use super::draw_text::{render_inline_fallback, render_virtual_file, wrap_content};
 use super::scrollbar::draw_content_scrollbar;
 use super::search::apply_search_to_regions;
 use super::selection::apply_selection;
-
-/// Width of the inline blame column (author + subject). Exposed so tests and
-/// the mouse handler can reference the same size. Cap subject to make room.
-pub(crate) const BLAME_COL_WIDTH: usize = 37;
-
-/// Formats a `BlameLine` into an inline annotation string showing `{author:<10}
-/// {subject}` truncated to `BLAME_COL_WIDTH`. Exposed for testing.
-pub(crate) fn format_blame_annotation(bl: &BlameLine) -> String {
-    let subj_len = BLAME_COL_WIDTH.saturating_sub(11);
-    let author: String = bl.author.chars().take(10).collect();
-    let subject: String = bl.subject.chars().take(subj_len).collect();
-    format!("{:<10} {:<width$}", author, subject, width = subj_len)
-}
 
 /// Renders the content/diff panel. Handles four modes:
 /// - Diff view (styled per-line, no gutter, no selection)
@@ -104,42 +90,6 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     let sel_bg = app.theme.selection_bg;
     let in_file_search = app.in_file_search.as_ref();
 
-    // Blame annotations: one formatted string per 0-based line index.
-    let blame_annotations: Vec<String> = if app.show_blame && app.has_text_cursor() {
-        if let Some(path) = &app.current_file {
-            // Plugin-provided blame data takes precedence over live git blame.
-            let git_lines = crate::git::file_blame(&app.root, path);
-            let lines = if git_lines.is_empty() {
-                Vec::new()
-            } else {
-                let max_line = git_lines
-                    .iter()
-                    .map(|l| l.line_no as usize)
-                    .max()
-                    .unwrap_or(0);
-                let mut annotations = vec![String::new(); max_line + 1];
-                for bl in &git_lines {
-                    let idx = (bl.line_no as usize).saturating_sub(1);
-                    if idx < annotations.len() {
-                        annotations[idx] = format_blame_annotation(bl);
-                    }
-                }
-                annotations
-            };
-            lines
-        } else {
-            Vec::new()
-        }
-    } else {
-        Vec::new()
-    };
-    let blame_width = if blame_annotations.is_empty() {
-        0
-    } else {
-        BLAME_COL_WIDTH
-    };
-    app.blame_col_width = blame_width;
-    let blame_style = Style::default().fg(app.theme.dim);
     let show_ln = app.show_line_numbers;
 
     // ln_width, ln_lines, content_lines, fold_gutter_rows
@@ -231,20 +181,6 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         // (rendering collapses blank lines, strips code fences, etc.). This
         // matches line_prefix_width() which already returns 0 for rendered
         // markdown, keeping input and render math consistent.
-        let blame_style_inner = blame_style;
-        let gutters: Vec<Line> = (scroll..visible_end)
-            .map(|i| {
-                let mut spans = Vec::new();
-                if blame_width > 0 {
-                    let annotation = blame_annotations
-                        .get(i)
-                        .cloned()
-                        .unwrap_or_else(|| " ".repeat(BLAME_COL_WIDTH));
-                    spans.push(Span::styled(annotation, blame_style_inner));
-                }
-                Line::from(spans)
-            })
-            .collect();
         let lines: Vec<Line> = md_lines[scroll..visible_end]
             .iter()
             .enumerate()
@@ -288,7 +224,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                 }
             })
             .collect();
-        (blame_width, gutters, lines, vec![])
+        (0, vec![], lines, vec![])
     } else if let Some(vf) = app.virtual_file.as_ref() {
         render_virtual_file(
             app,
@@ -296,9 +232,6 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
             inner,
             scroll,
             visible_end,
-            &blame_annotations,
-            blame_width,
-            blame_style,
             show_ln,
             in_file_search,
             sel,
@@ -310,9 +243,6 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
             inner,
             scroll,
             visible_end,
-            &blame_annotations,
-            blame_width,
-            blame_style,
             show_ln,
             in_file_search,
             sel,

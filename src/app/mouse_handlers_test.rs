@@ -481,47 +481,24 @@ fn breadcrumb_double_click_on_compact_dotdot_changes_root() {
 }
 
 #[test]
-fn blame_column_click_opens_line_blame() {
+fn blame_pane_click_sets_active_line() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
-    app.content_area = Rect {
-        x: 10,
-        y: 2,
-        width: 60,
+    app.tree_area = Rect {
+        x: 0,
+        y: 1,
+        width: 30,
         height: 20,
     };
-    app.blame_col_width = 37;
+    app.tree_offset = 0;
+    app.active_line = 0;
     app.show_blame = true;
-    app.show_line_blame = false;
-    // rel_col = 11 - 10 = 1, inside blame_col_width (37).
-    app.handle_mouse(left_down_at(11, 4));
+    // Click the first row in the blame pane.
+    app.handle_mouse(left_down_at(0, 1));
     assert!(
         app.show_line_blame,
-        "click inside the blame column must open the line-blame popup"
-    );
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn click_past_blame_column_does_not_open_line_blame() {
-    let root = temp_tree();
-    let mut app = app_for(&root);
-    app.open_file(&root.join("long.txt"));
-    app.content_area = Rect {
-        x: 10,
-        y: 2,
-        width: 60,
-        height: 20,
-    };
-    app.blame_col_width = 37;
-    app.show_blame = true;
-    app.show_line_blame = false;
-    // rel_col = 52 - 10 = 42, past blame_col_width (37).
-    app.handle_mouse(left_down_at(52, 4));
-    assert!(
-        !app.show_line_blame,
-        "click past the blame column must not open the line-blame popup"
+        "click in the blame pane must open single-line blame"
     );
     fs::remove_dir_all(&root).ok();
 }

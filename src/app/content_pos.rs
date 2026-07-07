@@ -265,6 +265,21 @@ impl App {
         }
     }
 
+    /// Nudges `blame_scroll` so `active_line` stays within the visible blame
+    /// pane viewport after a cursor move or scroll. `blame_scroll` indexes the
+    /// blame pane's per-physical-line rows, while `active_line` is a display
+    /// line, so the comparison is done in physical space via
+    /// `display_to_physical`.
+    pub(crate) fn scroll_blame_into_view(&mut self) {
+        let height = (self.tree_area.height as usize).max(1);
+        let phys = self.display_to_physical(self.active_line);
+        if phys < self.blame_scroll {
+            self.blame_scroll = phys;
+        } else if phys >= self.blame_scroll + height {
+            self.blame_scroll = phys.saturating_sub(height).saturating_add(1);
+        }
+    }
+
     /// Number of rows in a page — viewport height minus one overlap row.
     pub fn page_rows(&self) -> usize {
         (self.content_area.height as usize).saturating_sub(1).max(1)
