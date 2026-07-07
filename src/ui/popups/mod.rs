@@ -10,6 +10,7 @@
 //! visually float above the panes.
 
 mod about;
+mod bug_report;
 mod command;
 mod compare_input;
 mod goto_line;
@@ -24,6 +25,7 @@ mod tree_filter;
 mod util;
 
 pub(super) use about::draw_about;
+pub(super) use bug_report::draw_bug_report;
 pub(super) use command::draw_command_palette;
 pub(super) use compare_input::draw_compare_input;
 pub(super) use goto_line::draw_goto_line;

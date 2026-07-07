@@ -688,6 +688,9 @@ fn dispatch_bug_report_saves_report_and_sets_status() {
     }
     app.command_palette = Some(p);
     assert!(app.dispatch_command());
+    assert!(app.bug_report.is_some());
+
+    app.save_bug_report();
 
     let msg = app
         .status_message

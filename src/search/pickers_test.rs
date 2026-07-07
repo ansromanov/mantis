@@ -516,3 +516,69 @@ fn recent_files_refilter_handles_new_return_type() {
     r.pop();
     assert_eq!(r.results_len(), total);
 }
+
+#[test]
+fn bug_report_state_editing_operations() {
+    let mut state = BugReportState::new();
+    assert_eq!(state.text, vec![""]);
+    assert_eq!(state.cursor_row, 0);
+    assert_eq!(state.cursor_col, 0);
+
+    // Test insert_char
+    state.insert_char('A');
+    state.insert_char('B');
+    assert_eq!(state.text, vec!["AB"]);
+    assert_eq!(state.cursor_col, 2);
+
+    // Test insert_newline
+    state.insert_newline();
+    assert_eq!(state.text, vec!["AB".to_string(), "".to_string()]);
+    assert_eq!(state.cursor_row, 1);
+    assert_eq!(state.cursor_col, 0);
+
+    // Test insert_char in second line
+    state.insert_char('C');
+    assert_eq!(state.text, vec!["AB".to_string(), "C".to_string()]);
+
+    // Test backspace within line
+    state.backspace();
+    assert_eq!(state.text, vec!["AB".to_string(), "".to_string()]);
+
+    // Test backspace to merge lines
+    state.backspace();
+    assert_eq!(state.text, vec!["AB".to_string()]);
+    assert_eq!(state.cursor_row, 0);
+    assert_eq!(state.cursor_col, 2);
+
+    // Test backspace at start of single line
+    state.cursor_col = 0;
+    state.backspace();
+    assert_eq!(state.text, vec!["AB".to_string()]);
+
+    // Test move_left / move_right
+    state.cursor_col = 1;
+    state.move_left();
+    assert_eq!(state.cursor_col, 0);
+    state.move_right();
+    assert_eq!(state.cursor_col, 1);
+
+    // Test delete within line
+    state.delete();
+    assert_eq!(state.text, vec!["A".to_string()]);
+
+    // Test cursor vertical movement
+    state.insert_char('X'); // "AX"
+    state.insert_newline(); // line 0: "AX", line 1: ""
+    state.insert_char('Y'); // line 1: "Y"
+    state.move_up();
+    assert_eq!(state.cursor_row, 0);
+    assert_eq!(state.cursor_col, 1); // clamped to length of "AX" (which is 2)
+    state.move_down();
+    assert_eq!(state.cursor_row, 1);
+
+    // Test move_home and move_end
+    state.move_home();
+    assert_eq!(state.cursor_col, 0);
+    state.move_end();
+    assert_eq!(state.cursor_col, 1); // length of "Y"
+}

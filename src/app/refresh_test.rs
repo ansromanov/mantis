@@ -314,6 +314,7 @@ fn create_base_app() -> App {
         git_mode_flat: false,
         compare_base: None,
         compare_input: None,
+        bug_report: None,
         show_scrollbar: false,
         show_scroll_percentage: false,
         show_line_numbers: false,
