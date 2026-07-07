@@ -14,7 +14,7 @@ routes them via `PluginManager::provider_for` (`src/plugin/manager.rs`).
 
 | Capability | Declared in protocol | Handled by host | Used by a bundled plugin |
 |---|---|---|---|
-| `fold` | yes | yes — gates `set_fold_regions` in `handle_plugin_set_fold_regions` (`src/app/refresh.rs`) | **yes** — used by the bundled `rust` language provider plugin |
+| `fold` | yes | yes — gates `set_fold_regions` in `handle_plugin_set_fold_regions` (`src/app/refresh.rs`) | **yes** — used by the bundled `rust` and `python` language provider plugins |
 | `highlight` | yes | **no** — accepted at registration, never checked anywhere | no |
 | `hover` | yes (reserved) | no — unimplementable in v2 (no request/response correlation) | no |
 | `diagnostics` | yes (reserved) | no — same as `hover` | no |
@@ -37,8 +37,8 @@ Every action the host accepts, dispatched in `App::handle_plugin_action`
 | `open_file` | yes | no (one-shot navigation) | n/a | no |
 | `set_icon_map` | yes | `has_icon_map` | yes — icon map/fields cleared | yes — iconize |
 | `set_content` | yes | `content_paths` | yes — content removed, current file re-rendered | yes — markdown |
-| `register_language_provider` | yes | provider registration in `PluginManager` | yes — `remove_provider_registrations` | yes — rust |
-| `set_fold_regions` | yes | `fold_region_paths` | yes — regions removed, fold state reset | yes — rust |
+| `register_language_provider` | yes | provider registration in `PluginManager` | yes — `remove_provider_registrations` | yes — rust, python |
+| `set_fold_regions` | yes | `fold_region_paths` | yes — regions removed, fold state reset | yes — rust, python |
 
 Teardown status: **every stateful `set_*` action stamps `PluginContributions`
 and is cleared by `App::teardown_plugin_contributions`** (`src/app/mod.rs`).
@@ -55,6 +55,7 @@ version history in [Plugin Development](plugin-development.md) only.
 |---|---|---|---|
 | `iconize` | process | `set_icon_map` | none |
 | `markdown` | process | `set_content` | none |
+| `python` | process | `register_language_provider`, `set_fold_regions` | `fold` |
 | `rust` | process | `register_language_provider`, `set_fold_regions` | `fold` |
 | `terraform` | syntax | none (no subprocess) | n/a — extends syntect directly |
 
@@ -64,10 +65,11 @@ version history in [Plugin Development](plugin-development.md) only.
    unimplementable in protocol v2** — they need id-correlated
    request/response. Tracked in the protocol v3 proposal (issue #481), which
    names this audit as its precursor.
-2. **The language-provider fold pipeline has its first bundled consumer** —
+2. **The language-provider fold pipeline has bundled consumers** —
    `register_language_provider` + `Capability::Fold` + `set_fold_regions` are
-   used by the bundled `rust` language provider plugin (issue #599), which registers the
-   `fold` capability for `.rs` files.
+   used by the bundled `rust` (issue #599) and `python` (issue #601) language provider plugins.
+   The `python` plugin uses the shared `indent_fold` detector, while the `rust` plugin
+   uses the `brace_fold` detector.
 3. **`Capability::Highlight` is declared but routes to nothing.** Either
    implement provider-driven highlighting in v3 or re-document it as reserved
    alongside `hover`/`diagnostics`/`definition`. Not yet tracked in a

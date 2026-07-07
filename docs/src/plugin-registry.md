@@ -12,6 +12,12 @@ uses `git clone` and `git pull` to sync the registry.
 2. On subsequent access, `mantis` refreshes the cache with `git pull --ff-only`.
 3. The `index.json` file is parsed to build the list of available plugins.
 
+Bundled plugins (such as the built-in `python` language provider at
+`plugins/python/`) are not listed in the registry — they ship with `mantis`
+and are installed automatically at startup. See
+[Plugin Development](plugin-development.md) for how bundled plugins are
+structured.
+
 ## Default registry
 
 The default registry is hosted at:
