@@ -5087,3 +5087,44 @@ fn save_bug_report_surfaces_saved_path_in_status() {
     assert!(body.contains("## mantis diagnostic report"));
     std::env::remove_var("MANTIS_STATE_DIR");
 }
+
+#[test]
+fn toggle_telemetry_flips_config_persists_and_reports_status() {
+    let root = temp_tree();
+    let config_path = root.join("mantis.toml");
+    let mut app = App::new(
+        root.to_path_buf(),
+        Config::default(),
+        Some(config_path.clone()),
+        None,
+    )
+    .unwrap();
+    assert!(!app.config.telemetry.enabled, "disabled by default");
+    assert!(!app.telemetry.is_enabled());
+
+    app.toggle_telemetry();
+    assert!(app.config.telemetry.enabled, "toggle must flip config on");
+    assert!(
+        app.telemetry.is_enabled(),
+        "toggle must rebuild a live telemetry handle"
+    );
+    assert_eq!(
+        app.status_message.as_ref().unwrap().text,
+        "telemetry enabled"
+    );
+    let saved = fs::read_to_string(&config_path).unwrap();
+    assert!(
+        saved.contains("enabled = true"),
+        "toggle must persist the new state: {saved}"
+    );
+
+    app.toggle_telemetry();
+    assert!(!app.config.telemetry.enabled, "toggle must flip config off");
+    assert!(!app.telemetry.is_enabled());
+    assert_eq!(
+        app.status_message.as_ref().unwrap().text,
+        "telemetry disabled"
+    );
+
+    fs::remove_dir_all(&root).ok();
+}
