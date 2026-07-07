@@ -43,6 +43,14 @@ fn editor_blame_line_action_toggles_show_line_blame() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("a.txt"));
+    app.git_info = Some(crate::git::GitRepoInfo {
+        head: crate::git::GitHead::Branch("main".to_string()),
+        ahead: 0,
+        behind: 0,
+        total_changed: 0,
+        staged: 0,
+        untracked: 0,
+    });
     app.focus = Focus::Content;
     assert!(!app.show_line_blame);
     dispatch_blame_line(&mut app);
@@ -194,6 +202,7 @@ fn toggle_git_flat_noop_when_not_in_git_mode() {
 fn go_to_line_command_opens_dialog_when_content_focused() {
     let root = temp_tree();
     let mut app = app_for(&root);
+    app.current_file = Some(root.join("a.txt"));
     app.focus = Focus::Content;
     app.command_palette = Some(palette_with_query("Go to line"));
     app.dispatch_command();
@@ -205,6 +214,7 @@ fn go_to_line_command_opens_dialog_when_content_focused() {
 fn go_to_line_command_no_op_when_tree_focused() {
     let root = temp_tree();
     let mut app = app_for(&root);
+    app.current_file = Some(root.join("a.txt"));
     app.focus = Focus::Tree;
     app.command_palette = Some(palette_with_query("Go to line"));
     app.dispatch_command();
@@ -216,6 +226,14 @@ fn go_to_line_command_no_op_when_tree_focused() {
 fn compare_against_command_opens_input_prompt() {
     let root = temp_tree();
     let mut app = app_for(&root);
+    app.git_info = Some(crate::git::GitRepoInfo {
+        head: crate::git::GitHead::Branch("main".to_string()),
+        ahead: 0,
+        behind: 0,
+        total_changed: 0,
+        staged: 0,
+        untracked: 0,
+    });
     app.command_palette = Some(palette_with_query("Compare against a revision"));
     assert!(app.dispatch_command());
     assert!(app.compare_input.is_some());
@@ -226,6 +244,14 @@ fn compare_against_command_opens_input_prompt() {
 fn compare_against_command_starts_with_empty_query() {
     let root = temp_tree();
     let mut app = app_for(&root);
+    app.git_info = Some(crate::git::GitRepoInfo {
+        head: crate::git::GitHead::Branch("main".to_string()),
+        ahead: 0,
+        behind: 0,
+        total_changed: 0,
+        staged: 0,
+        untracked: 0,
+    });
     app.command_palette = Some(palette_with_query("Compare against a revision"));
     app.dispatch_command();
     assert_eq!(
@@ -586,6 +612,7 @@ fn dispatch_command_find_files_opens_file_picker() {
 fn dispatch_command_toggle_raw_markdown() {
     let root = temp_tree();
     let mut app = app_for(&root);
+    app.current_file = Some(root.join("a.txt"));
 
     // When plugin_content_active is false, it should show a status message
     app.command_palette = Some(palette_with_query("Toggle markdown render"));
@@ -701,4 +728,107 @@ fn dispatch_records_palette_action_in_telemetry_when_enabled() {
         "palette dispatch must be recorded: {raw}"
     );
     std::env::remove_var("MANTIS_STATE_DIR");
+}
+
+#[test]
+fn test_command_applicability_predicates() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = app_for(dir.path());
+
+    // Fixture 1: No file open, outside git repo.
+    app.current_file = None;
+    app.git_info = None;
+    app.is_json = false;
+    app.is_diff = false;
+    app.fold_regions = Vec::new();
+    app.plugin_content_active = false;
+    app.git_mode = false;
+
+    // Test applicability checks under this fixture
+    assert_eq!(app.check_applicability("toggle_pretty_json"), Err("no file is open"));
+    assert_eq!(app.check_applicability("blame_line"), Err("no file is open"));
+    assert_eq!(app.check_applicability("file_history"), Err("no file is open"));
+    assert_eq!(app.check_applicability("compare_against"), Err("not in a git repo"));
+    assert_eq!(app.check_applicability("toggle_diff_staged"), Err("not in a git repo"));
+    assert_eq!(app.check_applicability("toggle_diff_side_by_side"), Err("requires diff view"));
+    assert_eq!(app.check_applicability("fold_toggle"), Err("no file is open"));
+    assert_eq!(app.check_applicability("open_in_editor"), Err("no file is open"));
+    assert_eq!(app.check_applicability("git_mode_flat_toggle"), Err("requires git mode"));
+
+    // Fixture 2: File open, outside git repo, not JSON, no folds.
+    app.current_file = Some(std::path::PathBuf::from("test.txt"));
+    assert_eq!(app.check_applicability("toggle_pretty_json"), Err("requires JSON file"));
+    assert_eq!(app.check_applicability("blame_line"), Err("not in a git repo"));
+    assert_eq!(app.check_applicability("fold_toggle"), Err("no fold regions in file"));
+    assert_eq!(app.check_applicability("open_in_editor"), Ok(()));
+
+    // Fixture 3: File open, inside git repo, JSON file, folds exist.
+    app.git_info = Some(crate::git::GitRepoInfo {
+        head: crate::git::GitHead::Branch("main".to_string()),
+        ahead: 0,
+        behind: 0,
+        total_changed: 0,
+        staged: 0,
+        untracked: 0,
+    });
+    app.is_json = true;
+    app.fold_regions = vec![crate::fold::FoldRegion {
+        start: 0,
+        end: 5,
+    }];
+    assert_eq!(app.check_applicability("toggle_pretty_json"), Ok(()));
+    assert_eq!(app.check_applicability("blame_line"), Ok(()));
+    assert_eq!(app.check_applicability("fold_toggle"), Ok(()));
+
+    // Fixture 4: In a diff view.
+    app.is_diff = true;
+    // blame is not available in a diff
+    assert_eq!(app.check_applicability("blame_line"), Err("not available in a diff"));
+    assert_eq!(app.check_applicability("toggle_diff_staged"), Ok(()));
+}
+
+#[test]
+fn test_dispatch_inapplicable_command_sets_status_message() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = app_for(dir.path());
+
+    // Set up state where toggle_pretty_json is inapplicable (no JSON file)
+    app.current_file = Some(std::path::PathBuf::from("test.txt"));
+    app.is_json = false;
+    app.status_message = None;
+
+    // Open palette and select toggle_pretty_json
+    let json_idx = crate::command_palette::COMMANDS
+        .iter()
+        .position(|c| c.action_id == "toggle_pretty_json")
+        .unwrap();
+
+    let inapplicability_reasons = crate::command_palette::COMMANDS
+        .iter()
+        .map(|cmd| app.check_applicability(cmd.action_id).err())
+        .collect();
+
+    app.command_palette = Some(crate::command_palette::CommandPalette::new(
+        app.keys(),
+        vec![json_idx],
+        0,
+        inapplicability_reasons,
+    ));
+
+    if let Some(ref mut p) = app.command_palette {
+        let pos = p.filtered.iter().position(|&i| i == json_idx).unwrap();
+        p.selected = pos;
+    }
+
+    // Dispatch the command!
+    assert!(app.dispatch_command());
+
+    // Verify:
+    // 1. Palette is closed (command_palette is None)
+    assert!(app.command_palette.is_none());
+    // 2. Status message is set indicating why
+    let msg = app.status_message.as_ref().unwrap();
+    assert!(msg.text.contains("Toggle JSON pretty-print: requires JSON file"));
+    // 3. Changes nothing else (e.g. show_pretty_json is not toggled)
+    assert!(!app.show_pretty_json);
 }

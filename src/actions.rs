@@ -444,6 +444,56 @@ pub static ACTIONS: &[ActionSpec] = &[
     },
 ];
 
+/// The preconditions required for an action to be applicable.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum Applicability {
+    /// Always applicable.
+    Always,
+    /// Requires an open file.
+    OpenFile,
+    /// Requires an open JSON file.
+    JsonFile,
+    /// Requires being in a git repository.
+    GitRepo,
+    /// Requires being in a git repository and having an open file.
+    GitRepoAndFile,
+    /// Requires being in a git repository and a text cursor (not in diff).
+    GitRepoAndNoDiff,
+    /// Requires being in a git repository and a diff view.
+    GitRepoAndDiffView,
+    /// Requires being in a diff view.
+    DiffView,
+    /// Requires the current file to have fold regions.
+    FoldRegions,
+    /// Requires the current file to be rendered by a plugin (active plugin content).
+    PluginContentActive,
+    /// Requires being in git mode.
+    GitMode,
+}
+
+impl ActionSpec {
+    /// Returns the applicability precondition for this action.
+    pub fn applicability(&self) -> Applicability {
+        match self.id {
+            "toggle_pretty_json" => Applicability::JsonFile,
+            "blame_line" | "toggle_blame" => Applicability::GitRepoAndNoDiff,
+            "file_history" => Applicability::GitRepoAndFile,
+            "compare_against" => Applicability::GitRepo,
+            "toggle_diff_staged" => Applicability::GitRepoAndDiffView,
+            "toggle_diff_side_by_side" | "diff_hunk_next" | "diff_hunk_prev" => {
+                Applicability::DiffView
+            }
+            "fold_toggle" | "fold_all" | "unfold_all" => Applicability::FoldRegions,
+            "toggle_raw_markdown" => Applicability::PluginContentActive,
+            "open_in_editor" | "open_external" | "copy_path" | "copy_relative_path" |
+            "copy_line" | "copy_file" | "goto_line" => Applicability::OpenFile,
+            "git_mode_flat_toggle" => Applicability::GitMode,
+            _ => Applicability::Always,
+        }
+    }
+}
+
 #[cfg(test)]
 #[path = "actions_test.rs"]
 mod tests;
+

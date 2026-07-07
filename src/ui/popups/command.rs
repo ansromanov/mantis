@@ -123,9 +123,20 @@ pub(crate) fn draw_command_palette(f: &mut Frame, app: &mut App, area: Rect) {
                 })
                 .unwrap_or_default();
 
+            let reason = picker.inapplicability_reasons.get(i).copied().flatten();
+            let is_inapplicable = reason.is_some();
+
             // Build name/category spans with fuzzy-match highlighting.
-            let normal = Style::default().fg(theme.text);
-            let highlighted = Style::default().fg(theme.text).add_modifier(Modifier::BOLD);
+            let normal = if is_inapplicable {
+                Style::default().fg(theme.dim)
+            } else {
+                Style::default().fg(theme.text)
+            };
+            let highlighted = if is_inapplicable {
+                Style::default().fg(theme.dim).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(theme.text).add_modifier(Modifier::BOLD)
+            };
             let dim = Style::default().fg(theme.dim);
 
             let mut name_spans: Vec<Span> = Vec::new();
@@ -161,8 +172,11 @@ pub(crate) fn draw_command_palette(f: &mut Frame, app: &mut App, area: Rect) {
                 }
             }
 
-            // Description (dimmed, separated from name by " — ").
-            if let Some(desc) = cmd.description {
+            // Description or inapplicable reason (dimmed, separated from name by " — ").
+            if let Some(reason_str) = reason {
+                name_spans.push(Span::styled(" — ".to_string(), dim));
+                name_spans.push(Span::styled(reason_str.to_string(), dim));
+            } else if let Some(desc) = cmd.description {
                 name_spans.push(Span::styled(" — ".to_string(), dim));
                 name_spans.push(Span::styled(desc.to_string(), dim));
             }

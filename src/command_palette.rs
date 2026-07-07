@@ -60,16 +60,23 @@ pub struct CommandPalette {
     /// query is empty. Each inner vec corresponds to `filtered[i]`.
     pub match_positions: Vec<Vec<usize>>,
     matcher: SkimMatcherV2,
+    /// Inapplicability reason for each command index, if any.
+    pub inapplicability_reasons: Vec<Option<&'static str>>,
 }
 
 impl Default for CommandPalette {
     fn default() -> Self {
-        Self::new(&Keymap::default(), Vec::new(), 0)
+        Self::new(&Keymap::default(), Vec::new(), 0, vec![None; COMMANDS.len()])
     }
 }
 
 impl CommandPalette {
-    pub fn new(keymap: &Keymap, base_order: Vec<usize>, base_pinned: usize) -> Self {
+    pub fn new(
+        keymap: &Keymap,
+        base_order: Vec<usize>,
+        base_pinned: usize,
+        inapplicability_reasons: Vec<Option<&'static str>>,
+    ) -> Self {
         let binding_labels = COMMANDS
             .iter()
             .map(|cmd| keymap.label_for_action(cmd.action_id))
@@ -96,6 +103,28 @@ impl CommandPalette {
             }
             order
         };
+
+        // Empty-query ranking keeps pinned/frequent ordering but sinks
+        // inapplicable entries below applicable ones.
+        let mut applicable = Vec::new();
+        let mut inapplicable = Vec::new();
+        let mut applicable_pinned_count = 0;
+        for (idx, &i) in base_order.iter().enumerate() {
+            let is_pinned = idx < base_pinned;
+            let is_applicable = inapplicability_reasons.get(i).and_then(|r| *r).is_none();
+            if is_applicable {
+                applicable.push(i);
+                if is_pinned {
+                    applicable_pinned_count += 1;
+                }
+            } else {
+                inapplicable.push(i);
+            }
+        }
+        let base_pinned = applicable_pinned_count;
+        let mut base_order = applicable;
+        base_order.extend(inapplicable);
+
         let len = base_order.len();
         CommandPalette {
             query: String::new(),
@@ -106,6 +135,7 @@ impl CommandPalette {
             base_pinned,
             match_positions: vec![Vec::new(); len],
             matcher: SkimMatcherV2::default(),
+            inapplicability_reasons,
         }
     }
 
