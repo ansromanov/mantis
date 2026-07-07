@@ -95,6 +95,7 @@ fn dirs_next() -> Option<PathBuf> {
 pub(crate) const BUNDLED_PLUGINS: &[(&str, &str, &[u8])] = &[
     ("iconize", "iconize", ICONIZE),
     ("markdown", "markdown", MARKDOWN),
+    ("rust", "rust", RUST),
 ];
 
 /// Filenames of old shell-script plugins superseded by the current Rust binaries.

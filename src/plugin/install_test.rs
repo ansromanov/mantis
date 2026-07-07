@@ -53,6 +53,7 @@ fn bundled_plugin_entries_markdown_enabled_iconize_and_terraform_disabled() {
         "markdown plugin must be listed"
     );
     assert!(names.contains(&"iconize"), "iconize plugin must be listed");
+    assert!(names.contains(&"rust"), "rust plugin must be listed");
     assert!(
         names.contains(&"terraform"),
         "terraform syntax plugin must be listed"

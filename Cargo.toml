@@ -2,6 +2,7 @@
 members = [
     "plugins/markdown",
     "plugins/iconize",
+    "plugins/rust",
 ]
 resolver = "2"
 
