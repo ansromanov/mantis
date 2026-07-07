@@ -71,6 +71,23 @@ fn editor_blame_line_action_noop_when_is_diff() {
 }
 
 #[test]
+fn dispatch_command_toggle_telemetry_toggles_config_and_handle() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    assert!(!app.config.telemetry.enabled);
+
+    let mut p = CommandPalette::default();
+    for c in "Toggle telemetry".chars() {
+        p.push(c);
+    }
+    app.command_palette = Some(p);
+    assert!(app.dispatch_command());
+    assert!(app.config.telemetry.enabled);
+    assert!(app.telemetry.is_enabled());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn commands_includes_blame_line_action() {
     assert!(COMMANDS.iter().any(|c| c.action_id == "blame_line"));
 }

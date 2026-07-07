@@ -234,6 +234,19 @@ fn command_palette_has_help_section() {
 }
 
 #[test]
+fn toggle_telemetry_action_is_palette_only() {
+    let action = ACTIONS
+        .iter()
+        .find(|a| a.id == "toggle_telemetry")
+        .expect("toggle_telemetry must be registered");
+    assert!(action.palette.is_some(), "reachable via Ctrl-P");
+    assert!(
+        !KEYMAP_FIELD_ACTION_IDS.contains(&"toggle_telemetry"),
+        "palette-only: no keymap field expected"
+    );
+}
+
+#[test]
 fn bug_report_action_is_palette_only() {
     let action = ACTIONS
         .iter()
