@@ -149,18 +149,62 @@ fn blame_line_key_does_not_change_hscroll() {
     fs::remove_dir_all(&root).ok();
 }
 
-// -- Esc dismisses blame before selection ------------------------------------
+// -- Esc does not close bottom-bar blame (only full-file blame) --------------
 
 #[test]
-fn esc_closes_line_blame_first() {
+fn esc_does_not_close_line_blame() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
     app.focus = Focus::Content;
     app.show_line_blame = true;
     app.handle_key(key(KeyCode::Esc));
-    assert!(!app.show_line_blame);
+    assert!(
+        app.show_line_blame,
+        "Esc must not close single-line blame bar"
+    );
     fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn esc_closes_full_file_blame() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.show_blame = true;
+    app.handle_key(key(KeyCode::Esc));
+    assert!(!app.show_blame, "Esc must close full-file blame pane");
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- blame pane navigation (full-file blame active, tree key routing) --------
+
+#[test]
+fn blame_pane_nav_up_moves_active_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Tree;
+    app.show_blame = true;
+    app.active_line = 5;
+    app.handle_key(key(KeyCode::Char('k')));
+    assert_eq!(app.active_line, 4, "nav up moves active_line in blame pane");
+}
+
+#[test]
+fn blame_pane_nav_down_moves_active_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Tree;
+    app.show_blame = true;
+    app.active_line = 5;
+    app.handle_key(key(KeyCode::Char('j')));
+    assert_eq!(
+        app.active_line, 6,
+        "nav down moves active_line in blame pane"
+    );
 }
 
 #[test]

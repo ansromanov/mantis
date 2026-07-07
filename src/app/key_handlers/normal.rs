@@ -32,8 +32,8 @@ impl App {
         self.status_message = None;
 
         if static_keys::is_close(&key) {
-            if self.show_line_blame {
-                self.show_line_blame = false;
+            if self.show_blame {
+                self.show_blame = false;
                 return;
             }
             if self.selection.is_some() {
@@ -165,6 +165,46 @@ impl App {
     pub(super) fn handle_tree_key(&mut self, key: KeyEvent) {
         let scope = BindingScope::Tree;
         let k = &self.keys;
+
+        // When full-file blame is active, navigation keys move the content cursor
+        // (active_line) instead of tree selection.
+        if self.show_blame && self.has_text_cursor() {
+            if pressed_in(&k.nav_up, &key, scope) {
+                if self.active_line > 0 {
+                    self.active_line -= 1;
+                    self.scroll_active_line_into_view();
+                    self.scroll_blame_into_view();
+                    self.mark_content_scrolled();
+                }
+            } else if pressed_in(&k.nav_down, &key, scope) {
+                let max = self.display_line_count().saturating_sub(1);
+                if self.active_line < max {
+                    self.active_line += 1;
+                    self.scroll_active_line_into_view();
+                    self.scroll_blame_into_view();
+                    self.mark_content_scrolled();
+                }
+            } else if pressed_in(&k.content_top, &key, scope) {
+                self.active_line = 0;
+                self.set_content_scroll(0);
+                self.scroll_blame_into_view();
+            } else if pressed_in(&k.content_bottom, &key, scope) {
+                self.active_line = self.display_line_count().saturating_sub(1);
+                self.scroll_active_line_into_view();
+                self.scroll_blame_into_view();
+            } else if pressed_in(&k.content_page_up, &key, scope) {
+                self.active_line = self.active_line.saturating_sub(self.page_rows());
+                self.scroll_active_line_into_view();
+                self.scroll_blame_into_view();
+            } else if pressed_in(&k.content_page_down, &key, scope) {
+                let max = self.display_line_count().saturating_sub(1);
+                self.active_line = (self.active_line + self.page_rows()).min(max);
+                self.scroll_active_line_into_view();
+                self.scroll_blame_into_view();
+            }
+            return;
+        }
+
         if pressed_in(&k.nav_up, &key, scope) {
             if self.tree_selected > 0 {
                 self.tree_selected -= 1;

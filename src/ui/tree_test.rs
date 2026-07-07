@@ -1402,4 +1402,40 @@ fn draw_tree_git_mode_placeholder_hint_uses_canonical_action_id() {
     );
 }
 
+#[test]
+fn draw_blame_pane_does_not_panic() {
+    let mut app = App::new(PathBuf::from("."), Config::default(), None, None).unwrap();
+    app.content = (0..10).map(|i| format!("line {i}")).collect();
+    let backend = TestBackend::new(40, 20);
+    let mut terminal = Terminal::new(backend).unwrap();
+    let blame_lines = vec![];
+    terminal
+        .draw(|frame| {
+            draw_blame_pane(frame, &mut app, frame.area(), &blame_lines);
+        })
+        .unwrap();
+}
+
+#[test]
+fn draw_bottom_bar_blame_does_not_panic_without_blame_data() {
+    let mut app = App::new(PathBuf::from("."), Config::default(), None, None).unwrap();
+    app.current_file = Some(PathBuf::from("/nonexistent/file.txt"));
+    let backend = TestBackend::new(40, 20);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| {
+            draw_bottom_bar_blame(
+                frame,
+                &mut app,
+                Rect {
+                    x: 0,
+                    y: 18,
+                    width: 40,
+                    height: 2,
+                },
+            );
+        })
+        .unwrap();
+}
+
 // Modified for test requirements

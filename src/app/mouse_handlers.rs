@@ -194,6 +194,16 @@ impl App {
                     self.clear_selection();
                     let row = (ev.row - self.tree_area.y) as usize;
                     let index = self.tree_offset + row;
+
+                    // Blame pane: clicking a row sets the active line.
+                    if self.show_blame && self.has_text_cursor() {
+                        let phys = index;
+                        self.set_active_line_from_physical(phys);
+                        self.scroll_blame_into_view();
+                        self.show_line_blame = true;
+                        return;
+                    }
+
                     // When the inline tree filter is active, map the click
                     // through the visible-indices array to get the global node
                     // index, then close the filter (accept the selection).
@@ -226,14 +236,7 @@ impl App {
                     }
                 } else if rect_contains(self.content_area, ev.column, ev.row) {
                     self.focus = Focus::Content;
-                    // Check if click is on the blame column.
                     let rel_col = (ev.column.saturating_sub(self.content_area.x)) as usize;
-                    if self.blame_col_width > 0 && rel_col < self.blame_col_width {
-                        let pos = self.content_pos(ev.column, ev.row);
-                        self.set_active_line_from_physical(pos.0);
-                        self.show_line_blame = true;
-                        return;
-                    }
                     let on_scrollbar = self.show_scrollbar
                         && self.display_line_count() > self.content_area.height as usize
                         && ev.column
@@ -243,10 +246,9 @@ impl App {
                         self.set_scroll_from_mouse_y(ev.row);
                         self.mark_content_scrolled();
                     } else {
-                        // Check if click is on the fold gutter (after the blame column).
+                        // Check if click is on the fold gutter (at the start of the gutter).
                         let fold_gw = self.fold_gutter_width();
-                        let fold_start = self.blame_col_width;
-                        if fold_gw > 0 && rel_col >= fold_start && rel_col < fold_start + fold_gw {
+                        if fold_gw > 0 && rel_col < fold_gw {
                             // Find the fold region for this screen row.
                             let hit = self
                                 .fold_gutter_rows

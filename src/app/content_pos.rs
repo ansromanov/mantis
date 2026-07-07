@@ -265,6 +265,17 @@ impl App {
         }
     }
 
+    /// Nudges `blame_scroll` so `active_line` stays within the visible blame
+    /// pane viewport after a cursor move or scroll.
+    pub(crate) fn scroll_blame_into_view(&mut self) {
+        let height = (self.tree_area.height as usize).max(1);
+        if self.active_line < self.blame_scroll {
+            self.blame_scroll = self.active_line;
+        } else if self.active_line >= self.blame_scroll + height {
+            self.blame_scroll = self.active_line.saturating_sub(height).saturating_add(1);
+        }
+    }
+
     /// Number of rows in a page — viewport height minus one overlap row.
     pub fn page_rows(&self) -> usize {
         (self.content_area.height as usize).saturating_sub(1).max(1)

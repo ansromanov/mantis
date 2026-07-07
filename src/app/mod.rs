@@ -191,8 +191,9 @@ pub struct App {
     pub auto_watch: bool,
     pub show_file_info: bool,
     pub indent_guides: bool,
-    /// Content-pane blame column width captured during the last render (0 when hidden).
-    pub blame_col_width: usize,
+    /// Scroll offset for the blame pane (first visible line). Synced with
+    /// `content_scroll` so the cursor stays in view.
+    pub blame_scroll: usize,
     /// Whether to show file-type icon glyphs in the tree. The glyphs come from
     /// a plugin via the `set_icon_map` action; off by default because they
     /// require a Nerd Font in the terminal.
@@ -565,9 +566,11 @@ impl App {
 
     /// Human-readable label for the tree panel's current view mode, shown as the
     /// panel's border title. Extends as new modes are added (blame, functions,
-    /// file structure, …); today it reflects only Files vs Git.
+    /// file structure, …); today it reflects only Files vs Git vs Blame.
     pub fn panel_mode_label(&self) -> &'static str {
-        if self.git_mode {
+        if self.show_blame && self.has_text_cursor() {
+            "Blame"
+        } else if self.git_mode {
             if self.git_mode_flat {
                 "Git · flat"
             } else {

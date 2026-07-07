@@ -421,3 +421,55 @@ fn scroll_line_into_view_clamps_to_max() {
     assert_eq!(app.content_scroll, 40);
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn scroll_blame_into_view_nudges_scroll_when_active_line_outside_viewport() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.current_file = Some(root.join("doc.md"));
+    app.open_file(&root.join("doc.md"));
+    app.content = (0..50).map(|i| format!("line {i}")).collect();
+    app.tree_area = Rect {
+        x: 0,
+        y: 0,
+        width: 30,
+        height: 10,
+    };
+    app.blame_scroll = 0;
+    app.active_line = 15;
+    // active_line (15) is past tree_area height (10) from scroll (0).
+    app.scroll_blame_into_view();
+    assert!(
+        app.blame_scroll > 0,
+        "blame_scroll should advance so active_line is visible"
+    );
+    let vh = app.tree_area.height as usize;
+    assert!(
+        app.active_line >= app.blame_scroll && app.active_line < app.blame_scroll + vh,
+        "active_line={} should be within [blame_scroll={}, {}]",
+        app.active_line,
+        app.blame_scroll,
+        app.blame_scroll + vh
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn scroll_blame_into_view_does_not_nudge_when_already_in_view() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.current_file = Some(root.join("doc.md"));
+    app.open_file(&root.join("doc.md"));
+    app.content = (0..50).map(|i| format!("line {i}")).collect();
+    app.tree_area = Rect {
+        x: 0,
+        y: 0,
+        width: 30,
+        height: 10,
+    };
+    app.blame_scroll = 5;
+    app.active_line = 7;
+    app.scroll_blame_into_view();
+    assert_eq!(app.blame_scroll, 5, "blame_scroll must not change");
+    fs::remove_dir_all(&root).ok();
+}
