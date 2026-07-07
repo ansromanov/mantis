@@ -155,6 +155,7 @@ compiled alongside `mantis` and installed on first run.
 |---|---|---|---|
 | iconize | `iconize` | On `init`, sends a `set_icon_map` action with Nerd Font glyphs for ~80 file extensions. Requires `icons = true` in `mantis.toml` and a Nerd Font terminal. |
 | markdown | `markdown` | Renders `.md` files using pulldown-cmark, sending the output as ANSI-escaped lines via `set_content`. Responds to theme changes and `M` keypress for raw/rendered toggle. |
+| rust | `rust` | Registers as a language provider for `.rs` files with the `fold` capability. On file open, computes and registers collapsible curly-brace fold regions. |
 
 All bundled plugins are compiled as workspace members and installed to the
 plugin directory the first time `mantis` creates its global config. Enable them by
@@ -164,6 +165,7 @@ adding entries in `mantis.toml`:
 [plugins]
 iconize    = { path = "iconize" }
 markdown   = { path = "markdown" }
+rust       = { path = "rust" }
 ```
 
 > **Note:** Git features are built into `mantis` natively — no plugin required.
