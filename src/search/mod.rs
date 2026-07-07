@@ -39,6 +39,7 @@ pub(crate) fn fuzzy_refilter<T>(
     matcher: &SkimMatcherV2,
     query: &str,
     haystack: impl for<'a> Fn(&'a T) -> std::borrow::Cow<'a, str>,
+    with_positions: bool,
 ) -> Vec<(usize, Vec<usize>)> {
     if query.is_empty() {
         return (0..items.len()).map(|i| (i, Vec::new())).collect();
@@ -48,9 +49,15 @@ pub(crate) fn fuzzy_refilter<T>(
         .enumerate()
         .filter_map(|(i, item)| {
             let text = haystack(item);
-            matcher
-                .fuzzy_indices(text.as_ref(), query)
-                .map(|(s, indices)| (i, s, indices))
+            if with_positions {
+                matcher
+                    .fuzzy_indices(text.as_ref(), query)
+                    .map(|(s, indices)| (i, s, indices))
+            } else {
+                matcher
+                    .fuzzy_match(text.as_ref(), query)
+                    .map(|s| (i, s, Vec::new()))
+            }
         })
         .collect();
     scored.sort_by_key(|(_, s, _)| std::cmp::Reverse(*s));

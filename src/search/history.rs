@@ -52,9 +52,13 @@ impl HistoryState {
 
     fn refilter(&mut self) {
         self.selected = 0;
-        self.filtered = super::fuzzy_refilter(&self.commits, &self.matcher, &self.query, |c| {
-            std::borrow::Cow::Owned(format!("{} {} {}", c.short, c.date, c.subject))
-        })
+        self.filtered = super::fuzzy_refilter(
+            &self.commits,
+            &self.matcher,
+            &self.query,
+            |c| std::borrow::Cow::Owned(format!("{} {} {}", c.short, c.date, c.subject)),
+            false,
+        )
         .into_iter()
         .map(|(i, _)| i)
         .collect();

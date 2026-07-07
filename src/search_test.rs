@@ -15,7 +15,13 @@ fn search_temp_dir(label: &str) -> PathBuf {
 fn fuzzy_refilter_empty_query_returns_identity() {
     let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
     let items = vec!["alpha", "beta", "gamma"];
-    let result = fuzzy_refilter(&items, &matcher, "", |s| std::borrow::Cow::Borrowed(*s));
+    let result = fuzzy_refilter(
+        &items,
+        &matcher,
+        "",
+        |s| std::borrow::Cow::Borrowed(*s),
+        true,
+    );
     assert_eq!(result, vec![(0, vec![]), (1, vec![]), (2, vec![])]);
 }
 
@@ -23,7 +29,13 @@ fn fuzzy_refilter_empty_query_returns_identity() {
 fn fuzzy_refilter_filters_non_matching_items() {
     let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
     let items = vec!["alpha", "beta", "gamma"];
-    let result = fuzzy_refilter(&items, &matcher, "zzz", |s| std::borrow::Cow::Borrowed(*s));
+    let result = fuzzy_refilter(
+        &items,
+        &matcher,
+        "zzz",
+        |s| std::borrow::Cow::Borrowed(*s),
+        true,
+    );
     assert!(result.is_empty());
 }
 
@@ -31,7 +43,13 @@ fn fuzzy_refilter_filters_non_matching_items() {
 fn fuzzy_refilter_returns_matching_indices() {
     let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
     let items = vec!["alpha", "beta", "gamma"];
-    let result = fuzzy_refilter(&items, &matcher, "bet", |s| std::borrow::Cow::Borrowed(*s));
+    let result = fuzzy_refilter(
+        &items,
+        &matcher,
+        "bet",
+        |s| std::borrow::Cow::Borrowed(*s),
+        true,
+    );
     assert_eq!(result.len(), 1);
     assert_eq!(result[0].0, 1);
     // "bet" matches "beta" at chars 0,1,2
@@ -45,7 +63,13 @@ fn fuzzy_refilter_returns_matching_indices() {
 fn fuzzy_refilter_returns_all_matched_items() {
     let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
     let items = vec!["foobar", "baz_bar_qux", "barn"];
-    let result = fuzzy_refilter(&items, &matcher, "bar", |s| std::borrow::Cow::Borrowed(*s));
+    let result = fuzzy_refilter(
+        &items,
+        &matcher,
+        "bar",
+        |s| std::borrow::Cow::Borrowed(*s),
+        true,
+    );
     assert_eq!(
         result.len(),
         3,
@@ -65,7 +89,13 @@ fn fuzzy_refilter_sorts_by_descending_score() {
     let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
     // "beta" is an exact/prefix match for query "beta"; "alphabeta" is weaker
     let items = vec!["alphabeta", "beta"];
-    let result = fuzzy_refilter(&items, &matcher, "beta", |s| std::borrow::Cow::Borrowed(*s));
+    let result = fuzzy_refilter(
+        &items,
+        &matcher,
+        "beta",
+        |s| std::borrow::Cow::Borrowed(*s),
+        true,
+    );
     assert_eq!(result.len(), 2);
     assert_eq!(
         result[0].0, 1,
@@ -77,7 +107,13 @@ fn fuzzy_refilter_sorts_by_descending_score() {
 fn fuzzy_refilter_empty_items_returns_empty() {
     let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
     let items: Vec<&str> = vec![];
-    let result = fuzzy_refilter(&items, &matcher, "abc", |s| std::borrow::Cow::Borrowed(*s));
+    let result = fuzzy_refilter(
+        &items,
+        &matcher,
+        "abc",
+        |s| std::borrow::Cow::Borrowed(*s),
+        true,
+    );
     assert!(result.is_empty());
 }
 

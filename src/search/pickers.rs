@@ -388,9 +388,13 @@ impl ThemePicker {
 
     fn refilter(&mut self) {
         self.selected = 0;
-        self.filtered = super::fuzzy_refilter(&self.names, &self.matcher, &self.query, |n| {
-            std::borrow::Cow::Borrowed(n.as_str())
-        })
+        self.filtered = super::fuzzy_refilter(
+            &self.names,
+            &self.matcher,
+            &self.query,
+            |n| std::borrow::Cow::Borrowed(n.as_str()),
+            false,
+        )
         .into_iter()
         .map(|(i, _)| i)
         .collect();
@@ -467,9 +471,13 @@ impl RecentFilesState {
 
     fn refilter(&mut self) {
         self.selected = 0;
-        self.filtered = super::fuzzy_refilter(&self.paths, &self.matcher, &self.query, |p| {
-            p.to_string_lossy()
-        })
+        self.filtered = super::fuzzy_refilter(
+            &self.paths,
+            &self.matcher,
+            &self.query,
+            |p| p.to_string_lossy(),
+            false,
+        )
         .into_iter()
         .map(|(i, _)| i)
         .collect();

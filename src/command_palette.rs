@@ -140,15 +140,21 @@ impl CommandPalette {
         }
         let binding_labels = &self.binding_labels;
         let indices: Vec<usize> = (0..COMMANDS.len()).collect();
-        let results = fuzzy_refilter(&indices, &self.matcher, &self.query, |&i| {
-            let cmd = &COMMANDS[i];
-            let mut haystack = cmd.category.map(|c| format!("{c}: ")).unwrap_or_default();
-            haystack.push_str(cmd.name);
-            if !binding_labels[i].is_empty() {
-                haystack.push_str(&format!(" [{}]", binding_labels[i]));
-            }
-            std::borrow::Cow::Owned(haystack)
-        });
+        let results = fuzzy_refilter(
+            &indices,
+            &self.matcher,
+            &self.query,
+            |&i| {
+                let cmd = &COMMANDS[i];
+                let mut haystack = cmd.category.map(|c| format!("{c}: ")).unwrap_or_default();
+                haystack.push_str(cmd.name);
+                if !binding_labels[i].is_empty() {
+                    haystack.push_str(&format!(" [{}]", binding_labels[i]));
+                }
+                std::borrow::Cow::Owned(haystack)
+            },
+            true,
+        );
         self.filtered = results.iter().map(|&(i, _)| i).collect();
         self.match_positions = results
             .into_iter()

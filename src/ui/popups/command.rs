@@ -106,15 +106,18 @@ pub(crate) fn draw_command_palette(f: &mut Frame, app: &mut App, area: Rect) {
             display_str.push_str(cmd.name);
 
             // Extract match positions that fall within the display text.
-            // Positions beyond `display_str.len()` are in the binding portion
-            // of the haystack and are ignored for highlighting.
-            let hit_positions: Vec<usize> = picker
+            // Positions are *character* indices into the full haystack (as
+            // returned by `fuzzy_indices`, which matches over a `Vec<char>`,
+            // not bytes). Positions beyond the char count of `display_str`
+            // are in the binding portion of the haystack and are ignored.
+            let display_char_count = display_str.chars().count();
+            let hit_positions: std::collections::HashSet<usize> = picker
                 .match_positions
                 .get(pos)
                 .map(|positions| {
                     positions
                         .iter()
-                        .filter(|&&p| p < display_str.len())
+                        .filter(|&&p| p < display_char_count)
                         .copied()
                         .collect()
                 })
@@ -129,18 +132,32 @@ pub(crate) fn draw_command_palette(f: &mut Frame, app: &mut App, area: Rect) {
             if hit_positions.is_empty() {
                 name_spans.push(Span::styled(display_str.clone(), normal));
             } else {
-                let mut last = 0usize;
-                for &bp in &hit_positions {
-                    if bp > last {
-                        name_spans.push(Span::styled(display_str[last..bp].to_string(), normal));
+                // Walk by char (not byte) so multi-byte UTF-8 characters can't
+                // land a slice on a non-char boundary.
+                let mut run = String::new();
+                let mut run_hit: Option<bool> = None;
+                for (char_idx, ch) in display_str.chars().enumerate() {
+                    let is_hit = hit_positions.contains(&char_idx);
+                    if run_hit != Some(is_hit) {
+                        if !run.is_empty() {
+                            let style = if run_hit == Some(true) {
+                                highlighted
+                            } else {
+                                normal
+                            };
+                            name_spans.push(Span::styled(std::mem::take(&mut run), style));
+                        }
+                        run_hit = Some(is_hit);
                     }
-                    // Single matched character at byte position `bp`.
-                    let end = bp + 1;
-                    name_spans.push(Span::styled(display_str[bp..end].to_string(), highlighted));
-                    last = end;
+                    run.push(ch);
                 }
-                if last < display_str.len() {
-                    name_spans.push(Span::styled(display_str[last..].to_string(), normal));
+                if !run.is_empty() {
+                    let style = if run_hit == Some(true) {
+                        highlighted
+                    } else {
+                        normal
+                    };
+                    name_spans.push(Span::styled(run, style));
                 }
             }
 
