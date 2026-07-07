@@ -1,0 +1,11 @@
+[package]
+name = "python"
+version = "0.1.0"
+edition = "2021"
+description = "Bundled Python language provider plugin for mantis. Provides fold capability via indent_fold."
+license = "GPL-3.0-or-later"
+repository = "https://github.com/ansromanov/mantis"
+
+[dependencies]
+serde_json = "1"
+mantis = { path = "../.." }

@@ -530,7 +530,10 @@ fn main() {
    (`src/plugin/install.rs`) as `(name, binary_name)` pairs and built as
    workspace-member Rust crates under `plugins/`. The
    `install_bundled_plugins()` function finds and copies compiled binaries to
-   the plugin directory on first run.
+   the plugin directory on first run. The `python` plugin is a language-provider
+   example: it registers for `py`/`pyi` with `fold` capability at `init` and
+   sends `set_fold_regions` on `on_file_open` using the shared
+   `mantis::fold_detectors::indent_fold` detector.
 
 
 ---

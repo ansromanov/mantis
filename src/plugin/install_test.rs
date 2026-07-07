@@ -58,6 +58,7 @@ fn bundled_plugin_entries_markdown_enabled_iconize_and_terraform_disabled() {
         names.contains(&"terraform"),
         "terraform syntax plugin must be listed"
     );
+    assert!(names.contains(&"python"), "python plugin must be listed");
     for (name, entry) in &entries {
         if name == "markdown" {
             assert!(entry.enabled, "markdown plugin must be enabled by default");

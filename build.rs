@@ -35,7 +35,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 fn main() {
-    let plugins = &["iconize", "markdown", "rust"];
+    let plugins = &["iconize", "markdown", "python", "rust"];
 
     if std::env::var("MANTIS_IN_PLUGIN_SUBBUILD").is_ok() {
         let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR must be set by cargo");
