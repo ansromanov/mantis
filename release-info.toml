@@ -1,5 +1,18 @@
-version = "0.15.25"
+version = "0.16.0"
 date = "2026-07-07"
-whats_new = """- feat(keys): stable, cross-terminal-safe default keybindings (#609)
-- chore: bump Homebrew formula to v0.15.10 [skip ci]"""
-release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.15.11"
+whats_new = """- feat(palette): context-aware command palette (#632)
+- feat: bundled go plugin — Go language provider (fold capability) (#633)
+- feat(plugin): add python language provider plugin (#631)
+- feat: command palette metadata, highlighting, and keybindings (#630)
+- feat(blame): rework blame — dedicated pane for full-file, bottom-bar for single-line (#628)
+- feat: implement fold detectors and bundled rust plugin (#629)
+- feat: compare mode — browse tree changes against a chosen revision (#626)
+- feat: shared fold-detector lib (brace + indentation) for language plugins (#627)
+- chore: rename bundled plugin crates and drop prefix (#618)
+- Tree view: hide arrows when icons active (folder icons substitute) (#617)
+- fix(tree): prevent tree_up_dir from ascending past initial root (#614)
+- feat: local telemetry sink and diagnostic bug reports saved to state dir (#621)
+- feat: hide tree arrows when icons active (#619)
+- feat: add E2E and functional testing suite (#611)
+- chore: bump Homebrew formula to v0.15.11 [skip ci]"""
+release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.16.0"
