@@ -321,7 +321,7 @@ fn ranked_base_order_typing_query_still_fuzzy() {
     // After typing a query, push/pop/refilter should use fuzzy matching.
     let usage = crate::command_usage::UsageStats::default();
     let (base, _) = ranked_base_order(&usage, true, 3);
-    let mut p = CommandPalette::new(&Keymap::default(), base, 0);
+    let mut p = CommandPalette::new(&Keymap::default(), base, 0, vec![None; COMMANDS.len()]);
     assert_eq!(p.results_len(), COMMANDS.len());
     // Type a query — results should be fuzzy-filtered
     for c in "git".chars() {
@@ -342,7 +342,7 @@ fn command_palette_list_picker_impl_delegates() {
     use crate::list_picker::ListPicker;
     let usage = crate::command_usage::UsageStats::default();
     let (base, _) = ranked_base_order(&usage, true, 0);
-    let mut p = CommandPalette::new(&Keymap::default(), base, 0);
+    let mut p = CommandPalette::new(&Keymap::default(), base, 0, vec![None; COMMANDS.len()]);
     assert!(ListPicker::query_is_empty(&p));
     assert_eq!(ListPicker::selected(&p), 0);
     ListPicker::set_selected(&mut p, 1);

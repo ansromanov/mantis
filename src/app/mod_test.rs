@@ -4087,6 +4087,7 @@ fn dispatch_command_toggle_word_wrap_toggles() {
 fn dispatch_command_toggle_pretty_json_toggles() {
     let root = temp_tree();
     let mut app = app_for(&root);
+    app.current_file = Some(root.join("a.txt"));
     app.is_json = true;
     app.json_pretty_lines = vec![vec![(ratatui::style::Style::default(), "{}".to_string())]];
     setup_command(&mut app, "toggle_pretty_json");
@@ -4112,6 +4113,7 @@ fn dispatch_command_toggle_diff_side_by_side_toggles() {
 fn dispatch_command_unfold_all_works() {
     let root = temp_tree();
     let mut app = app_for(&root);
+    app.current_file = Some(root.join("a.txt"));
     app.content = vec![
         "header:".to_string(),
         "  child1: 1".to_string(),
@@ -4136,6 +4138,7 @@ fn dispatch_command_unfold_all_works() {
 fn dispatch_command_fold_toggle_toggles() {
     let root = temp_tree();
     let mut app = app_for(&root);
+    app.current_file = Some(root.join("a.txt"));
     app.content = vec!["header".to_string(), "  child".to_string()];
     app.fold_regions = vec![FoldRegion { start: 0, end: 1 }];
     app.rebuild_fold_display_map();

@@ -40,6 +40,16 @@ impl App {
             .as_ref()
             .and_then(|p| p.selected_command().map(|c| c.action_id));
         if let Some(id) = action_id {
+            if let Err(reason) = self.check_applicability(id) {
+                let name = crate::command_palette::COMMANDS
+                    .iter()
+                    .find(|c| c.action_id == id)
+                    .map(|c| c.name)
+                    .unwrap_or(id);
+                self.set_status(format!("{}: {}", name, reason));
+                self.command_palette = None;
+                return true;
+            }
             self.command_usage.record(id);
             self.command_usage.save();
             self.telemetry

@@ -1064,6 +1064,37 @@ fn ctrl_p_opens_palette_with_ranked_order_from_usage() {
     fs::remove_dir_all(&root).ok();
 }
 
+#[test]
+fn ctrl_p_computes_inapplicability_reasons_from_current_state() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    // App::new auto-opens the first file (long.txt, not JSON), so
+    // JSON-scoped commands must be marked inapplicable.
+    app.handle_key(ctrl('P'));
+    let palette = app
+        .command_palette
+        .as_ref()
+        .expect("Ctrl+P must open command_palette");
+    let json_idx = crate::command_palette::COMMANDS
+        .iter()
+        .position(|c| c.action_id == "toggle_pretty_json")
+        .unwrap();
+    let help_idx = crate::command_palette::COMMANDS
+        .iter()
+        .position(|c| c.action_id == "help")
+        .unwrap();
+    assert_eq!(
+        palette.inapplicability_reasons[json_idx],
+        Some("requires JSON file"),
+        "toggle_pretty_json must be inapplicable when the open file isn't JSON"
+    );
+    assert_eq!(
+        palette.inapplicability_reasons[help_idx], None,
+        "help has no precondition and must always be applicable"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
 // -- find_files (ctrl+t) ----------------------------------------------------
 
 #[test]

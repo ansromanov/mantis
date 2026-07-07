@@ -249,6 +249,12 @@ next to its current keybinding. Type to fuzzy-filter (e.g. "blame", "theme",
 command. It's the fastest way to discover what `mantis` can do without
 memorizing keys.
 
+Commands that don't apply to the current state (e.g. "Toggle JSON
+pretty-print" with no JSON file open, or "Toggle blame" outside a git repo)
+are shown dimmed with the reason in place of their description. Selecting
+one anyway sets a status-bar message explaining why it didn't run, instead
+of silently doing nothing.
+
 ## Reporting a bug
 
 Run **"Report a bug (save diagnostics locally)"** from the command palette to

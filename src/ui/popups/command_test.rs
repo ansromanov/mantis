@@ -45,7 +45,12 @@ fn pinned_entries_show_star_prefix_when_query_empty() {
         }
     }
     let keymap = app.keys().clone();
-    app.command_palette = Some(CommandPalette::new(&keymap, order, 1));
+    app.command_palette = Some(CommandPalette::new(
+        &keymap,
+        order,
+        1,
+        vec![None; crate::command_palette::COMMANDS.len()],
+    ));
 
     let backend = TestBackend::new(80, 30);
     let mut terminal = Terminal::new(backend).unwrap();
@@ -74,7 +79,12 @@ fn star_prefix_hidden_when_query_is_typed() {
         }
     }
     let keymap = app.keys().clone();
-    let mut palette = CommandPalette::new(&keymap, order, 1);
+    let mut palette = CommandPalette::new(
+        &keymap,
+        order,
+        1,
+        vec![None; crate::command_palette::COMMANDS.len()],
+    );
     // Typing a query disables the pin prefix.
     palette.push('h');
     app.command_palette = Some(palette);
@@ -105,6 +115,7 @@ fn category_label_appears_in_palette_rendering() {
         &keymap,
         (0..crate::command_palette::COMMANDS.len()).collect(),
         0,
+        vec![None; crate::command_palette::COMMANDS.len()],
     ));
 
     if let Some(p) = &mut app.command_palette {
@@ -137,6 +148,7 @@ fn description_appears_in_palette_rendering() {
         &keymap,
         (0..crate::command_palette::COMMANDS.len()).collect(),
         0,
+        vec![None; crate::command_palette::COMMANDS.len()],
     ));
 
     if let Some(p) = &mut app.command_palette {
