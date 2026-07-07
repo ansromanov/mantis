@@ -1,0 +1,580 @@
+use super::*;
+
+// ---------------------------------------------------------------------------
+// brace_fold tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn brace_fold_empty() {
+    assert!(brace_fold("").is_empty());
+}
+
+#[test]
+fn brace_fold_no_braces() {
+    assert!(brace_fold("fn foo() -> i32 { 0 }").is_empty());
+}
+
+#[test]
+fn brace_fold_single_line_block() {
+    // Single-line {…} — no region (must span >1 line).
+    assert!(brace_fold("fn foo() -> i32 { 42 }").is_empty());
+}
+
+#[test]
+fn brace_fold_simple_block() {
+    let r = brace_fold("fn foo() {\n    bar();\n}\n");
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 2);
+}
+
+#[test]
+fn brace_fold_nested_blocks() {
+    let r = brace_fold(
+        "\
+fn outer() {
+    fn inner() {
+        x();
+    }
+    y();
+}
+",
+    );
+    assert_eq!(r.len(), 2);
+    // Regions are returned in closing order: inner closes first.
+    assert_eq!(r[0].start, 1);
+    assert_eq!(r[0].end, 3);
+    // Outer block covers lines 0–5 (inclusive).
+    assert_eq!(r[1].start, 0);
+    assert_eq!(r[1].end, 5);
+}
+
+#[test]
+fn brace_fold_skips_line_comment() {
+    // Braces inside // comments should be skipped.
+    let r = brace_fold(
+        "\
+fn foo() {
+    // { this brace is ignored }
+    bar();
+}
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 3);
+}
+
+#[test]
+fn brace_fold_skips_block_comment() {
+    let r = brace_fold(
+        "\
+fn foo() {
+    /* { block brace } */
+    bar();
+}
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 3);
+}
+
+#[test]
+fn brace_fold_skips_block_comment_multiline() {
+    let r = brace_fold(
+        "\
+fn foo() {
+    /*
+       { nested brace in block comment }
+    */
+    bar();
+}
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 5);
+}
+
+#[test]
+fn brace_fold_skips_double_quoted_string() {
+    let r = brace_fold(
+        "\
+fn foo() {
+    let s = \"hello { world }\";
+    bar();
+}
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 3);
+}
+
+#[test]
+fn brace_fold_skips_escaped_quote() {
+    let r = brace_fold(
+        "\
+fn foo() {
+    let s = \"escaped \\\" quote { brace }\";
+    bar();
+}
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 3);
+}
+
+#[test]
+fn brace_fold_escaped_newline_in_string_keeps_line_count() {
+    // A backslash immediately followed by a real newline (C/JS line
+    // continuation inside a string) must still advance the line counter.
+    let r = brace_fold("int foo() {\n    char *s = \"abc\\\ndef\";\n    bar();\n}\n");
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 4);
+}
+
+#[test]
+fn brace_fold_skips_raw_string() {
+    let r = brace_fold(
+        "\
+fn foo() {
+    let s = r\"hello { world }\";
+    bar();
+}
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 3);
+}
+
+#[test]
+fn brace_fold_skips_raw_string_with_hashes() {
+    let r = brace_fold(
+        "\
+fn foo() {
+    let s = r#\"hello { \"quoted\" } \"#;
+    bar();
+}
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 3);
+}
+
+#[test]
+fn brace_fold_skips_raw_string_many_hashes() {
+    let r = brace_fold(
+        "\
+fn foo() {
+    let s = r##\"hello # { world } \"##;
+    bar();
+}
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 3);
+}
+
+#[test]
+fn brace_fold_skips_backtick_string() {
+    let r = brace_fold(
+        "\
+func foo() {
+    s := `hello { world }`
+    bar()
+}
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 3);
+}
+
+#[test]
+fn brace_fold_backtick_newline() {
+    let r = brace_fold(
+        "\
+func foo() {
+    s := `hello
+{ world }`
+    bar()
+}
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 4);
+}
+
+#[test]
+fn brace_fold_crlf() {
+    let r = brace_fold("fn foo() {\r\n    bar();\r\n}\r\n");
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 2);
+}
+
+#[test]
+fn brace_fold_deep_nesting() {
+    let r = brace_fold(
+        "\
+a {
+    b {
+        c {
+            d { e() }
+        }
+    }
+}
+",
+    );
+    assert_eq!(r.len(), 3);
+    // Regions are returned in closing (innermost-first) order.
+    // c { … }
+    assert_eq!(r[0].start, 2);
+    assert_eq!(r[0].end, 4);
+    // b { … }
+    assert_eq!(r[1].start, 1);
+    assert_eq!(r[1].end, 5);
+    // a { … }
+    assert_eq!(r[2].start, 0);
+    assert_eq!(r[2].end, 6);
+}
+
+#[test]
+fn brace_fold_unmatched_close_is_silent() {
+    // Extra } with no matching { should be silently ignored.
+    let r = brace_fold("}\n{\n    foo();\n}\n");
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 1);
+    assert_eq!(r[0].end, 3);
+}
+
+#[test]
+fn brace_fold_unmatched_open_leaves_stack() {
+    // Extra { with no matching } leaves it on the stack but doesn't panic.
+    let r = brace_fold("{\n    foo();\n");
+    assert!(r.is_empty());
+}
+
+// ---------------------------------------------------------------------------
+// indent_fold tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn indent_fold_empty() {
+    assert!(indent_fold("").is_empty());
+}
+
+#[test]
+fn indent_fold_flat_code_no_regions() {
+    let code = "\
+x = 1
+y = 2
+z = 3
+";
+    assert!(indent_fold(code).is_empty());
+}
+
+#[test]
+fn indent_fold_simple_def() {
+    let r = indent_fold(
+        "\
+def foo():
+    pass
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 1);
+}
+
+#[test]
+fn indent_fold_nested_def() {
+    let r = indent_fold(
+        "\
+class Outer:
+    def inner(self):
+        pass
+    x = 1
+",
+    );
+    assert_eq!(r.len(), 2);
+    // Outer class: lines 0–3
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 3);
+    // inner method: lines 1–2
+    assert_eq!(r[1].start, 1);
+    assert_eq!(r[1].end, 2);
+}
+
+#[test]
+fn indent_fold_if_elif_else_continuation() {
+    let r = indent_fold(
+        "\
+if True:
+    x = 1
+elif other:
+    y = 2
+else:
+    z = 3
+",
+    );
+    // Only one region: from `if` to end of `else` block.
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 5);
+}
+
+#[test]
+fn indent_fold_try_except_finally() {
+    let r = indent_fold(
+        "\
+try:
+    do_something()
+except ValueError:
+    handle()
+finally:
+    cleanup()
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 5);
+}
+
+#[test]
+fn indent_fold_blank_lines_dont_terminate() {
+    let r = indent_fold(
+        "\
+def foo():
+    x = 1
+
+    y = 2
+
+z = 3
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 4);
+}
+
+#[test]
+fn indent_fold_async_def_header() {
+    let r = indent_fold(
+        "\
+async def fetch():
+    await something()
+    return x
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 2);
+}
+
+#[test]
+fn indent_fold_async_for_header() {
+    let r = indent_fold(
+        "\
+async def gen():
+    async for item in stream():
+        process(item)
+    return x
+",
+    );
+    assert_eq!(r.len(), 2);
+    // async def gen: lines 0–3
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 3);
+    // async for item: lines 1–2
+    assert_eq!(r[1].start, 1);
+    assert_eq!(r[1].end, 2);
+}
+
+#[test]
+fn indent_fold_with_decorator() {
+    // Decorators are not headers — `def`/`class` below them is.
+    let r = indent_fold(
+        "\
+@decorator
+def foo():
+    pass
+
+@register
+class Handler:
+    def run(self):
+        pass
+",
+    );
+    assert_eq!(r.len(), 3);
+    // def foo:  (decorator on line 0 is part of the same declaration, not a separate header)
+    // Blank line after pass keeps the region going.
+    assert_eq!(r[0].start, 1);
+    assert_eq!(r[0].end, 3);
+    // class Handler:
+    assert_eq!(r[1].start, 5);
+    assert_eq!(r[1].end, 7);
+    // def run:
+    assert_eq!(r[2].start, 6);
+    assert_eq!(r[2].end, 7);
+}
+
+#[test]
+fn indent_fold_crlf() {
+    let r = indent_fold("def foo():\r\n    pass\r\n");
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 1);
+}
+
+#[test]
+fn indent_fold_continuation_not_pseudo_header() {
+    // Lines starting with `elsewhere` or `exceptional` should NOT be treated
+    // as continuations — only exact keyword match.
+    let r = indent_fold(
+        "\
+if True:
+    pass
+elsewhere = 5
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 1);
+}
+
+#[test]
+fn indent_fold_inner_else_continuation() {
+    let r = indent_fold(
+        "\
+if a:
+    if b:
+        c()
+    else:
+        d()
+e = 1
+",
+    );
+    assert_eq!(r.len(), 2);
+    // Outer if a: lines 0–4 (covers inner if/else including d())
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 4);
+    // Inner if b: lines 1–4 (else continuation extends through d())
+    assert_eq!(r[1].start, 1);
+    assert_eq!(r[1].end, 4);
+}
+
+#[test]
+fn indent_fold_match_case_header() {
+    let r = indent_fold(
+        "\
+def process(val):
+    match val:
+        case 1:
+            return 'one'
+        case _:
+            return 'other'
+",
+    );
+    // def process, match, and each case arm create fold regions.
+    assert_eq!(r.len(), 4);
+    assert_eq!(r[0].start, 0); // def process: lines 0–5
+    assert_eq!(r[0].end, 5);
+    assert_eq!(r[1].start, 1); // match val: lines 1–5
+    assert_eq!(r[1].end, 5);
+    assert_eq!(r[2].start, 2); // case 1: lines 2–3
+    assert_eq!(r[2].end, 3);
+    assert_eq!(r[3].start, 4); // case _: lines 4–5
+    assert_eq!(r[3].end, 5);
+}
+
+#[test]
+fn indent_fold_multiple_top_level_headers() {
+    let text = "\
+def first():
+    a()
+    b()
+
+def second():
+    c()
+    d()
+";
+    let r = indent_fold(text);
+    assert_eq!(r.len(), 2);
+    // Blank line after b() is included in the region.
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 3);
+    assert_eq!(r[1].start, 4);
+    assert_eq!(r[1].end, 6);
+}
+
+#[test]
+fn indent_fold_while_for_headers() {
+    let r = indent_fold(
+        "\
+while cond:
+    process()
+    if flag:
+        break
+",
+    );
+    assert_eq!(r.len(), 2);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 3);
+    assert_eq!(r[1].start, 2);
+    assert_eq!(r[1].end, 3);
+}
+
+#[test]
+fn indent_fold_with_header() {
+    let r = indent_fold(
+        "\
+with open('f') as f:
+    data = f.read()
+    process(data)
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 2);
+}
+
+#[test]
+fn indent_fold_comment_lines_not_headers() {
+    // Lines starting with # are blank for our purposes (trimmed empty).
+    let r = indent_fold(
+        "\
+def foo():
+    # comment
+    pass
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 2);
+}
+
+#[test]
+fn indent_fold_dedented_comment_does_not_terminate_region() {
+    // A comment at column 0 (or any indent <= the header's) carries no
+    // indentation significance in Python and must not end the block.
+    let r = indent_fold(
+        "\
+def foo():
+    x = 1
+# section marker
+    y = 2
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 3);
+}
