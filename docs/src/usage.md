@@ -140,7 +140,7 @@ These work no matter which panel is focused.
 | `Up`/`k`, `Down`/`j` | Move selection               |
 | `Enter`/`Right`/`l`  | Expand directory / open file |
 | `Left`/`h`           | Collapse directory / go up   |
-| `Backspace`          | Go up one directory          |
+| `Backspace`          | Go up one directory (stops at the directory mantis was launched from) |
 | `-`/`=`              | Collapse all / expand all    |
 | `g`/`Home`, `G`/`End` | Jump to first / last entry  |
 

@@ -27,6 +27,9 @@ pub struct SessionState {
     pub content_scroll: usize,
     /// Active line (cursor) in the content pane.
     pub active_line: usize,
+    /// The initial root directory that mantis was launched from.
+    #[serde(default)]
+    pub initial_root: Option<PathBuf>,
 }
 
 const SESSION_DIR_NAME: &str = "sessions";

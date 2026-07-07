@@ -66,6 +66,7 @@ pub(crate) use util::{deleted_set, diff_line_style, rect_contains};
 /// state, geometry captured during rendering, and configuration.
 pub struct App {
     pub root: PathBuf,
+    pub initial_root: PathBuf,
     pub nodes: Vec<TreeNode>,
     pub expanded: HashSet<PathBuf>,
     pub tree_selected: usize,
@@ -392,6 +393,7 @@ impl App {
             current_file: self.current_file.clone(),
             content_scroll: self.content_scroll,
             active_line: self.active_line,
+            initial_root: Some(self.initial_root.clone()),
         };
         crate::session::save(&self.root, &state);
         self.session_dirty = false;

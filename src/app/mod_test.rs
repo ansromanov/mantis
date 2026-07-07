@@ -4507,6 +4507,7 @@ fn breadcrumb_mouse_click_parent_changes_root() {
     let mut app = app_for(&root);
     let orig_root = root.clone();
     let parent = root.parent().expect("temp dir has a parent").to_path_buf();
+    app.initial_root = parent.clone();
 
     // Select a nested file.
     app.expanded.insert(root.join("sub"));

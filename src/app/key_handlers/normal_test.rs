@@ -348,18 +348,26 @@ fn backspace_in_tree_calls_tree_up_dir() {
     let root = temp_tree();
     let orig_root = root.clone();
     let mut app = app_for(&root);
+    // Descend to sub so app.root is root/sub
+    let sub = root.join("sub");
+    fs::create_dir_all(&sub).unwrap();
+    fs::write(sub.join("nested.txt"), "nested").unwrap();
+    app.rebuild(true);
+    let sub_idx = app.nodes.iter().position(|n| n.path == sub).unwrap();
+    app.tree_selected = sub_idx;
+    app.descend_to_selected();
+
     app.focus = Focus::Tree;
     let file_idx = app
         .nodes
         .iter()
-        .position(|n| n.path == root.join("long.txt"))
-        .expect("long.txt");
+        .position(|n| n.path == sub.join("nested.txt"))
+        .expect("nested.txt");
     app.tree_selected = file_idx;
-    let parent = root.parent().expect("root has parent").to_path_buf();
     app.handle_key(key(KeyCode::Backspace));
     assert_eq!(
-        app.root, parent,
-        "Backspace must call tree_up_dir and change root"
+        app.root, orig_root,
+        "Backspace must call tree_up_dir and change root back to initial_root"
     );
     fs::remove_dir_all(&orig_root).ok();
 }

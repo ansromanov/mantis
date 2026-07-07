@@ -301,7 +301,15 @@ impl App {
     /// add a reset here or verify that its default value is correct after a root
     /// change.
     fn set_root(&mut self, path: &std::path::Path) {
-        self.root = path.to_path_buf();
+        let path_buf = if path.starts_with(&self.initial_root) {
+            path.to_path_buf()
+        } else {
+            self.initial_root.clone()
+        };
+        if path_buf == self.root {
+            return;
+        }
+        self.root = path_buf;
         self.expanded.clear();
         self.clear_content_state();
         self.file_watcher = None;
@@ -399,12 +407,30 @@ impl App {
             return;
         };
 
+        let actual_target = if target == self.root {
+            self.root.parent().map(|p| p.to_path_buf())
+        } else {
+            Some(target.clone())
+        };
+
+        let Some(actual_target) = actual_target else {
+            return;
+        };
+
+        if !actual_target.starts_with(&self.initial_root) {
+            // Clamp to initial root.
+            if self.root != self.initial_root {
+                let init_root = self.initial_root.clone();
+                self.set_root(&init_root);
+            } else {
+                self.set_status("Already at root");
+            }
+            return;
+        }
+
         if target == self.root {
             // Already at root level → go up to root's parent.
-            let Some(grandparent) = self.root.parent().map(|p| p.to_path_buf()) else {
-                return;
-            };
-            self.set_root(&grandparent);
+            self.set_root(&actual_target);
             return;
         }
 
