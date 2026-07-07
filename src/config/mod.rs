@@ -33,7 +33,7 @@ pub use keymap::{pressed, pressed_in, BindingScope, Keymap};
 pub use types::{Config, StatusBarConfig};
 // Only referenced in test struct literals.
 #[cfg_attr(not(test), allow(unused_imports))]
-pub use types::UpdatesConfig;
+pub use types::{TelemetryConfig, UpdatesConfig};
 #[allow(unused_imports)]
 pub use validate::schema_paths;
 // Used by name only in test code (struct literals in *_test helpers).

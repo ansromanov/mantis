@@ -81,6 +81,8 @@ search.keep_query
 statusbar
 statusbar.left
 statusbar.right
+telemetry
+telemetry.enabled
 theme
 theme.accent
 theme.accent_alt

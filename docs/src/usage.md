@@ -249,6 +249,14 @@ next to its current keybinding. Type to fuzzy-filter (e.g. "blame", "theme",
 command. It's the fastest way to discover what `mantis` can do without
 memorizing keys.
 
+## Reporting a bug
+
+Run **"Report a bug (save diagnostics locally)"** from the command palette to
+save an anonymous diagnostic report (app version, OS, terminal, workspace
+shape — no paths, names, or content) under the state directory, then attach
+it to a GitHub issue. See [Telemetry & Bug Reports](telemetry.md) for exactly
+what the report contains.
+
 ## Git mode history
 
 `H` (while the tree is focused) opens the file's git history in both normal

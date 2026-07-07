@@ -45,6 +45,11 @@ pub static ACTIONS: &[ActionSpec] = &[
         help: Some(("Global", "toggle this help")),
     },
     ActionSpec {
+        id: "bug_report",
+        palette: Some("Report a bug (save diagnostics locally)"),
+        help: None,
+    },
+    ActionSpec {
         id: "switch_panel",
         palette: None,
         help: Some(("Global", "switch panel")),
