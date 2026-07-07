@@ -65,7 +65,7 @@ impl App {
                 true
             }
             Some("bug_report") => {
-                self.save_bug_report();
+                self.bug_report = Some(crate::search::BugReportState::new());
                 true
             }
             Some("quit") => {

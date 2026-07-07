@@ -2,7 +2,8 @@ use crate::app::{App, Focus};
 use crate::command_palette::{CommandPalette, COMMANDS};
 use crate::config::Config;
 use crate::search::{
-    CompareModeInput, GotoLineState, InFileSearch, SearchState, ThemePicker, TreeFilter,
+    BugReportState, CompareModeInput, GotoLineState, InFileSearch, SearchState, ThemePicker,
+    TreeFilter,
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::Rect;
@@ -924,6 +925,73 @@ fn handle_in_file_search_key_toggles() {
     assert!(!app.in_file_search.as_ref().unwrap().whole_word);
     app.handle_in_file_search_key(word_key);
     assert!(app.in_file_search.as_ref().unwrap().whole_word);
+
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn handle_bug_report_key_handling() {
+    let _guard = crate::session::STATE_DIR_ENV_LOCK.lock().unwrap();
+    let state_dir = tempfile::tempdir().unwrap();
+    std::env::set_var("MANTIS_STATE_DIR", state_dir.path());
+
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.bug_report = Some(BugReportState::new());
+
+    // Type "Hi"
+    app.handle_bug_report_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::empty()));
+    app.handle_bug_report_key(KeyEvent::new(KeyCode::Char('i'), KeyModifiers::empty()));
+    assert_eq!(
+        app.bug_report.as_ref().unwrap().text,
+        vec!["Hi".to_string()]
+    );
+
+    // Press Enter (newline)
+    app.handle_bug_report_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert_eq!(
+        app.bug_report.as_ref().unwrap().text,
+        vec!["Hi".to_string(), "".to_string()]
+    );
+
+    // Type "there"
+    for c in "there".chars() {
+        app.handle_bug_report_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::empty()));
+    }
+    assert_eq!(
+        app.bug_report.as_ref().unwrap().text,
+        vec!["Hi".to_string(), "there".to_string()]
+    );
+
+    // Test Backspace
+    app.handle_bug_report_key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::empty()));
+    assert_eq!(
+        app.bug_report.as_ref().unwrap().text,
+        vec!["Hi".to_string(), "ther".to_string()]
+    );
+
+    // Test Ctrl+S to submit & save
+    app.handle_bug_report_key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::CONTROL));
+    assert!(app.bug_report.is_none());
+
+    let saved: Vec<_> = fs::read_dir(state_dir.path().join("bug-reports"))
+        .unwrap()
+        .flatten()
+        .collect();
+    assert_eq!(saved.len(), 1);
+
+    std::env::remove_var("MANTIS_STATE_DIR");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn handle_bug_report_key_esc_closes_modal() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.bug_report = Some(BugReportState::new());
+
+    app.handle_bug_report_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+    assert!(app.bug_report.is_none());
 
     fs::remove_dir_all(&root).ok();
 }

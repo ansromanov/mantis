@@ -99,6 +99,10 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         popups::draw_recent(f, app, area);
     }
 
+    if app.bug_report.is_some() {
+        popups::draw_bug_report(f, app, area);
+    }
+
     if app.show_about {
         popups::draw_about(f, app, area);
     }

@@ -542,6 +542,63 @@ impl App {
             _ => {}
         }
     }
+    pub(super) fn handle_bug_report_key(&mut self, key: KeyEvent) {
+        use crossterm::event::KeyModifiers;
+
+        let is_ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+        let is_alt = key.modifiers.contains(KeyModifiers::ALT);
+
+        // Submit/Save: Ctrl+S or Ctrl+Enter
+        if is_ctrl
+            && (key.code == KeyCode::Char('s')
+                || key.code == KeyCode::Char('S')
+                || key.code == KeyCode::Enter)
+        {
+            self.save_bug_report();
+            return;
+        }
+
+        let Some(ref mut state) = self.bug_report else {
+            return;
+        };
+
+        match key.code {
+            KeyCode::Esc => {
+                self.bug_report = None;
+            }
+            KeyCode::Enter => {
+                state.insert_newline();
+            }
+            KeyCode::Backspace => {
+                state.backspace();
+            }
+            KeyCode::Delete => {
+                state.delete();
+            }
+            KeyCode::Left => {
+                state.move_left();
+            }
+            KeyCode::Right => {
+                state.move_right();
+            }
+            KeyCode::Up => {
+                state.move_up();
+            }
+            KeyCode::Down => {
+                state.move_down();
+            }
+            KeyCode::Home => {
+                state.move_home();
+            }
+            KeyCode::End => {
+                state.move_end();
+            }
+            KeyCode::Char(c) if !is_ctrl && !is_alt => {
+                state.insert_char(c);
+            }
+            _ => {}
+        }
+    }
 }
 
 #[cfg(test)]

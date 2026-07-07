@@ -40,8 +40,8 @@ use crate::git::GitStatus;
 use crate::highlight::Highlighter;
 use crate::plugin::{ExtraSyntax, PluginContributions, PluginManager};
 use crate::search::{
-    CommandPalette, CompareModeInput, GotoLineState, HistoryState, InFileSearch, PluginPicker,
-    RecentFilesState, SearchState, ThemePicker, TreeFilter,
+    BugReportState, CommandPalette, CompareModeInput, GotoLineState, HistoryState, InFileSearch,
+    PluginPicker, RecentFilesState, SearchState, ThemePicker, TreeFilter,
 };
 use crate::selection::TextSelection;
 use crate::theme::Theme;
@@ -179,6 +179,7 @@ pub struct App {
     /// State for the compare-against-revision input prompt. `Some` while the
     /// prompt is open (user typing a revision); `None` otherwise.
     pub compare_input: Option<CompareModeInput>,
+    pub bug_report: Option<BugReportState>,
     pub show_scrollbar: bool,
     pub show_scroll_percentage: bool,
     pub show_line_numbers: bool,
@@ -610,6 +611,7 @@ impl App {
             Ok(path) => self.set_status(format!("bug report saved: {}", path.display())),
             Err(e) => self.set_status(format!("bug report failed: {e}")),
         }
+        self.bug_report = None;
     }
 
     /// Copies `text` to the system clipboard, reporting success or failure in the

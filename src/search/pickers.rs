@@ -545,6 +545,194 @@ impl ListPicker for PluginPicker {
     }
 }
 
+/// State for the bug report modal.
+/// Holds the typed text lines, the cursor position, and the viewport scroll offset.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BugReportState {
+    pub text: Vec<String>,
+    pub cursor_row: usize,
+    pub cursor_col: usize,
+    pub scroll_top: usize,
+}
+
+impl Default for BugReportState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl BugReportState {
+    pub fn new() -> Self {
+        BugReportState {
+            text: vec![String::new()],
+            cursor_row: 0,
+            cursor_col: 0,
+            scroll_top: 0,
+        }
+    }
+
+    pub fn insert_char(&mut self, c: char) {
+        if self.text.is_empty() {
+            self.text.push(String::new());
+        }
+        if self.cursor_row >= self.text.len() {
+            self.cursor_row = self.text.len() - 1;
+        }
+        let line = &mut self.text[self.cursor_row];
+        let char_len = line.chars().count();
+        if self.cursor_col > char_len {
+            self.cursor_col = char_len;
+        }
+        let byte_idx = line
+            .char_indices()
+            .map(|(i, _)| i)
+            .nth(self.cursor_col)
+            .unwrap_or(line.len());
+        line.insert(byte_idx, c);
+        self.cursor_col += 1;
+    }
+
+    pub fn insert_newline(&mut self) {
+        if self.text.is_empty() {
+            self.text.push(String::new());
+        }
+        if self.cursor_row >= self.text.len() {
+            self.cursor_row = self.text.len() - 1;
+        }
+        let line = &mut self.text[self.cursor_row];
+        let char_len = line.chars().count();
+        if self.cursor_col > char_len {
+            self.cursor_col = char_len;
+        }
+        let byte_idx = line
+            .char_indices()
+            .map(|(i, _)| i)
+            .nth(self.cursor_col)
+            .unwrap_or(line.len());
+        let next_line = line.split_off(byte_idx);
+        self.text.insert(self.cursor_row + 1, next_line);
+        self.cursor_row += 1;
+        self.cursor_col = 0;
+    }
+
+    pub fn backspace(&mut self) {
+        if self.text.is_empty() {
+            return;
+        }
+        if self.cursor_row >= self.text.len() {
+            self.cursor_row = self.text.len() - 1;
+        }
+        if self.cursor_col > 0 {
+            let line = &mut self.text[self.cursor_row];
+            let char_len = line.chars().count();
+            if self.cursor_col > char_len {
+                self.cursor_col = char_len;
+            }
+            let char_idx = self.cursor_col - 1;
+            let byte_idx = line
+                .char_indices()
+                .map(|(i, _)| i)
+                .nth(char_idx)
+                .unwrap_or(line.len());
+            line.remove(byte_idx);
+            self.cursor_col -= 1;
+        } else if self.cursor_row > 0 {
+            let current_line = self.text.remove(self.cursor_row);
+            self.cursor_row -= 1;
+            let prev_line = &mut self.text[self.cursor_row];
+            let prev_len = prev_line.chars().count();
+            prev_line.push_str(&current_line);
+            self.cursor_col = prev_len;
+        }
+    }
+
+    pub fn delete(&mut self) {
+        if self.text.is_empty() {
+            return;
+        }
+        if self.cursor_row >= self.text.len() {
+            self.cursor_row = self.text.len() - 1;
+        }
+        let line = &mut self.text[self.cursor_row];
+        let char_len = line.chars().count();
+        if self.cursor_col < char_len {
+            let byte_idx = line
+                .char_indices()
+                .map(|(i, _)| i)
+                .nth(self.cursor_col)
+                .unwrap_or(line.len());
+            line.remove(byte_idx);
+        } else if self.cursor_row + 1 < self.text.len() {
+            let next_line = self.text.remove(self.cursor_row + 1);
+            let line = &mut self.text[self.cursor_row];
+            line.push_str(&next_line);
+        }
+    }
+
+    pub fn move_left(&mut self) {
+        if self.cursor_col > 0 {
+            self.cursor_col -= 1;
+        } else if self.cursor_row > 0 {
+            self.cursor_row -= 1;
+            self.cursor_col = self.text[self.cursor_row].chars().count();
+        }
+    }
+
+    pub fn move_right(&mut self) {
+        if self.text.is_empty() {
+            return;
+        }
+        let char_len = self.text[self.cursor_row].chars().count();
+        if self.cursor_col < char_len {
+            self.cursor_col += 1;
+        } else if self.cursor_row + 1 < self.text.len() {
+            self.cursor_row += 1;
+            self.cursor_col = 0;
+        }
+    }
+
+    pub fn move_up(&mut self) {
+        if self.cursor_row > 0 {
+            self.cursor_row -= 1;
+            let char_len = self.text[self.cursor_row].chars().count();
+            if self.cursor_col > char_len {
+                self.cursor_col = char_len;
+            }
+        }
+    }
+
+    pub fn move_down(&mut self) {
+        if self.cursor_row + 1 < self.text.len() {
+            self.cursor_row += 1;
+            let char_len = self.text[self.cursor_row].chars().count();
+            if self.cursor_col > char_len {
+                self.cursor_col = char_len;
+            }
+        }
+    }
+
+    pub fn move_home(&mut self) {
+        self.cursor_col = 0;
+    }
+
+    pub fn move_end(&mut self) {
+        if !self.text.is_empty() {
+            self.cursor_col = self.text[self.cursor_row].chars().count();
+        }
+    }
+
+    pub fn clamp_scroll(&mut self, height: usize) {
+        if height == 0 {
+            return;
+        }
+        if self.cursor_row < self.scroll_top {
+            self.scroll_top = self.cursor_row;
+        } else if self.cursor_row >= self.scroll_top + height {
+            self.scroll_top = self.cursor_row - height + 1;
+        }
+    }
+}
+
 #[cfg(test)]
 #[path = "pickers_test.rs"]
 mod tests;

@@ -68,6 +68,7 @@ pub struct DiagnosticReport {
     pub config_overrides: Vec<String>,
     pub plugin_count: usize,
     pub telemetry_enabled: bool,
+    pub body: String,
 }
 
 impl DiagnosticReport {
@@ -78,7 +79,13 @@ impl DiagnosticReport {
             .as_deref()
             .and_then(|p| fs::metadata(p).ok())
             .map(|m| m.len());
+        let body = app
+            .bug_report
+            .as_ref()
+            .map(|br| br.text.join("\n"))
+            .unwrap_or_default();
         DiagnosticReport {
+            body,
             app_version: env!("CARGO_PKG_VERSION"),
             release_date: crate::release_info::RELEASE
                 .as_ref()
@@ -127,7 +134,13 @@ impl DiagnosticReport {
 
     /// Renders the report as the markdown body a user can paste into an issue.
     pub fn to_markdown(&self) -> String {
-        let mut md = String::from("## mantis diagnostic report\n\n");
+        let mut md = String::new();
+        if !self.body.is_empty() {
+            md.push_str("## bug report body\n\n");
+            md.push_str(&self.body);
+            md.push_str("\n\n");
+        }
+        md.push_str("## mantis diagnostic report\n\n");
         let opt = |v: &Option<String>| v.clone().unwrap_or_else(|| "unknown".into());
         md.push_str(&format!(
             "- **app**: {} (released {})\n",
