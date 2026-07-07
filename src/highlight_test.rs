@@ -204,3 +204,10 @@ fn to_ratatui_respects_no_color() {
     }
     std::env::remove_var("MANTIS_TEST_NO_COLOR");
 }
+
+#[test]
+fn highlight_range_empty_lines() {
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[]);
+    let spans = h.highlight_range(Some("Rust"), &[]);
+    assert!(spans.is_empty());
+}

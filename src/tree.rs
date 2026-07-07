@@ -37,6 +37,7 @@ pub fn build_visible(
     ignore_gitignore: bool,
     deleted_files: &HashSet<PathBuf>,
 ) -> (Vec<TreeNode>, usize) {
+    let _span = tracing::info_span!("build_visible").entered();
     let mut children: HashMap<PathBuf, Vec<DirEntry>> = HashMap::new();
     let mut error_count = 0usize;
 

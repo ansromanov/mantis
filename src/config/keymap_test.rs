@@ -683,3 +683,13 @@ fn default_keymap_includes_open_external() {
         &ev(KeyCode::Char('o'), KeyModifiers::NONE)
     ));
 }
+
+#[test]
+fn action_for_key_resolves_correctly() {
+    let keymap = Keymap::default();
+    let key = ev(KeyCode::Char('o'), KeyModifiers::NONE);
+    assert_eq!(
+        keymap.action_for_key(&key, BindingScope::Content),
+        Some("open_external")
+    );
+}

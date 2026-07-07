@@ -405,6 +405,8 @@ fn create_base_app() -> App {
         clipboard_capture: Vec::new(),
         command_usage: crate::command_usage::UsageStats::default(),
         telemetry: crate::telemetry::Telemetry::disabled(),
+        last_open_source: crate::telemetry::FileSourceKind::Startup,
+        active_overlays: crate::app::ActiveOverlays::default(),
         diff_mode: crate::app::DiffMode::default(),
         goto_line: None,
         tree_filter: None,
@@ -1662,4 +1664,10 @@ path = "mantis-plugin-markdown"
     // Verify migrated plugin config
     let entry = app.config.plugins.get("markdown").expect("markdown entry");
     assert_eq!(entry.path.to_str().unwrap(), "markdown");
+}
+
+#[test]
+fn refresh_telemetry_check() {
+    let mut app = create_base_app();
+    assert!(!app.telemetry.is_enabled());
 }

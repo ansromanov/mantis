@@ -193,3 +193,9 @@ fn push_range_merges_contiguous() {
     push_range(&mut r, 7, 9);
     assert_eq!(r, vec![(0, 5), (7, 9)]);
 }
+
+#[test]
+fn parse_side_by_side_empty_input() {
+    let rows = parse_side_by_side(&[]);
+    assert!(rows.is_empty());
+}

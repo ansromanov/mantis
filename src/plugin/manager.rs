@@ -92,6 +92,7 @@ pub(crate) struct PluginManager {
     next_request_id: u64,
     /// Requests sent via `send_request` awaiting a `response`, keyed by id.
     pending_requests: HashMap<u64, PendingRequest>,
+    request_spans: HashMap<u64, tracing::Span>,
 }
 
 impl PluginManager {
@@ -110,6 +111,7 @@ impl PluginManager {
             provider_conflicts_warned: HashSet::new(),
             next_request_id: 0,
             pending_requests: HashMap::new(),
+            request_spans: HashMap::new(),
         }
     }
 
@@ -191,6 +193,8 @@ impl PluginManager {
         let plugin = self.plugins.iter_mut().find(|p| p.name == plugin_name)?;
         let id = self.next_request_id;
         self.next_request_id = self.next_request_id.wrapping_add(1);
+        let span = tracing::info_span!("plugin_round_trip");
+        self.request_spans.insert(id, span);
         plugin.send(&ToPlugin {
             event: "request".into(),
             path: None,
@@ -225,6 +229,7 @@ impl PluginManager {
             for (id, result) in plugin.drain_responses() {
                 if self.pending_requests.remove(&id).is_some() {
                     results.push((id, result));
+                    self.request_spans.remove(&id);
                 }
                 // Unknown or already-timed-out id: silently dropped.
             }
@@ -240,6 +245,7 @@ impl PluginManager {
             let Some(pending) = self.pending_requests.remove(&id) else {
                 continue;
             };
+            self.request_spans.remove(&id);
             let message = format!("request {id} to plugin '{}' timed out", pending.plugin_name);
             self.record_plugin_error(
                 &pending.plugin_name,

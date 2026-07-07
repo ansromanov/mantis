@@ -19,7 +19,7 @@ mod sink;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{self, SyncSender};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::Instant;
 
@@ -27,12 +27,97 @@ use serde::Serialize;
 
 use sink::JsonlSink;
 
-/// How an action was invoked. Only palette dispatch is instrumented so far;
-/// key and mouse sources are added when those choke points are wired.
+/// How an action was invoked.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ActionSource {
     Palette,
+    Key,
+    Mouse,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OverlayKind {
+    Help,
+    About,
+    ThemePicker,
+    PluginPicker,
+    CommandPalette,
+    History,
+    RecentFiles,
+    Search,
+    InFileSearch,
+    TreeFilter,
+    BugReport,
+    CompareInput,
+    GotoLine,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Feature {
+    Fold,
+    DiffNav,
+    GitHistory,
+    VisualMode,
+    GitBlame,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FileSourceKind {
+    Tree,
+    RecentFiles,
+    Search,
+    History,
+    Startup,
+    Reopen,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FileSizeBucket {
+    Under1Kb,
+    From1KbTo1Mb,
+    From1MbTo16Mb,
+    Over16Mb,
+}
+
+impl FileSizeBucket {
+    pub fn from_size(size: u64) -> Self {
+        if size < 1024 {
+            Self::Under1Kb
+        } else if size < 1024 * 1024 {
+            Self::From1KbTo1Mb
+        } else if size < 16 * 1024 * 1024 {
+            Self::From1MbTo16Mb
+        } else {
+            Self::Over16Mb
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FileEncoding {
+    Utf8,
+    Ascii,
+    Utf8Bom,
+    Binary,
+    Unknown,
+}
+
+impl FileEncoding {
+    pub fn from_str(enc: Option<&str>) -> Self {
+        match enc {
+            Some("UTF-8") => Self::Utf8,
+            Some("ASCII") => Self::Ascii,
+            Some("UTF-8 BOM") => Self::Utf8Bom,
+            Some("BINARY") => Self::Binary,
+            _ => Self::Unknown,
+        }
+    }
 }
 
 /// One telemetry event. A closed enum of typed fields is the privacy
@@ -59,11 +144,104 @@ pub enum TelemetryEvent {
         action: &'static str,
         source: ActionSource,
     },
+    OverlayOpened {
+        kind: OverlayKind,
+    },
+    FeatureUsed {
+        feature: Feature,
+    },
+    PluginToggled {
+        kind: crate::plugin::types::PluginKind,
+        enabled: bool,
+    },
+    FileOpened {
+        size_bucket: FileSizeBucket,
+        source_kind: FileSourceKind,
+        encoding: FileEncoding,
+        is_binary: bool,
+    },
+    PerfSpan {
+        span: &'static str,
+        duration_bucket: &'static str,
+    },
+    ErrorOccurred {
+        module: &'static str,
+        kind: &'static str,
+    },
 }
 
 /// Bounded queue between the render loop and the writer thread. Sized so a
 /// burst of palette commands never blocks; overflow drops events instead.
 const CHANNEL_CAPACITY: usize = 256;
+
+struct TelemetryState {
+    tx: SyncSender<TelemetryEvent>,
+    dropped: Arc<AtomicU64>,
+}
+
+static TELEMETRY_STATE: Mutex<Option<TelemetryState>> = Mutex::new(None);
+
+/// Telemetry layer for the tracing library.
+pub struct TelemetryLayer;
+
+struct SpanStart(Instant);
+
+impl<S> tracing_subscriber::Layer<S> for TelemetryLayer
+where
+    S: tracing::Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
+{
+    fn on_new_span(&self, _attrs: &tracing::span::Attributes<'_>, id: &tracing::span::Id, ctx: tracing_subscriber::layer::Context<'_, S>) {
+        if let Some(span) = ctx.span(id) {
+            span.extensions_mut().insert(SpanStart(Instant::now()));
+        }
+    }
+
+    fn on_close(&self, id: tracing::span::Id, ctx: tracing_subscriber::layer::Context<'_, S>) {
+        if let Some(span) = ctx.span(&id) {
+            let name = span.name();
+            const ALLOWED_SPANS: &[&str] = &[
+                "open_file",
+                "build_visible",
+                "highlight",
+                "highlight_range",
+                "search_refresh",
+                "diff_parse",
+                "plugin_round_trip",
+            ];
+            if !ALLOWED_SPANS.contains(&name) {
+                return;
+            }
+            let start = span.extensions().get::<SpanStart>().map(|s| s.0);
+            if let Some(start) = start {
+                let duration = start.elapsed();
+                let duration_ms = duration.as_millis() as u64;
+                let bucket = if duration_ms < 1 {
+                    "<1ms"
+                } else if duration_ms < 16 {
+                    "1-16ms"
+                } else if duration_ms < 100 {
+                    "16-100ms"
+                } else {
+                    ">100ms"
+                };
+                record_global(TelemetryEvent::PerfSpan {
+                    span: name,
+                    duration_bucket: bucket,
+                });
+            }
+        }
+    }
+}
+
+pub(crate) fn record_global(event: TelemetryEvent) {
+    if let Ok(guard) = TELEMETRY_STATE.lock() {
+        if let Some(state) = &*guard {
+            if state.tx.try_send(event).is_err() {
+                state.dropped.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+    }
+}
 
 /// Handle owned by `App`. Cheap to call from anywhere; all I/O happens on the
 /// background writer thread. Dropping the handle emits `SessionEnd` and joins
@@ -110,12 +288,18 @@ impl Telemetry {
         });
         let telemetry = Telemetry {
             inner: Some(Inner {
-                tx: Some(tx),
+                tx: Some(tx.clone()),
                 dropped: Arc::new(AtomicU64::new(0)),
                 started,
                 writer: Some(writer),
             }),
         };
+        if let Ok(mut guard) = TELEMETRY_STATE.lock() {
+            *guard = Some(TelemetryState {
+                tx,
+                dropped: telemetry.inner.as_ref().unwrap().dropped.clone(),
+            });
+        }
         telemetry.record(TelemetryEvent::SessionStart {
             app_version: env!("CARGO_PKG_VERSION"),
             os: std::env::consts::OS,
@@ -133,16 +317,15 @@ impl Telemetry {
     /// Queues `event` for the writer thread. Never blocks: a full channel
     /// drops the event and bumps the counter reported in `SessionEnd`.
     pub fn record(&self, event: TelemetryEvent) {
-        let Some(inner) = &self.inner else { return };
-        let Some(tx) = &inner.tx else { return };
-        if tx.try_send(event).is_err() {
-            inner.dropped.fetch_add(1, Ordering::Relaxed);
-        }
+        record_global(event);
     }
 }
 
 impl Drop for Telemetry {
     fn drop(&mut self) {
+        if let Ok(mut guard) = TELEMETRY_STATE.lock() {
+            *guard = None;
+        }
         let Some(inner) = &mut self.inner else { return };
         // Best-effort flush: telemetry is a cache-grade side channel, so a
         // failed final send is deliberately ignored (per the error-handling

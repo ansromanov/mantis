@@ -775,3 +775,10 @@ fn send_request_times_out_without_response() {
     mgr.deactivate_all();
     std::fs::remove_dir_all(&dir).ok();
 }
+
+#[test]
+fn send_request_returns_none_for_missing_plugin() {
+    let mut mgr = PluginManager::new(vec![]);
+    let id = mgr.send_request("nonexistent", "method", serde_json::json!({}));
+    assert!(id.is_none());
+}

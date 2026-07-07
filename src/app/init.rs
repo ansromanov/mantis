@@ -133,6 +133,8 @@ impl App {
             goto_line: None,
             command_usage: crate::command_usage::UsageStats::load(),
             telemetry: crate::telemetry::Telemetry::new(cfg.telemetry.enabled),
+            last_open_source: crate::telemetry::FileSourceKind::Startup,
+            active_overlays: crate::app::ActiveOverlays::default(),
             command_palette: None,
             history: None,
             theme_picker: None,

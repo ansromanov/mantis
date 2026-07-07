@@ -40,6 +40,9 @@ impl App {
 
     /// Toggles the fold state of `region_idx` and clamps the scroll position.
     pub fn toggle_fold_region(&mut self, region_idx: usize) {
+        self.telemetry.record(crate::telemetry::TelemetryEvent::FeatureUsed {
+            feature: crate::telemetry::Feature::Fold,
+        });
         if self.folded.contains(&region_idx) {
             self.folded.remove(&region_idx);
         } else {
@@ -51,6 +54,9 @@ impl App {
 
     /// Folds every detected region and scrolls to the top.
     pub fn fold_all(&mut self) {
+        self.telemetry.record(crate::telemetry::TelemetryEvent::FeatureUsed {
+            feature: crate::telemetry::Feature::Fold,
+        });
         self.folded = (0..self.fold_regions.len()).collect();
         self.rebuild_fold_display_map();
         self.set_content_scroll(0);
@@ -58,6 +64,9 @@ impl App {
 
     /// Expands every region.
     pub fn unfold_all(&mut self) {
+        self.telemetry.record(crate::telemetry::TelemetryEvent::FeatureUsed {
+            feature: crate::telemetry::Feature::Fold,
+        });
         self.folded.clear();
         self.fold_display_map.clear();
     }

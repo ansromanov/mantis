@@ -286,6 +286,11 @@ fn redirect_stdin_to_console() -> io::Result<()> {
 }
 
 fn main() -> anyhow::Result<()> {
+    use tracing_subscriber::prelude::*;
+    let layer = crate::telemetry::TelemetryLayer;
+    let subscriber = tracing_subscriber::registry().with(layer);
+    let _ = tracing::subscriber::set_global_default(subscriber);
+
     let stdin_piped = pager::is_piped_stdin();
     match plan_startup(parse_args(), parse_language_flag(), stdin_piped)? {
         Startup::Print(message) => {

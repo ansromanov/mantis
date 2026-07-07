@@ -294,3 +294,11 @@ fn apply_plugin_fold_regions_noop_when_path_not_mapped() {
 
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn fold_telemetry_check() {
+    let root = temp_tree();
+    let app = app_for(&root);
+    assert!(!app.telemetry.is_enabled());
+    fs::remove_dir_all(&root).ok();
+}

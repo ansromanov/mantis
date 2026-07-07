@@ -70,8 +70,28 @@ pub use types::{DiffMode, Focus, StatusMessage};
 pub(crate) use types::{HighlightCacheKey, HighlightCacheValue, PendingKeypress};
 pub(crate) use util::{deleted_set, diff_line_style, rect_contains};
 
-/// Central application state. Holds the file tree, content buffers, overlay
-/// state, geometry captured during rendering, and configuration.
+#[derive(Default, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ActiveOverlays {
+    pub help: bool,
+    pub about: bool,
+    pub theme_picker: bool,
+    pub plugin_picker: bool,
+    pub command_palette: bool,
+    pub history: bool,
+    pub recent_files: bool,
+    pub search: bool,
+    pub in_file_search: bool,
+    pub tree_filter: bool,
+    pub bug_report: bool,
+    pub compare_input: bool,
+    pub goto_line: bool,
+    pub visual_mode: bool,
+    pub git_blame: bool,
+}
+
+/// Central state struct for the `mantis` application. Handles the main event
+/// loop, key/mouse dispatch, overlays, plugins, theme preset/color roles, git
+/// status tracking, and file preview/diff rendering.
 pub struct App {
     pub root: PathBuf,
     pub initial_root: PathBuf,
@@ -123,6 +143,8 @@ pub struct App {
     /// Opt-in local telemetry handle; a no-op when `[telemetry]` is disabled.
     /// Dropping it (with `App`) flushes and joins the writer thread.
     pub telemetry: crate::telemetry::Telemetry,
+    pub(crate) last_open_source: crate::telemetry::FileSourceKind,
+    pub(crate) active_overlays: ActiveOverlays,
     pub content_title: Option<String>,
     pub focus: Focus,
     pub search: Option<SearchState>,
@@ -391,6 +413,10 @@ impl App {
     fn save_config(&mut self) {
         if let Some(path) = &self.config_path {
             if let Err(e) = config::save(&self.config, path) {
+                self.telemetry.record(crate::telemetry::TelemetryEvent::ErrorOccurred {
+                    module: "config",
+                    kind: "save_failed",
+                });
                 self.set_status(format!("could not save config: {e}"));
             }
         }
@@ -633,6 +659,10 @@ impl App {
         let local_path = match report.save() {
             Ok(path) => Some(path),
             Err(e) => {
+                self.telemetry.record(crate::telemetry::TelemetryEvent::ErrorOccurred {
+                    module: "diagnostics",
+                    kind: "bug_report_failed",
+                });
                 self.set_status(format!("bug report local save failed: {e}"));
                 None
             }
@@ -689,6 +719,10 @@ impl App {
                 self.set_status("opened browser; full report copied (paste into description)");
             }
             (Err(err), _) => {
+                self.telemetry.record(crate::telemetry::TelemetryEvent::ErrorOccurred {
+                    module: "diagnostics",
+                    kind: "bug_report_failed",
+                });
                 self.copy_to_clipboard(md, "full bug report");
                 self.set_status(format!(
                     "clipboard filled; browser failed (open github.com/ansromanov/mantis/issues/new): {err}"
@@ -707,7 +741,13 @@ impl App {
         }
         match self.clipboard_set(text) {
             Ok(()) => self.set_status(format!("copied {label}")),
-            Err(e) => self.set_status(format!("clipboard error: {e}")),
+            Err(e) => {
+                self.telemetry.record(crate::telemetry::TelemetryEvent::ErrorOccurred {
+                    module: "clipboard",
+                    kind: "write_failed",
+                });
+                self.set_status(format!("clipboard error: {e}"));
+            }
         }
     }
 
