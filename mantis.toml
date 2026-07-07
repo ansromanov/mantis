@@ -214,11 +214,11 @@ diff_hunk_prev = ["N"]
 #
 # [plugins.iconize]                 # Nerd Font file-type icons (set tree.icons = true)
 # enabled = true
-# path = "mantis-plugin-iconize"
+# path = "iconize"
 #
 # [plugins.markdown]                # render .md with pulldown-cmark; M toggles raw
 # enabled = true
-# path = "mantis-plugin-markdown"
+# path = "markdown"
 #
 # Syntax plugin example (extra highlighting; no subprocess spawned):
 # [plugins.terraform]

@@ -93,8 +93,8 @@ fn dirs_next() -> Option<PathBuf> {
 /// injected via `include!` at the top of this file, so the binaries are
 /// always available regardless of install method.
 pub(crate) const BUNDLED_PLUGINS: &[(&str, &str, &[u8])] = &[
-    ("iconize", "mantis-plugin-iconize", MANTIS_PLUGIN_ICONIZE),
-    ("markdown", "mantis-plugin-markdown", MANTIS_PLUGIN_MARKDOWN),
+    ("iconize", "iconize", ICONIZE),
+    ("markdown", "markdown", MARKDOWN),
 ];
 
 /// Filenames of old shell-script plugins superseded by the current Rust binaries.
@@ -102,7 +102,15 @@ pub(crate) const BUNDLED_PLUGINS: &[(&str, &str, &[u8])] = &[
 /// These were shipped by mantis up to 0.7.x and lived in the plugin directory
 /// as standalone shell scripts. They are no longer needed and are silently
 /// removed on startup so stale files cannot be accidentally re-enabled.
-pub(crate) const RETIRED_BUNDLED_PLUGINS: &[&str] = &["git-diff.sh", "git-log.sh", "iconize.sh"];
+pub(crate) const RETIRED_BUNDLED_PLUGINS: &[&str] = &[
+    "git-diff.sh",
+    "git-log.sh",
+    "iconize.sh",
+    "mantis-plugin-iconize",
+    "mantis-plugin-iconize.exe",
+    "mantis-plugin-markdown",
+    "mantis-plugin-markdown.exe",
+];
 
 /// List of (filename, content) for each bundled syntax definition.
 const BUNDLED_SYNTAX_PLUGINS: &[(&str, &str)] = &[(

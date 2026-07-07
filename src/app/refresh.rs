@@ -116,6 +116,7 @@ impl App {
             Ok(mut cfg) => {
                 cfg.migrate_legacy_flat_fields();
                 cfg.migrate_legacy_git_fields();
+                cfg.migrate_legacy_plugin_paths();
                 cfg.keys.migrate_legacy_keys();
                 let retired = crate::plugin::retired_bundled_plugins();
                 cfg.plugins.retain(|_name, entry| {

@@ -71,6 +71,7 @@ pub fn load(root: &Path) -> (Config, Option<PathBuf>, Option<String>) {
             Ok(mut config) => {
                 config.migrate_legacy_flat_fields();
                 config.migrate_legacy_git_fields();
+                config.migrate_legacy_plugin_paths();
                 config.keys.migrate_legacy_keys();
                 // Remove any [plugins] entries referencing retired bundled
                 // plugin filenames (e.g. old shell scripts). This is done
