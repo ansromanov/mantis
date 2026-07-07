@@ -745,21 +745,57 @@ fn test_command_applicability_predicates() {
     app.git_mode = false;
 
     // Test applicability checks under this fixture
-    assert_eq!(app.check_applicability("toggle_pretty_json"), Err("no file is open"));
-    assert_eq!(app.check_applicability("blame_line"), Err("no file is open"));
-    assert_eq!(app.check_applicability("file_history"), Err("no file is open"));
-    assert_eq!(app.check_applicability("compare_against"), Err("not in a git repo"));
-    assert_eq!(app.check_applicability("toggle_diff_staged"), Err("not in a git repo"));
-    assert_eq!(app.check_applicability("toggle_diff_side_by_side"), Err("requires diff view"));
-    assert_eq!(app.check_applicability("fold_toggle"), Err("no file is open"));
-    assert_eq!(app.check_applicability("open_in_editor"), Err("no file is open"));
-    assert_eq!(app.check_applicability("git_mode_flat_toggle"), Err("requires git mode"));
+    assert_eq!(
+        app.check_applicability("toggle_pretty_json"),
+        Err("no file is open")
+    );
+    assert_eq!(
+        app.check_applicability("blame_line"),
+        Err("no file is open")
+    );
+    assert_eq!(
+        app.check_applicability("file_history"),
+        Err("no file is open")
+    );
+    assert_eq!(
+        app.check_applicability("compare_against"),
+        Err("not in a git repo")
+    );
+    assert_eq!(
+        app.check_applicability("toggle_diff_staged"),
+        Err("not in a git repo")
+    );
+    assert_eq!(
+        app.check_applicability("toggle_diff_side_by_side"),
+        Err("requires diff view")
+    );
+    assert_eq!(
+        app.check_applicability("fold_toggle"),
+        Err("no file is open")
+    );
+    assert_eq!(
+        app.check_applicability("open_in_editor"),
+        Err("no file is open")
+    );
+    assert_eq!(
+        app.check_applicability("git_mode_flat_toggle"),
+        Err("requires git mode")
+    );
 
     // Fixture 2: File open, outside git repo, not JSON, no folds.
     app.current_file = Some(std::path::PathBuf::from("test.txt"));
-    assert_eq!(app.check_applicability("toggle_pretty_json"), Err("requires JSON file"));
-    assert_eq!(app.check_applicability("blame_line"), Err("not in a git repo"));
-    assert_eq!(app.check_applicability("fold_toggle"), Err("no fold regions in file"));
+    assert_eq!(
+        app.check_applicability("toggle_pretty_json"),
+        Err("requires JSON file")
+    );
+    assert_eq!(
+        app.check_applicability("blame_line"),
+        Err("not in a git repo")
+    );
+    assert_eq!(
+        app.check_applicability("fold_toggle"),
+        Err("no fold regions in file")
+    );
     assert_eq!(app.check_applicability("open_in_editor"), Ok(()));
 
     // Fixture 3: File open, inside git repo, JSON file, folds exist.
@@ -772,10 +808,16 @@ fn test_command_applicability_predicates() {
         untracked: 0,
     });
     app.is_json = true;
-    app.fold_regions = vec![crate::fold::FoldRegion {
-        start: 0,
-        end: 5,
-    }];
+    app.fold_regions = vec![crate::fold::FoldRegion { start: 0, end: 5 }];
+    // A `.json` file that fails to parse leaves `is_json` true but
+    // `json_pretty_lines` empty (see loader.rs) - must not be reported
+    // applicable, or dispatch silently no-ops on a palette entry the user
+    // was told was runnable.
+    assert_eq!(
+        app.check_applicability("toggle_pretty_json"),
+        Err("JSON file failed to parse")
+    );
+    app.json_pretty_lines = vec![vec![(ratatui::style::Style::default(), "{}".to_string())]];
     assert_eq!(app.check_applicability("toggle_pretty_json"), Ok(()));
     assert_eq!(app.check_applicability("blame_line"), Ok(()));
     assert_eq!(app.check_applicability("fold_toggle"), Ok(()));
@@ -783,8 +825,21 @@ fn test_command_applicability_predicates() {
     // Fixture 4: In a diff view.
     app.is_diff = true;
     // blame is not available in a diff
-    assert_eq!(app.check_applicability("blame_line"), Err("not available in a diff"));
+    assert_eq!(
+        app.check_applicability("blame_line"),
+        Err("not available in a diff")
+    );
     assert_eq!(app.check_applicability("toggle_diff_staged"), Ok(()));
+    app.is_diff = false;
+
+    // Fixture 5: plugin-rendered content has no text cursor, so blame must
+    // be reported inapplicable even though a file is open in a git repo.
+    let plugin_path = app.current_file.clone().unwrap();
+    app.plugin_content.insert(plugin_path, Vec::new());
+    assert_eq!(
+        app.check_applicability("blame_line"),
+        Err("not available (current file not plugin-rendered)")
+    );
 }
 
 #[test]
@@ -828,7 +883,9 @@ fn test_dispatch_inapplicable_command_sets_status_message() {
     assert!(app.command_palette.is_none());
     // 2. Status message is set indicating why
     let msg = app.status_message.as_ref().unwrap();
-    assert!(msg.text.contains("Toggle JSON pretty-print: requires JSON file"));
+    assert!(msg
+        .text
+        .contains("Toggle JSON pretty-print: requires JSON file"));
     // 3. Changes nothing else (e.g. show_pretty_json is not toggled)
     assert!(!app.show_pretty_json);
 }

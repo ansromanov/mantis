@@ -13,6 +13,9 @@
 //! Keybinding labels are right-aligned to form a scannable column.
 //! When the query is non-empty, matched characters in the display text (category
 //! + name) are highlighted with bold weight.
+//!
+//! Entries the current app state can't run (per `picker.inapplicability_reasons`)
+//! are dimmed entirely and show their reason in place of the description.
 
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},

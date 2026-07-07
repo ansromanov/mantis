@@ -525,6 +525,9 @@ impl App {
                 if !self.is_json {
                     return Err("requires JSON file");
                 }
+                if self.json_pretty_lines.is_empty() {
+                    return Err("JSON file failed to parse");
+                }
                 Ok(())
             }
             crate::actions::Applicability::GitRepo => {
@@ -551,6 +554,9 @@ impl App {
                 }
                 if self.is_diff {
                     return Err("not available in a diff");
+                }
+                if !self.has_text_cursor() {
+                    return Err("not available (current file not plugin-rendered)");
                 }
                 Ok(())
             }

@@ -298,3 +298,67 @@ fn navigation_actions_have_no_category_or_description() {
         );
     }
 }
+
+// -- applicability tests -----------------------------------------------------
+
+fn applicability_of(id: &str) -> Applicability {
+    ACTIONS.iter().find(|a| a.id == id).unwrap().applicability()
+}
+
+#[test]
+fn applicability_defaults_to_always_for_unlisted_actions() {
+    assert_eq!(applicability_of("quit"), Applicability::Always);
+    assert_eq!(applicability_of("help"), Applicability::Always);
+}
+
+#[test]
+fn applicability_maps_each_special_cased_action_to_its_precondition() {
+    assert_eq!(
+        applicability_of("toggle_pretty_json"),
+        Applicability::JsonFile
+    );
+    assert_eq!(
+        applicability_of("blame_line"),
+        Applicability::GitRepoAndNoDiff
+    );
+    assert_eq!(
+        applicability_of("toggle_blame"),
+        Applicability::GitRepoAndNoDiff
+    );
+    assert_eq!(
+        applicability_of("file_history"),
+        Applicability::GitRepoAndFile
+    );
+    assert_eq!(applicability_of("compare_against"), Applicability::GitRepo);
+    assert_eq!(
+        applicability_of("toggle_diff_staged"),
+        Applicability::GitRepoAndDiffView
+    );
+    assert_eq!(
+        applicability_of("toggle_diff_side_by_side"),
+        Applicability::DiffView
+    );
+    assert_eq!(applicability_of("diff_hunk_next"), Applicability::DiffView);
+    assert_eq!(applicability_of("diff_hunk_prev"), Applicability::DiffView);
+    assert_eq!(applicability_of("fold_toggle"), Applicability::FoldRegions);
+    assert_eq!(applicability_of("fold_all"), Applicability::FoldRegions);
+    assert_eq!(applicability_of("unfold_all"), Applicability::FoldRegions);
+    assert_eq!(
+        applicability_of("toggle_raw_markdown"),
+        Applicability::PluginContentActive
+    );
+    assert_eq!(applicability_of("open_in_editor"), Applicability::OpenFile);
+    assert_eq!(applicability_of("open_external"), Applicability::OpenFile);
+    assert_eq!(applicability_of("copy_path"), Applicability::OpenFile);
+    assert_eq!(
+        applicability_of("copy_relative_path"),
+        Applicability::OpenFile
+    );
+    assert_eq!(applicability_of("copy_line"), Applicability::OpenFile);
+    assert_eq!(applicability_of("copy_file"), Applicability::OpenFile);
+    assert_eq!(applicability_of("goto_line"), Applicability::OpenFile);
+    assert_eq!(
+        applicability_of("git_mode_flat_toggle"),
+        Applicability::GitMode
+    );
+}

@@ -11,6 +11,13 @@
 //! `App` method - so the palette and direct keybindings share one set of
 //! canonical ids. Add new commands to `ACTIONS` (not here) and wire the
 //! `action_id` into that dispatcher.
+//!
+//! `inapplicability_reasons` carries, per `COMMANDS` index, why a command
+//! can't run right now (from `App::check_applicability`, driven by
+//! `ActionSpec::applicability()`). Commands with a reason are sunk below
+//! applicable ones in the empty-query `base_order` and rendered dimmed by
+//! `ui::popups::command`; dispatch refuses them with a status message
+//! instead of running.
 
 use std::sync::LazyLock;
 
@@ -66,7 +73,12 @@ pub struct CommandPalette {
 
 impl Default for CommandPalette {
     fn default() -> Self {
-        Self::new(&Keymap::default(), Vec::new(), 0, vec![None; COMMANDS.len()])
+        Self::new(
+            &Keymap::default(),
+            Vec::new(),
+            0,
+            vec![None; COMMANDS.len()],
+        )
     }
 }
 

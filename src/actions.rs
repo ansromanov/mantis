@@ -485,8 +485,8 @@ impl ActionSpec {
             }
             "fold_toggle" | "fold_all" | "unfold_all" => Applicability::FoldRegions,
             "toggle_raw_markdown" => Applicability::PluginContentActive,
-            "open_in_editor" | "open_external" | "copy_path" | "copy_relative_path" |
-            "copy_line" | "copy_file" | "goto_line" => Applicability::OpenFile,
+            "open_in_editor" | "open_external" | "copy_path" | "copy_relative_path"
+            | "copy_line" | "copy_file" | "goto_line" => Applicability::OpenFile,
             "git_mode_flat_toggle" => Applicability::GitMode,
             _ => Applicability::Always,
         }
@@ -496,4 +496,3 @@ impl ActionSpec {
 #[cfg(test)]
 #[path = "actions_test.rs"]
 mod tests;
-

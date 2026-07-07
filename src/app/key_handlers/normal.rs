@@ -121,7 +121,12 @@ impl App {
                 .iter()
                 .map(|cmd| self.check_applicability(cmd.action_id).err())
                 .collect();
-            self.command_palette = Some(CommandPalette::new(&self.keys, base_order, base_pinned, inapplicability_reasons));
+            self.command_palette = Some(CommandPalette::new(
+                &self.keys,
+                base_order,
+                base_pinned,
+                inapplicability_reasons,
+            ));
         } else if pressed_in(&k.switch_panel, &key, scope) {
             self.focus = match self.focus {
                 Focus::Tree => Focus::Content,
