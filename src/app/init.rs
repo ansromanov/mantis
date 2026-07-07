@@ -161,6 +161,7 @@ impl App {
             git_status_map,
             git_mode: false,
             git_mode_flat: false,
+            compare_base: None,
             show_scrollbar: cfg.content.scrollbar,
             show_scroll_percentage: cfg.content.scroll_percentage,
             show_line_numbers: cfg.content.line_numbers,

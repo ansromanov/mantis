@@ -208,6 +208,11 @@ impl App {
                     self.apply_git_status_load(*load);
                 }
             }
+            LoadResponse::RangeStatus { seq, root, load } => {
+                if seq == self.git_seq && root == self.root {
+                    self.apply_range_status_load(*load);
+                }
+            }
             #[cfg(test)]
             LoadResponse::Barrier(_) => {}
         }
@@ -218,6 +223,18 @@ impl App {
     /// and info. When in git mode, expand git dirs and rebuild the tree so
     /// colors and filtering are current.
     pub(super) fn apply_git_status_load(&mut self, load: GitStatusLoad) {
+        self.git_status_map = load.status_map;
+        self.git_info = load.info;
+        if self.git_mode {
+            self.expand_git_dirs();
+            self.rebuild(false);
+        }
+    }
+
+    /// Applies a range-status load (from `git diff --name-status <rev>`),
+    /// used in compare mode. When in git mode, expands git dirs and rebuilds
+    /// the tree so only changed files are shown.
+    pub(super) fn apply_range_status_load(&mut self, load: GitStatusLoad) {
         self.git_status_map = load.status_map;
         self.git_info = load.info;
         if self.git_mode {
@@ -247,7 +264,9 @@ impl App {
     }
 
     /// Dispatches a working-tree diff to the background worker. Bumps the load
-    /// sequence so any in-flight worker result is treated as stale.
+    /// sequence so any in-flight worker result is treated as stale. When
+    /// `compare_base` is set, the diff is computed against that revision instead
+    /// of HEAD.
     pub(super) fn request_working_tree_diff(&mut self, path: &std::path::Path) {
         let seq = self.invalidate_pending_load();
         self.loading = true;
@@ -256,6 +275,18 @@ impl App {
             root: self.root.clone(),
             path: path.to_path_buf(),
             diff_mode: self.diff_mode,
+            compare_base: self.compare_base.clone(),
+        });
+    }
+
+    /// Enqueues a range-status refresh for compare mode via the background
+    /// worker. Bumps `git_seq` so earlier in-flight results are ignored.
+    pub(super) fn request_range_status(&mut self, rev: String) {
+        self.git_seq = self.git_seq.wrapping_add(1);
+        self.loader.request(LoadRequest::RangeStatus {
+            seq: self.git_seq,
+            root: self.root.clone(),
+            rev,
         });
     }
 

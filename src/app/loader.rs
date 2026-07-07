@@ -252,16 +252,24 @@ pub(super) fn compute_git_status_load(
 /// Runs the appropriate `git diff` variant for `path` and parses it into
 /// renderable diff state. The `diff_mode` parameter selects between all changes
 /// vs HEAD, staged changes only, or unstaged changes only.
+///
+/// When `compare_base` is `Some(rev)`, the diff is computed against `rev`
+/// instead of HEAD (compare mode), using `crate::git::file_diff`.
 pub(super) fn compute_diff_load(
     root: &Path,
     path: &Path,
     theme: &Theme,
     diff_mode: DiffMode,
+    compare_base: Option<&str>,
 ) -> DiffLoad {
-    let lines = match diff_mode {
-        DiffMode::All => crate::git::working_tree_diff(root, path),
-        DiffMode::Staged => crate::git::staged_diff(root, path),
-        DiffMode::Unstaged => crate::git::unstaged_diff(root, path),
+    let lines = if let Some(rev) = compare_base {
+        crate::git::file_diff(root, rev, path)
+    } else {
+        match diff_mode {
+            DiffMode::All => crate::git::working_tree_diff(root, path),
+            DiffMode::Staged => crate::git::staged_diff(root, path),
+            DiffMode::Unstaged => crate::git::unstaged_diff(root, path),
+        }
     };
     let rel = path.strip_prefix(root).unwrap_or(path);
     let highlighted = lines
@@ -269,8 +277,13 @@ pub(super) fn compute_diff_load(
         .map(|l| vec![(super::diff_line_style(l, theme), l.clone())])
         .collect();
     let diff_rows = crate::diff::parse_side_by_side(&lines);
+    let title = if let Some(rev) = compare_base {
+        format!(" diff {rev} — {} ", rel.display())
+    } else {
+        format!(" working diff — {} [{}] ", rel.display(), diff_mode.label())
+    };
     DiffLoad {
-        content_title: format!(" working diff — {} [{}] ", rel.display(), diff_mode.label()),
+        content_title: title,
         highlighted,
         diff_rows,
         content: lines,
@@ -290,6 +303,7 @@ pub(super) enum LoadRequest {
         root: PathBuf,
         path: PathBuf,
         diff_mode: DiffMode,
+        compare_base: Option<String>,
     },
     /// Fetch git status (`repo_status` + `repo_info`) for `root`.
     GitStatus {
@@ -297,6 +311,12 @@ pub(super) enum LoadRequest {
         root: PathBuf,
         include_untracked: bool,
         include_ignored: bool,
+    },
+    /// Fetch range status (`range_status`) for `root` compared to `rev`.
+    RangeStatus {
+        seq: u64,
+        root: PathBuf,
+        rev: String,
     },
     /// Rebuild the worker's highlighter/theme after a theme change.
     SetTheme(Box<Theme>),
@@ -324,6 +344,11 @@ pub(super) enum LoadResponse {
         load: Box<DiffLoad>,
     },
     GitStatus {
+        seq: u64,
+        root: PathBuf,
+        load: Box<GitStatusLoad>,
+    },
+    RangeStatus {
         seq: u64,
         root: PathBuf,
         load: Box<GitStatusLoad>,
@@ -398,9 +423,31 @@ impl Loader {
                         root,
                         path,
                         diff_mode,
+                        compare_base,
                     } => {
-                        let load = Box::new(compute_diff_load(&root, &path, &theme, diff_mode));
+                        let load = Box::new(compute_diff_load(
+                            &root,
+                            &path,
+                            &theme,
+                            diff_mode,
+                            compare_base.as_deref(),
+                        ));
                         if res_tx.send(LoadResponse::Diff { seq, path, load }).is_err() {
+                            break;
+                        }
+                    }
+                    LoadRequest::RangeStatus { seq, root, rev } => {
+                        let status_map = crate::git::range_status(&root, &rev);
+                        let info = crate::git::repo_info(&root);
+                        let load = Box::new(GitStatusLoad { status_map, info });
+                        if res_tx
+                            .send(LoadResponse::RangeStatus {
+                                seq,
+                                root: root.clone(),
+                                load,
+                            })
+                            .is_err()
+                        {
                             break;
                         }
                     }

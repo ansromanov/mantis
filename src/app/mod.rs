@@ -15,6 +15,13 @@
 //! when `is_diff` is `true`: `All` (default, `git diff HEAD`), `Staged`
 //! (`git diff --cached`), or `Unstaged` (`git diff`). The active mode is cycled
 //! with the `S` keybinding and is reflected in the content title badge.
+//!
+//! When `compare_base` is `Some(rev)`, the app is in compare mode: the tree
+//! shows only files changed between `rev` and the working tree, and opening a
+//! file shows `git diff <rev> -- <file>` instead of the usual working-tree diff.
+//! Compare mode is either entered via the `--diff <rev>` CLI flag, or from the
+//! commit history overlay (see `history.rs`). Exiting git mode (Esc / toggle)
+//! clears `compare_base` and returns to normal browsing.
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -164,6 +171,10 @@ pub struct App {
     pub git_status_map: HashMap<PathBuf, GitStatus>,
     pub git_mode: bool,
     pub git_mode_flat: bool,
+    /// When `Some(rev)`, the tree and content pane show changes between `rev`
+    /// and the working tree (compare mode). Set by `--diff <rev>` CLI flag or
+    /// from the history overlay. Cleared when exiting git mode.
+    pub compare_base: Option<String>,
     pub show_scrollbar: bool,
     pub show_scroll_percentage: bool,
     pub show_line_numbers: bool,

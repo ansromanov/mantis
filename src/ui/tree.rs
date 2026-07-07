@@ -203,6 +203,7 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
     // filtering, so they're computed once per tree rebuild and cached on
     // `tree_revision` rather than redone on every render.
     let guide_style = Style::default().fg(theme.dim).add_modifier(Modifier::DIM);
+    let badge_style = Style::default().fg(theme.dim).add_modifier(Modifier::BOLD);
     let end = (offset + view_height).min(n);
     if app.indent_guides && total_nodes > 0 {
         let stale = app
@@ -314,6 +315,17 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
                 vec![Span::styled(node.name.clone(), name_style)]
             };
             spans.extend(name_spans);
+
+            // Git status badge (A/M/D/R) when in git mode
+            if app.git_status_enabled {
+                if let Some(label) = app
+                    .git_status_map
+                    .get(&node.path)
+                    .and_then(git_status_badge_label)
+                {
+                    spans.push(Span::styled(format!(" {label}"), badge_style));
+                }
+            }
 
             ListItem::new(Line::from(spans))
         })
@@ -613,6 +625,18 @@ fn compact_segments(
     ]
 }
 
+/// Returns a short status badge label for a git status, or `None` if no badge
+/// should be shown (e.g. ignored files).
+fn git_status_badge_label(status: &crate::git::GitStatus) -> Option<&'static str> {
+    match status {
+        GitStatus::New => Some("A"),
+        GitStatus::Modified => Some("M"),
+        GitStatus::Deleted => Some("D"),
+        GitStatus::Renamed => Some("R"),
+        GitStatus::Ignored => None,
+    }
+}
+
 /// Returns the foreground color and modifier for a tree node based on its
 /// git status and whether it is a directory. Deleted files get `diff_del`,
 /// new files `diff_add`, modified files `accent_alt`, ignored files gray.
@@ -637,6 +661,7 @@ fn git_status_style(
             Some(GitStatus::Modified) => return (theme.accent_alt, dir_bold),
             Some(GitStatus::Deleted) => return (theme.diff_del, dir_bold),
             Some(GitStatus::Ignored) => return (Color::DarkGray, dir_bold),
+            Some(GitStatus::Renamed) => return (theme.accent_alt, dir_bold),
             None => {}
         }
     }

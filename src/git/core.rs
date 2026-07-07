@@ -278,6 +278,96 @@ pub fn repo_status(
     map
 }
 
+/// Returns the set of files changed between `<rev>` and the working tree, with
+/// their status (Added/Modified/Deleted/Renamed), using `git diff --name-status -z`.
+///
+/// The output with `-z` is a sequence of NUL-delimited fields alternating
+/// between status and path: `M\0path\0`, `A\0path\0`, `D\0path\0`, or for
+/// renames: `R<score>\0old_path\0new_path\0`.
+///
+/// Parent directories are included with their highest-priority child status so
+/// collapsed dirs can be colored when they contain changes.
+pub fn range_status(dir: &Path, rev: &str) -> HashMap<PathBuf, GitStatus> {
+    let Some(root) = git_toplevel(dir) else {
+        return HashMap::new();
+    };
+
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(&root)
+        .args(["diff", "--name-status", "-z", rev])
+        .output();
+    let out = match out {
+        Ok(o) if o.status.success() => o,
+        _ => return HashMap::new(),
+    };
+
+    let mut map: HashMap<PathBuf, GitStatus> = HashMap::new();
+    let bytes = &out.stdout;
+    let mut segs: Vec<&[u8]> = bytes.split(|&b| b == 0).collect();
+    if segs.last().is_some_and(|s| s.is_empty()) {
+        segs.pop();
+    }
+
+    let mut i = 0;
+    while i < segs.len() {
+        let seg = segs[i];
+        if seg.is_empty() {
+            i += 1;
+            continue;
+        }
+
+        // First character tells us the status.
+        let status_char = seg[0] as char;
+        let status = match status_char {
+            'A' => GitStatus::New,
+            'M' => GitStatus::Modified,
+            'D' => GitStatus::Deleted,
+            'R' => GitStatus::Renamed,
+            'C' => GitStatus::New,
+            _ => {
+                i += 1;
+                continue;
+            }
+        };
+
+        // For renames/copies the next segment is the old path; skip it.
+        if status_char == 'R' || status_char == 'C' {
+            i += 1;
+        }
+
+        // Next segment is the path.
+        i += 1;
+        let Some(path_seg) = segs.get(i) else {
+            break;
+        };
+        let path_str = std::str::from_utf8(path_seg)
+            .unwrap_or("")
+            .trim_end_matches('/');
+        if path_str.is_empty() {
+            i += 1;
+            continue;
+        }
+
+        let abs = root.join(path_str);
+        set_if_higher(&mut map, abs.clone(), status);
+
+        // Include parent directories with highest-priority child status.
+        let mut cur = abs.parent();
+        while let Some(d) = cur {
+            if d == root.as_path() || !d.starts_with(&root) {
+                break;
+            }
+            set_if_higher(&mut map, d.to_path_buf(), status);
+            cur = d.parent();
+        }
+
+        i += 1;
+    }
+
+    map
+}
+
 /// Returns the working-tree diff for `file` compared to HEAD, as lines.
 /// For new untracked files that aren't staged, falls back to a
 /// `--no-index` diff against `/dev/null`.
