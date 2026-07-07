@@ -455,6 +455,27 @@ impl App {
         }
     }
 
+    /// Handles keyboard input while the compare-against-revision prompt is open.
+    /// Extra keys: Esc closes, Enter enters compare mode with the typed revision.
+    pub(super) fn handle_compare_input_key(&mut self, key: KeyEvent) {
+        let Some(ref mut m) = self.compare_input else {
+            return;
+        };
+        match handle_list_picker_key(m, &key) {
+            OverlayKey::Activate => {
+                let rev = self.compare_input.as_ref().map(|m| m.query.clone());
+                self.compare_input = None;
+                if let Some(rev) = rev.filter(|r| !r.is_empty()) {
+                    self.enter_compare_mode(rev);
+                }
+            }
+            OverlayKey::Close => {
+                self.compare_input = None;
+            }
+            _ => {}
+        }
+    }
+
     /// Handles keyboard input while the go-to-line dialog is open.
     /// Extra keys: filters out the open binding so it is not appended.
     pub(super) fn handle_goto_line_key(&mut self, key: KeyEvent) {

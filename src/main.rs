@@ -103,30 +103,6 @@ where
     None
 }
 
-/// Returns the value of a `--diff <rev>`/`--diff=<rev>` flag among the process
-/// arguments, if present. Used to start in compare mode.
-fn parse_diff_flag() -> Option<String> {
-    parse_diff_flag_from(std::env::args())
-}
-
-/// Parses the `--diff` flag from an iterator of strings. Extracted for
-/// testability.
-fn parse_diff_flag_from<I>(args: I) -> Option<String>
-where
-    I: IntoIterator<Item = String>,
-{
-    let mut iter = args.into_iter();
-    while let Some(a) = iter.next() {
-        if let Some(v) = a.strip_prefix("--diff=") {
-            return Some(v.to_string());
-        }
-        if a == "--diff" {
-            return iter.next();
-        }
-    }
-    None
-}
-
 /// A meta CLI action that prints information and exits before launching the UI.
 enum MetaAction {
     Help,
@@ -144,8 +120,7 @@ impl MetaAction {
                  -h, --help, /?      Print this help\n  \
                  -V, --version       Print version\n  \
                  --update            Self-update to the latest release\n  \
-                 --language <lang>   Force the syntax used to highlight piped stdin\n  \
-                 --diff <rev>        Compare mode: show changes against revision\n\n\
+                 --language <lang>   Force the syntax used to highlight piped stdin\n\n\
                  Pager mode: with no <path> and stdin not a terminal, mantis reads\n\
                  stdin instead of a directory - diff-shaped input renders as a\n\
                  navigable side-by-side diff, anything else is syntax-highlighted:\n  \
@@ -183,12 +158,10 @@ fn resolve_input_path(arg: Option<PathBuf>) -> anyhow::Result<PathBuf> {
 enum Startup {
     /// Print this text to stdout and exit successfully.
     Print(String),
-    /// Launch the UI for `root`, optionally revealing `file` and/or starting
-    /// in compare mode against `diff_base`.
+    /// Launch the UI for `root`, optionally revealing `file`.
     Launch {
         root: PathBuf,
         file: Option<PathBuf>,
-        diff_base: Option<String>,
     },
     /// Read stdin into the content pane instead of walking a directory
     /// (`git diff | mantis`). `root` still anchors the (collapsed) tree pane.
@@ -206,7 +179,6 @@ enum Startup {
 fn plan_startup(
     arg: Option<PathBuf>,
     language: Option<String>,
-    diff_base: Option<String>,
     stdin_piped: bool,
 ) -> anyhow::Result<Startup> {
     if let Some(action) = meta_action(arg.as_deref()) {
@@ -226,11 +198,7 @@ fn plan_startup(
         return Ok(Startup::Pager { root, language });
     }
     let (root, file) = resolve_root_and_file(&resolve_input_path(arg)?);
-    Ok(Startup::Launch {
-        root,
-        file,
-        diff_base,
-    })
+    Ok(Startup::Launch { root, file })
 }
 
 /// A source of input events for the event loop. Abstracted so the loop can be
@@ -318,12 +286,7 @@ fn redirect_stdin_to_console() -> io::Result<()> {
 
 fn main() -> anyhow::Result<()> {
     let stdin_piped = pager::is_piped_stdin();
-    match plan_startup(
-        parse_args(),
-        parse_language_flag(),
-        parse_diff_flag(),
-        stdin_piped,
-    )? {
+    match plan_startup(parse_args(), parse_language_flag(), stdin_piped)? {
         Startup::Print(message) => {
             print!("{message}");
             Ok(())
@@ -332,20 +295,16 @@ fn main() -> anyhow::Result<()> {
             crate::update::run_self_update()?;
             Ok(())
         }
-        Startup::Launch {
-            root,
-            file,
-            diff_base,
-        } => {
+        Startup::Launch { root, file } => {
             let initial = file.map_or(InitialContent::None, InitialContent::File);
-            launch_tui(root, initial, diff_base)
+            launch_tui(root, initial)
         }
         Startup::Pager { root, language } => {
             // Read stdin to EOF before touching the terminal, mirroring how
             // `less`/`git`'s built-in pager behave.
             let bytes = pager::read_stdin_bytes()?;
             let parsed = pager::parse_pager_bytes(&bytes);
-            launch_tui(root, InitialContent::Pager { parsed, language }, None)
+            launch_tui(root, InitialContent::Pager { parsed, language })
         }
     }
 }
@@ -377,11 +336,7 @@ impl Drop for TerminalGuard {
     }
 }
 
-fn launch_tui(
-    root: PathBuf,
-    initial: InitialContent,
-    diff_base: Option<String>,
-) -> anyhow::Result<()> {
+fn launch_tui(root: PathBuf, initial: InitialContent) -> anyhow::Result<()> {
     // Whenever stdin isn't the terminal (piped/redirected, e.g. `mantis <
     // /dev/null` or `echo x | mantis some/path`), fd 0 can't supply keyboard
     // events, regardless of whether pager mode is showing piped content or a
@@ -443,9 +398,7 @@ fn launch_tui(
     #[cfg(not(unix))]
     let _ = keyboard_enhanced;
 
-    let result = run_app(&mut terminal, root, initial, events.as_mut(), diff_base);
-
-    result
+    run_app(&mut terminal, root, initial, events.as_mut())
 }
 
 /// Builds the app for `root`, applies `initial` (a revealed file, piped
@@ -457,7 +410,6 @@ fn run_app(
     root: PathBuf,
     initial: InitialContent,
     events: &mut dyn EventSource,
-    compare_base: Option<String>,
 ) -> anyhow::Result<()> {
     let (cfg, cfg_path, cfg_error) = config::load(&root);
     let mut app = App::new(root, cfg, cfg_path, cfg_error)?;
@@ -465,9 +417,6 @@ fn run_app(
         InitialContent::File(file) => app.open_and_reveal(&file),
         InitialContent::Pager { parsed, language } => app.open_pager_content(parsed, language),
         InitialContent::None => {}
-    }
-    if let Some(rev) = compare_base {
-        app.enter_compare_mode(rev);
     }
     // Drive tree/git refreshes from filesystem events rather than a blind timer.
     app.watch_root();

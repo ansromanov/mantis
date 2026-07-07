@@ -138,6 +138,56 @@ impl ListPicker for GotoLineState {
     fn set_selected(&mut self, _i: usize) {}
 }
 
+/// State for the compare-against dialog.
+///
+/// Opened from the command palette. The user types a revision (e.g. `HEAD~3`,
+/// a commit hash, or a branch name) and presses Enter to enter compare mode
+/// against that revision, or Esc to cancel.
+pub struct CompareModeInput {
+    pub query: String,
+}
+
+impl Default for CompareModeInput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl CompareModeInput {
+    pub fn new() -> Self {
+        CompareModeInput {
+            query: String::new(),
+        }
+    }
+
+    pub fn push(&mut self, c: char) {
+        self.query.push(c);
+    }
+
+    pub fn pop(&mut self) {
+        self.query.pop();
+    }
+}
+
+impl ListPicker for CompareModeInput {
+    fn query_push(&mut self, c: char) {
+        self.push(c);
+    }
+    fn query_pop(&mut self) {
+        self.pop();
+    }
+    fn query_is_empty(&self) -> bool {
+        self.query.is_empty()
+    }
+    fn results_len(&self) -> usize {
+        0
+    }
+    fn selected(&self) -> usize {
+        0
+    }
+    fn set_selected(&mut self, _i: usize) {}
+}
+
 /// A single match occurrence within a file for in-file search.
 #[derive(Clone, Debug)]
 pub struct InFileMatch {

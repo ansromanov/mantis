@@ -39,8 +39,8 @@ use crate::git::GitStatus;
 use crate::highlight::Highlighter;
 use crate::plugin::{ExtraSyntax, PluginContributions, PluginManager};
 use crate::search::{
-    CommandPalette, GotoLineState, HistoryState, InFileSearch, PluginPicker, RecentFilesState,
-    SearchState, ThemePicker, TreeFilter,
+    CommandPalette, CompareModeInput, GotoLineState, HistoryState, InFileSearch, PluginPicker,
+    RecentFilesState, SearchState, ThemePicker, TreeFilter,
 };
 use crate::selection::TextSelection;
 use crate::theme::Theme;
@@ -172,9 +172,12 @@ pub struct App {
     pub git_mode: bool,
     pub git_mode_flat: bool,
     /// When `Some(rev)`, the tree and content pane show changes between `rev`
-    /// and the working tree (compare mode). Set by `--diff <rev>` CLI flag or
-    /// from the history overlay. Cleared when exiting git mode.
+    /// and the working tree (compare mode). Set from the command palette (or
+    /// the history overlay). Cleared when exiting git mode.
     pub compare_base: Option<String>,
+    /// State for the compare-against-revision input prompt. `Some` while the
+    /// prompt is open (user typing a revision); `None` otherwise.
+    pub compare_input: Option<CompareModeInput>,
     pub show_scrollbar: bool,
     pub show_scroll_percentage: bool,
     pub show_line_numbers: bool,

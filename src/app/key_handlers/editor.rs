@@ -278,6 +278,10 @@ impl App {
                 }
                 true
             }
+            Some("compare_against") => {
+                self.compare_input = Some(crate::search::CompareModeInput::new());
+                true
+            }
             Some("toggle_raw_markdown") => {
                 if self.plugin_content_active {
                     let key = crossterm::event::KeyEvent::new(
