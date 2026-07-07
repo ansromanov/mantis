@@ -1,5 +1,72 @@
 use super::*;
 
+#[test]
+fn commands_have_categories() {
+    let git_idx = COMMANDS
+        .iter()
+        .position(|c| c.action_id == "git_mode_toggle")
+        .expect("git_mode_toggle must be in COMMANDS");
+    assert_eq!(COMMANDS[git_idx].category, Some("Git"));
+
+    let copy_idx = COMMANDS
+        .iter()
+        .position(|c| c.action_id == "copy_path")
+        .expect("copy_path must be in COMMANDS");
+    assert_eq!(COMMANDS[copy_idx].category, Some("Copy"));
+
+    let view_idx = COMMANDS
+        .iter()
+        .position(|c| c.action_id == "toggle_wrap")
+        .expect("toggle_wrap must be in COMMANDS");
+    assert_eq!(COMMANDS[view_idx].category, Some("View"));
+
+    let tree_idx = COMMANDS
+        .iter()
+        .position(|c| c.action_id == "find_files")
+        .expect("find_files must be in COMMANDS");
+    assert_eq!(COMMANDS[tree_idx].category, Some("Tree"));
+}
+
+#[test]
+fn commands_have_descriptions() {
+    let help_idx = COMMANDS
+        .iter()
+        .position(|c| c.action_id == "help")
+        .expect("help must be in COMMANDS");
+    assert!(
+        COMMANDS[help_idx].description.is_some(),
+        "help command should have a description"
+    );
+    assert!(
+        !COMMANDS[help_idx].description.unwrap().is_empty(),
+        "description should not be empty"
+    );
+}
+
+#[test]
+fn every_palette_entry_has_category() {
+    for cmd in COMMANDS.iter() {
+        assert!(
+            cmd.category.is_some(),
+            "command '{}' ({}) is missing a category",
+            cmd.name,
+            cmd.action_id,
+        );
+    }
+}
+
+#[test]
+fn every_palette_entry_has_description() {
+    for cmd in COMMANDS.iter() {
+        assert!(
+            cmd.description.is_some(),
+            "command '{}' ({}) is missing a description",
+            cmd.name,
+            cmd.action_id,
+        );
+    }
+}
+
 fn index_of(id: &str) -> usize {
     COMMANDS
         .iter()
@@ -290,6 +357,33 @@ fn command_palette_list_picker_impl_delegates() {
     ListPicker::query_pop(&mut p);
     assert!(ListPicker::query_is_empty(&p));
     assert_eq!(ListPicker::results_len(&p), COMMANDS.len());
+}
+
+#[test]
+fn command_palette_match_positions_populated_for_query() {
+    let mut p = CommandPalette::default();
+    // Empty query -> no match positions
+    assert_eq!(p.match_positions.len(), COMMANDS.len());
+    assert!(
+        p.match_positions.iter().all(|v| v.is_empty()),
+        "match positions should be empty when query is empty"
+    );
+
+    // Typing a query populates match positions
+    for c in "git".chars() {
+        p.push(c);
+    }
+    assert_eq!(p.match_positions.len(), p.filtered.len());
+    for (pos, positions) in p.match_positions.iter().enumerate() {
+        assert!(
+            !positions.is_empty(),
+            "entry {} of {} should have match positions for query 'git'",
+            pos,
+            p.filtered.len(),
+        );
+    }
+    let cmd = p.selected_command().unwrap();
+    assert_eq!(cmd.action_id, "git_mode_toggle");
 }
 
 #[test]

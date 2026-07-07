@@ -24,6 +24,8 @@ use crate::search::fuzzy_refilter;
 pub struct CommandEntry {
     pub name: &'static str,
     pub action_id: &'static str,
+    pub category: Option<&'static str>,
+    pub description: Option<&'static str>,
 }
 
 /// Palette-invokable actions, in `ACTIONS` order.
@@ -34,6 +36,8 @@ pub static COMMANDS: LazyLock<Vec<CommandEntry>> = LazyLock::new(|| {
             a.palette.map(|name| CommandEntry {
                 name,
                 action_id: a.id,
+                category: a.category,
+                description: a.description,
             })
         })
         .collect()
@@ -51,6 +55,10 @@ pub struct CommandPalette {
     /// frequent). Used by the UI to show a star prefix for pinned commands
     /// when the query is empty.
     pub base_pinned: usize,
+    /// Fuzzy match character positions for each entry in `filtered`, used by
+    /// `draw_command_palette` to highlight matched characters. Empty when the
+    /// query is empty. Each inner vec corresponds to `filtered[i]`.
+    pub match_positions: Vec<Vec<usize>>,
     matcher: SkimMatcherV2,
 }
 
@@ -88,14 +96,15 @@ impl CommandPalette {
             }
             order
         };
-        let filtered = base_order.clone();
+        let len = base_order.len();
         CommandPalette {
             query: String::new(),
-            filtered,
+            filtered: base_order.clone(),
             selected: 0,
             binding_labels,
             base_order,
             base_pinned,
+            match_positions: vec![Vec::new(); len],
             matcher: SkimMatcherV2::default(),
         }
     }
@@ -126,13 +135,25 @@ impl CommandPalette {
         self.selected = 0;
         if self.query.is_empty() {
             self.filtered = self.base_order.clone();
+            self.match_positions = vec![Vec::new(); self.filtered.len()];
             return;
         }
         let binding_labels = &self.binding_labels;
         let indices: Vec<usize> = (0..COMMANDS.len()).collect();
-        self.filtered = fuzzy_refilter(&indices, &self.matcher, &self.query, |&i| {
-            std::borrow::Cow::Owned(format!("{} {}", COMMANDS[i].name, binding_labels[i]))
+        let results = fuzzy_refilter(&indices, &self.matcher, &self.query, |&i| {
+            let cmd = &COMMANDS[i];
+            let mut haystack = cmd.category.map(|c| format!("{c}: ")).unwrap_or_default();
+            haystack.push_str(cmd.name);
+            if !binding_labels[i].is_empty() {
+                haystack.push_str(&format!(" [{}]", binding_labels[i]));
+            }
+            std::borrow::Cow::Owned(haystack)
         });
+        self.filtered = results.iter().map(|&(i, _)| i).collect();
+        self.match_positions = results
+            .into_iter()
+            .map(|(_, positions)| positions)
+            .collect();
     }
 }
 

@@ -488,3 +488,31 @@ fn plugin_picker_entries_carry_crash_badge_only_for_dead_plugins() {
     assert_eq!(picker.entries[0].3, None);
     assert_eq!(picker.entries[1].3.as_deref(), Some("exited unexpectedly"));
 }
+
+// -- fuzzy_refilter integration (new return type) -----------------------------
+
+#[test]
+fn theme_picker_refilter_handles_new_return_type() {
+    let mut p = ThemePicker::default();
+    let total = p.names.len();
+    p.push('m');
+    assert!(p.filtered.len() < total);
+    // Should still work after pop
+    p.pop();
+    assert_eq!(p.filtered.len(), total);
+}
+
+#[test]
+fn recent_files_refilter_handles_new_return_type() {
+    let paths = vec![
+        std::path::PathBuf::from("/tmp/alpha.rs"),
+        std::path::PathBuf::from("/tmp/beta.rs"),
+    ];
+    let mut r = RecentFilesState::new(paths);
+    let total = r.paths.len();
+    // Filtering should still work
+    r.push('z');
+    assert_eq!(r.results_len(), 0);
+    r.pop();
+    assert_eq!(r.results_len(), total);
+}

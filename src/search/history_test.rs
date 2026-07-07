@@ -80,3 +80,15 @@ fn history_state_filtered_out_of_bounds() {
     assert_eq!(h.results_len(), 0);
     assert!(h.selected_commit().is_none());
 }
+
+#[test]
+fn history_state_filters_by_subject() {
+    let commits = sample_commits();
+    let mut h = HistoryState::new(PathBuf::from("f.txt"), commits);
+    // "critical" appears in the subject of the first commit
+    for c in "critical".chars() {
+        h.push(c);
+    }
+    assert_eq!(h.results_len(), 1);
+    assert_eq!(h.selected_commit().unwrap().short, "abc123");
+}

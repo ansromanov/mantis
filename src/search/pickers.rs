@@ -390,7 +390,10 @@ impl ThemePicker {
         self.selected = 0;
         self.filtered = super::fuzzy_refilter(&self.names, &self.matcher, &self.query, |n| {
             std::borrow::Cow::Borrowed(n.as_str())
-        });
+        })
+        .into_iter()
+        .map(|(i, _)| i)
+        .collect();
     }
 }
 
@@ -466,7 +469,10 @@ impl RecentFilesState {
         self.selected = 0;
         self.filtered = super::fuzzy_refilter(&self.paths, &self.matcher, &self.query, |p| {
             p.to_string_lossy()
-        });
+        })
+        .into_iter()
+        .map(|(i, _)| i)
+        .collect();
     }
 }
 

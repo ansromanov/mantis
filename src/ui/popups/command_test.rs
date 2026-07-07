@@ -91,4 +91,69 @@ fn star_prefix_hidden_when_query_is_typed() {
     );
 }
 
+#[test]
+fn category_label_appears_in_palette_rendering() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    // Select git_mode_toggle and type a query that shows it.
+    let git_idx = crate::command_palette::COMMANDS
+        .iter()
+        .position(|c| c.action_id == "git_mode_toggle")
+        .expect("git_mode_toggle must be in COMMANDS");
+    let keymap = app.keys().clone();
+    app.command_palette = Some(CommandPalette::new(
+        &keymap,
+        (0..crate::command_palette::COMMANDS.len()).collect(),
+        0,
+    ));
+
+    if let Some(p) = &mut app.command_palette {
+        p.filtered = vec![git_idx];
+        p.selected = 0;
+    }
+
+    let backend = TestBackend::new(80, 30);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| draw_command_palette(f, &mut app, f.area()))
+        .unwrap();
+    let joined = buffer_rows(&terminal).join("\n");
+    assert!(
+        joined.contains("Git:"),
+        "category 'Git:' should appear in command rendering"
+    );
+}
+
+#[test]
+fn description_appears_in_palette_rendering() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    let help_idx = crate::command_palette::COMMANDS
+        .iter()
+        .position(|c| c.action_id == "help")
+        .expect("help must be in COMMANDS");
+    let keymap = app.keys().clone();
+    app.command_palette = Some(CommandPalette::new(
+        &keymap,
+        (0..crate::command_palette::COMMANDS.len()).collect(),
+        0,
+    ));
+
+    if let Some(p) = &mut app.command_palette {
+        p.filtered = vec![help_idx];
+        p.selected = 0;
+    }
+
+    let backend = TestBackend::new(120, 30);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| draw_command_palette(f, &mut app, f.area()))
+        .unwrap();
+    let joined = buffer_rows(&terminal).join("\n");
+    assert!(
+        joined.contains("keybinding"),
+        "help action description should appear in rendering"
+    );
+}
+
 // Modified for test requirements
