@@ -1,4 +1,4 @@
-version = "0.15.17"
+version = "0.15.18"
 date = "2026-07-07"
 whats_new = """- feat(keys): stable, cross-terminal-safe default keybindings (#609)
 - chore: bump Homebrew formula to v0.15.10 [skip ci]"""
