@@ -14,7 +14,7 @@ routes them via `PluginManager::provider_for` (`src/plugin/manager.rs`).
 
 | Capability | Declared in protocol | Handled by host | Used by a bundled plugin |
 |---|---|---|---|
-| `fold` | yes | yes — gates `set_fold_regions` in `handle_plugin_set_fold_regions` (`src/app/refresh.rs`) | **yes** — used by the bundled `rust` and `python` language provider plugins |
+| `fold` | yes | yes — gates `set_fold_regions` in `handle_plugin_set_fold_regions` (`src/app/refresh.rs`) | **yes** — used by the bundled `rust`, `go`, and `python` language provider plugins |
 | `highlight` | yes | **no** — accepted at registration, never checked anywhere | no |
 | `hover` | yes (reserved) | no — unimplementable in v2 (no request/response correlation) | no |
 | `diagnostics` | yes (reserved) | no — same as `hover` | no |
@@ -57,6 +57,7 @@ version history in [Plugin Development](plugin-development.md) only.
 | `markdown` | process | `set_content` | none |
 | `python` | process | `register_language_provider`, `set_fold_regions` | `fold` |
 | `rust` | process | `register_language_provider`, `set_fold_regions` | `fold` |
+| `go` | process | `register_language_provider`, `set_fold_regions` | `fold` |
 | `terraform` | syntax | none (no subprocess) | n/a — extends syntect directly |
 
 ## Gaps and follow-ups
@@ -67,9 +68,11 @@ version history in [Plugin Development](plugin-development.md) only.
    names this audit as its precursor.
 2. **The language-provider fold pipeline has bundled consumers** —
    `register_language_provider` + `Capability::Fold` + `set_fold_regions` are
-   used by the bundled `rust` (issue #599) and `python` (issue #601) language provider plugins.
-   The `python` plugin uses the shared `indent_fold` detector, while the `rust` plugin
-   uses the `brace_fold` detector.
+   used by the bundled `rust` (issue #599), `go` (issue #600), and `python`
+   (issue #601) language provider plugins. The `rust` and `go` plugins
+   register the `fold` capability for `.rs` and `.go` files via the shared
+   `brace_fold` detector (#598); the `python` plugin uses the shared
+   `indent_fold` detector.
 3. **`Capability::Highlight` is declared but routes to nothing.** Either
    implement provider-driven highlighting in v3 or re-document it as reserved
    alongside `hover`/`diagnostics`/`definition`. Not yet tracked in a

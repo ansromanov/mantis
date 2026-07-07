@@ -4,6 +4,7 @@ members = [
     "plugins/iconize",
     "plugins/python",
     "plugins/rust",
+    "plugins/go",
 ]
 resolver = "2"
 
