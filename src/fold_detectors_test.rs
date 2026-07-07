@@ -128,6 +128,16 @@ fn foo() {
 }
 
 #[test]
+fn brace_fold_escaped_newline_in_string_keeps_line_count() {
+    // A backslash immediately followed by a real newline (C/JS line
+    // continuation inside a string) must still advance the line counter.
+    let r = brace_fold("int foo() {\n    char *s = \"abc\\\ndef\";\n    bar();\n}\n");
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 4);
+}
+
+#[test]
 fn brace_fold_skips_raw_string() {
     let r = brace_fold(
         "\
@@ -550,4 +560,21 @@ def foo():
     assert_eq!(r.len(), 1);
     assert_eq!(r[0].start, 0);
     assert_eq!(r[0].end, 2);
+}
+
+#[test]
+fn indent_fold_dedented_comment_does_not_terminate_region() {
+    // A comment at column 0 (or any indent <= the header's) carries no
+    // indentation significance in Python and must not end the block.
+    let r = indent_fold(
+        "\
+def foo():
+    x = 1
+# section marker
+    y = 2
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 3);
 }

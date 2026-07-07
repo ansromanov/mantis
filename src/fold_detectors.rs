@@ -120,6 +120,9 @@ pub fn brace_fold(text: &str) -> Vec<FoldRegion> {
             }
             St::DqStr => {
                 if b == b'\\' && i + 1 < len {
+                    if bytes[i + 1] == b'\n' {
+                        line += 1;
+                    }
                     i += 1;
                 } else if b == b'"' {
                     st = St::Normal;
@@ -166,6 +169,14 @@ const PY_CONTINUATIONS: &[&str] = &["else", "elif", "except", "finally"];
 const PY_HEADERS: &[&str] = &[
     "def", "class", "if", "for", "while", "with", "try", "match", "case",
 ];
+
+/// Returns `true` when `line` is a comment (`#…`) after stripping leading
+/// whitespace. Comments carry no indentation significance in Python, so they
+/// must not terminate a fold region even when dedented to (or past) the
+/// enclosing header's indent.
+fn is_comment_line(line: &str) -> bool {
+    line.trim_start().starts_with('#')
+}
 
 /// Returns `true` when `line` starts with a continuation keyword (`else`,
 /// `elif`, `except`, `finally`) after stripping leading whitespace.
@@ -260,6 +271,12 @@ pub fn indent_fold(text: &str) -> Vec<FoldRegion> {
                 }
                 Some(_) if is_py_continuation(lines[j]) => {
                     // Continuation at same/lesser indent — pass through.
+                    end = j;
+                    j += 1;
+                }
+                Some(_) if is_comment_line(lines[j]) => {
+                    // Comments have no indentation significance — pass through
+                    // regardless of their column.
                     end = j;
                     j += 1;
                 }
