@@ -57,6 +57,10 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
         if let Some(path) = app.current_file.clone() {
             let blame_lines = crate::git::file_blame(&app.root, &path);
             if !blame_lines.is_empty() {
+                // Clear stale breadcrumb hit-rects from the last normal-tree
+                // render so they can't hijack clicks on the blame pane, which
+                // occupies the same top rows the breadcrumb used to.
+                app.breadcrumb_areas.clear();
                 draw_blame_pane(f, app, inner, &blame_lines);
                 return;
             }
@@ -457,9 +461,9 @@ fn draw_blame_pane(f: &mut Frame, app: &mut App, inner: Rect, blame_lines: &[Bla
     );
 
     let mut state = ListState::default();
-    if vis_count > 0 && app.active_line >= scroll && app.active_line < end {
-        let phys = app.display_to_physical(app.active_line);
-        let rel = phys.saturating_sub(scroll);
+    let active_phys = app.display_to_physical(app.active_line);
+    if vis_count > 0 && active_phys >= scroll && active_phys < end {
+        let rel = active_phys.saturating_sub(scroll);
         if rel < vis_count {
             state.select(Some(rel));
         }
