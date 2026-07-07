@@ -97,6 +97,7 @@ pub(crate) const BUNDLED_PLUGINS: &[(&str, &str, &[u8])] = &[
     ("markdown", "markdown", MARKDOWN),
     ("python", "python", PYTHON),
     ("rust", "rust", RUST),
+    ("go", "go", GO),
 ];
 
 /// Filenames of old shell-script plugins superseded by the current Rust binaries.

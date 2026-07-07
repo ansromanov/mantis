@@ -1,0 +1,69 @@
+use super::*;
+
+#[test]
+fn test_register_language_provider() {
+    let mut buf = Vec::new();
+    register_language_provider(&mut buf);
+    let output = String::from_utf8(buf).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(output.trim()).unwrap();
+    assert_eq!(parsed["event"], "action");
+    assert_eq!(parsed["action"], "register_language_provider");
+    assert_eq!(parsed["params"]["extensions"][0], "go");
+    assert_eq!(parsed["params"]["capabilities"][0], "fold");
+}
+
+#[test]
+fn test_send_set_fold_regions() {
+    let regions = vec![mantis::fold::FoldRegion { start: 1, end: 3 }];
+    let mut buf = Vec::new();
+    send_set_fold_regions(&regions, "/path/to/file.go", &mut buf);
+    let output = String::from_utf8(buf).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(output.trim()).unwrap();
+    assert_eq!(parsed["event"], "action");
+    assert_eq!(parsed["action"], "set_fold_regions");
+    assert_eq!(parsed["params"]["path"], "/path/to/file.go");
+    assert_eq!(parsed["params"]["regions"][0][0], 1);
+    assert_eq!(parsed["params"]["regions"][0][1], 3);
+}
+
+#[test]
+fn test_handle_file_open() {
+    let mut tmp = std::env::temp_dir();
+    tmp.push("mantis_plugin_go_test.go");
+    std::fs::write(&tmp, "func foo() {\n\tx := 1\n\t_ = x\n}").unwrap();
+    let path_str = tmp.to_str().unwrap().to_string();
+
+    let mut buf = Vec::new();
+    handle_file_open(&path_str, &mut buf);
+    let output = String::from_utf8(buf).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(output.trim()).unwrap();
+    assert_eq!(parsed["event"], "action");
+    assert_eq!(parsed["action"], "set_fold_regions");
+    assert_eq!(parsed["params"]["path"], path_str);
+    assert_eq!(parsed["params"]["regions"][0][0], 0);
+    assert_eq!(parsed["params"]["regions"][0][1], 3);
+
+    std::fs::remove_file(&tmp).ok();
+}
+
+#[test]
+fn test_handle_file_open_backtick_string() {
+    let mut tmp = std::env::temp_dir();
+    tmp.push("mantis_plugin_go_test_backtick.go");
+    // Backtick string contains a brace that must not be treated as a fold
+    // boundary; only the surrounding func braces should produce a region.
+    std::fs::write(&tmp, "func foo() {\n\ts := `{ not a brace }`\n\t_ = s\n}").unwrap();
+    let path_str = tmp.to_str().unwrap().to_string();
+
+    let mut buf = Vec::new();
+    handle_file_open(&path_str, &mut buf);
+    let output = String::from_utf8(buf).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(output.trim()).unwrap();
+    assert_eq!(parsed["action"], "set_fold_regions");
+    let regions = parsed["params"]["regions"].as_array().unwrap();
+    assert_eq!(regions.len(), 1);
+    assert_eq!(regions[0][0], 0);
+    assert_eq!(regions[0][1], 3);
+
+    std::fs::remove_file(&tmp).ok();
+}
