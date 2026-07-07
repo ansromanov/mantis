@@ -99,15 +99,15 @@ impl App {
         if self.show_help {
             match ev.kind {
                 MouseEventKind::ScrollDown => {
-                    self.help_scroll = self.help_scroll.saturating_add(WHEEL_STEP);
+                    self.help_scroll.scroll_down(WHEEL_STEP, usize::MAX);
                 }
                 MouseEventKind::ScrollUp => {
-                    self.help_scroll = self.help_scroll.saturating_sub(WHEEL_STEP);
+                    self.help_scroll.scroll_up(WHEEL_STEP);
                 }
                 MouseEventKind::Down(MouseButton::Left) => {
                     if !rect_contains(self.help_area, ev.column, ev.row) {
                         self.show_help = false;
-                        self.help_scroll = 0;
+                        self.help_scroll.scroll = 0;
                         self.help_tab = 0;
                         return;
                     }
@@ -123,7 +123,7 @@ impl App {
                             if content_col >= *start && content_col < *end {
                                 if self.help_tab != i {
                                     self.help_tab = i;
-                                    self.help_scroll = 0;
+                                    self.help_scroll.scroll = 0;
                                 }
                                 return;
                             }
@@ -132,6 +132,10 @@ impl App {
                 }
                 _ => {}
             }
+            return;
+        }
+        if self.bug_report.is_some() {
+            self.handle_bug_report_mouse(ev);
             return;
         }
         if self.theme_picker.is_some() {
@@ -469,5 +473,36 @@ impl App {
         let y = (row as usize).saturating_sub(self.content_area.y as usize);
         let y = y.min(track_range);
         self.set_content_scroll(y * scroll_range / track_range);
+    }
+
+    /// Handles mouse events for the bug report modal.
+    fn handle_bug_report_mouse(&mut self, ev: MouseEvent) {
+        match ev.kind {
+            MouseEventKind::ScrollDown => {
+                if rect_contains(self.bug_report_preview_area, ev.column, ev.row) {
+                    let report = crate::diagnostics::DiagnosticReport::collect(self);
+                    let md = report.to_markdown();
+                    let total_lines = md.lines().count();
+                    let preview_height = self.bug_report_preview_area.height as usize;
+                    let max_scroll = total_lines.saturating_sub(preview_height);
+                    if let Some(ref mut state) = self.bug_report {
+                        state.preview_scroll.scroll_down(WHEEL_STEP, max_scroll);
+                    }
+                }
+            }
+            MouseEventKind::ScrollUp => {
+                if rect_contains(self.bug_report_preview_area, ev.column, ev.row) {
+                    if let Some(ref mut state) = self.bug_report {
+                        state.preview_scroll.scroll_up(WHEEL_STEP);
+                    }
+                }
+            }
+            MouseEventKind::Down(MouseButton::Left)
+                if !rect_contains(self.bug_report_area, ev.column, ev.row) =>
+            {
+                self.bug_report = None;
+            }
+            _ => {}
+        }
     }
 }

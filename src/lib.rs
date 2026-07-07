@@ -32,6 +32,7 @@ pub mod list_picker;
 pub mod pager;
 pub mod plugin;
 pub mod release_info;
+pub mod scroll;
 pub mod search;
 pub mod selection;
 pub mod session;

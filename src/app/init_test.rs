@@ -487,7 +487,7 @@ fn help_scroll_initialises_to_zero() {
     let root = temp_dir();
     let app = new_app(&root, Config::default());
     assert_eq!(
-        app.help_scroll, 0,
+        app.help_scroll.scroll, 0,
         "help_scroll must start at zero so the help popup opens unscrolled"
     );
     assert_eq!(

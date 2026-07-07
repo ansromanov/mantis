@@ -553,6 +553,7 @@ pub struct BugReportState {
     pub cursor_row: usize,
     pub cursor_col: usize,
     pub scroll_top: usize,
+    pub preview_scroll: crate::scroll::ScrollState,
 }
 
 impl Default for BugReportState {
@@ -568,6 +569,7 @@ impl BugReportState {
             cursor_row: 0,
             cursor_col: 0,
             scroll_top: 0,
+            preview_scroll: crate::scroll::ScrollState::new(),
         }
     }
 

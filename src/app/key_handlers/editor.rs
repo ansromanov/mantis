@@ -318,7 +318,9 @@ impl App {
         let Some(release) = crate::release_info::RELEASE.as_ref() else {
             return;
         };
-        self.open_in_browser(&release.release_url);
+        if let Err(e) = self.open_in_browser(&release.release_url) {
+            self.set_status(e);
+        }
     }
 }
 
@@ -369,18 +371,18 @@ impl App {
     }
 
     /// Opens `url` in the system browser. No-op for empty URLs. When stdout
-    /// is not a terminal (piped/headless/CI), sets a status message instead
+    /// is not a terminal (piped/headless/CI), returns an error instead
     /// of spawning the browser.
-    pub(super) fn open_in_browser(&mut self, url: &str) {
+    pub(crate) fn open_in_browser(&mut self, url: &str) -> Result<(), String> {
         if url.is_empty() {
-            return;
+            return Ok(());
         }
         if !std::io::stdout().is_terminal() {
-            self.set_status("not opening browser (non-interactive)");
-            return;
+            return Err("not opening browser (non-interactive)".to_string());
         }
-        if let Err(e) = spawn_system_open(url.as_ref()) {
-            self.set_status(format!("browser launch failed: {e}"));
+        match spawn_system_open(url.as_ref()) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(format!("browser launch failed: {e}")),
         }
     }
 

@@ -61,6 +61,7 @@ fn main() {
     // x86_64-apple-darwin on an aarch64 macos-latest runner). Plugins must be
     // built for the same triple or the embedded binaries won't run.
     let target_triple = std::env::var("TARGET").expect("TARGET must be set by cargo");
+    println!("cargo:rustc-env=TARGET={}", target_triple);
     let is_windows_target = target_triple.contains("windows");
 
     let target_dir = resolve_target_dir();

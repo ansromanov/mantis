@@ -156,7 +156,7 @@ fn help_overlay_intercepts_wheel_before_content_pane() {
     app.show_help = true;
     app.handle_mouse(scroll_down_at(40, 5));
     assert_eq!(
-        app.help_scroll, 3,
+        app.help_scroll.scroll, 3,
         "wheel scroll while the help overlay is open must move help_scroll, not content_scroll"
     );
     assert_eq!(
@@ -173,7 +173,7 @@ fn help_overlay_wheel_up_does_not_underflow() {
     app.show_help = true;
     app.handle_mouse(scroll_up_at(40, 5));
     assert_eq!(
-        app.help_scroll, 0,
+        app.help_scroll.scroll, 0,
         "wheel-up at the top of the help overlay must saturate at zero"
     );
     fs::remove_dir_all(&root).ok();

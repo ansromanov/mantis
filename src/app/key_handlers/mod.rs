@@ -82,31 +82,31 @@ impl App {
         if self.show_help {
             if static_keys::is_modal_close(&key) {
                 self.show_help = false;
-                self.help_scroll = 0;
+                self.help_scroll.scroll = 0;
                 self.help_tab = 0;
             } else {
                 match key.code {
                     KeyCode::Up | KeyCode::Char('k') => {
-                        self.help_scroll = self.help_scroll.saturating_sub(1);
+                        self.help_scroll.scroll_up(1);
                     }
                     KeyCode::Down | KeyCode::Char('j') => {
-                        self.help_scroll = self.help_scroll.saturating_add(1);
+                        self.help_scroll.scroll_down(1, usize::MAX);
                     }
                     KeyCode::PageUp => {
-                        self.help_scroll = self.help_scroll.saturating_sub(HELP_PAGE_SIZE);
+                        self.help_scroll.scroll_up(HELP_PAGE_SIZE);
                     }
                     KeyCode::PageDown => {
-                        self.help_scroll = self.help_scroll.saturating_add(HELP_PAGE_SIZE);
+                        self.help_scroll.scroll_down(HELP_PAGE_SIZE, usize::MAX);
                     }
                     KeyCode::Home | KeyCode::Char('g') => {
-                        self.help_scroll = 0;
+                        self.help_scroll.scroll = 0;
                     }
                     KeyCode::End | KeyCode::Char('G') => {
-                        self.help_scroll = usize::MAX;
+                        self.help_scroll.scroll = usize::MAX;
                     }
                     KeyCode::Right | KeyCode::Char('l') | KeyCode::Tab => {
                         self.help_tab = (self.help_tab + 1) % crate::ui::popups::HELP_TABS.len();
-                        self.help_scroll = 0;
+                        self.help_scroll.scroll = 0;
                     }
                     KeyCode::Left | KeyCode::Char('h') | KeyCode::BackTab => {
                         self.help_tab = if self.help_tab == 0 {
@@ -114,7 +114,7 @@ impl App {
                         } else {
                             self.help_tab - 1
                         };
-                        self.help_scroll = 0;
+                        self.help_scroll.scroll = 0;
                     }
                     _ => {}
                 }

@@ -609,18 +609,16 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
     let total_rows = rows.len();
     let visible = content_area.height as usize;
     let max_scroll = total_rows.saturating_sub(visible);
-    if app.help_scroll > max_scroll {
-        app.help_scroll = max_scroll;
-    }
+    app.help_scroll.clamp(max_scroll);
 
     f.render_widget(
-        Paragraph::new(rows).scroll((app.help_scroll as u16, 0)),
+        Paragraph::new(rows).scroll((app.help_scroll.scroll as u16, 0)),
         content_area,
     );
 
     if max_scroll > 0 {
         let indicator_y = if total_rows > 0 {
-            (app.help_scroll as f64 * content_area.height.saturating_sub(2) as f64
+            (app.help_scroll.scroll as f64 * content_area.height.saturating_sub(2) as f64
                 / max_scroll as f64)
                 .round() as u16
         } else {
@@ -629,9 +627,9 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
         let indicator_y = indicator_y
             .saturating_add(content_area.y)
             .min(content_area.bottom().saturating_sub(2));
-        let indicator_chars = if app.help_scroll == 0 {
+        let indicator_chars = if app.help_scroll.scroll == 0 {
             " ▲ "
-        } else if app.help_scroll >= max_scroll {
+        } else if app.help_scroll.scroll >= max_scroll {
             " ▼ "
         } else {
             " ║ "
