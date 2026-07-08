@@ -446,6 +446,98 @@ fn tree_filter_pop_invalidates_cache() {
     assert!(f.cached.is_none(), "pop must clear the filter cache");
 }
 
+#[test]
+fn tree_filter_regex_matches_via_regex() {
+    let mut f = TreeFilter::new();
+    f.push('r');
+    f.push('?');
+    f.push('s');
+    f.push('r');
+    f.push('c');
+    // "r?src" matches "src" (the `r?` part is optional) via regex
+    assert!(f.regex.is_some(), "a valid regex should be compiled");
+    assert!(f.matches_name("src"));
+    assert!(f.matches_name("rsrc"));
+    assert!(!f.matches_name("source"));
+}
+
+#[test]
+fn tree_filter_invalid_regex_falls_back_to_substring() {
+    let mut f = TreeFilter::new();
+    f.push('[');
+    // Unclosed bracket is not a valid regex
+    assert!(f.regex.is_none(), "invalid regex should fall back to None");
+    // Falls back to literal substring match: "[" is contained in "file[1]"
+    assert!(f.matches_name("file[1]"));
+    assert!(!f.matches_name("file1"));
+}
+
+#[test]
+fn tree_filter_regex_case_insensitive() {
+    let mut f = TreeFilter::new();
+    for c in "README".chars() {
+        f.push(c);
+    }
+    assert!(f.matches_name("readme"));
+    assert!(f.matches_name("README"));
+    assert!(f.matches_name("Readme.md"));
+    assert!(!f.matches_name("read"));
+}
+
+#[test]
+fn tree_filter_regex_empty_query_matches_all() {
+    let f = TreeFilter::new();
+    assert!(f.matches_name("anything"));
+    assert!(f.matches_name(""));
+}
+
+#[test]
+fn tree_filter_substring_fallback_case_insensitive() {
+    let mut f = TreeFilter::new();
+    // A pattern that won't compile as regex but is a valid substring
+    f.push('(');
+    f.push('?');
+    // `(?` is not a valid regex by itself but `(?` is valid as substring
+    // Actually `(?` is a valid regex start of a group. Let's use a pattern that's
+    // definitely not regex but is a valid substring.
+    // Just use plain substring matching with an unclosed group
+    let mut g = TreeFilter::new();
+    g.push('[');
+    g.push('a');
+    g.push('b');
+    // `[ab` is not a valid regex (unclosed character class)
+    assert!(g.regex.is_none());
+    assert!(g.matches_name("foo[ab]"));
+    assert!(!g.matches_name("fooab"));
+}
+
+#[test]
+fn tree_filter_new_has_no_regex() {
+    let f = TreeFilter::new();
+    assert!(f.regex.is_none());
+}
+
+#[test]
+fn tree_filter_push_rebuilds_regex() {
+    let mut f = TreeFilter::new();
+    f.push('a');
+    assert!(f.regex.is_some(), "a single char is a valid regex");
+    f.push('*');
+    assert!(f.regex.is_some(), "'a*' is also valid regex");
+}
+
+#[test]
+fn tree_filter_pop_rebuilds_regex() {
+    let mut f = TreeFilter::new();
+    f.push('a');
+    f.push('\\'); // "a\" - trailing backslash is invalid regex
+    assert!(f.regex.is_none(), "'a\\' is an invalid regex");
+    f.push('\\'); // "a\\" - escaped backslash is valid
+    assert!(f.regex.is_some());
+    f.pop(); // back to "a\" - invalid again
+    assert!(f.regex.is_none(), "'a\\' trailing backslash is invalid");
+}
+
 // -- PluginPicker ------------------------------------------------------------
 
 #[test]

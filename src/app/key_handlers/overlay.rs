@@ -328,22 +328,23 @@ impl App {
             }
         }
 
-        let Some(filter) = self.tree_filter.as_ref() else {
-            return;
-        };
-        let query = filter.query.to_lowercase();
-        // Take ownership of the cache instead of cloning it: the filter session
-        // reuses it across every keystroke, so a clone here would allocate a
-        // fresh copy of the whole tree's paths on each edit.
+        // Take ownership of the cache first (requires mutable access) so we
+        // don't hold an immutable borrow across it.
         let paths = self
             .tree_filter
             .as_mut()
             .and_then(|f| f.full_paths_cache.take())
             .unwrap_or_default();
 
+        let Some(filter) = self.tree_filter.as_ref() else {
+            return;
+        };
+
         let mut to_expand: HashSet<PathBuf> = HashSet::new();
         for (path, name) in &paths {
-            if !name.contains(&query) {
+            // `name` is already lowercased in the cache; `matches_name` is
+            // case-insensitive so matching against a lowercased name is fine.
+            if !filter.matches_name(name) {
                 continue;
             }
             let mut ancestor = path.parent();
@@ -432,11 +433,7 @@ impl App {
             self.scroll_tree_into_view();
             return;
         }
-        let q = filter.query.to_lowercase();
-        let first_match = self
-            .nodes
-            .iter()
-            .position(|n| n.name.to_lowercase().contains(&q));
+        let first_match = self.nodes.iter().position(|n| filter.matches_name(&n.name));
         self.tree_selected = first_match.unwrap_or(0);
         self.scroll_tree_into_view();
     }

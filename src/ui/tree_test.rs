@@ -1309,6 +1309,37 @@ fn draw_tree_filter_records_visible_indices() {
 }
 
 #[test]
+fn draw_tree_filter_regex_matches_pattern() {
+    let mut app = make_app(false, HashMap::new());
+    app.nodes = vec![
+        make_node("main.rs", false, false),
+        make_node("readme.md", false, false),
+        make_node("lib.rs", false, false),
+    ];
+    app.tree_filter = Some(crate::search::TreeFilter::new());
+    // Regex: files ending in ".rs"
+    for c in r"\.rs$".chars() {
+        app.tree_filter.as_mut().unwrap().push(c);
+    }
+    app.tree_selected = 0;
+
+    let rows = render_tree(&mut app, 40, 10);
+    let text = all_text(&rows);
+    assert!(
+        text.contains("main.rs"),
+        "main.rs should match regex '\\.rs$'"
+    );
+    assert!(
+        text.contains("lib.rs"),
+        "lib.rs should match regex '\\.rs$'"
+    );
+    assert!(
+        !text.contains("readme.md"),
+        "readme.md should not match regex '\\.rs$'"
+    );
+}
+
+#[test]
 fn draw_tree_filter_empty_shows_all_nodes() {
     let mut app = make_app(false, HashMap::new());
     app.nodes = vec![

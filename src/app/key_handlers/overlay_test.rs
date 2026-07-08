@@ -659,6 +659,68 @@ fn tree_filter_esc_does_not_activate() {
     fs::remove_dir_all(&root).ok();
 }
 
+#[test]
+fn tree_filter_regex_matches_files() {
+    let root = temp_tree();
+    // Create files with distinct patterns
+    fs::write(root.join("main.rs"), "").unwrap();
+    fs::write(root.join("main_test.rs"), "").unwrap();
+    fs::write(root.join("readme.md"), "").unwrap();
+    // Rebuild the app so it sees the new files
+    let mut app = app_for(&root);
+    app.tree_filter = Some(TreeFilter::new());
+
+    // Type a regex that matches .rs files only, not .md
+    for c in r"\.rs$".chars() {
+        app.handle_tree_filter_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::empty()));
+    }
+
+    // Selection should land on the first .rs file (main.rs sorted before main_test.rs).
+    // `\.rs$` should match .rs files but not .md.
+    let sel = &app.nodes[app.tree_selected];
+    assert!(
+        sel.path.ends_with("main.rs"),
+        "regex '\\.rs$' should select main.rs, got {:?}",
+        sel.path
+    );
+
+    // Verify the filter's matches_name works correctly for each node.
+    let filter = app.tree_filter.as_ref().unwrap();
+    assert!(filter.matches_name("main.rs"), "regex should match main.rs");
+    assert!(
+        filter.matches_name("main_test.rs"),
+        "regex should match main_test.rs"
+    );
+    assert!(
+        !filter.matches_name("readme.md"),
+        "regex should NOT match readme.md"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_filter_invalid_regex_falls_back_to_substring() {
+    let root = temp_tree();
+    fs::write(root.join("file[1].txt"), "").unwrap();
+    fs::write(root.join("file1.txt"), "").unwrap();
+    let mut app = app_for(&root);
+    app.tree_filter = Some(TreeFilter::new());
+
+    // Unclosed bracket is not a valid regex, falls back to substring match
+    for c in "[1".chars() {
+        app.handle_tree_filter_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::empty()));
+    }
+
+    // Substring "[1" matches "file[1].txt" but not "file1.txt"
+    let sel = &app.nodes[app.tree_selected];
+    assert!(
+        sel.path.ends_with("file[1].txt"),
+        "fallback substring should match file[1].txt, got {:?}",
+        sel.path
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
 // -- Theme picker live preview -----------------------------------------------
 
 #[test]
