@@ -562,3 +562,24 @@ fn restore_terminal_is_idempotent() {
     crate::app::restore_terminal();
     crate::app::restore_terminal();
 }
+
+#[test]
+fn meta_action_recognizes_telemetry_status_flag() {
+    let arg = PathBuf::from("--telemetry-status");
+    assert!(matches!(
+        meta_action(Some(&arg)),
+        Some(MetaAction::TelemetryStatus)
+    ));
+}
+
+#[test]
+fn plan_startup_telemetry_status_returns_print() {
+    let startup = plan_startup(Some(PathBuf::from("--telemetry-status")), None, false).unwrap();
+    match startup {
+        Startup::Print(msg) => {
+            assert!(msg.contains("Telemetry:"));
+            assert!(msg.contains("Directory:"));
+        }
+        _ => panic!("expected Print for --telemetry-status"),
+    }
+}

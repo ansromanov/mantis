@@ -109,6 +109,7 @@ enum MetaAction {
     Help,
     Version,
     Update,
+    TelemetryStatus,
 }
 
 impl MetaAction {
@@ -121,6 +122,7 @@ impl MetaAction {
                  -h, --help, /?      Print this help\n  \
                  -V, --version       Print version\n  \
                  --update            Self-update to the latest release\n  \
+                 --telemetry-status  Print telemetry status and directory\n  \
                  --language <lang>   Force the syntax used to highlight piped stdin\n\n\
                  Pager mode: with no <path> and stdin not a terminal, mantis reads\n\
                  stdin instead of a directory - diff-shaped input renders as a\n\
@@ -130,6 +132,20 @@ impl MetaAction {
                 .to_string(),
             MetaAction::Version => format!("v{}\n", env!("CARGO_PKG_VERSION")),
             MetaAction::Update => String::new(),
+            MetaAction::TelemetryStatus => {
+                let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+                let (cfg, _, _) = config::load(&current_dir);
+                let status = if cfg.telemetry.enabled {
+                    "active"
+                } else {
+                    "disabled"
+                };
+                let dir = crate::session::state_dir()
+                    .map(|d| d.join("telemetry"))
+                    .map(|p| p.display().to_string())
+                    .unwrap_or_else(|| "unknown".to_string());
+                format!("Telemetry: {status}\nDirectory: {dir}\n")
+            }
         }
     }
 }
@@ -140,6 +156,7 @@ fn meta_action(arg: Option<&Path>) -> Option<MetaAction> {
         Some("--help") | Some("-h") | Some("/?") => Some(MetaAction::Help),
         Some("--version") | Some("-V") => Some(MetaAction::Version),
         Some("--update") => Some(MetaAction::Update),
+        Some("--telemetry-status") => Some(MetaAction::TelemetryStatus),
         _ => None,
     }
 }
@@ -184,7 +201,9 @@ fn plan_startup(
 ) -> anyhow::Result<Startup> {
     if let Some(action) = meta_action(arg.as_deref()) {
         match action {
-            MetaAction::Help | MetaAction::Version => return Ok(Startup::Print(action.message())),
+            MetaAction::Help | MetaAction::Version | MetaAction::TelemetryStatus => {
+                return Ok(Startup::Print(action.message()))
+            }
             MetaAction::Update => return Ok(Startup::Update),
         }
     }
