@@ -690,7 +690,9 @@ impl App {
             }
             (Err(err), _) => {
                 self.copy_to_clipboard(md, "full bug report");
-                self.set_status(format!("clipboard filled; browser failed: {err}"));
+                self.set_status(format!(
+                    "clipboard filled; browser failed (open github.com/ansromanov/mantis/issues/new): {err}"
+                ));
             }
         }
 
