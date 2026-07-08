@@ -375,13 +375,13 @@ fn app_git_show_fields_default_matches_config() {
 
 // -- resolve_editor ----------------------------------------------------------
 
-#[test]
-fn resolve_editor_uses_visual_when_set() {
+#[track_caller]
+fn with_clean_env<F: FnOnce()>(f: F) {
     let prior_visual = std::env::var("VISUAL").ok();
     let prior_editor = std::env::var("EDITOR").ok();
-    std::env::set_var("VISUAL", "my-editor");
+    std::env::remove_var("VISUAL");
     std::env::remove_var("EDITOR");
-    let result = super::editor::resolve_editor();
+    f();
     if let Some(v) = prior_visual {
         std::env::set_var("VISUAL", v);
     } else {
@@ -392,50 +392,86 @@ fn resolve_editor_uses_visual_when_set() {
     } else {
         std::env::remove_var("EDITOR");
     }
-    assert_eq!(result, "my-editor");
+}
+
+#[test]
+fn resolve_editor_uses_config_when_set() {
+    let (cmd, is_fallback) = super::editor::resolve_editor(Some("code --wait"));
+    assert_eq!(cmd, "code --wait");
+    assert!(!is_fallback, "config override is not a fallback");
+}
+
+#[test]
+fn resolve_editor_empty_config_falls_through() {
+    with_clean_env(|| {
+        std::env::set_var("EDITOR", "vim");
+        let (cmd, is_fallback) = super::editor::resolve_editor(Some(""));
+        assert_eq!(cmd, "vim");
+        assert!(!is_fallback, "env var is not a fallback");
+    });
+}
+
+#[test]
+fn resolve_editor_config_wins_over_env() {
+    with_clean_env(|| {
+        std::env::set_var("VISUAL", "nano");
+        let (cmd, is_fallback) = super::editor::resolve_editor(Some("code --wait"));
+        assert_eq!(cmd, "code --wait");
+        assert!(!is_fallback);
+    });
+}
+
+#[test]
+fn resolve_editor_uses_visual_when_set() {
+    with_clean_env(|| {
+        std::env::set_var("VISUAL", "my-editor");
+        std::env::remove_var("EDITOR");
+        let (result, is_fallback) = super::editor::resolve_editor(None);
+        assert_eq!(result, "my-editor");
+        assert!(!is_fallback, "env var is not a fallback");
+    });
 }
 
 #[test]
 fn resolve_editor_uses_editor_when_visual_unset() {
-    let prior_visual = std::env::var("VISUAL").ok();
-    let prior_editor = std::env::var("EDITOR").ok();
-    std::env::remove_var("VISUAL");
-    std::env::set_var("EDITOR", "nano");
-    let result = super::editor::resolve_editor();
-    if let Some(v) = prior_visual {
-        std::env::set_var("VISUAL", v);
-    } else {
+    with_clean_env(|| {
         std::env::remove_var("VISUAL");
-    }
-    if let Some(v) = prior_editor {
-        std::env::set_var("EDITOR", v);
-    } else {
-        std::env::remove_var("EDITOR");
-    }
-    assert_eq!(result, "nano");
+        std::env::set_var("EDITOR", "nano");
+        let (result, is_fallback) = super::editor::resolve_editor(None);
+        assert_eq!(result, "nano");
+        assert!(!is_fallback, "env var is not a fallback");
+    });
 }
 
 #[test]
-fn resolve_editor_fallback_vim_on_unix() {
+fn resolve_editor_fallback_returns_is_fallback_true() {
     if cfg!(windows) {
-        return; // fallback differs on Windows; tested separately
+        return; // fallback differs on Windows
     }
-    let prior_visual = std::env::var("VISUAL").ok();
-    let prior_editor = std::env::var("EDITOR").ok();
-    std::env::remove_var("VISUAL");
-    std::env::remove_var("EDITOR");
-    let result = super::editor::resolve_editor();
-    if let Some(v) = prior_visual {
-        std::env::set_var("VISUAL", v);
-    } else {
-        std::env::remove_var("VISUAL");
+    with_clean_env(|| {
+        let (_cmd, is_fallback) = super::editor::resolve_editor(None);
+        assert!(is_fallback, "fallback must set is_fallback flag");
+    });
+}
+
+#[test]
+fn resolve_editor_fallback_prefers_nano_over_vim() {
+    if cfg!(windows) {
+        return; // fallback differs on Windows
     }
-    if let Some(v) = prior_editor {
-        std::env::set_var("EDITOR", v);
-    } else {
-        std::env::remove_var("EDITOR");
-    }
-    assert_eq!(result, "vim");
+    with_clean_env(|| {
+        let (cmd, _) = super::editor::resolve_editor(None);
+        let nano_available = std::process::Command::new("which")
+            .arg("nano")
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+        if nano_available {
+            assert_eq!(cmd, "nano", "should prefer nano when available");
+        } else {
+            assert_eq!(cmd, "vim", "should fall back to vim when nano not found");
+        }
+    });
 }
 
 // -- open_in_browser ---------------------------------------------------------

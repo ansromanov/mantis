@@ -111,6 +111,7 @@ pub(crate) fn validate_keys(src: &str) -> Vec<String> {
 /// because their default fields are all `None`, which TOML omits.
 fn schema_table() -> toml::Table {
     let cfg = Config {
+        general: crate::config::GeneralConfig::schema(),
         theme: ThemeConfig::schema(),
         statusbar: StatusBarConfig::schema(),
         ..Config::default()

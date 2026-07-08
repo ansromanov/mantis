@@ -173,6 +173,24 @@ fn schema_paths_are_sorted_and_unique() {
 }
 
 #[test]
+fn schema_paths_contains_general_editor() {
+    let paths = schema_paths();
+    assert!(
+        paths.contains(&"general.editor".to_string()),
+        "general.editor must be a known schema path"
+    );
+}
+
+#[test]
+fn validate_keys_accepts_general_editor() {
+    let warnings = validate_keys("[general]\neditor = \"code --wait\"\n");
+    assert!(
+        warnings.is_empty(),
+        "general.editor should be a known key: {warnings:?}"
+    );
+}
+
+#[test]
 fn schema_paths_contains_at_least_50_entries() {
     let paths = schema_paths();
     assert!(

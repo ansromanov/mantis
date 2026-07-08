@@ -16,6 +16,25 @@ use crate::theme::ThemeConfig;
 
 use super::keymap::Keymap;
 
+/// General application configuration, grouped under `[general]` in the TOML.
+#[derive(Default, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(default)]
+pub struct GeneralConfig {
+    /// External editor command. Overrides `$VISUAL` and `$EDITOR`. When unset
+    /// (the default), falls back to `$VISUAL` then `$EDITOR`, then probes for
+    /// `nano` before falling back to `vim` on Unix / `notepad` on Windows.
+    pub editor: Option<String>,
+}
+
+impl GeneralConfig {
+    /// A fully-populated instance for config-validation schema building.
+    pub(crate) fn schema() -> Self {
+        GeneralConfig {
+            editor: Some("code --wait".into()),
+        }
+    }
+}
+
 /// Tree-pane configuration, grouped under `[tree]` in the TOML.
 #[derive(Serialize, Deserialize, Clone, PartialEq)]
 #[serde(default)]
@@ -209,6 +228,8 @@ pub struct TelemetryConfig {
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(default)]
 pub struct Config {
+    /// Grouped general settings.
+    pub general: GeneralConfig,
     /// Grouped tree settings.
     pub tree: TreeConfig,
     /// Grouped content settings.
@@ -285,6 +306,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
+            general: GeneralConfig::default(),
             tree: TreeConfig::default(),
             content: ContentConfig::default(),
             search: SearchConfig::default(),

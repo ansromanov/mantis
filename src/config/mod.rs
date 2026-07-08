@@ -30,7 +30,7 @@ pub(crate) mod validate;
 #[cfg_attr(not(test), allow(unused_imports))]
 pub(crate) use keymap::bind;
 pub use keymap::{pressed, pressed_in, BindingScope, Keymap};
-pub use types::{Config, StatusBarConfig};
+pub use types::{Config, GeneralConfig, StatusBarConfig};
 // Only referenced in test struct literals.
 #[cfg_attr(not(test), allow(unused_imports))]
 pub use types::{TelemetryConfig, UpdatesConfig};

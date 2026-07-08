@@ -21,6 +21,11 @@ recent_files_count = 10      # how many recently-opened files to remember
 palette_pin_recent = true    # pin the last-used command atop the Ctrl+P palette
 palette_frequent_count = 3   # most-used commands pinned below it; 0 disables
 
+[general]
+# editor = "code --wait"    # external editor command; overrides $VISUAL / $EDITOR
+                             #   When unset, falls back to $VISUAL, then $EDITOR,
+                             #   then probes for nano before falling back to vim
+
 
 # --- tree -------------------------------------------------------------------
 # The left-hand file tree.
