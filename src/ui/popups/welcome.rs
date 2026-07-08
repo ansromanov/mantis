@@ -30,9 +30,10 @@ const WELCOME_ACTIONS: &[(&str, &str)] = &[
     ("quit", "Exit mantis"),
 ];
 
-pub(crate) fn draw_welcome(f: &mut Frame, app: &App, area: Rect) {
+pub(crate) fn draw_welcome(f: &mut Frame, app: &mut App, area: Rect) {
     let theme = &app.theme;
-    let popup = centered_rect(48, 50, area);
+    let popup = centered_rect(60, 70, area);
+    app.welcome_area = popup;
     f.render_widget(Clear, popup);
 
     let block = Block::default()
@@ -94,3 +95,7 @@ pub(crate) fn draw_welcome(f: &mut Frame, app: &App, area: Rect) {
 
     f.render_widget(Paragraph::new(rows), inner);
 }
+
+#[cfg(test)]
+#[path = "welcome_test.rs"]
+mod tests;

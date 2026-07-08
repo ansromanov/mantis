@@ -231,20 +231,19 @@ fn esc_dismisses_welcome() {
 }
 
 #[test]
-fn non_esc_keys_pass_through_welcome() {
+fn non_esc_keys_are_blocked_by_welcome() {
     let root = temp_tree();
     fs::write(root.join("a.txt"), "").unwrap();
     fs::write(root.join("b.txt"), "").unwrap();
     let mut app = app_for(&root);
 
-    // Enable welcome, then press Down — it should navigate tree through the overlay.
+    // Enable welcome, then press Down — it should NOT navigate tree.
     app.show_welcome = true;
     let before = app.tree_selected;
     app.handle_key(key(KeyCode::Down));
-    assert!(
-        app.tree_selected > before || app.tree_selected >= app.nodes.len() - 1,
-        "non-Esc keys must pass through welcome (selected changed from {before} to {})",
-        app.tree_selected
+    assert_eq!(
+        app.tree_selected, before,
+        "non-Esc keys must be blocked (selected remained {before})"
     );
 
     // Welcome is still shown after non-Esc key.

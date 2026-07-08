@@ -77,9 +77,11 @@ impl App {
             }
             return;
         }
-        if self.show_welcome && static_keys::is_close(&key) {
-            self.show_welcome = false;
-            crate::session::mark_welcome_shown();
+        if self.show_welcome {
+            if static_keys::is_close(&key) {
+                self.show_welcome = false;
+                crate::session::mark_welcome_shown();
+            }
             return;
         }
         if self.show_about {
