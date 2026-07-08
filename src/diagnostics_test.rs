@@ -1,3 +1,4 @@
+// Tests for diagnostic report generation and configuration diffing.
 use super::*;
 
 use std::fs;

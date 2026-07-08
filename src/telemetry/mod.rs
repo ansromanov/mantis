@@ -19,7 +19,6 @@
 
 mod sink;
 
-use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{self, SyncSender};
@@ -29,6 +28,7 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
 
+use crate::sys_info;
 use sink::JsonlSink;
 
 /// How an action was invoked.
@@ -269,11 +269,11 @@ impl SessionSnapshot {
             os: std::env::consts::OS,
             arch: std::env::consts::ARCH,
             terminal: std::env::var("TERM").unwrap_or_default(),
-            os_version: os_version(),
-            wsl: is_wsl(),
-            term_program: whitelisted_env("TERM_PROGRAM"),
-            term_program_version: whitelisted_env("TERM_PROGRAM_VERSION"),
-            colorterm: whitelisted_env("COLORTERM"),
+            os_version: sys_info::os_version(),
+            wsl: sys_info::is_wsl(),
+            term_program: sys_info::whitelisted_env("TERM_PROGRAM"),
+            term_program_version: sys_info::whitelisted_env("TERM_PROGRAM_VERSION"),
+            colorterm: sys_info::whitelisted_env("COLORTERM"),
             windows_terminal: std::env::var_os("WT_SESSION").is_some(),
             ssh_session: std::env::var_os("SSH_CONNECTION").is_some(),
             terminal_size: crossterm::terminal::size().ok(),
@@ -306,34 +306,6 @@ impl SessionSnapshot {
             telemetry_enabled: app.telemetry.is_enabled(),
         }
     }
-}
-
-fn whitelisted_env(name: &str) -> Option<String> {
-    std::env::var(name).ok().filter(|v| !v.is_empty())
-}
-
-fn os_version() -> Option<String> {
-    if cfg!(target_os = "linux") {
-        let raw = fs::read_to_string("/etc/os-release").ok()?;
-        raw.lines()
-            .find_map(|l| l.strip_prefix("PRETTY_NAME="))
-            .map(|v| v.trim_matches('"').to_string())
-    } else if cfg!(target_os = "macos") {
-        std::process::Command::new("sw_vers")
-            .arg("-productVersion")
-            .output()
-            .ok()
-            .filter(|o| o.status.success())
-            .and_then(|o| String::from_utf8(o.stdout).ok())
-            .map(|s| format!("macOS {}", s.trim()))
-    } else {
-        None
-    }
-}
-
-fn is_wsl() -> bool {
-    cfg!(target_os = "linux")
-        && fs::read_to_string("/proc/version").is_ok_and(|v| v.to_lowercase().contains("microsoft"))
 }
 
 /// Bounded queue between the render loop and the writer thread. Sized so a

@@ -56,7 +56,7 @@ You can also set this key by hand instead of using the palette.
 When enabled, whitelisted events are appended to a local JSONL log under
 `<state dir>/telemetry/`.  Each session writes to a fresh, timestamped file
 `events-<epoch>.jsonl` (one file per session), rotated at 1 MiB within a
-session; at most five rotated files are kept across sessions.  When disabled
+session; at most five files (one active plus four rotated) are kept across sessions.  When disabled
 — the default — no events are recorded and no files or threads are created.
 Data never leaves your machine; there is no upload endpoint.
 

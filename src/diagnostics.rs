@@ -21,6 +21,7 @@ use serde::Serialize;
 
 use crate::app::App;
 use crate::config::Config;
+use crate::sys_info;
 
 /// Everything included in a bug report. Counts, whitelisted identifiers, and
 /// booleans only — see the module doc for the privacy rules.
@@ -94,12 +95,12 @@ impl DiagnosticReport {
                 .map(|r| r.date.clone()),
             os: std::env::consts::OS,
             arch: std::env::consts::ARCH,
-            os_version: os_version(),
-            wsl: is_wsl(),
-            term: whitelisted_env("TERM"),
-            term_program: whitelisted_env("TERM_PROGRAM"),
-            term_program_version: whitelisted_env("TERM_PROGRAM_VERSION"),
-            colorterm: whitelisted_env("COLORTERM"),
+            os_version: sys_info::os_version(),
+            wsl: sys_info::is_wsl(),
+            term: sys_info::whitelisted_env("TERM"),
+            term_program: sys_info::whitelisted_env("TERM_PROGRAM"),
+            term_program_version: sys_info::whitelisted_env("TERM_PROGRAM_VERSION"),
+            colorterm: sys_info::whitelisted_env("COLORTERM"),
             windows_terminal: std::env::var_os("WT_SESSION").is_some(),
             ssh_session: std::env::var_os("SSH_CONNECTION").is_some(),
             terminal_size: crossterm::terminal::size().ok(),
@@ -250,41 +251,6 @@ impl DiagnosticReport {
         fs::write(&path, self.to_markdown())?;
         Ok(path)
     }
-}
-
-/// Reads a whitelisted terminal-identity env var. The whitelist lives in
-/// `DiagnosticReport::collect`; this helper never sees arbitrary var names
-/// from user input.
-fn whitelisted_env(name: &str) -> Option<String> {
-    std::env::var(name).ok().filter(|v| !v.is_empty())
-}
-
-/// Best-effort human-readable OS version. `None` on platforms without a
-/// cheap, reliable probe.
-fn os_version() -> Option<String> {
-    if cfg!(target_os = "linux") {
-        let raw = fs::read_to_string("/etc/os-release").ok()?;
-        raw.lines()
-            .find_map(|l| l.strip_prefix("PRETTY_NAME="))
-            .map(|v| v.trim_matches('"').to_string())
-    } else if cfg!(target_os = "macos") {
-        std::process::Command::new("sw_vers")
-            .arg("-productVersion")
-            .output()
-            .ok()
-            .filter(|o| o.status.success())
-            .and_then(|o| String::from_utf8(o.stdout).ok())
-            .map(|s| format!("macOS {}", s.trim()))
-    } else {
-        None
-    }
-}
-
-/// Whether we are running under Windows Subsystem for Linux, which has its
-/// own set of terminal quirks worth knowing about in a report.
-fn is_wsl() -> bool {
-    cfg!(target_os = "linux")
-        && fs::read_to_string("/proc/version").is_ok_and(|v| v.to_lowercase().contains("microsoft"))
 }
 
 /// Dotted key paths where `cfg` differs from `Config::default()`. Only the
