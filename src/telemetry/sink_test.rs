@@ -78,3 +78,26 @@ fn collision_on_active_file_uses_incrementing_suffix() {
     let sink = JsonlSink::with_limits(tmp.path().to_path_buf(), 42, 1024, 4);
     assert_eq!(sink.active_name, "events-42-1.jsonl");
 }
+
+#[test]
+fn collision_on_active_file_rotate_preserves_suffix() {
+    let tmp = tempfile::tempdir().unwrap();
+    // Pre-create a file with the same epoch name.
+    fs::write(tmp.path().join("events-42.jsonl"), "prior session data\n").unwrap();
+
+    // Cap below two lines so the second append must rotate first.
+    let mut sink = JsonlSink::with_limits(tmp.path().to_path_buf(), 42, 80, 4);
+    assert_eq!(sink.active_name, "events-42-1.jsonl");
+
+    sink.append(&event(), Duration::ZERO);
+    sink.append(&event(), Duration::ZERO);
+
+    // After rotation, active file should still use the suffix base name.
+    assert_eq!(sink.active_name, "events-42-1.jsonl");
+    assert!(tmp.path().join("events-42-1.jsonl").exists());
+    assert!(tmp.path().join("events-42-2.jsonl").exists());
+
+    // The prior session file events-42.jsonl must be untouched.
+    let prior_content = fs::read_to_string(tmp.path().join("events-42.jsonl")).unwrap();
+    assert_eq!(prior_content, "prior session data\n");
+}

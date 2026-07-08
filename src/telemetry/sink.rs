@@ -28,6 +28,8 @@ pub(crate) struct JsonlSink {
     dir: PathBuf,
     /// Basename of the active file (e.g. `events-1770393600.jsonl`).
     active_name: String,
+    /// The initial/base active filename for this session.
+    base_name: String,
     /// Epoch second from the session start, used for all file names in this
     /// session.
     session_epoch: u64,
@@ -55,9 +57,11 @@ impl JsonlSink {
             active_name = format!("events-{session_epoch}-{n}.jsonl");
             n += 1;
         }
+        let base_name = active_name.clone();
         JsonlSink {
             dir,
             active_name,
+            base_name,
             session_epoch,
             active_len: 0,
             max_file_bytes,
@@ -109,7 +113,7 @@ impl JsonlSink {
         let active = self.dir.join(&old_name);
         let target = self.dir.join(&self.active_name);
         let _ = fs::rename(&active, &target);
-        self.active_name = format!("events-{epoch}.jsonl");
+        self.active_name = self.base_name.clone();
         self.active_len = 0;
         self.prune();
     }
