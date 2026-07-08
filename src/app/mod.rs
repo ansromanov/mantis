@@ -665,10 +665,11 @@ impl App {
         let local_path = match report.save() {
             Ok(path) => Some(path),
             Err(e) => {
-                self.telemetry.record(crate::telemetry::TelemetryEvent::ErrorOccurred {
-                    module: "diagnostics",
-                    kind: "bug_report_failed",
-                });
+                self.telemetry
+                    .record(crate::telemetry::TelemetryEvent::ErrorOccurred {
+                        module: "diagnostics",
+                        kind: "bug_report_failed",
+                    });
                 self.set_status(format!("bug report local save failed: {e}"));
                 None
             }
@@ -725,10 +726,11 @@ impl App {
                 self.set_status("opened browser; full report copied (paste into description)");
             }
             (Err(err), _) => {
-                self.telemetry.record(crate::telemetry::TelemetryEvent::ErrorOccurred {
-                    module: "diagnostics",
-                    kind: "bug_report_failed",
-                });
+                self.telemetry
+                    .record(crate::telemetry::TelemetryEvent::ErrorOccurred {
+                        module: "diagnostics",
+                        kind: "bug_report_failed",
+                    });
                 self.copy_to_clipboard(md, "full bug report");
                 self.set_status(format!(
                     "clipboard filled; browser failed (open github.com/ansromanov/mantis/issues/new): {err}"
