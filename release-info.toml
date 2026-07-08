@@ -1,4 +1,4 @@
-version = "0.16.8"
+version = "0.16.9"
 date = "2026-07-08"
 whats_new = """- test(e2e): cover features merged since PR #614 (#645)
 - feat: shell completions and man page (#642)
