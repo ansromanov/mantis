@@ -149,6 +149,50 @@ fi
 
 info "${GREEN}Installed${RESET} ${BIN} to ${BOLD}${INSTALL_DIR}/${BIN}${exe}${RESET}"
 
+# --- generate + install shell completions (best-effort) ------------------
+installed_bin="${INSTALL_DIR}/${BIN}${exe}"
+case "$os_part" in
+  linux|macos)
+    # Derive the share directory from the install prefix. If the binary went
+    # into a system path (e.g. /usr/local/bin), use /usr/local/share; otherwise
+    # use XDG_DATA_HOME or ~/.local/share.
+    prefix="$(dirname "$INSTALL_DIR")"
+    if [ "$prefix" = "/usr/local" ] || [ "$prefix" = "/usr" ]; then
+      data_root="${prefix}/share"
+    else
+      data_root="${XDG_DATA_HOME:-$HOME/.local/share}"
+    fi
+
+    # Bash completions
+    bash_comp_dirs="${data_root}/bash-completion/completions"
+    if mkdir -p "$bash_comp_dirs" 2>/dev/null; then
+      "$installed_bin" --completions bash > "$bash_comp_dirs/mantis" 2>/dev/null && \
+        info "Installed bash completions to ${bash_comp_dirs}"
+    fi
+
+    # Zsh completions
+    zsh_comp_dirs="${data_root}/zsh/site-functions"
+    if mkdir -p "$zsh_comp_dirs" 2>/dev/null; then
+      "$installed_bin" --completions zsh > "$zsh_comp_dirs/_mantis" 2>/dev/null && \
+        info "Installed zsh completions to ${zsh_comp_dirs}"
+    fi
+
+    # Fish completions
+    fish_comp_dirs="${data_root}/fish/vendor_completions.d"
+    if mkdir -p "$fish_comp_dirs" 2>/dev/null; then
+      "$installed_bin" --completions fish > "$fish_comp_dirs/mantis.fish" 2>/dev/null && \
+        info "Installed fish completions to ${fish_comp_dirs}"
+    fi
+
+    # Man page
+    man_dir="${data_root}/man/man1"
+    if mkdir -p "$man_dir" 2>/dev/null; then
+      "$installed_bin" --print-man-page > "$man_dir/mantis.1" 2>/dev/null && \
+        info "Installed man page to ${man_dir}"
+    fi
+    ;;
+esac
+
 # --- PATH hint ------------------------------------------------------------
 case ":${PATH}:" in
   *":${INSTALL_DIR}:"*) ;;

@@ -1,19 +1,22 @@
 //! Binary entry point for `mantis`.
 //!
-//! Handles the command-line surface (`--help`/`--version` and an optional
-//! file-or-directory path argument), then sets up the terminal: enables raw
-//! mode, enters the alternate screen, and turns on mouse capture. It loads the
-//! config, constructs the [`App`], installs the filesystem watcher, and runs the
-//! synchronous render/poll/dispatch loop in `run_event_loop` until the app asks
-//! to quit. On exit it restores the terminal to its original state and prints
-//! any deferred config-load warning. This is the only module that uses `anyhow`
-//! freely alongside `App::new`; everything below degrades errors into UI
-//! messages instead of bubbling them up to here.
+//! Handles the command-line surface using clap (positional path argument,
+//! `--language`, `--completions`, `--print-man-page`, `--update`,
+//! `--help`/`--version`), then sets up the terminal: enables raw mode, enters the
+//! alternate screen, and turns on mouse capture. It loads the config, constructs
+//! the [`App`], installs the filesystem watcher, and runs the synchronous
+//! render/poll/dispatch loop in `run_event_loop` until the app asks to quit. On
+//! exit it restores the terminal to its original state and prints any deferred
+//! config-load warning. This is the only module that uses `anyhow` freely
+//! alongside `App::new`; everything below degrades errors into UI messages
+//! instead of bubbling them up to here.
 
 use std::io;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use clap::CommandFactory;
+use clap::Parser;
 use crossterm::{
     event::{EnableMouseCapture, Event},
     execute,
@@ -52,6 +55,95 @@ mod update;
 mod virtual_file;
 mod yaml_fold;
 
+// ---------------------------------------------------------------------------
+// CLI definition
+// ---------------------------------------------------------------------------
+
+/// A fast terminal file tree viewer with syntax highlighting, fuzzy search,
+/// and mouse support.
+#[derive(Parser)]
+#[command(
+    name = "mantis",
+    version,
+    about,
+    long_about = "A fast terminal file tree viewer — navigate filesystems, preview \
+                  files with syntax highlighting, fuzzy-search files and content, \
+                  browse git history, and switch themes.\n\
+                  \n\
+                  Pager mode: with no <PATH> and stdin not a terminal, mantis reads \
+                  stdin instead of a directory — diff-shaped input renders as a \
+                  navigable side-by-side diff, anything else is syntax-highlighted:\n  \
+                  git diff | mantis\n  \
+                  kubectl logs pod | mantis",
+    max_term_width = 80
+)]
+struct Cli {
+    /// File or directory to open (default: current directory)
+    #[arg(value_name = "PATH")]
+    path: Option<PathBuf>,
+
+    /// Force the syntax highlighting language for piped stdin
+    #[arg(long = "language", short = 'l', value_name = "LANG")]
+    language: Option<String>,
+
+    /// Generate shell completions (bash, zsh, fish, powershell)
+    #[arg(long = "completions", value_name = "SHELL")]
+    completions: Option<String>,
+
+    /// Print the man page to stdout
+    #[arg(long = "print-man-page")]
+    print_man_page: bool,
+
+    /// Self-update to the latest release
+    #[arg(long = "update")]
+    update: bool,
+
+    /// Print telemetry status and directory
+    #[arg(long = "telemetry-status")]
+    telemetry_status: bool,
+}
+
+/// Prints shell completions for the given shell to stdout.
+fn print_completions(shell: &str) -> anyhow::Result<()> {
+    let shell = match shell {
+        "bash" => clap_complete::Shell::Bash,
+        "zsh" => clap_complete::Shell::Zsh,
+        "fish" => clap_complete::Shell::Fish,
+        "powershell" => clap_complete::Shell::PowerShell,
+        other => anyhow::bail!("unsupported shell: {other} (use bash, zsh, fish, or powershell)"),
+    };
+    let mut cmd = Cli::command();
+    let name = cmd.get_name().to_string();
+    clap_complete::generate(shell, &mut cmd, name, &mut std::io::stdout());
+    Ok(())
+}
+
+/// Prints the man page to stdout.
+fn print_man_page() -> anyhow::Result<()> {
+    let cmd = Cli::command();
+    let mut stdout = std::io::stdout();
+    let man = clap_mangen::Man::new(cmd);
+    man.render(&mut stdout)?;
+    Ok(())
+}
+
+/// Prints the telemetry status to stdout.
+fn print_telemetry_status() -> anyhow::Result<()> {
+    let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let (cfg, _, _) = config::load(&current_dir);
+    let status = if cfg.telemetry.enabled {
+        "active"
+    } else {
+        "disabled"
+    };
+    let dir = crate::session::state_dir()
+        .map(|d| d.join("telemetry"))
+        .map(|p| p.display().to_string())
+        .unwrap_or_else(|| "unknown".to_string());
+    println!("Telemetry: {status}\nDirectory: {dir}");
+    Ok(())
+}
+
 /// Parses a canonicalized path argument into (root_dir, optional_file_to_open).
 fn resolve_root_and_file(arg: &Path) -> (PathBuf, Option<PathBuf>) {
     if arg.is_file() {
@@ -65,102 +157,6 @@ fn resolve_root_and_file(arg: &Path) -> (PathBuf, Option<PathBuf>) {
     }
 }
 
-/// Returns the first CLI argument as a `PathBuf`, if any.
-fn parse_args() -> Option<PathBuf> {
-    parse_args_from(std::env::args())
-}
-
-/// Parses the first argument from an iterator of strings. Extracted for
-/// testability: tests can inject an arbitrary argument list.
-fn parse_args_from<I>(args: I) -> Option<PathBuf>
-where
-    I: IntoIterator<Item = String>,
-{
-    args.into_iter().nth(1).map(PathBuf::from)
-}
-
-/// Returns the value of a `--language <lang>`/`--language=<lang>` flag among
-/// the process arguments, if present. Used to force syntax highlighting for
-/// piped stdin content (pager mode) when first-line sniffing isn't enough.
-fn parse_language_flag() -> Option<String> {
-    parse_language_flag_from(std::env::args())
-}
-
-/// Parses the `--language` flag from an iterator of strings. Extracted for
-/// testability, mirroring `parse_args_from`.
-fn parse_language_flag_from<I>(args: I) -> Option<String>
-where
-    I: IntoIterator<Item = String>,
-{
-    let mut iter = args.into_iter();
-    while let Some(a) = iter.next() {
-        if let Some(v) = a.strip_prefix("--language=") {
-            return Some(v.to_string());
-        }
-        if a == "--language" {
-            return iter.next();
-        }
-    }
-    None
-}
-
-/// A meta CLI action that prints information and exits before launching the UI.
-enum MetaAction {
-    Help,
-    Version,
-    Update,
-    TelemetryStatus,
-}
-
-impl MetaAction {
-    /// The text printed to stdout for this action.
-    fn message(&self) -> String {
-        match self {
-            MetaAction::Help => "Usage: mantis [<path>]\n  \
-                 <path>  File or directory to open (default: current dir)\n\n\
-                 Options:\n  \
-                 -h, --help, /?      Print this help\n  \
-                 -V, --version       Print version\n  \
-                 --update            Self-update to the latest release\n  \
-                 --telemetry-status  Print telemetry status and directory\n  \
-                 --language <lang>   Force the syntax used to highlight piped stdin\n\n\
-                 Pager mode: with no <path> and stdin not a terminal, mantis reads\n\
-                 stdin instead of a directory - diff-shaped input renders as a\n\
-                 navigable side-by-side diff, anything else is syntax-highlighted:\n  \
-                 git diff | mantis\n  \
-                 kubectl logs pod | mantis\n"
-                .to_string(),
-            MetaAction::Version => format!("v{}\n", env!("CARGO_PKG_VERSION")),
-            MetaAction::Update => String::new(),
-            MetaAction::TelemetryStatus => {
-                let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-                let (cfg, _, _) = config::load(&current_dir);
-                let status = if cfg.telemetry.enabled {
-                    "active"
-                } else {
-                    "disabled"
-                };
-                let dir = crate::session::state_dir()
-                    .map(|d| d.join("telemetry"))
-                    .map(|p| p.display().to_string())
-                    .unwrap_or_else(|| "unknown".to_string());
-                format!("Telemetry: {status}\nDirectory: {dir}\n")
-            }
-        }
-    }
-}
-
-/// Classifies a CLI argument as a meta action (help/version), if it is one.
-fn meta_action(arg: Option<&Path>) -> Option<MetaAction> {
-    match arg.and_then(|p| p.to_str()) {
-        Some("--help") | Some("-h") | Some("/?") => Some(MetaAction::Help),
-        Some("--version") | Some("-V") => Some(MetaAction::Version),
-        Some("--update") => Some(MetaAction::Update),
-        Some("--telemetry-status") => Some(MetaAction::TelemetryStatus),
-        _ => None,
-    }
-}
-
 /// Resolves the optional path argument to a canonical path: flag-like args are
 /// ignored and a missing arg defaults to the current directory.
 fn resolve_input_path(arg: Option<PathBuf>) -> anyhow::Result<PathBuf> {
@@ -170,12 +166,9 @@ fn resolve_input_path(arg: Option<PathBuf>) -> anyhow::Result<PathBuf> {
     Ok(path.canonicalize()?)
 }
 
-/// What `main` should do once arguments are parsed: either print a meta message
-/// (help/version) and exit, launch the TUI rooted at `root`, or read piped
-/// stdin into a pager view.
+/// What `main` should do once arguments are parsed: launch the TUI for `root`,
+/// optionally revealing `file`, or read piped stdin into a pager view.
 enum Startup {
-    /// Print this text to stdout and exit successfully.
-    Print(String),
     /// Launch the UI for `root`, optionally revealing `file`.
     Launch {
         root: PathBuf,
@@ -187,37 +180,27 @@ enum Startup {
         root: PathBuf,
         language: Option<String>,
     },
-    /// Perform the self-update and exit.
-    Update,
 }
 
 /// Decides what to do with the parsed CLI argument. Pure and fully testable:
 /// the only side-effecting work (terminal setup, reading stdin, the event
 /// loop) is deferred to `main` based on the returned `Startup`.
 fn plan_startup(
-    arg: Option<PathBuf>,
+    path: Option<PathBuf>,
     language: Option<String>,
     stdin_piped: bool,
 ) -> anyhow::Result<Startup> {
-    if let Some(action) = meta_action(arg.as_deref()) {
-        match action {
-            MetaAction::Help | MetaAction::Version | MetaAction::TelemetryStatus => {
-                return Ok(Startup::Print(action.message()))
-            }
-            MetaAction::Update => return Ok(Startup::Update),
-        }
-    }
     // Pager mode triggers when no real path argument was given (missing, or
     // flag-like — the same rule `resolve_input_path` uses to fall back to the
     // current dir) and stdin is a pipe rather than a terminal.
-    let has_path_arg = arg
+    let has_path_arg = path
         .as_deref()
         .is_some_and(|a| !a.to_string_lossy().starts_with('-'));
     if stdin_piped && !has_path_arg {
         let root = resolve_input_path(None)?;
         return Ok(Startup::Pager { root, language });
     }
-    let (root, file) = resolve_root_and_file(&resolve_input_path(arg)?);
+    let (root, file) = resolve_root_and_file(&resolve_input_path(path)?);
     Ok(Startup::Launch { root, file })
 }
 
@@ -310,16 +293,23 @@ fn main() -> anyhow::Result<()> {
     let subscriber = tracing_subscriber::registry().with(layer);
     let _ = tracing::subscriber::set_global_default(subscriber);
 
+    let cli = Cli::parse();
+
+    if let Some(shell) = &cli.completions {
+        return print_completions(shell);
+    }
+    if cli.print_man_page {
+        return print_man_page();
+    }
+    if cli.update {
+        return crate::update::run_self_update();
+    }
+    if cli.telemetry_status {
+        return print_telemetry_status();
+    }
+
     let stdin_piped = pager::is_piped_stdin();
-    match plan_startup(parse_args(), parse_language_flag(), stdin_piped)? {
-        Startup::Print(message) => {
-            print!("{message}");
-            Ok(())
-        }
-        Startup::Update => {
-            crate::update::run_self_update()?;
-            Ok(())
-        }
+    match plan_startup(cli.path, cli.language, stdin_piped)? {
         Startup::Launch { root, file } => {
             let initial = file.map_or(InitialContent::None, InitialContent::File);
             launch_tui(root, initial)

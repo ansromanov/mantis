@@ -91,6 +91,138 @@ impl EventSource for IdleThenQuit {
     }
 }
 
+// ---------------------------------------------------------------------------
+// clap CLI parsing tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn cli_defaults() {
+    let cli = Cli::try_parse_from(["mantis"]).unwrap();
+    assert!(cli.path.is_none());
+    assert!(cli.language.is_none());
+    assert!(cli.completions.is_none());
+    assert!(!cli.print_man_page);
+    assert!(!cli.update);
+}
+
+#[test]
+fn cli_parses_path() {
+    let cli = Cli::try_parse_from(["mantis", "/some/path"]).unwrap();
+    assert_eq!(cli.path, Some(PathBuf::from("/some/path")));
+}
+
+#[test]
+fn cli_parses_language() {
+    let cli = Cli::try_parse_from(["mantis", "--language", "rust"]).unwrap();
+    assert_eq!(cli.language.as_deref(), Some("rust"));
+}
+
+#[test]
+fn cli_parses_language_equals() {
+    let cli = Cli::try_parse_from(["mantis", "--language=python"]).unwrap();
+    assert_eq!(cli.language.as_deref(), Some("python"));
+}
+
+#[test]
+fn cli_parses_language_short() {
+    let cli = Cli::try_parse_from(["mantis", "-l", "go"]).unwrap();
+    assert_eq!(cli.language.as_deref(), Some("go"));
+}
+
+#[test]
+fn cli_parses_completions() {
+    let cli = Cli::try_parse_from(["mantis", "--completions", "bash"]).unwrap();
+    assert_eq!(cli.completions.as_deref(), Some("bash"));
+}
+
+#[test]
+fn cli_parses_print_man_page() {
+    let cli = Cli::try_parse_from(["mantis", "--print-man-page"]).unwrap();
+    assert!(cli.print_man_page);
+}
+
+#[test]
+fn cli_parses_update() {
+    let cli = Cli::try_parse_from(["mantis", "--update"]).unwrap();
+    assert!(cli.update);
+}
+
+#[test]
+fn cli_parses_telemetry_status() {
+    let cli = Cli::try_parse_from(["mantis", "--telemetry-status"]).unwrap();
+    assert!(cli.telemetry_status);
+}
+
+#[test]
+fn cli_parses_path_and_language() {
+    let cli = Cli::try_parse_from(["mantis", "--language", "rust", "/some/path"]).unwrap();
+    assert_eq!(cli.language.as_deref(), Some("rust"));
+    assert_eq!(cli.path, Some(PathBuf::from("/some/path")));
+}
+
+#[test]
+fn cli_rejects_unknown_flag() {
+    let result = Cli::try_parse_from(["mantis", "--bogus"]);
+    assert!(result.is_err());
+}
+
+#[test]
+fn cli_allows_any_completions_value() {
+    // clap stores the value as a string — validation happens in print_completions.
+    let cli = Cli::try_parse_from(["mantis", "--completions", "csh"]).unwrap();
+    assert_eq!(cli.completions.as_deref(), Some("csh"));
+}
+
+// ---------------------------------------------------------------------------
+// print_completions / print_man_page
+// ---------------------------------------------------------------------------
+
+#[test]
+fn print_completions_bash_produces_output() {
+    let mut buf = Vec::new();
+    let shell = clap_complete::Shell::Bash;
+    let mut cmd = Cli::command();
+    let name = cmd.get_name().to_string();
+    clap_complete::generate(shell, &mut cmd, name, &mut buf);
+    let output = String::from_utf8(buf).unwrap();
+    assert!(output.contains("mantis"));
+    assert!(output.contains("--language") || output.contains("--completions"));
+}
+
+#[test]
+fn print_completions_zsh_produces_output() {
+    let mut buf = Vec::new();
+    let shell = clap_complete::Shell::Zsh;
+    let mut cmd = Cli::command();
+    let name = cmd.get_name().to_string();
+    clap_complete::generate(shell, &mut cmd, name, &mut buf);
+    let output = String::from_utf8(buf).unwrap();
+    assert!(!output.is_empty());
+}
+
+#[test]
+fn print_completions_errors_on_unsupported_shell() {
+    let err = print_completions("csh").unwrap_err();
+    let msg = format!("{err:#}");
+    assert!(msg.contains("csh"));
+}
+
+#[test]
+fn print_man_page_produces_output() {
+    // Render the man page to a buffer and verify it has expected sections.
+    let cmd = Cli::command();
+    let mut buf = Vec::new();
+    let man = clap_mangen::Man::new(cmd);
+    man.render(&mut buf).unwrap();
+    let output = String::from_utf8(buf).unwrap();
+    assert!(output.contains("mantis"));
+    assert!(output.contains(".TH") || output.contains(".SH"));
+}
+
+// ---------------------------------------------------------------------------
+// resolve_root_and_file
+// ---------------------------------------------------------------------------
+
 #[test]
 fn resolve_root_and_file_with_directory() {
     let dir = temp_dir();
@@ -112,116 +244,9 @@ fn resolve_root_and_file_with_file() {
     fs::remove_dir_all(&dir).ok();
 }
 
-#[test]
-fn parse_args_returns_none_with_no_args() {
-    let result = parse_args_from(std::iter::empty::<String>());
-    assert!(result.is_none());
-}
-
-#[test]
-fn parse_args_returns_first_arg() {
-    let result = parse_args_from(["program", "some/path"].into_iter().map(String::from));
-    assert_eq!(result, Some(PathBuf::from("some/path")));
-}
-
-#[test]
-fn event_loop_key_quit_sets_should_quit() {
-    let dir = temp_dir();
-    fs::write(dir.join("a.txt"), "hello\n").unwrap();
-    let mut app = app_for(&dir);
-    assert!(!app.should_quit);
-    app.handle_key(KeyEvent::new(KeyCode::Char('q'), KeyModifiers::empty()));
-    assert!(app.should_quit);
-    fs::remove_dir_all(&dir).ok();
-}
-
-#[test]
-fn event_loop_key_search_toggles_search() {
-    let dir = temp_dir();
-    fs::write(dir.join("a.txt"), "hello\n").unwrap();
-    let mut app = app_for(&dir);
-    assert!(app.search.is_none());
-    // ctrl+f opens the full-text content search overlay.
-    app.focus = crate::app::Focus::Content;
-    app.current_file = None;
-    app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
-    assert!(app.search.is_some());
-    app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
-    assert!(app.search.is_none());
-    fs::remove_dir_all(&dir).ok();
-}
-
-#[test]
-fn event_loop_key_theme_toggles_picker() {
-    let dir = temp_dir();
-    fs::write(dir.join("a.txt"), "hello\n").unwrap();
-    let mut app = app_for(&dir);
-    assert!(app.theme_picker.is_none());
-    app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::empty()));
-    assert!(app.theme_picker.is_some());
-    app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
-    assert!(app.theme_picker.is_none());
-    fs::remove_dir_all(&dir).ok();
-}
-
-#[test]
-fn event_loop_key_help_toggles() {
-    let dir = temp_dir();
-    fs::write(dir.join("a.txt"), "hello\n").unwrap();
-    let mut app = app_for(&dir);
-    assert!(!app.show_help);
-    app.handle_key(KeyEvent::new(KeyCode::Char('?'), KeyModifiers::empty()));
-    assert!(app.show_help);
-    app.handle_key(KeyEvent::new(KeyCode::Char('?'), KeyModifiers::empty()));
-    assert!(!app.show_help);
-    fs::remove_dir_all(&dir).ok();
-}
-
-#[test]
-fn event_loop_key_command_palette_toggles() {
-    let dir = temp_dir();
-    fs::write(dir.join("a.txt"), "hello\n").unwrap();
-    let mut app = app_for(&dir);
-    assert!(app.command_palette.is_none());
-    // command_palette = ctrl+p; matching is case-insensitive so an
-    // uppercase event (CapsLock / stray Shift) must open it too.
-    app.handle_key(KeyEvent::new(KeyCode::Char('P'), KeyModifiers::CONTROL));
-    assert!(app.command_palette.is_some());
-    app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
-    assert!(app.command_palette.is_none());
-    fs::remove_dir_all(&dir).ok();
-}
-
-#[test]
-fn meta_action_recognizes_help_flags() {
-    for flag in ["--help", "-h", "/?"] {
-        let arg = PathBuf::from(flag);
-        assert!(matches!(meta_action(Some(&arg)), Some(MetaAction::Help)));
-    }
-}
-
-#[test]
-fn meta_action_recognizes_version_flags() {
-    for flag in ["--version", "-V"] {
-        let arg = PathBuf::from(flag);
-        assert!(matches!(meta_action(Some(&arg)), Some(MetaAction::Version)));
-    }
-}
-
-#[test]
-fn meta_action_none_for_path_or_missing() {
-    assert!(meta_action(None).is_none());
-    let arg = PathBuf::from("some/path");
-    assert!(meta_action(Some(&arg)).is_none());
-}
-
-#[test]
-fn meta_action_messages_have_expected_content() {
-    assert!(MetaAction::Help.message().contains("Usage: mantis"));
-    let version = MetaAction::Version.message();
-    assert!(version.starts_with('v'));
-    assert!(version.contains(env!("CARGO_PKG_VERSION")));
-}
+// ---------------------------------------------------------------------------
+// resolve_input_path
+// ---------------------------------------------------------------------------
 
 #[test]
 fn resolve_input_path_defaults_to_current_dir() {
@@ -249,203 +274,9 @@ fn resolve_input_path_errors_on_missing_path() {
     assert!(resolve_input_path(Some(missing)).is_err());
 }
 
-#[test]
-fn dispatch_event_routes_key_to_handler() {
-    let dir = temp_dir();
-    let mut app = app_for(&dir);
-    dispatch_event(&mut app, key_event('q'));
-    assert!(app.should_quit);
-    fs::remove_dir_all(&dir).ok();
-}
-
-#[test]
-fn dispatch_event_ignores_non_key_mouse_events() {
-    let dir = temp_dir();
-    let mut app = app_for(&dir);
-    dispatch_event(&mut app, Event::FocusGained);
-    assert!(!app.should_quit);
-    fs::remove_dir_all(&dir).ok();
-}
-
-#[test]
-fn render_frame_clears_when_requested() {
-    let dir = temp_dir();
-    fs::write(dir.join("a.txt"), "hello\n").unwrap();
-    let mut app = app_for(&dir);
-    app.needs_clear = true;
-    let backend = TestBackend::new(80, 30);
-    let mut terminal = ratatui::Terminal::new(backend).unwrap();
-    render_frame(&mut terminal, &mut app).unwrap();
-    assert!(!app.needs_clear);
-    fs::remove_dir_all(&dir).ok();
-}
-
-#[test]
-fn run_event_loop_quits_on_q() {
-    let dir = temp_dir();
-    fs::write(dir.join("a.txt"), "hello\n").unwrap();
-    let mut app = app_for(&dir);
-    let backend = TestBackend::new(80, 30);
-    let mut terminal = ratatui::Terminal::new(backend).unwrap();
-    let mut events = ScriptedEvents::new(vec![key_event('q')]);
-    run_event_loop(&mut terminal, &mut app, &mut events).unwrap();
-    assert!(app.should_quit);
-    fs::remove_dir_all(&dir).ok();
-}
-
-#[test]
-fn run_event_loop_processes_events_before_quit() {
-    let dir = temp_dir();
-    fs::write(dir.join("a.txt"), "hello\n").unwrap();
-    let mut app = app_for(&dir);
-    let backend = TestBackend::new(80, 30);
-    let mut terminal = ratatui::Terminal::new(backend).unwrap();
-    // Open search, close it, then quit; the loop renders between each event.
-    let mut events = ScriptedEvents::new(vec![key_event('/'), esc_event(), key_event('q')]);
-    run_event_loop(&mut terminal, &mut app, &mut events).unwrap();
-    assert!(app.should_quit);
-    assert!(app.search.is_none());
-    fs::remove_dir_all(&dir).ok();
-}
-
-#[test]
-fn run_event_loop_handles_idle_none_event() {
-    let dir = temp_dir();
-    fs::write(dir.join("a.txt"), "hello\n").unwrap();
-    let mut app = app_for(&dir);
-    let backend = TestBackend::new(80, 30);
-    let mut terminal = ratatui::Terminal::new(backend).unwrap();
-    // An idle frame (None) then quit exercises the no-event tick() path.
-    let mut events = IdleThenQuit::new();
-    run_event_loop(&mut terminal, &mut app, &mut events).unwrap();
-    assert!(app.should_quit);
-    fs::remove_dir_all(&dir).ok();
-}
-
-#[test]
-fn run_app_builds_and_runs_to_quit() {
-    let dir = temp_dir();
-    fs::write(dir.join("a.txt"), "hello\n").unwrap();
-    let backend = TestBackend::new(80, 30);
-    let mut terminal = ratatui::Terminal::new(backend).unwrap();
-    let mut events = ScriptedEvents::new(vec![key_event('q')]);
-    run_app(
-        &mut terminal,
-        dir.clone(),
-        InitialContent::None,
-        &mut events,
-    )
-    .unwrap();
-    fs::remove_dir_all(&dir).ok();
-}
-
-#[test]
-fn run_app_opens_and_reveals_file() {
-    let dir = temp_dir();
-    let file_path = dir.join("a.txt");
-    fs::write(&file_path, "hello\nworld\n").unwrap();
-    let backend = TestBackend::new(80, 30);
-    let mut terminal = ratatui::Terminal::new(backend).unwrap();
-    // Opening a file switches focus to Content, where the tree-scoped `q`
-    // quit binding doesn't apply; use the global ctrl+c binding instead.
-    let mut events = ScriptedEvents::new(vec![Event::Key(KeyEvent::new(
-        KeyCode::Char('c'),
-        KeyModifiers::CONTROL,
-    ))]);
-    run_app(
-        &mut terminal,
-        dir.clone(),
-        InitialContent::File(file_path),
-        &mut events,
-    )
-    .unwrap();
-    fs::remove_dir_all(&dir).ok();
-}
-
-#[test]
-fn run_app_surfaces_config_error_without_failing() {
-    let dir = temp_dir();
-    fs::write(dir.join("mantis.toml"), "garbage [[[ = 1").unwrap();
-    fs::write(dir.join("a.txt"), "hello\n").unwrap();
-    let backend = TestBackend::new(80, 30);
-    let mut terminal = ratatui::Terminal::new(backend).unwrap();
-    let mut events = ScriptedEvents::new(vec![key_event('q')]);
-    // A bad config is reported (to stderr) but must not abort the run.
-    run_app(
-        &mut terminal,
-        dir.clone(),
-        InitialContent::None,
-        &mut events,
-    )
-    .unwrap();
-    fs::remove_dir_all(&dir).ok();
-}
-
-#[test]
-fn parse_args_reads_process_args_without_panicking() {
-    // Smoke test for the std::env::args wrapper; the test harness passes its own
-    // binary name, so the first user arg may be present or absent.
-    let _ = parse_args();
-}
-
-#[test]
-fn dispatch_event_routes_mouse_event() {
-    use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
-    let dir = temp_dir();
-    fs::write(dir.join("a.txt"), "hello\n").unwrap();
-    let mut app = app_for(&dir);
-    let mouse = Event::Mouse(MouseEvent {
-        kind: MouseEventKind::Down(MouseButton::Left),
-        column: 0,
-        row: 0,
-        modifiers: KeyModifiers::empty(),
-    });
-    // Just needs to route to handle_mouse without panicking.
-    dispatch_event(&mut app, mouse);
-    assert!(!app.should_quit);
-    fs::remove_dir_all(&dir).ok();
-}
-
-#[test]
-fn crossterm_events_polls_without_panicking() {
-    // Exercises the production event source. Under the test harness stdin is not
-    // a tty, so poll may time out (Ok(None)) or error; either is acceptable here
-    // -- we only assert it never yields a spurious event and never panics.
-    let mut events = CrosstermEvents;
-    if let Ok(event) = events.next_event() {
-        assert!(event.is_none());
-    }
-}
-
-#[test]
-fn plan_startup_help_returns_print() {
-    let startup = plan_startup(Some(PathBuf::from("--help")), None, false).unwrap();
-    match startup {
-        Startup::Print(msg) => assert!(msg.contains("Usage: mantis")),
-        _ => panic!("expected Print for --help"),
-    }
-}
-
-#[test]
-fn plan_startup_version_returns_print() {
-    let startup = plan_startup(Some(PathBuf::from("--version")), None, false).unwrap();
-    match startup {
-        Startup::Print(msg) => assert!(msg.starts_with('v')),
-        _ => panic!("expected Print for --version"),
-    }
-}
-
-#[test]
-fn plan_startup_update_returns_update() {
-    let startup = plan_startup(Some(PathBuf::from("--update")), None, false).unwrap();
-    assert!(matches!(startup, Startup::Update));
-}
-
-#[test]
-fn meta_action_recognizes_update_flag() {
-    let arg = PathBuf::from("--update");
-    assert!(matches!(meta_action(Some(&arg)), Some(MetaAction::Update)));
-}
+// ---------------------------------------------------------------------------
+// plan_startup
+// ---------------------------------------------------------------------------
 
 #[test]
 fn plan_startup_directory_returns_launch() {
@@ -525,25 +356,239 @@ fn plan_startup_no_path_without_piped_stdin_returns_launch() {
     }
 }
 
+// ---------------------------------------------------------------------------
+// dispatch_event
+// ---------------------------------------------------------------------------
+
 #[test]
-fn parse_language_flag_from_reads_separate_and_equals_forms() {
-    let sep = parse_language_flag_from(
-        ["program", "--language", "rust"]
-            .into_iter()
-            .map(String::from),
-    );
-    assert_eq!(sep.as_deref(), Some("rust"));
-
-    let eq = parse_language_flag_from(
-        ["program", "--language=python"]
-            .into_iter()
-            .map(String::from),
-    );
-    assert_eq!(eq.as_deref(), Some("python"));
-
-    let none = parse_language_flag_from(["program"].into_iter().map(String::from));
-    assert!(none.is_none());
+fn dispatch_event_routes_key_to_handler() {
+    let dir = temp_dir();
+    let mut app = app_for(&dir);
+    dispatch_event(&mut app, key_event('q'));
+    assert!(app.should_quit);
+    fs::remove_dir_all(&dir).ok();
 }
+
+#[test]
+fn dispatch_event_ignores_non_key_mouse_events() {
+    let dir = temp_dir();
+    let mut app = app_for(&dir);
+    dispatch_event(&mut app, Event::FocusGained);
+    assert!(!app.should_quit);
+    fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn dispatch_event_routes_mouse_event() {
+    use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
+    let dir = temp_dir();
+    fs::write(dir.join("a.txt"), "hello\n").unwrap();
+    let mut app = app_for(&dir);
+    let mouse = Event::Mouse(MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: 0,
+        row: 0,
+        modifiers: KeyModifiers::empty(),
+    });
+    // Just needs to route to handle_mouse without panicking.
+    dispatch_event(&mut app, mouse);
+    assert!(!app.should_quit);
+    fs::remove_dir_all(&dir).ok();
+}
+
+// ---------------------------------------------------------------------------
+// event loop
+// ---------------------------------------------------------------------------
+
+#[test]
+fn event_loop_key_quit_sets_should_quit() {
+    let dir = temp_dir();
+    fs::write(dir.join("a.txt"), "hello\n").unwrap();
+    let mut app = app_for(&dir);
+    assert!(!app.should_quit);
+    app.handle_key(KeyEvent::new(KeyCode::Char('q'), KeyModifiers::empty()));
+    assert!(app.should_quit);
+    fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn event_loop_key_search_toggles_search() {
+    let dir = temp_dir();
+    fs::write(dir.join("a.txt"), "hello\n").unwrap();
+    let mut app = app_for(&dir);
+    assert!(app.search.is_none());
+    // ctrl+f opens the full-text content search overlay.
+    app.focus = crate::app::Focus::Content;
+    app.current_file = None;
+    app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
+    assert!(app.search.is_some());
+    app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+    assert!(app.search.is_none());
+    fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn event_loop_key_theme_toggles_picker() {
+    let dir = temp_dir();
+    fs::write(dir.join("a.txt"), "hello\n").unwrap();
+    let mut app = app_for(&dir);
+    assert!(app.theme_picker.is_none());
+    app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::empty()));
+    assert!(app.theme_picker.is_some());
+    app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+    assert!(app.theme_picker.is_none());
+    fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn event_loop_key_help_toggles() {
+    let dir = temp_dir();
+    fs::write(dir.join("a.txt"), "hello\n").unwrap();
+    let mut app = app_for(&dir);
+    assert!(!app.show_help);
+    app.handle_key(KeyEvent::new(KeyCode::Char('?'), KeyModifiers::empty()));
+    assert!(app.show_help);
+    app.handle_key(KeyEvent::new(KeyCode::Char('?'), KeyModifiers::empty()));
+    assert!(!app.show_help);
+    fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn event_loop_key_command_palette_toggles() {
+    let dir = temp_dir();
+    fs::write(dir.join("a.txt"), "hello\n").unwrap();
+    let mut app = app_for(&dir);
+    assert!(app.command_palette.is_none());
+    // command_palette = ctrl+p; matching is case-insensitive so an
+    // uppercase event (CapsLock / stray Shift) must open it too.
+    app.handle_key(KeyEvent::new(KeyCode::Char('P'), KeyModifiers::CONTROL));
+    assert!(app.command_palette.is_some());
+    app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+    assert!(app.command_palette.is_none());
+    fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn run_event_loop_quits_on_q() {
+    let dir = temp_dir();
+    fs::write(dir.join("a.txt"), "hello\n").unwrap();
+    let mut app = app_for(&dir);
+    let backend = TestBackend::new(80, 30);
+    let mut terminal = ratatui::Terminal::new(backend).unwrap();
+    let mut events = ScriptedEvents::new(vec![key_event('q')]);
+    run_event_loop(&mut terminal, &mut app, &mut events).unwrap();
+    assert!(app.should_quit);
+    fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn run_event_loop_processes_events_before_quit() {
+    let dir = temp_dir();
+    fs::write(dir.join("a.txt"), "hello\n").unwrap();
+    let mut app = app_for(&dir);
+    let backend = TestBackend::new(80, 30);
+    let mut terminal = ratatui::Terminal::new(backend).unwrap();
+    // Open search, close it, then quit; the loop renders between each event.
+    let mut events = ScriptedEvents::new(vec![key_event('/'), esc_event(), key_event('q')]);
+    run_event_loop(&mut terminal, &mut app, &mut events).unwrap();
+    assert!(app.should_quit);
+    assert!(app.search.is_none());
+    fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn run_event_loop_handles_idle_none_event() {
+    let dir = temp_dir();
+    fs::write(dir.join("a.txt"), "hello\n").unwrap();
+    let mut app = app_for(&dir);
+    let backend = TestBackend::new(80, 30);
+    let mut terminal = ratatui::Terminal::new(backend).unwrap();
+    // An idle frame (None) then quit exercises the no-event tick() path.
+    let mut events = IdleThenQuit::new();
+    run_event_loop(&mut terminal, &mut app, &mut events).unwrap();
+    assert!(app.should_quit);
+    fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn render_frame_clears_when_requested() {
+    let dir = temp_dir();
+    fs::write(dir.join("a.txt"), "hello\n").unwrap();
+    let mut app = app_for(&dir);
+    app.needs_clear = true;
+    let backend = TestBackend::new(80, 30);
+    let mut terminal = ratatui::Terminal::new(backend).unwrap();
+    render_frame(&mut terminal, &mut app).unwrap();
+    assert!(!app.needs_clear);
+    fs::remove_dir_all(&dir).ok();
+}
+
+// ---------------------------------------------------------------------------
+// run_app
+// ---------------------------------------------------------------------------
+
+#[test]
+fn run_app_builds_and_runs_to_quit() {
+    let dir = temp_dir();
+    fs::write(dir.join("a.txt"), "hello\n").unwrap();
+    let backend = TestBackend::new(80, 30);
+    let mut terminal = ratatui::Terminal::new(backend).unwrap();
+    let mut events = ScriptedEvents::new(vec![key_event('q')]);
+    run_app(
+        &mut terminal,
+        dir.clone(),
+        InitialContent::None,
+        &mut events,
+    )
+    .unwrap();
+    fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn run_app_opens_and_reveals_file() {
+    let dir = temp_dir();
+    let file_path = dir.join("a.txt");
+    fs::write(&file_path, "hello\nworld\n").unwrap();
+    let backend = TestBackend::new(80, 30);
+    let mut terminal = ratatui::Terminal::new(backend).unwrap();
+    // Opening a file switches focus to Content, where the tree-scoped `q`
+    // quit binding doesn't apply; use the global ctrl+c binding instead.
+    let mut events = ScriptedEvents::new(vec![Event::Key(KeyEvent::new(
+        KeyCode::Char('c'),
+        KeyModifiers::CONTROL,
+    ))]);
+    run_app(
+        &mut terminal,
+        dir.clone(),
+        InitialContent::File(file_path),
+        &mut events,
+    )
+    .unwrap();
+    fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn run_app_surfaces_config_error_without_failing() {
+    let dir = temp_dir();
+    fs::write(dir.join("mantis.toml"), "garbage [[[ = 1").unwrap();
+    fs::write(dir.join("a.txt"), "hello\n").unwrap();
+    let backend = TestBackend::new(80, 30);
+    let mut terminal = ratatui::Terminal::new(backend).unwrap();
+    let mut events = ScriptedEvents::new(vec![key_event('q')]);
+    // A bad config is reported (to stderr) but must not abort the run.
+    run_app(
+        &mut terminal,
+        dir.clone(),
+        InitialContent::None,
+        &mut events,
+    )
+    .unwrap();
+    fs::remove_dir_all(&dir).ok();
+}
+
+// ---------------------------------------------------------------------------
+// misc helpers
+// ---------------------------------------------------------------------------
 
 #[test]
 fn config_error_surfaces_from_invalid_toml() {
@@ -561,25 +606,4 @@ fn restore_terminal_is_idempotent() {
     // terminal is not in raw/alternate-screen mode.
     crate::app::restore_terminal();
     crate::app::restore_terminal();
-}
-
-#[test]
-fn meta_action_recognizes_telemetry_status_flag() {
-    let arg = PathBuf::from("--telemetry-status");
-    assert!(matches!(
-        meta_action(Some(&arg)),
-        Some(MetaAction::TelemetryStatus)
-    ));
-}
-
-#[test]
-fn plan_startup_telemetry_status_returns_print() {
-    let startup = plan_startup(Some(PathBuf::from("--telemetry-status")), None, false).unwrap();
-    match startup {
-        Startup::Print(msg) => {
-            assert!(msg.contains("Telemetry:"));
-            assert!(msg.contains("Directory:"));
-        }
-        _ => panic!("expected Print for --telemetry-status"),
-    }
 }

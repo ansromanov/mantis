@@ -43,7 +43,8 @@ powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/ans
 
 The script downloads `mantis.exe`, verifies its SHA-256 checksum, installs it to
 `%CARGO_HOME%\bin` (if Rust is present) or `%LOCALAPPDATA%\Programs\mantis`,
-and adds the directory to your user `PATH`.
+and adds the directory to your user `PATH`. It also generates PowerShell tab
+completions (install to `%CARGO_HOME%\completions\mantis.ps1`).
 
 You can override the install location:
 
@@ -131,6 +132,28 @@ version.
 > The explicit URL is needed because the repository is named `mantis`, not
 > `homebrew-mantis`; Homebrew's short `brew tap user/repo` form only resolves the
 > `homebrew-`-prefixed name.
+
+The formula installs **bash**, **zsh**, and **fish** completions plus the **man
+page** automatically — no extra steps needed.
+
+### Manual: completions and man page
+
+After installing `mantis` from any method, you can generate completions and the
+man page at any time:
+
+```sh
+# Shell completions
+mantis --completions bash > /usr/local/share/bash-completion/completions/mantis
+mantis --completions zsh  > /usr/local/share/zsh/site-functions/_mantis
+mantis --completions fish > /usr/local/share/fish/vendor_completions.d/mantis.fish
+mantis --completions powershell > ~/.config/powershell/completions/mantis.ps1
+
+# Man page
+mantis --print-man-page > /usr/local/share/man/man1/mantis.1
+```
+
+The one-liner install script (`install.sh`) does this automatically when it can
+write to the appropriate `share/` directories.
 
 ### Other package managers
 

@@ -3,9 +3,15 @@
 ## Basic usage
 
 ```sh
-mantis          # view the current directory
-mantis path/to/dir  # view a specific directory
-mantis file.md      # open a single file directly
+mantis                    # view the current directory
+mantis path/to/dir        # view a specific directory
+mantis file.md            # open a single file directly
+mantis --completions bash # generate shell completions (bash, zsh, fish, powershell)
+mantis --print-man-page   # print the man page
+mantis --language rust < file # force syntax highlighting for piped stdin
+mantis --update           # self-update to the latest release
+mantis --help             # print help (or -h)
+mantis --version          # print version (or -V)
 ```
 
 Press `?` or `F1` for in-app help, and `q` to quit.

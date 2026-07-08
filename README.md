@@ -117,15 +117,27 @@ for prebuilt binaries, Windows, and checksum verification.
 ## Usage
 
 ```sh
-mantis              # view the current directory
-mantis path/to/dir  # view a specific directory
-mantis file.md      # open a file directly
+mantis                          # view the current directory
+mantis path/to/dir              # view a specific directory
+mantis file.md                  # open a file directly
+mantis --completions bash       # generate bash completions
+mantis --print-man-page         # print the man page (mantis.1)
+mantis --language rust < file   # highlight piped stdin as rust
+mantis --update                 # self-update to the latest release
 ```
 
 Press `F1` for in-app help (or `?`), and `Ctrl+c` to quit. For the full keybinding
 list and every action name, see the
 [Usage & Keybindings guide](https://ansromanov.github.io/mantis/usage.html) — or
 press `Ctrl+P` in-app to fuzzy-find any action with its binding.
+
+Shell completions for **bash**, **zsh**, **fish**, and **PowerShell** are generated
+automatically by the install script and Homebrew formula. Alternatively:
+```sh
+mantis --completions bash > /etc/bash_completion.d/mantis
+mantis --completions zsh > /usr/local/share/zsh/site-functions/_mantis
+man mantis    # view the man page
+```
 
 ## Plugins
 

@@ -146,6 +146,20 @@ bench *args:
 bench-report *args:
     ./scripts/bench-report.sh {{args}}
 
+# generate shell completions and man page into completions/ and man/ directories
+generate-completions: build
+    #!/usr/bin/env sh
+    set -eu
+    mkdir -p completions man
+    for shell in bash zsh fish powershell; do
+      target/debug/mantis --completions "$shell" > "completions/mantis.${shell}" 2>/dev/null
+      echo "generated completions/mantis.${shell}"
+    done
+    # zsh convention: file is named _mantis
+    cp completions/mantis.zsh completions/_mantis
+    target/debug/mantis --print-man-page > man/mantis.1 2>/dev/null
+    echo "generated man/mantis.1"
+
 # remove build artifacts
 clean:
     cargo clean
