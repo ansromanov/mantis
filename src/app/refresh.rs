@@ -160,7 +160,14 @@ impl App {
         self.auto_watch = cfg.content.watch;
         self.show_file_info = cfg.content.show_file_info;
         self.indent_guides = cfg.tree.indent_guides;
-        self.icons_enabled = cfg.tree.icons;
+        // Only apply the config default when no active plugin currently owns
+        // the icon map — otherwise a config-file reload (e.g. the app's own
+        // atomic `save_config` write triggering the watcher) would stomp the
+        // `set_icon_map` action's live `icons_enabled = true` right back to
+        // `cfg.tree.icons`'s cold-start default of `false`.
+        if !self.plugin_contributions.values().any(|c| c.has_icon_map) {
+            self.icons_enabled = cfg.tree.icons;
+        }
         self.keys = cfg.keys.clone();
 
         let theme_name = cfg.theme.name.as_deref().unwrap_or("default").to_string();
