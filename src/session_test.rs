@@ -274,3 +274,45 @@ fn save_load_round_trip_uses_per_root_file() {
         .collect();
     assert_eq!(entries.len(), 1, "only one per-root file expected");
 }
+
+// -- welcome_shown flag -----------------------------------------------------
+
+#[test]
+fn welcome_not_shown_by_default() {
+    let _lock = SESSION_LOCK.lock().unwrap();
+    let _env = TestEnv::new("welcome_default");
+    assert!(!is_welcome_shown(), "welcome must not be shown initially");
+}
+
+#[test]
+fn mark_welcome_creates_flag() {
+    let _lock = SESSION_LOCK.lock().unwrap();
+    let _env = TestEnv::new("welcome_mark");
+    assert!(!is_welcome_shown(), "precondition: not shown");
+    mark_welcome_shown();
+    assert!(is_welcome_shown(), "welcome must be shown after mark");
+    let path = welcome_shown_path().unwrap();
+    assert!(path.exists(), "flag file must exist on disk");
+}
+
+#[test]
+fn welcome_shown_survives_reinit() {
+    let _lock = SESSION_LOCK.lock().unwrap();
+    let _env = TestEnv::new("welcome_survive");
+    mark_welcome_shown();
+    assert!(is_welcome_shown(), "precondition: shown after mark");
+    // Re-read by simulating a fresh session (state dir is persistent).
+    assert!(is_welcome_shown(), "welcome must stay shown on re-check");
+}
+
+#[test]
+fn welcome_shown_path_returns_some_when_state_dir_available() {
+    let _lock = SESSION_LOCK.lock().unwrap();
+    let _env = TestEnv::new("welcome_path");
+    let path = welcome_shown_path();
+    assert!(path.is_some(), "welcome_shown_path must return Some");
+    assert!(
+        path.unwrap().ends_with("welcome_shown.flag"),
+        "must end with welcome_shown.flag"
+    );
+}

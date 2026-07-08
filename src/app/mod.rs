@@ -210,6 +210,10 @@ pub struct App {
     pub show_blame: bool,
     pub show_about: bool,
     pub show_telemetry_notice: bool,
+    /// When `true`, the welcome overlay is shown on top of everything else.
+    /// Set during construction on first-ever launch; cleared on dismiss and
+    /// never set again (persisted via `welcome_shown.flag` in the state dir).
+    pub show_welcome: bool,
     pub walk_errors: usize,
     /// Warning describing a malformed config that was ignored at startup, if any.
     pub config_error: Option<String>,

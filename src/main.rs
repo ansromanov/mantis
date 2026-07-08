@@ -438,6 +438,12 @@ fn run_app(
 ) -> anyhow::Result<()> {
     let (cfg, cfg_path, cfg_error) = config::load(&root);
     let mut app = App::new(root, cfg, cfg_path, cfg_error)?;
+
+    // Show the first-run welcome overlay if it has never been dismissed.
+    if !crate::session::is_welcome_shown() {
+        app.show_welcome = true;
+    }
+
     match initial {
         InitialContent::File(file) => app.open_and_reveal(&file),
         InitialContent::Pager { parsed, language } => app.open_pager_content(parsed, language),

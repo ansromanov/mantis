@@ -175,6 +175,7 @@ impl App {
             blame_scroll: 0,
             show_about: false,
             show_telemetry_notice: false,
+            show_welcome: false,
             walk_errors,
             config_error,
             auto_watch: cfg.content.watch,

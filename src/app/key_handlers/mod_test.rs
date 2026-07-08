@@ -217,3 +217,60 @@ fn on_keypress_new_key_preempts_stale_pending_keypress() {
     app.plugin_manager.deactivate_all();
     fs::remove_dir_all(&root).ok();
 }
+
+// -- welcome overlay key handling --------------------------------------------
+
+#[test]
+fn esc_dismisses_welcome() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.show_welcome = true;
+    app.handle_key(key(KeyCode::Esc));
+    assert!(!app.show_welcome, "Esc must dismiss the welcome overlay");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn non_esc_keys_pass_through_welcome() {
+    let root = temp_tree();
+    fs::write(root.join("a.txt"), "").unwrap();
+    fs::write(root.join("b.txt"), "").unwrap();
+    let mut app = app_for(&root);
+
+    // Enable welcome, then press Down — it should navigate tree through the overlay.
+    app.show_welcome = true;
+    let before = app.tree_selected;
+    app.handle_key(key(KeyCode::Down));
+    assert!(
+        app.tree_selected > before || app.tree_selected >= app.nodes.len() - 1,
+        "non-Esc keys must pass through welcome (selected changed from {before} to {})",
+        app.tree_selected
+    );
+
+    // Welcome is still shown after non-Esc key.
+    assert!(app.show_welcome, "welcome must survive non-Esc keys");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn esc_dismisses_welcome_and_normal_keys_still_work() {
+    let root = temp_tree();
+    fs::write(root.join("a.txt"), "").unwrap();
+    fs::write(root.join("b.txt"), "").unwrap();
+    let mut app = app_for(&root);
+    app.show_welcome = true;
+
+    // Dismiss the welcome overlay.
+    app.handle_key(key(KeyCode::Esc));
+    assert!(!app.show_welcome, "welcome dismissed");
+
+    // Now pressing Down should move the tree selection.
+    let before = app.tree_selected;
+    app.handle_key(key(KeyCode::Down));
+    assert!(
+        app.tree_selected > before || app.tree_selected >= app.nodes.len() - 1,
+        "after dismiss, Down must navigate tree (selected changed from {before} to {})",
+        app.tree_selected
+    );
+    fs::remove_dir_all(&root).ok();
+}

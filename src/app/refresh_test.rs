@@ -324,6 +324,7 @@ fn create_base_app() -> App {
         blame_scroll: 0,
         show_about: false,
         show_telemetry_notice: false,
+        show_welcome: false,
         walk_errors: 0,
         config_error: None,
         auto_watch: false,
