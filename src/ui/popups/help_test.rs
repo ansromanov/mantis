@@ -303,7 +303,7 @@ fn help_never_shows_legacy_terminal_warning() {
 fn help_scroll_starts_at_zero() {
     let dir = tempfile::tempdir().unwrap();
     let app = make_app(dir.path());
-    assert_eq!(app.help_scroll, 0);
+    assert_eq!(app.help_scroll.scroll, 0);
 }
 
 #[test]
@@ -312,7 +312,7 @@ fn help_scroll_j_down() {
     let mut app = make_app(dir.path());
     app.show_help = true;
     app.handle_key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::empty()));
-    assert_eq!(app.help_scroll, 1);
+    assert_eq!(app.help_scroll.scroll, 1);
 }
 
 #[test]
@@ -321,7 +321,7 @@ fn help_scroll_down_arrow() {
     let mut app = make_app(dir.path());
     app.show_help = true;
     app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
-    assert_eq!(app.help_scroll, 1);
+    assert_eq!(app.help_scroll.scroll, 1);
 }
 
 #[test]
@@ -329,9 +329,9 @@ fn help_scroll_k_up() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());
     app.show_help = true;
-    app.help_scroll = 5;
+    app.help_scroll.scroll = 5;
     app.handle_key(KeyEvent::new(KeyCode::Char('k'), KeyModifiers::empty()));
-    assert_eq!(app.help_scroll, 4);
+    assert_eq!(app.help_scroll.scroll, 4);
 }
 
 #[test]
@@ -339,9 +339,9 @@ fn help_scroll_up_arrow() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());
     app.show_help = true;
-    app.help_scroll = 5;
+    app.help_scroll.scroll = 5;
     app.handle_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()));
-    assert_eq!(app.help_scroll, 4);
+    assert_eq!(app.help_scroll.scroll, 4);
 }
 
 #[test]
@@ -349,10 +349,10 @@ fn help_scroll_j_does_not_overflow() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());
     app.show_help = true;
-    app.help_scroll = usize::MAX;
+    app.help_scroll.scroll = usize::MAX;
     app.handle_key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::empty()));
     // saturating_add clamps at MAX rather than wrapping, so should still be MAX
-    assert_eq!(app.help_scroll, usize::MAX);
+    assert_eq!(app.help_scroll.scroll, usize::MAX);
 }
 
 #[test]
@@ -361,7 +361,7 @@ fn help_scroll_k_does_not_underflow() {
     let mut app = make_app(dir.path());
     app.show_help = true;
     app.handle_key(KeyEvent::new(KeyCode::Char('k'), KeyModifiers::empty()));
-    assert_eq!(app.help_scroll, 0);
+    assert_eq!(app.help_scroll.scroll, 0);
 }
 
 #[test]
@@ -370,7 +370,7 @@ fn help_scroll_page_down() {
     let mut app = make_app(dir.path());
     app.show_help = true;
     app.handle_key(KeyEvent::new(KeyCode::PageDown, KeyModifiers::empty()));
-    assert_eq!(app.help_scroll, 10);
+    assert_eq!(app.help_scroll.scroll, 10);
 }
 
 #[test]
@@ -378,9 +378,9 @@ fn help_scroll_page_up() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());
     app.show_help = true;
-    app.help_scroll = 15;
+    app.help_scroll.scroll = 15;
     app.handle_key(KeyEvent::new(KeyCode::PageUp, KeyModifiers::empty()));
-    assert_eq!(app.help_scroll, 5);
+    assert_eq!(app.help_scroll.scroll, 5);
 }
 
 #[test]
@@ -388,9 +388,9 @@ fn help_scroll_home_g() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());
     app.show_help = true;
-    app.help_scroll = 20;
+    app.help_scroll.scroll = 20;
     app.handle_key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::empty()));
-    assert_eq!(app.help_scroll, 0);
+    assert_eq!(app.help_scroll.scroll, 0);
 }
 
 #[test]
@@ -398,9 +398,9 @@ fn help_scroll_home_key() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());
     app.show_help = true;
-    app.help_scroll = 20;
+    app.help_scroll.scroll = 20;
     app.handle_key(KeyEvent::new(KeyCode::Home, KeyModifiers::empty()));
-    assert_eq!(app.help_scroll, 0);
+    assert_eq!(app.help_scroll.scroll, 0);
 }
 
 #[test]
@@ -409,7 +409,7 @@ fn help_scroll_cap_g() {
     let mut app = make_app(dir.path());
     app.show_help = true;
     app.handle_key(KeyEvent::new(KeyCode::Char('G'), KeyModifiers::empty()));
-    assert_eq!(app.help_scroll, usize::MAX);
+    assert_eq!(app.help_scroll.scroll, usize::MAX);
 }
 
 #[test]
@@ -418,7 +418,7 @@ fn help_scroll_end_key() {
     let mut app = make_app(dir.path());
     app.show_help = true;
     app.handle_key(KeyEvent::new(KeyCode::End, KeyModifiers::empty()));
-    assert_eq!(app.help_scroll, usize::MAX);
+    assert_eq!(app.help_scroll.scroll, usize::MAX);
 }
 
 #[test]
@@ -426,10 +426,10 @@ fn help_scroll_esc_resets() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());
     app.show_help = true;
-    app.help_scroll = 10;
+    app.help_scroll.scroll = 10;
     app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
     assert!(!app.show_help);
-    assert_eq!(app.help_scroll, 0);
+    assert_eq!(app.help_scroll.scroll, 0);
 }
 
 #[test]
@@ -443,7 +443,7 @@ fn help_scroll_mouse_wheel_down() {
         row: 1,
         modifiers: KeyModifiers::empty(),
     });
-    assert_eq!(app.help_scroll, 3);
+    assert_eq!(app.help_scroll.scroll, 3);
 }
 
 #[test]
@@ -451,14 +451,14 @@ fn help_scroll_mouse_wheel_up() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());
     app.show_help = true;
-    app.help_scroll = 10;
+    app.help_scroll.scroll = 10;
     app.handle_mouse(MouseEvent {
         kind: MouseEventKind::ScrollUp,
         column: 1,
         row: 1,
         modifiers: KeyModifiers::empty(),
     });
-    assert_eq!(app.help_scroll, 7);
+    assert_eq!(app.help_scroll.scroll, 7);
 }
 
 #[test]
@@ -472,7 +472,7 @@ fn help_scroll_mouse_wheel_does_not_underflow() {
         row: 1,
         modifiers: KeyModifiers::empty(),
     });
-    assert_eq!(app.help_scroll, 0);
+    assert_eq!(app.help_scroll.scroll, 0);
 }
 
 #[test]
@@ -481,7 +481,7 @@ fn help_scroll_clamped_by_draw() {
     let mut app = make_app(dir.path());
     app.show_help = true;
     // Set help_scroll past the end of content
-    app.help_scroll = 999;
+    app.help_scroll.scroll = 999;
     // Draw clamps it to max_scroll = total_rows - inner_height
     // Using a small terminal (80x10) so we scroll past everything
     let backend = TestBackend::new(80, 10);
@@ -490,9 +490,9 @@ fn help_scroll_clamped_by_draw() {
     // After clamping, help_scroll should be <= max_scroll
     // We can't know the exact value without replicating the logic, but it should be < 999
     assert!(
-        app.help_scroll < 999,
+        app.help_scroll.scroll < 999,
         "help_scroll should be clamped by draw, got {}",
-        app.help_scroll
+        app.help_scroll.scroll
     );
 }
 
@@ -548,7 +548,7 @@ fn help_scroll_down_reveals_later_sections() {
     let has_search_section = before.contains("Filters & In-File Search");
 
     // Scroll down to near the bottom
-    app.help_scroll = 999;
+    app.help_scroll.scroll = 999;
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let rows_after = buffer_rows(&terminal);
     let after = rows_after.join("\n");

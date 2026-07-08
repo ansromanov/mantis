@@ -28,6 +28,7 @@ use crate::config::Config;
 pub struct DiagnosticReport {
     // Application.
     pub app_version: &'static str,
+    pub target_triple: &'static str,
     pub release_date: Option<String>,
     // Operating system.
     pub os: &'static str,
@@ -87,6 +88,7 @@ impl DiagnosticReport {
         DiagnosticReport {
             body,
             app_version: env!("CARGO_PKG_VERSION"),
+            target_triple: env!("TARGET"),
             release_date: crate::release_info::RELEASE
                 .as_ref()
                 .map(|r| r.date.clone()),
@@ -143,8 +145,9 @@ impl DiagnosticReport {
         md.push_str("## mantis diagnostic report\n\n");
         let opt = |v: &Option<String>| v.clone().unwrap_or_else(|| "unknown".into());
         md.push_str(&format!(
-            "- **app**: {} (released {})\n",
+            "- **app**: {} ({}, released {})\n",
             self.app_version,
+            self.target_triple,
             opt(&self.release_date)
         ));
         md.push_str(&format!(

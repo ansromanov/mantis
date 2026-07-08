@@ -141,12 +141,13 @@ fn to_markdown_lists_all_sections() {
 fn collect_includes_bug_report_body() {
     let tmp = fixture_root();
     let mut app = app_for(tmp.path());
-    let mut state = crate::search::BugReportState::new();
+    let mut state = crate::search::BugReportState::new(String::new());
     state.text = vec!["Hello bug".to_string(), "Line 2".to_string()];
     app.bug_report = Some(state);
 
     let report = DiagnosticReport::collect(&app);
     assert_eq!(report.body, "Hello bug\nLine 2");
+    assert!(!report.target_triple.is_empty());
 
     let md = report.to_markdown();
     assert!(md.contains("## bug report body\n\nHello bug\nLine 2\n\n"));

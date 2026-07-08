@@ -553,21 +553,25 @@ pub struct BugReportState {
     pub cursor_row: usize,
     pub cursor_col: usize,
     pub scroll_top: usize,
+    pub preview_scroll: crate::scroll::ScrollState,
+    pub diagnostics_markdown: String,
 }
 
 impl Default for BugReportState {
     fn default() -> Self {
-        Self::new()
+        Self::new(String::new())
     }
 }
 
 impl BugReportState {
-    pub fn new() -> Self {
+    pub fn new(diagnostics_markdown: String) -> Self {
         BugReportState {
             text: vec![String::new()],
             cursor_row: 0,
             cursor_col: 0,
             scroll_top: 0,
+            preview_scroll: crate::scroll::ScrollState::new(),
+            diagnostics_markdown,
         }
     }
 

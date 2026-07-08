@@ -558,43 +558,81 @@ impl App {
             return;
         }
 
-        let Some(ref mut state) = self.bug_report else {
-            return;
-        };
-
         match key.code {
             KeyCode::Esc => {
                 self.bug_report = None;
             }
             KeyCode::Enter => {
-                state.insert_newline();
+                if let Some(ref mut state) = self.bug_report {
+                    state.insert_newline();
+                }
             }
             KeyCode::Backspace => {
-                state.backspace();
+                if let Some(ref mut state) = self.bug_report {
+                    state.backspace();
+                }
             }
             KeyCode::Delete => {
-                state.delete();
+                if let Some(ref mut state) = self.bug_report {
+                    state.delete();
+                }
             }
             KeyCode::Left => {
-                state.move_left();
+                if let Some(ref mut state) = self.bug_report {
+                    state.move_left();
+                }
             }
             KeyCode::Right => {
-                state.move_right();
+                if let Some(ref mut state) = self.bug_report {
+                    state.move_right();
+                }
             }
             KeyCode::Up => {
-                state.move_up();
+                if let Some(ref mut state) = self.bug_report {
+                    state.move_up();
+                }
             }
             KeyCode::Down => {
-                state.move_down();
+                if let Some(ref mut state) = self.bug_report {
+                    state.move_down();
+                }
             }
             KeyCode::Home => {
-                state.move_home();
+                if let Some(ref mut state) = self.bug_report {
+                    state.move_home();
+                }
             }
             KeyCode::End => {
-                state.move_end();
+                if let Some(ref mut state) = self.bug_report {
+                    state.move_end();
+                }
+            }
+            KeyCode::PageUp => {
+                if let Some(ref mut state) = self.bug_report {
+                    state.preview_scroll.scroll_up(10);
+                }
+            }
+            KeyCode::PageDown => {
+                if let Some(ref mut state) = self.bug_report {
+                    let body_text = state.text.join("\n");
+                    let report_md = if body_text.trim().is_empty() {
+                        state.diagnostics_markdown.clone()
+                    } else {
+                        format!(
+                            "## bug report body\n\n{}\n\n{}",
+                            body_text, state.diagnostics_markdown
+                        )
+                    };
+                    let lines_count = report_md.lines().count();
+                    let height = self.bug_report_preview_area.height.max(1) as usize;
+                    let max_scroll = lines_count.saturating_sub(height);
+                    state.preview_scroll.scroll_down(10, max_scroll);
+                }
             }
             KeyCode::Char(c) if !is_ctrl && !is_alt => {
-                state.insert_char(c);
+                if let Some(ref mut state) = self.bug_report {
+                    state.insert_char(c);
+                }
             }
             _ => {}
         }

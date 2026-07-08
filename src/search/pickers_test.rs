@@ -519,7 +519,7 @@ fn recent_files_refilter_handles_new_return_type() {
 
 #[test]
 fn bug_report_state_editing_operations() {
-    let mut state = BugReportState::new();
+    let mut state = BugReportState::default();
     assert_eq!(state.text, vec![""]);
     assert_eq!(state.cursor_row, 0);
     assert_eq!(state.cursor_col, 0);
@@ -581,4 +581,10 @@ fn bug_report_state_editing_operations() {
     assert_eq!(state.cursor_col, 0);
     state.move_end();
     assert_eq!(state.cursor_col, 1); // length of "Y"
+}
+
+#[test]
+fn bug_report_state_custom_diagnostics() {
+    let state = BugReportState::new("test diagnostics info".to_string());
+    assert_eq!(state.diagnostics_markdown, "test diagnostics info");
 }

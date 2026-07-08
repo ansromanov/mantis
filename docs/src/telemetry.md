@@ -8,12 +8,18 @@ delete, or choose to share when filing an issue.
 ## Bug reports
 
 Open the command palette (`Ctrl+P`) and run **"Report a bug (save
-diagnostics locally)"**. This collects an anonymous diagnostic snapshot,
-saves it as markdown under the state directory
-(`~/.local/state/mantis/bug-reports/` on Linux/macOS,
-`%APPDATA%\mantis\bug-reports\` on Windows), and shows the saved path in the
-status bar. Review the file, then attach or paste it into a
-[GitHub issue](https://github.com/ansromanov/mantis/issues).
+diagnostics locally)"**. This opens a modal dialog where you can write a
+description of the bug and preview the diagnostic report below it.
+
+When you submit the report (via `Ctrl+S` or `Ctrl+Enter`), `mantis`:
+1. Saves the report as markdown under the state directory
+   (`~/.local/state/mantis/bug-reports/` on Linux/macOS,
+   `%APPDATA%\mantis\bug-reports\` on Windows).
+2. Attempts to open your default browser to create a new GitHub issue pre-filled
+   with your description and the diagnostic report.
+3. If the report exceeds the URL length limit (~6KB) or if the browser fails to
+   open, it copies the full report to your clipboard so you can paste it manually,
+   updating the status bar with instructions.
 
 The report contains, in full:
 

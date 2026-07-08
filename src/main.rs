@@ -40,6 +40,7 @@ mod list_picker;
 mod pager;
 mod plugin;
 mod release_info;
+mod scroll;
 mod search;
 mod selection;
 mod session;

@@ -444,12 +444,7 @@ fn resolve_editor_fallback_vim_on_unix() {
 fn open_in_browser_empty_url_noop() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    assert!(app.status_message.is_none());
-    app.open_in_browser("");
-    assert!(
-        app.status_message.is_none(),
-        "empty URL must not set status"
-    );
+    assert!(app.open_in_browser("").is_ok(), "empty URL must be a no-op");
     fs::remove_dir_all(&root).ok();
 }
 
@@ -458,14 +453,10 @@ fn open_in_browser_non_tty_sets_status() {
     // In test context stdout is not a terminal, so the non-interactive branch fires.
     let root = temp_tree();
     let mut app = app_for(&root);
-    assert!(app.status_message.is_none());
-    app.open_in_browser("https://example.com");
-    assert!(
-        app.status_message.is_some(),
-        "non-interactive browser open must set a status message"
-    );
-    let msg = app.status_message.as_ref().unwrap();
-    assert!(msg.text.contains("not opening browser"));
+    let err = app
+        .open_in_browser("https://example.com")
+        .expect_err("non-interactive browser open must return an error");
+    assert!(err.contains("not opening browser"));
     fs::remove_dir_all(&root).ok();
 }
 
