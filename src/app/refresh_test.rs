@@ -1668,6 +1668,6 @@ path = "mantis-plugin-markdown"
 
 #[test]
 fn refresh_telemetry_check() {
-    let mut app = create_base_app();
+    let app = create_base_app();
     assert!(!app.telemetry.is_enabled());
 }

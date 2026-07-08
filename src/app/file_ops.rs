@@ -340,12 +340,13 @@ impl App {
             };
             let encoding = crate::telemetry::FileEncoding::from_str(load.encoding.as_deref());
             let is_binary = encoding == crate::telemetry::FileEncoding::Binary;
-            self.telemetry.record(crate::telemetry::TelemetryEvent::FileOpened {
-                size_bucket,
-                source_kind,
-                encoding,
-                is_binary,
-            });
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::FileOpened {
+                    size_bucket,
+                    source_kind,
+                    encoding,
+                    is_binary,
+                });
         }
 
         self.is_diff = false;
@@ -505,9 +506,10 @@ impl App {
         if commits.is_empty() {
             return;
         }
-        self.telemetry.record(crate::telemetry::TelemetryEvent::FeatureUsed {
-            feature: crate::telemetry::Feature::GitHistory,
-        });
+        self.telemetry
+            .record(crate::telemetry::TelemetryEvent::FeatureUsed {
+                feature: crate::telemetry::Feature::GitHistory,
+            });
         self.history = Some(HistoryState::new(file, commits));
     }
 

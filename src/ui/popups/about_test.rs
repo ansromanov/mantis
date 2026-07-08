@@ -74,17 +74,29 @@ fn about_shows_license() {
 fn about_shows_telemetry_status() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());
-    
+
     // Telemetry is disabled by default
     let text = buffer_text(&app);
-    assert!(text.contains("disabled"), "must show disabled by default: {text}");
-    assert!(!text.contains("active"), "must not show active when disabled: {text}");
-    
+    assert!(
+        text.contains("disabled"),
+        "must show disabled by default: {text}"
+    );
+    assert!(
+        !text.contains("active"),
+        "must not show active when disabled: {text}"
+    );
+
     // Enable telemetry
     app.telemetry = crate::telemetry::Telemetry::new(true);
     let text = buffer_text(&app);
-    assert!(text.contains("active"), "must show active when enabled: {text}");
-    assert!(!text.contains("disabled"), "must not show disabled when active: {text}");
+    assert!(
+        text.contains("active"),
+        "must show active when enabled: {text}"
+    );
+    assert!(
+        !text.contains("disabled"),
+        "must not show disabled when active: {text}"
+    );
 }
 
 #[test]

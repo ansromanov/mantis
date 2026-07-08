@@ -36,10 +36,11 @@ impl App {
             Focus::Content => crate::config::BindingScope::Content,
         };
         if let Some(action_id) = self.keys.action_for_key(&key, scope) {
-            self.telemetry.record(crate::telemetry::TelemetryEvent::ActionInvoked {
-                action: action_id,
-                source: crate::telemetry::ActionSource::Key,
-            });
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::ActionInvoked {
+                    action: action_id,
+                    source: crate::telemetry::ActionSource::Key,
+                });
         }
 
         if static_keys::is_close(&key) {

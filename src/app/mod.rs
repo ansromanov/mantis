@@ -413,10 +413,11 @@ impl App {
     fn save_config(&mut self) {
         if let Some(path) = &self.config_path {
             if let Err(e) = config::save(&self.config, path) {
-                self.telemetry.record(crate::telemetry::TelemetryEvent::ErrorOccurred {
-                    module: "config",
-                    kind: "save_failed",
-                });
+                self.telemetry
+                    .record(crate::telemetry::TelemetryEvent::ErrorOccurred {
+                        module: "config",
+                        kind: "save_failed",
+                    });
                 self.set_status(format!("could not save config: {e}"));
             }
         }
@@ -742,10 +743,11 @@ impl App {
         match self.clipboard_set(text) {
             Ok(()) => self.set_status(format!("copied {label}")),
             Err(e) => {
-                self.telemetry.record(crate::telemetry::TelemetryEvent::ErrorOccurred {
-                    module: "clipboard",
-                    kind: "write_failed",
-                });
+                self.telemetry
+                    .record(crate::telemetry::TelemetryEvent::ErrorOccurred {
+                        module: "clipboard",
+                        kind: "write_failed",
+                    });
                 self.set_status(format!("clipboard error: {e}"));
             }
         }

@@ -310,7 +310,7 @@ fn diff_nav_noop_when_not_a_diff() {
 #[test]
 fn diff_nav_telemetry_check() {
     let root = temp_tree();
-    let mut app = app_for(&root);
+    let app = app_for(&root);
     assert!(!app.telemetry.is_enabled());
     fs::remove_dir_all(&root).ok();
 }

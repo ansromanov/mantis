@@ -619,20 +619,24 @@ fn bench_telemetry_overhead(c: &mut Criterion) {
     let tel_disabled = mantis::telemetry::Telemetry::new(false);
     group.bench_function(BenchmarkId::new("disabled", ""), |b| {
         b.iter(|| {
-            tel_disabled.record(black_box(mantis::telemetry::TelemetryEvent::ActionInvoked {
-                action: "test_action",
-                source: mantis::telemetry::ActionSource::Key,
-            }));
+            tel_disabled.record(black_box(
+                mantis::telemetry::TelemetryEvent::ActionInvoked {
+                    action: "test_action",
+                    source: mantis::telemetry::ActionSource::Key,
+                },
+            ));
         })
     });
 
     let tel_enabled = mantis::telemetry::Telemetry::new(true);
     group.bench_function(BenchmarkId::new("enabled", ""), |b| {
         b.iter(|| {
-            tel_enabled.record(black_box(mantis::telemetry::TelemetryEvent::ActionInvoked {
-                action: "test_action",
-                source: mantis::telemetry::ActionSource::Key,
-            }));
+            tel_enabled.record(black_box(
+                mantis::telemetry::TelemetryEvent::ActionInvoked {
+                    action: "test_action",
+                    source: mantis::telemetry::ActionSource::Key,
+                },
+            ));
         })
     });
 

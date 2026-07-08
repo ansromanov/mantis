@@ -109,6 +109,7 @@ pub enum FileEncoding {
 }
 
 impl FileEncoding {
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(enc: Option<&str>) -> Self {
         match enc {
             Some("UTF-8") => Self::Utf8,
@@ -175,11 +176,13 @@ pub enum TelemetryEvent {
 const CHANNEL_CAPACITY: usize = 256;
 
 struct TelemetryState {
+    id: u64,
     tx: SyncSender<TelemetryEvent>,
     dropped: Arc<AtomicU64>,
 }
 
 static TELEMETRY_STATE: Mutex<Option<TelemetryState>> = Mutex::new(None);
+static TELEMETRY_ID_GEN: AtomicU64 = AtomicU64::new(0);
 
 /// Telemetry layer for the tracing library.
 pub struct TelemetryLayer;
@@ -190,9 +193,25 @@ impl<S> tracing_subscriber::Layer<S> for TelemetryLayer
 where
     S: tracing::Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
 {
-    fn on_new_span(&self, _attrs: &tracing::span::Attributes<'_>, id: &tracing::span::Id, ctx: tracing_subscriber::layer::Context<'_, S>) {
+    fn on_new_span(
+        &self,
+        _attrs: &tracing::span::Attributes<'_>,
+        id: &tracing::span::Id,
+        ctx: tracing_subscriber::layer::Context<'_, S>,
+    ) {
         if let Some(span) = ctx.span(id) {
-            span.extensions_mut().insert(SpanStart(Instant::now()));
+            const ALLOWED_SPANS: &[&str] = &[
+                "open_file",
+                "build_visible",
+                "highlight",
+                "highlight_range",
+                "search_refresh",
+                "diff_parse",
+                "plugin_round_trip",
+            ];
+            if ALLOWED_SPANS.contains(&span.name()) {
+                span.extensions_mut().insert(SpanStart(Instant::now()));
+            }
         }
     }
 
@@ -251,6 +270,7 @@ pub struct Telemetry {
 }
 
 struct Inner {
+    id: u64,
     tx: Option<SyncSender<TelemetryEvent>>,
     dropped: Arc<AtomicU64>,
     started: Instant,
@@ -279,6 +299,7 @@ impl Telemetry {
     /// isolated directory). Emits `SessionStart` immediately.
     pub fn with_dir(dir: PathBuf) -> Self {
         let started = Instant::now();
+        let id = TELEMETRY_ID_GEN.fetch_add(1, Ordering::Relaxed);
         let (tx, rx) = mpsc::sync_channel::<TelemetryEvent>(CHANNEL_CAPACITY);
         let writer = std::thread::spawn(move || {
             let mut sink = JsonlSink::new(dir);
@@ -288,6 +309,7 @@ impl Telemetry {
         });
         let telemetry = Telemetry {
             inner: Some(Inner {
+                id,
                 tx: Some(tx.clone()),
                 dropped: Arc::new(AtomicU64::new(0)),
                 started,
@@ -296,6 +318,7 @@ impl Telemetry {
         };
         if let Ok(mut guard) = TELEMETRY_STATE.lock() {
             *guard = Some(TelemetryState {
+                id,
                 tx,
                 dropped: telemetry.inner.as_ref().unwrap().dropped.clone(),
             });
@@ -323,10 +346,14 @@ impl Telemetry {
 
 impl Drop for Telemetry {
     fn drop(&mut self) {
-        if let Ok(mut guard) = TELEMETRY_STATE.lock() {
-            *guard = None;
-        }
         let Some(inner) = &mut self.inner else { return };
+        if let Ok(mut guard) = TELEMETRY_STATE.lock() {
+            if let Some(state) = &*guard {
+                if state.id == inner.id {
+                    *guard = None;
+                }
+            }
+        }
         // Best-effort flush: telemetry is a cache-grade side channel, so a
         // failed final send is deliberately ignored (per the error-handling
         // policy for best-effort caches).

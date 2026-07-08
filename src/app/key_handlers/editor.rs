@@ -462,10 +462,11 @@ impl App {
         match spawn_system_open(path.as_os_str()) {
             Ok(_) => self.set_status("opened file externally"),
             Err(e) => {
-                self.telemetry.record(crate::telemetry::TelemetryEvent::ErrorOccurred {
-                    module: "editor",
-                    kind: "external_open_failed",
-                });
+                self.telemetry
+                    .record(crate::telemetry::TelemetryEvent::ErrorOccurred {
+                        module: "editor",
+                        kind: "external_open_failed",
+                    });
                 self.set_status(format!("external open failed: {e}"));
             }
         }

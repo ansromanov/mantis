@@ -502,10 +502,11 @@ impl App {
             None => format!("[plugin_error] {message}"),
         };
         self.plugin_manager.log_plugin_error_line(name, &log_line);
-        self.telemetry.record(crate::telemetry::TelemetryEvent::ErrorOccurred {
-            module: "plugin",
-            kind: "plugin_error",
-        });
+        self.telemetry
+            .record(crate::telemetry::TelemetryEvent::ErrorOccurred {
+                module: "plugin",
+                kind: "plugin_error",
+            });
         self.plugin_manager
             .record_plugin_error(name, message.clone(), context.clone());
         self.plugin_error = Some(match &context {
@@ -699,49 +700,94 @@ impl App {
         };
 
         if current.help && !self.active_overlays.help {
-            self.telemetry.record(crate::telemetry::TelemetryEvent::OverlayOpened { kind: crate::telemetry::OverlayKind::Help });
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::OverlayOpened {
+                    kind: crate::telemetry::OverlayKind::Help,
+                });
         }
         if current.about && !self.active_overlays.about {
-            self.telemetry.record(crate::telemetry::TelemetryEvent::OverlayOpened { kind: crate::telemetry::OverlayKind::About });
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::OverlayOpened {
+                    kind: crate::telemetry::OverlayKind::About,
+                });
         }
         if current.theme_picker && !self.active_overlays.theme_picker {
-            self.telemetry.record(crate::telemetry::TelemetryEvent::OverlayOpened { kind: crate::telemetry::OverlayKind::ThemePicker });
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::OverlayOpened {
+                    kind: crate::telemetry::OverlayKind::ThemePicker,
+                });
         }
         if current.plugin_picker && !self.active_overlays.plugin_picker {
-            self.telemetry.record(crate::telemetry::TelemetryEvent::OverlayOpened { kind: crate::telemetry::OverlayKind::PluginPicker });
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::OverlayOpened {
+                    kind: crate::telemetry::OverlayKind::PluginPicker,
+                });
         }
         if current.command_palette && !self.active_overlays.command_palette {
-            self.telemetry.record(crate::telemetry::TelemetryEvent::OverlayOpened { kind: crate::telemetry::OverlayKind::CommandPalette });
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::OverlayOpened {
+                    kind: crate::telemetry::OverlayKind::CommandPalette,
+                });
         }
         if current.history && !self.active_overlays.history {
-            self.telemetry.record(crate::telemetry::TelemetryEvent::OverlayOpened { kind: crate::telemetry::OverlayKind::History });
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::OverlayOpened {
+                    kind: crate::telemetry::OverlayKind::History,
+                });
         }
         if current.recent_files && !self.active_overlays.recent_files {
-            self.telemetry.record(crate::telemetry::TelemetryEvent::OverlayOpened { kind: crate::telemetry::OverlayKind::RecentFiles });
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::OverlayOpened {
+                    kind: crate::telemetry::OverlayKind::RecentFiles,
+                });
         }
         if current.search && !self.active_overlays.search {
-            self.telemetry.record(crate::telemetry::TelemetryEvent::OverlayOpened { kind: crate::telemetry::OverlayKind::Search });
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::OverlayOpened {
+                    kind: crate::telemetry::OverlayKind::Search,
+                });
         }
         if current.in_file_search && !self.active_overlays.in_file_search {
-            self.telemetry.record(crate::telemetry::TelemetryEvent::OverlayOpened { kind: crate::telemetry::OverlayKind::InFileSearch });
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::OverlayOpened {
+                    kind: crate::telemetry::OverlayKind::InFileSearch,
+                });
         }
         if current.tree_filter && !self.active_overlays.tree_filter {
-            self.telemetry.record(crate::telemetry::TelemetryEvent::OverlayOpened { kind: crate::telemetry::OverlayKind::TreeFilter });
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::OverlayOpened {
+                    kind: crate::telemetry::OverlayKind::TreeFilter,
+                });
         }
         if current.bug_report && !self.active_overlays.bug_report {
-            self.telemetry.record(crate::telemetry::TelemetryEvent::OverlayOpened { kind: crate::telemetry::OverlayKind::BugReport });
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::OverlayOpened {
+                    kind: crate::telemetry::OverlayKind::BugReport,
+                });
         }
         if current.compare_input && !self.active_overlays.compare_input {
-            self.telemetry.record(crate::telemetry::TelemetryEvent::OverlayOpened { kind: crate::telemetry::OverlayKind::CompareInput });
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::OverlayOpened {
+                    kind: crate::telemetry::OverlayKind::CompareInput,
+                });
         }
         if current.goto_line && !self.active_overlays.goto_line {
-            self.telemetry.record(crate::telemetry::TelemetryEvent::OverlayOpened { kind: crate::telemetry::OverlayKind::GotoLine });
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::OverlayOpened {
+                    kind: crate::telemetry::OverlayKind::GotoLine,
+                });
         }
         if current.visual_mode && !self.active_overlays.visual_mode {
-            self.telemetry.record(crate::telemetry::TelemetryEvent::FeatureUsed { feature: crate::telemetry::Feature::VisualMode });
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::FeatureUsed {
+                    feature: crate::telemetry::Feature::VisualMode,
+                });
         }
         if current.git_blame && !self.active_overlays.git_blame {
-            self.telemetry.record(crate::telemetry::TelemetryEvent::FeatureUsed { feature: crate::telemetry::Feature::GitBlame });
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::FeatureUsed {
+                    feature: crate::telemetry::Feature::GitBlame,
+                });
         }
 
         self.active_overlays = current;

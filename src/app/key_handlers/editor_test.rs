@@ -900,3 +900,13 @@ fn test_dispatch_inapplicable_command_sets_status_message() {
     // 3. Changes nothing else (e.g. show_pretty_json is not toggled)
     assert!(!app.show_pretty_json);
 }
+
+#[test]
+fn open_external_with_telemetry_enabled() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.telemetry = crate::telemetry::Telemetry::new(true);
+    app.open_external(std::path::Path::new("test.png"));
+    assert!(app.status_message.is_some());
+    fs::remove_dir_all(&root).ok();
+}
