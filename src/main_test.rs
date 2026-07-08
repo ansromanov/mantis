@@ -148,6 +148,12 @@ fn cli_parses_update() {
 }
 
 #[test]
+fn cli_parses_telemetry_status() {
+    let cli = Cli::try_parse_from(["mantis", "--telemetry-status"]).unwrap();
+    assert!(cli.telemetry_status);
+}
+
+#[test]
 fn cli_parses_path_and_language() {
     let cli = Cli::try_parse_from(["mantis", "--language", "rust", "/some/path"]).unwrap();
     assert_eq!(cli.language.as_deref(), Some("rust"));
@@ -600,25 +606,4 @@ fn restore_terminal_is_idempotent() {
     // terminal is not in raw/alternate-screen mode.
     crate::app::restore_terminal();
     crate::app::restore_terminal();
-}
-
-#[test]
-fn meta_action_recognizes_telemetry_status_flag() {
-    let arg = PathBuf::from("--telemetry-status");
-    assert!(matches!(
-        meta_action(Some(&arg)),
-        Some(MetaAction::TelemetryStatus)
-    ));
-}
-
-#[test]
-fn plan_startup_telemetry_status_returns_print() {
-    let startup = plan_startup(Some(PathBuf::from("--telemetry-status")), None, false).unwrap();
-    match startup {
-        Startup::Print(msg) => {
-            assert!(msg.contains("Telemetry:"));
-            assert!(msg.contains("Directory:"));
-        }
-        _ => panic!("expected Print for --telemetry-status"),
-    }
 }

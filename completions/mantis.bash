@@ -23,7 +23,7 @@ _mantis() {
 
     case "${cmd}" in
         mantis)
-            opts="-l -h -V --language --completions --print-man-page --update --help --version"
+            opts="-l -h -V --language --completions --print-man-page --update --telemetry-status --help --version"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0

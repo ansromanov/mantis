@@ -1,10 +1,10 @@
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
-.TH mantis 1  "mantis 0.16.3"
+.TH mantis 1  "mantis 0.16.4"
 .SH NAME
 mantis \- A fast terminal file tree viewer with syntax highlighting, fuzzy search, and mouse support.
 .SH SYNOPSIS
-\fBmantis\fR [\fB\-l\fR|\fB\-\-language\fR] [\fB\-\-completions\fR] [\fB\-\-print\-man\-page\fR] [\fB\-\-update\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] [\fIPATH\fR]
+\fBmantis\fR [\fB\-l\fR|\fB\-\-language\fR] [\fB\-\-completions\fR] [\fB\-\-print\-man\-page\fR] [\fB\-\-update\fR] [\fB\-\-telemetry\-status\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] [\fIPATH\fR]
 .SH DESCRIPTION
 A fast terminal file tree viewer — navigate filesystems, preview files with syntax highlighting, fuzzy\-search files and content, browse git history, and switch themes.
 .PP
@@ -25,6 +25,9 @@ Print the man page to stdout
 \fB\-\-update\fR
 Self\-update to the latest release
 .TP
+\fB\-\-telemetry\-status\fR
+Print telemetry status and directory
+.TP
 \fB\-h\fR, \fB\-\-help\fR
 Print help (see a summary with \*(Aq\-h\*(Aq)
 .TP
@@ -34,4 +37,4 @@ Print version
 [\fIPATH\fR]
 File or directory to open (default: current directory)
 .SH VERSION
-v0.16.3
+v0.16.4

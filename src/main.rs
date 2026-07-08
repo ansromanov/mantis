@@ -157,7 +157,6 @@ fn resolve_root_and_file(arg: &Path) -> (PathBuf, Option<PathBuf>) {
     }
 }
 
-
 /// Resolves the optional path argument to a canonical path: flag-like args are
 /// ignored and a missing arg defaults to the current directory.
 fn resolve_input_path(arg: Option<PathBuf>) -> anyhow::Result<PathBuf> {
@@ -191,7 +190,6 @@ fn plan_startup(
     language: Option<String>,
     stdin_piped: bool,
 ) -> anyhow::Result<Startup> {
-
     // Pager mode triggers when no real path argument was given (missing, or
     // flag-like — the same rule `resolve_input_path` uses to fall back to the
     // current dir) and stdin is a pipe rather than a terminal.

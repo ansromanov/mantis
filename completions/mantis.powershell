@@ -26,6 +26,7 @@ Register-ArgumentCompleter -Native -CommandName 'mantis' -ScriptBlock {
             [CompletionResult]::new('--completions', '--completions', [CompletionResultType]::ParameterName, 'Generate shell completions (bash, zsh, fish, powershell)')
             [CompletionResult]::new('--print-man-page', '--print-man-page', [CompletionResultType]::ParameterName, 'Print the man page to stdout')
             [CompletionResult]::new('--update', '--update', [CompletionResultType]::ParameterName, 'Self-update to the latest release')
+            [CompletionResult]::new('--telemetry-status', '--telemetry-status', [CompletionResultType]::ParameterName, 'Print telemetry status and directory')
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
             [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
