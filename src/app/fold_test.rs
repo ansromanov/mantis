@@ -38,10 +38,10 @@ fn set_fold_regions(app: &mut App) {
 }
 
 #[test]
-fn fold_gutter_width_zero_when_no_regions() {
+fn fold_gutter_width_always_two_even_without_regions() {
     let root = temp_tree();
     let app = app_for(&root);
-    assert_eq!(app.fold_gutter_width(), 0);
+    assert_eq!(app.fold_gutter_width(), 2);
     fs::remove_dir_all(&root).ok();
 }
 

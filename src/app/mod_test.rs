@@ -1945,30 +1945,30 @@ fn content_pos_word_wrap_plain_text_multi_span_line() {
         "short".to_string(),        // 5 chars -> 1 visual row with width 10
         "hello world!".to_string(), // 12 chars -> 2 visual rows with width 10
     ];
-    // Override highlighted so line_prefix_width returns 1+1=2 (1-digit gutter).
+    // fold_gw=2 + len("2") + 1 = 4; wrap_width = 10 - 4 = 6.
     app.highlighted = vec![];
     app.word_wrap = true;
     app.content_scroll = 0;
-    // prefix = line_prefix_width() = len("2") + 1 = 2; wrap_width = 10 - 2 = 8.
+    // prefix = line_prefix_width() = 4; wrap_width = 10 - 4 = 6.
     app.content_area = Rect {
         x: 0,
         y: 0,
         width: 10,
         height: 20,
     };
-    // "short" (5 chars) -> ceil(5/8) = 1 visual row.
-    // "hello world!" (12 chars) -> ceil(12/8) = 2 visual rows.
+    // "short" (5 chars) -> ceil(5/6) = 1 visual row.
+    // "hello world!" (12 chars) -> ceil(12/6) = 2 visual rows.
     // rel_row=0 -> line 0.
     let (line, _col) = app.content_pos(2, 0);
     assert_eq!(line, 0);
     // rel_row=1 -> line 1, visual_remaining=0.
     let (line, col) = app.content_pos(2, 1);
     assert_eq!(line, 1);
-    assert_eq!(col, 0); // text_col = 2 - prefix(2) = 0; 0*8 + 0 = 0
-                        // rel_row=2 -> line 1, visual_remaining=1 -> col_offset = 1*8 = 8.
+    assert_eq!(col, 0); // text_col = 2 - prefix(4) = 0; 0*6 + 0 = 0
+                        // rel_row=2 -> line 1, visual_remaining=1 -> col_offset = 1*6 = 6.
     let (line, col) = app.content_pos(2, 2);
     assert_eq!(line, 1);
-    assert_eq!(col, 8);
+    assert_eq!(col, 6);
     fs::remove_dir_all(&root).ok();
 }
 
@@ -3686,9 +3686,9 @@ fn content_pos_no_wrap_with_hscroll() {
         width: 80,
         height: 20,
     };
-    // rel_col = 5 - 2 = 3, prefix = 2, buf_col = 3 + 5 - 2 = 6
+    // rel_col = 5 - 2 = 3, prefix = 4 (fold_gw=2 + ln=2), buf_col = 3 + 5 - 4 = 4
     let (_line, col) = app.content_pos(5, 2);
-    assert_eq!(col, 6);
+    assert_eq!(col, 4);
     fs::remove_dir_all(&root).ok();
 }
 
@@ -3805,8 +3805,8 @@ fn line_prefix_width_normal_file_with_line_numbers() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.content = vec!["hello".to_string()];
-    // Not diff, not markdown → prefix = fold_gutter_width + len("1") + 1 = 0 + 1 + 1 = 2
-    assert_eq!(app.line_prefix_width(), 2);
+    // Not diff, not markdown → prefix = fold_gutter_width + len("1") + 1 = 2 + 1 + 1 = 4
+    assert_eq!(app.line_prefix_width(), 4);
     fs::remove_dir_all(&root).ok();
 }
 
@@ -3954,10 +3954,10 @@ fn content_pos_word_wrap_visual_rows_past_content_clamps() {
 // -- fold_gutter_width ------------------------------------------------------
 
 #[test]
-fn fold_gutter_width_zero_when_no_regions() {
+fn fold_gutter_width_always_two_even_without_regions() {
     let root = temp_tree();
     let app = app_for(&root);
-    assert_eq!(app.fold_gutter_width(), 0);
+    assert_eq!(app.fold_gutter_width(), 2);
     fs::remove_dir_all(&root).ok();
 }
 
