@@ -1,30 +1,30 @@
 class Mantis < Formula
   desc "Fast terminal file tree viewer with syntax highlighting, markdown rendering, and fuzzy search"
   homepage "https://github.com/ansromanov/mantis"
-  version "0.16.8"
+  version "0.16.13"
   license "GPL-3.0-or-later"
 
   on_macos do
     on_arm do
       url "https://github.com/ansromanov/mantis/releases/download/v#{version}/mantis-macos-aarch64"
-      sha256 "fff0a1c0d2c4eb7624402415ccc2781bfce77a310b21389e5aee08ab267ae44c"
+      sha256 "960996acff2e1c426ff6f70deafb1a88292f2c50b20437bcbdb9c725c5f57e6d"
     end
 
     on_intel do
       url "https://github.com/ansromanov/mantis/releases/download/v#{version}/mantis-macos-x86_64"
-      sha256 "727c5c39c44e1a064a0be7fad830fff6cac05c3aa51777941f0acfd250bb1ea9"
+      sha256 "07995bfa4576d463c440d0d9eff18d5509a18657f1d797ffe9eb7fd43f1c3902"
     end
   end
 
   on_linux do
     on_arm do
       url "https://github.com/ansromanov/mantis/releases/download/v#{version}/mantis-linux-aarch64"
-      sha256 "74ecceb9cd404d90fd64ce582d9bf57b12017b5c07668d23e1133c623f042810"
+      sha256 "8e6a94b64e1b27a842762e908421b970aba1ba2a0e2452343394171ec10ffc89"
     end
 
     on_intel do
       url "https://github.com/ansromanov/mantis/releases/download/v#{version}/mantis-linux-x86_64"
-      sha256 "c7434e9bba97cb1bab60a0b214bb3a418b6da85b9ed797b52c4cc54ace40a0b0"
+      sha256 "3cfbf2bb1f6e758b06559574185b51d5f2bd516465edad4832fa973577d51fab"
     end
   end
 
