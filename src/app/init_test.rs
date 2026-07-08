@@ -653,7 +653,10 @@ fn telemetry_enabled_when_configured() {
     std::env::set_var("MANTIS_STATE_DIR", state.path());
     let dir = temp_dir();
     let cfg = Config {
-        telemetry: crate::config::TelemetryConfig { enabled: true },
+        telemetry: crate::config::TelemetryConfig {
+            enabled: true,
+            notice_shown: false,
+        },
         ..Config::default()
     };
     let app = new_app(&dir, cfg);
@@ -741,4 +744,12 @@ fn app_new_ignores_stale_initial_root_that_is_ancestor_of_launch_root() {
     );
     fs::remove_dir_all(&ancestor).ok();
     fs::remove_dir_all(&state_dir).ok();
+}
+
+#[test]
+fn init_telemetry_check() {
+    let root = temp_dir();
+    let app = new_app(&root, Config::default());
+    assert!(!app.telemetry.is_enabled());
+    fs::remove_dir_all(&root).ok();
 }

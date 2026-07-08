@@ -31,6 +31,18 @@ impl App {
         // Clear transient status messages on the next handled keypress.
         self.status_message = None;
 
+        let scope = match self.focus {
+            Focus::Tree => crate::config::BindingScope::Tree,
+            Focus::Content => crate::config::BindingScope::Content,
+        };
+        if let Some(action_id) = self.keys.action_for_key(&key, scope) {
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::ActionInvoked {
+                    action: action_id,
+                    source: crate::telemetry::ActionSource::Key,
+                });
+        }
+
         if static_keys::is_close(&key) {
             if self.show_blame {
                 self.show_blame = false;

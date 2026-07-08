@@ -348,3 +348,12 @@ fn ignore_gitignore_respects_rules() {
     assert!(names.contains(&"ignored.log"));
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn build_visible_runs_without_panicking() {
+    let root = temp_dir("dummy_test");
+    let expanded = HashSet::new();
+    let (nodes, _) = build_visible(&root, &expanded, false, false, &HashSet::new());
+    assert!(nodes.is_empty());
+    fs::remove_dir_all(&root).ok();
+}

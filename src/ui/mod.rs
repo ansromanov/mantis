@@ -103,6 +103,10 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         popups::draw_bug_report(f, app, area);
     }
 
+    if app.show_telemetry_notice {
+        popups::draw_telemetry_notice(f, app, area);
+    }
+
     if app.show_about {
         popups::draw_about(f, app, area);
     }

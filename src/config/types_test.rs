@@ -521,12 +521,16 @@ fn telemetry_defaults_to_disabled() {
 #[test]
 fn telemetry_enabled_round_trips_through_serde() {
     let cfg = Config {
-        telemetry: TelemetryConfig { enabled: true },
+        telemetry: TelemetryConfig {
+            enabled: true,
+            notice_shown: true,
+        },
         ..Config::default()
     };
     let toml_str = toml::to_string_pretty(&cfg).unwrap();
     let parsed: Config = toml::from_str(&toml_str).unwrap();
     assert!(parsed.telemetry.enabled);
+    assert!(parsed.telemetry.notice_shown);
 }
 
 #[test]

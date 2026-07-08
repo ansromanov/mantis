@@ -315,6 +315,7 @@ impl App {
     /// uses `request_open_file`; both share `apply_file_load`. Errors and empty
     /// files produce inline messages rather than crashing.
     pub fn open_file(&mut self, path: &Path) {
+        let _span = tracing::info_span!("open_file").entered();
         self.invalidate_pending_load();
         let load = compute_file_load(
             path,
@@ -328,6 +329,26 @@ impl App {
     /// selection, then installs the rendered content/highlighting/JSON/YAML
     /// state. Shared by the synchronous and worker-thread code paths.
     pub(super) fn apply_file_load(&mut self, path: &Path, load: FileLoad) {
+        if load.ok {
+            let size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
+            let size_bucket = crate::telemetry::FileSizeBucket::from_size(size);
+            let is_new_file = self.current_file.as_deref() != Some(path);
+            let source_kind = if is_new_file {
+                self.last_open_source
+            } else {
+                crate::telemetry::FileSourceKind::Reopen
+            };
+            let encoding = crate::telemetry::FileEncoding::from_str(load.encoding.as_deref());
+            let is_binary = encoding == crate::telemetry::FileEncoding::Binary;
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::FileOpened {
+                    size_bucket,
+                    source_kind,
+                    encoding,
+                    is_binary,
+                });
+        }
+
         self.is_diff = false;
         self.viewing_revision = None;
         self.diff_rows = Vec::new();
@@ -451,6 +472,7 @@ impl App {
             .and_then(|r| r.selected_path().cloned());
         self.recent_files = None;
         if let Some(path) = path {
+            self.last_open_source = crate::telemetry::FileSourceKind::RecentFiles;
             self.open_and_reveal(&path);
         }
     }
@@ -484,6 +506,10 @@ impl App {
         if commits.is_empty() {
             return;
         }
+        self.telemetry
+            .record(crate::telemetry::TelemetryEvent::FeatureUsed {
+                feature: crate::telemetry::Feature::GitHistory,
+            });
         self.history = Some(HistoryState::new(file, commits));
     }
 
@@ -495,6 +521,7 @@ impl App {
         });
         self.history = None;
         if let Some((hash, short, file)) = picked {
+            self.last_open_source = crate::telemetry::FileSourceKind::History;
             let diff = crate::git::file_diff(&self.root, &hash, &file);
             self.show_diff(&file, &short, diff);
         }

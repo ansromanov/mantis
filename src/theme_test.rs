@@ -417,3 +417,29 @@ fn colorfgbg_parsing() {
 
     std::env::remove_var("COLORFGBG");
 }
+
+#[test]
+fn test_no_color_active_env_checks() {
+    let old_no_color = std::env::var_os("NO_COLOR");
+    let old_term = std::env::var_os("TERM");
+    let old_test_no_color = std::env::var_os("MANTIS_TEST_NO_COLOR");
+
+    std::env::remove_var("NO_COLOR");
+    std::env::remove_var("TERM");
+    std::env::remove_var("MANTIS_TEST_NO_COLOR");
+    assert!(!no_color_active());
+
+    std::env::set_var("MANTIS_TEST_NO_COLOR", "1");
+    assert!(no_color_active());
+
+    std::env::remove_var("MANTIS_TEST_NO_COLOR");
+    if let Some(v) = old_no_color {
+        std::env::set_var("NO_COLOR", v);
+    }
+    if let Some(v) = old_term {
+        std::env::set_var("TERM", v);
+    }
+    if let Some(v) = old_test_no_color {
+        std::env::set_var("MANTIS_TEST_NO_COLOR", v);
+    }
+}

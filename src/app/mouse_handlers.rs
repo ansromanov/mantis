@@ -232,9 +232,21 @@ impl App {
                         );
                         if double && is_dir {
                             self.last_click = None;
+                            self.telemetry.record(
+                                crate::telemetry::TelemetryEvent::ActionInvoked {
+                                    action: "tree_expand",
+                                    source: crate::telemetry::ActionSource::Mouse,
+                                },
+                            );
                             self.descend_to_selected();
                         } else {
                             self.last_click = Some((now, index));
+                            self.telemetry.record(
+                                crate::telemetry::TelemetryEvent::ActionInvoked {
+                                    action: "tree_expand",
+                                    source: crate::telemetry::ActionSource::Mouse,
+                                },
+                            );
                             self.activate_selected();
                         }
                     }
@@ -260,6 +272,12 @@ impl App {
                                 .find(|&&(y, _)| y == ev.row)
                                 .map(|&(_, ri)| ri);
                             if let Some(ri) = hit {
+                                self.telemetry.record(
+                                    crate::telemetry::TelemetryEvent::ActionInvoked {
+                                        action: "fold_toggle",
+                                        source: crate::telemetry::ActionSource::Mouse,
+                                    },
+                                );
                                 self.toggle_fold_region(ri);
                                 self.mark_content_scrolled();
                                 return;
@@ -325,15 +343,35 @@ impl App {
             }
             MouseEventKind::ScrollDown => {
                 if rect_contains(self.content_area, ev.column, ev.row) {
+                    self.telemetry
+                        .record(crate::telemetry::TelemetryEvent::ActionInvoked {
+                            action: "content_scroll_down",
+                            source: crate::telemetry::ActionSource::Mouse,
+                        });
                     self.set_content_scroll(self.content_scroll.saturating_add(WHEEL_STEP));
                 } else if rect_contains(self.tree_area, ev.column, ev.row) {
+                    self.telemetry
+                        .record(crate::telemetry::TelemetryEvent::ActionInvoked {
+                            action: "tree_scroll_down",
+                            source: crate::telemetry::ActionSource::Mouse,
+                        });
                     self.tree_scroll = (self.tree_scroll + WHEEL_STEP).min(self.tree_scroll_max());
                 }
             }
             MouseEventKind::ScrollUp => {
                 if rect_contains(self.content_area, ev.column, ev.row) {
+                    self.telemetry
+                        .record(crate::telemetry::TelemetryEvent::ActionInvoked {
+                            action: "content_scroll_up",
+                            source: crate::telemetry::ActionSource::Mouse,
+                        });
                     self.set_content_scroll(self.content_scroll.saturating_sub(WHEEL_STEP));
                 } else if rect_contains(self.tree_area, ev.column, ev.row) {
+                    self.telemetry
+                        .record(crate::telemetry::TelemetryEvent::ActionInvoked {
+                            action: "tree_scroll_up",
+                            source: crate::telemetry::ActionSource::Mouse,
+                        });
                     self.tree_scroll = self.tree_scroll.saturating_sub(WHEEL_STEP);
                 }
             }

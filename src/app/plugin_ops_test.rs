@@ -110,3 +110,11 @@ fn toggle_plugin_picker_selection_noop_when_no_picker() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn plugin_ops_telemetry_check() {
+    let root = temp_dir();
+    let app = new_app_with_syntax_plugin(&root, "my-syntax", false);
+    assert!(!app.telemetry.is_enabled());
+    fs::remove_dir_all(&root).ok();
+}

@@ -1242,3 +1242,11 @@ fn normal_key_o_triggers_open_external() {
     assert!(msg.text.contains("not opening file"));
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn normal_telemetry_check() {
+    let root = temp_tree();
+    let app = app_for(&root);
+    assert!(!app.telemetry.is_enabled());
+    fs::remove_dir_all(&root).ok();
+}

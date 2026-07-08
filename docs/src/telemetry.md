@@ -68,7 +68,13 @@ the session started (no wall-clock timestamps).
 |---|---|---|
 | `session_start` | `app_version`, `os`, `arch`, `terminal` (the `$TERM` value) | mantis starts |
 | `session_end` | `duration_s`, `events_dropped` | mantis exits |
-| `action_invoked` | `action` (canonical action id), `source` (`palette`) | a command palette entry runs |
+| `action_invoked` | `action` (canonical action id), `source` (`palette`, `key`, `mouse`) | a command palette, key binding, or mouse action runs |
+| `overlay_opened` | `kind` (help, about, theme_picker, command_palette, etc.) | an overlay popup is opened |
+| `feature_used` | `feature` (fold, diff_nav, git_history, visual_mode, git_blame) | a core feature is used |
+| `plugin_toggled` | `kind` (linter, formatter, etc.), `enabled` (bool) | a plugin is enabled/disabled |
+| `file_opened` | `size_bucket` (under_1kb, from_1kb_to_1mb, etc.), `source_kind` (tree, search, history, etc.), `encoding`, `is_binary` | a file is opened in the content pane |
+| `perf_span` | `span` (open_file, build_visible, highlight, etc.), `duration_bucket` (<1ms, 1-16ms, 16-100ms, >100ms) | an instrumented hot-path span finishes |
+| `error_occurred` | `module`, `kind` (error classification/variant name) | an error event is intercepted |
 
 Raw keystrokes, search queries, palette query text, file names, and paths
 are never recorded — the event types above cannot carry them. To stop

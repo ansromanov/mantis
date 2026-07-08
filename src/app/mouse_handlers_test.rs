@@ -1019,3 +1019,11 @@ fn mouse_click_in_plugin_content_starts_drag() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn mouse_telemetry_check() {
+    let root = temp_tree();
+    let app = app_for(&root);
+    assert!(!app.telemetry.is_enabled());
+    fs::remove_dir_all(&root).ok();
+}

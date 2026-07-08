@@ -102,6 +102,15 @@ pub(crate) fn draw_about(f: &mut Frame, app: &App, area: Rect) {
         Span::styled("GPL-3.0-or-later", text_style),
     ]));
 
+    rows.push(Line::from(vec![
+        Span::styled("  Telemetry: ", dim),
+        if app.telemetry.is_enabled() {
+            Span::styled("active", Style::default().fg(theme.accent))
+        } else {
+            Span::styled("disabled", dim)
+        },
+    ]));
+
     if let Some(ref latest) = app.new_version_available {
         rows.push(Line::from(vec![
             Span::styled("  Update:    ", dim),

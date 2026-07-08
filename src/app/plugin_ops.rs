@@ -31,11 +31,21 @@ impl App {
             if let Some(entry) = self.config.plugins.get_mut(&name) {
                 entry.enabled = !was_enabled;
             }
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::PluginToggled {
+                    kind,
+                    enabled: !was_enabled,
+                });
             self.plugin_manager.set_enabled(&name, !was_enabled);
             self.save_config();
             self.rebuild_extra_syntaxes();
             self.reload_content();
         } else if running {
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::PluginToggled {
+                    kind,
+                    enabled: false,
+                });
             self.plugin_manager.deactivate_one(&name);
             if let Some(entry) = self.config.plugins.get_mut(&name) {
                 entry.enabled = false;
@@ -53,6 +63,11 @@ impl App {
                 .activate_one(&name, self.current_file.as_deref())
             {
                 Ok(()) => {
+                    self.telemetry
+                        .record(crate::telemetry::TelemetryEvent::PluginToggled {
+                            kind,
+                            enabled: true,
+                        });
                     if let Some(entry) = self.config.plugins.get_mut(&name) {
                         entry.enabled = true;
                     }

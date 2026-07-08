@@ -81,6 +81,7 @@ pub fn max_line_numbers(rows: &[DiffRow]) -> (usize, usize) {
 /// when there is nothing diff-shaped to render (e.g. a placeholder message),
 /// signalling the caller to keep the unified view.
 pub fn parse_side_by_side(lines: &[String]) -> Vec<DiffRow> {
+    let _span = tracing::info_span!("diff_parse").entered();
     let mut rows = Vec::new();
     let mut removed: Vec<(usize, String)> = Vec::new();
     let mut added: Vec<(usize, String)> = Vec::new();

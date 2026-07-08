@@ -317,6 +317,32 @@ fn all_embedded() -> &'static HashMap<&'static str, Theme> {
 // ---------------------------------------------------------------------------
 
 fn user_themes_dir() -> Option<PathBuf> {
+    let is_test_env = cfg!(test)
+        || std::env::current_exe()
+            .map(|p| {
+                p.parent()
+                    .and_then(|parent| parent.file_name())
+                    .map(|name| name == "deps")
+                    .unwrap_or(false)
+            })
+            .unwrap_or(false);
+    if is_test_env {
+        #[cfg(windows)]
+        let env_key = "APPDATA";
+        #[cfg(not(windows))]
+        let env_key = "XDG_CONFIG_HOME";
+
+        let env_val = std::env::var_os(env_key);
+        let is_isolated = env_val
+            .as_ref()
+            .map(|v| v.to_string_lossy().contains("tv2_theme_test"))
+            .unwrap_or(false);
+
+        if !is_isolated {
+            return None;
+        }
+    }
+
     #[cfg(windows)]
     {
         std::env::var_os("APPDATA").map(|p| PathBuf::from(p).join("mantis").join("themes"))
@@ -695,7 +721,16 @@ fn parse_osc_response(resp: &str) -> Option<(u8, u8, u8)> {
 }
 
 pub fn no_color_active() -> bool {
-    if cfg!(test) {
+    let is_test_env = cfg!(test)
+        || std::env::current_exe()
+            .map(|p| {
+                p.parent()
+                    .and_then(|parent| parent.file_name())
+                    .map(|name| name == "deps")
+                    .unwrap_or(false)
+            })
+            .unwrap_or(false);
+    if is_test_env {
         std::env::var_os("MANTIS_TEST_NO_COLOR").is_some()
     } else {
         std::env::var_os("NO_COLOR").is_some() || std::env::var("TERM").as_deref() == Ok("dumb")

@@ -34,6 +34,7 @@ impl App {
     /// been quiet for `TREE_RELOAD_DEBOUNCE`); otherwise it falls back to a
     /// periodic reload so the view never goes permanently stale.
     pub fn tick(&mut self) {
+        self.check_overlay_transitions();
         self.drain_loads();
         if let Some(latest) = self.update_rx.as_ref().and_then(|rx| rx.try_recv().ok()) {
             self.new_version_available = Some(latest);
@@ -501,6 +502,11 @@ impl App {
             None => format!("[plugin_error] {message}"),
         };
         self.plugin_manager.log_plugin_error_line(name, &log_line);
+        self.telemetry
+            .record(crate::telemetry::TelemetryEvent::ErrorOccurred {
+                module: "plugin",
+                kind: "plugin_error",
+            });
         self.plugin_manager
             .record_plugin_error(name, message.clone(), context.clone());
         self.plugin_error = Some(match &context {
@@ -670,6 +676,121 @@ impl App {
         if self.current_file.as_deref() == Some(&path) {
             self.apply_plugin_fold_regions(&path);
         }
+    }
+
+    pub(crate) fn check_overlay_transitions(&mut self) {
+        use super::ActiveOverlays;
+
+        let current = ActiveOverlays {
+            help: self.show_help,
+            about: self.show_about,
+            theme_picker: self.theme_picker.is_some(),
+            plugin_picker: self.plugin_picker.is_some(),
+            command_palette: self.command_palette.is_some(),
+            history: self.history.is_some(),
+            recent_files: self.recent_files.is_some(),
+            search: self.search.is_some(),
+            in_file_search: self.in_file_search.is_some(),
+            tree_filter: self.tree_filter.is_some(),
+            bug_report: self.bug_report.is_some(),
+            compare_input: self.compare_input.is_some(),
+            goto_line: self.goto_line.is_some(),
+            visual_mode: self.selection.is_some(),
+            git_blame: self.show_blame,
+        };
+
+        if current.help && !self.active_overlays.help {
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::OverlayOpened {
+                    kind: crate::telemetry::OverlayKind::Help,
+                });
+        }
+        if current.about && !self.active_overlays.about {
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::OverlayOpened {
+                    kind: crate::telemetry::OverlayKind::About,
+                });
+        }
+        if current.theme_picker && !self.active_overlays.theme_picker {
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::OverlayOpened {
+                    kind: crate::telemetry::OverlayKind::ThemePicker,
+                });
+        }
+        if current.plugin_picker && !self.active_overlays.plugin_picker {
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::OverlayOpened {
+                    kind: crate::telemetry::OverlayKind::PluginPicker,
+                });
+        }
+        if current.command_palette && !self.active_overlays.command_palette {
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::OverlayOpened {
+                    kind: crate::telemetry::OverlayKind::CommandPalette,
+                });
+        }
+        if current.history && !self.active_overlays.history {
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::OverlayOpened {
+                    kind: crate::telemetry::OverlayKind::History,
+                });
+        }
+        if current.recent_files && !self.active_overlays.recent_files {
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::OverlayOpened {
+                    kind: crate::telemetry::OverlayKind::RecentFiles,
+                });
+        }
+        if current.search && !self.active_overlays.search {
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::OverlayOpened {
+                    kind: crate::telemetry::OverlayKind::Search,
+                });
+        }
+        if current.in_file_search && !self.active_overlays.in_file_search {
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::OverlayOpened {
+                    kind: crate::telemetry::OverlayKind::InFileSearch,
+                });
+        }
+        if current.tree_filter && !self.active_overlays.tree_filter {
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::OverlayOpened {
+                    kind: crate::telemetry::OverlayKind::TreeFilter,
+                });
+        }
+        if current.bug_report && !self.active_overlays.bug_report {
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::OverlayOpened {
+                    kind: crate::telemetry::OverlayKind::BugReport,
+                });
+        }
+        if current.compare_input && !self.active_overlays.compare_input {
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::OverlayOpened {
+                    kind: crate::telemetry::OverlayKind::CompareInput,
+                });
+        }
+        if current.goto_line && !self.active_overlays.goto_line {
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::OverlayOpened {
+                    kind: crate::telemetry::OverlayKind::GotoLine,
+                });
+        }
+        if current.visual_mode && !self.active_overlays.visual_mode {
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::FeatureUsed {
+                    feature: crate::telemetry::Feature::VisualMode,
+                });
+        }
+        if current.git_blame && !self.active_overlays.git_blame {
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::FeatureUsed {
+                    feature: crate::telemetry::Feature::GitBlame,
+                });
+        }
+
+        self.active_overlays = current;
     }
 }
 

@@ -1056,3 +1056,11 @@ fn large_json_shows_raw_content_with_status_message() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn file_ops_telemetry_check() {
+    let root = temp_dir();
+    let app = app_for(&root);
+    assert!(!app.telemetry.is_enabled());
+    fs::remove_dir_all(&root).ok();
+}

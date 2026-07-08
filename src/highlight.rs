@@ -98,6 +98,7 @@ impl Highlighter {
     /// doesn't resolve a syntax, so it's meant for a one-off full-file
     /// highlight, not a per-redraw call — see `highlight_range` for that.
     pub fn highlight(&self, path: &Path, lines: &[String]) -> Vec<Vec<(Style, String)>> {
+        let _span = tracing::info_span!("highlight").entered();
         let syntax = self
             .ss
             .find_syntax_for_file(path)
@@ -140,6 +141,7 @@ impl Highlighter {
         syntax_name: Option<&str>,
         lines: &[&str],
     ) -> Vec<Vec<(Style, String)>> {
+        let _span = tracing::info_span!("highlight_range").entered();
         let syntax = syntax_name
             .and_then(|name| self.ss.find_syntax_by_name(name))
             .unwrap_or_else(|| self.ss.find_syntax_plain_text());

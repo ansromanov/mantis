@@ -71,6 +71,12 @@ impl App {
         // Notify plugins of each keypress *only* in normal mode (no overlay
         // active) so search/picker input is not broadcast. Plugins receive
         // the key as a readable string: "q", "ctrl+c", "Enter", etc.
+        if self.show_telemetry_notice {
+            if static_keys::is_modal_close(&key) {
+                self.show_telemetry_notice = false;
+            }
+            return;
+        }
         if self.show_about {
             if static_keys::is_open_release(&key) {
                 self.open_release_url();

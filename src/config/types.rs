@@ -195,6 +195,9 @@ pub struct TelemetryConfig {
     /// Collect anonymous usage events into a local, size-capped log under the
     /// state directory. Nothing is ever sent anywhere. Disabled by default.
     pub enabled: bool,
+    /// Whether the telemetry collection notice has been shown to the user.
+    #[serde(default)]
+    pub notice_shown: bool,
 }
 
 /// The root mantis configuration object.

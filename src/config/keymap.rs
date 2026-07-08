@@ -274,6 +274,16 @@ impl Keymap {
         }
     }
 
+    pub fn action_for_key(&self, key: &KeyEvent, scope: BindingScope) -> Option<&'static str> {
+        for spec in crate::actions::ACTIONS {
+            let bindings = self.bindings_for_action(spec.id);
+            if crate::config::pressed_in(bindings, key, scope) {
+                return Some(spec.id);
+            }
+        }
+        None
+    }
+
     /// Returns a display label for the first binding mapped to `action_id`,
     /// e.g. `"Ctrl+G"` for `git_mode_toggle`.
     pub fn label_for_action(&self, action_id: &str) -> String {
