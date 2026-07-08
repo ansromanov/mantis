@@ -20,6 +20,7 @@ mod in_file;
 mod plugin;
 mod recent;
 mod search;
+mod telemetry_notice;
 mod theme;
 mod tree_filter;
 mod util;
@@ -36,6 +37,7 @@ pub(super) use in_file::draw_in_file_search;
 pub(super) use plugin::draw_plugin_picker;
 pub(super) use recent::draw_recent;
 pub(super) use search::draw_search;
+pub(super) use telemetry_notice::draw_telemetry_notice;
 pub(super) use theme::draw_theme;
 pub(super) use tree_filter::draw_tree_filter;
 

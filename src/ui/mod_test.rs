@@ -155,3 +155,13 @@ fn draw_layout_respects_tree_width() {
     let mid_col: String = (0..30).map(|y| buf[(49, y)].symbol().to_string()).collect();
     assert!(!mid_col.is_empty());
 }
+
+#[test]
+fn draw_telemetry_notice_overlay() {
+    let mut app = make_app();
+    app.show_telemetry_notice = true;
+    let rows = render(&mut app);
+    let joined = rows.join("\n");
+    assert!(joined.contains("Telemetry Enabled"));
+    assert!(joined.contains("Storage directory:"));
+}

@@ -209,6 +209,7 @@ pub struct App {
     pub show_line_numbers: bool,
     pub show_blame: bool,
     pub show_about: bool,
+    pub show_telemetry_notice: bool,
     pub walk_errors: usize,
     /// Warning describing a malformed config that was ignored at startup, if any.
     pub config_error: Option<String>,
@@ -639,6 +640,10 @@ impl App {
         let enabled = !self.config.telemetry.enabled;
         self.config.telemetry.enabled = enabled;
         self.telemetry = crate::telemetry::Telemetry::new(enabled);
+        if enabled && !self.config.telemetry.notice_shown {
+            self.config.telemetry.notice_shown = true;
+            self.show_telemetry_notice = true;
+        }
         self.save_config();
         self.set_status(format!(
             "telemetry {}",

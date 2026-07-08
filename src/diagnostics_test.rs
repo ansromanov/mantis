@@ -78,7 +78,10 @@ fn serialized_report_never_contains_paths_or_names() {
 fn changed_config_paths_reports_paths_without_values() {
     let mut cfg = Config::default();
     cfg.tree.show_hidden = true;
-    cfg.telemetry = TelemetryConfig { enabled: true };
+    cfg.telemetry = TelemetryConfig {
+        enabled: true,
+        notice_shown: false,
+    };
     cfg.plugins.insert(
         "my-secret-plugin".into(),
         crate::plugin::PluginEntry::default(),

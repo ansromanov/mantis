@@ -653,7 +653,10 @@ fn telemetry_enabled_when_configured() {
     std::env::set_var("MANTIS_STATE_DIR", state.path());
     let dir = temp_dir();
     let cfg = Config {
-        telemetry: crate::config::TelemetryConfig { enabled: true },
+        telemetry: crate::config::TelemetryConfig {
+            enabled: true,
+            notice_shown: false,
+        },
         ..Config::default()
     };
     let app = new_app(&dir, cfg);

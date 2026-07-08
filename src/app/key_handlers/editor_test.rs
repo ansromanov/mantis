@@ -720,7 +720,10 @@ fn dispatch_records_palette_action_in_telemetry_when_enabled() {
 
     let root = temp_tree();
     let cfg = Config {
-        telemetry: crate::config::TelemetryConfig { enabled: true },
+        telemetry: crate::config::TelemetryConfig {
+            enabled: true,
+            notice_shown: false,
+        },
         ..Config::default()
     };
     let mut app = App::new(root.clone(), cfg, None, None).unwrap();

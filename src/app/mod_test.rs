@@ -5100,10 +5100,22 @@ fn toggle_telemetry_flips_config_persists_and_reports_status() {
     )
     .unwrap();
     assert!(!app.config.telemetry.enabled, "disabled by default");
+    assert!(
+        !app.config.telemetry.notice_shown,
+        "notice not shown by default"
+    );
     assert!(!app.telemetry.is_enabled());
 
     app.toggle_telemetry();
     assert!(app.config.telemetry.enabled, "toggle must flip config on");
+    assert!(
+        app.config.telemetry.notice_shown,
+        "toggle must record notice shown"
+    );
+    assert!(
+        app.show_telemetry_notice,
+        "first enable must show the notice popup"
+    );
     assert!(
         app.telemetry.is_enabled(),
         "toggle must rebuild a live telemetry handle"
@@ -5117,13 +5129,36 @@ fn toggle_telemetry_flips_config_persists_and_reports_status() {
         saved.contains("enabled = true"),
         "toggle must persist the new state: {saved}"
     );
+    assert!(
+        saved.contains("notice_shown = true"),
+        "toggle must persist notice shown: {saved}"
+    );
+
+    // Dismiss the notice popup
+    app.show_telemetry_notice = false;
 
     app.toggle_telemetry();
     assert!(!app.config.telemetry.enabled, "toggle must flip config off");
+    assert!(app.config.telemetry.notice_shown, "notice_shown stays true");
+    assert!(
+        !app.show_telemetry_notice,
+        "disabling does not show notice popup"
+    );
     assert!(!app.telemetry.is_enabled());
     assert_eq!(
         app.status_message.as_ref().unwrap().text,
         "telemetry disabled"
+    );
+
+    // Enable telemetry a second time; notice must not be shown
+    app.toggle_telemetry();
+    assert!(
+        app.config.telemetry.enabled,
+        "toggle must flip config on second time"
+    );
+    assert!(
+        !app.show_telemetry_notice,
+        "subsequent enable must not show notice popup"
     );
 
     fs::remove_dir_all(&root).ok();
