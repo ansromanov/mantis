@@ -114,6 +114,10 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     if app.show_help {
         popups::draw_help(f, app, area);
     }
+
+    if app.show_welcome {
+        popups::draw_welcome(f, app, area);
+    }
 }
 
 #[cfg(test)]

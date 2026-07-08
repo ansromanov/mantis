@@ -1027,3 +1027,27 @@ fn mouse_telemetry_check() {
     assert!(!app.telemetry.is_enabled());
     fs::remove_dir_all(&root).ok();
 }
+
+// -- welcome overlay mouse handling ------------------------------------------
+
+#[test]
+fn click_outside_welcome_dismisses_it() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.show_welcome = true;
+    app.welcome_area = Rect {
+        x: 10,
+        y: 10,
+        width: 20,
+        height: 20,
+    };
+
+    // Click inside welcome does not dismiss it.
+    app.handle_mouse(left_down_at(15, 15));
+    assert!(app.show_welcome, "click inside welcome must not dismiss it");
+
+    // Click outside welcome dismisses it.
+    app.handle_mouse(left_down_at(5, 5));
+    assert!(!app.show_welcome, "click outside welcome must dismiss it");
+    fs::remove_dir_all(&root).ok();
+}

@@ -753,3 +753,22 @@ fn init_telemetry_check() {
     assert!(!app.telemetry.is_enabled());
     fs::remove_dir_all(&root).ok();
 }
+
+// -- welcome overlay ---------------------------------------------------------
+
+#[test]
+fn app_new_starts_with_welcome_disabled() {
+    // App::new() does not inspect the welcome flag — that is done by the
+    // production `run_app` wrapper. The struct field defaults to false.
+    let _lock = crate::session::STATE_DIR_ENV_LOCK.lock().unwrap();
+    let root = temp_dir();
+    let state_dir = temp_dir();
+    std::env::set_var("MANTIS_STATE_DIR", &state_dir);
+
+    let app = new_app(&root, Config::default());
+    std::env::remove_var("MANTIS_STATE_DIR");
+
+    assert!(!app.show_welcome, "App::new must set show_welcome = false");
+    fs::remove_dir_all(&root).ok();
+    fs::remove_dir_all(&state_dir).ok();
+}

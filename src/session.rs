@@ -9,6 +9,10 @@
 //! Each root gets its own file under `sessions/<hash>.json` so concurrent
 //! mantis instances on different roots never race. A one-time migration
 //! reads the legacy `sessions.json` and creates the per-root files.
+//!
+//! A global `welcome_shown.flag` file in the state directory tracks whether
+//! the first-run welcome overlay has been dismissed, so it is shown exactly
+//! once across all roots.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -192,6 +196,28 @@ fn root_key(root: &Path) -> String {
         )
     };
     s.trim_end_matches(std::path::MAIN_SEPARATOR).to_string()
+}
+
+/// Returns the path to the global `welcome_shown.flag` file in the state dir.
+/// The file's mere existence (not its content) indicates the welcome overlay
+/// has been dismissed.
+pub fn welcome_shown_path() -> Option<PathBuf> {
+    state_dir().map(|d| d.join("welcome_shown.flag"))
+}
+
+/// Returns `true` when the first-run welcome overlay has already been
+/// dismissed. Returns `false` when the flag file is absent or the platform
+/// has no state dir.
+pub fn is_welcome_shown() -> bool {
+    welcome_shown_path().is_some_and(|p| p.exists())
+}
+
+/// Creates the `welcome_shown.flag` file so the welcome overlay is never
+/// shown again. Best-effort: I/O errors are silently ignored.
+pub fn mark_welcome_shown() {
+    if let Some(path) = welcome_shown_path() {
+        let _ = fs::write(&path, "");
+    }
 }
 
 /// Platform-specific state directory.
