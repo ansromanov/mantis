@@ -1,5 +1,5 @@
-version = "0.16.2"
-date = "2026-07-07"
+version = "0.16.3"
+date = "2026-07-08"
 whats_new = """- feat(palette): context-aware command palette (#632)
 - feat: bundled go plugin — Go language provider (fold capability) (#633)
 - feat(plugin): add python language provider plugin (#631)
