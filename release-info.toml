@@ -1,13 +1,10 @@
 version = "0.16.13"
 date = "2026-07-08"
-whats_new = """- test(e2e): cover features merged since PR #614 (#645)
-- feat: shell completions and man page (#642)
-- feat: first-run welcome overlay (one-time, dismissible) (#643)
-- feat(editor): config override for external editor, probe nano before vim (#644)
-- feat(telemetry): instrument key/mouse actions, overlays, features, file opens (#640)
-- feat(bug-report): scrollable diagnostic preview + shared ScrollState (#641)
-- test(telemetry): cover toggle_telemetry registration and dispatch (#639)
-- feat: open modal with multiline text input for bug report (#638)
-- feat(pr-review): make pr-review skill lightweight (#637)
-- chore: bump Homebrew formula to v0.16.0 [skip ci]"""
-release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.16.8"
+whats_new = """- perf(theme): cache test-env detection in no_color_active (#658)
+- test(ui): fix content rendering tests for persistent fold gutter (#657)
+- Telemetry: per-session timestamped files with rich SessionStart snapshot (#655)
+- feat(tree-filter): support regex in tree filter (/) (#654)
+- fix(plugin): enable iconize plugin by default (#652)
+- fix: always reserve fold gutter width to prevent line-number shift between files (#653)
+- chore: bump Homebrew formula to v0.16.8 [skip ci]"""
+release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.16.13"
