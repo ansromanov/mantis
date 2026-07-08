@@ -65,7 +65,8 @@ impl App {
                 true
             }
             Some("bug_report") => {
-                self.bug_report = Some(crate::search::BugReportState::new());
+                let report = crate::diagnostics::DiagnosticReport::collect(self);
+                self.bug_report = Some(crate::search::BugReportState::new(report.to_markdown()));
                 true
             }
             Some("toggle_telemetry") => {

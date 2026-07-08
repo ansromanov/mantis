@@ -937,7 +937,7 @@ fn handle_bug_report_key_handling() {
 
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.bug_report = Some(BugReportState::new());
+    app.bug_report = Some(BugReportState::default());
 
     // Type "Hi"
     app.handle_bug_report_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::empty()));
@@ -988,7 +988,7 @@ fn handle_bug_report_key_handling() {
 fn handle_bug_report_key_esc_closes_modal() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.bug_report = Some(BugReportState::new());
+    app.bug_report = Some(BugReportState::default());
 
     app.handle_bug_report_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
     assert!(app.bug_report.is_none());

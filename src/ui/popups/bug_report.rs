@@ -16,8 +16,6 @@ use super::util::centered_rect;
 use crate::app::App;
 
 pub(crate) fn draw_bug_report(f: &mut Frame, app: &mut App, area: Rect) {
-    let report = crate::diagnostics::DiagnosticReport::collect(app);
-
     let Some(state) = app.bug_report.as_mut() else {
         return;
     };
@@ -123,7 +121,15 @@ pub(crate) fn draw_bug_report(f: &mut Frame, app: &mut App, area: Rect) {
     app.bug_report_preview_area = preview_inner;
     f.render_widget(preview_block, parts[4]);
 
-    let report_md = report.to_markdown();
+    let body_text = state.text.join("\n");
+    let report_md = if body_text.trim().is_empty() {
+        state.diagnostics_markdown.clone()
+    } else {
+        format!(
+            "## bug report body\n\n{}\n\n{}",
+            body_text, state.diagnostics_markdown
+        )
+    };
     let preview_lines_all: Vec<String> = report_md.lines().map(String::from).collect();
     let total_rows = preview_lines_all.len();
     let visible = preview_inner.height as usize;

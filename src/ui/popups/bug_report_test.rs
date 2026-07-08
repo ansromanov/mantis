@@ -23,7 +23,7 @@ fn draw_bug_report_none_does_not_panic() {
 #[test]
 fn draw_bug_report_empty_does_not_panic() {
     let mut app = test_app();
-    app.bug_report = Some(BugReportState::new());
+    app.bug_report = Some(BugReportState::default());
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
     terminal
@@ -34,7 +34,7 @@ fn draw_bug_report_empty_does_not_panic() {
 #[test]
 fn draw_bug_report_with_text_does_not_panic() {
     let mut app = test_app();
-    let mut state = BugReportState::new();
+    let mut state = BugReportState::default();
     state.insert_char('H');
     state.insert_char('i');
     state.insert_newline();
@@ -53,7 +53,7 @@ fn draw_bug_report_with_text_does_not_panic() {
 #[test]
 fn draw_bug_report_populates_areas() {
     let mut app = test_app();
-    app.bug_report = Some(BugReportState::new());
+    app.bug_report = Some(BugReportState::default());
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
     terminal

@@ -258,10 +258,12 @@ of silently doing nothing.
 ## Reporting a bug
 
 Run **"Report a bug (save diagnostics locally)"** from the command palette to
-save an anonymous diagnostic report (app version, OS, terminal, workspace
-shape — no paths, names, or content) under the state directory, then attach
-it to a GitHub issue. See [Telemetry & Bug Reports](telemetry.md) for exactly
-what the report contains.
+open an interactive modal where you can write a description and preview the
+collected diagnostics. Submitting the modal (`Ctrl+S` or `Ctrl+Enter`) saves the
+report locally, attempts to open the GitHub issue creator in your browser
+prefilled with the report, and falls back to copying the report to your clipboard
+if needed. See [Telemetry & Bug Reports](telemetry.md) for exactly what the
+report contains.
 
 ## Git mode history
 

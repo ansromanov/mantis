@@ -613,11 +613,19 @@ impl App {
                 }
             }
             KeyCode::PageDown => {
-                let report = crate::diagnostics::DiagnosticReport::collect(self);
-                let lines_count = report.to_markdown().lines().count();
-                let height = self.bug_report_preview_area.height.max(1) as usize;
-                let max_scroll = lines_count.saturating_sub(height);
                 if let Some(ref mut state) = self.bug_report {
+                    let body_text = state.text.join("\n");
+                    let report_md = if body_text.trim().is_empty() {
+                        state.diagnostics_markdown.clone()
+                    } else {
+                        format!(
+                            "## bug report body\n\n{}\n\n{}",
+                            body_text, state.diagnostics_markdown
+                        )
+                    };
+                    let lines_count = report_md.lines().count();
+                    let height = self.bug_report_preview_area.height.max(1) as usize;
+                    let max_scroll = lines_count.saturating_sub(height);
                     state.preview_scroll.scroll_down(10, max_scroll);
                 }
             }

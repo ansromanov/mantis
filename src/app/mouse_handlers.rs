@@ -480,12 +480,19 @@ impl App {
         match ev.kind {
             MouseEventKind::ScrollDown => {
                 if rect_contains(self.bug_report_preview_area, ev.column, ev.row) {
-                    let report = crate::diagnostics::DiagnosticReport::collect(self);
-                    let md = report.to_markdown();
-                    let total_lines = md.lines().count();
-                    let preview_height = self.bug_report_preview_area.height as usize;
-                    let max_scroll = total_lines.saturating_sub(preview_height);
                     if let Some(ref mut state) = self.bug_report {
+                        let body_text = state.text.join("\n");
+                        let report_md = if body_text.trim().is_empty() {
+                            state.diagnostics_markdown.clone()
+                        } else {
+                            format!(
+                                "## bug report body\n\n{}\n\n{}",
+                                body_text, state.diagnostics_markdown
+                            )
+                        };
+                        let total_lines = report_md.lines().count();
+                        let preview_height = self.bug_report_preview_area.height as usize;
+                        let max_scroll = total_lines.saturating_sub(preview_height);
                         state.preview_scroll.scroll_down(WHEEL_STEP, max_scroll);
                     }
                 }
