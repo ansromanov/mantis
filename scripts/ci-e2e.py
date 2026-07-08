@@ -4,6 +4,7 @@ import pty
 import select
 import subprocess
 import sys
+import tempfile
 import time
 
 def run_e2e_test():
@@ -23,6 +24,14 @@ def run_e2e_test():
     if not os.path.exists(binary_path):
         print(f"Binary not found at {binary_path}")
         return False
+
+    # Isolate state dir and pre-dismiss the first-run welcome overlay so it
+    # never covers the tree pane the assertions below look for, and so this
+    # run never touches the real user state dir on the runner.
+    state_dir = tempfile.mkdtemp(prefix="mantis-ci-e2e-")
+    with open(os.path.join(state_dir, "welcome_shown.flag"), "w") as f:
+        f.write("")
+    os.environ["MANTIS_STATE_DIR"] = state_dir
 
     # Spawn mantis under a pseudo-terminal (PTY)
     pid, fd = pty.fork()
