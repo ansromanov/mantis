@@ -275,11 +275,24 @@ to return to the current file (or the working-tree diff in git mode).
 ## Open in your editor
 
 Press `Ctrl+e` (or `e` while the tree is focused) with a file open to launch
-it in your editor. `mantis` uses `$VISUAL`, then `$EDITOR`, falling back to `vim`. The TUI suspends while the editor runs and
+it in your editor. `mantis` uses `$VISUAL`, then `$EDITOR`, preferring `nano`
+over `vim` when neither is set. The TUI suspends while the editor runs and
 resumes when you exit; the file is reloaded afterwards so you see your changes.
 
 > 💡 `$EDITOR` can include arguments — e.g. `export EDITOR="code --wait"` opens
 > the file in VS Code and waits for you to close the tab before returning.
+
+To override the editor without setting environment variables, add to
+`mantis.toml`:
+
+```toml
+[general]
+editor = "code --wait"
+```
+
+When `$VISUAL` and `$EDITOR` are both unset and no config override exists,
+`mantis` probes for `nano`, then `vim`, and shows a status-bar hint on
+return so you know how to change it.
 
 ## Status bar
 

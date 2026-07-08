@@ -325,18 +325,59 @@ impl App {
     }
 }
 
-/// Resolves the external editor command from environment, falling back to
-/// an OS-appropriate default (`vim` on Unix, `notepad` on Windows).
-pub(super) fn resolve_editor() -> String {
-    std::env::var("VISUAL")
-        .or_else(|_| std::env::var("EDITOR"))
-        .unwrap_or_else(|_| {
-            if cfg!(windows) {
-                "notepad".to_string()
-            } else {
-                "vim".to_string()
-            }
-        })
+/// Resolves the external editor command from config, environment, or a
+/// platform-appropriate default.
+///
+/// Priority: config editor > `$VISUAL` > `$EDITOR` > probe for `nano` >
+/// `vim` (Unix) / `notepad` (Windows). Returns the command string and a
+/// boolean indicating whether the fallback was used (no config or env var).
+pub(super) fn resolve_editor(config_editor: Option<&str>) -> (String, bool) {
+    // 1. Config override takes precedence
+    if let Some(editor) = config_editor {
+        if !editor.is_empty() {
+            return (editor.to_string(), false);
+        }
+    }
+    // 2. Environment variables
+    if let Ok(editor) = std::env::var("VISUAL") {
+        if !editor.is_empty() {
+            return (editor, false);
+        }
+    }
+    if let Ok(editor) = std::env::var("EDITOR") {
+        if !editor.is_empty() {
+            return (editor, false);
+        }
+    }
+    // 3. Platform-appropriate fallback
+    if cfg!(windows) {
+        return ("notepad".to_string(), true);
+    }
+    if is_executable_in_path("nano") {
+        ("nano".to_string(), true)
+    } else {
+        ("vim".to_string(), true)
+    }
+}
+
+/// Returns `true` when `name` resolves to an executable on `$PATH`.
+fn is_executable_in_path(name: &str) -> bool {
+    #[cfg(windows)]
+    {
+        std::process::Command::new("where")
+            .arg(name)
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+    }
+    #[cfg(not(windows))]
+    {
+        std::process::Command::new("which")
+            .arg(name)
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+    }
 }
 
 impl App {
@@ -345,7 +386,8 @@ impl App {
     /// and flags a clear. The caller is responsible for reloading content
     /// after the editor returns.
     fn launch_editor(&mut self, path: &Path) {
-        let editor = resolve_editor();
+        let config_editor = self.config.general.editor.as_deref();
+        let (editor, is_fallback) = resolve_editor(config_editor);
 
         crate::app::restore_terminal();
 
@@ -368,6 +410,11 @@ impl App {
         self.needs_clear = true;
         if let Some(e) = launch_err {
             self.set_status(format!("editor launch failed: {e}"));
+        } else if is_fallback {
+            let editor_name = editor.split_whitespace().next().unwrap_or(&editor);
+            self.set_status(format!(
+                "Opened with {editor_name} — set $EDITOR to choose your editor"
+            ));
         }
     }
 

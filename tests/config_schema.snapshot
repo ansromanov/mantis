@@ -6,6 +6,8 @@ content.scrollbar
 content.show_file_info
 content.watch
 content.word_wrap
+general
+general.editor
 git
 git.diff
 git.diff.mode

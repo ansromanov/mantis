@@ -538,3 +538,36 @@ fn telemetry_section_parses_from_toml() {
     let parsed: Config = toml::from_str("[telemetry]\nenabled = true\n").unwrap();
     assert!(parsed.telemetry.enabled);
 }
+
+// -- GeneralConfig -----------------------------------------------------------
+
+#[test]
+fn general_config_editor_defaults_to_none() {
+    let cfg = Config::default();
+    assert!(cfg.general.editor.is_none());
+}
+
+#[test]
+fn general_config_editor_round_trips_through_serde() {
+    let cfg = Config {
+        general: GeneralConfig {
+            editor: Some("code --wait".into()),
+        },
+        ..Config::default()
+    };
+    let toml_str = toml::to_string_pretty(&cfg).unwrap();
+    let parsed: Config = toml::from_str(&toml_str).unwrap();
+    assert_eq!(parsed.general.editor.as_deref(), Some("code --wait"));
+}
+
+#[test]
+fn general_config_section_parses_from_toml() {
+    let parsed: Config = toml::from_str("[general]\neditor = \"vim\"\n").unwrap();
+    assert_eq!(parsed.general.editor.as_deref(), Some("vim"));
+}
+
+#[test]
+fn general_config_schema_has_editor() {
+    let schema = GeneralConfig::schema();
+    assert_eq!(schema.editor.as_deref(), Some("code --wait"));
+}
