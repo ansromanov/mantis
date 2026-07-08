@@ -63,8 +63,8 @@ fn search_highlight_on_correct_wrapped_row() {
         ));
     });
 
-    // Row 0 (y = 1): current match at screen x = 1 + 5 .. 1 + 9.
-    for x in 6u16..10 {
+    // Row 0 (y = 1): current match at screen x = inner.x(1) + ln_width(2) + col(5) .. inner.x(1) + ln_width(2) + col(9) -> 8..12.
+    for x in 8u16..12 {
         assert_eq!(
             cell_bg(&buffer, x, 1),
             theme.selection_bg,
@@ -72,10 +72,10 @@ fn search_highlight_on_correct_wrapped_row() {
         );
     }
     // Cell just before the match on row 0 is unhighlighted.
-    assert_eq!(cell_bg(&buffer, 5, 1), Color::Reset);
+    assert_eq!(cell_bg(&buffer, 7, 1), Color::Reset);
 
-    // Row 1 (y = 2): other match at local cols 22..26 -> screen x = 23..27.
-    for x in 23u16..27 {
+    // Row 1 (y = 2): other match at local cols 24..28 -> screen x = 27..31.
+    for x in 27u16..31 {
         assert_eq!(
             cell_bg(&buffer, x, 2),
             theme.dim,
@@ -83,7 +83,7 @@ fn search_highlight_on_correct_wrapped_row() {
         );
     }
     // The other match must NOT bleed onto row 0 at the same screen columns.
-    for x in 23u16..27 {
+    for x in 27u16..31 {
         assert_eq!(
             cell_bg(&buffer, x, 1),
             Color::Reset,
@@ -110,14 +110,14 @@ fn search_highlight_spans_wrap_boundary() {
         app.in_file_search = Some(make_search(
             vec![crate::search::InFileMatch {
                 line: 0,
-                col: 76,
+                col: 74,
                 len: 6,
             }],
             0,
         ));
     });
 
-    // Tail of row 0: cols 76,77 -> screen x = 77, 78.
+    // Tail of row 0: cols 74,75 -> screen x = 77, 78.
     for x in 77u16..79 {
         assert_eq!(
             cell_bg(&buffer, x, 1),
@@ -125,8 +125,8 @@ fn search_highlight_spans_wrap_boundary() {
             "wrap-boundary match tail on row 0 at ({x},1)"
         );
     }
-    // Head of row 1: local cols 0..4 -> screen x = 1..5.
-    for x in 1u16..5 {
+    // Head of row 1: local cols 0..4 -> screen x = 3..7.
+    for x in 3u16..7 {
         assert_eq!(
             cell_bg(&buffer, x, 2),
             theme.selection_bg,
@@ -263,7 +263,8 @@ fn line_number_gutter_hidden_when_disabled() {
         app.highlighted = vec![vec![(Style::default(), "hello".to_string())]];
     });
     // With the gutter off, content starts flush at the inner edge: "hello".
-    let row: String = buffer.content().chunks(80).nth(1).unwrap()[1..6]
+    // Note: the fold gutter is always showing (width 2), so content starts at index 3.
+    let row: String = buffer.content().chunks(80).nth(1).unwrap()[3..8]
         .iter()
         .map(|c| c.symbol())
         .collect();
