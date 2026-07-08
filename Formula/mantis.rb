@@ -30,9 +30,23 @@ class Mantis < Formula
 
   def install
     bin.install Dir["mantis-*"].first => "mantis"
+
+    # Generate shell completions and man page from the installed binary.
+    %w[bash zsh fish].each do |shell|
+      (buildpath/"mantis.#{shell}").write Utils.popen_read(bin/"mantis", "--completions", shell)
+    end
+    bash_completion.install "mantis.bash"
+    zsh_completion.install "mantis.zsh" => "_mantis"
+    fish_completion.install "mantis.fish"
+
+    (buildpath/"mantis.1").write Utils.popen_read(bin/"mantis", "--print-man-page")
+    man1.install "mantis.1"
   end
 
   test do
     assert_match version.to_s, shell_output("#{bin}/mantis --version")
+    # Completions and man page should be non-empty.
+    assert_match "mantis", shell_output("#{bin}/mantis --completions bash")
+    assert_match ".TH", shell_output("#{bin}/mantis --print-man-page")
   end
 end

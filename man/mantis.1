@@ -1,0 +1,37 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH mantis 1  "mantis 0.16.2"
+.SH NAME
+mantis \- A fast terminal file tree viewer with syntax highlighting, fuzzy search, and mouse support.
+.SH SYNOPSIS
+\fBmantis\fR [\fB\-l\fR|\fB\-\-language\fR] [\fB\-\-completions\fR] [\fB\-\-print\-man\-page\fR] [\fB\-\-update\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] [\fIPATH\fR]
+.SH DESCRIPTION
+A fast terminal file tree viewer — navigate filesystems, preview files with syntax highlighting, fuzzy\-search files and content, browse git history, and switch themes.
+.PP
+Pager mode: with no <PATH> and stdin not a terminal, mantis reads stdin instead of a directory — diff\-shaped input renders as a navigable side\-by\-side diff, anything else is syntax\-highlighted:
+  git diff | mantis
+  kubectl logs pod | mantis
+.SH OPTIONS
+.TP
+\fB\-l\fR, \fB\-\-language\fR \fI<LANG>\fR
+Force the syntax highlighting language for piped stdin
+.TP
+\fB\-\-completions\fR \fI<SHELL>\fR
+Generate shell completions (bash, zsh, fish, powershell)
+.TP
+\fB\-\-print\-man\-page\fR
+Print the man page to stdout
+.TP
+\fB\-\-update\fR
+Self\-update to the latest release
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+Print version
+.TP
+[\fIPATH\fR]
+File or directory to open (default: current directory)
+.SH VERSION
+v0.16.2

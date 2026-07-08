@@ -103,6 +103,20 @@ try {
 
     Write-Step "Installed $BinName to $Dest"
 
+    # Generate PowerShell completions (best-effort).
+    $CompDir = Join-Path $InstallDir 'completions'
+    if (-not (Test-Path $CompDir)) {
+        New-Item -ItemType Directory -Path $CompDir -ErrorAction SilentlyContinue | Out-Null
+    }
+    if (Test-Path $CompDir) {
+        $CompFile = Join-Path $CompDir "mantis.ps1"
+        & $Dest --completions powershell 2>$null | Out-File -FilePath $CompFile -Encoding utf8 -ErrorAction SilentlyContinue
+        if ($?) {
+            Write-Step "Installed PowerShell completions to $CompFile"
+            Write-Warn "Add 'Import-Module $CompFile' to your PowerShell profile to enable tab completion."
+        }
+    }
+
     # Add install dir to the user PATH if it is not already there.
     $UserPath = [System.Environment]::GetEnvironmentVariable('PATH', [System.EnvironmentVariableTarget]::User)
     if ($UserPath -notlike "*$InstallDir*") {
