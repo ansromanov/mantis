@@ -641,25 +641,25 @@ impl App {
         // 2. Prepare URL parameters.
         let base = "https://github.com/ansromanov/mantis/issues/new?template=app-bugreport.yml";
         let title_encoded = percent_encode("App Bug Report");
-        let description_encoded = percent_encode(&body_text);
 
         let mut truncated = false;
-        let diagnostics_encoded = {
-            let full_encoded = percent_encode(&md);
+        let (description_encoded, diagnostics_encoded) = {
+            let desc_enc = percent_encode(&body_text);
+            let diag_enc = percent_encode(&md);
             let test_url = format!(
                 "{}&title={}&description={}&diagnostics={}",
-                base, title_encoded, description_encoded, full_encoded
+                base, title_encoded, desc_enc, diag_enc
             );
             if test_url.len() > 6000 {
                 truncated = true;
                 let fallback_msg = format!(
                     "<!-- DIAGNOSTICS TOO LARGE FOR URL - COPIED TO CLIPBOARD. PLEASE PASTE OVER THIS LINE -->\n\
-                     [Diagnostics truncated due to URL length limit ({} bytes). The full report was copied to your clipboard. Please paste it here.]",
+                     [Report truncated due to URL length limit ({} bytes). The full report was copied to your clipboard. Please paste it here.]",
                     md.len()
                 );
-                percent_encode(&fallback_msg)
+                (percent_encode(&fallback_msg), percent_encode(""))
             } else {
-                full_encoded
+                (desc_enc, diag_enc)
             }
         };
 
