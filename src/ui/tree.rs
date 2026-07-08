@@ -176,10 +176,9 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
                 Some(cached) => visible_indices = cached,
                 None => {
                     cache_miss = true;
-                    let q: String = filter.query.to_lowercase();
                     let matching: HashSet<usize> = (0..total_nodes)
                         // index i is loop-bounded by 0..total_nodes
-                        .filter(|&i| app.nodes[i].name.to_lowercase().contains(&q))
+                        .filter(|&i| filter.matches_name(&app.nodes[i].name))
                         .collect();
                     let mut include = matching.clone();
                     for &mi in &matching {
