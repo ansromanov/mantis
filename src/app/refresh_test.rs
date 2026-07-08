@@ -219,6 +219,52 @@ fn set_icon_map_then_clear_on_disable_clears_state() {
     assert!(app.icon_fallback.is_empty());
 }
 
+// -- apply_reloaded_config / icons interaction --------------------------------
+
+#[test]
+fn config_reload_does_not_clear_icons_owned_by_active_plugin() {
+    let mut app = App {
+        icons_enabled: true,
+        ..create_base_app()
+    };
+    app.plugin_contributions.insert(
+        "iconize".to_string(),
+        crate::plugin::types::PluginContributions {
+            has_icon_map: true,
+            ..Default::default()
+        },
+    );
+
+    // cfg.tree.icons defaults to false; a config-file reload (e.g. triggered
+    // by the app's own atomic `save_config` write) must not stomp the
+    // plugin-set `icons_enabled` back to that cold-start default.
+    let cfg = crate::config::Config::default();
+    assert!(!cfg.tree.icons);
+    app.apply_reloaded_config(cfg);
+
+    assert!(
+        app.icons_enabled,
+        "reload must not clear icons_enabled while a plugin owns the icon map"
+    );
+}
+
+#[test]
+fn config_reload_applies_icons_default_when_no_plugin_owns_icon_map() {
+    let mut app = App {
+        icons_enabled: true,
+        ..create_base_app()
+    };
+    // No plugin_contributions entry with has_icon_map: icons_enabled came
+    // from somewhere else (or stale state), so the config default should win.
+    let cfg = crate::config::Config::default();
+    app.apply_reloaded_config(cfg);
+
+    assert!(
+        !app.icons_enabled,
+        "reload must apply cfg.tree.icons default when no plugin owns the icon map"
+    );
+}
+
 // -- helpers ------------------------------------------------------------------
 
 /// Minimal App for testing drain_plugin_actions in isolation.
