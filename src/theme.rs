@@ -721,15 +721,18 @@ fn parse_osc_response(resp: &str) -> Option<(u8, u8, u8)> {
 }
 
 pub fn no_color_active() -> bool {
-    let is_test_env = cfg!(test)
-        || std::env::current_exe()
-            .map(|p| {
-                p.parent()
-                    .and_then(|parent| parent.file_name())
-                    .map(|name| name == "deps")
-                    .unwrap_or(false)
-            })
-            .unwrap_or(false);
+    static IS_TEST_ENV: OnceLock<bool> = OnceLock::new();
+    let is_test_env = *IS_TEST_ENV.get_or_init(|| {
+        cfg!(test)
+            || std::env::current_exe()
+                .map(|p| {
+                    p.parent()
+                        .and_then(|parent| parent.file_name())
+                        .map(|name| name == "deps")
+                        .unwrap_or(false)
+                })
+                .unwrap_or(false)
+    });
     if is_test_env {
         std::env::var_os("MANTIS_TEST_NO_COLOR").is_some()
     } else {
