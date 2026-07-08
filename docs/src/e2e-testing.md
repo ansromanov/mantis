@@ -66,3 +66,11 @@ cargo run -- ./e2e/data
 | **7. Status Bar** | Check status bar while cycling files. | Correct file names, encoding (e.g., `UTF-8 BOM` for `bom_utf8_sample.txt`), line endings (`CRLF` for `crlf_sample.txt`), and syntax names. |
 | **8. Git Diffs** | Press `Ctrl+D` to enter git mode (if in git repository) or view diff history by pressing `H` (from the tree). Toggle side-by-side diff via the command palette. | Displays diff correctly. Side-by-side mode splits left/right panels. |
 | **9. Resizing** | Resize the terminal window while running `mantis`. | Viewport adapts immediately without crashing or breaking layout boundary lines. |
+| **10. Root Clamp** | With the tree focused at the launch directory, press `Backspace`. | No-op; status bar shows `Already at root`. |
+| **11. Compare Mode** | In a git repo, run `Compare against a revision` from the command palette (`Ctrl+P`), enter a revision at the `rev: ` prompt. | Tree shows `A`/`M`/`D`/`R` badges; status bar shows a `[compare: <rev>]` badge. |
+| **12. Blame Rework** | Focus content pane on a tracked file, press `Ctrl+B` for the full blame pane, `B` for the single-line bottom bar. | Blame pane shows hash/author/date/subject columns; bottom bar shows a 2-line summary. |
+| **13. Bundled Language Plugins** | Press `p` to open the plugin manager, enable `rust`/`python`/`go` (disabled by default). | Folding (`Space`) works on the corresponding language files. |
+| **14. Bug Report & Telemetry** | Run `Report a bug (save diagnostics locally)` and `Toggle telemetry` from the command palette. | Bug report modal opens with a scrollable diagnostic preview; telemetry toggle shows `telemetry enabled`/`disabled` in the status bar. |
+| **15. First-Run Welcome Overlay** | Launch `mantis` against a fresh state dir (`MANTIS_STATE_DIR=$(mktemp -d) cargo run -- ./e2e/data`). | A dismissible welcome popup shows 5 essential keybindings; does not reappear after `Esc` and relaunch. |
+
+See the per-terminal checklists in `e2e/checklists/*.md` (section "4. New Features") for detailed step-by-step coverage of items 10–15.
