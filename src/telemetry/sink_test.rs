@@ -15,7 +15,18 @@ fn rotated_files(dir: &Path) -> Vec<String> {
         .unwrap()
         .flatten()
         .filter_map(|e| e.file_name().into_string().ok())
-        .filter(|n| n.starts_with("events-") && n.ends_with(".jsonl"))
+        .filter(|n| {
+            // Rotated files have a `-<n>` before `.jsonl` (e.g. `events-42-1.jsonl`).
+            // The active file is `events-42.jsonl` (no `-<n>` before `.jsonl`).
+            if let Some(rest) = n
+                .strip_prefix("events-")
+                .and_then(|s| s.strip_suffix(".jsonl"))
+            {
+                rest.contains('-')
+            } else {
+                false
+            }
+        })
         .collect();
     names.sort();
     names
@@ -24,10 +35,10 @@ fn rotated_files(dir: &Path) -> Vec<String> {
 #[test]
 fn append_writes_one_stamped_json_line() {
     let tmp = tempfile::tempdir().unwrap();
-    let mut sink = JsonlSink::new(tmp.path().to_path_buf());
+    let mut sink = JsonlSink::new(tmp.path().to_path_buf(), 42);
     sink.append(&event(), Duration::from_millis(42));
 
-    let raw = fs::read_to_string(tmp.path().join("events.jsonl")).unwrap();
+    let raw = fs::read_to_string(tmp.path().join("events-42.jsonl")).unwrap();
     let lines: Vec<&str> = raw.lines().collect();
     assert_eq!(lines.len(), 1);
     let v: serde_json::Value = serde_json::from_str(lines[0]).unwrap();
@@ -39,36 +50,31 @@ fn append_writes_one_stamped_json_line() {
 fn append_over_cap_rotates_active_file() {
     let tmp = tempfile::tempdir().unwrap();
     // Cap below two lines so the second append must rotate first.
-    let mut sink = JsonlSink::with_limits(tmp.path().to_path_buf(), 80, 4);
+    let mut sink = JsonlSink::with_limits(tmp.path().to_path_buf(), 42, 80, 4);
     sink.append(&event(), Duration::ZERO);
     sink.append(&event(), Duration::ZERO);
 
     assert_eq!(rotated_files(tmp.path()).len(), 1);
-    let active = fs::read_to_string(tmp.path().join("events.jsonl")).unwrap();
+    let active = fs::read_to_string(tmp.path().join("events-42.jsonl")).unwrap();
     assert_eq!(active.lines().count(), 1, "active restarted after rotation");
 }
 
 #[test]
 fn prune_keeps_at_most_max_rotated_files() {
     let tmp = tempfile::tempdir().unwrap();
-    let mut sink = JsonlSink::with_limits(tmp.path().to_path_buf(), 80, 2);
+    let mut sink = JsonlSink::with_limits(tmp.path().to_path_buf(), 42, 80, 2);
     for _ in 0..6 {
         sink.append(&event(), Duration::ZERO);
     }
     assert!(rotated_files(tmp.path()).len() <= 2);
-    assert!(tmp.path().join("events.jsonl").exists());
+    assert!(tmp.path().join("events-42.jsonl").exists());
 }
 
 #[test]
-fn existing_active_file_length_is_respected_on_reopen() {
+fn collision_on_active_file_uses_incrementing_suffix() {
     let tmp = tempfile::tempdir().unwrap();
-    {
-        let mut sink = JsonlSink::with_limits(tmp.path().to_path_buf(), 80, 4);
-        sink.append(&event(), Duration::ZERO);
-    }
-    // A new sink over the same dir sees the existing length and rotates on
-    // the next over-cap append instead of growing the file unbounded.
-    let mut sink = JsonlSink::with_limits(tmp.path().to_path_buf(), 80, 4);
-    sink.append(&event(), Duration::ZERO);
-    assert_eq!(rotated_files(tmp.path()).len(), 1);
+    // Pre-create a file with the same epoch name.
+    fs::write(tmp.path().join("events-42.jsonl"), "").unwrap();
+    let sink = JsonlSink::with_limits(tmp.path().to_path_buf(), 42, 1024, 4);
+    assert_eq!(sink.active_name, "events-42-1.jsonl");
 }

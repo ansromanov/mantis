@@ -662,7 +662,14 @@ fn telemetry_enabled_when_configured() {
     let app = new_app(&dir, cfg);
     assert!(app.telemetry.is_enabled());
     drop(app);
-    assert!(state.path().join("telemetry").join("events.jsonl").exists());
+    let telemetry_dir = state.path().join("telemetry");
+    assert!(std::fs::read_dir(&telemetry_dir)
+        .unwrap()
+        .flatten()
+        .any(|e| e
+            .file_name()
+            .to_str()
+            .is_some_and(|n| n.starts_with("events-") && n.ends_with(".jsonl"))));
     std::env::remove_var("MANTIS_STATE_DIR");
 }
 
