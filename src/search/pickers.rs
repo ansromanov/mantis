@@ -24,6 +24,10 @@ pub struct TreeFilter {
     /// Compiled regex for the current query, if the query is a valid regex.
     /// `None` when the query is empty or is not a valid regex (substring fallback).
     pub(crate) regex: Option<regex::Regex>,
+    /// Lowercased copy of `query`, kept in sync in `rebuild_regex` so the
+    /// substring-fallback path in `matches_name` doesn't re-lowercase the
+    /// query on every node it's called against.
+    lowercase_query: String,
     /// Cached visible indices for the current query + tree revision.
     /// `None` when no cache is built yet or the query is empty.
     /// `Some((query, revision, indices))` where revision matches `App::tree_revision`.
@@ -46,22 +50,22 @@ impl TreeFilter {
         TreeFilter {
             query: String::new(),
             regex: None,
+            lowercase_query: String::new(),
             cached: None,
             saved_expanded: None,
             full_paths_cache: None,
         }
     }
 
-    /// Rebuilds the compiled regex (or clears it) to reflect the current query.
+    /// Rebuilds the compiled regex (or clears it) and the lowercased query
+    /// cache to reflect the current query.
     fn rebuild_regex(&mut self) {
         self.regex = if self.query.is_empty() {
             None
         } else {
-            regex::RegexBuilder::new(&self.query)
-                .case_insensitive(true)
-                .build()
-                .ok()
+            crate::search::build_search_regex(&self.query, true, false, false)
         };
+        self.lowercase_query = self.query.to_lowercase();
     }
 
     /// Appends `c` to the query.
@@ -95,7 +99,7 @@ impl TreeFilter {
         }
         match &self.regex {
             Some(re) => re.is_match(name),
-            None => name.to_lowercase().contains(&self.query.to_lowercase()),
+            None => name.to_lowercase().contains(&self.lowercase_query),
         }
     }
 }
