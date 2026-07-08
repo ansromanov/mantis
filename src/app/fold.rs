@@ -15,14 +15,13 @@
 use super::App;
 
 impl App {
-    /// Width of the fold gutter (2 chars: marker + space) when fold regions
-    /// are detected, 0 otherwise.
+    /// Width of the fold gutter (2 chars: marker + space).
+    ///
+    /// This is always returned as 2 (rather than 0 when no fold regions are
+    /// detected) so that the line-number column position doesn't shift
+    /// left/right when switching between files with and without fold regions.
     pub fn fold_gutter_width(&self) -> usize {
-        if self.fold_regions.is_empty() {
-            0
-        } else {
-            2
-        }
+        2
     }
 
     /// Returns the fold region index whose `start` matches `physical_line`, if any.
