@@ -36,6 +36,7 @@ pub mod scroll;
 pub mod search;
 pub mod selection;
 pub mod session;
+pub mod sys_info;
 pub mod telemetry;
 pub mod theme;
 pub mod tree;

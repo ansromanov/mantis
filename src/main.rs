@@ -47,6 +47,7 @@ mod scroll;
 mod search;
 mod selection;
 mod session;
+mod sys_info;
 mod telemetry;
 mod theme;
 mod tree;

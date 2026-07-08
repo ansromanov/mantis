@@ -305,6 +305,13 @@ impl App {
             }
         }
 
+        // Emit a rich SessionStart event with the full environment and
+        // workspace snapshot now that the app is fully initialized.
+        if app.telemetry.is_enabled() {
+            let snapshot = crate::telemetry::SessionSnapshot::collect(&app);
+            app.telemetry.record_session_start(snapshot);
+        }
+
         Ok(app)
     }
 }

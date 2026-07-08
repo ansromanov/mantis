@@ -54,10 +54,11 @@ enabled = true
 You can also set this key by hand instead of using the palette.
 
 When enabled, whitelisted events are appended to a local JSONL log under
-`<state dir>/telemetry/` (`events.jsonl`, rotated at 1 MiB, at most five
-files kept). When disabled — the default — no events are recorded and no
-files or threads are created. Data never leaves your machine; there is no
-upload endpoint.
+`<state dir>/telemetry/`.  Each session writes to a fresh, timestamped file
+`events-<epoch>.jsonl` (one file per session), rotated at 1 MiB within a
+session; at most five files (one active plus four rotated) are kept across sessions.  When disabled
+— the default — no events are recorded and no files or threads are created.
+Data never leaves your machine; there is no upload endpoint.
 
 ### Complete event schema
 
@@ -66,7 +67,7 @@ the session started (no wall-clock timestamps).
 
 | Event | Fields | Recorded when |
 |---|---|---|
-| `session_start` | `app_version`, `os`, `arch`, `terminal` (the `$TERM` value) | mantis starts |
+| `session_start` | `app_version`, `os`, `arch`, `terminal`, `os_version`, `wsl`, `term_program`, `term_program_version`, `colorterm`, `windows_terminal`, `ssh_session`, `terminal_size`, `tree_nodes`, `tree_files`, `tree_dirs`, `tree_max_depth`, `expanded_dirs`, `tree_filter_active`, `walk_errors`, `git_repo`, `git_mode`, `file_open`, `file_extension`, `file_size_bytes`, `file_line_count`, `file_encoding`, `file_line_ending`, `file_syntax`, `file_is_json`, `file_is_diff`, `file_uses_mmap`, `theme`, `plugin_count`, `telemetry_enabled` | mantis starts — same privacy rules as bug-report snapshot: counts and whitelisted env vars only, never paths or names |
 | `session_end` | `duration_s`, `events_dropped` | mantis exits |
 | `action_invoked` | `action` (canonical action id), `source` (`palette`, `key`, `mouse`) | a command palette, key binding, or mouse action runs |
 | `overlay_opened` | `kind` (help, about, theme_picker, command_palette, etc.) | an overlay popup is opened |

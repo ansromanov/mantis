@@ -645,9 +645,13 @@ impl App {
         let enabled = !self.config.telemetry.enabled;
         self.config.telemetry.enabled = enabled;
         self.telemetry = crate::telemetry::Telemetry::new(enabled);
-        if enabled && !self.config.telemetry.notice_shown {
-            self.config.telemetry.notice_shown = true;
-            self.show_telemetry_notice = true;
+        if enabled {
+            let snapshot = crate::telemetry::SessionSnapshot::collect(self);
+            self.telemetry.record_session_start(snapshot);
+            if !self.config.telemetry.notice_shown {
+                self.config.telemetry.notice_shown = true;
+                self.show_telemetry_notice = true;
+            }
         }
         self.save_config();
         self.set_status(format!(

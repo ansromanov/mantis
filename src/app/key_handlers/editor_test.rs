@@ -771,7 +771,22 @@ fn dispatch_records_palette_action_in_telemetry_when_enabled() {
     assert!(app.dispatch_command());
     drop(app); // flush the telemetry writer
 
-    let raw = fs::read_to_string(state.path().join("telemetry").join("events.jsonl")).unwrap();
+    let telemetry_dir = state.path().join("telemetry");
+    let mut files: Vec<_> = std::fs::read_dir(&telemetry_dir)
+        .unwrap()
+        .flatten()
+        .filter_map(|e| {
+            let name = e.file_name();
+            let name = name.to_str()?;
+            if name.starts_with("events-") && name.ends_with(".jsonl") {
+                Some(e.path())
+            } else {
+                None
+            }
+        })
+        .collect();
+    files.sort();
+    let raw = std::fs::read_to_string(files.into_iter().next().unwrap()).unwrap();
     assert!(
         raw.lines()
             .any(|l| l.contains("\"action_invoked\"") && l.contains("\"help\"")),
