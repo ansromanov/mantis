@@ -1,4 +1,4 @@
-version = "0.16.14"
+version = "0.16.15"
 date = "2026-07-09"
 whats_new = """- perf(theme): cache test-env detection in no_color_active (#658)
 - test(ui): fix content rendering tests for persistent fold gutter (#657)
