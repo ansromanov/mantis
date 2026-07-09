@@ -793,10 +793,16 @@ impl BugReportState {
 
     /// Total visual (rendered) rows across all logical lines for the given edit width.
     pub fn total_visual_rows(&self, width: usize) -> usize {
-        self.text
-            .iter()
-            .map(|l| Self::visual_row_count(l, width))
-            .sum()
+        let mut total = 0;
+        for (i, line) in self.text.iter().enumerate() {
+            let n = line.chars().count();
+            let mut rows = Self::visual_row_count(line, width);
+            if i == self.cursor_row && self.cursor_col == n && n > 0 && n % width.max(1) == 0 {
+                rows += 1;
+            }
+            total += rows;
+        }
+        total
     }
 
     pub fn clamp_scroll(&mut self, height: usize, width: usize) {

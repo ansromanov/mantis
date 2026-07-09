@@ -8,7 +8,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph, Wrap},
+    widgets::{Block, Borders, Clear, Paragraph},
     Frame,
 };
 
@@ -76,7 +76,7 @@ pub(crate) fn draw_bug_report(f: &mut Frame, app: &mut App, area: Rect) {
     let desc_inner = desc_block.inner(parts[2]);
     f.render_widget(desc_block, parts[2]);
 
-    let edit_width = (desc_inner.width as usize).max(1);
+    let edit_width = (desc_inner.width as usize).saturating_sub(1).max(1);
     state.clamp_scroll(desc_inner.height as usize, edit_width);
 
     // Build all visual lines, wrapping long logical lines at edit_width chars
@@ -94,7 +94,14 @@ pub(crate) fn draw_bug_report(f: &mut Frame, app: &mut App, area: Rect) {
             }
             continue;
         }
-        let num_chunks = char_count.div_ceil(edit_width);
+        let mut num_chunks = char_count.div_ceil(edit_width);
+        if li == state.cursor_row
+            && state.cursor_col == char_count
+            && char_count > 0
+            && char_count % edit_width == 0
+        {
+            num_chunks += 1;
+        }
         for chunk_idx in 0..num_chunks {
             let start = chunk_idx * edit_width;
             let end = std::cmp::min(start + edit_width, char_count);
@@ -128,9 +135,7 @@ pub(crate) fn draw_bug_report(f: &mut Frame, app: &mut App, area: Rect) {
         visible_lines.push(Line::from(""));
     }
     f.render_widget(
-        Paragraph::new(visible_lines)
-            .wrap(Wrap { trim: false })
-            .style(Style::default().fg(theme.text).bg(theme.background)),
+        Paragraph::new(visible_lines).style(Style::default().fg(theme.text).bg(theme.background)),
         desc_inner,
     );
 

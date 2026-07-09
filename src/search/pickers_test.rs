@@ -697,7 +697,13 @@ fn bug_report_state_total_visual_rows() {
     for _ in 0..10 {
         state.insert_char('x');
     }
+    // Cursor at index 10 wraps to the next line, so total is 2
+    assert_eq!(state.total_visual_rows(10), 2);
+    // If cursor is moved back, no extra row is needed
+    state.cursor_col = 9;
     assert_eq!(state.total_visual_rows(10), 1);
+    // Restore cursor position for subsequent insertions in the test
+    state.cursor_col = 10;
 
     // Line that wraps to 2 visual rows
     for _ in 0..5 {
