@@ -215,7 +215,7 @@ diff_hunk_prev = ["N"]
 #   syntax_file path to the .sublime-syntax file (syntax plugins)
 #   events      manifest events to subscribe to; empty = all
 #
-# Bundled plugins (installed to the plugin dir on first run). Enable per entry:
+# Bundled plugins (installed to the plugin dir on first run). All enabled by default:
 #
 # [plugins.iconize]                 # Nerd Font file-type icons (set tree.icons = true)
 # enabled = true
@@ -224,6 +224,10 @@ diff_hunk_prev = ["N"]
 # [plugins.markdown]                # render .md with pulldown-cmark; M toggles raw
 # enabled = true
 # path = "markdown"
+#
+# To disable a bundled plugin, set enabled = false:
+# [plugins.rust]
+# enabled = false
 #
 # Syntax plugin example (extra highlighting; no subprocess spawned):
 # [plugins.terraform]
