@@ -69,7 +69,7 @@ cargo run -- ./e2e/data
 | **10. Root Clamp** | With the tree focused at the launch directory, press `Backspace`. | No-op; status bar shows `Already at root`. |
 | **11. Compare Mode** | In a git repo, run `Compare against a revision` from the command palette (`Ctrl+P`), select or type a revision in the picker overlay, press `Enter`. | Tree shows `A`/`M`/`D`/`R` badges; status bar shows a `[compare: <rev>]` badge. |
 | **12. Blame Rework** | Focus content pane on a tracked file, press `Ctrl+B` for the full blame pane, `B` for the single-line bottom bar. | Blame pane shows hash/author/date/subject columns; bottom bar shows a 2-line summary. |
-| **13. Bundled Language Plugins** | Press `p` to open the plugin manager, enable `rust`/`python`/`go` (disabled by default). | Folding (`Space`) works on the corresponding language files. |
+| **13. Bundled Language Plugins** | Press `p` to open the plugin manager, verify `rust`/`python`/`go` are enabled (default). | Folding (`Space`) works on the corresponding language files. |
 | **14. Bug Report & Telemetry** | Run `Report a bug (save diagnostics locally)` and `Toggle telemetry` from the command palette. | Bug report modal opens with a scrollable diagnostic preview; telemetry toggle shows `telemetry enabled`/`disabled` in the status bar. |
 | **15. First-Run Welcome Overlay** | Launch `mantis` against a fresh state dir (`MANTIS_STATE_DIR=$(mktemp -d) cargo run -- ./e2e/data`). | A dismissible welcome popup shows 5 essential keybindings; does not reappear after `Esc` and relaunch. |
 

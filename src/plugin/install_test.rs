@@ -44,7 +44,7 @@ fn default_plugin_dir_respects_xdg() {
 }
 
 #[test]
-fn bundled_plugin_entries_markdown_and_iconize_enabled_others_disabled() {
+fn bundled_plugin_entries_all_enabled_by_default() {
     let entries = bundled_plugin_entries();
     assert!(!entries.is_empty(), "must have at least one bundled plugin");
     let names: Vec<&str> = entries.iter().map(|(n, _)| n.as_str()).collect();
@@ -61,14 +61,10 @@ fn bundled_plugin_entries_markdown_and_iconize_enabled_others_disabled() {
     );
     assert!(names.contains(&"python"), "python plugin must be listed");
     for (name, entry) in &entries {
-        if name == "markdown" || name == "iconize" {
-            assert!(entry.enabled, "{} plugin must be enabled by default", name);
-        } else {
-            assert!(
-                !entry.enabled,
-                "bundled plugin {name} must default to enabled=false"
-            );
-        }
+        assert!(
+            entry.enabled,
+            "bundled plugin {name} must default to enabled=true"
+        );
     }
     // Process entries
     for (name, entry) in &entries {

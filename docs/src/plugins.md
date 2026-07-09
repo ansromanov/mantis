@@ -152,22 +152,21 @@ clock = { path = "clock.sh" }
 compiled alongside `mantis` and installed on first run.
 
 | Plugin | Binary | What it does |
-|---|---|---|---|
+|---|---|---|
 | iconize | `iconize` | On `init`, sends a `set_icon_map` action with Nerd Font glyphs for ~80 file extensions. Requires `icons = true` in `mantis.toml` and a Nerd Font terminal. |
 | markdown | `markdown` | Renders `.md` files using pulldown-cmark, sending the output as ANSI-escaped lines via `set_content`. Responds to theme changes and `M` keypress for raw/rendered toggle. |
+| python | `python` | Registers as a language provider for `.py` files with the `fold` capability. On file open, computes and registers collapsible indentation-based fold regions. |
 | rust | `rust` | Registers as a language provider for `.rs` files with the `fold` capability. On file open, computes and registers collapsible curly-brace fold regions. |
 | go | `go` | Registers as a language provider for `.go` files with the `fold` capability. On file open, computes and registers collapsible curly-brace fold regions. |
 
 All bundled plugins are compiled as workspace members and installed to the
-plugin directory the first time `mantis` creates its global config. Enable them by
-adding entries in `mantis.toml`:
+plugin directory the first time `mantis` creates its global config. They are all
+enabled by default. If you want to disable a bundled plugin, explicitly set
+`enabled = false` in your `mantis.toml`:
 
 ```toml
-[plugins]
-iconize    = { path = "iconize" }
-markdown   = { path = "markdown" }
-rust       = { path = "rust" }
-go         = { path = "go" }
+[plugins.rust]
+enabled = false
 ```
 
 > **Note:** Git features are built into `mantis` natively — no plugin required.

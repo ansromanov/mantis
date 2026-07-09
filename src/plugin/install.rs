@@ -17,12 +17,9 @@ use crate::plugin::types::{PluginEntry, PluginKind};
 
 /// Returns `(name, PluginEntry)` pairs for every plugin that ships with `mantis`.
 ///
-/// The markdown and iconize plugins are enabled by default (markdown is the
-/// flagship first-run feature — rendered READMEs; iconize provides file-type icons).
-/// Other bundled plugins (python, rust, go, terraform) are disabled by default
-/// so they appear in the palette without being spawned automatically. User config
-/// entries with `or_insert` always win over these defaults, so an explicit
-/// `enabled = false` in `mantis.toml` is respected.
+/// All plugins shipped with `mantis` (markdown, iconize, python, rust, go, terraform)
+/// are enabled by default. User config entries with `or_insert` always win over these
+/// defaults, so an explicit `enabled = false` in `mantis.toml` is respected.
 pub(crate) fn bundled_plugin_entries() -> Vec<(String, PluginEntry)> {
     let mut entries = Vec::new();
     for (name, binary_name, _data) in BUNDLED_PLUGINS {
@@ -36,7 +33,7 @@ pub(crate) fn bundled_plugin_entries() -> Vec<(String, PluginEntry)> {
         // serialised verbatim into the user's `mantis.toml` on the first plugin
         // toggle, pinning a machine-specific home directory into a config that is
         // meant to be portable.
-        let enabled = name == &"markdown" || name == &"iconize";
+        let enabled = true;
         entries.push((
             name.to_string(),
             PluginEntry {
@@ -55,7 +52,7 @@ pub(crate) fn bundled_plugin_entries() -> Vec<(String, PluginEntry)> {
             name.to_string(),
             PluginEntry {
                 path: PathBuf::from(syntax_rel_path),
-                enabled: false,
+                enabled: true,
                 kind: PluginKind::Syntax,
                 extensions,
                 syntax_file: Some(PathBuf::from(syntax_rel_path)),
