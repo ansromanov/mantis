@@ -611,4 +611,3 @@ fn recent_commits_returns_empty_for_non_repo() {
     let commits = recent_commits(dir.path(), 10);
     assert!(commits.is_empty());
 }
-}
