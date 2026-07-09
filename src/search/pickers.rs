@@ -767,14 +767,58 @@ impl BugReportState {
         }
     }
 
-    pub fn clamp_scroll(&mut self, height: usize) {
-        if height == 0 {
+    fn visual_row_count(line: &str, width: usize) -> usize {
+        if width == 0 {
+            return 1;
+        }
+        let n = line.chars().count();
+        if n == 0 {
+            1
+        } else {
+            n.div_ceil(width)
+        }
+    }
+
+    /// Visual (rendered) row index of the cursor for the given character-cell edit width.
+    pub fn cursor_visual_row(&self, width: usize) -> usize {
+        let mut visual = 0;
+        for (i, line) in self.text.iter().enumerate() {
+            if i == self.cursor_row {
+                return visual + self.cursor_col / width.max(1);
+            }
+            visual += Self::visual_row_count(line, width);
+        }
+        visual
+    }
+
+    /// Total visual (rendered) rows across all logical lines for the given edit width.
+    pub fn total_visual_rows(&self, width: usize) -> usize {
+        let mut total = 0;
+        for (i, line) in self.text.iter().enumerate() {
+            let n = line.chars().count();
+            let mut rows = Self::visual_row_count(line, width);
+            if i == self.cursor_row && self.cursor_col == n && n > 0 && n % width.max(1) == 0 {
+                rows += 1;
+            }
+            total += rows;
+        }
+        total
+    }
+
+    pub fn clamp_scroll(&mut self, height: usize, width: usize) {
+        if height == 0 || width == 0 {
             return;
         }
-        if self.cursor_row < self.scroll_top {
-            self.scroll_top = self.cursor_row;
-        } else if self.cursor_row >= self.scroll_top + height {
-            self.scroll_top = self.cursor_row - height + 1;
+        let cursor_vis = self.cursor_visual_row(width);
+        if cursor_vis < self.scroll_top {
+            self.scroll_top = cursor_vis;
+        } else if cursor_vis >= self.scroll_top + height {
+            self.scroll_top = cursor_vis - height + 1;
+        }
+        let total_vis = self.total_visual_rows(width);
+        let max_scroll = total_vis.saturating_sub(height);
+        if self.scroll_top > max_scroll {
+            self.scroll_top = max_scroll;
         }
     }
 }

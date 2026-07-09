@@ -76,33 +76,66 @@ pub(crate) fn draw_bug_report(f: &mut Frame, app: &mut App, area: Rect) {
     let desc_inner = desc_block.inner(parts[2]);
     f.render_widget(desc_block, parts[2]);
 
-    state.clamp_scroll(desc_inner.height as usize);
+    let edit_width = (desc_inner.width as usize).saturating_sub(1).max(1);
+    state.clamp_scroll(desc_inner.height as usize, edit_width);
 
-    let mut desc_lines = Vec::new();
-    let start_desc = state.scroll_top;
-    let end_desc = (start_desc + desc_inner.height as usize).min(state.text.len());
+    // Build all visual lines, wrapping long logical lines at edit_width chars
+    let mut desc_lines: Vec<Line> = Vec::new();
+    for (li, line_text) in state.text.iter().enumerate() {
+        let char_count = line_text.chars().count();
+        if char_count == 0 {
+            if li == state.cursor_row && state.cursor_col == 0 {
+                desc_lines.push(Line::from(Span::styled(
+                    "█",
+                    Style::default().fg(theme.accent_alt),
+                )));
+            } else {
+                desc_lines.push(Line::from(""));
+            }
+            continue;
+        }
+        let mut num_chunks = char_count.div_ceil(edit_width);
+        if li == state.cursor_row
+            && state.cursor_col == char_count
+            && char_count > 0
+            && char_count % edit_width == 0
+        {
+            num_chunks += 1;
+        }
+        for chunk_idx in 0..num_chunks {
+            let start = chunk_idx * edit_width;
+            let end = std::cmp::min(start + edit_width, char_count);
+            let chunk: String = line_text.chars().skip(start).take(end - start).collect();
+            let chunk_char_count = end - start;
 
-    for i in start_desc..end_desc {
-        let line_text = &state.text[i];
-        if i == state.cursor_row {
-            let char_count = line_text.chars().count();
-            let col = state.cursor_col.min(char_count);
-            let before: String = line_text.chars().take(col).collect();
-            let after: String = line_text.chars().skip(col).collect();
-            desc_lines.push(Line::from(vec![
-                Span::raw(before),
-                Span::styled("█", Style::default().fg(theme.accent_alt)),
-                Span::raw(after),
-            ]));
-        } else {
-            desc_lines.push(Line::from(vec![Span::raw(line_text.clone())]));
+            if li == state.cursor_row
+                && state.cursor_col >= start
+                && (state.cursor_col < end || chunk_idx == num_chunks - 1)
+            {
+                let col_in_chunk =
+                    std::cmp::min(state.cursor_col.saturating_sub(start), chunk_char_count);
+                let before: String = chunk.chars().take(col_in_chunk).collect();
+                let after: String = chunk.chars().skip(col_in_chunk).collect();
+                desc_lines.push(Line::from(vec![
+                    Span::raw(before),
+                    Span::styled("█", Style::default().fg(theme.accent_alt)),
+                    Span::raw(after),
+                ]));
+            } else {
+                desc_lines.push(Line::from(vec![Span::raw(chunk)]));
+            }
         }
     }
-    while desc_lines.len() < desc_inner.height as usize {
-        desc_lines.push(Line::from(""));
+
+    let start_desc = state.scroll_top.min(desc_lines.len().saturating_sub(1));
+    let end_desc = std::cmp::min(start_desc + desc_inner.height as usize, desc_lines.len());
+
+    let mut visible_lines: Vec<Line> = desc_lines[start_desc..end_desc].to_vec();
+    while visible_lines.len() < desc_inner.height as usize {
+        visible_lines.push(Line::from(""));
     }
     f.render_widget(
-        Paragraph::new(desc_lines).style(Style::default().fg(theme.text).bg(theme.background)),
+        Paragraph::new(visible_lines).style(Style::default().fg(theme.text).bg(theme.background)),
         desc_inner,
     );
 
