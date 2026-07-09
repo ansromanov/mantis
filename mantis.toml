@@ -31,7 +31,7 @@ palette_frequent_count = 3   # most-used commands pinned below it; 0 disables
 # The left-hand file tree.
 [tree]
 show_hidden = false          # show dotfiles / hidden entries
-width = 28                   # pane width in columns
+width = 20                   # pane width as a percentage (5-95) of terminal width
 independent_scroll = false   # PageUp/Down scroll the viewport without moving
                              #   the selection (Up/Down still move the cursor)
 indent_guides = true         # draw indentation guides (│)
@@ -142,6 +142,8 @@ tree_collapse = ["Left", "h"]
 tree_up_dir = ["Backspace"]
 tree_collapse_all = ["-"]
 tree_expand_all = ["="]
+tree_width_grow = ["]"]     # increase tree pane width (tree panel)
+tree_width_shrink = ["["]  # decrease tree pane width (tree panel)
 fold_toggle = ["Space"]
 
 # content pane

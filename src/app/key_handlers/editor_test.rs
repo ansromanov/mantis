@@ -965,3 +965,69 @@ fn open_external_with_telemetry_enabled() {
     assert!(app.status_message.is_some());
     fs::remove_dir_all(&root).ok();
 }
+
+// -- tree_width_grow / tree_width_shrink via command palette (issue #665) ----
+
+#[test]
+fn dispatch_command_tree_width_grow_increases_width() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.tree_width = 50;
+    app.command_palette = Some(palette_with_query("Grow tree pane width"));
+    assert!(
+        app.dispatch_command(),
+        "tree_width_grow must be a real dispatch arm"
+    );
+    assert_eq!(
+        app.tree_width, 52,
+        "dispatch tree_width_grow must increase width by 2"
+    );
+    assert_eq!(
+        app.config.tree.width, 52,
+        "config.tree.width must be persisted"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn dispatch_command_tree_width_shrink_decreases_width() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.tree_width = 50;
+    app.command_palette = Some(palette_with_query("Shrink tree pane width"));
+    assert!(
+        app.dispatch_command(),
+        "tree_width_shrink must be a real dispatch arm"
+    );
+    assert_eq!(
+        app.tree_width, 48,
+        "dispatch tree_width_shrink must decrease width by 2"
+    );
+    assert_eq!(
+        app.config.tree.width, 48,
+        "config.tree.width must be persisted"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn dispatch_command_tree_width_grow_clamps_at_95() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.tree_width = 95;
+    app.command_palette = Some(palette_with_query("Grow tree pane width"));
+    assert!(app.dispatch_command());
+    assert_eq!(app.tree_width, 95, "tree_width must clamp at 95");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn dispatch_command_tree_width_shrink_clamps_at_5() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.tree_width = 5;
+    app.command_palette = Some(palette_with_query("Shrink tree pane width"));
+    assert!(app.dispatch_command());
+    assert_eq!(app.tree_width, 5, "tree_width must clamp at 5");
+    fs::remove_dir_all(&root).ok();
+}

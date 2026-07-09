@@ -55,6 +55,8 @@ const KEYMAP_FIELD_ACTION_IDS: &[&str] = &[
     "plugin_picker",
     "goto_line",
     "tree_up_dir",
+    "tree_width_grow",
+    "tree_width_shrink",
 ];
 
 /// Pure-navigation actions that are inherently keymap-only: they should never

@@ -328,6 +328,8 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
             rows.push(row_key("tree_up_dir"));
             rows.push(row_key("tree_collapse_all"));
             rows.push(row_key("tree_expand_all"));
+            rows.push(row_key("tree_width_grow"));
+            rows.push(row_key("tree_width_shrink"));
             rows.push(row_key("reload"));
             rows.push(gap.clone());
             rows.push(section("Content Panel Navigation"));

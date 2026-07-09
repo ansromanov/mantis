@@ -62,7 +62,7 @@ editor = "code --wait"       # external editor command; overrides $VISUAL / $EDI
 
 [tree]
 show_hidden = false          # show dotfiles / hidden entries
-width = 28                   # tree panel width in columns
+width = 20                   # tree panel width as a percentage (5-95) of terminal width
 independent_scroll = false   # PageUp/Down scroll the viewport, not the selection
 indent_guides = true         # draw indentation guide lines (│)
 icons = false                # Nerd Font file-type icons (icon map from a plugin)
@@ -174,6 +174,8 @@ tree_collapse = ["Left", "h"]
 tree_up_dir = ["Backspace"]
 tree_collapse_all = ["-"]
 tree_expand_all = ["="]
+tree_width_grow = ["]"]     # increase tree pane width
+tree_width_shrink = ["["]   # decrease tree pane width
 fold_toggle = ["Space"]
 
 # content pane

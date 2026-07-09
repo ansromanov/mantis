@@ -219,6 +219,20 @@ pub static ACTIONS: &[ActionSpec] = &[
         description: Some("Expand every directory in the tree"),
     },
     ActionSpec {
+        id: "tree_width_grow",
+        palette: Some("Grow tree pane width"),
+        help: Some(("Tree panel", "increase tree pane width")),
+        category: Some("View"),
+        description: Some("Increase the tree pane width percentage"),
+    },
+    ActionSpec {
+        id: "tree_width_shrink",
+        palette: Some("Shrink tree pane width"),
+        help: Some(("Tree panel", "decrease tree pane width")),
+        category: Some("View"),
+        description: Some("Decrease the tree pane width percentage"),
+    },
+    ActionSpec {
         id: "find_files",
         palette: Some("Find files"),
         help: Some(("Tree panel", "global fuzzy file-name picker")),

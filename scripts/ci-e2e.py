@@ -73,8 +73,10 @@ def run_e2e_test():
                         if not data:
                             break
                         output += data
-                        # Look for file names from the test dataset in the TUI screen output
-                        if b"rust_sample.rs" in output or b"yaml_sample.yml" in output:
+                        # Look for file names from the test dataset in the TUI screen output.
+                        # Use name-only patterns (no extension) since the tree pane
+                        # at 20% default width truncates long filenames.
+                        if b"rust_sample" in output or b"yaml_sample" in output:
                             print("TUI initialized successfully (detected file tree).")
                             success = True
                             break

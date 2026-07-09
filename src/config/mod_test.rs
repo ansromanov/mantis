@@ -60,7 +60,7 @@ fn init_writes_stub_user_config_and_default_reference() {
     let reference = fs::read_to_string(dir.join("mantis.default.toml")).unwrap();
     assert!(reference.contains("Open config in editor"));
     let cfg: Config = toml::from_str(&reference).expect("default reference should parse");
-    assert_eq!(cfg.tree.width, 28);
+    assert_eq!(cfg.tree.width, 20);
 
     fs::remove_dir_all(&dir).ok();
 }

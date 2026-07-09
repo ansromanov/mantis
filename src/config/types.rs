@@ -41,7 +41,7 @@ impl GeneralConfig {
 pub struct TreeConfig {
     /// Show dotfiles / hidden entries in the tree.
     pub show_hidden: bool,
-    /// Tree pane width in columns.
+    /// Tree pane width as a percentage of terminal width (5-95).
     pub width: u16,
     /// PageUp/Down scroll the tree viewport without moving selection.
     pub independent_scroll: bool,
@@ -55,7 +55,7 @@ impl Default for TreeConfig {
     fn default() -> Self {
         TreeConfig {
             show_hidden: false,
-            width: 28,
+            width: 20,
             independent_scroll: false,
             indent_guides: true,
             icons: false,
