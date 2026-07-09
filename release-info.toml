@@ -1,5 +1,5 @@
-version = "0.16.13"
-date = "2026-07-08"
+version = "0.16.14"
+date = "2026-07-09"
 whats_new = """- perf(theme): cache test-env detection in no_color_active (#658)
 - test(ui): fix content rendering tests for persistent fold gutter (#657)
 - Telemetry: per-session timestamped files with rich SessionStart snapshot (#655)
