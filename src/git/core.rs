@@ -7,6 +7,10 @@
 //! per-commit). Results are cached behind a mutex keyed on a coarse timestamp so
 //! rapid redraws don't spawn a process per frame.
 //!
+//! To prevent lock contention with concurrent user git commands, all read-only
+//! invocations here disable optional locks by setting the `GIT_OPTIONAL_LOCKS=0`
+//! environment variable, and status calls additionally pass `--no-optional-locks`.
+//!
 //! Every call degrades gracefully - a missing repo, a `git` that isn't
 //! installed, or a failed command yields empty/`None` results instead of an
 //! error, so the viewer works fine outside a repository.
@@ -25,9 +29,21 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::types::*;
 
+/// Helper to construct a `Command` running `git` with optional locks disabled.
+///
+/// Disabling optional locks (via `GIT_OPTIONAL_LOCKS=0`) ensures that read-only
+/// operations (like `git status`) do not refresh the index and write to
+/// `.git/index.lock`, preventing race conditions with concurrent user git
+/// commands (such as a pull or commit).
+fn git_cmd() -> Command {
+    let mut cmd = Command::new("git");
+    cmd.env("GIT_OPTIONAL_LOCKS", "0");
+    cmd
+}
+
 /// Returns the git repository root containing `dir`, canonicalized.
 fn git_toplevel(dir: &Path) -> Option<PathBuf> {
-    let out = Command::new("git")
+    let out = git_cmd()
         .arg("-C")
         .arg(dir)
         .args(["rev-parse", "--show-toplevel"])
@@ -51,7 +67,8 @@ fn git_toplevel(dir: &Path) -> Option<PathBuf> {
 pub fn repo_info(dir: &Path) -> Option<GitRepoInfo> {
     let root = git_toplevel(dir)?;
 
-    let out = Command::new("git")
+    let out = git_cmd()
+        .arg("--no-optional-locks")
         .arg("-C")
         .arg(&root)
         .args(["status", "--porcelain", "-b"])
@@ -93,7 +110,7 @@ pub fn repo_info(dir: &Path) -> Option<GitRepoInfo> {
 /// Missing upstreams and git errors return `None` so callers can omit the
 /// indicator entirely.
 pub fn ahead_behind(repo_dir: &Path) -> Option<(usize, usize)> {
-    let out = Command::new("git")
+    let out = git_cmd()
         .arg("-C")
         .arg(repo_dir)
         .args(["rev-list", "--left-right", "--count", "HEAD...@{u}"])
@@ -186,8 +203,9 @@ pub fn repo_status(
         return HashMap::new();
     };
 
-    let mut cmd = Command::new("git");
-    cmd.arg("-C")
+    let mut cmd = git_cmd();
+    cmd.arg("--no-optional-locks")
+        .arg("-C")
         .arg(&root)
         .args(["status", "--porcelain", "-z"]);
     if include_ignored {
@@ -296,7 +314,7 @@ pub fn range_status(dir: &Path, rev: &str) -> Result<HashMap<PathBuf, GitStatus>
         return Err("not a git repository".to_string());
     };
 
-    let out = Command::new("git")
+    let out = git_cmd()
         .arg("-C")
         .arg(&root)
         .args(["diff", "--name-status", "-z", "--end-of-options", rev])
@@ -380,7 +398,7 @@ pub fn range_status(dir: &Path, rev: &str) -> Result<HashMap<PathBuf, GitStatus>
 /// For new untracked files that aren't staged, falls back to a
 /// `--no-index` diff against `/dev/null`.
 pub fn working_tree_diff(repo_dir: &Path, file: &Path) -> Vec<String> {
-    let out = Command::new("git")
+    let out = git_cmd()
         .arg("-C")
         .arg(repo_dir)
         .args(["diff", "HEAD", "--no-color", "--"])
@@ -430,7 +448,7 @@ pub fn working_tree_diff(repo_dir: &Path, file: &Path) -> Vec<String> {
 /// Returns the staged diff for `file` (index vs. HEAD), as lines.
 /// Returns a placeholder message when there are no staged changes.
 pub fn staged_diff(repo_dir: &Path, file: &Path) -> Vec<String> {
-    let out = Command::new("git")
+    let out = git_cmd()
         .arg("-C")
         .arg(repo_dir)
         .args(["diff", "--cached", "--no-color", "--"])
@@ -448,7 +466,7 @@ pub fn staged_diff(repo_dir: &Path, file: &Path) -> Vec<String> {
 /// Returns the unstaged diff for `file` (worktree vs. index), as lines.
 /// Returns a placeholder message when there are no unstaged changes.
 pub fn unstaged_diff(repo_dir: &Path, file: &Path) -> Vec<String> {
-    let out = Command::new("git")
+    let out = git_cmd()
         .arg("-C")
         .arg(repo_dir)
         .args(["diff", "--no-color", "--"])
@@ -465,7 +483,7 @@ pub fn unstaged_diff(repo_dir: &Path, file: &Path) -> Vec<String> {
 /// Returns the commit history for a single file, newest first. Empty if the
 /// file is untracked, not in a git repository, or git is unavailable.
 pub fn file_log(repo_dir: &Path, file: &Path) -> Vec<Commit> {
-    let output = Command::new("git")
+    let output = git_cmd()
         .arg("-C")
         .arg(repo_dir)
         .args([
@@ -500,7 +518,7 @@ pub fn file_log(repo_dir: &Path, file: &Path) -> Vec<Commit> {
 /// Returns the diff of `file` between `rev` and the current working tree, as
 /// lines. On error or git being unavailable, returns a single message line.
 pub fn file_diff(repo_dir: &Path, rev: &str, file: &Path) -> Vec<String> {
-    let output = Command::new("git")
+    let output = git_cmd()
         .arg("-C")
         .arg(repo_dir)
         .args(["diff", "--no-color", "--end-of-options", rev, "--"])
@@ -608,7 +626,7 @@ pub fn file_blame(repo_dir: &Path, file: &Path) -> Vec<BlameLine> {
         }
     }
 
-    let output = Command::new("git")
+    let output = git_cmd()
         .arg("-C")
         .arg(repo_dir)
         .args(["blame", "--porcelain", "--"])
