@@ -1250,3 +1250,86 @@ fn normal_telemetry_check() {
     assert!(!app.telemetry.is_enabled());
     fs::remove_dir_all(&root).ok();
 }
+
+// -- tree width grow/shrink (issue #665) ------------------------------------
+
+#[test]
+fn right_bracket_in_tree_mode_grows_tree_width() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Tree;
+    app.tree_width = 50;
+    app.handle_key(key(KeyCode::Char(']')));
+    assert_eq!(app.tree_width, 52, "']' must increase tree_width by 2");
+    assert_eq!(
+        app.config.tree.width, 52,
+        "config.tree.width must persist new tree_width"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn left_bracket_in_tree_mode_shrinks_tree_width() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Tree;
+    app.tree_width = 50;
+    app.handle_key(key(KeyCode::Char('[')));
+    assert_eq!(app.tree_width, 48, "'[' must decrease tree_width by 2");
+    assert_eq!(
+        app.config.tree.width, 48,
+        "config.tree.width must persist new tree_width"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_width_grow_clamps_at_95() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Tree;
+    app.tree_width = 94;
+    app.handle_key(key(KeyCode::Char(']')));
+    assert_eq!(app.tree_width, 95, "tree_width must clamp to 95 max");
+    app.handle_key(key(KeyCode::Char(']')));
+    assert_eq!(
+        app.tree_width, 95,
+        "tree_width must stay at 95 when already at max"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_width_shrink_clamps_at_5() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Tree;
+    app.tree_width = 6;
+    app.handle_key(key(KeyCode::Char('[')));
+    assert_eq!(app.tree_width, 5, "tree_width must clamp to 5 min");
+    app.handle_key(key(KeyCode::Char('[')));
+    assert_eq!(
+        app.tree_width, 5,
+        "tree_width must stay at 5 when already at min"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_width_brackets_do_not_fire_in_content_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.tree_width = 50;
+    app.handle_key(key(KeyCode::Char(']')));
+    assert_eq!(
+        app.tree_width, 50,
+        "']' must not affect tree_width in content mode (tree-scoped binding)"
+    );
+    app.handle_key(key(KeyCode::Char('[')));
+    assert_eq!(
+        app.tree_width, 50,
+        "'[' must not affect tree_width in content mode (tree-scoped binding)"
+    );
+    fs::remove_dir_all(&root).ok();
+}

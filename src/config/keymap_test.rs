@@ -693,3 +693,31 @@ fn action_for_key_resolves_correctly() {
         Some("open_external")
     );
 }
+
+#[test]
+fn tree_width_grow_default_binding_is_right_bracket() {
+    let keymap = Keymap::default();
+    let grow = ev(KeyCode::Char(']'), KeyModifiers::empty());
+    assert!(
+        pressed_in(&keymap.tree_width_grow, &grow, BindingScope::Tree),
+        "tree_width_grow must bind to ']' in tree scope"
+    );
+    assert!(
+        !pressed_in(&keymap.tree_width_grow, &grow, BindingScope::Content),
+        "tree_width_grow must NOT fire in content scope"
+    );
+}
+
+#[test]
+fn tree_width_shrink_default_binding_is_left_bracket() {
+    let keymap = Keymap::default();
+    let shrink = ev(KeyCode::Char('['), KeyModifiers::empty());
+    assert!(
+        pressed_in(&keymap.tree_width_shrink, &shrink, BindingScope::Tree),
+        "tree_width_shrink must bind to '[' in tree scope"
+    );
+    assert!(
+        !pressed_in(&keymap.tree_width_shrink, &shrink, BindingScope::Content),
+        "tree_width_shrink must NOT fire in content scope"
+    );
+}

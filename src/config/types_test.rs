@@ -390,7 +390,7 @@ fn recent_files_count_stays_top_level() {
 fn defaults_for_new_tables() {
     let cfg = Config::default();
     assert!(!cfg.tree.show_hidden);
-    assert_eq!(cfg.tree.width, 28);
+    assert_eq!(cfg.tree.width, 20);
     assert!(!cfg.tree.independent_scroll);
     assert!(cfg.tree.indent_guides);
     assert!(!cfg.tree.icons);
@@ -570,4 +570,20 @@ fn general_config_section_parses_from_toml() {
 fn general_config_schema_has_editor() {
     let schema = GeneralConfig::schema();
     assert_eq!(schema.editor.as_deref(), Some("code --wait"));
+}
+
+#[test]
+fn tree_width_default_is_percentage() {
+    let cfg = Config::default();
+    assert_eq!(
+        cfg.tree.width, 20,
+        "tree.width default should be 20% (not 28 columns)"
+    );
+}
+
+#[test]
+fn tree_width_default_differs_from_old_28() {
+    // Explicit guard: the old default of 28 was too wide on broad terminals
+    // (see #665). We expect it to stay at 20 after the fix.
+    assert_ne!(Config::default().tree.width, 28);
 }

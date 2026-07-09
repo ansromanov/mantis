@@ -269,6 +269,8 @@ impl Keymap {
             "plugin_picker" => &self.plugin_picker,
             "goto_line" => &self.goto_line,
             "toggle_raw_markdown" => &self.toggle_raw_markdown,
+            "tree_width_grow" => &self.tree_width_grow,
+            "tree_width_shrink" => &self.tree_width_shrink,
             "tree_up_dir" => &self.tree_up_dir,
             _ => &[],
         }
@@ -344,6 +346,8 @@ pub struct Keymap {
     pub tree_collapse: Vec<KeyBinding>,
     pub tree_collapse_all: Vec<KeyBinding>,
     pub tree_expand_all: Vec<KeyBinding>,
+    pub tree_width_grow: Vec<KeyBinding>,
+    pub tree_width_shrink: Vec<KeyBinding>,
     // Content panel
     pub content_left: Vec<KeyBinding>,
     pub content_right: Vec<KeyBinding>,
@@ -422,6 +426,8 @@ impl Default for Keymap {
             tree_collapse: bind(&["Left", "h"]),
             tree_collapse_all: bind(&["-"]),
             tree_expand_all: bind(&["="]),
+            tree_width_grow: bind(&["tree:]"]),
+            tree_width_shrink: bind(&["tree:["]),
             content_left: bind(&["Left"]),
             content_right: bind(&["Right"]),
             content_top: bind(&["ctrl+Home", "g", "tree:Home"]),

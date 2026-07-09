@@ -277,6 +277,18 @@ impl App {
                 self.tree_up_dir();
                 true
             }
+            Some("tree_width_grow") => {
+                self.tree_width = (self.tree_width + 2).min(95);
+                self.config.tree.width = self.tree_width;
+                self.save_config();
+                true
+            }
+            Some("tree_width_shrink") => {
+                self.tree_width = self.tree_width.saturating_sub(2).max(5);
+                self.config.tree.width = self.tree_width;
+                self.save_config();
+                true
+            }
             Some("recent_files") => {
                 self.open_recent_files();
                 true

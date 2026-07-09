@@ -170,6 +170,14 @@ impl App {
             self.auto_watch = !self.auto_watch;
             self.config.content.watch = self.auto_watch;
             self.save_config();
+        } else if pressed_in(&k.tree_width_grow, &key, scope) {
+            self.tree_width = (self.tree_width + 2).min(95);
+            self.config.tree.width = self.tree_width;
+            self.save_config();
+        } else if pressed_in(&k.tree_width_shrink, &key, scope) {
+            self.tree_width = self.tree_width.saturating_sub(2).max(5);
+            self.config.tree.width = self.tree_width;
+            self.save_config();
         } else if pressed_in(&k.copy_path, &key, scope) {
             self.copy_path_to_clipboard(false);
         } else if pressed_in(&k.copy_relative_path, &key, scope) {

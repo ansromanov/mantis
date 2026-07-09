@@ -66,6 +66,8 @@ keys.tree_collapse_all
 keys.tree_expand
 keys.tree_expand_all
 keys.tree_up_dir
+keys.tree_width_grow
+keys.tree_width_shrink
 palette_frequent_count
 palette_pin_recent
 plugins
