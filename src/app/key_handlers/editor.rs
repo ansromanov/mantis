@@ -294,7 +294,7 @@ impl App {
                 true
             }
             Some("compare_against") => {
-                self.compare_input = Some(crate::search::CompareModeInput::new());
+                self.revision_picker = Some(crate::search::RevisionPicker::new(&self.root));
                 true
             }
             Some("toggle_raw_markdown") => {

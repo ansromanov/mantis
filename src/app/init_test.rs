@@ -295,7 +295,7 @@ fn app_new_starts_with_no_compare_mode() {
     fs::write(root.join("f.txt"), "x\n").unwrap();
     let app = new_app(&root, Config::default());
     assert!(app.compare_base.is_none());
-    assert!(app.compare_input.is_none());
+    assert!(app.revision_picker.is_none());
     assert!(app.bug_report.is_none());
     fs::remove_dir_all(&root).ok();
 }

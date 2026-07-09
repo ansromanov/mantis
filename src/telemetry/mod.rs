@@ -54,7 +54,7 @@ pub enum OverlayKind {
     InFileSearch,
     TreeFilter,
     BugReport,
-    CompareInput,
+    RevisionPicker,
     GotoLine,
 }
 

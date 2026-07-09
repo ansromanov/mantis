@@ -180,38 +180,123 @@ impl ListPicker for GotoLineState {
     fn set_selected(&mut self, _i: usize) {}
 }
 
-/// State for the compare-against dialog.
+/// A single selectable revision in the revision picker.
+#[derive(Debug, Clone)]
+pub struct RevisionItem {
+    /// The revision specifier to pass to `git diff` (short hash, branch name,
+    /// tag name, or shortcut like `HEAD` / `HEAD~1`).
+    pub rev: String,
+    /// Human-readable label shown in the picker list.
+    pub display: String,
+}
+
+/// State for the revision picker overlay.
 ///
-/// Opened from the command palette. The user types a revision (e.g. `HEAD~3`,
-/// a commit hash, or a branch name) and presses Enter to enter compare mode
-/// against that revision, or Esc to cancel.
-pub struct CompareModeInput {
+/// Replaces the old blind-input bar for `compare_against` with a selectable
+/// list of revisions: recent commits, local branches, tags, and shortcuts
+/// like `HEAD` / `HEAD~1` / `HEAD~2`. Supports fuzzy filtering and retains
+/// free-form entry — if the filtered list is empty but the user has typed
+/// something, pressing Enter uses the typed text as a raw revspec.
+pub struct RevisionPicker {
+    pub items: Vec<RevisionItem>,
     pub query: String,
+    pub filtered: Vec<usize>,
+    pub selected: usize,
+    pub(crate) matcher: SkimMatcherV2,
 }
 
-impl Default for CompareModeInput {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+impl RevisionPicker {
+    /// Builds the revision list by shelling out to git. When git is unavailable
+    /// or the directory is not a repo, items is empty (the picker still allows
+    /// free-form entry).
+    pub fn new(repo_dir: &std::path::Path) -> Self {
+        let mut items: Vec<RevisionItem> = Vec::new();
 
-impl CompareModeInput {
-    pub fn new() -> Self {
-        CompareModeInput {
+        // Static shortcuts.
+        items.push(RevisionItem {
+            rev: "HEAD".into(),
+            display: "HEAD (current)".into(),
+        });
+        items.push(RevisionItem {
+            rev: "HEAD~1".into(),
+            display: "HEAD~1 (parent)".into(),
+        });
+        items.push(RevisionItem {
+            rev: "HEAD~2".into(),
+            display: "HEAD~2 (grandparent)".into(),
+        });
+
+        // Local branches.
+        for branch in crate::git::branches(repo_dir) {
+            items.push(RevisionItem {
+                rev: branch.clone(),
+                display: format!("branch: {branch}"),
+            });
+        }
+
+        // Tags.
+        for tag in crate::git::tags(repo_dir) {
+            items.push(RevisionItem {
+                rev: tag.clone(),
+                display: format!("tag: {tag}"),
+            });
+        }
+
+        // Recent commits.
+        for commit in crate::git::recent_commits(repo_dir, 50) {
+            items.push(RevisionItem {
+                rev: commit.hash,
+                display: format!("{} {}", commit.short, commit.subject),
+            });
+        }
+
+        let filtered: Vec<usize> = (0..items.len()).collect();
+        RevisionPicker {
+            items,
             query: String::new(),
+            filtered,
+            selected: 0,
+            matcher: SkimMatcherV2::default(),
         }
     }
 
     pub fn push(&mut self, c: char) {
         self.query.push(c);
+        self.refilter();
     }
 
     pub fn pop(&mut self) {
         self.query.pop();
+        self.refilter();
+    }
+
+    pub fn results_len(&self) -> usize {
+        self.filtered.len()
+    }
+
+    pub fn selected_rev(&self) -> Option<&str> {
+        self.filtered
+            .get(self.selected)
+            .and_then(|&i| self.items.get(i))
+            .map(|item| item.rev.as_str())
+    }
+
+    pub(crate) fn refilter(&mut self) {
+        self.selected = 0;
+        self.filtered = super::fuzzy_refilter(
+            &self.items,
+            &self.matcher,
+            &self.query,
+            |item| std::borrow::Cow::Borrowed(item.display.as_str()),
+            false,
+        )
+        .into_iter()
+        .map(|(i, _)| i)
+        .collect();
     }
 }
 
-impl ListPicker for CompareModeInput {
+impl ListPicker for RevisionPicker {
     fn query_push(&mut self, c: char) {
         self.push(c);
     }
@@ -222,12 +307,14 @@ impl ListPicker for CompareModeInput {
         self.query.is_empty()
     }
     fn results_len(&self) -> usize {
-        0
+        self.results_len()
     }
     fn selected(&self) -> usize {
-        0
+        self.selected
     }
-    fn set_selected(&mut self, _i: usize) {}
+    fn set_selected(&mut self, i: usize) {
+        self.selected = i;
+    }
 }
 
 /// A single match occurrence within a file for in-file search.
