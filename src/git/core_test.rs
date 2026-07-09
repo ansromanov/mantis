@@ -554,3 +554,11 @@ fn blame_cache_update_promotes_entry() {
     assert_eq!(cache.order[0], b);
     assert_eq!(cache.order[1], a);
 }
+
+#[test]
+fn git_cmd_has_optional_locks_disabled() {
+    let cmd = git_cmd();
+    let envs: std::collections::HashMap<_, _> = cmd.get_envs().collect();
+    let lock_val = envs.get(std::ffi::OsStr::new("GIT_OPTIONAL_LOCKS"));
+    assert_eq!(lock_val, Some(&Some(std::ffi::OsStr::new("0"))));
+}
