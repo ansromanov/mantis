@@ -2,8 +2,8 @@ use crate::app::{App, Focus};
 use crate::command_palette::{CommandPalette, COMMANDS};
 use crate::config::Config;
 use crate::search::{
-    BugReportState, CompareModeInput, GotoLineState, InFileSearch, SearchState, ThemePicker,
-    TreeFilter,
+    BugReportState, GotoLineState, InFileSearch, RevisionItem, RevisionPicker, SearchState,
+    ThemePicker, TreeFilter,
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::Rect;
@@ -154,53 +154,45 @@ fn handle_goto_line_key_activate_relative_uses_content_scroll_without_cursor() {
     fs::remove_dir_all(&root).ok();
 }
 
-// -- Compare-input prompt ----------------------------------------------------
+// -- Revision picker ---------------------------------------------------------
 
 #[test]
-fn handle_compare_input_key_esc_closes_without_entering_compare_mode() {
+fn handle_revision_key_esc_closes_without_entering_compare_mode() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.compare_input = Some(CompareModeInput::new());
-    app.handle_compare_input_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
-    assert!(app.compare_input.is_none());
+    app.revision_picker = Some(RevisionPicker::new(&root));
+    app.handle_revision_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+    assert!(app.revision_picker.is_none());
     assert!(app.compare_base.is_none());
     fs::remove_dir_all(&root).ok();
 }
 
 #[test]
-fn handle_compare_input_key_char_appends_to_query() {
+fn handle_revision_key_char_appends_to_query() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.compare_input = Some(CompareModeInput::new());
-    for c in "HEAD~3".chars() {
-        app.handle_compare_input_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::empty()));
+    app.revision_picker = Some(RevisionPicker::new(&root));
+    for c in "HEAD".chars() {
+        app.handle_revision_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::empty()));
     }
-    assert_eq!(app.compare_input.as_ref().unwrap().query, "HEAD~3");
+    assert_eq!(app.revision_picker.as_ref().unwrap().query, "HEAD");
     fs::remove_dir_all(&root).ok();
 }
 
 #[test]
-fn handle_compare_input_key_j_and_k_are_typed_not_treated_as_nav() {
-    // This is a free-text revision input, not a list picker: 'j'/'k' must be
-    // typed literally (e.g. a branch named `jira-1234` or `kai/feature`)
-    // rather than swallowed as vim-style navigation.
+fn handle_revision_key_enter_with_empty_query_and_empty_items_closes_without_entering() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.compare_input = Some(CompareModeInput::new());
-    app.handle_compare_input_key(KeyEvent::new(KeyCode::Char('k'), KeyModifiers::empty()));
-    app.handle_compare_input_key(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::empty()));
-    app.handle_compare_input_key(KeyEvent::new(KeyCode::Char('i'), KeyModifiers::empty()));
-    assert_eq!(app.compare_input.as_ref().unwrap().query, "kai");
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn handle_compare_input_key_enter_with_empty_query_closes_without_entering() {
-    let root = temp_tree();
-    let mut app = app_for(&root);
-    app.compare_input = Some(CompareModeInput::new());
-    app.handle_compare_input_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
-    assert!(app.compare_input.is_none());
+    // A picker with no items and empty query: nothing to select and nothing typed.
+    app.revision_picker = Some(RevisionPicker {
+        items: vec![],
+        query: String::new(),
+        filtered: vec![],
+        selected: 0,
+        matcher: fuzzy_matcher::skim::SkimMatcherV2::default(),
+    });
+    app.handle_revision_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert!(app.revision_picker.is_none());
     assert!(
         app.compare_base.is_none(),
         "empty revision must not enter compare mode"
@@ -209,17 +201,85 @@ fn handle_compare_input_key_enter_with_empty_query_closes_without_entering() {
 }
 
 #[test]
-fn handle_compare_input_key_enter_with_query_enters_compare_mode() {
+fn handle_revision_key_enter_with_empty_query_selects_first_item() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.compare_input = Some(CompareModeInput::new());
-    for c in "HEAD".chars() {
-        app.handle_compare_input_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::empty()));
-    }
-    app.handle_compare_input_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
-    assert!(app.compare_input.is_none());
+    // Picker with shortcuts: pressing Enter selects HEAD.
+    app.revision_picker = Some(RevisionPicker::new(&root));
+    app.handle_revision_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert!(app.revision_picker.is_none());
+    assert_eq!(app.compare_base.as_deref(), Some("HEAD"));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn handle_revision_key_enter_with_selection_enters_compare_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    // Build a picker with a known item, bypassing git shell-out.
+    app.revision_picker = Some(RevisionPicker {
+        items: vec![RevisionItem {
+            rev: "HEAD".into(),
+            display: "HEAD (current)".into(),
+        }],
+        query: String::new(),
+        filtered: vec![0],
+        selected: 0,
+        matcher: fuzzy_matcher::skim::SkimMatcherV2::default(),
+    });
+    app.handle_revision_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert!(app.revision_picker.is_none());
     assert_eq!(app.compare_base.as_deref(), Some("HEAD"));
     assert!(app.git_mode, "entering compare mode should enable git mode");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn handle_revision_key_enter_with_empty_filtered_list_uses_typed_query() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.revision_picker = Some(RevisionPicker {
+        items: vec![RevisionItem {
+            rev: "main".into(),
+            display: "branch: main".into(),
+        }],
+        query: String::from("HEAD~3"),
+        filtered: vec![],
+        selected: 0,
+        matcher: fuzzy_matcher::skim::SkimMatcherV2::default(),
+    });
+    app.handle_revision_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert!(app.revision_picker.is_none());
+    assert_eq!(
+        app.compare_base.as_deref(),
+        Some("HEAD~3"),
+        "when filtered list is empty, the typed query should be used as the revspec"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn handle_revision_key_down_navigates_list() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.revision_picker = Some(RevisionPicker {
+        items: vec![
+            RevisionItem {
+                rev: "HEAD".into(),
+                display: "HEAD (current)".into(),
+            },
+            RevisionItem {
+                rev: "main".into(),
+                display: "branch: main".into(),
+            },
+        ],
+        query: String::new(),
+        filtered: vec![0, 1],
+        selected: 0,
+        matcher: fuzzy_matcher::skim::SkimMatcherV2::default(),
+    });
+    app.handle_revision_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
+    assert_eq!(app.revision_picker.as_ref().unwrap().selected, 1);
     fs::remove_dir_all(&root).ok();
 }
 

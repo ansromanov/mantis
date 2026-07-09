@@ -364,59 +364,126 @@ fn goto_line_state_default_is_empty() {
     assert!(s.query.is_empty());
 }
 
-// -- CompareModeInput ---------------------------------------------------------
+// -- RevisionPicker -----------------------------------------------------------
 
 #[test]
-fn compare_mode_input_new_is_empty() {
-    let s = CompareModeInput::new();
-    assert!(s.query.is_empty());
+fn revision_picker_new_with_nonexistent_repo_has_shortcuts_only() {
+    let p = RevisionPicker::new(std::path::Path::new("/nonexistent"));
+    assert_eq!(p.query, "");
+    assert!(p.filtered.len() <= p.items.len());
+    // Shortcuts should still be present (they don't need git).
+    assert!(
+        p.items.iter().any(|i| i.rev == "HEAD"),
+        "HEAD shortcut must always be present"
+    );
+    assert!(
+        p.items.iter().any(|i| i.rev == "HEAD~1"),
+        "HEAD~1 shortcut must always be present"
+    );
 }
 
 #[test]
-fn compare_mode_input_default_is_empty() {
-    let s = CompareModeInput::default();
-    assert!(s.query.is_empty());
+fn revision_picker_push_appends() {
+    let mut p = RevisionPicker {
+        items: vec![RevisionItem {
+            rev: "HEAD".into(),
+            display: "HEAD (current)".into(),
+        }],
+        query: String::new(),
+        filtered: vec![0],
+        selected: 0,
+        matcher: fuzzy_matcher::skim::SkimMatcherV2::default(),
+    };
+    p.push('H');
+    assert_eq!(p.query, "H");
 }
 
 #[test]
-fn compare_mode_input_push_appends() {
-    let mut s = CompareModeInput::new();
-    s.push('H');
-    s.push('E');
-    s.push('A');
-    s.push('D');
-    assert_eq!(s.query, "HEAD");
+fn revision_picker_pop_removes() {
+    let mut p = RevisionPicker {
+        items: vec![RevisionItem {
+            rev: "HEAD".into(),
+            display: "HEAD (current)".into(),
+        }],
+        query: String::from("HE"),
+        filtered: vec![0],
+        selected: 0,
+        matcher: fuzzy_matcher::skim::SkimMatcherV2::default(),
+    };
+    p.pop();
+    assert_eq!(p.query, "H");
+    p.pop();
+    assert!(p.query.is_empty());
 }
 
 #[test]
-fn compare_mode_input_pop_removes() {
-    let mut s = CompareModeInput::new();
-    s.push('a');
-    s.push('b');
-    s.pop();
-    assert_eq!(s.query, "a");
-    s.pop();
-    assert!(s.query.is_empty());
+fn revision_picker_selected_rev_returns_correct_rev() {
+    let mut p = RevisionPicker {
+        items: vec![
+            RevisionItem {
+                rev: "HEAD".into(),
+                display: "HEAD (current)".into(),
+            },
+            RevisionItem {
+                rev: "abc1234".into(),
+                display: "abc1234 fix".into(),
+            },
+        ],
+        query: String::new(),
+        filtered: vec![0, 1],
+        selected: 0,
+        matcher: fuzzy_matcher::skim::SkimMatcherV2::default(),
+    };
+    assert_eq!(p.selected_rev(), Some("HEAD"));
+    p.selected = 1;
+    assert_eq!(p.selected_rev(), Some("abc1234"));
 }
 
 #[test]
-fn compare_mode_input_list_picker_has_no_selectable_results() {
-    let mut s = CompareModeInput::new();
-    assert_eq!(ListPicker::results_len(&s), 0);
-    assert_eq!(ListPicker::selected(&s), 0);
-    ListPicker::set_selected(&mut s, 5);
-    assert_eq!(ListPicker::selected(&s), 0, "set_selected is a no-op");
+fn revision_picker_list_picker_query_methods_delegate() {
+    let mut p = RevisionPicker {
+        items: vec![RevisionItem {
+            rev: "HEAD".into(),
+            display: "HEAD (current)".into(),
+        }],
+        query: String::new(),
+        filtered: vec![0],
+        selected: 0,
+        matcher: fuzzy_matcher::skim::SkimMatcherV2::default(),
+    };
+    assert!(ListPicker::query_is_empty(&p));
+    ListPicker::query_push(&mut p, 'x');
+    assert_eq!(p.query, "x");
+    assert!(!ListPicker::query_is_empty(&p));
+    ListPicker::query_pop(&mut p);
+    assert!(p.query.is_empty());
 }
 
 #[test]
-fn compare_mode_input_list_picker_query_methods_delegate() {
-    let mut s = CompareModeInput::new();
-    assert!(ListPicker::query_is_empty(&s));
-    ListPicker::query_push(&mut s, 'x');
-    assert_eq!(s.query, "x");
-    assert!(!ListPicker::query_is_empty(&s));
-    ListPicker::query_pop(&mut s);
-    assert!(s.query.is_empty());
+fn revision_picker_refilter_filters_by_display_text() {
+    let mut p = RevisionPicker {
+        items: vec![
+            RevisionItem {
+                rev: "HEAD".into(),
+                display: "HEAD (current)".into(),
+            },
+            RevisionItem {
+                rev: "main".into(),
+                display: "branch: main".into(),
+            },
+            RevisionItem {
+                rev: "abc1234".into(),
+                display: "abc1234 fix bug".into(),
+            },
+        ],
+        query: String::from("main"),
+        filtered: vec![],
+        selected: 0,
+        matcher: fuzzy_matcher::skim::SkimMatcherV2::default(),
+    };
+    p.refilter();
+    assert_eq!(p.results_len(), 1);
+    assert_eq!(p.selected_rev(), Some("main"));
 }
 
 // -- TreeFilter --------------------------------------------------------------

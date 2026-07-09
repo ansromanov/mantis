@@ -253,7 +253,7 @@ fn compare_against_command_opens_input_prompt() {
     });
     app.command_palette = Some(palette_with_query("Compare against a revision"));
     assert!(app.dispatch_command());
-    assert!(app.compare_input.is_some());
+    assert!(app.revision_picker.is_some());
     fs::remove_dir_all(&root).ok();
 }
 
@@ -271,10 +271,11 @@ fn compare_against_command_starts_with_empty_query() {
     });
     app.command_palette = Some(palette_with_query("Compare against a revision"));
     app.dispatch_command();
-    assert_eq!(
-        app.compare_input.as_ref().map(|s| s.query.as_str()),
-        Some("")
-    );
+    assert!(app.revision_picker.is_some());
+    // The revision picker always starts with shortcuts (HEAD, HEAD~1, HEAD~2),
+    // and may also have branches/tags/commits from the git repo. Query should
+    // be empty.
+    assert!(app.revision_picker.as_ref().unwrap().query.is_empty());
     fs::remove_dir_all(&root).ok();
 }
 

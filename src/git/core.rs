@@ -515,6 +515,81 @@ pub fn file_log(repo_dir: &Path, file: &Path) -> Vec<Commit> {
         .collect()
 }
 
+/// Lists recent commits from all branches, newest first.
+/// Returns up to `count` commits. Empty when not in a git repo.
+pub fn recent_commits(dir: &Path, count: usize) -> Vec<Commit> {
+    let Some(root) = git_toplevel(dir) else {
+        return Vec::new();
+    };
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(&root)
+        .args([
+            "log",
+            "--all",
+            &format!("--max-count={}", count),
+            "--format=%H%x1f%h%x1f%ad%x1f%s",
+        ])
+        .output();
+    let output = match output {
+        Ok(o) if o.status.success() => o,
+        _ => return Vec::new(),
+    };
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter_map(|line| {
+            let mut parts = line.split('\u{1f}');
+            Some(Commit {
+                hash: parts.next()?.to_string(),
+                short: parts.next()?.to_string(),
+                date: parts.next()?.to_string(),
+                subject: parts.next().unwrap_or("").to_string(),
+            })
+        })
+        .collect()
+}
+
+/// Lists all local branch names. Empty when not in a git repo.
+pub fn branches(dir: &Path) -> Vec<String> {
+    let Some(root) = git_toplevel(dir) else {
+        return Vec::new();
+    };
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(&root)
+        .args(["branch", "--format=%(refname:short)"])
+        .output();
+    match output {
+        Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout)
+            .lines()
+            .map(|l| l.trim().to_string())
+            .filter(|l| !l.is_empty())
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+/// Lists all tag names, newest first (by creation date). Empty when not in a
+/// git repo.
+pub fn tags(dir: &Path) -> Vec<String> {
+    let Some(root) = git_toplevel(dir) else {
+        return Vec::new();
+    };
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(&root)
+        .args(["tag", "--sort=-creatordate"])
+        .output();
+    match output {
+        Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout)
+            .lines()
+            .map(|l| l.trim().to_string())
+            .filter(|l| !l.is_empty())
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
 /// Returns the diff of `file` between `rev` and the current working tree, as
 /// lines. On error or git being unavailable, returns a single message line.
 pub fn file_diff(repo_dir: &Path, rev: &str, file: &Path) -> Vec<String> {

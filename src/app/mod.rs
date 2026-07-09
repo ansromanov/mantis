@@ -20,7 +20,7 @@
 //! shows only files changed between `rev` and the working tree, and opening a
 //! file shows `git diff <rev> -- <file>` instead of the usual working-tree diff.
 //! Compare mode is entered via the command palette's `compare_against` action,
-//! which opens a prompt (`compare_input`, see `key_handlers/overlay.rs`) for
+//! which opens a revision picker overlay (see `key_handlers/overlay.rs`) for
 //! the target revision. Exiting git mode (Esc / toggle) clears `compare_base`
 //! and returns to normal browsing.
 
@@ -40,8 +40,8 @@ use crate::git::GitStatus;
 use crate::highlight::Highlighter;
 use crate::plugin::{ExtraSyntax, PluginContributions, PluginManager};
 use crate::search::{
-    BugReportState, CommandPalette, CompareModeInput, GotoLineState, HistoryState, InFileSearch,
-    PluginPicker, RecentFilesState, SearchState, ThemePicker, TreeFilter,
+    BugReportState, CommandPalette, GotoLineState, HistoryState, InFileSearch, PluginPicker,
+    RecentFilesState, RevisionPicker, SearchState, ThemePicker, TreeFilter,
 };
 use crate::selection::TextSelection;
 use crate::theme::Theme;
@@ -83,7 +83,7 @@ pub(crate) struct ActiveOverlays {
     pub in_file_search: bool,
     pub tree_filter: bool,
     pub bug_report: bool,
-    pub compare_input: bool,
+    pub revision_picker: bool,
     pub goto_line: bool,
     pub visual_mode: bool,
     pub git_blame: bool,
@@ -200,9 +200,9 @@ pub struct App {
     /// and the working tree (compare mode). Set from the command palette (or
     /// the history overlay). Cleared when exiting git mode.
     pub compare_base: Option<String>,
-    /// State for the compare-against-revision input prompt. `Some` while the
-    /// prompt is open (user typing a revision); `None` otherwise.
-    pub compare_input: Option<CompareModeInput>,
+    /// State for the compare-against-revision picker overlay. `Some` while the
+    /// picker is open; `None` otherwise.
+    pub revision_picker: Option<RevisionPicker>,
     pub bug_report: Option<BugReportState>,
     pub show_scrollbar: bool,
     pub show_scroll_percentage: bool,
@@ -261,6 +261,10 @@ pub struct App {
     pub history_offset: usize,
     pub theme_area: Rect,
     pub theme_offset: usize,
+    /// Hit area of the revision picker list recorded during the last render.
+    pub revision_picker_area: Rect,
+    /// Scroll offset of the revision picker list recorded during the last render.
+    pub revision_picker_offset: usize,
     /// Hit area of the splitter bar between tree and content panes.
     pub splitter_area: Rect,
     // Time and result index of the last search-result click, for double-click.

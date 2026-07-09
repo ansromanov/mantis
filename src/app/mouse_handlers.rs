@@ -147,6 +147,31 @@ impl App {
             self.handle_bug_report_mouse(ev);
             return;
         }
+        if self.revision_picker.is_some() {
+            if handle_picker_mouse(
+                ev,
+                self.revision_picker_area,
+                self.revision_picker_offset,
+                &mut self.revision_picker,
+                &mut self.last_click,
+            ) == PickerMouseAction::Activate
+            {
+                let rev = self.revision_picker.as_ref().and_then(|p| {
+                    if p.results_len() > 0 && p.selected < p.results_len() {
+                        p.selected_rev().map(|r| r.to_string())
+                    } else if !p.query.is_empty() {
+                        Some(p.query.clone())
+                    } else {
+                        None
+                    }
+                });
+                self.revision_picker = None;
+                if let Some(rev) = rev {
+                    self.enter_compare_mode(rev);
+                }
+            }
+            return;
+        }
         if self.theme_picker.is_some() {
             self.handle_theme_mouse(ev);
             return;

@@ -555,10 +555,59 @@ fn blame_cache_update_promotes_entry() {
     assert_eq!(cache.order[1], a);
 }
 
+fn init_repo_with_commit(dir: &Path) {
+    git(dir, &["init"]);
+    let f = dir.join("f.txt");
+    fs::write(&f, "hello\n").unwrap();
+    git(dir, &["add", "f.txt"]);
+    git(dir, &["commit", "-m", "initial commit"]);
+}
+
 #[test]
 fn git_cmd_has_optional_locks_disabled() {
     let cmd = git_cmd();
     let envs: std::collections::HashMap<_, _> = cmd.get_envs().collect();
     let lock_val = envs.get(std::ffi::OsStr::new("GIT_OPTIONAL_LOCKS"));
     assert_eq!(lock_val, Some(&Some(std::ffi::OsStr::new("0"))));
+}
+
+#[test]
+fn branches_returns_local_branches() {
+    let dir = tempfile::tempdir().unwrap();
+    init_repo_with_commit(dir.path());
+    let bs = branches(dir.path());
+    assert!(
+        !bs.is_empty(),
+        "should have at least one branch after a commit"
+    );
+}
+
+#[test]
+fn branches_returns_empty_for_non_repo() {
+    let dir = tempfile::tempdir().unwrap();
+    let bs = branches(dir.path());
+    assert!(bs.is_empty());
+}
+
+#[test]
+fn tags_returns_empty_for_non_repo() {
+    let dir = tempfile::tempdir().unwrap();
+    let ts = tags(dir.path());
+    assert!(ts.is_empty());
+}
+
+#[test]
+fn recent_commits_returns_commits() {
+    let dir = tempfile::tempdir().unwrap();
+    init_repo_with_commit(dir.path());
+    let commits = recent_commits(dir.path(), 10);
+    assert_eq!(commits.len(), 1);
+    assert_eq!(commits[0].subject, "initial commit");
+}
+
+#[test]
+fn recent_commits_returns_empty_for_non_repo() {
+    let dir = tempfile::tempdir().unwrap();
+    let commits = recent_commits(dir.path(), 10);
+    assert!(commits.is_empty());
 }

@@ -1051,3 +1051,169 @@ fn click_outside_welcome_dismisses_it() {
     assert!(!app.show_welcome, "click outside welcome must dismiss it");
     fs::remove_dir_all(&root).ok();
 }
+
+// -- revision picker mouse handling ------------------------------------------
+
+#[test]
+fn revision_picker_click_outside_closes() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let mut picker = crate::search::RevisionPicker::new(&root);
+    // Clear items so we don't shell out to git; just check close-on-click-outside.
+    picker.items.clear();
+    picker.filtered.clear();
+    app.revision_picker = Some(picker);
+    app.revision_picker_area = Rect {
+        x: 10,
+        y: 10,
+        width: 40,
+        height: 20,
+    };
+    // Click outside the picker area.
+    app.handle_mouse(left_down_at(1, 1));
+    assert!(
+        app.revision_picker.is_none(),
+        "click outside revision picker must close it"
+    );
+    assert!(
+        app.compare_base.is_none(),
+        "closing by outside click must not enter compare mode"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn revision_picker_double_click_selects_revision_and_enters_compare_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.revision_picker = Some(crate::search::RevisionPicker {
+        items: vec![crate::search::RevisionItem {
+            rev: "HEAD".into(),
+            display: "HEAD (current)".into(),
+        }],
+        query: String::new(),
+        filtered: vec![0],
+        selected: 0,
+        matcher: fuzzy_matcher::skim::SkimMatcherV2::default(),
+    });
+    app.revision_picker_area = Rect {
+        x: 10,
+        y: 10,
+        width: 40,
+        height: 20,
+    };
+    // First click: select the item.
+    app.handle_mouse(left_down_at(15, 10));
+    assert!(app.revision_picker.is_some(), "first click must not close");
+    // Second click (same row within 400 ms): double-click → activate.
+    app.handle_mouse(left_down_at(15, 10));
+    assert!(
+        app.revision_picker.is_none(),
+        "double-click must close the picker"
+    );
+    assert_eq!(
+        app.compare_base.as_deref(),
+        Some("HEAD"),
+        "double-click must enter compare mode"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn revision_picker_double_click_with_empty_filtered_list_uses_typed_query() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.revision_picker = Some(crate::search::RevisionPicker {
+        items: vec![crate::search::RevisionItem {
+            rev: "main".into(),
+            display: "branch: main".into(),
+        }],
+        query: String::from("HEAD~3"),
+        filtered: vec![],
+        selected: 0,
+        matcher: fuzzy_matcher::skim::SkimMatcherV2::default(),
+    });
+    app.revision_picker_area = Rect {
+        x: 10,
+        y: 10,
+        width: 40,
+        height: 20,
+    };
+    // First click (row maps to index 0, but filtered list is empty → outside range).
+    app.handle_mouse(left_down_at(15, 10));
+    assert!(
+        app.revision_picker.is_some(),
+        "click on empty filtered list must not close the picker"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn revision_picker_scroll_down_navigates() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.revision_picker = Some(crate::search::RevisionPicker {
+        items: vec![
+            crate::search::RevisionItem {
+                rev: "HEAD".into(),
+                display: "HEAD (current)".into(),
+            },
+            crate::search::RevisionItem {
+                rev: "main".into(),
+                display: "branch: main".into(),
+            },
+        ],
+        query: String::new(),
+        filtered: vec![0, 1],
+        selected: 0,
+        matcher: fuzzy_matcher::skim::SkimMatcherV2::default(),
+    });
+    app.revision_picker_area = Rect {
+        x: 10,
+        y: 10,
+        width: 40,
+        height: 20,
+    };
+    app.handle_mouse(scroll_down_at(15, 15));
+    assert_eq!(
+        app.revision_picker.as_ref().unwrap().selected,
+        1,
+        "scroll down must move selection to next item"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn revision_picker_scroll_up_navigates() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.revision_picker = Some(crate::search::RevisionPicker {
+        items: vec![
+            crate::search::RevisionItem {
+                rev: "HEAD".into(),
+                display: "HEAD (current)".into(),
+            },
+            crate::search::RevisionItem {
+                rev: "main".into(),
+                display: "branch: main".into(),
+            },
+        ],
+        query: String::new(),
+        filtered: vec![0, 1],
+        selected: 1,
+        matcher: fuzzy_matcher::skim::SkimMatcherV2::default(),
+    });
+    app.revision_picker_area = Rect {
+        x: 10,
+        y: 10,
+        width: 40,
+        height: 20,
+    };
+    app.handle_mouse(scroll_up_at(15, 15));
+    assert_eq!(
+        app.revision_picker.as_ref().unwrap().selected,
+        0,
+        "scroll up must move selection to previous item"
+    );
+    fs::remove_dir_all(&root).ok();
+}

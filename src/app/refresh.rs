@@ -700,7 +700,7 @@ impl App {
             in_file_search: self.in_file_search.is_some(),
             tree_filter: self.tree_filter.is_some(),
             bug_report: self.bug_report.is_some(),
-            compare_input: self.compare_input.is_some(),
+            revision_picker: self.revision_picker.is_some(),
             goto_line: self.goto_line.is_some(),
             visual_mode: self.selection.is_some(),
             git_blame: self.show_blame,
@@ -772,10 +772,10 @@ impl App {
                     kind: crate::telemetry::OverlayKind::BugReport,
                 });
         }
-        if current.compare_input && !self.active_overlays.compare_input {
+        if current.revision_picker && !self.active_overlays.revision_picker {
             self.telemetry
                 .record(crate::telemetry::TelemetryEvent::OverlayOpened {
-                    kind: crate::telemetry::OverlayKind::CompareInput,
+                    kind: crate::telemetry::OverlayKind::RevisionPicker,
                 });
         }
         if current.goto_line && !self.active_overlays.goto_line {
