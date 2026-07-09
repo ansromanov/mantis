@@ -680,3 +680,159 @@ fn bug_report_state_custom_diagnostics() {
     let state = BugReportState::new("test diagnostics info".to_string());
     assert_eq!(state.diagnostics_markdown, "test diagnostics info");
 }
+
+#[test]
+fn bug_report_state_total_visual_rows() {
+    let mut state = BugReportState::default();
+    // Single empty line → 1 visual row
+    assert_eq!(state.total_visual_rows(10), 1);
+
+    // Short line → 1 visual row
+    state.insert_char('a');
+    state.insert_char('b');
+    assert_eq!(state.total_visual_rows(10), 1);
+
+    // Line that fills exactly one chunk
+    state = BugReportState::default();
+    for _ in 0..10 {
+        state.insert_char('x');
+    }
+    assert_eq!(state.total_visual_rows(10), 1);
+
+    // Line that wraps to 2 visual rows
+    for _ in 0..5 {
+        state.insert_char('y');
+    }
+    assert_eq!(state.total_visual_rows(10), 2);
+
+    // Multiple lines with wrapping
+    let mut state = BugReportState::default();
+    // line 0: 25 chars → 3 visual rows at width=10
+    for _ in 0..25 {
+        state.insert_char('a');
+    }
+    state.insert_newline();
+    // line 1: 3 chars → 1 visual row
+    state.insert_char('b');
+    state.insert_char('c');
+    state.insert_char('d');
+    assert_eq!(state.total_visual_rows(10), 4);
+}
+
+#[test]
+fn bug_report_state_cursor_visual_row_single_short_line() {
+    let mut state = BugReportState::default();
+    state.insert_char('H');
+    state.insert_char('i');
+    // cursor_col=2, single line with 2 chars, width=10 → 1 visual row
+    assert_eq!(state.cursor_visual_row(10), 0);
+}
+
+#[test]
+fn bug_report_state_cursor_visual_row_wrapped_line() {
+    let mut state = BugReportState::default();
+    // Line with 15 chars
+    for _ in 0..15 {
+        state.insert_char('x');
+    }
+    // cursor_col=15, width=10 → visual row = 0 + 15/10 = 1
+    assert_eq!(state.cursor_visual_row(10), 1);
+
+    // cursor_col=9 → visual row = 0 + 9/10 = 0
+    state.cursor_col = 9;
+    assert_eq!(state.cursor_visual_row(10), 0);
+
+    // cursor_col=10 → visual row = 0 + 10/10 = 1
+    state.cursor_col = 10;
+    assert_eq!(state.cursor_visual_row(10), 1);
+}
+
+#[test]
+fn bug_report_state_cursor_visual_row_multi_line() {
+    let mut state = BugReportState::default();
+    // line 0: 20 chars → 2 visual rows at width=10
+    for _ in 0..20 {
+        state.insert_char('a');
+    }
+    state.insert_newline();
+    // line 1: 5 chars → 1 visual row
+    for _ in 0..5 {
+        state.insert_char('b');
+    }
+    // cursor at line 1, col 3, width=10
+    // visual = visual_rows("aaa...") = 2 + 3/10 = 2
+    assert_eq!(state.cursor_visual_row(10), 2);
+
+    // cursor at line 0, col 15 → visual = 0 + 15/10 = 1
+    state.cursor_row = 0;
+    state.cursor_col = 15;
+    assert_eq!(state.cursor_visual_row(10), 1);
+}
+
+#[test]
+fn bug_report_state_clamp_scroll_wrapped_lines() {
+    let mut state = BugReportState::default();
+    // line 0: 25 chars → 3 visual rows at width=10
+    for _ in 0..25 {
+        state.insert_char('a');
+    }
+    // cursor_visual_row(10) = 0 + 25/10 = 2
+    // height=2, width=10: scroll_top should be 1 (cursor_vis - height + 1 = 2 - 2 + 1 = 1)
+    state.clamp_scroll(2, 10);
+    assert_eq!(state.scroll_top, 1);
+
+    // With height=3, cursor at vis=2: scroll_top stays 0 (cursor visible)
+    state.scroll_top = 0;
+    state.clamp_scroll(3, 10);
+    assert_eq!(state.scroll_top, 0);
+
+    // Cursor below scroll_top: scroll_top should move down to keep cursor visible
+    state.scroll_top = 0;
+    state.clamp_scroll(1, 10);
+    // cursor_vis=2, height=1 → scroll_top = 2 - 1 + 1 = 2
+    assert_eq!(state.scroll_top, 2);
+}
+
+#[test]
+fn bug_report_state_clamp_scroll_wrapped_lines_multi_line() {
+    let mut state = BugReportState::default();
+    // line 0: 25 chars → 3 visual rows
+    for _ in 0..25 {
+        state.insert_char('a');
+    }
+    state.insert_newline();
+    // line 1: 25 chars → 3 visual rows (total = 6)
+    for _ in 0..25 {
+        state.insert_char('b');
+    }
+    // After insertions cursor is at line 1, col 25 (end), width=10
+    // cursor_vis = 3 (line 0) + 25/10 = 3 + 2 = 5
+    // height=2: scroll_top = 5 - 2 + 1 = 4, max_scroll = 6 - 2 = 4
+    state.clamp_scroll(2, 10);
+    assert_eq!(state.scroll_top, 4);
+
+    // Move cursor to start of line 1 → cursor_vis = 3 + 0/10 = 3
+    // cursor_vis < scroll_top (4) → scroll_top slides up to cursor_vis = 3
+    state.cursor_col = 0;
+    state.clamp_scroll(2, 10);
+    assert_eq!(state.scroll_top, 3);
+}
+
+#[test]
+fn bug_report_state_clamp_scroll_zero_height_does_nothing() {
+    let mut state = BugReportState::default();
+    state.insert_char('x');
+    state.scroll_top = 42;
+    state.clamp_scroll(0, 10);
+    assert_eq!(state.scroll_top, 42);
+
+    state.clamp_scroll(3, 0);
+    assert_eq!(state.scroll_top, 42);
+}
+
+#[test]
+fn bug_report_state_clamp_scroll_empty_text() {
+    let mut state = BugReportState::default();
+    state.clamp_scroll(3, 10);
+    assert_eq!(state.scroll_top, 0);
+}
