@@ -1722,3 +1722,40 @@ fn refresh_telemetry_check() {
     let app = create_base_app();
     assert!(!app.telemetry.is_enabled());
 }
+
+// -- palette sub-picker debounce ------------------------------------------------
+
+#[test]
+fn tick_flushes_palette_content_search_debounce() {
+    let dir = std::env::temp_dir().join(format!("tv_refresh_palette_{}", std::process::id()));
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(dir.join("a.txt"), "needle in here\n").unwrap();
+    let dir = dir.canonicalize().unwrap();
+
+    let mut app = create_base_app();
+    let mut s = crate::search::SearchState::new(&dir, false, false, 0, None);
+    s.toggle_mode(); // content mode
+    for c in "needle".chars() {
+        s.push(c); // only schedules a debounced refresh
+    }
+    let mut p = crate::command_palette::CommandPalette::default();
+    p.push('#');
+    p.route_search = Some(s);
+    app.command_palette = Some(p);
+
+    let results = |app: &App| {
+        app.command_palette
+            .as_ref()
+            .and_then(|p| p.route_search.as_ref())
+            .map(|s| s.content_results.len())
+            .unwrap_or(0)
+    };
+    assert_eq!(results(&app), 0, "push only schedules the refresh");
+    std::thread::sleep(Duration::from_millis(120));
+    app.tick();
+    assert!(
+        results(&app) > 0,
+        "tick must flush the palette sub-picker's debounced content refresh"
+    );
+    fs::remove_dir_all(&dir).ok();
+}

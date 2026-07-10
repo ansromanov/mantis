@@ -261,18 +261,12 @@ impl CommandPalette {
                 self.query.pop();
                 self.refilter();
             }
+            // Popping the last routed-query char keeps the route; only a
+            // further backspace on the now-empty query (the dispatcher's
+            // empty-backspace Close) returns to commands mode.
             PaletteRoute::Files | PaletteRoute::Content => {
                 match self.route_search {
-                    Some(ref mut s) => {
-                        s.pop();
-                        if s.query.is_empty() {
-                            self.route_search = None;
-                            self.route = PaletteRoute::Commands;
-                            self.selected = 0;
-                            self.filtered = self.base_order.clone();
-                            self.match_positions = vec![Vec::new(); self.filtered.len()];
-                        }
-                    }
+                    Some(ref mut s) => s.pop(),
                     None => {
                         // No sub-picker yet (prefix just typed, no chars after
                         // it); return to commands mode.
@@ -284,16 +278,7 @@ impl CommandPalette {
                 }
             }
             PaletteRoute::GotoLine => match self.route_goto_line {
-                Some(ref mut g) => {
-                    g.pop();
-                    if g.query.is_empty() {
-                        self.route_goto_line = None;
-                        self.route = PaletteRoute::Commands;
-                        self.selected = 0;
-                        self.filtered = self.base_order.clone();
-                        self.match_positions = vec![Vec::new(); self.filtered.len()];
-                    }
-                }
+                Some(ref mut g) => g.pop(),
                 None => {
                     self.route = PaletteRoute::Commands;
                     self.selected = 0;

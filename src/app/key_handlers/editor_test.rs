@@ -1090,3 +1090,61 @@ fn toggle_pretty_json_via_command_preserves_content_scroll() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+// -- goto-line query parsing (shared by dialog and palette `:` route) -----------
+
+#[test]
+fn goto_line_from_query_absolute_relative_and_clamped() {
+    let root = temp_tree();
+    let long: String = (1..=50).map(|i| format!("line {i}\n")).collect();
+    fs::write(root.join("long.txt"), long).unwrap();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+
+    app.active_line = 10;
+    app.goto_line_from_query("+5");
+    assert_eq!(app.active_line, 15, "+n offsets forward");
+    app.goto_line_from_query("-3");
+    assert_eq!(app.active_line, 12, "-n offsets backward");
+    app.goto_line_from_query("2");
+    assert_eq!(app.active_line, 1, "absolute input is 1-indexed");
+    app.goto_line_from_query("9999");
+    assert_eq!(
+        app.active_line,
+        app.display_line_count() - 1,
+        "absolute input clamps to the last line"
+    );
+    app.goto_line_from_query("junk");
+    assert_eq!(
+        app.active_line,
+        app.display_line_count() - 1,
+        "junk is a no-op"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn dispatch_palette_goto_line_jumps_and_closes_palette() {
+    let root = temp_tree();
+    let long: String = (1..=50).map(|i| format!("line {i}\n")).collect();
+    fs::write(root.join("long.txt"), long).unwrap();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.active_line = 0;
+
+    let mut p = CommandPalette::default();
+    p.push(':');
+    p.route_goto_line = Some(crate::search::GotoLineState::new());
+    p.push('2');
+    p.push('0');
+    app.command_palette = Some(p);
+    app.dispatch_palette_goto_line();
+    assert!(app.command_palette.is_none(), "dispatch closes the palette");
+    assert_eq!(
+        app.active_line, 19,
+        "matches the standalone goto-line dialog"
+    );
+    fs::remove_dir_all(&root).ok();
+}

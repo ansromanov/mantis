@@ -364,34 +364,41 @@ impl App {
     }
 
     /// Jumps to the line number typed in the palette's go-to-line route and
-    /// closes the palette. Supports absolute (`42`), relative forward (`+5`),
-    /// and relative backward (`-3`) jumps — matching the standalone goto-line
-    /// dialog behaviour.
+    /// closes the palette.
     pub(crate) fn dispatch_palette_goto_line(&mut self) {
+        let query = self
+            .command_palette
+            .as_ref()
+            .and_then(|p| p.route_goto_line.as_ref().map(|g| g.query.clone()));
+        self.command_palette = None;
+        if let Some(q) = query {
+            self.goto_line_from_query(&q);
+        }
+    }
+
+    /// Parses a goto-line query and jumps to the resulting line. Supports
+    /// absolute (`42`, 1-indexed, clamped to the file), relative forward
+    /// (`+5`), and relative backward (`-3`) jumps. Diff and plugin-rendered
+    /// views have no active-line cursor, so relative jumps are based on
+    /// `content_scroll` there instead. Shared by the standalone goto-line
+    /// dialog and the palette's `:` route.
+    pub(crate) fn goto_line_from_query(&mut self, q: &str) {
         let has_cursor = self.has_text_cursor();
         let base = if has_cursor {
             self.active_line
         } else {
             self.content_scroll
         };
-        let target = self.command_palette.as_ref().and_then(|p| {
-            let g = p.route_goto_line.as_ref()?;
-            let q = g.query.as_str();
-            if q.is_empty() {
-                return None;
-            }
-            if let Some(offset) = q.strip_prefix('+') {
-                let n = offset.parse::<usize>().ok()?;
-                Some(base.saturating_add(n))
-            } else if let Some(offset) = q.strip_prefix('-') {
-                let n = offset.parse::<usize>().ok()?;
-                Some(base.saturating_sub(n))
-            } else {
-                let n = q.parse::<usize>().ok()?;
-                Some(n.saturating_sub(1)) // 1-indexed → 0-indexed
-            }
-        });
-        self.command_palette = None;
+        let target = if q.is_empty() {
+            None
+        } else if let Some(offset) = q.strip_prefix('+') {
+            offset.parse::<usize>().ok().map(|n| base.saturating_add(n))
+        } else if let Some(offset) = q.strip_prefix('-') {
+            offset.parse::<usize>().ok().map(|n| base.saturating_sub(n))
+        } else {
+            // 1-indexed → 0-indexed
+            q.parse::<usize>().ok().map(|n| n.saturating_sub(1))
+        };
         if let Some(line) = target {
             let max = self.display_line_count().saturating_sub(1);
             let line = line.min(max);

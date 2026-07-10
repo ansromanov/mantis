@@ -505,6 +505,20 @@ fn pop_returns_to_commands_from_routed_mode() {
 }
 
 #[test]
+fn pop_keeps_route_when_routed_query_becomes_empty() {
+    let mut p = CommandPalette::default();
+    p.push(':');
+    p.route_goto_line = Some(crate::search::GotoLineState::new());
+    p.push('4');
+    p.pop();
+    // Deleting the last typed char keeps the route; only a further backspace
+    // on the now-empty query (the dispatcher's Close) returns to commands.
+    assert_eq!(p.route, PaletteRoute::GotoLine);
+    assert!(p.route_goto_line.is_some());
+    assert!(p.is_query_empty());
+}
+
+#[test]
 fn active_query_returns_command_query_in_commands_mode() {
     let mut p = CommandPalette::default();
     p.push('t');

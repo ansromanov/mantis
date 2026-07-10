@@ -169,3 +169,57 @@ fn description_appears_in_palette_rendering() {
 }
 
 // Modified for test requirements
+
+// -- prefix routing rendering ----------------------------------------------------
+
+#[test]
+fn files_route_renders_title_prefix_and_results() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("hello.txt"), "hi\n").unwrap();
+    let mut app = make_app(dir.path());
+    let mut palette = CommandPalette::default();
+    palette.push('/');
+    palette.route_search = Some(crate::search::SearchState::new(
+        &app.root.clone(),
+        false,
+        false,
+        0,
+        None,
+    ));
+    app.command_palette = Some(palette);
+
+    let backend = TestBackend::new(80, 30);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| draw_command_palette(f, &mut app, f.area()))
+        .unwrap();
+    let joined = buffer_rows(&terminal).join("\n");
+    assert!(joined.contains(" Files - "), "title shows the route label");
+    assert!(joined.contains("/> "), "query bar shows the `/` prefix");
+    assert!(joined.contains("hello.txt"), "file results are listed");
+}
+
+#[test]
+fn goto_line_route_renders_hint() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    let mut palette = CommandPalette::default();
+    palette.push(':');
+    palette.route_goto_line = Some(crate::search::GotoLineState::new());
+    app.command_palette = Some(palette);
+
+    let backend = TestBackend::new(80, 30);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| draw_command_palette(f, &mut app, f.area()))
+        .unwrap();
+    let joined = buffer_rows(&terminal).join("\n");
+    assert!(
+        joined.contains(" Go to Line - "),
+        "title shows the route label"
+    );
+    assert!(
+        joined.contains("Enter a line number"),
+        "hint line renders for the goto route"
+    );
+}

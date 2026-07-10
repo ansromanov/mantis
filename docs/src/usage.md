@@ -261,6 +261,24 @@ are shown dimmed with the reason in place of their description. Selecting
 one anyway sets a status-bar message explaining why it didn't run, instead
 of silently doing nothing.
 
+### Prefix routing
+
+The palette is also a unified quick-open: type one of these characters as
+the **first** character of the query to switch what it searches:
+
+| Prefix | Mode                                        |
+|--------|---------------------------------------------|
+| (none) | Commands (the default list above)           |
+| `>`    | Commands (explicit alias)                   |
+| `/`    | File search (fuzzy file names)              |
+| `#`    | Content search (grep across files)          |
+| `:`    | Go to line (`42`, `+5`, `-3`)               |
+
+In the file/content modes, `Tab` toggles between the two (just like the
+standalone search overlay), and `Enter` opens the selected result. Backspace
+on an empty routed query — or `Esc` — returns to the commands list; a second
+`Esc` closes the palette.
+
 ## Reporting a bug
 
 Run **"Report a bug (save diagnostics locally)"** from the command palette to
