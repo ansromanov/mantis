@@ -538,7 +538,10 @@ fn main() {
    (a `brace_fold` variant that also folds `[…]` arrays) run against the same
    pretty-printed text core renders by default, rather than the raw file —
    otherwise fold-region line numbers would not line up with what's on
-   screen for minified JSON.
+   screen for minified JSON. The `yaml` plugin follows the same shape for
+   `yaml`/`yml` files, using the shared `mantis::fold_detectors::yaml_fold`
+   detector — the same algorithm the built-in
+   `crate::yaml_fold::detect_fold_regions` re-exports.
 
 
 ---

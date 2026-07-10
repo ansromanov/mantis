@@ -35,3 +35,18 @@ fn nested_regions() {
     assert_eq!(r[1].start, 1);
     assert_eq!(r[1].end, 2);
 }
+
+#[test]
+fn multiple_top_level_keys_each_get_a_region() {
+    // Two sibling top-level keys, each with their own nested block, should
+    // produce two independent regions rather than merging into one. This is
+    // the same shape the bundled `yaml` plugin (plugins/yaml) exercises via
+    // `crate::fold_detectors::yaml_fold`, which delegates to this function.
+    let ls = lines("a:\n  x: 1\n  y: 2\nb:\n  z: 3");
+    let r = detect_fold_regions(&ls);
+    assert_eq!(r.len(), 2);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 2);
+    assert_eq!(r[1].start, 3);
+    assert_eq!(r[1].end, 4);
+}

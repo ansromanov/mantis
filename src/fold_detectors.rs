@@ -1,5 +1,5 @@
-//! Pure fold-region detectors for brace-delimited and indentation-based
-//! languages, intended for consumption by language-provider plugins.
+//! Pure fold-region detectors for brace-delimited, indentation-based, and
+//! YAML-style languages, intended for consumption by language-provider plugins.
 //!
 //! Public functions share the `crate::fold::FoldRegion` output type:
 //!
@@ -19,10 +19,13 @@
 //!   each compound-statement header (`def`/`class`/`if`/`for`/`while`/etc.) to
 //!   the last more-indented line.  Continuation keywords (`else`/`elif`/
 //!   `except`/`finally`) are not new headers.  Blank lines are transparent.
+//! * `yaml_fold` — YAML indentation detector. A region spans from any
+//!   non-blank line to the last line more indented than it. This is the
+//!   original built-in YAML fold algorithm; `crate::yaml_fold::detect_fold_regions`
+//!   re-exports it so existing call sites are unaffected.
 //!
-//! Neither function knows about `App`, plugins, or IPC — they are pure
-//! `&str` → `Vec<FoldRegion>` transformations, the same design as
-//! `crate::yaml_fold::detect_fold_regions`.
+//! None of these functions know about `App`, plugins, or IPC — they are pure
+//! transformations to `Vec<FoldRegion>`.
 
 use crate::fold::FoldRegion;
 
@@ -519,6 +522,20 @@ pub fn indent_fold(text: &str) -> Vec<FoldRegion> {
     }
 
     regions
+}
+
+// ---------------------------------------------------------------------------
+// YAML indentation-based detector
+// ---------------------------------------------------------------------------
+
+/// Detects foldable regions in YAML content by indentation nesting.
+///
+/// Delegates to `crate::yaml_fold::detect_fold_regions` — the original
+/// built-in YAML fold algorithm — so this crate has a single implementation
+/// that both the app's built-in YAML handling and the bundled `yaml`
+/// language-provider plugin (`plugins/yaml`) share.
+pub fn yaml_fold(lines: &[impl AsRef<str>]) -> Vec<FoldRegion> {
+    crate::yaml_fold::detect_fold_regions(lines)
 }
 
 #[cfg(test)]

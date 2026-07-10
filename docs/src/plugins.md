@@ -165,6 +165,7 @@ compiled alongside `mantis` and installed on first run.
 | rust | `rust` | Registers as a language provider for `.rs` files with the `fold` capability. On file open, computes and registers collapsible curly-brace fold regions. |
 | go | `go` | Registers as a language provider for `.go` files with the `fold` capability. On file open, computes and registers collapsible curly-brace fold regions. |
 | sh | `sh` | Registers as a language provider for `.sh`, `.bash`, and `.zsh` files with the `fold` capability. On file open, computes fold regions for function bodies and compound blocks, aware of `#` comments, quoted strings, and heredocs. |
+| yaml | `yaml` | Registers as a language provider for `.yaml`/`.yml` files with the `fold` capability. On file open, computes and registers collapsible indentation-based fold regions. When enabled, its regions take precedence over the built-in YAML folding. |
 
 ### Bundled syntax plugins
 
