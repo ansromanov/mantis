@@ -609,7 +609,7 @@ fn toggle_wrap_preserves_content_scroll() {
 #[test]
 fn toggle_pretty_json_off_clamps_scroll_when_content_shrinks() {
     let root = temp_tree();
-    fs::write(root.join("tiny.txt"), "one\n").unwrap();
+    fs::write(root.join("tiny.txt"), "one\ntwo\nthree\n").unwrap();
     let mut app = app_for(&root);
     app.open_file(&root.join("tiny.txt"));
     app.focus = Focus::Content;
@@ -641,9 +641,12 @@ fn toggle_pretty_json_off_clamps_scroll_when_content_shrinks() {
     assert_eq!(
         app.content_scroll,
         app.content_scroll_max(),
-        "scroll must be clamped to the shrunk raw content (1 line)"
+        "scroll must be clamped to the shrunk raw content (3 lines)"
     );
-    assert_eq!(app.content_scroll, 0, "raw content fits viewport, max is 0");
+    assert_eq!(
+        app.content_scroll, 1,
+        "clamp lands on raw max (3 - 2 = 1), not the old hard reset to 0"
+    );
     fs::remove_dir_all(&root).ok();
 }
 
