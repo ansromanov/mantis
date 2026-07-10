@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Reads changed file paths on stdin (one per line) and prints a cargo-nextest
 # filterset (the argument to `-E`) selecting only the tests related to those
-# changes. Prints the literal token `__ALL__` to request the full suite when a
-# change is broad enough that a related subset cannot be trusted.
+# changes. Prints the literal token `__ALL__` when a change is broad enough
+# that a related subset cannot be trusted; consumers decide what that means
+# (ci.yml/main.yml run a smoke set — never the full suite; `just test-pr`
+# skips). The full suite runs only on release (release.yml).
 #
 # Mapping rules:
 #   src/foo.rs            -> unit tests under module `foo`        (foo::...)
