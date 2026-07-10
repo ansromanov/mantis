@@ -17,9 +17,10 @@ use crate::plugin::types::{PluginEntry, PluginKind};
 
 /// Returns `(name, PluginEntry)` pairs for every plugin that ships with `mantis`.
 ///
-/// All plugins shipped with `mantis` (markdown, iconize, python, rust, go, terraform)
-/// are enabled by default. User config entries with `or_insert` always win over these
-/// defaults, so an explicit `enabled = false` in `mantis.toml` is respected.
+/// All plugins shipped with `mantis` (markdown, iconize, python, rust, go, json,
+/// terraform) are enabled by default. User config entries with `or_insert` always
+/// win over these defaults, so an explicit `enabled = false` in `mantis.toml` is
+/// respected.
 pub(crate) fn bundled_plugin_entries() -> Vec<(String, PluginEntry)> {
     let mut entries = Vec::new();
     for (name, binary_name, _data) in BUNDLED_PLUGINS {
@@ -96,6 +97,7 @@ pub(crate) const BUNDLED_PLUGINS: &[(&str, &str, &[u8])] = &[
     ("python", "python", PYTHON),
     ("rust", "rust", RUST),
     ("go", "go", GO),
+    ("json", "json", JSON),
 ];
 
 /// Filenames of old shell-script plugins superseded by the current Rust binaries.

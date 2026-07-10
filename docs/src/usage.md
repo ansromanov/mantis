@@ -327,12 +327,18 @@ provided by a language provider plugin — the bundled `rust` and `go` plugins r
 this way. You must explicitly enable such plugins in `mantis.toml` (or via the plugin
 manager popup) for folding to work on those files.
 
+Objects and arrays in `.json` files can be folded the same way, via the bundled
+`json` plugin (also opt-in). It folds against the pretty-printed view below, so
+regions line up whether or not the file was originally minified.
+
 ## JSON pretty-printing
 
 Viewing a JSON file? Use the command palette (`Ctrl+P` → "Toggle JSON
 pretty-print") to reformat it with indentation for easier reading, and again
 to return to the raw text. Handy for minified `.json`. There's no default key
 for this — bind `toggle_pretty_json` in `mantis.toml` if you want one.
+JSON pretty-printing itself is always core, not a plugin concern — the `json`
+plugin only adds fold regions on top of it.
 
 ## Mouse
 

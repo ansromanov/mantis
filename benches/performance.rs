@@ -613,6 +613,46 @@ fn bench_indent_fold(c: &mut Criterion) {
     group.finish();
 }
 
+// ---------------------------------------------------------------------------
+// Benchmark: brace_fold_with_brackets — large synthetic pretty-printed JSON
+// ---------------------------------------------------------------------------
+
+fn generate_json_source(line_count: usize) -> String {
+    // An array of objects, each with a nested array — mirrors what
+    // `serde_json::to_string_pretty` produces, which is what the `json`
+    // plugin actually folds.
+    let mut content = String::with_capacity(line_count * 24);
+    content.push_str("[\n");
+    for i in 0..line_count / 6 {
+        content.push_str("  {\n");
+        content.push_str(&format!("    \"id\": {i},\n"));
+        content.push_str(&format!("    \"name\": \"item_{i}\",\n"));
+        content.push_str("    \"tags\": [\n      \"a\",\n      \"b\"\n    ]\n");
+        content.push_str("  },\n");
+    }
+    content.push_str("]\n");
+    content
+}
+
+fn bench_brace_fold_with_brackets(c: &mut Criterion) {
+    let mut group = c.benchmark_group("brace_fold_with_brackets");
+    for &lines in &[100, 1_000, 10_000] {
+        let src = generate_json_source(lines);
+        group.bench_with_input(
+            BenchmarkId::new("brace_fold_with_brackets", lines),
+            &src,
+            |b, src| {
+                b.iter(|| {
+                    black_box(mantis::fold_detectors::brace_fold_with_brackets(black_box(
+                        src,
+                    )))
+                })
+            },
+        );
+    }
+    group.finish();
+}
+
 fn bench_telemetry_overhead(c: &mut Criterion) {
     let mut group = c.benchmark_group("telemetry_overhead");
 
@@ -659,6 +699,7 @@ criterion_group!(
     bench_tree_filter_sync,
     bench_brace_fold,
     bench_indent_fold,
+    bench_brace_fold_with_brackets,
     bench_telemetry_overhead,
 );
 
