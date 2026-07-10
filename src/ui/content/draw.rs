@@ -101,8 +101,8 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                 if !blame_lines.is_empty() {
                     blame::draw_blame_annotations(f, app, chunks[0], &blame_lines);
                     blame_area = chunks[0];
+                    inner = chunks[1];
                 }
-                inner = chunks[1];
             }
         }
     }

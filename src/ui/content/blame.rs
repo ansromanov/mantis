@@ -24,7 +24,9 @@ use crate::app::App;
 use crate::git::BlameLine;
 
 /// Width of the blame annotation strip when full-file blame is active.
-/// At least 25 characters, at most 40, roughly 30% of the available pane.
+/// At least 25 characters, at most 40, roughly 30% of the available pane —
+/// except on very narrow panes, where at least 10 columns are always left
+/// for content, which can push the strip below the 25 minimum.
 pub(super) fn blame_strip_width(inner_w: u16) -> u16 {
     let pct = (inner_w * 30 / 100).clamp(25, 40);
     pct.min(inner_w.saturating_sub(10))

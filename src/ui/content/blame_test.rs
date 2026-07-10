@@ -13,7 +13,7 @@ use super::*;
 fn blame_strip_width_respects_bounds() {
     // At least 25, at most 40, roughly 30%
     assert_eq!(blame_strip_width(100), 30);
-    assert_eq!(blame_strip_width(30), 25); // min
+    assert_eq!(blame_strip_width(30), 20); // 25 min overridden: only 10 left for content
     assert_eq!(blame_strip_width(200), 40); // max
     assert_eq!(blame_strip_width(80), 25); // 30% = 24, clamped to min 25
     assert_eq!(blame_strip_width(10), 0); // can't leave 10 for content
