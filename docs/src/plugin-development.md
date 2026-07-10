@@ -533,7 +533,12 @@ fn main() {
    the plugin directory on first run. The `python` plugin is a language-provider
    example: it registers for `py`/`pyi` with `fold` capability at `init` and
    sends `set_fold_regions` on `on_file_open` using the shared
-   `mantis::fold_detectors::indent_fold` detector.
+   `mantis::fold_detectors::indent_fold` detector. The `json` plugin follows
+   the same shape for `.json` files, using `mantis::fold_detectors::brace_fold_with_brackets`
+   (a `brace_fold` variant that also folds `[…]` arrays) run against the same
+   pretty-printed text core renders by default, rather than the raw file —
+   otherwise fold-region line numbers would not line up with what's on
+   screen for minified JSON.
 
 
 ---

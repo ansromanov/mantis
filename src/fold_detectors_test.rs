@@ -263,6 +263,91 @@ fn brace_fold_unmatched_open_leaves_stack() {
     assert!(r.is_empty());
 }
 
+#[test]
+fn brace_fold_ignores_brackets() {
+    // Plain brace_fold must not fold `[...]` blocks — brackets are inert.
+    let r = brace_fold("[\n    1,\n    2\n]\n");
+    assert!(r.is_empty());
+}
+
+// ---------------------------------------------------------------------------
+// brace_fold_with_brackets tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn brace_fold_with_brackets_empty() {
+    assert!(brace_fold_with_brackets("").is_empty());
+}
+
+#[test]
+fn brace_fold_with_brackets_object_block() {
+    let r = brace_fold_with_brackets("{\n    \"a\": 1\n}\n");
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 2);
+}
+
+#[test]
+fn brace_fold_with_brackets_array_block() {
+    let r = brace_fold_with_brackets("[\n    1,\n    2\n]\n");
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 3);
+}
+
+#[test]
+fn brace_fold_with_brackets_single_line_array_no_region() {
+    let r = brace_fold_with_brackets("[1, 2, 3]");
+    assert!(r.is_empty());
+}
+
+#[test]
+fn brace_fold_with_brackets_nested_object_and_array() {
+    let r = brace_fold_with_brackets(
+        "\
+{
+    \"items\": [
+        1,
+        2
+    ]
+}
+",
+    );
+    assert_eq!(r.len(), 2);
+    // Inner array closes first: lines 1-4.
+    assert_eq!(r[0].start, 1);
+    assert_eq!(r[0].end, 4);
+    // Outer object: lines 0-5.
+    assert_eq!(r[1].start, 0);
+    assert_eq!(r[1].end, 5);
+}
+
+#[test]
+fn brace_fold_with_brackets_bracket_in_string_ignored() {
+    let r = brace_fold_with_brackets(
+        "\
+{
+    \"note\": \"array looks like [ this ] but is just text\",
+    \"n\": 1
+}
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 3);
+}
+
+#[test]
+fn brace_fold_with_brackets_mismatched_pair_silent() {
+    // A `]` closing a `{` (or vice versa) should not panic or produce a
+    // region — treat the stack purely as a line-position stack, matching
+    // `brace_fold`'s existing tolerance of unbalanced input.
+    let r = brace_fold_with_brackets("{\n    1\n]\n");
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 2);
+}
+
 // ---------------------------------------------------------------------------
 // indent_fold tests
 // ---------------------------------------------------------------------------

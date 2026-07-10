@@ -7,6 +7,10 @@
 //!   `{`/`}` pairs, skipping braces inside line/block comments, double-quoted
 //!   strings (with `\"` escapes), Rust raw strings (`r"…"`, `r#"…"#`, …), and
 //!   Go backtick strings.
+//! * `brace_fold_with_brackets` — same state machine, additionally matching
+//!   `[`/`]` pairs. Used by the JSON plugin, where multiline arrays are as
+//!   foldable as objects; kept separate from `brace_fold` so Rust/Go (where
+//!   folding every multiline array literal would be noise) are unaffected.
 //! * `indent_fold` — Python-style indentation detector.  A region spans from
 //!   each compound-statement header (`def`/`class`/`if`/`for`/`while`/etc.) to
 //!   the last more-indented line.  Continuation keywords (`else`/`elif`/
@@ -38,6 +42,19 @@ use crate::fold::FoldRegion;
 /// nesting stack is `Vec<usize>` (line number), so deeply nested files are
 /// bounded only by available memory.
 pub fn brace_fold(text: &str) -> Vec<FoldRegion> {
+    brace_fold_impl(text, false)
+}
+
+/// Like [`brace_fold`], but also tracks `[…]` bracket blocks as foldable
+/// regions — for JSON, a multiline array is as foldable as an object.
+/// Braces and brackets share a single line-position stack (no type
+/// checking), matching `brace_fold`'s existing tolerance of unbalanced
+/// input: a `]` closes whatever is on top of the stack, `{` or `[` alike.
+pub fn brace_fold_with_brackets(text: &str) -> Vec<FoldRegion> {
+    brace_fold_impl(text, true)
+}
+
+fn brace_fold_impl(text: &str, track_brackets: bool) -> Vec<FoldRegion> {
     let bytes = text.as_bytes();
     let len = bytes.len();
     if len == 0 {
@@ -67,6 +84,14 @@ pub fn brace_fold(text: &str) -> Vec<FoldRegion> {
                 b'\n' => line += 1,
                 b'{' => stack.push(line),
                 b'}' => {
+                    if let Some(start) = stack.pop() {
+                        if line > start {
+                            regions.push(FoldRegion { start, end: line });
+                        }
+                    }
+                }
+                b'[' if track_brackets => stack.push(line),
+                b']' if track_brackets => {
                     if let Some(start) = stack.pop() {
                         if line > start {
                             regions.push(FoldRegion { start, end: line });
