@@ -10,7 +10,7 @@
 //! the content `Rect` and scroll offsets back onto `App` for mouse hit-testing.
 
 use ratatui::{
-    layout::Rect,
+    layout::{Constraint, Direction, Layout, Rect},
     style::Style,
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
@@ -20,6 +20,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::app::{App, Focus};
 
+use super::blame;
 use super::diff::draw_side_by_side_diff;
 use super::draw_text::{render_inline_fallback, render_virtual_file, wrap_content};
 use super::scrollbar::draw_content_scrollbar;
@@ -62,7 +63,8 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         .borders(Borders::ALL)
         .border_style(border_style);
 
-    let inner = block.inner(area);
+    let mut inner = block.inner(area);
+    let mut line_blame_area = Rect::default();
 
     // Side-by-side diff layout takes over the whole content pane when toggled
     // on and the pane is wide enough; otherwise we fall through to unified.
@@ -73,6 +75,36 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     {
         draw_side_by_side_diff(f, app, area, block);
         return;
+    }
+
+    // ── Line blame bar: reserve 2 rows at the bottom ───────────────
+    if app.show_line_blame && app.has_text_cursor() && app.current_file.is_some() {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Min(0), Constraint::Length(2)])
+            .split(inner);
+        inner = chunks[0];
+        line_blame_area = chunks[1];
+    }
+
+    // ── Full-file blame: split inner horizontally ───────────────────
+    let mut blame_area = Rect::default();
+    if app.show_blame && app.has_text_cursor() {
+        if let Some(ref path) = app.current_file.clone() {
+            let bw = blame::blame_strip_width(inner.width);
+            if bw < inner.width {
+                let chunks = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([Constraint::Length(bw), Constraint::Min(0)])
+                    .split(inner);
+                let blame_lines = crate::git::file_blame(&app.root, path);
+                if !blame_lines.is_empty() {
+                    blame::draw_blame_annotations(f, app, chunks[0], &blame_lines);
+                    blame_area = chunks[0];
+                    inner = chunks[1];
+                }
+            }
+        }
     }
 
     let view_height = inner.height as usize;
@@ -347,7 +379,6 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         }
     }
 
-    let inner = block.inner(area);
     f.render_widget(block, area);
 
     let hscroll = if app.word_wrap {
@@ -391,20 +422,28 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         },
     );
 
-    let inner_x = area.x + 1;
-    let inner_y = area.y + 1;
-    let inner_w = area.width.saturating_sub(2) as usize;
-    let inner_h = area.height.saturating_sub(2) as usize;
-
-    app.content_area = Rect {
-        x: inner_x,
-        y: inner_y,
-        width: inner_w as u16,
-        height: inner_h as u16,
-    };
+    app.content_area = inner;
+    app.blame_area = blame_area;
     app.fold_gutter_rows = new_fold_gutter_rows;
 
-    draw_content_scrollbar(f, app, inner_x, inner_y, inner_w, inner_h);
+    // Scrollbar is computed from the full pane area (area minus border).
+    let full_inner_x = area.x + 1;
+    let full_inner_y = area.y + 1;
+    let full_inner_w = area.width.saturating_sub(2) as usize;
+    let full_inner_h = area.height.saturating_sub(2) as usize;
+    draw_content_scrollbar(
+        f,
+        app,
+        full_inner_x,
+        full_inner_y,
+        full_inner_w,
+        full_inner_h,
+    );
+
+    // ── Bottom-bar: single-line blame ─────────────────────────────────
+    if line_blame_area.height > 0 {
+        blame::draw_bottom_bar_blame(f, app, line_blame_area);
+    }
 }
 
 #[cfg(test)]

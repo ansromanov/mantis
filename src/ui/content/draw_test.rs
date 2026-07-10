@@ -462,4 +462,32 @@ fn empty_state_hint_survives_word_wrap_with_line_number_gutter() {
     fs::remove_dir_all(&root).ok();
 }
 
+#[test]
+fn draw_content_with_show_blame_does_not_panic() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.show_blame = true;
+    let backend = TestBackend::new(80, 24);
+    let mut terminal = ratatui::Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| draw_content(frame, &mut app, frame.area()))
+        .unwrap();
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn draw_content_with_show_line_blame_does_not_panic() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.show_line_blame = true;
+    let backend = TestBackend::new(80, 24);
+    let mut terminal = ratatui::Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| draw_content(frame, &mut app, frame.area()))
+        .unwrap();
+    fs::remove_dir_all(&root).ok();
+}
+
 // Modified for test requirements

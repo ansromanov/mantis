@@ -10,6 +10,7 @@
 //! `draw_content` smoke tests live in `content_test.rs`; each submodule has its
 //! own sibling `_test.rs` for its unit-level behavior.
 
+pub(crate) mod blame;
 mod diff;
 mod draw;
 mod draw_text;

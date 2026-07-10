@@ -222,9 +222,7 @@ pub struct App {
     pub auto_watch: bool,
     pub show_file_info: bool,
     pub indent_guides: bool,
-    /// Scroll offset for the blame pane (first visible line). Synced with
-    /// `content_scroll` so the cursor stays in view.
-    pub blame_scroll: usize,
+
     /// Whether to show file-type icon glyphs in the tree. The glyphs come from
     /// a plugin via the `set_icon_map` action; off by default because they
     /// require a Nerd Font in the terminal.
@@ -253,6 +251,9 @@ pub struct App {
     /// recomputed only when the tree is rebuilt rather than on every render.
     pub(crate) tree_guide_cache: Option<(u64, Vec<Vec<bool>>)>,
     pub content_area: Rect,
+    /// Hit area of the blame annotation strip recorded during the last render.
+    /// `Rect::default()` when blame is not shown or there is no blame data.
+    pub blame_area: Rect,
     pub search_area: Rect,
     pub search_offset: usize,
     pub command_palette_area: Rect,

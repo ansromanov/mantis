@@ -233,15 +233,6 @@ impl App {
                     let row = (ev.row - self.tree_area.y) as usize;
                     let index = self.tree_offset + row;
 
-                    // Blame pane: clicking a row sets the active line.
-                    if self.show_blame && self.has_text_cursor() {
-                        let phys = index;
-                        self.set_active_line_from_physical(phys);
-                        self.scroll_blame_into_view();
-                        self.show_line_blame = true;
-                        return;
-                    }
-
                     // When the inline tree filter is active, map the click
                     // through the visible-indices array to get the global node
                     // index, then close the filter (accept the selection).
@@ -327,6 +318,17 @@ impl App {
                             self.selection = None;
                         }
                     }
+                } else if self.show_blame
+                    && self.has_text_cursor()
+                    && rect_contains(self.blame_area, ev.column, ev.row)
+                {
+                    self.focus = Focus::Content;
+                    let rel_row = (ev.row.saturating_sub(self.blame_area.y)) as usize;
+                    let display_line = self.content_scroll + rel_row;
+                    if display_line < self.display_line_count() {
+                        let phys = self.display_to_physical(display_line);
+                        self.set_active_line_from_physical(phys);
+                    }
                 }
             }
             MouseEventKind::Drag(MouseButton::Left) => {
@@ -376,7 +378,9 @@ impl App {
                 }
             }
             MouseEventKind::ScrollDown => {
-                if rect_contains(self.content_area, ev.column, ev.row) {
+                if rect_contains(self.content_area, ev.column, ev.row)
+                    || (self.show_blame && rect_contains(self.blame_area, ev.column, ev.row))
+                {
                     self.telemetry
                         .record(crate::telemetry::TelemetryEvent::ActionInvoked {
                             action: "content_scroll_down",
@@ -393,7 +397,9 @@ impl App {
                 }
             }
             MouseEventKind::ScrollUp => {
-                if rect_contains(self.content_area, ev.column, ev.row) {
+                if rect_contains(self.content_area, ev.column, ev.row)
+                    || (self.show_blame && rect_contains(self.blame_area, ev.column, ev.row))
+                {
                     self.telemetry
                         .record(crate::telemetry::TelemetryEvent::ActionInvoked {
                             action: "content_scroll_up",
