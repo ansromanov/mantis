@@ -426,30 +426,30 @@ fn scroll_line_into_view_clamps_to_max() {
 fn scroll_blame_into_view_nudges_scroll_when_active_line_outside_viewport() {
     let root = temp_root();
     let mut app = app_for(&root);
-    app.current_file = Some(root.join("doc.md"));
-    app.open_file(&root.join("doc.md"));
+    // Don't open_file — set content directly so line_count() reads app.content.
     app.content = (0..50).map(|i| format!("line {i}")).collect();
-    app.tree_area = Rect {
+    app.virtual_file = None;
+    app.content_area = Rect {
         x: 0,
         y: 0,
         width: 30,
         height: 10,
     };
-    app.blame_scroll = 0;
+    app.content_scroll = 0;
     app.active_line = 15;
-    // active_line (15) is past tree_area height (10) from scroll (0).
+    // active_line (15) is past content_area height (10) from scroll (0).
     app.scroll_blame_into_view();
     assert!(
-        app.blame_scroll > 0,
-        "blame_scroll should advance so active_line is visible"
+        app.content_scroll > 0,
+        "content_scroll should advance so active_line is visible"
     );
-    let vh = app.tree_area.height as usize;
+    let vh = app.content_area.height as usize;
     assert!(
-        app.active_line >= app.blame_scroll && app.active_line < app.blame_scroll + vh,
-        "active_line={} should be within [blame_scroll={}, {}]",
+        app.active_line >= app.content_scroll && app.active_line < app.content_scroll + vh,
+        "active_line={} should be within [content_scroll={}, {}]",
         app.active_line,
-        app.blame_scroll,
-        app.blame_scroll + vh
+        app.content_scroll,
+        app.content_scroll + vh
     );
     fs::remove_dir_all(&root).ok();
 }
@@ -458,18 +458,18 @@ fn scroll_blame_into_view_nudges_scroll_when_active_line_outside_viewport() {
 fn scroll_blame_into_view_does_not_nudge_when_already_in_view() {
     let root = temp_root();
     let mut app = app_for(&root);
-    app.current_file = Some(root.join("doc.md"));
-    app.open_file(&root.join("doc.md"));
+    // Don't open_file — set content directly so line_count() reads app.content.
     app.content = (0..50).map(|i| format!("line {i}")).collect();
-    app.tree_area = Rect {
+    app.virtual_file = None;
+    app.content_area = Rect {
         x: 0,
         y: 0,
         width: 30,
         height: 10,
     };
-    app.blame_scroll = 5;
+    app.content_scroll = 5;
     app.active_line = 7;
     app.scroll_blame_into_view();
-    assert_eq!(app.blame_scroll, 5, "blame_scroll must not change");
+    assert_eq!(app.content_scroll, 5, "content_scroll must not change");
     fs::remove_dir_all(&root).ok();
 }

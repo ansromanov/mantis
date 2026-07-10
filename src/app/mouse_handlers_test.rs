@@ -481,7 +481,71 @@ fn breadcrumb_double_click_on_compact_dotdot_changes_root() {
 }
 
 #[test]
-fn blame_pane_click_sets_active_line() {
+fn blame_area_click_moves_active_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.content_area = Rect {
+        x: 30,
+        y: 1,
+        width: 50,
+        height: 20,
+    };
+    app.blame_area = Rect {
+        x: 30,
+        y: 1,
+        width: 30,
+        height: 20,
+    };
+    app.content_scroll = 0;
+    app.active_line = 0;
+    app.show_blame = true;
+    // Click the third row in the blame strip (row offset 3 → display line 3).
+    app.handle_mouse(left_down_at(31, 4));
+    assert_eq!(
+        app.active_line, 3,
+        "click in blame area should set active_line"
+    );
+    assert_eq!(
+        app.focus,
+        crate::app::Focus::Content,
+        "click in blame area should focus content"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn blame_area_click_does_not_set_show_line_blame() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.content_area = Rect {
+        x: 30,
+        y: 1,
+        width: 50,
+        height: 20,
+    };
+    app.blame_area = Rect {
+        x: 30,
+        y: 1,
+        width: 30,
+        height: 20,
+    };
+    app.content_scroll = 0;
+    app.active_line = 0;
+    app.show_blame = true;
+    app.show_line_blame = false;
+    // Click the first row in the blame strip.
+    app.handle_mouse(left_down_at(31, 1));
+    assert!(
+        !app.show_line_blame,
+        "click in blame area should NOT set show_line_blame (it is now a display-only gutter)"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_click_does_not_set_show_line_blame_when_blame_active() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
@@ -494,11 +558,12 @@ fn blame_pane_click_sets_active_line() {
     app.tree_offset = 0;
     app.active_line = 0;
     app.show_blame = true;
-    // Click the first row in the blame pane.
-    app.handle_mouse(left_down_at(0, 1));
+    app.show_line_blame = false;
+    // Click the tree area (blame no longer replaces the tree).
+    app.handle_mouse(left_down_at(1, 1));
     assert!(
-        app.show_line_blame,
-        "click in the blame pane must open single-line blame"
+        !app.show_line_blame,
+        "click in the tree when blame is active must not open line blame"
     );
     fs::remove_dir_all(&root).ok();
 }

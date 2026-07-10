@@ -369,7 +369,7 @@ fn create_base_app() -> App {
         show_scroll_percentage: false,
         show_line_numbers: false,
         show_blame: false,
-        blame_scroll: 0,
+        blame_area: ratatui::layout::Rect::default(),
         show_about: false,
         show_telemetry_notice: false,
         show_welcome: false,

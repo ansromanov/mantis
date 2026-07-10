@@ -1,13 +1,10 @@
-//! File-tree / blame-pane panel rendering.
+//! File-tree panel rendering.
 //!
 //! `draw_tree` renders the left-hand panel: the file tree under normal
-//! conditions, a blame pane when full-file blame is active (`App::show_blame`),
-//! and a bottom-bar blame info line when single-line blame is active
-//! (`App::show_line_blame`). The blame pane replaces the tree entirely, showing
-//! per-line commit annotations (hash, author, date, subject) with the same
-//! cursor-driven viewport as the content pane. The bottom bar, when visible,
-//! occupies the last 2 rows of the tree pane's inner area and shows blame info
-//! for the current active line.
+//! conditions. Blame rendering (full-pane and bottom-bar) has moved to
+//! `src/ui/content/blame.rs` so it sits alongside the file content.
+//! See that module for per-line blame annotations and the single-line
+//! blame info bar.
 
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -22,7 +19,7 @@ use ratatui::{
 use unicode_width::UnicodeWidthStr;
 
 use crate::app::{App, Focus};
-use crate::git::{BlameLine, GitStatus};
+use crate::git::GitStatus;
 
 /// Renders the file tree panel with a breadcrumb path bar at the top. Iterates
 /// `app.nodes`, drawing indentation, expand/collapse arrows, and git-status
@@ -52,21 +49,6 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
     let inner = block.inner(area);
     f.render_widget(block, area);
 
-    // ── Blame pane (replaces tree) ──────────────────────────────────────
-    if app.show_blame && app.has_text_cursor() {
-        if let Some(path) = app.current_file.clone() {
-            let blame_lines = crate::git::file_blame(&app.root, &path);
-            if !blame_lines.is_empty() {
-                // Clear stale breadcrumb hit-rects from the last normal-tree
-                // render so they can't hijack clicks on the blame pane, which
-                // occupies the same top rows the breadcrumb used to.
-                app.breadcrumb_areas.clear();
-                draw_blame_pane(f, app, inner, &blame_lines);
-                return;
-            }
-        }
-    }
-
     // ── Breadcrumb ──────────────────────────────────────────────────────
     app.breadcrumb_areas.clear();
     let breadcrumb_segments = compute_breadcrumb(app);
@@ -84,27 +66,6 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
     } else {
         inner
     };
-
-    // ── Bottom-bar slot (single-line blame) ─────────────────────────────
-    let bottom_bar_lines: usize =
-        if app.show_line_blame && app.has_text_cursor() && app.current_file.is_some() {
-            2
-        } else {
-            0
-        };
-    let (tree_content_area, bottom_bar_area) = if bottom_bar_lines > 0 {
-        let chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Min(0),
-                Constraint::Length(bottom_bar_lines as u16),
-            ])
-            .split(list_area);
-        (chunks[0], chunks[1])
-    } else {
-        (list_area, Rect::default())
-    };
-    let list_area = tree_content_area;
 
     // ── Empty git-mode placeholder ──────────────────────────────────────
     if app.git_mode && app.nodes.is_empty() {
@@ -379,162 +340,6 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
     } else {
         None
     };
-
-    // ── Bottom-bar: single-line blame ─────────────────────────────────────
-    if bottom_bar_lines > 0 {
-        draw_bottom_bar_blame(f, app, bottom_bar_area);
-    }
-}
-
-/// Renders the blame pane: a scrollable table of per-line blame annotations
-/// (short hash, author, relative date, subject) that replaces the tree pane
-/// when full-file blame is active. The cursor (`app.active_line`) is
-/// highlighted, and scrolling is linked to the content pane.
-fn draw_blame_pane(f: &mut Frame, app: &mut App, inner: Rect, blame_lines: &[BlameLine]) {
-    let theme = &app.theme;
-    let view_height = inner.height.max(1) as usize;
-    let total = blame_lines.len();
-
-    // Clamp scroll to valid range
-    let max_scroll = total.saturating_sub(view_height);
-    if app.blame_scroll > max_scroll {
-        app.blame_scroll = max_scroll;
-    }
-    let scroll = app.blame_scroll;
-
-    let end = (scroll + view_height).min(total);
-    let vis_count = end.saturating_sub(scroll);
-
-    let dim = Style::default().fg(theme.dim);
-    let accent = Style::default().fg(theme.accent);
-    let text = Style::default().fg(theme.text);
-    let selection_bg = app.theme.selection_style().bg.unwrap_or(theme.selection_bg);
-
-    let items: Vec<ListItem> = (scroll..end)
-        .map(|i| {
-            let bl = &blame_lines[i];
-            let phys = i; // blame_lines index matches physical line (0-based)
-            let display_line = app.physical_to_display(phys);
-
-            let is_active = display_line == app.active_line && app.has_text_cursor();
-
-            let mut spans: Vec<Span> = Vec::new();
-
-            // Short hash
-            let hash_style = if is_active { accent } else { dim };
-            spans.push(Span::styled(format!("{:<7}", bl.short_hash), hash_style));
-
-            // Author (truncated to fit)
-            let author_width = 12usize.min(inner.width.saturating_sub(35) as usize);
-            let author_trunc: String = bl.author.chars().take(author_width).collect();
-            let author_style = if is_active { text } else { accent };
-            spans.push(Span::styled(
-                format!(" {:<width$}", author_trunc, width = author_width),
-                author_style,
-            ));
-
-            // Date
-            let date_style = if is_active { text } else { dim };
-            let date_trunc: String = bl.date_relative.chars().take(12).collect();
-            spans.push(Span::styled(format!(" {:<12}", date_trunc), date_style));
-
-            // Subject (truncated to remaining width)
-            let used = 7 + 1 + author_width.max(1) + 1 + 12 + 1;
-            let subj_width = (inner.width as usize).saturating_sub(used);
-            let subject_trunc: String = bl.subject.chars().take(subj_width).collect();
-            let subj_style = if is_active { text } else { dim };
-            spans.push(Span::styled(
-                format!(" {subject_trunc:<subj_width$}"),
-                subj_style,
-            ));
-
-            ListItem::new(Line::from(spans))
-        })
-        .collect();
-
-    let list = List::new(items).highlight_style(
-        theme
-            .selection_style()
-            .add_modifier(Modifier::BOLD)
-            .bg(selection_bg),
-    );
-
-    let mut state = ListState::default();
-    let active_phys = app.display_to_physical(app.active_line);
-    if vis_count > 0 && active_phys >= scroll && active_phys < end {
-        let rel = active_phys.saturating_sub(scroll);
-        if rel < vis_count {
-            state.select(Some(rel));
-        }
-    }
-
-    f.render_stateful_widget(list, inner, &mut state);
-
-    // Record geometry for mouse hit-testing
-    app.tree_area = inner;
-    app.tree_offset = scroll;
-    app.tree_visible_indices = None;
-}
-
-/// Draws a 2-line blame info bar at the bottom of the tree pane, showing the
-/// short commit hash, author, relative date, and subject for the current
-/// `app.active_line`. Triggered by `show_line_blame`.
-fn draw_bottom_bar_blame(f: &mut Frame, app: &mut App, area: Rect) {
-    let Some(ref path) = app.current_file else {
-        return;
-    };
-    let theme = &app.theme;
-
-    let phys = app.display_to_physical(app.active_line);
-    let lineno = phys + 1;
-
-    let blame_lines = crate::git::file_blame(&app.root, path);
-    let blame = blame_lines.iter().find(|b| b.line_no == lineno as u32);
-
-    let dim = Style::default().fg(theme.dim);
-    let sep = Style::default().fg(theme.dim);
-    let sep_line = Line::from(Span::styled("─".repeat(area.width as usize), sep));
-
-    let rows: Vec<Line> = if let Some(b) = blame {
-        // Truncate to fit
-        let max_w = area.width as usize;
-        let line1 = format!(" {}  {}  {}", b.short_hash, b.author, b.date_relative);
-        let line1_trunc: String = line1.chars().take(max_w).collect();
-        let line2_trunc: String = b.subject.chars().take(max_w).collect();
-
-        vec![
-            Line::from(Span::styled(line1_trunc, Style::default())),
-            Line::from(Span::styled(line2_trunc, dim)),
-        ]
-    } else {
-        vec![
-            Line::from(Span::styled(
-                " No blame data — file is untracked or not in a git repo.",
-                dim,
-            )),
-            Line::from(""),
-        ]
-    };
-
-    // Draw a horizontal separator line, then the two blame lines
-    f.render_widget(
-        Paragraph::new(sep_line),
-        Rect {
-            x: area.x,
-            y: area.y,
-            width: area.width,
-            height: 1,
-        },
-    );
-
-    let blame_area = Rect {
-        x: area.x,
-        y: area.y.saturating_add(1),
-        width: area.width,
-        height: area.height.saturating_sub(1),
-    };
-
-    f.render_widget(Paragraph::new(rows), blame_area);
 }
 
 /// Splits `name` into spans, highlighting substrings that match `query`
