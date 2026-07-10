@@ -60,6 +60,7 @@ fn bundled_plugin_entries_all_enabled_by_default() {
         "terraform syntax plugin must be listed"
     );
     assert!(names.contains(&"python"), "python plugin must be listed");
+    assert!(names.contains(&"json"), "json plugin must be listed");
     for (name, entry) in &entries {
         assert!(
             entry.enabled,
