@@ -552,6 +552,59 @@ fn toggle_diff_staged_persists_to_config() {
     fs::remove_dir_all(&root).ok();
 }
 
+#[test]
+fn toggle_wrap_preserves_content_scroll() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 20,
+    };
+    app.content_scroll = 25;
+    app.keys.toggle_wrap = crate::config::bind(&["z"]);
+    app.handle_key(key(KeyCode::Char('z')));
+    assert!(app.word_wrap);
+    assert_eq!(
+        app.content_scroll, 25,
+        "toggle_wrap must preserve content_scroll"
+    );
+    app.handle_key(key(KeyCode::Char('z')));
+    assert!(!app.word_wrap);
+    assert_eq!(
+        app.content_scroll, 25,
+        "toggle_wrap back must preserve content_scroll"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn toggle_wrap_clamps_scroll_when_content_shrinks() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 48,
+    };
+    assert_eq!(app.content_scroll_max(), 2, "50 lines - 48 height = 2");
+    app.content_scroll = 2;
+    app.keys.toggle_wrap = crate::config::bind(&["z"]);
+    app.handle_key(key(KeyCode::Char('z')));
+    assert!(app.word_wrap);
+    assert!(
+        app.content_scroll <= app.content_scroll_max(),
+        "scroll must be clamped after toggle"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
 // -- content config persist --------------------------------------------------
 
 #[test]

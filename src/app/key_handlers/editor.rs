@@ -143,8 +143,8 @@ impl App {
             Some("toggle_wrap") => {
                 self.word_wrap = !self.word_wrap;
                 self.config.content.word_wrap = self.word_wrap;
-                self.set_content_scroll(0);
                 self.content_hscroll = 0;
+                self.clamp_content_scroll();
                 self.save_config();
                 true
             }
@@ -157,8 +157,8 @@ impl App {
             Some("toggle_pretty_json") => {
                 if self.is_json && !self.json_pretty_lines.is_empty() {
                     self.show_pretty_json = !self.show_pretty_json;
-                    self.set_content_scroll(0);
                     self.content_hscroll = 0;
+                    self.clamp_content_scroll();
                 }
                 true
             }
@@ -175,8 +175,8 @@ impl App {
                     self.diff_side_by_side = !self.diff_side_by_side;
                     self.config.git.diff.side_by_side = self.diff_side_by_side;
                     self.save_config();
-                    self.set_content_scroll(0);
                     self.content_hscroll = 0;
+                    self.clamp_content_scroll();
                 }
                 true
             }
