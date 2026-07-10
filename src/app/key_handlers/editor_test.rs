@@ -1031,3 +1031,62 @@ fn dispatch_command_tree_width_shrink_clamps_at_5() {
     assert_eq!(app.tree_width, 5, "tree_width must clamp at 5");
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn toggle_wrap_via_command_preserves_content_scroll() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt"));
+    app.content_area = ratatui::layout::Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 1,
+    };
+    app.content_scroll = 1;
+    app.word_wrap = false;
+    app.command_palette = Some(palette_with_query("Toggle word wrap"));
+    app.dispatch_command();
+    assert!(app.word_wrap);
+    assert_eq!(
+        app.content_scroll, 1,
+        "toggle_wrap via command must preserve content_scroll"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn toggle_pretty_json_via_command_preserves_content_scroll() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt"));
+    app.is_json = true;
+    app.json_pretty_lines = vec![
+        vec![(ratatui::style::Style::default(), "{".to_string())],
+        vec![(ratatui::style::Style::default(), "  \"a\": 1,".to_string())],
+        vec![(ratatui::style::Style::default(), "  \"b\": 2".to_string())],
+        vec![(ratatui::style::Style::default(), "}".to_string())],
+    ];
+    app.json_pretty_text = vec![
+        "{".to_string(),
+        "  \"a\": 1,".to_string(),
+        "  \"b\": 2".to_string(),
+        "}".to_string(),
+    ];
+    app.show_pretty_json = false;
+    app.content_area = ratatui::layout::Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 2,
+    };
+    app.content_scroll = 2;
+    app.command_palette = Some(palette_with_query("Toggle JSON pretty"));
+    app.dispatch_command();
+    assert!(app.show_pretty_json);
+    assert_eq!(
+        app.content_scroll, 2,
+        "toggle_pretty_json must preserve content_scroll"
+    );
+    fs::remove_dir_all(&root).ok();
+}

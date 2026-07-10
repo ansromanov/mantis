@@ -529,6 +529,31 @@ fn toggle_diff_side_by_side_persists_to_config() {
 }
 
 #[test]
+fn toggle_diff_side_by_side_preserves_content_scroll() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.is_diff = true;
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 20,
+    };
+    app.content_scroll = 25;
+    // toggle_diff_side_by_side ships unbound (palette-only); bind a key.
+    app.keys.toggle_diff_side_by_side = crate::config::bind(&["D"]);
+    app.handle_key(key(KeyCode::Char('D')));
+    assert!(app.diff_side_by_side);
+    assert_eq!(
+        app.content_scroll, 25,
+        "diff side-by-side toggle must preserve content_scroll"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn toggle_diff_staged_persists_to_config() {
     use crate::app::DiffMode;
     let root = temp_tree();
@@ -549,6 +574,79 @@ fn toggle_diff_staged_persists_to_config() {
     app.handle_key(key(KeyCode::Char('S')));
     assert_eq!(app.diff_mode, DiffMode::Unstaged);
     assert_eq!(app.config.git.diff.mode, DiffMode::Unstaged);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn toggle_wrap_preserves_content_scroll() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 20,
+    };
+    app.content_scroll = 25;
+    app.keys.toggle_wrap = crate::config::bind(&["z"]);
+    app.handle_key(key(KeyCode::Char('z')));
+    assert!(app.word_wrap);
+    assert_eq!(
+        app.content_scroll, 25,
+        "toggle_wrap must preserve content_scroll"
+    );
+    app.handle_key(key(KeyCode::Char('z')));
+    assert!(!app.word_wrap);
+    assert_eq!(
+        app.content_scroll, 25,
+        "toggle_wrap back must preserve content_scroll"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn toggle_pretty_json_off_clamps_scroll_when_content_shrinks() {
+    let root = temp_tree();
+    fs::write(root.join("tiny.txt"), "one\ntwo\nthree\n").unwrap();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("tiny.txt"));
+    app.focus = Focus::Content;
+    app.is_json = true;
+    app.json_pretty_lines = vec![
+        vec![(ratatui::style::Style::default(), "{".to_string())],
+        vec![(ratatui::style::Style::default(), "  \"a\": 1,".to_string())],
+        vec![(ratatui::style::Style::default(), "  \"b\": 2".to_string())],
+        vec![(ratatui::style::Style::default(), "}".to_string())],
+    ];
+    app.json_pretty_text = vec![
+        "{".to_string(),
+        "  \"a\": 1,".to_string(),
+        "  \"b\": 2".to_string(),
+        "}".to_string(),
+    ];
+    app.show_pretty_json = true;
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 2,
+    };
+    assert_eq!(app.content_scroll_max(), 2, "4 pretty lines - 2 height = 2");
+    app.content_scroll = 2;
+    app.keys.toggle_pretty_json = crate::config::bind(&["J"]);
+    app.handle_key(key(KeyCode::Char('J')));
+    assert!(!app.show_pretty_json);
+    assert_eq!(
+        app.content_scroll,
+        app.content_scroll_max(),
+        "scroll must be clamped to the shrunk raw content (3 lines)"
+    );
+    assert_eq!(
+        app.content_scroll, 1,
+        "clamp lands on raw max (3 - 2 = 1), not the old hard reset to 0"
+    );
     fs::remove_dir_all(&root).ok();
 }
 
