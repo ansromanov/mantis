@@ -49,6 +49,39 @@ impl EventSource for ScriptedEvents {
     }
 }
 
+/// Points `MANTIS_STATE_DIR` at an isolated dir under `root` so `run_app`
+/// tests never read or write the user's real state dir (welcome flag,
+/// session files). Holds the crate-wide env lock until dropped so parallel
+/// tests in the same process cannot race on the env var.
+struct IsolatedState {
+    _lock: std::sync::MutexGuard<'static, ()>,
+}
+
+impl IsolatedState {
+    /// Fresh state dir: `run_app` sees a first run (welcome overlay shows).
+    fn fresh(root: &Path) -> Self {
+        let lock = crate::session::STATE_DIR_ENV_LOCK.lock().unwrap();
+        let state = root.join("state");
+        fs::create_dir_all(&state).unwrap();
+        std::env::set_var("MANTIS_STATE_DIR", &state);
+        Self { _lock: lock }
+    }
+
+    /// State dir with the welcome flag pre-set, so `run_app` skips the
+    /// first-run overlay and scripted keys reach the app directly.
+    fn welcome_shown(root: &Path) -> Self {
+        let env = Self::fresh(root);
+        crate::session::mark_welcome_shown();
+        env
+    }
+}
+
+impl Drop for IsolatedState {
+    fn drop(&mut self) {
+        std::env::remove_var("MANTIS_STATE_DIR");
+    }
+}
+
 fn key_event(c: char) -> Event {
     Event::Key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::empty()))
 }
@@ -530,6 +563,7 @@ fn render_frame_clears_when_requested() {
 #[test]
 fn run_app_builds_and_runs_to_quit() {
     let dir = temp_dir();
+    let _state = IsolatedState::welcome_shown(&dir);
     fs::write(dir.join("a.txt"), "hello\n").unwrap();
     let backend = TestBackend::new(80, 30);
     let mut terminal = ratatui::Terminal::new(backend).unwrap();
@@ -547,6 +581,7 @@ fn run_app_builds_and_runs_to_quit() {
 #[test]
 fn run_app_opens_and_reveals_file() {
     let dir = temp_dir();
+    let _state = IsolatedState::welcome_shown(&dir);
     let file_path = dir.join("a.txt");
     fs::write(&file_path, "hello\nworld\n").unwrap();
     let backend = TestBackend::new(80, 30);
@@ -570,6 +605,7 @@ fn run_app_opens_and_reveals_file() {
 #[test]
 fn run_app_surfaces_config_error_without_failing() {
     let dir = temp_dir();
+    let _state = IsolatedState::welcome_shown(&dir);
     fs::write(dir.join("mantis.toml"), "garbage [[[ = 1").unwrap();
     fs::write(dir.join("a.txt"), "hello\n").unwrap();
     let backend = TestBackend::new(80, 30);
@@ -583,6 +619,30 @@ fn run_app_surfaces_config_error_without_failing() {
         &mut events,
     )
     .unwrap();
+    fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn run_app_first_run_shows_welcome_then_esc_dismisses_and_persists() {
+    let dir = temp_dir();
+    let _state = IsolatedState::fresh(&dir);
+    fs::write(dir.join("a.txt"), "hello\n").unwrap();
+    let backend = TestBackend::new(80, 30);
+    let mut terminal = ratatui::Terminal::new(backend).unwrap();
+    // On a fresh state dir the welcome overlay swallows keys until Esc
+    // dismisses it; only then does `q` reach the tree-scoped quit binding.
+    let mut events = ScriptedEvents::new(vec![esc_event(), key_event('q')]);
+    run_app(
+        &mut terminal,
+        dir.clone(),
+        InitialContent::None,
+        &mut events,
+    )
+    .unwrap();
+    assert!(
+        crate::session::is_welcome_shown(),
+        "dismissing the welcome overlay must persist the flag"
+    );
     fs::remove_dir_all(&dir).ok();
 }
 
