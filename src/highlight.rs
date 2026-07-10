@@ -12,6 +12,10 @@
 //! Extra syntax definitions (e.g. from plugins) can be passed via
 //! [`with_extra_syntaxes`]; each is a `.sublime-syntax` file loaded into the
 //! `SyntaxSet` so its file extensions are recognised during highlighting.
+//!
+//! For extensionless well-known filenames (e.g. `Dockerfile`, `Containerfile`),
+//! [`resolve_syntax_for_file`] falls back to a name-based lookup when
+//! syntect's extension matching fails.
 
 use ratatui::style::{Color, Modifier, Style};
 use std::fs;
@@ -20,7 +24,7 @@ use std::sync::{Arc, OnceLock};
 use syntect::{
     easy::HighlightLines,
     highlighting::{FontStyle, Style as SynStyle, ThemeSet},
-    parsing::{SyntaxDefinition, SyntaxSet},
+    parsing::{SyntaxDefinition, SyntaxReference, SyntaxSet},
 };
 
 use crate::plugin::ExtraSyntax;
@@ -83,11 +87,7 @@ impl Highlighter {
     /// only plain text was matched. Used by `compute_file_load` to populate
     /// `FileLoad::syntax_name` on the worker thread.
     pub fn syntax_name(&self, path: &Path) -> Option<String> {
-        self.ss
-            .find_syntax_for_file(path)
-            .ok()
-            .flatten()
-            .map(|s| s.name.clone())
+        resolve_syntax_for_file(&self.ss, path)
     }
 
     /// Syntax-highlights the given lines by detecting the file type from
@@ -104,6 +104,7 @@ impl Highlighter {
             .find_syntax_for_file(path)
             .ok()
             .flatten()
+            .or_else(|| find_syntax_by_file_name(&self.ss, path))
             .unwrap_or_else(|| self.ss.find_syntax_plain_text());
         self.highlight_impl(syntax, lines.iter().map(|s| s.as_str()))
     }
@@ -166,6 +167,31 @@ impl Highlighter {
             })
             .collect()
     }
+}
+
+/// Resolves a syntax name for a file path, handling extensionless filenames.
+///
+/// Tries syntect's `find_syntax_for_file` (extension + first-line matching) first,
+/// then falls back to checking the filename against well-known names like
+/// `Dockerfile` and `Containerfile` which have no file extension.
+fn resolve_syntax_for_file(ss: &SyntaxSet, path: &Path) -> Option<String> {
+    ss.find_syntax_for_file(path)
+        .ok()
+        .flatten()
+        .or_else(|| find_syntax_by_file_name(ss, path))
+        .map(|s| s.name.clone())
+}
+
+/// Looks up a syntax for an extensionless well-known filename by matching it
+/// against syntax names (e.g. `Dockerfile`), with aliases for filenames that
+/// share a grammar under a different name (`Containerfile` → `Dockerfile`).
+fn find_syntax_by_file_name<'a>(ss: &'a SyntaxSet, path: &Path) -> Option<&'a SyntaxReference> {
+    let name = path.file_name()?.to_str()?;
+    let name = match name {
+        "Containerfile" => "Dockerfile",
+        other => other,
+    };
+    ss.find_syntax_by_name(name)
 }
 
 /// Converts a syntect style (foreground + font-style flags) into ratatui

@@ -64,6 +64,12 @@ Syntax plugins can also be registered explicitly in `mantis.toml` with
 [plugins]
 terraform = { kind = "syntax", syntax_file = "syntaxes/terraform.sublime-syntax",
               extensions = ["tf", "tfvars"] }
+toml = { kind = "syntax", syntax_file = "syntaxes/toml.sublime-syntax",
+         extensions = ["toml"] }
+typescript = { kind = "syntax", syntax_file = "syntaxes/typescript.sublime-syntax",
+               extensions = ["ts", "tsx", "mts", "cts", "jsx"] }
+dockerfile = { kind = "syntax", syntax_file = "syntaxes/dockerfile.sublime-syntax",
+               extensions = ["dockerfile"] }
 ```
 
 - **`kind`** — `"syntax"` for syntax-definition plugins (default: `"process"`).
@@ -158,6 +164,18 @@ compiled alongside `mantis` and installed on first run.
 | python | `python` | Registers as a language provider for `.py` files with the `fold` capability. On file open, computes and registers collapsible indentation-based fold regions. |
 | rust | `rust` | Registers as a language provider for `.rs` files with the `fold` capability. On file open, computes and registers collapsible curly-brace fold regions. |
 | go | `go` | Registers as a language provider for `.go` files with the `fold` capability. On file open, computes and registers collapsible curly-brace fold regions. |
+
+### Bundled syntax plugins
+
+`mantis` also bundles syntax-only plugins that provide highlighting for
+additional file types without spawning a subprocess.
+
+| Plugin | Extensions | What it highlights |
+|---|---|---|
+| terraform | `.tf`, `.tfvars` | HashiCorp Configuration Language (HCL) used by Terraform |
+| toml | `.toml` | TOML configuration files (`Cargo.toml`, `mantis.toml`, `pyproject.toml`, etc.) |
+| typescript | `.ts`, `.tsx`, `.mts`, `.cts`, `.jsx` | TypeScript and TSX (JSX) source files |
+| dockerfile | `Dockerfile`, `Containerfile` | Dockerfile instructions (matched by filename, no extension) |
 
 All bundled plugins are compiled as workspace members and installed to the
 plugin directory the first time `mantis` creates its global config. They are all

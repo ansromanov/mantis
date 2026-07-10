@@ -1,0 +1,171 @@
+%YAML 1.2
+---
+# TypeScript/TSX syntax definition for syntect.
+# Covers both .ts/.mts/.cts and .tsx (JSX) files.
+name: TypeScript
+file_extensions:
+  - ts
+  - tsx
+  - mts
+  - cts
+  - jsx
+scope: source.ts
+
+contexts:
+  main:
+    - include: comments
+    - include: strings
+    - include: template_strings
+    - include: numbers
+    - include: keywords
+    - include: types
+    - include: storage
+    - include: functions
+    - include: jsx
+    - include: operators
+    - include: punctuation
+    - include: constants
+
+  comments:
+    - match: '//.*$'
+      scope: comment.line.double-slash.ts
+    - match: '/\*'
+      scope: punctuation.definition.comment.begin.ts
+      push: block_comment
+
+  block_comment:
+    - meta_scope: comment.block.ts
+    - match: '\*/'
+      scope: punctuation.definition.comment.end.ts
+      pop: true
+
+  strings:
+    - match: '"'
+      scope: punctuation.definition.string.begin.ts
+      push: string_double
+    - match: "'"
+      scope: punctuation.definition.string.begin.ts
+      push: string_single
+
+  string_double:
+    - meta_scope: string.quoted.double.ts
+    - match: '"'
+      scope: punctuation.definition.string.end.ts
+      pop: true
+    - match: '\\.'
+      scope: constant.character.escape.ts
+
+  string_single:
+    - meta_scope: string.quoted.single.ts
+    - match: "'"
+      scope: punctuation.definition.string.end.ts
+      pop: true
+    - match: '\\.'
+      scope: constant.character.escape.ts
+
+  template_strings:
+    - match: '`'
+      scope: punctuation.definition.string.template.begin.ts
+      push: template_string
+
+  template_string:
+    - meta_scope: string.template.ts
+    - match: '`'
+      scope: punctuation.definition.string.template.end.ts
+      pop: true
+    - match: '\$\{'
+      scope: punctuation.definition.template-expression.begin.ts
+      push: template_expression
+    - match: '\\.'
+      scope: constant.character.escape.ts
+
+  template_expression:
+    - meta_scope: meta.template.expression.ts
+    - match: '\}'
+      scope: punctuation.definition.template-expression.end.ts
+      pop: true
+    - include: main
+
+  numbers:
+    - match: '\b0[xX][0-9a-fA-F]+\b'
+      scope: constant.numeric.hex.ts
+    - match: '\b0[oO][0-7]+\b'
+      scope: constant.numeric.octal.ts
+    - match: '\b0[bB][01]+\b'
+      scope: constant.numeric.binary.ts
+    - match: '\b[0-9][0-9_]*\.?[0-9_]*([eE][+-]?[0-9]+)?\b'
+      scope: constant.numeric.ts
+
+  keywords:
+    - match: '\b(function|return|if|else|for|while|do|switch|case|break|continue|throw|try|catch|finally|new|delete|typeof|instanceof|void|in|of|class|extends|super|import|from|export|default|as|async|await|yield|static|get|set|constructor)\b'
+      scope: keyword.control.ts
+    - match: '\b(var|let|const)\b'
+      scope: storage.type.ts
+    - match: '\b(this|self)\b'
+      scope: variable.language.ts
+
+  types:
+    - match: '\b(string|number|boolean|any|unknown|never|void|null|undefined|object|symbol|bigint)\b'
+      scope: support.type.ts
+    - match: '\b(Array|Map|Set|Promise|Record|Partial|Required|Readonly|Pick|Omit|Exclude|Extract|ReturnType|InstanceType|Parameters|ConstructorParameters|ReadonlyArray|ReadonlyMap|ReadonlySet|WeakMap|WeakSet)\b'
+      scope: support.type.builtin.ts
+    - match: ':\s*([A-Z][a-zA-Z0-9]*)'
+      scope: entity.name.type.ts
+
+  storage:
+    - match: '\b(interface|type|enum|namespace|module|declare|abstract|implements|readonly|private|protected|public|override|abstract|accessor|satisfies|keyof|infer|is|as const)\b'
+      scope: storage.modifier.ts
+
+  functions:
+    - match: '\b([a-zA-Z_$][a-zA-Z0-9_$]*)\s*(?=\()'
+      scope: support.function.ts
+    - match: '=>'
+      scope: keyword.operator.arrow.ts
+
+  operators:
+    - match: '([=!<>&|?:+\-*/%]+)'
+      scope: keyword.operator.ts
+    - match: '\.\.\.'
+      scope: keyword.operator.spread.ts
+
+  punctuation:
+    - match: '[{}()\[\];,]'
+      scope: punctuation.terminator.ts
+
+  constants:
+    - match: '\b(true|false|null|undefined|NaN|Infinity)\b'
+      scope: constant.language.ts
+
+  jsx:
+    - match: '<(?=[A-Za-z/$])'
+      scope: punctuation.definition.tag.begin.tsx
+      push: jsx_tag
+
+  jsx_tag:
+    - meta_scope: meta.jsx.tsx
+    - match: '/>'
+      scope: punctuation.definition.tag.end.tsx
+      pop: true
+    - match: '>'
+      scope: punctuation.definition.tag.end.tsx
+      pop: true
+    - match: '</'
+      scope: punctuation.definition.tag.begin.tsx
+    - match: '[A-Za-z_][A-Za-z0-9_.]*'
+      scope: entity.name.tag.tsx
+    - match: '[a-zA-Z_][a-zA-Z0-9_]*'
+      scope: entity.other.attribute-name.tsx
+    - match: '='
+      scope: keyword.operator.assignment.tsx
+    - include: strings
+    - include: template_strings
+    - match: '\{'
+      scope: punctuation.section.block.begin.tsx
+      push: jsx_expression
+
+  jsx_expression:
+    - meta_scope: meta.jsx.expression.tsx
+    - match: '\}'
+      scope: punctuation.section.block.end.tsx
+      pop: true
+    - include: main

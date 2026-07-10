@@ -211,3 +211,123 @@ fn highlight_range_empty_lines() {
     let spans = h.highlight_range(Some("Rust"), &[]);
     assert!(spans.is_empty());
 }
+
+fn extra_syntax(name: &str) -> ExtraSyntax {
+    let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("plugins")
+        .join(name)
+        .join("syntaxes")
+        .join(format!("{name}.sublime-syntax"));
+    ExtraSyntax {
+        syntax_path: path,
+        extensions: vec![],
+    }
+}
+
+#[test]
+fn syntax_name_resolves_toml_extension() {
+    let extra = extra_syntax("toml");
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[extra]);
+    let mut f = tempfile::NamedTempFile::with_suffix(".toml").unwrap();
+    f.write_all(b"[section]\nkey = \"value\"\n").unwrap();
+    let name = h.syntax_name(f.path());
+    assert_eq!(name.as_deref(), Some("TOML"));
+}
+
+#[test]
+fn highlight_toml_highlights_sections() {
+    let extra = extra_syntax("toml");
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[extra]);
+    let result = h.highlight(Path::new("config.toml"), &["[dependencies]".to_string()]);
+    assert!(
+        result[0].len() > 1,
+        "expected multiple spans for TOML section header"
+    );
+}
+
+#[test]
+fn syntax_name_resolves_typescript_extensions() {
+    let extra = extra_syntax("typescript");
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[extra]);
+    for suffix in &[".ts", ".tsx", ".mts", ".cts", ".jsx"] {
+        let mut f = tempfile::NamedTempFile::with_suffix(suffix).unwrap();
+        f.write_all(b"const x: number = 1;\n").unwrap();
+        let name = h.syntax_name(f.path());
+        assert_eq!(
+            name.as_deref(),
+            Some("TypeScript"),
+            "expected TypeScript for extension {suffix}"
+        );
+    }
+}
+
+#[test]
+fn highlight_typescript_highlights_keywords() {
+    let extra = extra_syntax("typescript");
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[extra]);
+    let result = h.highlight(
+        Path::new("main.ts"),
+        &["function greet(name: string) {}".to_string()],
+    );
+    assert!(
+        result[0].len() > 1,
+        "expected multiple spans for TypeScript code"
+    );
+}
+
+#[test]
+fn syntax_name_resolves_dockerfile_by_filename() {
+    let extra = extra_syntax("dockerfile");
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[extra]);
+    // Create a file named "Dockerfile" (no extension) in a temp dir.
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("Dockerfile");
+    std::fs::write(&path, "FROM ubuntu:22.04\nRUN apt-get update\n").unwrap();
+    let name = h.syntax_name(&path);
+    assert_eq!(name.as_deref(), Some("Dockerfile"));
+}
+
+#[test]
+fn syntax_name_resolves_containerfile_by_filename() {
+    let extra = extra_syntax("dockerfile");
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[extra]);
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("Containerfile");
+    // First line is a comment, so first-line sniffing (`^FROM`) can't rescue
+    // it — only the Containerfile → Dockerfile filename alias resolves this.
+    std::fs::write(&path, "# syntax=docker/dockerfile:1\nFROM alpine\n").unwrap();
+    let name = h.syntax_name(&path);
+    assert_eq!(name.as_deref(), Some("Dockerfile"));
+}
+
+#[test]
+fn highlight_tsx_styles_jsx_tag_name() {
+    let extra = extra_syntax("typescript");
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[extra]);
+    let result = h.highlight(Path::new("app.tsx"), &["<div>".to_string()]);
+    let plain = h.highlight(Path::new("noext"), &["div".to_string()]);
+    let div_span = result[0]
+        .iter()
+        .find(|(_, text)| text == "div")
+        .expect("expected a distinct span for the JSX tag name");
+    assert_ne!(
+        div_span.0, plain[0][0].0,
+        "JSX tag name must be styled, not plain text — the jsx context \
+         must win over the operators context for `<`"
+    );
+}
+
+#[test]
+fn highlight_dockerfile_highlights_instructions() {
+    let extra = extra_syntax("dockerfile");
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[extra]);
+    // highlight() uses find_syntax_for_file which tries extensions first,
+    // then first-line matching. The Dockerfile syntax has first_line_match
+    // for FROM, so even without a filename-based lookup, highlight() should
+    // detect it via first-line sniffing.
+    let result = h.highlight(Path::new("Dockerfile"), &["FROM ubuntu:22.04".to_string()]);
+    assert!(
+        result[0].len() > 1,
+        "expected multiple spans for Dockerfile FROM instruction"
+    );
+}
