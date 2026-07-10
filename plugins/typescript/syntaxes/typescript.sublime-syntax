@@ -21,10 +21,10 @@ contexts:
     - include: types
     - include: storage
     - include: functions
+    - include: jsx
     - include: operators
     - include: punctuation
     - include: constants
-    - include: jsx
 
   comments:
     - match: '//.*$'

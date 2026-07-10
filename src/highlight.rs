@@ -24,7 +24,7 @@ use std::sync::{Arc, OnceLock};
 use syntect::{
     easy::HighlightLines,
     highlighting::{FontStyle, Style as SynStyle, ThemeSet},
-    parsing::{SyntaxDefinition, SyntaxSet},
+    parsing::{SyntaxDefinition, SyntaxReference, SyntaxSet},
 };
 
 use crate::plugin::ExtraSyntax;
@@ -104,11 +104,7 @@ impl Highlighter {
             .find_syntax_for_file(path)
             .ok()
             .flatten()
-            .or_else(|| {
-                path.file_name()
-                    .and_then(|n| n.to_str())
-                    .and_then(|name| self.ss.find_syntax_by_name(name))
-            })
+            .or_else(|| find_syntax_by_file_name(&self.ss, path))
             .unwrap_or_else(|| self.ss.find_syntax_plain_text());
         self.highlight_impl(syntax, lines.iter().map(|s| s.as_str()))
     }
@@ -182,12 +178,20 @@ fn resolve_syntax_for_file(ss: &SyntaxSet, path: &Path) -> Option<String> {
     ss.find_syntax_for_file(path)
         .ok()
         .flatten()
-        .or_else(|| {
-            path.file_name()
-                .and_then(|n| n.to_str())
-                .and_then(|name| ss.find_syntax_by_name(name))
-        })
+        .or_else(|| find_syntax_by_file_name(ss, path))
         .map(|s| s.name.clone())
+}
+
+/// Looks up a syntax for an extensionless well-known filename by matching it
+/// against syntax names (e.g. `Dockerfile`), with aliases for filenames that
+/// share a grammar under a different name (`Containerfile` → `Dockerfile`).
+fn find_syntax_by_file_name<'a>(ss: &'a SyntaxSet, path: &Path) -> Option<&'a SyntaxReference> {
+    let name = path.file_name()?.to_str()?;
+    let name = match name {
+        "Containerfile" => "Dockerfile",
+        other => other,
+    };
+    ss.find_syntax_by_name(name)
 }
 
 /// Converts a syntect style (foreground + font-style flags) into ratatui

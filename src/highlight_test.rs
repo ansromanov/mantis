@@ -288,6 +288,36 @@ fn syntax_name_resolves_dockerfile_by_filename() {
 }
 
 #[test]
+fn syntax_name_resolves_containerfile_by_filename() {
+    let extra = extra_syntax("dockerfile");
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[extra]);
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("Containerfile");
+    // First line is a comment, so first-line sniffing (`^FROM`) can't rescue
+    // it — only the Containerfile → Dockerfile filename alias resolves this.
+    std::fs::write(&path, "# syntax=docker/dockerfile:1\nFROM alpine\n").unwrap();
+    let name = h.syntax_name(&path);
+    assert_eq!(name.as_deref(), Some("Dockerfile"));
+}
+
+#[test]
+fn highlight_tsx_styles_jsx_tag_name() {
+    let extra = extra_syntax("typescript");
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[extra]);
+    let result = h.highlight(Path::new("app.tsx"), &["<div>".to_string()]);
+    let plain = h.highlight(Path::new("noext"), &["div".to_string()]);
+    let div_span = result[0]
+        .iter()
+        .find(|(_, text)| text == "div")
+        .expect("expected a distinct span for the JSX tag name");
+    assert_ne!(
+        div_span.0, plain[0][0].0,
+        "JSX tag name must be styled, not plain text — the jsx context \
+         must win over the operators context for `<`"
+    );
+}
+
+#[test]
 fn highlight_dockerfile_highlights_instructions() {
     let extra = extra_syntax("dockerfile");
     let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[extra]);

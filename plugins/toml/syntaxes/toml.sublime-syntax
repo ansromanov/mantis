@@ -26,7 +26,7 @@ contexts:
     - match: '([a-zA-Z0-9_-]+)(\s*)(=)'
       captures:
         1: entity.name.tag.toml
-        2: keyword.operator.assignment.toml
+        3: keyword.operator.assignment.toml
     - match: '(\[)([a-zA-Z0-9._-]+)(\])'
       captures:
         1: punctuation.definition.table.begin.toml
