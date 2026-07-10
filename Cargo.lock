@@ -1596,6 +1596,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "sh"
+version = "0.1.0"
+dependencies = [
+ "mantis",
+ "serde_json",
+]
+
+[[package]]
 name = "sharded-slab"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"

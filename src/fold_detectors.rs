@@ -1,16 +1,20 @@
 //! Pure fold-region detectors for brace-delimited and indentation-based
 //! languages, intended for consumption by language-provider plugins.
 //!
-//! Two public functions share the `crate::fold::FoldRegion` output type:
+//! Public functions share the `crate::fold::FoldRegion` output type:
 //!
 //! * `brace_fold` — character-level lexer-lite state machine that matches
 //!   `{`/`}` pairs, skipping braces inside line/block comments, double-quoted
 //!   strings (with `\"` escapes), Rust raw strings (`r"…"`, `r#"…"#`, …), and
 //!   Go backtick strings.
 //! * `brace_fold_with_brackets` — same state machine, additionally matching
-//!   `[`/`]` pairs. Used by the JSON plugin, where multiline arrays are as
+//!   `[`/`]` pairs.  Used by the JSON plugin, where multiline arrays are as
 //!   foldable as objects; kept separate from `brace_fold` so Rust/Go (where
 //!   folding every multiline array literal would be noise) are unaffected.
+//! * `shell_brace_fold` — shell-specific brace detector.  Matches `{`/`}`
+//!   pairs, skipping braces inside `#` line comments, single-quoted strings
+//!   (no escape processing), double-quoted strings (`\"` escapes), and
+//!   heredocs (`<<WORD … WORD`).
 //! * `indent_fold` — Python-style indentation detector.  A region spans from
 //!   each compound-statement header (`def`/`class`/`if`/`for`/`while`/etc.) to
 //!   the last more-indented line.  Continuation keywords (`else`/`elif`/
@@ -176,6 +180,152 @@ fn brace_fold_impl(text: &str, track_brackets: bool) -> Vec<FoldRegion> {
                     st = St::Normal;
                 } else if b == b'\n' {
                     line += 1;
+                }
+            }
+        }
+        i += 1;
+    }
+
+    regions
+}
+
+// ---------------------------------------------------------------------------
+// Shell brace-nesting detector
+// ---------------------------------------------------------------------------
+
+/// Detects foldable regions in shell scripts (sh, bash, zsh).
+///
+/// Like [`brace_fold`], walks `text` character by character maintaining a
+/// nesting stack for `{…}` pairs, but uses shell-specific syntax rules:
+///
+/// * Line comments (`# …`)
+/// * Single-quoted strings (`'…'` — no escape processing)
+/// * Double-quoted strings (`"…"` with `\"` escapes)
+/// * Heredocs (`<<WORD … WORD` — braces inside are inert)
+///
+/// Returns one region per `{…}` block that spans more than one line.
+pub fn shell_brace_fold(text: &str) -> Vec<FoldRegion> {
+    let bytes = text.as_bytes();
+    let len = bytes.len();
+    if len == 0 {
+        return Vec::new();
+    }
+
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    enum St {
+        Normal,
+        LineCmt,
+        SqStr,
+        DqStr,
+        Heredoc,
+    }
+
+    let mut st = St::Normal;
+    let mut line = 0usize;
+    let mut stack: Vec<usize> = Vec::new();
+    let mut regions: Vec<FoldRegion> = Vec::new();
+    let mut heredoc_delim: Vec<u8> = Vec::new();
+    let mut i = 0;
+
+    while i < len {
+        let b = bytes[i];
+        match st {
+            St::Normal => match b {
+                b'\n' => line += 1,
+                b'{' => stack.push(line),
+                b'}' => {
+                    if let Some(start) = stack.pop() {
+                        if line > start {
+                            regions.push(FoldRegion { start, end: line });
+                        }
+                    }
+                }
+                b'#' => st = St::LineCmt,
+                b'\'' => st = St::SqStr,
+                b'"' => st = St::DqStr,
+                b'<' if i + 1 < len && bytes[i + 1] == b'<' => {
+                    // Skip <<< (here-string) — not a heredoc.
+                    if i + 2 < len && bytes[i + 2] == b'<' {
+                        i += 2;
+                    } else {
+                        i += 1;
+                        let dash = i + 1 < len && bytes[i + 1] == b'-';
+                        if dash {
+                            i += 1;
+                        }
+                        i += 1;
+                        while i < len && (bytes[i] == b' ' || bytes[i] == b'\t') {
+                            i += 1;
+                        }
+                        let word_start = i;
+                        while i < len && bytes[i] != b'\n' && bytes[i] != b' ' && bytes[i] != b'\t'
+                        {
+                            i += 1;
+                        }
+                        if i > word_start {
+                            heredoc_delim.clear();
+                            heredoc_delim.extend_from_slice(&bytes[word_start..i]);
+                            st = St::Heredoc;
+                            continue;
+                        }
+                    }
+                }
+                _ => {}
+            },
+            St::LineCmt => {
+                if b == b'\n' {
+                    st = St::Normal;
+                    line += 1;
+                }
+            }
+            St::SqStr => {
+                if b == b'\'' {
+                    st = St::Normal;
+                }
+            }
+            St::DqStr => {
+                if b == b'\\' && i + 1 < len {
+                    if bytes[i + 1] == b'\n' {
+                        line += 1;
+                    }
+                    i += 1;
+                } else if b == b'"' {
+                    st = St::Normal;
+                } else if b == b'\n' {
+                    line += 1;
+                }
+            }
+            St::Heredoc => {
+                if b == b'\n' {
+                    line += 1;
+                    let after_nl = i + 1;
+                    let remaining = len - after_nl;
+                    if remaining >= heredoc_delim.len() {
+                        // Skip optional leading whitespace (tabs for <<- style).
+                        let mut start = after_nl;
+                        while start < len && (bytes[start] == b' ' || bytes[start] == b'\t') {
+                            start += 1;
+                        }
+                        let avail = len - start;
+                        if avail >= heredoc_delim.len() {
+                            let mut matches = true;
+                            for (j, &d) in heredoc_delim.iter().enumerate() {
+                                if bytes[start + j] != d {
+                                    matches = false;
+                                    break;
+                                }
+                            }
+                            if matches {
+                                let after_delim = start + heredoc_delim.len();
+                                if after_delim >= len
+                                    || bytes[after_delim] == b'\n'
+                                    || bytes[after_delim] == b'\r'
+                                {
+                                    st = St::Normal;
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

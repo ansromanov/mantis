@@ -164,6 +164,7 @@ compiled alongside `mantis` and installed on first run.
 | python | `python` | Registers as a language provider for `.py` files with the `fold` capability. On file open, computes and registers collapsible indentation-based fold regions. |
 | rust | `rust` | Registers as a language provider for `.rs` files with the `fold` capability. On file open, computes and registers collapsible curly-brace fold regions. |
 | go | `go` | Registers as a language provider for `.go` files with the `fold` capability. On file open, computes and registers collapsible curly-brace fold regions. |
+| sh | `sh` | Registers as a language provider for `.sh`, `.bash`, and `.zsh` files with the `fold` capability. On file open, computes fold regions for function bodies and compound blocks, aware of `#` comments, quoted strings, and heredocs. |
 
 ### Bundled syntax plugins
 
