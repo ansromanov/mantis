@@ -122,12 +122,16 @@ test-pr:
     # the agent's own ship loop, instead of only at commit-time or in CI.
     echo "$changed" | bash scripts/require-tests.sh
     filterset=$(echo "$changed" | bash scripts/related-tests.sh)
+    # The bin target re-declares every lib module, so each unit test exists in
+    # both `mantis` (lib) and `mantis::bin/mantis`. Skip the bin copies, keeping
+    # its exclusive modules (`tests`, `draw_tests`).
+    dedup='not (binary_id(mantis::bin/mantis) & !test(/^(tests|draw_tests)::/))'
     if [[ "$filterset" == "__ALL__" ]]; then
         echo "[test-pr] broad change detected — skipping (run 'cargo nextest run' manually if needed)"
         exit 0
     else
         echo "[test-pr] running related tests: $filterset"
-        cargo nextest run -E "$filterset"
+        cargo nextest run -E "($filterset) & $dedup"
     fi
 
 # type-check without building

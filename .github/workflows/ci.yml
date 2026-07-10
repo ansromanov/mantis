@@ -1,8 +1,10 @@
 name: CI
 
 # Pull-request gate: format, lint, and only the tests related to the changed
-# files. The full suite, Windows, bench-smoke and coverage run elsewhere
-# (main.yml on merge, coverage.yml on demand).
+# files. Broad changes run a small smoke set (integration + plugin + bin-only
+# tests), never the full suite. The full suite, Windows and benchmarks run on
+# release (release.yml); merge to main runs a related-tests sanity pass
+# (main.yml); coverage is on demand (coverage.yml).
 on:
   pull_request:
     branches: [main]
@@ -127,12 +129,21 @@ jobs:
           echo "Selected filter: $filter"
 
       - name: Run related tests
+        env:
+          FILTER: ${{ steps.select.outputs.filter }}
         run: |
-          if [ "${{ steps.select.outputs.filter }}" = "__ALL__" ]; then
-            echo "Running full suite (broad change detected)."
-            cargo nextest run --profile ci --all
+          # The bin target re-declares every lib module, so each unit test
+          # exists twice: in `mantis` (lib) and `mantis::bin/mantis`. Drop the
+          # bin copies, keeping only its exclusive modules (`tests`,
+          # `draw_tests` from src/main_test.rs / src/main_draw_test.rs).
+          dedup='not (binary_id(mantis::bin/mantis) & !test(/^(tests|draw_tests)::/))'
+          if [ "$FILTER" = "__ALL__" ]; then
+            echo "Broad change — running smoke set instead of the full suite."
+            # Integration binaries + plugin bin tests + main.rs-only tests
+            # (~100 tests). The full suite runs on release.
+            cargo nextest run --profile ci --all -E "(kind(test) + kind(bin)) & $dedup"
           else
-            cargo nextest run --profile ci --all -E '${{ steps.select.outputs.filter }}'
+            cargo nextest run --profile ci --all -E "($FILTER) & $dedup"
           fi
 
       - name: Run E2E whole-binary smoke test

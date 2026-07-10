@@ -1,7 +1,8 @@
 name: Main
 
-# Runs after merge to main: the full test suite on Linux + Windows, plus the
-# bench compile-smoke. Coverage is separate (coverage.yml, on demand).
+# Post-merge sanity on main: lint everything (clippy --all-targets compiles
+# benches too), run only the tests related to the merge diff, and the e2e
+# smoke. The full suite, Windows and benchmarks run on release (release.yml).
 on:
   push:
     branches: [main]
@@ -10,8 +11,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  test:
-    name: full test suite (Linux)
+  sanity:
+    name: clippy + related tests (Linux)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -32,6 +33,7 @@ jobs:
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
           fi
+          printf '%s\n' "$changed" > changed_files.txt
 
       - name: Install lld
         if: steps.changes.outputs.code == 'true'
@@ -61,9 +63,30 @@ jobs:
         if: steps.changes.outputs.code == 'true'
         run: cargo clippy --all-targets -- -D warnings
 
-      - name: Test
+      - name: Select related tests
         if: steps.changes.outputs.code == 'true'
-        run: cargo nextest run --profile ci --all
+        id: select
+        run: |
+          filter=$(bash scripts/related-tests.sh < changed_files.txt)
+          echo "filter<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$filter" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          echo "Selected filter: $filter"
+
+      - name: Run related tests
+        if: steps.changes.outputs.code == 'true'
+        env:
+          FILTER: ${{ steps.select.outputs.filter }}
+        run: |
+          # Same selection as ci.yml: dedup the bin-target unit-test copies and
+          # cap broad changes to the smoke set. Full suite runs on release.
+          dedup='not (binary_id(mantis::bin/mantis) & !test(/^(tests|draw_tests)::/))'
+          if [ "$FILTER" = "__ALL__" ]; then
+            echo "Broad change — running smoke set instead of the full suite."
+            cargo nextest run --profile ci --all -E "(kind(test) + kind(bin)) & $dedup"
+          else
+            cargo nextest run --profile ci --all -E "($FILTER) & $dedup"
+          fi
 
       - name: Run E2E whole-binary smoke test
         if: steps.changes.outputs.code == 'true'
@@ -77,69 +100,3 @@ jobs:
           detailed_summary: true
           include_passed: true
           check_name: Test Results
-
-  windows:
-    name: test (Windows)
-    runs-on: windows-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 2
-
-      - name: Detect code changes
-        id: changes
-        shell: bash
-        run: |
-          changed=$(git diff --name-only HEAD~1 HEAD)
-          if echo "$changed" | grep -qE '^(src/|tests/|benches/|Cargo\.(toml|lock)|mantis\.toml|themes/|install\.ps1)'; then
-            echo "code=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "code=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - uses: dtolnay/rust-toolchain@stable
-        if: steps.changes.outputs.code == 'true'
-      - uses: Swatinem/rust-cache@v2
-        if: steps.changes.outputs.code == 'true'
-
-      # `cargo test` compiles the test targets itself — no separate build step.
-      - name: Test
-        if: steps.changes.outputs.code == 'true'
-        run: cargo test --all
-
-  bench-smoke:
-    name: bench (compile check)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    env:
-      RUSTFLAGS: "-C link-arg=-fuse-ld=lld"
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 2
-
-      - name: Detect code changes
-        id: changes
-        run: |
-          changed=$(git diff --name-only HEAD~1 HEAD)
-          if echo "$changed" | grep -qE '^(src/|benches/|Cargo\.(toml|lock))'; then
-            echo "code=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "code=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Install lld
-        if: steps.changes.outputs.code == 'true'
-        run: sudo apt-get update && sudo apt-get install -y lld
-      - uses: dtolnay/rust-toolchain@stable
-        if: steps.changes.outputs.code == 'true'
-      - uses: Swatinem/rust-cache@v2
-        if: steps.changes.outputs.code == 'true'
-      - name: Bench smoke test (compiles + runs one group)
-        if: steps.changes.outputs.code == 'true'
-        # Target the Criterion binary explicitly so libtest in src/lib.rs is not invoked.
-        # --test runs each benchmark once without statistics — sufficient to catch crashes.
-        run: cargo bench --bench performance -- "scroll_redraw/highlight_range/top/25" --test

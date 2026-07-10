@@ -93,6 +93,86 @@ jobs:
           fi
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
+  # Full validation runs here (and only here): complete test suite on Linux
+  # and Windows, the e2e smoke, and the full benchmarks — all in parallel with
+  # the builds. PRs and merges to main run only related-test subsets (ci.yml,
+  # main.yml), so release is the single point that exercises everything.
+  test:
+    name: full test suite + e2e (Linux)
+    needs: bump
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      RUSTFLAGS: "-C link-arg=-fuse-ld=lld"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.bump.outputs.sha }}
+
+      - name: Install lld
+        run: sudo apt-get update && sudo apt-get install -y lld
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
+
+      - name: Run full test suite
+        run: cargo nextest run --profile ci --all
+
+      - name: Run E2E whole-binary smoke test
+        run: python3 scripts/ci-e2e.py
+
+  test-windows:
+    name: full test suite (Windows)
+    needs: bump
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.bump.outputs.sha }}
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Test
+        run: cargo test --all
+
+  bench:
+    name: full benchmarks
+    needs: bump
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.bump.outputs.sha }}
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Run full benchmarks
+        run: ./scripts/bench-report.sh
+
+      - name: Write perf recap
+        run: ./scripts/bench-summary.sh | tee bench-results/summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload bench report
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-report-v${{ needs.bump.outputs.version }}
+          path: bench-results/
+
   build:
     needs: bump
     strategy:
@@ -148,7 +228,7 @@ jobs:
           path: ${{ matrix.artifact }}
 
   publish:
-    needs: [bump, build]
+    needs: [bump, build, test, test-windows, bench]
     runs-on: ubuntu-latest
     permissions:
       contents: write
