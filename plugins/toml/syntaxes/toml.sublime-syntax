@@ -1,0 +1,103 @@
+%YAML 1.2
+---
+# TOML syntax definition for syntect.
+# Based on the TOML v1.0 specification.
+name: TOML
+file_extensions:
+  - toml
+scope: source.toml
+
+contexts:
+  main:
+    - include: comments
+    - include: keys
+    - include: strings
+    - include: integers
+    - include: floats
+    - include: booleans
+    - include: dates
+    - include: brackets
+
+  comments:
+    - match: '#.*$'
+      scope: comment.line.number-sign.toml
+
+  keys:
+    - match: '([a-zA-Z0-9_-]+)(\s*)(=)'
+      captures:
+        1: entity.name.tag.toml
+        2: keyword.operator.assignment.toml
+    - match: '(\[)([a-zA-Z0-9._-]+)(\])'
+      captures:
+        1: punctuation.definition.table.begin.toml
+        2: entity.name.tag.table.toml
+        3: punctuation.definition.table.end.toml
+    - match: '(\[\[)([a-zA-Z0-9._-]+)(\]\])'
+      captures:
+        1: punctuation.definition.table.array.begin.toml
+        2: entity.name.tag.table.toml
+        3: punctuation.definition.table.array.end.toml
+
+  strings:
+    - match: '"'
+      scope: punctuation.definition.string.begin.toml
+      push: string_basic
+    - match: "'"
+      scope: punctuation.definition.string.begin.toml
+      push: string_literal
+
+  string_basic:
+    - meta_scope: string.quoted.double.toml
+    - match: '"'
+      scope: punctuation.definition.string.end.toml
+      pop: true
+    - match: '\\.'
+      scope: constant.character.escape.toml
+
+  string_literal:
+    - meta_scope: string.quoted.single.toml
+    - match: "'"
+      scope: punctuation.definition.string.end.toml
+      pop: true
+
+  integers:
+    - match: '[+-]?\b(0x[0-9a-fA-F]+|0o[0-7]+|0b[01]+|[0-9][0-9_]*)\b'
+      scope: constant.numeric.integer.toml
+
+  floats:
+    - match: '[+-]?\b[0-9][0-9_]*\.[0-9][0-9_]*([eE][+-]?[0-9]+)?\b'
+      scope: constant.numeric.float.toml
+    - match: '[+-]?\b[0-9][0-9_]*[eE][+-]?[0-9]+\b'
+      scope: constant.numeric.float.toml
+    - match: '[+-]?\b(inf|nan)\b'
+      scope: constant.numeric.float.toml
+
+  booleans:
+    - match: '\b(true|false)\b'
+      scope: constant.language.boolean.toml
+
+  dates:
+    - match: '\b\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?)?\b'
+      scope: constant.other.date.toml
+
+  brackets:
+    - match: '\{'
+      scope: punctuation.definition.table.begin.toml
+      push: inline_table
+    - match: '\['
+      scope: punctuation.definition.array.begin.toml
+      push: array
+
+  inline_table:
+    - meta_scope: meta.table.inline.toml
+    - match: '\}'
+      scope: punctuation.definition.table.end.toml
+      pop: true
+    - include: main
+
+  array:
+    - meta_scope: meta.array.toml
+    - match: '\]'
+      scope: punctuation.definition.array.end.toml
+      pop: true
+    - include: main

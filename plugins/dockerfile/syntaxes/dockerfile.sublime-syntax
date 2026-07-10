@@ -1,0 +1,57 @@
+%YAML 1.2
+---
+# Dockerfile syntax definition for syntect.
+# Based on the Dockerfile Reference.
+name: Dockerfile
+file_extensions:
+  - dockerfile
+scope: source.dockerfile
+first_line_match: '(?i)^FROM\s+'
+
+contexts:
+  main:
+    - include: comments
+    - include: instructions
+    - include: strings
+    - include: variables
+    - include: numbers
+
+  comments:
+    - match: '#.*$'
+      scope: comment.line.number-sign.dockerfile
+
+  instructions:
+    - match: '(?i)^(FROM|RUN|CMD|LABEL|MAINTAINER|EXPOSE|ENV|ADD|COPY|ENTRYPOINT|VOLUME|USER|WORKDIR|ARG|ONBUILD|STOPSIGNAL|HEALTHCHECK|SHELL)\b'
+      scope: keyword.control.instruction.dockerfile
+
+  strings:
+    - match: '"'
+      scope: punctuation.definition.string.begin.dockerfile
+      push: string_double
+    - match: "'"
+      scope: punctuation.definition.string.begin.dockerfile
+      push: string_single
+
+  string_double:
+    - meta_scope: string.quoted.double.dockerfile
+    - match: '"'
+      scope: punctuation.definition.string.end.dockerfile
+      pop: true
+    - match: '\\.'
+      scope: constant.character.escape.dockerfile
+
+  string_single:
+    - meta_scope: string.quoted.single.dockerfile
+    - match: "'"
+      scope: punctuation.definition.string.end.dockerfile
+      pop: true
+    - match: '\\.'
+      scope: constant.character.escape.dockerfile
+
+  variables:
+    - match: '\$[{(]?[a-zA-Z_][a-zA-Z0-9_]*[})]?'
+      scope: variable.other.dockerfile
+
+  numbers:
+    - match: '\b[0-9]+\b'
+      scope: constant.numeric.dockerfile

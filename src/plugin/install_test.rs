@@ -59,6 +59,15 @@ fn bundled_plugin_entries_all_enabled_by_default() {
         names.contains(&"terraform"),
         "terraform syntax plugin must be listed"
     );
+    assert!(names.contains(&"toml"), "toml syntax plugin must be listed");
+    assert!(
+        names.contains(&"typescript"),
+        "typescript syntax plugin must be listed"
+    );
+    assert!(
+        names.contains(&"dockerfile"),
+        "dockerfile syntax plugin must be listed"
+    );
     assert!(names.contains(&"python"), "python plugin must be listed");
     assert!(names.contains(&"json"), "json plugin must be listed");
     for (name, entry) in &entries {
@@ -69,15 +78,15 @@ fn bundled_plugin_entries_all_enabled_by_default() {
     }
     // Process entries
     for (name, entry) in &entries {
-        if name == "terraform" {
+        if name == "terraform" || name == "toml" || name == "typescript" || name == "dockerfile" {
             assert_eq!(
                 entry.kind,
                 PluginKind::Syntax,
-                "terraform must be a syntax plugin"
+                "{name} must be a syntax plugin"
             );
             assert!(
                 entry.syntax_file.is_some(),
-                "terraform must have syntax_file set"
+                "{name} must have syntax_file set"
             );
         } else {
             assert_eq!(
@@ -157,6 +166,27 @@ fn install_bundled_plugins_creates_iconize_binary() {
             .exists(),
         "terraform.sublime-syntax must be installed"
     );
+    assert!(
+        plugins_dir
+            .join("syntaxes")
+            .join("toml.sublime-syntax")
+            .exists(),
+        "toml.sublime-syntax must be installed"
+    );
+    assert!(
+        plugins_dir
+            .join("syntaxes")
+            .join("typescript.sublime-syntax")
+            .exists(),
+        "typescript.sublime-syntax must be installed"
+    );
+    assert!(
+        plugins_dir
+            .join("syntaxes")
+            .join("dockerfile.sublime-syntax")
+            .exists(),
+        "dockerfile.sublime-syntax must be installed"
+    );
     let iconize_name = if cfg!(windows) {
         "iconize.exe"
     } else {
@@ -213,6 +243,64 @@ fn install_bundles_terraform_syntax_content() {
         content.to_lowercase().contains("terraform"),
         "bundled terraform syntax must contain the HCL/Terraform grammar"
     );
+    std::fs::remove_dir_all(&tmp).ok();
+}
+
+#[test]
+fn install_bundles_new_syntax_content() {
+    // Guards the `include_str!` source paths for the new syntax plugins.
+    // A wrong-but-existing path would bundle empty/garbage content while
+    // still compiling, so assert each installed file carries its real grammar.
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let tmp = fresh_plugin_dir();
+    std::fs::create_dir_all(&tmp).unwrap();
+    let old = std::env::var_os("XDG_CONFIG_HOME");
+    unsafe { std::env::set_var("XDG_CONFIG_HOME", &tmp) };
+
+    install_bundled_plugins();
+
+    unsafe {
+        match old {
+            Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
+            None => std::env::remove_var("XDG_CONFIG_HOME"),
+        }
+    }
+
+    let syntax_dir = tmp.join("mantis").join("plugins").join("syntaxes");
+
+    let toml_content = std::fs::read_to_string(syntax_dir.join("toml.sublime-syntax"))
+        .expect("toml syntax should be readable");
+    assert!(
+        toml_content.contains("%YAML"),
+        "bundled toml syntax must be a real .sublime-syntax document"
+    );
+    assert!(
+        toml_content.to_lowercase().contains("toml"),
+        "bundled toml syntax must contain the TOML grammar"
+    );
+
+    let ts_content = std::fs::read_to_string(syntax_dir.join("typescript.sublime-syntax"))
+        .expect("typescript syntax should be readable");
+    assert!(
+        ts_content.contains("%YAML"),
+        "bundled typescript syntax must be a real .sublime-syntax document"
+    );
+    assert!(
+        ts_content.to_lowercase().contains("typescript"),
+        "bundled typescript syntax must contain the TypeScript grammar"
+    );
+
+    let docker_content = std::fs::read_to_string(syntax_dir.join("dockerfile.sublime-syntax"))
+        .expect("dockerfile syntax should be readable");
+    assert!(
+        docker_content.contains("%YAML"),
+        "bundled dockerfile syntax must be a real .sublime-syntax document"
+    );
+    assert!(
+        docker_content.to_lowercase().contains("dockerfile"),
+        "bundled dockerfile syntax must contain the Dockerfile grammar"
+    );
+
     std::fs::remove_dir_all(&tmp).ok();
 }
 
@@ -409,6 +497,27 @@ fn install_bundled_plugins_creates_plugin_dir_and_syntaxes() {
             .join("terraform.sublime-syntax")
             .exists(),
         "terraform.sublime-syntax must be installed"
+    );
+    assert!(
+        plugins_dir
+            .join("syntaxes")
+            .join("toml.sublime-syntax")
+            .exists(),
+        "toml.sublime-syntax must be installed"
+    );
+    assert!(
+        plugins_dir
+            .join("syntaxes")
+            .join("typescript.sublime-syntax")
+            .exists(),
+        "typescript.sublime-syntax must be installed"
+    );
+    assert!(
+        plugins_dir
+            .join("syntaxes")
+            .join("dockerfile.sublime-syntax")
+            .exists(),
+        "dockerfile.sublime-syntax must be installed"
     );
     std::fs::remove_dir_all(&tmp).ok();
 }

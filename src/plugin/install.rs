@@ -8,6 +8,10 @@
 //! time via `build.rs` → `$OUT_DIR/plugin_binaries.rs` — no search-path dance
 //! or fallback `cargo build` at runtime. This ensures they are always
 //! available for non-source installs (release artifacts, Homebrew, etc.).
+//!
+//! Bundled syntax plugins (`terraform`, `toml`, `typescript`, `dockerfile`)
+//! are embedded via `include_str!` and written to the `syntaxes/` subdirectory
+//! on first run.
 
 include!(concat!(env!("OUT_DIR"), "/plugin_binaries.rs"));
 
@@ -18,7 +22,7 @@ use crate::plugin::types::{PluginEntry, PluginKind};
 /// Returns `(name, PluginEntry)` pairs for every plugin that ships with `mantis`.
 ///
 /// All plugins shipped with `mantis` (markdown, iconize, python, rust, go, json,
-/// terraform) are enabled by default. User config entries with `or_insert` always
+/// terraform, toml, typescript, dockerfile) are enabled by default. User config entries with `or_insert` always
 /// win over these defaults, so an explicit `enabled = false` in `mantis.toml` is
 /// respected.
 pub(crate) fn bundled_plugin_entries() -> Vec<(String, PluginEntry)> {
@@ -116,18 +120,45 @@ pub(crate) const RETIRED_BUNDLED_PLUGINS: &[&str] = &[
 ];
 
 /// List of (filename, content) for each bundled syntax definition.
-const BUNDLED_SYNTAX_PLUGINS: &[(&str, &str)] = &[(
-    "terraform.sublime-syntax",
-    include_str!("../../plugins/terraform/syntaxes/terraform.sublime-syntax"),
-)];
+const BUNDLED_SYNTAX_PLUGINS: &[(&str, &str)] = &[
+    (
+        "terraform.sublime-syntax",
+        include_str!("../../plugins/terraform/syntaxes/terraform.sublime-syntax"),
+    ),
+    (
+        "toml.sublime-syntax",
+        include_str!("../../plugins/toml/syntaxes/toml.sublime-syntax"),
+    ),
+    (
+        "typescript.sublime-syntax",
+        include_str!("../../plugins/typescript/syntaxes/typescript.sublime-syntax"),
+    ),
+    (
+        "dockerfile.sublime-syntax",
+        include_str!("../../plugins/dockerfile/syntaxes/dockerfile.sublime-syntax"),
+    ),
+];
 
 /// List of (name, syntax_rel_path, extensions) for syntax plugin [plugins] entries.
 /// Seeded into the config so syntax plugins appear in the plugin palette.
-const BUNDLED_SYNTAX_PLUGIN_ENTRIES: &[(&str, &str, &[&str])] = &[(
-    "terraform",
-    "syntaxes/terraform.sublime-syntax",
-    &["tf", "tfvars"],
-)];
+const BUNDLED_SYNTAX_PLUGIN_ENTRIES: &[(&str, &str, &[&str])] = &[
+    (
+        "terraform",
+        "syntaxes/terraform.sublime-syntax",
+        &["tf", "tfvars"],
+    ),
+    ("toml", "syntaxes/toml.sublime-syntax", &["toml"]),
+    (
+        "typescript",
+        "syntaxes/typescript.sublime-syntax",
+        &["ts", "tsx", "mts", "cts", "jsx"],
+    ),
+    (
+        "dockerfile",
+        "syntaxes/dockerfile.sublime-syntax",
+        &["dockerfile"],
+    ),
+];
 
 /// Copies every bundled plugin to the plugin directory if it doesn't already
 /// exist there, or overwrites it if the installed binary differs from the

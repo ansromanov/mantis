@@ -12,6 +12,10 @@
 //! Extra syntax definitions (e.g. from plugins) can be passed via
 //! [`with_extra_syntaxes`]; each is a `.sublime-syntax` file loaded into the
 //! `SyntaxSet` so its file extensions are recognised during highlighting.
+//!
+//! For extensionless well-known filenames (e.g. `Dockerfile`, `Containerfile`),
+//! [`resolve_syntax_for_file`] falls back to a name-based lookup when
+//! syntect's extension matching fails.
 
 use ratatui::style::{Color, Modifier, Style};
 use std::fs;
@@ -83,11 +87,7 @@ impl Highlighter {
     /// only plain text was matched. Used by `compute_file_load` to populate
     /// `FileLoad::syntax_name` on the worker thread.
     pub fn syntax_name(&self, path: &Path) -> Option<String> {
-        self.ss
-            .find_syntax_for_file(path)
-            .ok()
-            .flatten()
-            .map(|s| s.name.clone())
+        resolve_syntax_for_file(&self.ss, path)
     }
 
     /// Syntax-highlights the given lines by detecting the file type from
@@ -104,6 +104,11 @@ impl Highlighter {
             .find_syntax_for_file(path)
             .ok()
             .flatten()
+            .or_else(|| {
+                path.file_name()
+                    .and_then(|n| n.to_str())
+                    .and_then(|name| self.ss.find_syntax_by_name(name))
+            })
             .unwrap_or_else(|| self.ss.find_syntax_plain_text());
         self.highlight_impl(syntax, lines.iter().map(|s| s.as_str()))
     }
@@ -166,6 +171,23 @@ impl Highlighter {
             })
             .collect()
     }
+}
+
+/// Resolves a syntax name for a file path, handling extensionless filenames.
+///
+/// Tries syntect's `find_syntax_for_file` (extension + first-line matching) first,
+/// then falls back to checking the filename against well-known names like
+/// `Dockerfile` and `Containerfile` which have no file extension.
+fn resolve_syntax_for_file(ss: &SyntaxSet, path: &Path) -> Option<String> {
+    ss.find_syntax_for_file(path)
+        .ok()
+        .flatten()
+        .or_else(|| {
+            path.file_name()
+                .and_then(|n| n.to_str())
+                .and_then(|name| ss.find_syntax_by_name(name))
+        })
+        .map(|s| s.name.clone())
 }
 
 /// Converts a syntect style (foreground + font-style flags) into ratatui
