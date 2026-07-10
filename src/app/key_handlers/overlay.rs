@@ -439,16 +439,144 @@ impl App {
     }
 
     /// Handles keyboard input while the command palette is open.
+    ///
+    /// Prefix routing: the first character of the query can be a prefix
+    /// (`/` → files, `#` → content, `:` → go-to-line, `>` → commands)
+    /// that delegates the remaining query to the corresponding sub-picker.
+    /// Backspace on an empty routed query returns to commands mode.
     pub(super) fn handle_command_key(&mut self, key: KeyEvent) {
-        let Some(ref mut p) = self.command_palette else {
-            return;
-        };
-        match handle_list_picker_key(p, &key) {
-            OverlayKey::Activate => {
-                self.dispatch_command();
+        // Detect Tab mode-toggle when in content route (mirrors search overlay).
+        if static_keys::is_toggle_modal(&key) {
+            if let Some(ref mut p) = self.command_palette {
+                if p.route == crate::command_palette::PaletteRoute::Content {
+                    if let Some(ref mut s) = p.route_search {
+                        s.toggle_mode();
+                        p.route = match s.mode {
+                            crate::search::SearchMode::Files => {
+                                crate::command_palette::PaletteRoute::Files
+                            }
+                            crate::search::SearchMode::Content => {
+                                crate::command_palette::PaletteRoute::Content
+                            }
+                        };
+                    }
+                }
             }
-            OverlayKey::Close => self.command_palette = None,
+            return;
+        }
+
+        // Capture route before key handling so we can detect a prefix transition.
+        let route_before = self
+            .command_palette
+            .as_ref()
+            .map(|p| p.route)
+            .unwrap_or(crate::command_palette::PaletteRoute::Commands);
+
+        // Use a block so the mutable borrow on command_palette is released
+        // before we potentially call self methods in Handled/Activate arms.
+        let action = self
+            .command_palette
+            .as_mut()
+            .map(|p| handle_list_picker_key(p, &key));
+
+        match action {
+            Some(OverlayKey::Activate) => {
+                let route = self
+                    .command_palette
+                    .as_ref()
+                    .map(|p| p.route)
+                    .unwrap_or(crate::command_palette::PaletteRoute::Commands);
+                match route {
+                    crate::command_palette::PaletteRoute::Commands => {
+                        self.dispatch_command();
+                    }
+                    crate::command_palette::PaletteRoute::Files => {
+                        self.dispatch_palette_file();
+                    }
+                    crate::command_palette::PaletteRoute::Content => {
+                        self.dispatch_palette_content();
+                    }
+                    crate::command_palette::PaletteRoute::GotoLine => {
+                        self.dispatch_palette_goto_line();
+                    }
+                }
+            }
+            Some(OverlayKey::Close) => {
+                if let Some(ref mut p) = self.command_palette {
+                    let in_routed_mode = p.route != crate::command_palette::PaletteRoute::Commands;
+                    if in_routed_mode {
+                        p.route = crate::command_palette::PaletteRoute::Commands;
+                        p.route_search = None;
+                        p.route_goto_line = None;
+                        p.selected = 0;
+                        p.filtered = p.base_order.clone();
+                        p.match_positions = vec![Vec::new(); p.filtered.len()];
+                    } else {
+                        self.command_palette = None;
+                    }
+                }
+            }
+            Some(OverlayKey::Handled) => {
+                let current_route = self
+                    .command_palette
+                    .as_ref()
+                    .map(|p| p.route)
+                    .unwrap_or(crate::command_palette::PaletteRoute::Commands);
+                self.maybe_create_palette_sub_picker(current_route, route_before);
+            }
             _ => {}
+        }
+    }
+
+    /// Creates the appropriate sub-picker when the palette route just changed
+    /// (i.e. the user typed a prefix character). This is separated from
+    /// `handle_command_key` to satisfy the borrow checker: the mutable borrow
+    /// on `command_palette` must be released before calling `self` methods
+    /// that read other `self` fields.
+    fn maybe_create_palette_sub_picker(
+        &mut self,
+        current_route: crate::command_palette::PaletteRoute,
+        previous_route: crate::command_palette::PaletteRoute,
+    ) {
+        if current_route == previous_route {
+            return;
+        }
+        match current_route {
+            crate::command_palette::PaletteRoute::Files => {
+                let root = self.root.clone();
+                let changed = self.git_changed_files_set();
+                let s = crate::search::SearchState::new(
+                    &root,
+                    self.show_hidden,
+                    self.ignore_gitignore,
+                    self.config.search.context_lines,
+                    changed.as_ref(),
+                );
+                if let Some(ref mut p) = self.command_palette {
+                    p.route_search = Some(s);
+                }
+            }
+            crate::command_palette::PaletteRoute::Content => {
+                let root = self.root.clone();
+                let changed = self.git_changed_files_set();
+                let mut s = crate::search::SearchState::new(
+                    &root,
+                    self.show_hidden,
+                    self.ignore_gitignore,
+                    self.config.search.context_lines,
+                    changed.as_ref(),
+                );
+                s.toggle_mode();
+                if let Some(ref mut p) = self.command_palette {
+                    p.route_search = Some(s);
+                }
+            }
+            crate::command_palette::PaletteRoute::GotoLine => {
+                if let Some(ref mut p) = self.command_palette {
+                    p.route_goto_line = Some(crate::search::GotoLineState::new());
+                }
+            }
+            crate::command_palette::PaletteRoute::Commands => {}
         }
     }
 

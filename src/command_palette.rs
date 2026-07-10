@@ -1,5 +1,6 @@
 //! The Ctrl-P command palette: a fuzzy-filterable picker over the
-//! palette-invokable subset of the canonical action registry.
+//! palette-invokable subset of the canonical action registry, with prefix
+//! routing to file search, content search, and go-to-line.
 //!
 //! `COMMANDS` is derived from `crate::actions::ACTIONS`, keeping only entries
 //! with `palette: Some(_)`, so this module no longer hand-maintains its own
@@ -11,6 +12,19 @@
 //! `App` method - so the palette and direct keybindings share one set of
 //! canonical ids. Add new commands to `ACTIONS` (not here) and wire the
 //! `action_id` into that dispatcher.
+//!
+//! **Prefix routing** lets one Ctrl-P entry point reach multiple pickers.
+//! The first character of the query is checked for a prefix:
+//!
+//! | Prefix | Route      | Sub-picker       |
+//! |--------|------------|------------------|
+//! | (none) | Commands   | —                |
+//! | `>`    | Commands   | (alias)          |
+//! | `/`    | Files      | `SearchState`    |
+//! | `#`    | Content    | `SearchState`    |
+//! | `:`    | Go to Line | `GotoLineState`  |
+//!
+//! `@` is reserved for symbols (epic #482) and is not yet routed.
 //!
 //! `inapplicability_reasons` carries, per `COMMANDS` index, why a command
 //! can't run right now (from `App::check_applicability`, driven by
@@ -27,6 +41,61 @@ use crate::actions::ACTIONS;
 use crate::config::Keymap;
 use crate::list_picker::ListPicker;
 use crate::search::fuzzy_refilter;
+use crate::search::{GotoLineState, SearchState};
+
+/// Routes the command palette query to different picker modes via a
+/// single-character prefix typed as the first character in the query bar.
+///
+/// | Prefix | Route            | Source picker      |
+/// |--------|------------------|--------------------|
+/// | (none) | Commands         | existing Ctrl+P    |
+/// | `>`    | Commands (alias) | —                  |
+/// | `/`    | File search      | `SearchState`      |
+/// | `#`    | Content search   | `SearchState`      |
+/// | `:`    | Go to line       | `GotoLineState`    |
+///
+/// `@` is reserved for symbols (epic #482) and is not yet routed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PaletteRoute {
+    Commands,
+    Files,
+    Content,
+    GotoLine,
+}
+
+impl PaletteRoute {
+    /// Maps a prefix character to a route. Returns `None` for characters
+    /// that are not recognized prefixes (they become part of the query).
+    pub fn from_char(c: char) -> Option<Self> {
+        match c {
+            '>' => Some(Self::Commands),
+            '/' => Some(Self::Files),
+            '#' => Some(Self::Content),
+            ':' => Some(Self::GotoLine),
+            _ => None,
+        }
+    }
+
+    /// Human-readable label shown in the popup title.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Commands => "Commands",
+            Self::Files => "Files",
+            Self::Content => "Content",
+            Self::GotoLine => "Go to Line",
+        }
+    }
+
+    /// The prefix character that activates this route.
+    pub fn prefix_char(self) -> char {
+        match self {
+            Self::Commands => '>',
+            Self::Files => '/',
+            Self::Content => '#',
+            Self::GotoLine => ':',
+        }
+    }
+}
 
 pub struct CommandEntry {
     pub name: &'static str,
@@ -69,6 +138,12 @@ pub struct CommandPalette {
     matcher: SkimMatcherV2,
     /// Inapplicability reason for each command index, if any.
     pub inapplicability_reasons: Vec<Option<&'static str>>,
+    /// Current routing mode determined by the first character typed.
+    pub route: PaletteRoute,
+    /// Sub-picker for file/content routes. `None` in Commands mode.
+    pub route_search: Option<SearchState>,
+    /// Sub-picker for the go-to-line route. `None` outside that route.
+    pub route_goto_line: Option<GotoLineState>,
 }
 
 impl Default for CommandPalette {
@@ -148,21 +223,131 @@ impl CommandPalette {
             match_positions: vec![Vec::new(); len],
             matcher: SkimMatcherV2::default(),
             inapplicability_reasons,
+            route: PaletteRoute::Commands,
+            route_search: None,
+            route_goto_line: None,
         }
     }
 
     pub fn push(&mut self, c: char) {
-        self.query.push(c);
-        self.refilter();
+        match self.route {
+            PaletteRoute::Commands => {
+                // Detect prefix on the first character of the query.
+                if self.query.is_empty() {
+                    if let Some(route) = PaletteRoute::from_char(c) {
+                        self.route = route;
+                        return;
+                    }
+                }
+                self.query.push(c);
+                self.refilter();
+            }
+            PaletteRoute::Files | PaletteRoute::Content => {
+                if let Some(ref mut s) = self.route_search {
+                    s.push(c);
+                }
+            }
+            PaletteRoute::GotoLine => {
+                if let Some(ref mut g) = self.route_goto_line {
+                    g.push(c);
+                }
+            }
+        }
     }
 
     pub fn pop(&mut self) {
-        self.query.pop();
-        self.refilter();
+        match self.route {
+            PaletteRoute::Commands => {
+                self.query.pop();
+                self.refilter();
+            }
+            PaletteRoute::Files | PaletteRoute::Content => {
+                match self.route_search {
+                    Some(ref mut s) => {
+                        s.pop();
+                        if s.query.is_empty() {
+                            self.route_search = None;
+                            self.route = PaletteRoute::Commands;
+                            self.selected = 0;
+                            self.filtered = self.base_order.clone();
+                            self.match_positions = vec![Vec::new(); self.filtered.len()];
+                        }
+                    }
+                    None => {
+                        // No sub-picker yet (prefix just typed, no chars after
+                        // it); return to commands mode.
+                        self.route = PaletteRoute::Commands;
+                        self.selected = 0;
+                        self.filtered = self.base_order.clone();
+                        self.match_positions = vec![Vec::new(); self.filtered.len()];
+                    }
+                }
+            }
+            PaletteRoute::GotoLine => match self.route_goto_line {
+                Some(ref mut g) => {
+                    g.pop();
+                    if g.query.is_empty() {
+                        self.route_goto_line = None;
+                        self.route = PaletteRoute::Commands;
+                        self.selected = 0;
+                        self.filtered = self.base_order.clone();
+                        self.match_positions = vec![Vec::new(); self.filtered.len()];
+                    }
+                }
+                None => {
+                    self.route = PaletteRoute::Commands;
+                    self.selected = 0;
+                    self.filtered = self.base_order.clone();
+                    self.match_positions = vec![Vec::new(); self.filtered.len()];
+                }
+            },
+        }
     }
 
     pub fn results_len(&self) -> usize {
-        self.filtered.len()
+        match self.route {
+            PaletteRoute::Commands => self.filtered.len(),
+            PaletteRoute::Files | PaletteRoute::Content => {
+                self.route_search.as_ref().map_or(0, |s| s.results_len())
+            }
+            PaletteRoute::GotoLine => self.route_goto_line.as_ref().map_or(0, |g| g.results_len()),
+        }
+    }
+
+    /// Returns `true` when the effective query (commands or routed) is empty.
+    pub fn is_query_empty(&self) -> bool {
+        match self.route {
+            PaletteRoute::Commands => self.query.is_empty(),
+            PaletteRoute::Files | PaletteRoute::Content => self
+                .route_search
+                .as_ref()
+                .is_none_or(|s| s.query.is_empty()),
+            PaletteRoute::GotoLine => self
+                .route_goto_line
+                .as_ref()
+                .is_none_or(|g| g.query.is_empty()),
+        }
+    }
+
+    /// Returns the effective query string for the active route.
+    pub fn active_query(&self) -> &str {
+        match self.route {
+            PaletteRoute::Commands => &self.query,
+            PaletteRoute::Files | PaletteRoute::Content => {
+                static EMPTY: &str = "";
+                self.route_search
+                    .as_ref()
+                    .map(|s| s.query.as_str())
+                    .unwrap_or(EMPTY)
+            }
+            PaletteRoute::GotoLine => {
+                static EMPTY: &str = "";
+                self.route_goto_line
+                    .as_ref()
+                    .map(|g| g.query.as_str())
+                    .unwrap_or(EMPTY)
+            }
+        }
     }
 
     pub fn selected_index(&self) -> Option<usize> {
@@ -254,16 +439,33 @@ impl ListPicker for CommandPalette {
         self.pop();
     }
     fn query_is_empty(&self) -> bool {
-        self.query.is_empty()
+        self.is_query_empty()
     }
     fn results_len(&self) -> usize {
         self.results_len()
     }
     fn selected(&self) -> usize {
-        self.selected
+        match self.route {
+            PaletteRoute::Commands => self.selected,
+            PaletteRoute::Files | PaletteRoute::Content => {
+                self.route_search.as_ref().map_or(0, |s| s.selected)
+            }
+            PaletteRoute::GotoLine => 0,
+        }
     }
     fn set_selected(&mut self, i: usize) {
-        self.selected = i;
+        match self.route {
+            PaletteRoute::Commands => self.selected = i,
+            PaletteRoute::Files | PaletteRoute::Content => {
+                if let Some(ref mut s) = self.route_search {
+                    s.selected = i;
+                }
+            }
+            PaletteRoute::GotoLine => {
+                // GotoLine has no selectable list; ignore.
+                let _ = i;
+            }
+        }
     }
 }
 

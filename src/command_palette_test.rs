@@ -411,3 +411,128 @@ fn command_palette_refilter_scores_by_relevance() {
         first.name
     );
 }
+
+// -- prefix routing tests ---------------------------------------------------
+
+#[test]
+fn palette_route_from_char_prefixes() {
+    assert_eq!(PaletteRoute::from_char('>'), Some(PaletteRoute::Commands));
+    assert_eq!(PaletteRoute::from_char('/'), Some(PaletteRoute::Files));
+    assert_eq!(PaletteRoute::from_char('#'), Some(PaletteRoute::Content));
+    assert_eq!(PaletteRoute::from_char(':'), Some(PaletteRoute::GotoLine));
+}
+
+#[test]
+fn palette_route_from_char_non_prefix_returns_none() {
+    assert_eq!(PaletteRoute::from_char('a'), None);
+    assert_eq!(PaletteRoute::from_char('z'), None);
+    assert_eq!(PaletteRoute::from_char(' '), None);
+    assert_eq!(PaletteRoute::from_char('@'), None); // reserved for symbols
+}
+
+#[test]
+fn palette_route_label() {
+    assert_eq!(PaletteRoute::Commands.label(), "Commands");
+    assert_eq!(PaletteRoute::Files.label(), "Files");
+    assert_eq!(PaletteRoute::Content.label(), "Content");
+    assert_eq!(PaletteRoute::GotoLine.label(), "Go to Line");
+}
+
+#[test]
+fn palette_route_prefix_char() {
+    assert_eq!(PaletteRoute::Commands.prefix_char(), '>');
+    assert_eq!(PaletteRoute::Files.prefix_char(), '/');
+    assert_eq!(PaletteRoute::Content.prefix_char(), '#');
+    assert_eq!(PaletteRoute::GotoLine.prefix_char(), ':');
+}
+
+#[test]
+fn starts_in_commands_route() {
+    let p = CommandPalette::default();
+    assert_eq!(p.route, PaletteRoute::Commands);
+    assert!(p.route_search.is_none());
+    assert!(p.route_goto_line.is_none());
+}
+
+#[test]
+fn slash_prefix_switches_to_files_route() {
+    let mut p = CommandPalette::default();
+    p.push('/');
+    assert_eq!(p.route, PaletteRoute::Files);
+    // No sub-picker created by push alone — that's done by the key handler.
+    assert!(p.route_search.is_none());
+}
+
+#[test]
+fn hash_prefix_switches_to_content_route() {
+    let mut p = CommandPalette::default();
+    p.push('#');
+    assert_eq!(p.route, PaletteRoute::Content);
+}
+
+#[test]
+fn colon_prefix_switches_to_goto_line_route() {
+    let mut p = CommandPalette::default();
+    p.push(':');
+    assert_eq!(p.route, PaletteRoute::GotoLine);
+    // No sub-picker created by push alone.
+    assert!(p.route_goto_line.is_none());
+}
+
+#[test]
+fn gt_prefix_stays_in_commands_route() {
+    let mut p = CommandPalette::default();
+    p.push('>');
+    assert_eq!(p.route, PaletteRoute::Commands);
+}
+
+#[test]
+fn non_prefix_first_char_stays_in_commands() {
+    let mut p = CommandPalette::default();
+    p.push('h');
+    assert_eq!(p.route, PaletteRoute::Commands);
+    assert_eq!(p.query, "h");
+}
+
+#[test]
+fn pop_returns_to_commands_from_routed_mode() {
+    let mut p = CommandPalette::default();
+    p.push('/');
+    assert_eq!(p.route, PaletteRoute::Files);
+    // Pop when sub-query is empty should return to commands.
+    p.pop();
+    assert_eq!(p.route, PaletteRoute::Commands);
+}
+
+#[test]
+fn active_query_returns_command_query_in_commands_mode() {
+    let mut p = CommandPalette::default();
+    p.push('t');
+    assert_eq!(p.active_query(), "t");
+}
+
+#[test]
+fn is_query_empty_reflects_command_query() {
+    let mut p = CommandPalette::default();
+    assert!(p.is_query_empty());
+    p.push('t');
+    assert!(!p.is_query_empty());
+    p.pop();
+    assert!(p.is_query_empty());
+}
+
+#[test]
+fn list_picker_query_is_empty_delegates_to_route() {
+    use crate::list_picker::ListPicker;
+    let mut p = CommandPalette::default();
+    assert!(ListPicker::query_is_empty(&p));
+    // In commands mode, push a char makes query non-empty.
+    ListPicker::query_push(&mut p, 't');
+    assert!(!ListPicker::query_is_empty(&p));
+    ListPicker::query_pop(&mut p);
+    assert!(ListPicker::query_is_empty(&p));
+
+    // In files route (no sub-picker yet), query is empty.
+    ListPicker::query_push(&mut p, '/');
+    assert!(ListPicker::query_is_empty(&p));
+}
