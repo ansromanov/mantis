@@ -1,4 +1,4 @@
-version = "0.17.4"
+version = "0.17.5"
 date = "2026-07-11"
 whats_new = """- ci: skip lld apt install on self-hosted runners (#697)
 - fix: defer release bump push until pipeline is green (#695)
