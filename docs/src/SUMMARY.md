@@ -10,6 +10,7 @@
 
 # User Guide
 
+- [Release Digests](releases.md)
 - [Usage & Keybindings](usage.md)
 - [Git Features](git.md)
 - [Configuration](configuration.md)

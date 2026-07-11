@@ -57,6 +57,14 @@ commits that touched it. Type to fuzzy-filter, navigate with `↑`/`↓`, and pr
 `Enter` (or double-click) to load the diff of that revision against your current
 working tree into the content panel — additions in green, deletions in red.
 
+## Repository commit log
+
+Press `L` while the tree is focused, or use the command palette (`Ctrl+P`) to
+run **Browse repository commits**, to search the repository-wide commit log.
+The picker shows each commit's short hash, date, author, and subject. Type to
+filter by hash, author, or subject; select a commit and press `Enter` to review
+all changes since it in compare mode. Press `Esc` to close the picker.
+
 ## Git mode
 
 Press `Ctrl+D` to switch the tree to show **only files with uncommitted changes**
