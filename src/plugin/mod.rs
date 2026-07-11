@@ -75,6 +75,8 @@ pub(crate) use install::default_plugin_dir;
 pub(crate) use install::install_bundled_plugins;
 pub(crate) use install::retired_bundled_plugins;
 pub(crate) use manager::PluginManager;
+#[cfg(test)]
+pub(crate) use process::Plugin;
 pub(crate) use syntax::load_extra_syntaxes;
 pub(crate) use types::{
     Capability, ExtraSyntax, LanguageProviderRegistration, PluginCommand, PluginContributions,

@@ -373,19 +373,41 @@ impl App {
                 self.set_status("pretty JSON: could not parse");
             }
         } else if pressed_in(&k.toggle_raw_markdown, &key, scope) {
-            if self.plugin_content_active {
-                let key_str = crate::plugin::key_event_to_string(&key);
-                if key_str != "M" {
-                    let m_key = crossterm::event::KeyEvent::new(
-                        crossterm::event::KeyCode::Char('M'),
-                        crossterm::event::KeyModifiers::SHIFT,
-                    );
-                    self.plugin_manager.on_keypress(&m_key);
-                }
-            } else {
+            let markdown_plugin_active = self.plugin_manager.is_plugin_active("markdown");
+            if !markdown_plugin_active {
                 self.set_status(
-                    "markdown render toggle: not available (current file not plugin-rendered)",
+                    "markdown render toggle: not available (markdown plugin not active)",
                 );
+            } else {
+                let is_markdown = self.current_file.as_ref().map_or(false, |path| {
+                    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+                    matches!(ext, "md" | "markdown")
+                });
+                if is_markdown {
+                    self.show_raw_markdown = !self.show_raw_markdown;
+                    if let Some(path) = self.current_file.clone() {
+                        if self.show_raw_markdown {
+                            self.plugin_content.remove(&path);
+                            self.plugin_content_text.remove(&path);
+                            self.plugin_content_active = false;
+                            self.plugin_content_active_path = None;
+                            self.reload_content();
+                        } else {
+                            self.reload_content();
+                            self.plugin_manager.on_file_open(&path);
+                        }
+                    }
+                    let key_str = crate::plugin::key_event_to_string(&key);
+                    if key_str != "M" {
+                        let m_key = crossterm::event::KeyEvent::new(
+                            crossterm::event::KeyCode::Char('M'),
+                            crossterm::event::KeyModifiers::SHIFT,
+                        );
+                        self.plugin_manager.on_keypress(&m_key);
+                    }
+                } else {
+                    self.set_status("markdown render toggle: not available (not a markdown file)");
+                }
             }
         } else if pressed_in(&k.toggle_blame, &key, scope) {
             if self.has_text_cursor() {

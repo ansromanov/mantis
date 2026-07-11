@@ -70,7 +70,7 @@ pub(crate) const REQUEST_TIMEOUT: Duration = Duration::from_secs(2);
 /// Manages discovery, lifecycle, and hook dispatch for all plugins.
 pub(crate) struct PluginManager {
     entries: Vec<(String, PluginEntry)>,
-    plugins: Vec<Plugin>,
+    pub(crate) plugins: Vec<Plugin>,
     pending_actions: Vec<(String, String, serde_json::Value)>,
     dead_plugins: Vec<String>,
     /// Diagnostics for the most recent crash of each plugin, keyed by name.
@@ -584,6 +584,11 @@ impl PluginManager {
     /// Whether any plugins are currently active.
     pub(crate) fn is_empty(&self) -> bool {
         self.plugins.is_empty()
+    }
+
+    /// Returns `true` if a plugin with the given name is currently active.
+    pub(crate) fn is_plugin_active(&self, name: &str) -> bool {
+        self.plugins.iter().any(|p| p.name == name)
     }
 
     /// Returns every registered plugin as `(name, is_active, kind, crash_badge)`,

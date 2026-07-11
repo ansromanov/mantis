@@ -416,7 +416,13 @@ impl App {
             self.plugin_content_active = false;
             self.set_file_watch(Some(path));
             if !self.plugin_is_opening_file {
-                self.plugin_manager.on_file_open(path);
+                let is_markdown = {
+                    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+                    matches!(ext, "md" | "markdown")
+                };
+                if !(is_markdown && self.show_raw_markdown) {
+                    self.plugin_manager.on_file_open(path);
+                }
             }
             if is_new_file {
                 self.push_recent(path.to_path_buf());

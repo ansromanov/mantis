@@ -451,6 +451,7 @@ fn create_base_app() -> App {
         plugin_content_text: HashMap::new(),
         cursor_positions: HashMap::new(),
         plugin_content_active: false,
+        show_raw_markdown: false,
         plugin_content_active_path: None,
         status_message: None,
         breadcrumb_areas: Vec::new(),

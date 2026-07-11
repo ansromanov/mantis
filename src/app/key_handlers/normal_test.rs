@@ -715,6 +715,38 @@ fn toggle_raw_markdown_not_active_shows_status() {
     fs::remove_dir_all(&root).ok();
 }
 
+#[test]
+fn toggle_raw_markdown_active_toggles_state() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Content;
+
+    // Create a markdown file and open it
+    let md_path = root.join("test.md");
+    fs::write(&md_path, "# Hello").unwrap();
+    app.open_file(&md_path);
+
+    // Mock active markdown plugin
+    app.plugin_manager
+        .plugins
+        .push(crate::plugin::Plugin::new("markdown".to_string(), vec![]));
+
+    assert!(
+        !app.show_raw_markdown,
+        "initially show_raw_markdown should be false"
+    );
+
+    // Pressing 'M' should toggle it
+    app.handle_key(key(KeyCode::Char('M')));
+    assert!(app.show_raw_markdown, "should toggle to true");
+
+    // Pressing 'M' again should toggle it back
+    app.handle_key(key(KeyCode::Char('M')));
+    assert!(!app.show_raw_markdown, "should toggle back to false");
+
+    fs::remove_dir_all(&root).ok();
+}
+
 // -- copy path ---------------------------------------------------------------
 
 #[test]

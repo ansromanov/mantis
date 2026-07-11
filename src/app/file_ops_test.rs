@@ -1200,3 +1200,15 @@ fn file_at_revision_initially_none() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn open_file_with_show_raw_markdown_true_skips_plugin_open() {
+    let root = temp_dir();
+    let f = root.join("test.md");
+    fs::write(&f, "# Hello\n").unwrap();
+    let mut app = app_for(&root);
+    app.show_raw_markdown = true;
+    app.open_file(&f);
+    assert!(app.show_raw_markdown);
+    fs::remove_dir_all(&root).ok();
+}

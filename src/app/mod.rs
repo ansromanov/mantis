@@ -402,6 +402,8 @@ pub struct App {
     /// reset to `false` when `current_file` changes, so the `[rendering…]`
     /// placeholder only shows while the plugin is actively working on that file.
     pub plugin_content_active: bool,
+    /// When `true`, rendered markdown files are instead displayed as raw plain text natively.
+    pub show_raw_markdown: bool,
     /// The last path for which a plugin sent `set_content` while it was the
     /// current file. Used to detect re-renders of the same file vs. first-time
     /// renders of a newly opened file, so scroll position is preserved across

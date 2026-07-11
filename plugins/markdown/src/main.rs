@@ -157,18 +157,15 @@ impl PluginState {
             return;
         }
         self.current_file = Some(path_str.to_string());
+        if self.toggle_raw {
+            // When raw mode is toggled, skip logic entirely to let host render natively.
+            return;
+        }
         let src = match std::fs::read_to_string(path) {
             Ok(s) => s,
             Err(_) => return,
         };
-        let rendered = if self.toggle_raw {
-            // When toggled, send raw file content as plain text.
-            let lines: Vec<String> = src.lines().map(|l| l.to_string()).collect();
-            send_set_content(&lines, path_str, out);
-            return;
-        } else {
-            render_to_ansi(&src, &self.theme)
-        };
+        let rendered = render_to_ansi(&src, &self.theme);
         let ansi_lines: Vec<String> = rendered;
         send_set_content(&ansi_lines, path_str, out);
     }
