@@ -11,6 +11,17 @@ fn fresh_plugin_dir() -> PathBuf {
     std::env::temp_dir().join(format!("mantis_plugin_install_{}_{n}", std::process::id()))
 }
 
+/// The env var `default_plugin_dir` consults for the config root: `APPDATA`
+/// on Windows, `XDG_CONFIG_HOME` elsewhere. Tests must override this one
+/// rather than hardcoding `XDG_CONFIG_HOME`, which Windows ignores.
+fn config_home_var() -> &'static str {
+    if cfg!(windows) {
+        "APPDATA"
+    } else {
+        "XDG_CONFIG_HOME"
+    }
+}
+
 #[test]
 #[cfg(not(windows))]
 fn default_plugin_dir_ends_with_suffix() {
@@ -143,15 +154,15 @@ fn install_bundled_plugins_creates_iconize_binary() {
     let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let tmp = fresh_plugin_dir();
     std::fs::create_dir_all(&tmp).unwrap();
-    let old = std::env::var_os("XDG_CONFIG_HOME");
-    unsafe { std::env::set_var("XDG_CONFIG_HOME", &tmp) };
+    let old = std::env::var_os(config_home_var());
+    unsafe { std::env::set_var(config_home_var(), &tmp) };
 
     install_bundled_plugins();
 
     unsafe {
         match old {
-            Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
-            None => std::env::remove_var("XDG_CONFIG_HOME"),
+            Some(v) => std::env::set_var(config_home_var(), v),
+            None => std::env::remove_var(config_home_var()),
         }
     }
 
@@ -219,15 +230,15 @@ fn install_bundles_terraform_syntax_content() {
     let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let tmp = fresh_plugin_dir();
     std::fs::create_dir_all(&tmp).unwrap();
-    let old = std::env::var_os("XDG_CONFIG_HOME");
-    unsafe { std::env::set_var("XDG_CONFIG_HOME", &tmp) };
+    let old = std::env::var_os(config_home_var());
+    unsafe { std::env::set_var(config_home_var(), &tmp) };
 
     install_bundled_plugins();
 
     unsafe {
         match old {
-            Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
-            None => std::env::remove_var("XDG_CONFIG_HOME"),
+            Some(v) => std::env::set_var(config_home_var(), v),
+            None => std::env::remove_var(config_home_var()),
         }
     }
 
@@ -256,15 +267,15 @@ fn install_bundles_new_syntax_content() {
     let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let tmp = fresh_plugin_dir();
     std::fs::create_dir_all(&tmp).unwrap();
-    let old = std::env::var_os("XDG_CONFIG_HOME");
-    unsafe { std::env::set_var("XDG_CONFIG_HOME", &tmp) };
+    let old = std::env::var_os(config_home_var());
+    unsafe { std::env::set_var(config_home_var(), &tmp) };
 
     install_bundled_plugins();
 
     unsafe {
         match old {
-            Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
-            None => std::env::remove_var("XDG_CONFIG_HOME"),
+            Some(v) => std::env::set_var(config_home_var(), v),
+            None => std::env::remove_var(config_home_var()),
         }
     }
 
@@ -311,8 +322,8 @@ fn remove_retired_plugins_cleans_stale_shell_scripts_and_preserves_user_plugins(
     let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let tmp = fresh_plugin_dir();
     std::fs::create_dir_all(&tmp).unwrap();
-    let old = std::env::var_os("XDG_CONFIG_HOME");
-    unsafe { std::env::set_var("XDG_CONFIG_HOME", &tmp) };
+    let old = std::env::var_os(config_home_var());
+    unsafe { std::env::set_var(config_home_var(), &tmp) };
 
     let plugins_dir = tmp.join("mantis").join("plugins");
     std::fs::create_dir_all(&plugins_dir).unwrap();
@@ -345,8 +356,8 @@ fn remove_retired_plugins_cleans_stale_shell_scripts_and_preserves_user_plugins(
 
     unsafe {
         match old {
-            Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
-            None => std::env::remove_var("XDG_CONFIG_HOME"),
+            Some(v) => std::env::set_var(config_home_var(), v),
+            None => std::env::remove_var(config_home_var()),
         }
     }
     std::fs::remove_dir_all(&tmp).ok();
@@ -357,8 +368,8 @@ fn remove_retired_plugins_no_ops_on_empty_dir() {
     let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let tmp = fresh_plugin_dir();
     std::fs::create_dir_all(&tmp).unwrap();
-    let old = std::env::var_os("XDG_CONFIG_HOME");
-    unsafe { std::env::set_var("XDG_CONFIG_HOME", &tmp) };
+    let old = std::env::var_os(config_home_var());
+    unsafe { std::env::set_var(config_home_var(), &tmp) };
 
     let plugins_dir = tmp.join("mantis").join("plugins");
     std::fs::create_dir_all(&plugins_dir).unwrap();
@@ -368,8 +379,8 @@ fn remove_retired_plugins_no_ops_on_empty_dir() {
 
     unsafe {
         match old {
-            Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
-            None => std::env::remove_var("XDG_CONFIG_HOME"),
+            Some(v) => std::env::set_var(config_home_var(), v),
+            None => std::env::remove_var(config_home_var()),
         }
     }
     std::fs::remove_dir_all(&tmp).ok();
@@ -434,8 +445,8 @@ fn install_bundled_plugins_skips_rewrite_when_content_matches() {
     let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let tmp = fresh_plugin_dir();
     std::fs::create_dir_all(&tmp).unwrap();
-    let old = std::env::var_os("XDG_CONFIG_HOME");
-    unsafe { std::env::set_var("XDG_CONFIG_HOME", &tmp) };
+    let old = std::env::var_os(config_home_var());
+    unsafe { std::env::set_var(config_home_var(), &tmp) };
 
     let plugins_dir = tmp.join("mantis").join("plugins");
     std::fs::create_dir_all(&plugins_dir).unwrap();
@@ -451,8 +462,8 @@ fn install_bundled_plugins_skips_rewrite_when_content_matches() {
 
     unsafe {
         match old {
-            Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
-            None => std::env::remove_var("XDG_CONFIG_HOME"),
+            Some(v) => std::env::set_var(config_home_var(), v),
+            None => std::env::remove_var(config_home_var()),
         }
     }
 
@@ -475,15 +486,15 @@ fn install_bundled_plugins_creates_plugin_dir_and_syntaxes() {
     let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let tmp = fresh_plugin_dir();
     std::fs::create_dir_all(&tmp).unwrap();
-    let old = std::env::var_os("XDG_CONFIG_HOME");
-    unsafe { std::env::set_var("XDG_CONFIG_HOME", &tmp) };
+    let old = std::env::var_os(config_home_var());
+    unsafe { std::env::set_var(config_home_var(), &tmp) };
 
     install_bundled_plugins();
 
     unsafe {
         match old {
-            Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
-            None => std::env::remove_var("XDG_CONFIG_HOME"),
+            Some(v) => std::env::set_var(config_home_var(), v),
+            None => std::env::remove_var(config_home_var()),
         }
     }
 
