@@ -1,4 +1,4 @@
-version = "0.17.0"
+version = "0.17.1"
 date = "2026-07-11"
 whats_new = """- docs: add historical release digests (#685)
 - feat: view file at revision — diff ↔ snapshot toggle (#683)
