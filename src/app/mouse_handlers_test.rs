@@ -1310,3 +1310,45 @@ fn double_click_palette_file_route_opens_file_not_command() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+// -- repo log overlay ---------------------------------------------------------
+
+fn repo_log_with_commits(root: PathBuf, n: usize) -> crate::search::RepoLogState {
+    let mut s = crate::search::RepoLogState::new(root);
+    s.commits = (0..n)
+        .map(|i| crate::git::Commit {
+            hash: format!("{i:040}"),
+            short: format!("{i:07}"),
+            date: "2024-01-01".to_string(),
+            author: "Test".to_string(),
+            subject: format!("commit {i}"),
+        })
+        .collect();
+    s.filtered = (0..n).collect();
+    s.selected = 0;
+    s
+}
+
+#[test]
+fn repo_log_click_inside_selects_row() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.repo_log = Some(repo_log_with_commits(root.clone(), 3));
+    app.repo_log_area = Rect::new(10, 10, 40, 20);
+    app.repo_log_offset = 0;
+    app.handle_repo_log_mouse(left_down_at(12, 11));
+    assert_eq!(app.repo_log.as_ref().unwrap().selected, 1);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn repo_log_click_outside_closes_overlay() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.repo_log = Some(repo_log_with_commits(root.clone(), 3));
+    app.repo_log_area = Rect::new(10, 10, 40, 20);
+    app.repo_log_offset = 0;
+    app.handle_repo_log_mouse(left_down_at(0, 0));
+    assert!(app.repo_log.is_none());
+    fs::remove_dir_all(&root).ok();
+}

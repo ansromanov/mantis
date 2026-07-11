@@ -13,8 +13,10 @@
 
 mod history;
 mod pickers;
+mod repo_log;
 
 pub use history::HistoryState;
+pub use repo_log::RepoLogState;
 // All picker types are re-exported for `crate::search` consumers.
 // `InFileMatch` is separated to avoid an unused-import warning in the binary
 // target (it is used only by test code and as a field type of `InFileSearch`).

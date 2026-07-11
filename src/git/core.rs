@@ -490,7 +490,7 @@ pub fn file_log(repo_dir: &Path, file: &Path) -> Vec<Commit> {
             "log",
             "--no-color",
             "--date=short",
-            "--format=%H%x1f%h%x1f%ad%x1f%s",
+            "--format=%H%x1f%h%x1f%ad%x1f%an%x1f%s",
             "--",
         ])
         .arg(file)
@@ -509,6 +509,7 @@ pub fn file_log(repo_dir: &Path, file: &Path) -> Vec<Commit> {
                 hash: parts.next()?.to_string(),
                 short: parts.next()?.to_string(),
                 date: parts.next()?.to_string(),
+                author: parts.next().unwrap_or("").to_string(),
                 subject: parts.next().unwrap_or("").to_string(),
             })
         })
@@ -528,7 +529,7 @@ pub fn recent_commits(dir: &Path, count: usize) -> Vec<Commit> {
             "log",
             "--all",
             &format!("--max-count={}", count),
-            "--format=%H%x1f%h%x1f%ad%x1f%s",
+            "--format=%H%x1f%h%x1f%ad%x1f%an%x1f%s",
         ])
         .output();
     let output = match output {
@@ -543,6 +544,47 @@ pub fn recent_commits(dir: &Path, count: usize) -> Vec<Commit> {
                 hash: parts.next()?.to_string(),
                 short: parts.next()?.to_string(),
                 date: parts.next()?.to_string(),
+                author: parts.next().unwrap_or("").to_string(),
+                subject: parts.next().unwrap_or("").to_string(),
+            })
+        })
+        .collect()
+}
+
+/// Returns the repository-wide commit log, newest first, with paged loading.
+///
+/// Fetches `limit` commits starting after `skip` already-loaded ones. Use
+/// `skip = 0, limit = 200` for the initial load, then increment `skip` by
+/// `limit` when the user scrolls past the end. Returns an empty vec when
+/// not in a git repo or git is unavailable.
+pub fn repo_log(dir: &Path, skip: usize, limit: usize) -> Vec<Commit> {
+    let Some(root) = git_toplevel(dir) else {
+        return Vec::new();
+    };
+    let mut cmd = Command::new("git");
+    cmd.env("GIT_OPTIONAL_LOCKS", "0")
+        .arg("-C")
+        .arg(&root)
+        .args([
+            "log",
+            "--all",
+            &format!("--skip={skip}"),
+            &format!("--max-count={limit}"),
+            "--format=%H%x1f%h%x1f%ad%x1f%an%x1f%s",
+        ]);
+    let output = match cmd.output() {
+        Ok(o) if o.status.success() => o,
+        _ => return Vec::new(),
+    };
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter_map(|line| {
+            let mut parts = line.split('\u{1f}');
+            Some(Commit {
+                hash: parts.next()?.to_string(),
+                short: parts.next()?.to_string(),
+                date: parts.next()?.to_string(),
+                author: parts.next().unwrap_or("").to_string(),
                 subject: parts.next().unwrap_or("").to_string(),
             })
         })

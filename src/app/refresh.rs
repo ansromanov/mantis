@@ -750,6 +750,7 @@ impl App {
             plugin_picker: self.plugin_picker.is_some(),
             command_palette: self.command_palette.is_some(),
             history: self.history.is_some(),
+            repo_log: self.repo_log.is_some(),
             recent_files: self.recent_files.is_some(),
             search: self.search.is_some(),
             in_file_search: self.in_file_search.is_some(),

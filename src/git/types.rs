@@ -59,12 +59,13 @@ impl GitRepoInfo {
     }
 }
 
-/// A commit that touched a particular file.
+/// A commit that touched a particular file or the repository.
 #[derive(Debug, Clone)]
 pub struct Commit {
     pub hash: String,
     pub short: String,
     pub date: String,
+    pub author: String,
     pub subject: String,
 }
 

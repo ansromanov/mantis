@@ -1064,3 +1064,72 @@ fn file_ops_telemetry_check() {
     assert!(!app.telemetry.is_enabled());
     fs::remove_dir_all(&root).ok();
 }
+
+// -- repo log overlay ---------------------------------------------------------
+
+fn git_info() -> crate::git::GitRepoInfo {
+    crate::git::GitRepoInfo {
+        head: crate::git::GitHead::Branch("main".to_string()),
+        ahead: 0,
+        behind: 0,
+        total_changed: 0,
+        staged: 0,
+        untracked: 0,
+    }
+}
+
+#[test]
+fn open_repo_log_noop_without_git_info() {
+    let root = temp_dir();
+    let mut app = app_for(&root);
+    app.git_info = None;
+    app.open_repo_log();
+    assert!(app.repo_log.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn open_repo_log_opens_overlay_in_git_repo() {
+    let root = temp_dir();
+    let mut app = app_for(&root);
+    app.git_info = Some(git_info());
+    app.open_repo_log();
+    assert!(app.repo_log.is_some());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn show_repo_log_compare_enters_compare_mode_for_selected() {
+    let root = temp_dir();
+    fs::write(root.join("a.txt"), "hi\n").unwrap();
+    let mut app = app_for(&root);
+    let mut state = crate::search::RepoLogState::new(root.clone());
+    state.commits = vec![crate::git::Commit {
+        hash: "a".repeat(40),
+        short: "aaaaaaa".to_string(),
+        date: "2024-01-01".to_string(),
+        author: "T".to_string(),
+        subject: "x".to_string(),
+    }];
+    state.filtered = vec![0];
+    state.selected = 0;
+    app.repo_log = Some(state);
+    app.show_repo_log_compare();
+    assert!(app.repo_log.is_none(), "overlay closes on activate");
+    assert_eq!(app.compare_base, Some("a".repeat(40)));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn show_repo_log_compare_without_selection_only_closes() {
+    let root = temp_dir();
+    let mut app = app_for(&root);
+    let mut state = crate::search::RepoLogState::new(root.clone());
+    state.commits.clear();
+    state.filtered.clear();
+    app.repo_log = Some(state);
+    app.show_repo_log_compare();
+    assert!(app.repo_log.is_none());
+    assert!(app.compare_base.is_none());
+    fs::remove_dir_all(&root).ok();
+}

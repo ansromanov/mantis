@@ -230,6 +230,7 @@ impl Keymap {
             "reload" => &self.reload,
             "switch_panel" => &self.switch_panel,
             "file_history" => &self.file_history,
+            "repo_commit_log" => &self.repo_commit_log,
             "theme_picker" => &self.theme_picker,
             "quit" => &self.quit,
             "nav_up" => &self.nav_up,
@@ -337,6 +338,7 @@ pub struct Keymap {
     pub reload: Vec<KeyBinding>,
     pub switch_panel: Vec<KeyBinding>,
     pub file_history: Vec<KeyBinding>,
+    pub repo_commit_log: Vec<KeyBinding>,
     pub theme_picker: Vec<KeyBinding>,
     // Shared navigation (tree + content)
     pub nav_up: Vec<KeyBinding>,
@@ -419,6 +421,7 @@ impl Default for Keymap {
             reload: bind(&["ctrl+r", "F5", "tree:r"]),
             switch_panel: bind(&["Tab"]),
             file_history: bind(&["tree:H"]),
+            repo_commit_log: bind(&["tree:L"]),
             theme_picker: bind(&["tree:t"]),
             nav_up: bind(&["Up", "k"]),
             nav_down: bind(&["Down", "j"]),

@@ -157,6 +157,34 @@ impl App {
         }
     }
 
+    /// Handles keyboard input while the repo-wide commit log overlay is open.
+    /// Enter enters compare mode for the selected commit; Down at the end of
+    /// the list triggers paged loading.
+    pub(super) fn handle_repo_log_key(&mut self, key: KeyEvent) {
+        let should_load_more = if let Some(ref r) = self.repo_log {
+            // 'j' navigates only while the query is empty; otherwise it is a
+            // query character and must not trigger paging.
+            (matches!(key.code, KeyCode::Down)
+                || (matches!(key.code, KeyCode::Char('j')) && r.query.is_empty()))
+                && r.selected + 1 >= r.results_len()
+        } else {
+            false
+        };
+        if should_load_more {
+            if let Some(ref mut r) = self.repo_log {
+                r.load_more();
+            }
+        }
+        let Some(ref mut r) = self.repo_log else {
+            return;
+        };
+        match handle_list_picker_key(r, &key) {
+            OverlayKey::Activate => self.show_repo_log_compare(),
+            OverlayKey::Close => self.repo_log = None,
+            _ => {}
+        }
+    }
+
     /// Handles keyboard input while the theme picker overlay is open.
     ///
     /// Navigation (j/k/arrows) previews the highlighted theme live behind the

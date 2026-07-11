@@ -70,6 +70,7 @@ fn draw_history_overlay() {
             hash: "a".into(),
             short: "abc123".into(),
             date: "2024-01-01".into(),
+            author: "Test".into(),
             subject: "initial commit".into(),
         }],
     ));

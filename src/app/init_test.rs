@@ -780,3 +780,12 @@ fn app_new_starts_with_welcome_disabled() {
     fs::remove_dir_all(&root).ok();
     fs::remove_dir_all(&state_dir).ok();
 }
+
+#[test]
+fn app_new_starts_without_repo_log_overlay() {
+    let root = temp_dir();
+    let app = new_app(&root, Config::default());
+    assert!(app.repo_log.is_none());
+    assert_eq!(app.repo_log_offset, 0);
+    fs::remove_dir_all(&root).ok();
+}

@@ -188,6 +188,10 @@ impl App {
             self.handle_history_mouse(ev);
             return;
         }
+        if self.repo_log.is_some() {
+            self.handle_repo_log_mouse(ev);
+            return;
+        }
         if self.recent_files.is_some() {
             self.handle_recent_mouse(ev);
             return;
@@ -474,6 +478,22 @@ impl App {
         ) == PickerMouseAction::Activate
         {
             self.show_selected_revision();
+        }
+    }
+
+    /// Handles mouse events on the repo-wide commit log overlay: click to
+    /// select, double-click to enter compare mode, scroll to navigate.
+    /// Close on click outside the popup area.
+    fn handle_repo_log_mouse(&mut self, ev: MouseEvent) {
+        if handle_picker_mouse(
+            ev,
+            self.repo_log_area,
+            self.repo_log_offset,
+            &mut self.repo_log,
+            &mut self.last_click,
+        ) == PickerMouseAction::Activate
+        {
+            self.show_repo_log_compare();
         }
     }
 

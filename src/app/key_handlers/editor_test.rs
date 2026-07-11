@@ -1192,3 +1192,42 @@ fn test_dispatch_plugin_command_closes_palette_and_returns_true() {
     assert!(app.dispatch_command());
     assert!(app.command_palette.is_none());
 }
+
+// -- repo log overlay ---------------------------------------------------------
+
+#[test]
+fn dispatch_repo_commit_log_opens_overlay() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.git_info = Some(crate::git::GitRepoInfo {
+        head: crate::git::GitHead::Branch("main".to_string()),
+        ahead: 0,
+        behind: 0,
+        total_changed: 0,
+        staged: 0,
+        untracked: 0,
+    });
+    let mut p = CommandPalette::default();
+    for c in "Browse repository commits".chars() {
+        p.push(c);
+    }
+    app.command_palette = Some(p);
+    app.dispatch_command();
+    assert!(app.repo_log.is_some());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn dispatch_repo_commit_log_noop_without_git_info() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.git_info = None;
+    let mut p = CommandPalette::default();
+    for c in "Browse repository commits".chars() {
+        p.push(c);
+    }
+    app.command_palette = Some(p);
+    app.dispatch_command();
+    assert!(app.repo_log.is_none());
+    fs::remove_dir_all(&root).ok();
+}

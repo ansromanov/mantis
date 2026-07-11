@@ -87,6 +87,10 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         popups::draw_history(f, app, area);
     }
 
+    if app.repo_log.is_some() {
+        popups::draw_repo_log(f, app, area);
+    }
+
     if app.plugin_picker.is_some() {
         popups::draw_plugin_picker(f, app, area);
     }
