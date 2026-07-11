@@ -14,7 +14,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::IsTerminal;
 use std::path::PathBuf;
-use std::sync::OnceLock;
+use std::sync::{OnceLock, RwLock};
 
 use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
@@ -720,6 +720,45 @@ fn parse_osc_response(resp: &str) -> Option<(u8, u8, u8)> {
     Some((rgb[0], rgb[1], rgb[2]))
 }
 
+/// Guards `MANTIS_TEST_NO_COLOR`, which is process-global and read on every
+/// call to [`no_color_active`] in test builds. Tests that flip the var must
+/// hold the guard for their whole critical section (via
+/// [`lock_no_color_test_env`]) so they don't leak a transient value into an
+/// unrelated test's `no_color_active()` read running on another thread
+/// (cargo test runs tests in parallel within one process).
+static NO_COLOR_TEST_ENV_LOCK: RwLock<()> = RwLock::new(());
+
+thread_local! {
+    // Set while this thread holds `NO_COLOR_TEST_ENV_LOCK`'s write side, so
+    // `no_color_active()` can tell it's being called re-entrantly by the
+    // lock holder itself (e.g. a test exercising code that reads the var it
+    // just set) and read the env var directly instead of taking the read
+    // side — `RwLock` isn't reentrant, so doing otherwise self-deadlocks.
+    static HOLDS_NO_COLOR_TEST_WRITE_LOCK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// RAII guard returned by [`lock_no_color_test_env`]; see that function.
+pub struct NoColorTestEnvGuard(std::sync::RwLockWriteGuard<'static, ()>);
+
+impl Drop for NoColorTestEnvGuard {
+    fn drop(&mut self) {
+        HOLDS_NO_COLOR_TEST_WRITE_LOCK.with(|c| c.set(false));
+    }
+}
+
+/// Acquires exclusive access to `MANTIS_TEST_NO_COLOR` for a test's whole
+/// critical section (set the var, exercise code, assert, unset). Hold the
+/// returned guard for as long as the var must keep its test-specific value,
+/// so no concurrently-running test's `no_color_active()` call observes it
+/// transiently.
+pub fn lock_no_color_test_env() -> NoColorTestEnvGuard {
+    let guard = NO_COLOR_TEST_ENV_LOCK
+        .write()
+        .unwrap_or_else(|e| e.into_inner());
+    HOLDS_NO_COLOR_TEST_WRITE_LOCK.with(|c| c.set(true));
+    NoColorTestEnvGuard(guard)
+}
+
 pub fn no_color_active() -> bool {
     static IS_TEST_ENV: OnceLock<bool> = OnceLock::new();
     let is_test_env = *IS_TEST_ENV.get_or_init(|| {
@@ -734,7 +773,14 @@ pub fn no_color_active() -> bool {
                 .unwrap_or(false)
     });
     if is_test_env {
-        std::env::var_os("MANTIS_TEST_NO_COLOR").is_some()
+        if HOLDS_NO_COLOR_TEST_WRITE_LOCK.with(|c| c.get()) {
+            std::env::var_os("MANTIS_TEST_NO_COLOR").is_some()
+        } else {
+            let _guard = NO_COLOR_TEST_ENV_LOCK
+                .read()
+                .unwrap_or_else(|e| e.into_inner());
+            std::env::var_os("MANTIS_TEST_NO_COLOR").is_some()
+        }
     } else {
         std::env::var_os("NO_COLOR").is_some() || std::env::var("TERM").as_deref() == Ok("dumb")
     }

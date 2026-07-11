@@ -192,6 +192,9 @@ fn highlight_stdin_plain_text_returns_none_name() {
 
 #[test]
 fn to_ratatui_respects_no_color() {
+    // See NO_COLOR_TEST_ENV_LOCK: serializes against other tests reading
+    // no_color_active() while we flip the shared test-only env var.
+    let _guard = crate::theme::lock_no_color_test_env();
     std::env::set_var("MANTIS_TEST_NO_COLOR", "1");
     let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[]);
     let result = h.highlight(Path::new("main.rs"), &["fn main() {".to_string()]);

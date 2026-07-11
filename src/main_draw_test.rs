@@ -77,10 +77,10 @@ fn app_draw_side_by_side_diff_does_not_panic() {
     };
     let mut app = App::new(dir.clone(), config, None, None).unwrap();
     app.open_file(&dir.join("f.txt"));
-    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::SHIFT));
     app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
     assert!(app.is_diff, "history Enter should load a diff");
-    app.handle_key(KeyEvent::new(KeyCode::Char('D'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('D'), KeyModifiers::SHIFT));
     assert!(app.diff_side_by_side);
 
     let backend = TestBackend::new(100, 20);
