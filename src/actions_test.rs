@@ -155,7 +155,7 @@ fn every_palette_action_id_is_dispatch_handled() {
 
     // Dispatch arms run for real (bug_report writes a file, command usage
     // saves), so point the state dir at an isolated temp directory.
-    let _guard = crate::session::STATE_DIR_ENV_LOCK.lock().unwrap();
+    let _guard = crate::session::STATE_DIR_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let state = tempfile::tempdir().unwrap();
     std::env::set_var("MANTIS_STATE_DIR", state.path());
 

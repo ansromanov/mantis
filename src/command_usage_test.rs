@@ -117,7 +117,7 @@ fn frecency_decay_over_time() {
 
 #[test]
 fn round_trip_preserves_scores_and_last_used() {
-    let _lock = USAGE_LOCK.lock().unwrap();
+    let _lock = USAGE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _env = TestEnv::new("round_trip");
 
     let mut s = UsageStats::default();
@@ -134,7 +134,7 @@ fn round_trip_preserves_scores_and_last_used() {
 
 #[test]
 fn missing_file_returns_default() {
-    let _lock = USAGE_LOCK.lock().unwrap();
+    let _lock = USAGE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _env = TestEnv::new("missing");
     let s = UsageStats::load();
     assert!(s.last_used().is_none());
@@ -143,7 +143,7 @@ fn missing_file_returns_default() {
 
 #[test]
 fn corrupt_file_returns_default() {
-    let _lock = USAGE_LOCK.lock().unwrap();
+    let _lock = USAGE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _env = TestEnv::new("corrupt");
     let Some(path) = crate::session::state_dir().map(|d| d.join(USAGE_FILE_NAME)) else {
         panic!("no state dir");
@@ -155,7 +155,7 @@ fn corrupt_file_returns_default() {
 
 #[test]
 fn v1_to_v2_migration() {
-    let _lock = USAGE_LOCK.lock().unwrap();
+    let _lock = USAGE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _env = TestEnv::new("migrate_v1");
 
     // Write a v1-format file manually.
@@ -185,7 +185,7 @@ fn v1_to_v2_migration() {
 
 #[test]
 fn v1_migration_persists_v2_file() {
-    let _lock = USAGE_LOCK.lock().unwrap();
+    let _lock = USAGE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _env = TestEnv::new("migrate_v1_persist");
 
     let Some(path) = crate::session::state_dir().map(|d| d.join(USAGE_FILE_NAME)) else {

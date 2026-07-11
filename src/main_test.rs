@@ -60,7 +60,7 @@ struct IsolatedState {
 impl IsolatedState {
     /// Fresh state dir: `run_app` sees a first run (welcome overlay shows).
     fn fresh(root: &Path) -> Self {
-        let lock = crate::session::STATE_DIR_ENV_LOCK.lock().unwrap();
+        let lock = crate::session::STATE_DIR_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let state = root.join("state");
         fs::create_dir_all(&state).unwrap();
         std::env::set_var("MANTIS_STATE_DIR", &state);
