@@ -741,7 +741,7 @@ thread_local! {
 /// The held write guard is never read — only kept alive so its `Drop` runs
 /// when the caller's guard goes out of scope.
 #[cfg(test)]
-pub struct NoColorTestEnvGuard(std::sync::RwLockWriteGuard<'static, ()>);
+pub struct NoColorTestEnvGuard(#[allow(dead_code)] std::sync::RwLockWriteGuard<'static, ()>);
 
 #[cfg(test)]
 impl Drop for NoColorTestEnvGuard {
