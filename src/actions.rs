@@ -340,8 +340,15 @@ pub static ACTIONS: &[ActionSpec] = &[
         id: "file_history",
         palette: Some("Open file history"),
         help: Some(("Content panel", "git history of current file")),
-        category: Some("Navigate"),
+        category: Some("Git"),
         description: Some("Browse the git log for the current file"),
+    },
+    ActionSpec {
+        id: "repo_commit_log",
+        palette: Some("Browse repository commits"),
+        help: Some(("Global", "browse repository-wide commit log")),
+        category: Some("Git"),
+        description: Some("Browse all commits in the repository"),
     },
     ActionSpec {
         id: "toggle_diff_side_by_side",
@@ -499,6 +506,7 @@ impl ActionSpec {
             "toggle_pretty_json" => Applicability::JsonFile,
             "blame_line" | "toggle_blame" => Applicability::GitRepoAndNoDiff,
             "file_history" => Applicability::GitRepoAndFile,
+            "repo_commit_log" => Applicability::GitRepo,
             "compare_against" => Applicability::GitRepo,
             "toggle_diff_staged" => Applicability::GitRepoAndDiffView,
             "toggle_diff_side_by_side" | "diff_hunk_next" | "diff_hunk_prev" => {

@@ -142,6 +142,8 @@ impl App {
             self.handle_command_key(key);
         } else if self.history.is_some() {
             self.handle_history_key(key);
+        } else if self.repo_log.is_some() {
+            self.handle_repo_log_key(key);
         } else if self.recent_files.is_some() {
             self.handle_recent_key(key);
         } else if self.search.is_some() {

@@ -41,7 +41,7 @@ use crate::highlight::Highlighter;
 use crate::plugin::{ExtraSyntax, PluginContributions, PluginManager};
 use crate::search::{
     BugReportState, CommandPalette, GotoLineState, HistoryState, InFileSearch, PluginPicker,
-    RecentFilesState, RevisionPicker, SearchState, ThemePicker, TreeFilter,
+    RecentFilesState, RepoLogState, RevisionPicker, SearchState, ThemePicker, TreeFilter,
 };
 use crate::selection::TextSelection;
 use crate::theme::Theme;
@@ -78,6 +78,7 @@ pub(crate) struct ActiveOverlays {
     pub plugin_picker: bool,
     pub command_palette: bool,
     pub history: bool,
+    pub repo_log: bool,
     pub recent_files: bool,
     pub search: bool,
     pub in_file_search: bool,
@@ -158,6 +159,9 @@ pub struct App {
     pub goto_line: Option<GotoLineState>,
     pub command_palette: Option<CommandPalette>,
     pub history: Option<HistoryState>,
+    /// State for the repo-wide commit log overlay. `Some` while the picker
+    /// is open; `None` otherwise.
+    pub repo_log: Option<RepoLogState>,
     pub theme_picker: Option<ThemePicker>,
     /// State for the plugin manager overlay. `Some` while the picker is open.
     pub plugin_picker: Option<PluginPicker>,
@@ -260,6 +264,10 @@ pub struct App {
     pub command_palette_offset: usize,
     pub history_area: Rect,
     pub history_offset: usize,
+    /// Hit area of the repo log list recorded during the last render.
+    pub repo_log_area: Rect,
+    /// Scroll offset of the repo log list recorded during the last render.
+    pub repo_log_offset: usize,
     pub theme_area: Rect,
     pub theme_offset: usize,
     /// Hit area of the revision picker list recorded during the last render.

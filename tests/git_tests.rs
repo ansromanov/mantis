@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use mantis::git::{file_diff, file_log, staged_diff, unstaged_diff, working_tree_diff};
+use mantis::git::{file_diff, file_log, repo_log, staged_diff, unstaged_diff, working_tree_diff};
 
 fn git(dir: &Path, args: &[&str]) {
     let status = Command::new("git")
@@ -142,6 +142,47 @@ fn unstaged_diff_empty_after_staging() {
     assert!(
         !joined.contains("@@"),
         "after staging all changes there should be no unstaged hunk headers, got: {joined}"
+    );
+    fs::remove_dir_all(&repo).ok();
+}
+
+#[test]
+fn repo_log_returns_commits_newest_first() {
+    let repo = temp_repo();
+    let log = repo_log(&repo, 0, 100);
+    assert_eq!(log.len(), 2);
+    assert_eq!(log[0].subject, "second");
+    assert_eq!(log[1].subject, "first");
+    assert!(!log[0].author.is_empty());
+    fs::remove_dir_all(&repo).ok();
+}
+
+#[test]
+fn repo_log_paged_loading() {
+    let repo = temp_repo();
+    let page1 = repo_log(&repo, 0, 1);
+    assert_eq!(page1.len(), 1);
+    assert_eq!(page1[0].subject, "second");
+    let page2 = repo_log(&repo, 1, 1);
+    assert_eq!(page2.len(), 1);
+    assert_eq!(page2[0].subject, "first");
+    fs::remove_dir_all(&repo).ok();
+}
+
+#[test]
+fn repo_log_empty_outside_repo() {
+    let dir = std::env::temp_dir();
+    let log = repo_log(&dir, 0, 100);
+    assert!(log.is_empty());
+}
+
+#[test]
+fn repo_log_includes_author() {
+    let repo = temp_repo();
+    let log = repo_log(&repo, 0, 100);
+    assert!(
+        log.iter().all(|c| !c.author.is_empty()),
+        "all commits should have a non-empty author"
     );
     fs::remove_dir_all(&repo).ok();
 }

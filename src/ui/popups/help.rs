@@ -475,6 +475,10 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
                 "file_history",
                 "pick a commit -> view its diff vs your working tree",
             ));
+            rows.push(row_key_custom(
+                "repo_commit_log",
+                "browse all repository commits, enter to compare",
+            ));
         }
         5 => {
             // Settings

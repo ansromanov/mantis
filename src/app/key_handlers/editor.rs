@@ -124,6 +124,10 @@ impl App {
                 self.open_file_history();
                 true
             }
+            Some("repo_commit_log") => {
+                self.open_repo_log();
+                true
+            }
             Some("theme_picker") => {
                 self.theme_picker = Some(ThemePicker::default());
                 true

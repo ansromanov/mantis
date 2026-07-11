@@ -115,6 +115,8 @@ impl App {
             self.search = Some(s);
         } else if pressed_in(&k.file_history, &key, scope) {
             self.open_file_history();
+        } else if pressed_in(&k.repo_commit_log, &key, scope) {
+            self.open_repo_log();
         } else if pressed_in(&k.recent_files, &key, scope) {
             self.open_recent_files();
         } else if pressed_in(&k.theme_picker, &key, scope) {

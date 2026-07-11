@@ -563,6 +563,32 @@ impl App {
         self.focus = Focus::Content;
         self.set_file_watch(None);
     }
+
+    /// Opens the repository-wide commit log as a picker overlay.
+    /// Does nothing if not in a git repo.
+    pub(super) fn open_repo_log(&mut self) {
+        if self.git_info.is_none() {
+            return;
+        }
+        self.telemetry
+            .record(crate::telemetry::TelemetryEvent::FeatureUsed {
+                feature: crate::telemetry::Feature::GitHistory,
+            });
+        self.repo_log = Some(crate::search::RepoLogState::new(self.root.clone()));
+    }
+
+    /// Enters compare mode for the selected commit in the repo log overlay.
+    /// Filters the tree to files changed since that commit.
+    pub(super) fn show_repo_log_compare(&mut self) {
+        let picked = self
+            .repo_log
+            .as_ref()
+            .and_then(|r| r.selected_commit().map(|c| c.hash.clone()));
+        self.repo_log = None;
+        if let Some(hash) = picked {
+            self.enter_compare_mode(hash);
+        }
+    }
 }
 
 #[cfg(test)]

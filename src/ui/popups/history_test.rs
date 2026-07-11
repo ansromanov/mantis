@@ -40,6 +40,7 @@ fn draw_history_some_does_not_panic() {
             hash: "abc123".into(),
             short: "abc".into(),
             date: "2024-01-01".into(),
+            author: "Test".into(),
             subject: "test commit".into(),
         }],
     ));

@@ -8,18 +8,21 @@ fn sample_commits() -> Vec<crate::git::Commit> {
             hash: "abc123def456".into(),
             short: "abc123".into(),
             date: "2024-01-15".into(),
+            author: "Alice".into(),
             subject: "fix critical bug".into(),
         },
         crate::git::Commit {
             hash: "def789abc012".into(),
             short: "def789".into(),
             date: "2024-01-14".into(),
+            author: "Bob".into(),
             subject: "add new feature".into(),
         },
         crate::git::Commit {
             hash: "ghi345jkl678".into(),
             short: "ghi345".into(),
             date: "2024-01-13".into(),
+            author: "Charlie".into(),
             subject: "refactor module".into(),
         },
     ]
