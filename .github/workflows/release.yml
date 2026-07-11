@@ -216,6 +216,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Test
+        shell: bash
         run: cargo test --all
 
   bench:
