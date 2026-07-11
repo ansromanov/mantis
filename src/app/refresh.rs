@@ -52,6 +52,11 @@ impl App {
         if let Some(ref mut s) = self.search {
             s.maybe_refresh();
         }
+        if let Some(ref mut p) = self.command_palette {
+            if let Some(ref mut s) = p.route_search {
+                s.maybe_refresh();
+            }
+        }
         if self.drain_root_watch() {
             self.tree_dirty = true;
             self.tree_dirty_at = Some(self.now());

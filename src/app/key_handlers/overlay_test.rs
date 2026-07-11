@@ -1117,3 +1117,85 @@ fn handle_bug_report_key_esc_closes_modal() {
 
     fs::remove_dir_all(&root).ok();
 }
+
+// -- command palette prefix routing --------------------------------------------
+
+#[test]
+fn palette_slash_prefix_creates_file_sub_picker() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.command_palette = Some(CommandPalette::default());
+    app.handle_command_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
+    let p = app.command_palette.as_ref().unwrap();
+    assert_eq!(p.route, crate::command_palette::PaletteRoute::Files);
+    assert!(
+        p.route_search.is_some(),
+        "typing the prefix must create the file sub-picker"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn palette_tab_toggles_files_and_content_both_ways() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.command_palette = Some(CommandPalette::default());
+    app.handle_command_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
+    app.handle_command_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::empty()));
+    assert_eq!(
+        app.command_palette.as_ref().unwrap().route,
+        crate::command_palette::PaletteRoute::Content,
+        "Tab in the files route switches to content"
+    );
+    app.handle_command_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::empty()));
+    assert_eq!(
+        app.command_palette.as_ref().unwrap().route,
+        crate::command_palette::PaletteRoute::Files,
+        "Tab in the content route switches back to files"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn palette_esc_in_routed_mode_returns_to_commands_then_closes() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.command_palette = Some(CommandPalette::default());
+    app.handle_command_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
+    app.handle_command_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+    let p = app.command_palette.as_ref().expect("palette stays open");
+    assert_eq!(p.route, crate::command_palette::PaletteRoute::Commands);
+    assert!(p.route_search.is_none());
+    app.handle_command_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+    assert!(
+        app.command_palette.is_none(),
+        "second Esc closes the palette"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn palette_goto_line_route_enter_jumps_and_closes() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.active_line = 0;
+    app.command_palette = Some(CommandPalette::default());
+    app.handle_command_key(KeyEvent::new(KeyCode::Char(':'), KeyModifiers::empty()));
+    assert!(app
+        .command_palette
+        .as_ref()
+        .unwrap()
+        .route_goto_line
+        .is_some());
+    app.handle_command_key(KeyEvent::new(KeyCode::Char('2'), KeyModifiers::empty()));
+    app.handle_command_key(KeyEvent::new(KeyCode::Char('0'), KeyModifiers::empty()));
+    app.handle_command_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert!(app.command_palette.is_none(), "Enter closes the palette");
+    assert_eq!(
+        app.active_line, 19,
+        "palette goto-line matches the standalone dialog"
+    );
+    fs::remove_dir_all(&root).ok();
+}

@@ -1282,3 +1282,31 @@ fn revision_picker_scroll_up_navigates() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+// -- command palette routed-mode mouse dispatch ---------------------------------
+
+#[test]
+fn double_click_palette_file_route_opens_file_not_command() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let mut p = crate::command_palette::CommandPalette::default();
+    p.push('/');
+    p.route_search = Some(crate::search::SearchState::new(
+        &root, false, false, 0, None,
+    ));
+    app.command_palette = Some(p);
+    app.command_palette_area = Rect::new(0, 0, 40, 10);
+    // Double-click the first (and only) file result.
+    app.handle_mouse(left_down_at(5, 0));
+    app.handle_mouse(left_down_at(5, 0));
+    assert!(
+        app.command_palette.is_none(),
+        "activating a routed result closes the palette"
+    );
+    assert_eq!(
+        app.current_file.as_deref(),
+        Some(root.join("long.txt").as_path()),
+        "double-click in the files route opens the file, not a command"
+    );
+    fs::remove_dir_all(&root).ok();
+}
