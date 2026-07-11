@@ -1,4 +1,4 @@
-version = "0.17.2"
+version = "0.17.3"
 date = "2026-07-11"
 whats_new = """- chore: make Windows release optional and add workflow_dispatch controls (#687)
 - fix: add missing help-overlay entries for toggle_file_revision and blame_open_commit (#686)
