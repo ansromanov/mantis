@@ -141,7 +141,11 @@ jobs:
           TOMLEOF
           sed -i "s/__RELEASE_DATE__/$(date +%Y-%m-%d)/" release-info.toml
 
-      - name: Commit and push
+      # The release commit goes to a staging branch, not main. Main only gets
+      # it in publish, after tests/bench/build pass — a failed pipeline leaves
+      # main untouched (no version bump to roll back). Force-push so a retry
+      # of the same version clobbers the leftover branch from a failed run.
+      - name: Commit and push to staging branch
         id: commit
         run: |
           git config user.name "github-actions[bot]"
@@ -151,11 +155,8 @@ jobs:
             echo "Nothing to commit (version and release notes unchanged)."
           else
             git commit -m "chore: release v${{ steps.version.outputs.version }} [skip ci]"
-            if ! git push origin HEAD:main; then
-              git pull --rebase origin main
-              git push origin HEAD:main
-            fi
           fi
+          git push --force origin "HEAD:refs/heads/release/v${{ steps.version.outputs.version }}"
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   # Full validation runs here: complete test suite on Linux and Windows, the
@@ -304,6 +305,25 @@ jobs:
         with:
           ref: ${{ needs.bump.outputs.sha }}
           ssh-key: ${{ secrets.DEPLOY_KEY }}
+          # Full history so the promote step can rebase onto main if it moved.
+          fetch-depth: 0
+
+      # The pipeline is green — main gets the release commit now. If main
+      # moved since bump (a PR merged mid-pipeline), rebase onto it; the tag
+      # below targets the promoted sha so it is always reachable from main.
+      # (Artifacts were built from the pre-rebase tree; a mid-pipeline merge
+      # simply isn't in this release, same as if it landed after publish.)
+      - name: Promote release commit to main
+        id: promote
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if ! git push origin HEAD:main; then
+            git fetch origin main
+            git rebase origin/main
+            git push origin HEAD:main
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - uses: actions/download-artifact@v8
         with:
@@ -321,7 +341,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: v${{ needs.bump.outputs.version }}
           name: v${{ needs.bump.outputs.version }}
-          target_commitish: ${{ needs.bump.outputs.sha }}
+          target_commitish: ${{ steps.promote.outputs.sha }}
           body: |
             ## What's Changed
 
@@ -355,6 +375,27 @@ jobs:
           git add Formula/mantis.rb
           git commit -m "chore: bump Homebrew formula to v${{ needs.bump.outputs.version }} [skip ci]"
           if ! git push origin HEAD:main; then
-            git pull --rebase origin main
+            git fetch origin main
+            git rebase origin/main
             git push origin HEAD:main
           fi
+
+  # The release/vX.Y.Z staging branch only exists to make the candidate sha
+  # fetchable while the pipeline validates it. Delete it whether the release
+  # published or failed — main was either fast-forwarded by publish or never
+  # touched, so the branch carries no information either way.
+  cleanup:
+    name: delete staging branch
+    needs: [bump, plan, build, test, test-windows, bench, publish]
+    if: always() && needs.bump.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Delete release staging branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api -X DELETE \
+            "repos/${{ github.repository }}/git/refs/heads/release/v${{ needs.bump.outputs.version }}" \
+            || echo "Staging branch already gone."
