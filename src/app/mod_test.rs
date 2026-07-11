@@ -5070,7 +5070,9 @@ fn save_config_no_status_on_success() {
 
 #[test]
 fn save_bug_report_surfaces_saved_path_in_status() {
-    let _guard = crate::session::STATE_DIR_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _guard = crate::session::STATE_DIR_ENV_LOCK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     let state = tempfile::tempdir().unwrap();
     std::env::set_var("MANTIS_STATE_DIR", state.path());
 

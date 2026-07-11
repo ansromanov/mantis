@@ -762,7 +762,9 @@ fn dispatch_command_copy_file_via_palette() {
 
 #[test]
 fn dispatch_bug_report_saves_report_and_sets_status() {
-    let _guard = crate::session::STATE_DIR_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _guard = crate::session::STATE_DIR_ENV_LOCK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     let state = tempfile::tempdir().unwrap();
     std::env::set_var("MANTIS_STATE_DIR", state.path());
 
@@ -792,7 +794,9 @@ fn dispatch_bug_report_saves_report_and_sets_status() {
 
 #[test]
 fn dispatch_records_palette_action_in_telemetry_when_enabled() {
-    let _guard = crate::session::STATE_DIR_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _guard = crate::session::STATE_DIR_ENV_LOCK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     let state = tempfile::tempdir().unwrap();
     std::env::set_var("MANTIS_STATE_DIR", state.path());
 

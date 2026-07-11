@@ -452,7 +452,9 @@ fn app_new_diff_mode_invalid_falls_back_to_all() {
 
 #[test]
 fn app_new_command_usage_starts_empty() {
-    let _lock = crate::session::STATE_DIR_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _lock = crate::session::STATE_DIR_ENV_LOCK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     let root = temp_dir();
     // Point at a fresh temp dir so no on-disk usage data is loaded.
     let state_dir = temp_dir();
@@ -649,7 +651,9 @@ fn telemetry_disabled_by_default() {
 
 #[test]
 fn telemetry_enabled_when_configured() {
-    let _guard = crate::session::STATE_DIR_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _guard = crate::session::STATE_DIR_ENV_LOCK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     let state = tempfile::tempdir().unwrap();
     std::env::set_var("MANTIS_STATE_DIR", state.path());
     let dir = temp_dir();
@@ -690,7 +694,9 @@ fn app_new_ignores_stale_initial_root_not_an_ancestor_of_launch_root() {
     // `initial_root` must never be trusted unless it actually contains the
     // directory mantis was just launched with, otherwise the up-dir clamp
     // could let navigation escape past the real launch root.
-    let _lock = crate::session::STATE_DIR_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _lock = crate::session::STATE_DIR_ENV_LOCK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     let root = temp_dir();
     let unrelated = temp_dir();
     let state_dir = temp_dir();
@@ -725,7 +731,9 @@ fn app_new_ignores_stale_initial_root_that_is_ancestor_of_launch_root() {
     // current launch root must also be rejected: `starts_with` alone would
     // wrongly accept it, letting the up-dir clamp restore a wider stale
     // boundary than the directory mantis was actually launched with.
-    let _lock = crate::session::STATE_DIR_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _lock = crate::session::STATE_DIR_ENV_LOCK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     let ancestor = temp_dir();
     let root = ancestor.join("nested");
     fs::create_dir_all(&root).unwrap();
@@ -768,7 +776,9 @@ fn init_telemetry_check() {
 fn app_new_starts_with_welcome_disabled() {
     // App::new() does not inspect the welcome flag — that is done by the
     // production `run_app` wrapper. The struct field defaults to false.
-    let _lock = crate::session::STATE_DIR_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _lock = crate::session::STATE_DIR_ENV_LOCK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     let root = temp_dir();
     let state_dir = temp_dir();
     std::env::set_var("MANTIS_STATE_DIR", &state_dir);
