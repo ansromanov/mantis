@@ -198,10 +198,12 @@ fn brace_fold_impl(text: &str, track_brackets: bool) -> Vec<FoldRegion> {
 /// Like [`brace_fold`], walks `text` character by character maintaining a
 /// nesting stack for `{…}` pairs, but uses shell-specific syntax rules:
 ///
-/// * Line comments (`# …`)
+/// * Line comments (`# …` at word start only — `$#`/`${#v}` are expansions)
 /// * Single-quoted strings (`'…'` — no escape processing)
 /// * Double-quoted strings (`"…"` with `\"` escapes)
-/// * Heredocs (`<<WORD … WORD` — braces inside are inert)
+/// * Backslash escapes outside strings (`\'` does not open a string)
+/// * Heredocs (`<<WORD`, `<<'WORD'`, `<<-WORD` … `WORD` — braces inside are inert)
+/// * Arithmetic contexts (`(( … ))` — `<<` inside is a shift, not a heredoc)
 ///
 /// Returns one region per `{…}` block that spans more than one line.
 pub fn shell_brace_fold(text: &str) -> Vec<FoldRegion> {
@@ -225,6 +227,10 @@ pub fn shell_brace_fold(text: &str) -> Vec<FoldRegion> {
     let mut stack: Vec<usize> = Vec::new();
     let mut regions: Vec<FoldRegion> = Vec::new();
     let mut heredoc_delim: Vec<u8> = Vec::new();
+    // Only <<- heredocs allow (tab) indentation before the closing delimiter.
+    let mut heredoc_allow_indent = false;
+    // Depth of `(( … ))` arithmetic contexts, where << is a shift operator.
+    let mut arith_depth = 0usize;
     let mut i = 0;
 
     while i < len {
@@ -232,6 +238,13 @@ pub fn shell_brace_fold(text: &str) -> Vec<FoldRegion> {
         match st {
             St::Normal => match b {
                 b'\n' => line += 1,
+                b'\\' if i + 1 < len => {
+                    // Escape outside strings: \' and \" must not open a string.
+                    if bytes[i + 1] == b'\n' {
+                        line += 1;
+                    }
+                    i += 1;
+                }
                 b'{' => stack.push(line),
                 b'}' => {
                     if let Some(start) = stack.pop() {
@@ -240,12 +253,32 @@ pub fn shell_brace_fold(text: &str) -> Vec<FoldRegion> {
                         }
                     }
                 }
-                b'#' => st = St::LineCmt,
+                // `#` starts a comment only at the start of a word; `$#` and
+                // `${#var}` are parameter expansions.
+                b'#' if i == 0
+                    || matches!(
+                        bytes[i - 1],
+                        b'\n' | b' ' | b'\t' | b';' | b'&' | b'|' | b'('
+                    ) =>
+                {
+                    st = St::LineCmt
+                }
                 b'\'' => st = St::SqStr,
                 b'"' => st = St::DqStr,
+                b'(' if i + 1 < len && bytes[i + 1] == b'(' => {
+                    arith_depth += 1;
+                    i += 1;
+                }
+                b')' if arith_depth > 0 && i + 1 < len && bytes[i + 1] == b')' => {
+                    arith_depth -= 1;
+                    i += 1;
+                }
                 b'<' if i + 1 < len && bytes[i + 1] == b'<' => {
-                    // Skip <<< (here-string) — not a heredoc.
-                    if i + 2 < len && bytes[i + 2] == b'<' {
+                    if arith_depth > 0 {
+                        // Shift operator inside (( … )) — not a heredoc.
+                        i += 1;
+                    } else if i + 2 < len && bytes[i + 2] == b'<' {
+                        // Skip <<< (here-string) — not a heredoc.
                         i += 2;
                     } else {
                         i += 1;
@@ -262,9 +295,21 @@ pub fn shell_brace_fold(text: &str) -> Vec<FoldRegion> {
                         {
                             i += 1;
                         }
-                        if i > word_start {
+                        // Strip quoting from the delimiter word: <<'EOF',
+                        // <<"EOF" and <<\EOF all terminate on a bare EOF line.
+                        let mut word = &bytes[word_start..i];
+                        if word.first() == Some(&b'\\') {
+                            word = &word[1..];
+                        } else if word.len() >= 2
+                            && (word[0] == b'\'' || word[0] == b'"')
+                            && word[word.len() - 1] == word[0]
+                        {
+                            word = &word[1..word.len() - 1];
+                        }
+                        if !word.is_empty() {
                             heredoc_delim.clear();
-                            heredoc_delim.extend_from_slice(&bytes[word_start..i]);
+                            heredoc_delim.extend_from_slice(word);
+                            heredoc_allow_indent = dash;
                             st = St::Heredoc;
                             continue;
                         }
@@ -281,6 +326,8 @@ pub fn shell_brace_fold(text: &str) -> Vec<FoldRegion> {
             St::SqStr => {
                 if b == b'\'' {
                     st = St::Normal;
+                } else if b == b'\n' {
+                    line += 1;
                 }
             }
             St::DqStr => {
@@ -301,10 +348,13 @@ pub fn shell_brace_fold(text: &str) -> Vec<FoldRegion> {
                     let after_nl = i + 1;
                     let remaining = len - after_nl;
                     if remaining >= heredoc_delim.len() {
-                        // Skip optional leading whitespace (tabs for <<- style).
+                        // Only <<- strips leading tabs before the delimiter;
+                        // a plain << delimiter must start the line.
                         let mut start = after_nl;
-                        while start < len && (bytes[start] == b' ' || bytes[start] == b'\t') {
-                            start += 1;
+                        if heredoc_allow_indent {
+                            while start < len && bytes[start] == b'\t' {
+                                start += 1;
+                            }
                         }
                         let avail = len - start;
                         if avail >= heredoc_delim.len() {
