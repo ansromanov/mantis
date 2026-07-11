@@ -7,6 +7,7 @@ members = [
     "plugins/go",
     "plugins/json",
     "plugins/sh",
+    "plugins/yaml",
 ]
 resolver = "2"
 

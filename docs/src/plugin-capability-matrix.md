@@ -14,7 +14,7 @@ routes them via `PluginManager::provider_for` (`src/plugin/manager.rs`).
 
 | Capability | Declared in protocol | Handled by host | Used by a bundled plugin |
 |---|---|---|---|
-| `fold` | yes | yes — gates `set_fold_regions` in `handle_plugin_set_fold_regions` (`src/app/refresh.rs`) | **yes** — used by the bundled `rust`, `go`, `python`, `json`, and `sh` language provider plugins |
+| `fold` | yes | yes — gates `set_fold_regions` in `handle_plugin_set_fold_regions` (`src/app/refresh.rs`) | **yes** — used by the bundled `rust`, `go`, `python`, `json`, `sh`, and `yaml` language provider plugins |
 | `highlight` | yes | **no** — accepted at registration, never checked anywhere | no |
 | `hover` | yes (reserved) | no — unimplementable in v2 (no request/response correlation) | no |
 | `diagnostics` | yes (reserved) | no — same as `hover` | no |
@@ -37,8 +37,8 @@ Every action the host accepts, dispatched in `App::handle_plugin_action`
 | `open_file` | yes | no (one-shot navigation) | n/a | no |
 | `set_icon_map` | yes | `has_icon_map` | yes — icon map/fields cleared | yes — iconize |
 | `set_content` | yes | `content_paths` | yes — content removed, current file re-rendered | yes — markdown |
-| `register_language_provider` | yes | provider registration in `PluginManager` | yes — `remove_provider_registrations` | yes — rust, python, json |
-| `set_fold_regions` | yes | `fold_region_paths` | yes — regions removed, fold state reset | yes — rust, python, json |
+| `register_language_provider` | yes | provider registration in `PluginManager` | yes — `remove_provider_registrations` | yes — rust, python, json, yaml |
+| `set_fold_regions` | yes | `fold_region_paths` | yes — regions removed, fold state reset | yes — rust, python, json, yaml |
 
 Teardown status: **every stateful `set_*` action stamps `PluginContributions`
 and is cleared by `App::teardown_plugin_contributions`** (`src/app/mod.rs`).
@@ -60,6 +60,7 @@ version history in [Plugin Development](plugin-development.md) only.
 | `go` | process | `register_language_provider`, `set_fold_regions` | `fold` |
 | `json` | process | `register_language_provider`, `set_fold_regions` | `fold` |
 | `sh` | process | `register_language_provider`, `set_fold_regions` | `fold` |
+| `yaml` | process | `register_language_provider`, `set_fold_regions` | `fold` |
 | `terraform` | syntax | none (no subprocess) | n/a — extends syntect directly |
 
 ## Gaps and follow-ups
@@ -71,14 +72,24 @@ version history in [Plugin Development](plugin-development.md) only.
 2. **The language-provider fold pipeline has bundled consumers** —
    `register_language_provider` + `Capability::Fold` + `set_fold_regions` are
    used by the bundled `rust` (issue #599), `go` (issue #600), `python`
-   (issue #601), `json` (issue #604), and `sh` (issue #605) language
+   (issue #601), `json` (issue #604), `sh` (issue #605), and `yaml`
+   (issue #603) language
    provider plugins. The `rust` and `go` plugins register the `fold`
    capability for `.rs` and `.go` files via the shared `brace_fold` detector
    (#598); the `python` plugin uses the shared `indent_fold` detector; the
    `json` plugin uses `brace_fold_with_brackets`, a `brace_fold` variant that
    also folds `[…]` arrays; the `sh` plugin uses `shell_brace_fold`, a
    shell-specific variant that handles `#` line comments, single/double
-   quoted strings, and heredocs.
+   quoted strings, and heredocs; the `yaml` plugin uses the shared `yaml_fold`
+   detector — the same algorithm the built-in
+   `crate::yaml_fold::detect_fold_regions` re-exports, so plugin-enabled and
+   built-in YAML folding agree. Built-in YAML folding (`compute_file_load` in
+   `src/app/loader.rs`) is unchanged in this phase — it still dispatches to
+   `yaml_fold::detect_fold_regions` directly, and the plugin's regions only
+   take over when the plugin is enabled (existing override precedence in
+   `handle_plugin_set_fold_regions`). Retiring the built-in dispatch is a
+   separate follow-up (issue #603 phase 2), deferred until bundled plugins
+   have a default-enabled mechanism.
    **Known limitation:** provider routing is extension-based; extensionless
    scripts with a `#!/bin/bash` shebang won't route to the plugin. Shebang
    routing is a host/protocol gap (see #605).

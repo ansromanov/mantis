@@ -1032,3 +1032,30 @@ foo() {
     assert_eq!(r[0].start, 0);
     assert_eq!(r[0].end, 4);
 }
+
+// ---------------------------------------------------------------------------
+// yaml_fold tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn yaml_fold_empty() {
+    let empty: &[&str] = &[];
+    assert!(yaml_fold(empty).is_empty());
+}
+
+#[test]
+fn yaml_fold_delegates_to_yaml_fold_detect_fold_regions() {
+    // fold_detectors::yaml_fold is a thin delegate to the built-in
+    // crate::yaml_fold::detect_fold_regions — same algorithm, same output,
+    // reachable from the bundled `yaml` plugin (`plugins/yaml`).
+    let ls: Vec<&str> = "outer:\n  inner: 1\n  other: 2\nflat: 3".lines().collect();
+    let r = yaml_fold(&ls);
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 2);
+
+    let via_detect_fold_regions = crate::yaml_fold::detect_fold_regions(&ls);
+    assert_eq!(via_detect_fold_regions.len(), r.len());
+    assert_eq!(via_detect_fold_regions[0].start, r[0].start);
+    assert_eq!(via_detect_fold_regions[0].end, r[0].end);
+}
