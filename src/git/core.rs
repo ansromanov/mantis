@@ -632,6 +632,26 @@ pub fn tags(dir: &Path) -> Vec<String> {
     }
 }
 
+/// Returns the content of `file` as it was at revision `rev`, via `git show
+/// <rev>:<relpath>`. Returns `None` when the file does not exist at that
+/// revision, the path is not relative to the repo root, or git is unavailable.
+pub fn file_at_rev(repo_dir: &Path, rev: &str, file: &Path) -> Option<Vec<u8>> {
+    let root = git_toplevel(repo_dir)?;
+    let rel = file.strip_prefix(&root).ok()?;
+    let rel_str = rel.to_str()?;
+    let spec = format!("{rev}:{rel_str}");
+    let out = git_cmd()
+        .arg("-C")
+        .arg(&root)
+        .args(["show", &spec])
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    Some(out.stdout)
+}
+
 /// Returns the diff of `file` between `rev` and the current working tree, as
 /// lines. On error or git being unavailable, returns a single message line.
 pub fn file_diff(repo_dir: &Path, rev: &str, file: &Path) -> Vec<String> {

@@ -640,3 +640,52 @@ fn repo_log_empty_outside_git_repo() {
     let dir = tempfile::tempdir().unwrap();
     assert!(repo_log(dir.path(), 0, 10).is_empty());
 }
+
+// -- file_at_rev --------------------------------------------------------------
+
+#[test]
+fn file_at_rev_returns_file_content_at_commit() {
+    let dir = tempfile::tempdir().unwrap();
+    init_repo_with_commit(dir.path());
+    let f = dir.path().join("f.txt");
+    let result = file_at_rev(dir.path(), "HEAD", &f);
+    assert!(result.is_some(), "file_at_rev must return Some for HEAD");
+    let bytes = result.unwrap();
+    let text = String::from_utf8(bytes).unwrap();
+    assert_eq!(text, "hello\n");
+}
+
+#[test]
+fn file_at_rev_returns_none_for_nonexistent_path() {
+    let dir = tempfile::tempdir().unwrap();
+    init_repo_with_commit(dir.path());
+    let missing = dir.path().join("nope.txt");
+    let result = file_at_rev(dir.path(), "HEAD", &missing);
+    assert!(
+        result.is_none(),
+        "file_at_rev must return None for a nonexistent file"
+    );
+}
+
+#[test]
+fn file_at_rev_returns_none_for_non_repo() {
+    let dir = tempfile::tempdir().unwrap();
+    let f = dir.path().join("f.txt");
+    let result = file_at_rev(dir.path(), "HEAD", &f);
+    assert!(
+        result.is_none(),
+        "file_at_rev must return None outside a git repo"
+    );
+}
+
+#[test]
+fn file_at_rev_returns_none_for_invalid_rev() {
+    let dir = tempfile::tempdir().unwrap();
+    init_repo_with_commit(dir.path());
+    let f = dir.path().join("f.txt");
+    let result = file_at_rev(dir.path(), "nonexistent_tag_or_branch", &f);
+    assert!(
+        result.is_none(),
+        "file_at_rev must return None for an invalid revision"
+    );
+}

@@ -1088,6 +1088,26 @@ fn open_repo_log_noop_without_git_info() {
     fs::remove_dir_all(&root).ok();
 }
 
+// -- toggle_file_revision -----------------------------------------------------
+
+#[test]
+fn toggle_file_revision_shows_status_when_not_in_revision_diff() {
+    let root = temp_dir();
+    let mut app = app_for(&root);
+    assert!(app.file_at_revision.is_none());
+    app.toggle_file_revision();
+    let sm = app
+        .status_message
+        .as_ref()
+        .expect("status message must be set");
+    assert!(
+        sm.text.contains("not viewing a revision diff"),
+        "must show helpful error: got {:?}",
+        sm.text
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
 #[test]
 fn open_repo_log_opens_overlay_in_git_repo() {
     let root = temp_dir();
@@ -1095,6 +1115,17 @@ fn open_repo_log_opens_overlay_in_git_repo() {
     app.git_info = Some(git_info());
     app.open_repo_log();
     assert!(app.repo_log.is_some());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn viewing_revision_hash_initially_none() {
+    let root = temp_dir();
+    let app = app_for(&root);
+    assert!(
+        app.viewing_revision_hash.is_none(),
+        "viewing_revision_hash must start as None"
+    );
     fs::remove_dir_all(&root).ok();
 }
 
@@ -1131,5 +1162,16 @@ fn show_repo_log_compare_without_selection_only_closes() {
     app.show_repo_log_compare();
     assert!(app.repo_log.is_none());
     assert!(app.compare_base.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn file_at_revision_initially_none() {
+    let root = temp_dir();
+    let app = app_for(&root);
+    assert!(
+        app.file_at_revision.is_none(),
+        "file_at_revision must start as None"
+    );
     fs::remove_dir_all(&root).ok();
 }

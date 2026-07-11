@@ -253,6 +253,8 @@ impl Keymap {
             "blame_line" => &self.blame_line,
             "toggle_diff_side_by_side" => &self.toggle_diff_side_by_side,
             "toggle_diff_staged" => &self.toggle_diff_staged,
+            "toggle_file_revision" => &self.toggle_file_revision,
+            "blame_open_commit" => &self.blame_open_commit,
             "diff_hunk_next" => &self.diff_hunk_next,
             "diff_hunk_prev" => &self.diff_hunk_prev,
             "git_mode_toggle" => &self.git_mode_toggle,
@@ -366,6 +368,10 @@ pub struct Keymap {
     pub toggle_diff_side_by_side: Vec<KeyBinding>,
     /// Cycles the active diff mode: all -> staged -> unstaged -> all.
     pub toggle_diff_staged: Vec<KeyBinding>,
+    /// Toggles between diff view and file-at-revision snapshot.
+    pub toggle_file_revision: Vec<KeyBinding>,
+    /// Opens file at the commit shown on the active blame line.
+    pub blame_open_commit: Vec<KeyBinding>,
     pub diff_hunk_next: Vec<KeyBinding>,
     pub diff_hunk_prev: Vec<KeyBinding>,
     pub git_mode_toggle: Vec<KeyBinding>,
@@ -445,6 +451,8 @@ impl Default for Keymap {
             blame_line: bind(&["content:B"]),
             toggle_diff_side_by_side: Vec::new(),
             toggle_diff_staged: Vec::new(),
+            toggle_file_revision: bind(&["ctrl+u"]),
+            blame_open_commit: bind(&["o", "O"]),
             diff_hunk_next: bind(&["n"]),
             diff_hunk_prev: bind(&["N"]),
             git_mode_toggle: bind(&["ctrl+d"]),

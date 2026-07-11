@@ -138,6 +138,13 @@ pub struct App {
     /// from replacing it with the live working-tree diff. Cleared when the user
     /// returns to the live view (Esc, r, navigating to another file, etc.).
     pub viewing_revision: Option<String>,
+    /// Full commit hash of `viewing_revision`. Used by the file-at-revision
+    /// toggle to run `git show <hash>:<path>` and by Esc to restore the diff.
+    pub viewing_revision_hash: Option<String>,
+    /// When `Some(FileAtRevision)`, the content pane shows a read-only snapshot
+    /// of the file as it was at a specific git revision. Set by the
+    /// `toggle_file_revision` action; cleared by Esc, navigation, or reload.
+    pub file_at_revision: Option<types::FileAtRevision>,
     /// Side-by-side rows parsed from the current diff; empty for non-diffs.
     pub diff_rows: Vec<crate::diff::DiffRow>,
     pub command_usage: crate::command_usage::UsageStats,
@@ -865,6 +872,8 @@ impl App {
         self.json_pretty_text = Vec::new();
         self.json_pretty_lines = Vec::new();
         self.viewing_revision = None;
+        self.viewing_revision_hash = None;
+        self.file_at_revision = None;
         self.set_content_scroll(0);
         self.content_hscroll = 0;
         self.active_line = 0;

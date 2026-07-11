@@ -523,14 +523,20 @@ impl App {
         if let Some((hash, short, file)) = picked {
             self.last_open_source = crate::telemetry::FileSourceKind::History;
             let diff = crate::git::file_diff(&self.root, &hash, &file);
-            self.show_diff(&file, &short, diff);
+            self.show_diff(&file, &short, &diff, Some(&hash));
         }
     }
 
     /// Loads a diff (from git history) into the content panel with styled
     /// per-line markers. Sets `is_diff = true` so the line-number gutter is
     /// hidden and the diff stays read-only.
-    fn show_diff(&mut self, file: &Path, short: &str, lines: Vec<String>) {
+    pub(super) fn show_diff(
+        &mut self,
+        file: &Path,
+        short: &str,
+        lines: &[String],
+        full_hash: Option<&str>,
+    ) {
         self.invalidate_pending_load();
         self.in_file_search = None;
         self.virtual_file = None;
@@ -544,6 +550,8 @@ impl App {
         self.json_pretty_lines = Vec::new();
         self.is_diff = true;
         self.viewing_revision = Some(short.to_string());
+        self.viewing_revision_hash = full_hash.map(|h| h.to_string());
+        self.file_at_revision = None;
         self.clear_fold_state();
         self.file_encoding = None;
         self.file_line_ending = None;
@@ -558,8 +566,8 @@ impl App {
             .iter()
             .map(|l| vec![(diff_line_style(l, &self.theme), l.clone())])
             .collect();
-        self.diff_rows = crate::diff::parse_side_by_side(&lines);
-        self.content = lines;
+        self.diff_rows = crate::diff::parse_side_by_side(lines);
+        self.content = lines.to_vec();
         self.focus = Focus::Content;
         self.set_file_watch(None);
     }
@@ -588,6 +596,121 @@ impl App {
         if let Some(hash) = picked {
             self.enter_compare_mode(hash);
         }
+    }
+
+    /// Toggles between the revision diff view and the file content at that
+    /// revision. When in a revision diff (`viewing_revision` is set), loads the
+    /// file via `git show <rev>:<path>` and stores the diff state for instant
+    /// toggle-back. When viewing a file-at-revision snapshot, restores the
+    /// saved diff without re-fetching.
+    pub(super) fn toggle_file_revision(&mut self) {
+        if self.file_at_revision.is_some() {
+            // Currently showing file-at-revision snapshot → restore saved diff.
+            if let Some(snapshot) = self.file_at_revision.take() {
+                if let Some(saved) = snapshot.saved_diff {
+                    self.invalidate_pending_load();
+                    self.in_file_search = None;
+                    self.virtual_file = None;
+                    self.is_diff = true;
+                    self.viewing_revision = Some(snapshot.short);
+                    self.clear_fold_state();
+                    self.file_encoding = None;
+                    self.file_line_ending = None;
+                    self.is_json = false;
+                    self.show_pretty_json = false;
+                    self.json_pretty_text = Vec::new();
+                    self.json_pretty_lines = Vec::new();
+                    self.content_scroll = saved.content_scroll;
+                    self.active_line = saved.active_line;
+                    self.diff_side_by_side = saved.side_by_side;
+                    self.show_line_blame = false;
+                    self.clear_selection();
+                    self.content_title = Some(saved.content_title);
+                    self.highlighted = saved.highlighted;
+                    self.diff_rows = saved.diff_rows;
+                    self.content = saved.content;
+                    self.set_file_watch(None);
+                }
+            }
+            return;
+        }
+
+        // Currently in a revision diff → load file at that revision.
+        let Some(rev) = self.viewing_revision.clone() else {
+            self.set_status("toggle file at revision: not viewing a revision diff");
+            return;
+        };
+        let Some(ref hash) = self.viewing_revision_hash.clone() else {
+            self.set_status("toggle file at revision: commit hash unknown");
+            return;
+        };
+        let Some(ref path) = self.current_file.clone() else {
+            return;
+        };
+        let Some(bytes) = crate::git::file_at_rev(&self.root, hash, path) else {
+            self.set_status(format!(
+                "file not found at revision {}",
+                rev.chars().take(7).collect::<String>()
+            ));
+            return;
+        };
+        if crate::file::is_binary_bytes(&bytes) {
+            self.set_status("file at revision is binary");
+            return;
+        }
+        let text = String::from_utf8_lossy(&bytes);
+        let text = if text.contains('\r') {
+            text.replace("\r\n", "\n").replace('\r', "\n")
+        } else {
+            text.into()
+        };
+        let lines: Vec<String> = text.lines().map(|l| l.to_owned()).collect();
+        if lines.is_empty() {
+            self.set_status("file at revision is empty");
+            return;
+        }
+
+        // Save the current diff state for toggle-back.
+        let saved_diff = super::types::SavedDiffState {
+            content: self.content.clone(),
+            highlighted: self.highlighted.clone(),
+            diff_rows: self.diff_rows.clone(),
+            content_title: self.content_title.clone().unwrap_or_default(),
+            content_scroll: self.content_scroll,
+            active_line: self.active_line,
+            side_by_side: self.diff_side_by_side,
+        };
+
+        // Load the file-at-revision snapshot.
+        self.invalidate_pending_load();
+        self.in_file_search = None;
+        self.virtual_file = None;
+        self.is_diff = false;
+        self.diff_rows = Vec::new();
+        self.is_json = false;
+        self.show_pretty_json = false;
+        self.json_pretty_text = Vec::new();
+        self.json_pretty_lines = Vec::new();
+        self.clear_fold_state();
+        self.file_encoding = None;
+        self.file_line_ending = None;
+        self.set_content_scroll(0);
+        self.content_hscroll = 0;
+        self.active_line = 0;
+        self.show_line_blame = false;
+        self.clear_selection();
+
+        let rel = path.strip_prefix(&self.root).unwrap_or(path);
+        let short_display: String = rev.chars().take(7).collect();
+        self.content_title = Some(format!(" {} @ {} ", rel.display(), short_display));
+        self.highlighted = self.highlighter.highlight(path, &lines);
+        self.current_syntax = self.highlighter.syntax_name(path);
+        self.content = lines;
+        self.file_at_revision = Some(super::types::FileAtRevision {
+            short: rev,
+            saved_diff: Some(saved_diff),
+        });
+        self.set_file_watch(None);
     }
 }
 

@@ -1058,3 +1058,29 @@ fn navigation_telemetry_check() {
     assert!(!app.telemetry.is_enabled());
     fs::remove_dir_all(&root).ok();
 }
+
+// -- toggle_git_mode clears file_at_revision ----------------------------------
+
+#[test]
+fn toggle_git_mode_off_clears_file_at_revision() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.git_mode = true;
+    app.file_at_revision = Some(crate::app::types::FileAtRevision {
+        short: "abc1234".into(),
+        saved_diff: None,
+    });
+    app.viewing_revision = Some("abc1234".into());
+
+    app.toggle_git_mode();
+
+    assert!(
+        app.file_at_revision.is_none(),
+        "toggle_git_mode off must clear file_at_revision"
+    );
+    assert!(
+        app.viewing_revision.is_none(),
+        "toggle_git_mode off must clear viewing_revision"
+    );
+    fs::remove_dir_all(&root).ok();
+}

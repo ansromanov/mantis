@@ -789,3 +789,27 @@ fn app_new_starts_without_repo_log_overlay() {
     assert_eq!(app.repo_log_offset, 0);
     fs::remove_dir_all(&root).ok();
 }
+
+// -- file_at_revision / viewing_revision_hash ----------------------------------
+
+#[test]
+fn app_new_starts_with_file_at_revision_none() {
+    let root = temp_dir();
+    let app = new_app(&root, Config::default());
+    assert!(
+        app.file_at_revision.is_none(),
+        "App::new must set file_at_revision = None"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn app_new_starts_with_viewing_revision_hash_none() {
+    let root = temp_dir();
+    let app = new_app(&root, Config::default());
+    assert!(
+        app.viewing_revision_hash.is_none(),
+        "App::new must set viewing_revision_hash = None"
+    );
+    fs::remove_dir_all(&root).ok();
+}

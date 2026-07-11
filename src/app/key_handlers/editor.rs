@@ -319,6 +319,36 @@ impl App {
                 self.revision_picker = Some(crate::search::RevisionPicker::new(&self.root));
                 true
             }
+            Some("toggle_file_revision") => {
+                self.toggle_file_revision();
+                true
+            }
+            Some("blame_open_commit") => {
+                // From the palette: execute the same logic as the keybinding.
+                // Requires blame view and a valid active line.
+                if !self.show_blame {
+                    self.set_status("blame open commit: blame view not active");
+                    return true;
+                }
+                let physical = self.display_to_physical(self.active_line);
+                if let Some(ref path) = self.current_file.clone() {
+                    let blame_lines = crate::git::file_blame(&self.root, path);
+                    let lineno = physical as u32 + 1;
+                    if let Some(bl) = blame_lines.iter().find(|b| b.line_no == lineno) {
+                        let hash = bl.commit_hash.clone();
+                        let short = bl.short_hash.clone();
+                        self.show_blame = false;
+                        let diff = crate::git::file_diff(&self.root, &hash, path);
+                        self.show_diff(path, &short, &diff, Some(&hash));
+                        self.toggle_file_revision();
+                    } else {
+                        self.set_status("blame open commit: no blame data for active line");
+                    }
+                } else {
+                    self.set_status("blame open commit: no file open");
+                }
+                true
+            }
             Some("toggle_raw_markdown") => {
                 if self.plugin_content_active {
                     let key = crossterm::event::KeyEvent::new(

@@ -120,3 +120,17 @@ fn highlight_lines_none_current_syntax_is_plain_text() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn content_query_works_after_opening_file() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    let f = root.join("test.txt");
+    std::fs::write(&f, "line one\nline two\n").unwrap();
+    app.open_file(&f);
+    assert_eq!(app.line_count(), 2);
+    assert_eq!(app.line_text(0), Some("line one"));
+    assert_eq!(app.line_text(1), Some("line two"));
+    assert!(app.line_text(2).is_none());
+    fs::remove_dir_all(&root).ok();
+}

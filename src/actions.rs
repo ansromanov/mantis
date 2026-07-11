@@ -441,6 +441,26 @@ pub static ACTIONS: &[ActionSpec] = &[
         category: Some("Git"),
         description: Some("Compare the current file against a git revision"),
     },
+    ActionSpec {
+        id: "toggle_file_revision",
+        palette: Some("Toggle file at revision (diff ↔ snapshot)"),
+        help: Some((
+            "Content panel",
+            "toggle between diff and file at revision (in a revision diff)",
+        )),
+        category: Some("Git"),
+        description: Some("Switch between revision diff and file content at that commit"),
+    },
+    ActionSpec {
+        id: "blame_open_commit",
+        palette: Some("Blame: open file at commit"),
+        help: Some((
+            "Blame annotation",
+            "open file at the commit shown on the active blame line",
+        )),
+        category: Some("Git"),
+        description: Some("View the file content at the commit under the blame cursor"),
+    },
     // -- Palette/menu-only actions: no keymap binding --------------------
     ActionSpec {
         id: "open_config_in_editor",
@@ -512,6 +532,8 @@ impl ActionSpec {
             "toggle_diff_side_by_side" | "diff_hunk_next" | "diff_hunk_prev" => {
                 Applicability::DiffView
             }
+            "toggle_file_revision" => Applicability::GitRepoAndDiffView,
+            "blame_open_commit" => Applicability::GitRepoAndNoDiff,
             "fold_toggle" | "fold_all" | "unfold_all" => Applicability::FoldRegions,
             "toggle_raw_markdown" => Applicability::PluginContentActive,
             "open_in_editor" | "open_external" | "copy_path" | "copy_relative_path"

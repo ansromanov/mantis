@@ -52,6 +52,10 @@ impl App {
                 self.clear_selection();
                 return;
             }
+            if self.file_at_revision.is_some() {
+                self.toggle_file_revision();
+                return;
+            }
             if self.viewing_revision.is_some() {
                 self.viewing_revision = None;
                 if let Some(path) = self.current_file.clone() {
@@ -213,6 +217,7 @@ impl App {
         if self.show_blame && self.has_text_cursor() {
             let scroll_before = self.content_scroll;
             let active_line_before = self.active_line;
+            let blame_open = pressed_in(&k.blame_open_commit, &key, scope);
             if pressed_in(&k.nav_up, &key, scope) {
                 if self.active_line > 0 {
                     self.active_line -= 1;
@@ -237,6 +242,23 @@ impl App {
                 let max = self.display_line_count().saturating_sub(1);
                 self.active_line = (self.active_line + self.page_rows()).min(max);
                 self.scroll_active_line_into_view();
+            }
+            if blame_open {
+                // Get the commit hash at the active blame line and open file at that revision.
+                let physical = self.display_to_physical(self.active_line);
+                if let Some(ref path) = self.current_file.clone() {
+                    let blame_lines = crate::git::file_blame(&self.root, path);
+                    let lineno = physical as u32 + 1;
+                    if let Some(bl) = blame_lines.iter().find(|b| b.line_no == lineno) {
+                        let hash = bl.commit_hash.clone();
+                        let short = bl.short_hash.clone();
+                        self.show_blame = false;
+                        let diff = crate::git::file_diff(&self.root, &hash, path);
+                        self.show_diff(path, &short, &diff, Some(&hash));
+                        // Immediately toggle to file-at-revision snapshot.
+                        self.toggle_file_revision();
+                    }
+                }
             }
             if self.content_scroll != scroll_before || self.active_line != active_line_before {
                 self.scroll_blame_into_view();
@@ -395,6 +417,8 @@ impl App {
             if let Some(path) = self.current_file.clone() {
                 self.show_working_tree_diff(&path);
             }
+        } else if self.is_diff && pressed_in(&k.toggle_file_revision, &key, scope) {
+            self.toggle_file_revision();
         } else if self.is_diff && pressed_in(&k.diff_hunk_next, &key, scope) {
             self.diff_next_hunk();
         } else if self.is_diff && pressed_in(&k.diff_hunk_prev, &key, scope) {

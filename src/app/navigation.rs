@@ -197,7 +197,12 @@ impl App {
                 self.request_git_status_refresh();
             }
             self.rebuild(true);
-            // Re-open the current file as normal content instead of a diff.
+            // Re-open the current file as normal content instead of a diff
+            // or file-at-revision snapshot.
+            if self.file_at_revision.is_some() {
+                self.file_at_revision = None;
+                self.viewing_revision = None;
+            }
             if let Some(path) = self.current_file.clone() {
                 if self.is_diff {
                     self.open_file(&path);
