@@ -41,7 +41,10 @@ jobs:
         with:
           ref: ${{ inputs.ref || github.ref }}
 
+      # Self-hosted Linux runners are not Debian-based (no apt-get) and are
+      # expected to have lld preinstalled.
       - name: Install lld
+        if: inputs.runner != 'self-hosted'
         run: sudo apt-get update && sudo apt-get install -y lld
 
       - uses: dtolnay/rust-toolchain@stable
