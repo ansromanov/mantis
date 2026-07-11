@@ -30,7 +30,7 @@ on:
           - none
         default: all
       runner:
-        description: Runner for the core jobs (bump/test/bench/publish); build matrix always uses GitHub-hosted OS/arch runners
+        description: Runner for the core jobs (bump/test/test-windows/bench/publish); build matrix always uses GitHub-hosted OS/arch runners
         type: choice
         options:
           - github-hosted
@@ -199,7 +199,7 @@ jobs:
     needs: [bump, plan]
     if: needs.plan.outputs.run_windows_tests == 'true'
     continue-on-error: true
-    runs-on: windows-latest
+    runs-on: ${{ inputs.runner == 'self-hosted' && fromJSON('["self-hosted", "Windows"]') || 'windows-latest' }}
     permissions:
       contents: read
     steps:
