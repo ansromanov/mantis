@@ -2,6 +2,14 @@ name: Benchmark
 
 on:
   workflow_dispatch:
+    inputs:
+      runner:
+        description: Runner for the benchmark job
+        type: choice
+        options:
+          - github-hosted
+          - self-hosted
+        default: github-hosted
 
 env:
   CARGO_TERM_COLOR: always
@@ -9,7 +17,7 @@ env:
 jobs:
   bench:
     name: full
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner == 'self-hosted' && fromJSON('["self-hosted", "Linux"]') || 'ubuntu-latest' }}
     permissions:
       contents: read
       actions: read
