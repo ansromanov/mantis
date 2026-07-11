@@ -452,7 +452,7 @@ impl Default for Keymap {
             toggle_diff_side_by_side: Vec::new(),
             toggle_diff_staged: Vec::new(),
             toggle_file_revision: bind(&["ctrl+u"]),
-            blame_open_commit: bind(&["o", "O"]),
+            blame_open_commit: bind(&["o"]),
             diff_hunk_next: bind(&["n"]),
             diff_hunk_prev: bind(&["N"]),
             git_mode_toggle: bind(&["ctrl+d"]),

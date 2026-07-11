@@ -756,13 +756,3 @@ fn blame_open_commit_default_binding_is_o() {
         "blame_open_commit must bind to 'o' in content scope"
     );
 }
-
-#[test]
-fn blame_open_commit_default_binding_is_shift_o() {
-    let keymap = Keymap::default();
-    let shift_o = ev(KeyCode::Char('O'), KeyModifiers::SHIFT);
-    assert!(
-        pressed_in(&keymap.blame_open_commit, &shift_o, BindingScope::Content),
-        "blame_open_commit must bind to 'O' (shift+o) in content scope"
-    );
-}

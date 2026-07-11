@@ -177,6 +177,13 @@ impl App {
             }
         } else if pressed_in(&k.open_in_editor, &key, scope) {
             self.open_in_editor();
+        } else if self.show_blame
+            && self.has_text_cursor()
+            && pressed_in(&k.blame_open_commit, &key, scope)
+        {
+            // Must precede `open_external`: both default to 'o', and with the
+            // blame pane open the blame action wins.
+            self.open_blame_commit_at_active_line();
         } else if pressed_in(&k.open_external, &key, scope) {
             self.open_external_file();
         } else if pressed_in(&k.toggle_watch, &key, scope) {
@@ -217,7 +224,6 @@ impl App {
         if self.show_blame && self.has_text_cursor() {
             let scroll_before = self.content_scroll;
             let active_line_before = self.active_line;
-            let blame_open = pressed_in(&k.blame_open_commit, &key, scope);
             if pressed_in(&k.nav_up, &key, scope) {
                 if self.active_line > 0 {
                     self.active_line -= 1;
@@ -242,23 +248,6 @@ impl App {
                 let max = self.display_line_count().saturating_sub(1);
                 self.active_line = (self.active_line + self.page_rows()).min(max);
                 self.scroll_active_line_into_view();
-            }
-            if blame_open {
-                // Get the commit hash at the active blame line and open file at that revision.
-                let physical = self.display_to_physical(self.active_line);
-                if let Some(ref path) = self.current_file.clone() {
-                    let blame_lines = crate::git::file_blame(&self.root, path);
-                    let lineno = physical as u32 + 1;
-                    if let Some(bl) = blame_lines.iter().find(|b| b.line_no == lineno) {
-                        let hash = bl.commit_hash.clone();
-                        let short = bl.short_hash.clone();
-                        self.show_blame = false;
-                        let diff = crate::git::file_diff(&self.root, &hash, path);
-                        self.show_diff(path, &short, &diff, Some(&hash));
-                        // Immediately toggle to file-at-revision snapshot.
-                        self.toggle_file_revision();
-                    }
-                }
             }
             if self.content_scroll != scroll_before || self.active_line != active_line_before {
                 self.scroll_blame_into_view();

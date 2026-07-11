@@ -199,12 +199,13 @@ impl App {
             self.rebuild(true);
             // Re-open the current file as normal content instead of a diff
             // or file-at-revision snapshot.
-            if self.file_at_revision.is_some() {
+            let was_snapshot = self.file_at_revision.is_some();
+            if was_snapshot {
                 self.file_at_revision = None;
                 self.viewing_revision = None;
             }
             if let Some(path) = self.current_file.clone() {
-                if self.is_diff {
+                if self.is_diff || was_snapshot {
                     self.open_file(&path);
                 }
             }

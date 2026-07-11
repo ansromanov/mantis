@@ -712,6 +712,29 @@ impl App {
         });
         self.set_file_watch(None);
     }
+
+    /// Opens the file at the commit recorded on the active blame line: loads
+    /// that commit's diff, then immediately toggles to the file-at-revision
+    /// snapshot. Emits a status message when the file or blame data is missing.
+    pub(super) fn open_blame_commit_at_active_line(&mut self) {
+        let physical = self.display_to_physical(self.active_line);
+        let Some(path) = self.current_file.clone() else {
+            self.set_status("blame open commit: no file open");
+            return;
+        };
+        let blame_lines = crate::git::file_blame(&self.root, &path);
+        let lineno = physical as u32 + 1;
+        let Some(bl) = blame_lines.iter().find(|b| b.line_no == lineno) else {
+            self.set_status("blame open commit: no blame data for active line");
+            return;
+        };
+        let hash = bl.commit_hash.clone();
+        let short = bl.short_hash.clone();
+        self.show_blame = false;
+        let diff = crate::git::file_diff(&self.root, &hash, &path);
+        self.show_diff(&path, &short, &diff, Some(&hash));
+        self.toggle_file_revision();
+    }
 }
 
 #[cfg(test)]
