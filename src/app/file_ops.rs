@@ -358,6 +358,8 @@ impl App {
         // preserves all.
         let is_new_file = self.current_file.as_deref() != Some(path);
         if is_new_file {
+            self.file_at_revision = None;
+            self.viewing_revision_hash = None;
             // Remember outgoing cursor, restore incoming cursor
             if let Some(old) = self.current_file.clone() {
                 self.cursor_positions
@@ -613,6 +615,7 @@ impl App {
                     self.virtual_file = None;
                     self.is_diff = true;
                     self.viewing_revision = Some(snapshot.short);
+                    self.viewing_revision_hash = Some(snapshot.hash);
                     self.clear_fold_state();
                     self.file_encoding = None;
                     self.file_line_ending = None;
@@ -708,6 +711,7 @@ impl App {
         self.content = lines;
         self.file_at_revision = Some(super::types::FileAtRevision {
             short: rev,
+            hash: hash.clone(),
             saved_diff: Some(saved_diff),
         });
         self.set_file_watch(None);

@@ -1109,6 +1109,31 @@ fn toggle_file_revision_shows_status_when_not_in_revision_diff() {
 }
 
 #[test]
+fn opening_a_different_file_clears_file_at_revision_state() {
+    use crate::app::types::FileAtRevision;
+
+    let root = temp_dir();
+    let first = root.join("first.txt");
+    let second = root.join("second.txt");
+    fs::write(&first, "first\n").unwrap();
+    fs::write(&second, "second\n").unwrap();
+    let mut app = app_for(&root);
+    app.open_file(&first);
+    app.file_at_revision = Some(FileAtRevision {
+        short: "abc1234".into(),
+        hash: "abc1234def5678".into(),
+        saved_diff: None,
+    });
+    app.viewing_revision_hash = Some("abc1234def5678".into());
+
+    app.open_file(&second);
+
+    assert!(app.file_at_revision.is_none());
+    assert!(app.viewing_revision_hash.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn open_repo_log_opens_overlay_in_git_repo() {
     let root = temp_dir();
     let mut app = app_for(&root);

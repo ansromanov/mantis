@@ -79,6 +79,8 @@ impl StatusMessage {
 pub struct FileAtRevision {
     /// Short hash for display in the title bar.
     pub short: String,
+    /// Full commit hash used to restore the revision diff after a snapshot.
+    pub hash: String,
     /// Saved diff state so the toggle can restore the diff without re-fetching.
     pub saved_diff: Option<SavedDiffState>,
 }

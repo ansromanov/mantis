@@ -44,9 +44,11 @@ fn file_at_revision_stores_short_hash_and_saved_diff() {
     };
     let far = FileAtRevision {
         short: "abc1234".into(),
+        hash: "abc1234def5678".into(),
         saved_diff: Some(saved),
     };
     assert_eq!(far.short, "abc1234");
+    assert_eq!(far.hash, "abc1234def5678");
     assert!(far.saved_diff.is_some());
     let s = far.saved_diff.unwrap();
     assert_eq!(s.content, vec!["diff line"]);
@@ -59,10 +61,12 @@ fn file_at_revision_stores_short_hash_and_saved_diff() {
 fn file_at_revision_clone_preserves_data() {
     let far = FileAtRevision {
         short: "deadbee".into(),
+        hash: "deadbeef1234567".into(),
         saved_diff: None,
     };
     let far2 = far.clone();
     assert_eq!(far2.short, "deadbee");
+    assert_eq!(far2.hash, "deadbeef1234567");
     assert!(far2.saved_diff.is_none());
 }
 

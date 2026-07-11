@@ -1068,6 +1068,7 @@ fn toggle_git_mode_off_clears_file_at_revision() {
     app.git_mode = true;
     app.file_at_revision = Some(crate::app::types::FileAtRevision {
         short: "abc1234".into(),
+        hash: "abc1234def5678".into(),
         saved_diff: None,
     });
     app.viewing_revision = Some("abc1234".into());

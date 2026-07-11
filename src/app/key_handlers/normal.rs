@@ -406,7 +406,9 @@ impl App {
             if let Some(path) = self.current_file.clone() {
                 self.show_working_tree_diff(&path);
             }
-        } else if self.is_diff && pressed_in(&k.toggle_file_revision, &key, scope) {
+        } else if (self.is_diff || self.file_at_revision.is_some())
+            && pressed_in(&k.toggle_file_revision, &key, scope)
+        {
             self.toggle_file_revision();
         } else if self.is_diff && pressed_in(&k.diff_hunk_next, &key, scope) {
             self.diff_next_hunk();
