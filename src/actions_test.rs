@@ -58,6 +58,8 @@ const KEYMAP_FIELD_ACTION_IDS: &[&str] = &[
     "tree_up_dir",
     "tree_width_grow",
     "tree_width_shrink",
+    "toggle_file_revision",
+    "blame_open_commit",
 ];
 
 /// Pure-navigation actions that are inherently keymap-only: they should never

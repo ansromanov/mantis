@@ -123,6 +123,8 @@ impl App {
             diff_mode: cfg.git.diff.mode,
             diff_side_by_side: cfg.git.diff.side_by_side,
             viewing_revision: None,
+            viewing_revision_hash: None,
+            file_at_revision: None,
             diff_rows: Vec::new(),
             content_title: None,
             focus: Focus::Tree,

@@ -197,7 +197,48 @@ fn apply_theme_sends_new_theme_colors_to_plugins() {
         "on_theme_change colors must reflect the new theme, got: {line}"
     );
     fs::remove_dir_all(&root).ok();
-    fs::remove_dir_all(&plugin_dir).ok();
+}
+
+// -- toggle_file_revision dispatch -------------------------------------------
+
+#[test]
+fn toggle_file_revision_dispatch_returns_true() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.command_palette = Some(CommandPalette::default());
+    if let Some(ref mut p) = app.command_palette {
+        let idx = COMMANDS
+            .iter()
+            .position(|c| c.action_id == "toggle_file_revision")
+            .expect("toggle_file_revision must be in COMMANDS");
+        p.filtered = vec![idx];
+        p.selected = 0;
+    }
+    assert!(
+        app.dispatch_command(),
+        "toggle_file_revision must be handled by dispatch_command"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn blame_open_commit_dispatch_returns_true() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.command_palette = Some(CommandPalette::default());
+    if let Some(ref mut p) = app.command_palette {
+        let idx = COMMANDS
+            .iter()
+            .position(|c| c.action_id == "blame_open_commit")
+            .expect("blame_open_commit must be in COMMANDS");
+        p.filtered = vec![idx];
+        p.selected = 0;
+    }
+    assert!(
+        app.dispatch_command(),
+        "blame_open_commit must be handled by dispatch_command"
+    );
+    fs::remove_dir_all(&root).ok();
 }
 
 #[test]

@@ -192,10 +192,16 @@ content_reset_col = ["Home", "0"]
 # if you'd like a dedicated key.
 toggle_blame = ["ctrl+b"]
 blame_line = ["content:B"]
+# with the blame pane open, opens the file as it was at the commit on the
+# active line (takes precedence over open_external's "o" while blame is open)
+blame_open_commit = ["o"]
 
 # diff view
 diff_hunk_next = ["n"]
 diff_hunk_prev = ["N"]
+# in a revision diff, toggles between the diff and the full file content
+# at that revision
+toggle_file_revision = ["ctrl+u"]
 ```
 
 > **macOS.** `Keymap::default()` layers Cmd-primary bindings for the most

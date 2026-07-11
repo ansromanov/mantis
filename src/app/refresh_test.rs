@@ -324,6 +324,8 @@ fn create_base_app() -> App {
         is_diff: false,
         diff_side_by_side: false,
         viewing_revision: None,
+        viewing_revision_hash: None,
+        file_at_revision: None,
         diff_rows: Vec::new(),
         content_title: None,
         focus: crate::app::Focus::Tree,

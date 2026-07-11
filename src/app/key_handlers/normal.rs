@@ -52,6 +52,10 @@ impl App {
                 self.clear_selection();
                 return;
             }
+            if self.file_at_revision.is_some() {
+                self.toggle_file_revision();
+                return;
+            }
             if self.viewing_revision.is_some() {
                 self.viewing_revision = None;
                 if let Some(path) = self.current_file.clone() {
@@ -173,6 +177,13 @@ impl App {
             }
         } else if pressed_in(&k.open_in_editor, &key, scope) {
             self.open_in_editor();
+        } else if self.show_blame
+            && self.has_text_cursor()
+            && pressed_in(&k.blame_open_commit, &key, scope)
+        {
+            // Must precede `open_external`: both default to 'o', and with the
+            // blame pane open the blame action wins.
+            self.open_blame_commit_at_active_line();
         } else if pressed_in(&k.open_external, &key, scope) {
             self.open_external_file();
         } else if pressed_in(&k.toggle_watch, &key, scope) {
@@ -395,6 +406,10 @@ impl App {
             if let Some(path) = self.current_file.clone() {
                 self.show_working_tree_diff(&path);
             }
+        } else if (self.is_diff || self.file_at_revision.is_some())
+            && pressed_in(&k.toggle_file_revision, &key, scope)
+        {
+            self.toggle_file_revision();
         } else if self.is_diff && pressed_in(&k.diff_hunk_next, &key, scope) {
             self.diff_next_hunk();
         } else if self.is_diff && pressed_in(&k.diff_hunk_prev, &key, scope) {

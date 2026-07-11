@@ -1502,3 +1502,93 @@ fn shift_l_in_content_scope_does_not_open_repo_log() {
     assert!(app.repo_log.is_none());
     fs::remove_dir_all(&root).ok();
 }
+
+// -- file_at_revision Esc handling --------------------------------------------
+
+#[test]
+fn esc_toggles_back_from_file_at_revision_to_diff() {
+    use crate::app::types::{FileAtRevision, SavedDiffState};
+
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+
+    // Simulate being in a file-at-revision snapshot.
+    app.viewing_revision = Some("abc1234".into());
+    app.is_diff = false;
+    app.file_at_revision = Some(FileAtRevision {
+        short: "abc1234".into(),
+        hash: "abc1234def5678".into(),
+        saved_diff: Some(SavedDiffState {
+            content: vec!["+diff line".into()],
+            highlighted: vec![],
+            diff_rows: vec![],
+            content_title: " diff abc1234 -- long.txt ".into(),
+            content_scroll: 0,
+            active_line: 0,
+            side_by_side: false,
+        }),
+    });
+
+    app.handle_key(key(KeyCode::Esc));
+
+    assert!(
+        app.file_at_revision.is_none(),
+        "Esc must clear file_at_revision"
+    );
+    assert!(app.is_diff, "Esc must restore diff mode");
+    assert_eq!(app.content, vec!["+diff line"]);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn toggle_file_revision_key_restores_diff_from_snapshot() {
+    use crate::app::types::{FileAtRevision, SavedDiffState};
+
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.viewing_revision_hash = None;
+    app.file_at_revision = Some(FileAtRevision {
+        short: "abc1234".into(),
+        hash: "abc1234def5678".into(),
+        saved_diff: Some(SavedDiffState {
+            content: vec!["+diff line".into()],
+            highlighted: vec![],
+            diff_rows: vec![],
+            content_title: " diff abc1234 -- long.txt ".into(),
+            content_scroll: 0,
+            active_line: 0,
+            side_by_side: false,
+        }),
+    });
+
+    app.handle_key(ctrl('u'));
+
+    assert!(app.file_at_revision.is_none());
+    assert!(app.is_diff, "Ctrl-U must restore diff mode from a snapshot");
+    assert_eq!(
+        app.viewing_revision_hash.as_deref(),
+        Some("abc1234def5678"),
+        "restoring the diff must restore its saved full hash"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn esc_does_not_touch_file_at_revision_when_none() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.file_at_revision = None;
+    app.viewing_revision = None;
+
+    let scroll_before = app.content_scroll;
+    app.handle_key(key(KeyCode::Esc));
+    // Esc with nothing special open should just clear selection/search etc.
+    assert_eq!(app.content_scroll, scroll_before);
+    fs::remove_dir_all(&root).ok();
+}

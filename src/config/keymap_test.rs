@@ -736,3 +736,23 @@ fn repo_commit_log_default_binding_is_shift_l_tree_scope() {
         "repo_commit_log must NOT fire in content scope"
     );
 }
+
+#[test]
+fn toggle_file_revision_default_binding_is_ctrl_u() {
+    let keymap = Keymap::default();
+    let ctrl_u = ev(KeyCode::Char('u'), KeyModifiers::CONTROL);
+    assert!(
+        pressed_in(&keymap.toggle_file_revision, &ctrl_u, BindingScope::Content),
+        "toggle_file_revision must bind to ctrl+u in content scope"
+    );
+}
+
+#[test]
+fn blame_open_commit_default_binding_is_o() {
+    let keymap = Keymap::default();
+    let o = ev(KeyCode::Char('o'), KeyModifiers::empty());
+    assert!(
+        pressed_in(&keymap.blame_open_commit, &o, BindingScope::Content),
+        "blame_open_commit must bind to 'o' in content scope"
+    );
+}

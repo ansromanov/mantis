@@ -71,6 +71,34 @@ impl StatusMessage {
     }
 }
 
+/// Immutable snapshot of a file at a specific git revision. When active, the
+/// content pane shows the historical file content (highlighted, foldable,
+/// searchable) instead of the working-tree file or a diff. The buffer is
+/// read-only and watcher reloads must not replace it.
+#[derive(Debug, Clone)]
+pub struct FileAtRevision {
+    /// Short hash for display in the title bar.
+    pub short: String,
+    /// Full commit hash used to restore the revision diff after a snapshot.
+    pub hash: String,
+    /// Saved diff state so the toggle can restore the diff without re-fetching.
+    pub saved_diff: Option<SavedDiffState>,
+}
+
+/// Saved diff state for toggling between diff and file-at-revision views.
+/// Stored in [`FileAtRevision::saved_diff`] so the toggle back to diff is
+/// instant.
+#[derive(Debug, Clone)]
+pub struct SavedDiffState {
+    pub content: Vec<String>,
+    pub highlighted: Vec<Vec<(ratatui::style::Style, String)>>,
+    pub diff_rows: Vec<crate::diff::DiffRow>,
+    pub content_title: String,
+    pub content_scroll: usize,
+    pub active_line: usize,
+    pub side_by_side: bool,
+}
+
 /// A keypress dispatched to `on_keypress` subscribers (protocol 3+), waiting
 /// to see whether any of them claims it via a `key_handled` action before
 /// `deadline`. If claimed in time, the key is swallowed — no built-in

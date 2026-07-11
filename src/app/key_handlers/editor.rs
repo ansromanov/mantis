@@ -319,6 +319,18 @@ impl App {
                 self.revision_picker = Some(crate::search::RevisionPicker::new(&self.root));
                 true
             }
+            Some("toggle_file_revision") => {
+                self.toggle_file_revision();
+                true
+            }
+            Some("blame_open_commit") => {
+                if !self.show_blame {
+                    self.set_status("blame open commit: blame view not active");
+                    return true;
+                }
+                self.open_blame_commit_at_active_line();
+                true
+            }
             Some("toggle_raw_markdown") => {
                 if self.plugin_content_active {
                     let key = crossterm::event::KeyEvent::new(
