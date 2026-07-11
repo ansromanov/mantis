@@ -20,7 +20,7 @@ on:
           - windows
         default: all
       runner:
-        description: Runner for the Linux test job; Windows always uses GitHub-hosted windows-latest
+        description: Runner type for both Linux and Windows jobs
         type: choice
         options:
           - github-hosted
@@ -31,7 +31,7 @@ jobs:
   test:
     name: full test suite + e2e (Linux)
     if: inputs.test_targets == 'all' || inputs.test_targets == 'linux'
-    runs-on: ${{ inputs.runner == 'self-hosted' && 'self-hosted' || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.runner == 'self-hosted' && fromJSON('["self-hosted", "Linux"]') || 'ubuntu-latest' }}
     permissions:
       contents: read
     env:
@@ -65,7 +65,7 @@ jobs:
     # Best-effort: Windows is a known slow/flaky lane, so it never fails the
     # workflow — check the job's own outcome for the actual result.
     continue-on-error: true
-    runs-on: windows-latest
+    runs-on: ${{ inputs.runner == 'self-hosted' && fromJSON('["self-hosted", "Windows"]') || 'windows-latest' }}
     permissions:
       contents: read
     steps:
