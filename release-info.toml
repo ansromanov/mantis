@@ -1,6 +1,11 @@
 version = "0.17.3"
 date = "2026-07-11"
-whats_new = """- fix: route release.yml self-hosted jobs to Linux label (#692)
+whats_new = """- ci: skip lld apt install on self-hosted runners (#697)
+- fix: defer release bump push until pipeline is green (#695)
+- fix: respect runner input in release test-windows job (#694)
+- feat: add self-hosted runner option to bench.yml (#693)
+- chore: release v0.17.3 [skip ci]
+- fix: route release.yml self-hosted jobs to Linux label (#692)
 - fix: route self-hosted runners by OS label (#691)
 - fix: gate Unix-only test code and fix file_at_rev on Windows (#690)
 - fix: update config schema snapshot for keys added in #683 (#689)
