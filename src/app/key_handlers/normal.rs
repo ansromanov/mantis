@@ -379,7 +379,7 @@ impl App {
                     "markdown render toggle: not available (markdown plugin not active)",
                 );
             } else {
-                let is_markdown = self.current_file.as_ref().map_or(false, |path| {
+                let is_markdown = self.current_file.as_ref().is_some_and(|path| {
                     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
                     matches!(ext, "md" | "markdown")
                 });
