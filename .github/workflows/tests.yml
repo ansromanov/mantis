@@ -1,0 +1,81 @@
+name: Full Test Suite
+
+# On-demand full test suite, decoupled from a release. Useful for validating
+# a branch/main before cutting a release, or for exercising self-hosted
+# runners without going through bump/build/publish. release.yml runs the same
+# full suite as a release gate; this workflow exists to run it standalone.
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag, or SHA to test (defaults to the branch this workflow runs from)
+        type: string
+        default: ""
+      test_targets:
+        description: Which full test suite(s) to run
+        type: choice
+        options:
+          - all
+          - linux
+          - windows
+        default: all
+      runner:
+        description: Runner for the Linux test job; Windows always uses GitHub-hosted windows-latest
+        type: choice
+        options:
+          - github-hosted
+          - self-hosted
+        default: github-hosted
+
+jobs:
+  test:
+    name: full test suite + e2e (Linux)
+    if: inputs.test_targets == 'all' || inputs.test_targets == 'linux'
+    runs-on: ${{ inputs.runner == 'self-hosted' && 'self-hosted' || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+    env:
+      RUSTFLAGS: "-C link-arg=-fuse-ld=lld"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Install lld
+        run: sudo apt-get update && sudo apt-get install -y lld
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
+
+      - name: Run full test suite
+        run: cargo nextest run --profile ci --all
+
+      - name: Run E2E whole-binary smoke test
+        run: python3 scripts/ci-e2e.py
+
+  test-windows:
+    name: full test suite (Windows)
+    if: inputs.test_targets == 'all' || inputs.test_targets == 'windows'
+    # Best-effort: Windows is a known slow/flaky lane, so it never fails the
+    # workflow — check the job's own outcome for the actual result.
+    continue-on-error: true
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Test
+        run: cargo test --all

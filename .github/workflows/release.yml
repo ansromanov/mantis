@@ -158,10 +158,10 @@ jobs:
           fi
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-  # Full validation runs here (and only here): complete test suite on Linux
-  # and Windows, the e2e smoke, and the full benchmarks — all in parallel with
-  # the builds. PRs and merges to main run only related-test subsets (ci.yml,
-  # main.yml), so release is the single point that exercises everything.
+  # Full validation runs here: complete test suite on Linux and Windows, the
+  # e2e smoke, and the full benchmarks — all in parallel with the builds. PRs
+  # and merges to main run only related-test subsets (ci.yml, main.yml).
+  # tests.yml runs this same full suite on demand, decoupled from a release.
   test:
     name: full test suite + e2e (Linux)
     needs: [bump, plan]
