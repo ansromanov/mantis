@@ -195,7 +195,10 @@ fn root_key(root: &Path) -> String {
             bytes.iter().map(|b| format!("{b:02x}")).collect::<String>()
         )
     };
-    s.trim_end_matches(std::path::MAIN_SEPARATOR).to_string()
+    // Windows accepts both `/` and `\` as path separators, so a trailing
+    // `/repo/` must normalise the same as `MAIN_SEPARATOR`-only `/repo\`;
+    // trim either regardless of platform rather than just `MAIN_SEPARATOR`.
+    s.trim_end_matches(['/', '\\']).to_string()
 }
 
 /// Returns the path to the global `welcome_shown.flag` file in the state dir.

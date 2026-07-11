@@ -28,7 +28,15 @@ fn app_for(root: &std::path::Path) -> App {
 }
 
 fn key(code: KeyCode) -> KeyEvent {
-    KeyEvent::new(code, KeyModifiers::empty())
+    // Uppercase letters carry `SHIFT` here so `KeyBinding::matches`'s
+    // Windows-specific case re-derivation (see `keymap.rs`) sees the same
+    // event a real terminal would send, instead of downcasing the letter
+    // and missing shift-bound actions like `G`/`F`/`L`/`Y` on that platform.
+    let modifiers = match code {
+        KeyCode::Char(c) if c.is_ascii_uppercase() => KeyModifiers::SHIFT,
+        _ => KeyModifiers::empty(),
+    };
+    KeyEvent::new(code, modifiers)
 }
 
 fn ctrl(c: char) -> KeyEvent {

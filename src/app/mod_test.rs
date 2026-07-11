@@ -139,7 +139,7 @@ fn file_history_opens_picker_and_shows_diff() {
     app.open_file(&root.join("tracked.txt"));
 
     // H opens the history picker.
-    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::SHIFT));
     assert!(app.history.is_some());
     assert!(!app.history.as_ref().unwrap().commits.is_empty());
 
@@ -197,7 +197,7 @@ fn file_history_noop_without_git_history() {
     let root = temp_tree(); // not a git repo
     let mut app = app_for(&root);
     app.open_file(&root.join("a.txt"));
-    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::SHIFT));
     assert!(app.history.is_none());
     fs::remove_dir_all(&root).ok();
 }
@@ -494,7 +494,7 @@ fn g_key_stops_at_scroll_max_not_last_line() {
     app.focus = Focus::Content;
     app.content_area = viewport(10); // scroll_max = 50 - 10 = 40
 
-    app.handle_key(KeyEvent::new(KeyCode::Char('G'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('G'), KeyModifiers::SHIFT));
     assert_eq!(
         app.content_scroll, 40,
         "G should land at scroll_max, not total-1"
@@ -598,7 +598,7 @@ fn ctrl_d() -> KeyEvent {
 }
 
 fn flat_key() -> KeyEvent {
-    KeyEvent::new(KeyCode::Char('F'), KeyModifiers::empty())
+    KeyEvent::new(KeyCode::Char('F'), KeyModifiers::SHIFT)
 }
 
 #[test]
@@ -1477,7 +1477,7 @@ fn content_key_g_top_and_g_bottom() {
     app.content_scroll = 20;
     app.handle_key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::empty()));
     assert_eq!(app.content_scroll, 0);
-    app.handle_key(KeyEvent::new(KeyCode::Char('G'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('G'), KeyModifiers::SHIFT));
     assert_eq!(app.content_scroll, app.content_scroll_max());
     fs::remove_dir_all(&root).ok();
 }
@@ -1575,7 +1575,7 @@ fn history_mouse_scroll_down_up() {
     let root = temp_git_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("tracked.txt"));
-    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::SHIFT));
     app.history_area = Rect {
         x: 0,
         y: 0,
@@ -2217,11 +2217,11 @@ fn in_file_search_n_prev_match() {
     let mut app = app_for(&root);
     setup_in_file_search(&mut app);
     app.in_file_search.as_mut().unwrap().current = 1;
-    app.handle_key(KeyEvent::new(KeyCode::Char('N'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('N'), KeyModifiers::SHIFT));
     assert_eq!(app.in_file_search.as_ref().unwrap().current, 0);
     // "P" also goes back
     app.in_file_search.as_mut().unwrap().current = 1;
-    app.handle_key(KeyEvent::new(KeyCode::Char('P'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('P'), KeyModifiers::SHIFT));
     assert_eq!(app.in_file_search.as_ref().unwrap().current, 0);
     fs::remove_dir_all(&root).ok();
 }
@@ -2232,7 +2232,7 @@ fn in_file_search_prev_wraps_to_last() {
     let mut app = app_for(&root);
     setup_in_file_search(&mut app);
     assert_eq!(app.in_file_search.as_ref().unwrap().current, 0);
-    app.handle_key(KeyEvent::new(KeyCode::Char('N'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('N'), KeyModifiers::SHIFT));
     let last = app.in_file_search.as_ref().unwrap().matches.len() - 1;
     assert_eq!(app.in_file_search.as_ref().unwrap().current, last);
     fs::remove_dir_all(&root).ok();
@@ -2297,7 +2297,7 @@ fn in_file_search_no_matches_is_noop() {
     app.handle_key(KeyEvent::new(KeyCode::Char('z'), KeyModifiers::empty()));
     // No matches, next/prev should not crash
     app.handle_key(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::empty()));
-    app.handle_key(KeyEvent::new(KeyCode::Char('P'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('P'), KeyModifiers::SHIFT));
     assert_eq!(app.in_file_search.as_ref().unwrap().current, 0);
     fs::remove_dir_all(&root).ok();
 }
@@ -2309,7 +2309,7 @@ fn history_key_esc_closes() {
     let root = temp_git_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("tracked.txt"));
-    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::SHIFT));
     assert!(app.history.is_some());
     app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
     assert!(app.history.is_none());
@@ -2321,7 +2321,7 @@ fn history_key_up_down_navigation() {
     let root = temp_git_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("tracked.txt"));
-    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::SHIFT));
     let max = app
         .history
         .as_ref()
@@ -2349,7 +2349,7 @@ fn history_key_typing_filters() {
     let root = temp_git_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("tracked.txt"));
-    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::SHIFT));
     let total = app.history.as_ref().unwrap().results_len();
     app.handle_key(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::empty()));
     let filtered = app.history.as_ref().unwrap().results_len();
@@ -2490,9 +2490,9 @@ fn normal_key_toggle_watch_flips_auto_watch() {
     let root = temp_tree();
     let mut app = app_for(&root);
     assert!(!app.auto_watch);
-    app.handle_key(KeyEvent::new(KeyCode::Char('W'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('W'), KeyModifiers::SHIFT));
     assert!(app.auto_watch);
-    app.handle_key(KeyEvent::new(KeyCode::Char('W'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('W'), KeyModifiers::SHIFT));
     assert!(!app.auto_watch);
     fs::remove_dir_all(&root).ok();
 }
@@ -2885,9 +2885,9 @@ fn content_key_toggle_line_numbers_toggles() {
     app.focus = Focus::Content;
     assert!(app.show_line_numbers);
     app.keys.toggle_line_numbers = global_char_binding('L');
-    app.handle_key(KeyEvent::new(KeyCode::Char('L'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('L'), KeyModifiers::SHIFT));
     assert!(!app.show_line_numbers);
-    app.handle_key(KeyEvent::new(KeyCode::Char('L'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('L'), KeyModifiers::SHIFT));
     assert!(app.show_line_numbers);
     fs::remove_dir_all(&root).ok();
 }
@@ -3322,7 +3322,7 @@ fn history_mouse_click_outside_area_closes() {
     let root = temp_git_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("tracked.txt"));
-    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::SHIFT));
     app.history_area = Rect {
         x: 5,
         y: 5,
@@ -3339,7 +3339,7 @@ fn history_mouse_click_out_of_range_index_noop() {
     let root = temp_git_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("tracked.txt"));
-    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::SHIFT));
     app.history_area = Rect {
         x: 0,
         y: 0,
@@ -3357,7 +3357,7 @@ fn history_mouse_single_then_double_click_opens() {
     let root = temp_git_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("tracked.txt"));
-    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::SHIFT));
     app.history_area = Rect {
         x: 0,
         y: 0,
@@ -3608,9 +3608,9 @@ fn diff_side_by_side_toggle_flips_flag_and_builds_rows() {
     // D has no default binding; bind it explicitly to exercise dispatch.
     app.keys.toggle_diff_side_by_side = global_char_binding('D');
     // D toggles side-by-side on, then off.
-    app.handle_key(KeyEvent::new(KeyCode::Char('D'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('D'), KeyModifiers::SHIFT));
     assert!(app.diff_side_by_side);
-    app.handle_key(KeyEvent::new(KeyCode::Char('D'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('D'), KeyModifiers::SHIFT));
     assert!(!app.diff_side_by_side);
     fs::remove_dir_all(&root).ok();
 }
@@ -3622,7 +3622,7 @@ fn diff_side_by_side_key_is_noop_outside_diff() {
     app.open_file(&root.join("a.txt"));
     app.focus = Focus::Content;
 
-    app.handle_key(KeyEvent::new(KeyCode::Char('D'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('D'), KeyModifiers::SHIFT));
     assert!(
         !app.diff_side_by_side,
         "D must do nothing for a normal file"
@@ -4003,7 +4003,7 @@ fn diff_hunk_navigation_jumps_between_headers() {
     app.handle_key(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::empty()));
     assert_eq!(app.content_scroll, headers[1]);
     // N goes back to the first.
-    app.handle_key(KeyEvent::new(KeyCode::Char('N'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('N'), KeyModifiers::SHIFT));
     assert_eq!(app.content_scroll, headers[0]);
     fs::remove_dir_all(&root).ok();
 }
@@ -4171,7 +4171,7 @@ fn content_key_toggle_pretty_json_toggles() {
     // 'J' has no default binding (content-view toggles are palette-only by
     // default); bind it explicitly to exercise the dispatch logic.
     app.keys.toggle_pretty_json = global_char_binding('J');
-    app.handle_key(KeyEvent::new(KeyCode::Char('J'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('J'), KeyModifiers::SHIFT));
     assert!(app.show_pretty_json);
     fs::remove_dir_all(&root).ok();
 }
@@ -4206,7 +4206,7 @@ fn content_key_toggle_diff_side_by_side_toggles() {
     assert!(!app.diff_side_by_side);
     // 'D' has no default binding; bind it explicitly to exercise dispatch.
     app.keys.toggle_diff_side_by_side = global_char_binding('D');
-    app.handle_key(KeyEvent::new(KeyCode::Char('D'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('D'), KeyModifiers::SHIFT));
     assert!(app.diff_side_by_side);
     fs::remove_dir_all(&root).ok();
 }
@@ -4328,7 +4328,7 @@ fn history_mouse_scroll_at_boundary() {
     let root = temp_git_two_commits();
     let mut app = app_for(&root);
     app.open_file(&root.join("f.txt"));
-    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::SHIFT));
     app.history_area = Rect {
         x: 0,
         y: 0,
@@ -4587,7 +4587,7 @@ fn history_key_unrecognized_key_is_noop() {
     let root = temp_git_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("tracked.txt"));
-    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::SHIFT));
     assert!(app.history.is_some());
     let selected = app.history.as_ref().unwrap().selected;
     app.handle_key(KeyEvent::new(KeyCode::F(2), KeyModifiers::empty()));
@@ -4868,7 +4868,7 @@ fn s_key_cycles_diff_mode_in_diff_view() {
     app.keys.toggle_diff_staged = global_char_binding('S');
 
     // First S: All → Staged
-    app.handle_key(KeyEvent::new(KeyCode::Char('S'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('S'), KeyModifiers::SHIFT));
     app.pump_loads();
     assert_eq!(app.diff_mode, DiffMode::Staged);
     assert!(
@@ -4885,7 +4885,7 @@ fn s_key_cycles_diff_mode_in_diff_view() {
     );
 
     // Second S: Staged → Unstaged
-    app.handle_key(KeyEvent::new(KeyCode::Char('S'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('S'), KeyModifiers::SHIFT));
     app.pump_loads();
     assert_eq!(app.diff_mode, DiffMode::Unstaged);
     assert!(
@@ -4898,7 +4898,7 @@ fn s_key_cycles_diff_mode_in_diff_view() {
     );
 
     // Third S: Unstaged → All (full cycle)
-    app.handle_key(KeyEvent::new(KeyCode::Char('S'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('S'), KeyModifiers::SHIFT));
     app.pump_loads();
     assert_eq!(app.diff_mode, DiffMode::All);
     assert!(
@@ -4919,7 +4919,7 @@ fn s_key_outside_diff_view_is_noop() {
     assert!(!app.is_diff);
 
     // S should not change anything outside a diff view.
-    app.handle_key(KeyEvent::new(KeyCode::Char('S'), KeyModifiers::empty()));
+    app.handle_key(KeyEvent::new(KeyCode::Char('S'), KeyModifiers::SHIFT));
     assert_eq!(app.diff_mode, DiffMode::All, "mode unchanged outside diff");
     assert!(!app.is_diff);
     fs::remove_dir_all(&root).ok();
@@ -5070,7 +5070,9 @@ fn save_config_no_status_on_success() {
 
 #[test]
 fn save_bug_report_surfaces_saved_path_in_status() {
-    let _guard = crate::session::STATE_DIR_ENV_LOCK.lock().unwrap();
+    let _guard = crate::session::STATE_DIR_ENV_LOCK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     let state = tempfile::tempdir().unwrap();
     std::env::set_var("MANTIS_STATE_DIR", state.path());
 

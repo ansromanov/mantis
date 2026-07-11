@@ -1053,7 +1053,9 @@ fn handle_in_file_search_key_toggles() {
 
 #[test]
 fn handle_bug_report_key_handling() {
-    let _guard = crate::session::STATE_DIR_ENV_LOCK.lock().unwrap();
+    let _guard = crate::session::STATE_DIR_ENV_LOCK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     let state_dir = tempfile::tempdir().unwrap();
     std::env::set_var("MANTIS_STATE_DIR", state_dir.path());
 

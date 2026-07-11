@@ -105,7 +105,9 @@ fn changed_config_paths_empty_for_default_config() {
 
 #[test]
 fn save_writes_markdown_under_state_dir() {
-    let _guard = crate::session::STATE_DIR_ENV_LOCK.lock().unwrap();
+    let _guard = crate::session::STATE_DIR_ENV_LOCK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     let state = tempfile::tempdir().unwrap();
     std::env::set_var("MANTIS_STATE_DIR", state.path());
 

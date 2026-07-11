@@ -30,7 +30,7 @@ impl Drop for TestEnv {
 
 #[test]
 fn round_trip_preserves_all_fields() {
-    let _lock = SESSION_LOCK.lock().unwrap();
+    let _lock = SESSION_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let env = TestEnv::new("round_trip");
     let sub = env.root.join("sub");
     fs::create_dir_all(&sub).unwrap();
@@ -51,7 +51,7 @@ fn round_trip_preserves_all_fields() {
 
 #[test]
 fn save_and_load_empty_state() {
-    let _lock = SESSION_LOCK.lock().unwrap();
+    let _lock = SESSION_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let env = TestEnv::new("empty");
     let state = SessionState::default();
     save(&env.root, &state);
@@ -62,14 +62,14 @@ fn save_and_load_empty_state() {
 
 #[test]
 fn load_returns_none_for_missing_key() {
-    let _lock = SESSION_LOCK.lock().unwrap();
+    let _lock = SESSION_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let env = TestEnv::new("missing");
     assert!(load(&env.root).is_none());
 }
 
 #[test]
 fn stale_expanded_dirs_are_filtered() {
-    let _lock = SESSION_LOCK.lock().unwrap();
+    let _lock = SESSION_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let env = TestEnv::new("stale_expanded");
     let gone = env.root.join("gone");
 
@@ -85,7 +85,7 @@ fn stale_expanded_dirs_are_filtered() {
 
 #[test]
 fn stale_current_file_is_filtered() {
-    let _lock = SESSION_LOCK.lock().unwrap();
+    let _lock = SESSION_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let env = TestEnv::new("stale_file");
     let gone = env.root.join("gone.txt");
 
@@ -101,7 +101,7 @@ fn stale_current_file_is_filtered() {
 
 #[test]
 fn corrupt_legacy_file_returns_none() {
-    let _lock = SESSION_LOCK.lock().unwrap();
+    let _lock = SESSION_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let env = TestEnv::new("corrupt_legacy");
     // Write garbage to the isolated sessions.json (legacy format path).
     let legacy = env.state.join("sessions.json");
@@ -120,7 +120,7 @@ fn corrupt_legacy_file_returns_none() {
 
 #[test]
 fn corrupt_per_root_file_returns_none() {
-    let _lock = SESSION_LOCK.lock().unwrap();
+    let _lock = SESSION_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let env = TestEnv::new("corrupt_per_root");
     // First save a valid state so the per-root file exists
     save(&env.root, &SessionState::default());
@@ -139,7 +139,7 @@ fn corrupt_per_root_file_returns_none() {
 
 #[test]
 fn multiple_roots_are_independent() {
-    let _lock = SESSION_LOCK.lock().unwrap();
+    let _lock = SESSION_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let env = TestEnv::new("multi");
 
     let d1 = env.root.join("repo1");
@@ -164,7 +164,7 @@ fn multiple_roots_are_independent() {
 
 #[test]
 fn root_key_normalises_trailing_separator() {
-    let _lock = SESSION_LOCK.lock().unwrap();
+    let _lock = SESSION_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let env = TestEnv::new("trail");
 
     let state = SessionState {
@@ -181,7 +181,7 @@ fn root_key_normalises_trailing_separator() {
 
 #[test]
 fn concurrent_saves_dont_clobber() {
-    let _lock = SESSION_LOCK.lock().unwrap();
+    let _lock = SESSION_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let env = TestEnv::new("concurrent");
 
     let d1 = env.root.join("project_a");
@@ -211,7 +211,7 @@ fn concurrent_saves_dont_clobber() {
 
 #[test]
 fn legacy_migration_preserves_all_roots() {
-    let _lock = SESSION_LOCK.lock().unwrap();
+    let _lock = SESSION_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let env = TestEnv::new("legacy_migrate");
 
     let d1 = env.root.join("alpha");
@@ -219,11 +219,13 @@ fn legacy_migration_preserves_all_roots() {
     fs::create_dir_all(&d1).unwrap();
     fs::create_dir_all(&d2).unwrap();
 
-    // Manually write a sessions.json in the old format (version + HashMap)
-    let key1 = d1.to_string_lossy();
-    let key2 = d2.to_string_lossy();
+    // Manually write a sessions.json in the old format (version + HashMap).
+    // JSON-encode the keys (not just interpolate them) since a raw Windows
+    // path contains backslashes that aren't valid JSON escapes on their own.
+    let key1 = serde_json::to_string(&d1.to_string_lossy()).unwrap();
+    let key2 = serde_json::to_string(&d2.to_string_lossy()).unwrap();
     let old_json = format!(
-        r#"{{"version":1,"sessions":{{"{}":{{"expanded":[],"current_file":null,"content_scroll":5,"active_line":1}},"{}":{{"expanded":[],"current_file":null,"content_scroll":10,"active_line":2}}}}}}"#,
+        r#"{{"version":1,"sessions":{{{}:{{"expanded":[],"current_file":null,"content_scroll":5,"active_line":1}},{}:{{"expanded":[],"current_file":null,"content_scroll":10,"active_line":2}}}}}}"#,
         key1, key2
     );
     let legacy = env.state.join("sessions.json");
@@ -245,7 +247,7 @@ fn legacy_migration_preserves_all_roots() {
 
 #[test]
 fn save_load_round_trip_uses_per_root_file() {
-    let _lock = SESSION_LOCK.lock().unwrap();
+    let _lock = SESSION_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let env = TestEnv::new("per_root_path");
 
     let state = SessionState {
@@ -279,14 +281,14 @@ fn save_load_round_trip_uses_per_root_file() {
 
 #[test]
 fn welcome_not_shown_by_default() {
-    let _lock = SESSION_LOCK.lock().unwrap();
+    let _lock = SESSION_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _env = TestEnv::new("welcome_default");
     assert!(!is_welcome_shown(), "welcome must not be shown initially");
 }
 
 #[test]
 fn mark_welcome_creates_flag() {
-    let _lock = SESSION_LOCK.lock().unwrap();
+    let _lock = SESSION_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _env = TestEnv::new("welcome_mark");
     assert!(!is_welcome_shown(), "precondition: not shown");
     mark_welcome_shown();
@@ -297,7 +299,7 @@ fn mark_welcome_creates_flag() {
 
 #[test]
 fn welcome_shown_survives_reinit() {
-    let _lock = SESSION_LOCK.lock().unwrap();
+    let _lock = SESSION_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _env = TestEnv::new("welcome_survive");
     mark_welcome_shown();
     assert!(is_welcome_shown(), "precondition: shown after mark");
@@ -307,7 +309,7 @@ fn welcome_shown_survives_reinit() {
 
 #[test]
 fn welcome_shown_path_returns_some_when_state_dir_available() {
-    let _lock = SESSION_LOCK.lock().unwrap();
+    let _lock = SESSION_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let _env = TestEnv::new("welcome_path");
     let path = welcome_shown_path();
     assert!(path.is_some(), "welcome_shown_path must return Some");

@@ -659,7 +659,7 @@ fn copy_file_default_binding_is_content_shift_y() {
     assert!(
         pressed(
             &keymap.copy_file,
-            &ev(KeyCode::Char('Y'), KeyModifiers::NONE),
+            &ev(KeyCode::Char('Y'), KeyModifiers::SHIFT),
         ),
         "copy_file must match 'Y' in content scope"
     );
@@ -726,7 +726,7 @@ fn tree_width_shrink_default_binding_is_left_bracket() {
 #[test]
 fn repo_commit_log_default_binding_is_shift_l_tree_scope() {
     let keymap = Keymap::default();
-    let l = ev(KeyCode::Char('L'), KeyModifiers::empty());
+    let l = ev(KeyCode::Char('L'), KeyModifiers::SHIFT);
     assert!(
         pressed_in(&keymap.repo_commit_log, &l, BindingScope::Tree),
         "repo_commit_log must bind to 'L' in tree scope"

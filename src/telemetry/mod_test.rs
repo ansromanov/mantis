@@ -82,7 +82,9 @@ fn disabled_handle_is_noop() {
 
 #[test]
 fn new_disabled_creates_no_state_files() {
-    let _guard = crate::session::STATE_DIR_ENV_LOCK.lock().unwrap();
+    let _guard = crate::session::STATE_DIR_ENV_LOCK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     let tmp = tempfile::tempdir().unwrap();
     std::env::set_var("MANTIS_STATE_DIR", tmp.path());
     let t = Telemetry::new(false);
@@ -94,7 +96,9 @@ fn new_disabled_creates_no_state_files() {
 
 #[test]
 fn new_enabled_writes_under_state_dir_telemetry() {
-    let _guard = crate::session::STATE_DIR_ENV_LOCK.lock().unwrap();
+    let _guard = crate::session::STATE_DIR_ENV_LOCK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     let tmp = tempfile::tempdir().unwrap();
     std::env::set_var("MANTIS_STATE_DIR", tmp.path());
     let t = Telemetry::new(true);

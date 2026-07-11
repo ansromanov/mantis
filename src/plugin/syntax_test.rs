@@ -3,6 +3,17 @@ use std::path::PathBuf;
 use super::*;
 use crate::plugin::syntax::{collect_syntax_plugins, discover_syntax_plugins};
 
+/// The env var `default_plugin_dir` consults for the config root: `APPDATA`
+/// on Windows, `XDG_CONFIG_HOME` elsewhere. Tests must override this one
+/// rather than hardcoding `XDG_CONFIG_HOME`, which Windows ignores.
+fn config_home_var() -> &'static str {
+    if cfg!(windows) {
+        "APPDATA"
+    } else {
+        "XDG_CONFIG_HOME"
+    }
+}
+
 #[test]
 fn collect_syntax_plugins_filters_by_kind_and_enabled() {
     let entries: Vec<(String, PluginEntry)> = vec![
@@ -60,8 +71,8 @@ fn collect_syntax_plugins_skips_entries_without_syntax_file() {
 fn discover_syntax_plugins_finds_sublime_files() {
     let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let tmp = std::env::temp_dir().join(format!("tv_syntax_discover_{}", std::process::id()));
-    let old = std::env::var_os("XDG_CONFIG_HOME");
-    unsafe { std::env::set_var("XDG_CONFIG_HOME", &tmp) };
+    let old = std::env::var_os(config_home_var());
+    unsafe { std::env::set_var(config_home_var(), &tmp) };
 
     let syntax_dir = default_plugin_dir().join("syntaxes");
     std::fs::create_dir_all(&syntax_dir).unwrap();
@@ -72,8 +83,8 @@ fn discover_syntax_plugins_finds_sublime_files() {
 
     unsafe {
         match old {
-            Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
-            None => std::env::remove_var("XDG_CONFIG_HOME"),
+            Some(v) => std::env::set_var(config_home_var(), v),
+            None => std::env::remove_var(config_home_var()),
         }
     }
 
@@ -89,8 +100,8 @@ fn discover_syntax_plugins_finds_sublime_files() {
 fn discover_syntax_plugins_skips_managed_files() {
     let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let tmp = std::env::temp_dir().join(format!("tv_syntax_managed_{}", std::process::id()));
-    let old = std::env::var_os("XDG_CONFIG_HOME");
-    unsafe { std::env::set_var("XDG_CONFIG_HOME", &tmp) };
+    let old = std::env::var_os(config_home_var());
+    unsafe { std::env::set_var(config_home_var(), &tmp) };
 
     let syntax_dir = default_plugin_dir().join("syntaxes");
     std::fs::create_dir_all(&syntax_dir).unwrap();
@@ -112,8 +123,8 @@ fn discover_syntax_plugins_skips_managed_files() {
 
     unsafe {
         match old {
-            Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
-            None => std::env::remove_var("XDG_CONFIG_HOME"),
+            Some(v) => std::env::set_var(config_home_var(), v),
+            None => std::env::remove_var(config_home_var()),
         }
     }
 
@@ -136,15 +147,15 @@ fn discover_syntax_plugins_skips_managed_files() {
 fn discover_syntax_plugins_returns_empty_when_no_syntaxes_dir() {
     let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let tmp = std::env::temp_dir().join(format!("tv_no_syntaxes_{}", std::process::id()));
-    let old = std::env::var_os("XDG_CONFIG_HOME");
-    unsafe { std::env::set_var("XDG_CONFIG_HOME", &tmp) };
+    let old = std::env::var_os(config_home_var());
+    unsafe { std::env::set_var(config_home_var(), &tmp) };
 
     let result = discover_syntax_plugins(&[]);
 
     unsafe {
         match old {
-            Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
-            None => std::env::remove_var("XDG_CONFIG_HOME"),
+            Some(v) => std::env::set_var(config_home_var(), v),
+            None => std::env::remove_var(config_home_var()),
         }
     }
 
@@ -156,8 +167,8 @@ fn discover_syntax_plugins_returns_empty_when_no_syntaxes_dir() {
 fn load_extra_syntaxes_deduplicates_by_path() {
     let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let tmp = std::env::temp_dir().join(format!("tv_syntax_load_{}", std::process::id()));
-    let old = std::env::var_os("XDG_CONFIG_HOME");
-    unsafe { std::env::set_var("XDG_CONFIG_HOME", &tmp) };
+    let old = std::env::var_os(config_home_var());
+    unsafe { std::env::set_var(config_home_var(), &tmp) };
 
     let syntax_dir = default_plugin_dir().join("syntaxes");
     std::fs::create_dir_all(&syntax_dir).unwrap();
@@ -179,8 +190,8 @@ fn load_extra_syntaxes_deduplicates_by_path() {
 
     unsafe {
         match old {
-            Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
-            None => std::env::remove_var("XDG_CONFIG_HOME"),
+            Some(v) => std::env::set_var(config_home_var(), v),
+            None => std::env::remove_var(config_home_var()),
         }
     }
 

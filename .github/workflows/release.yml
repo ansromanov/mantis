@@ -217,7 +217,7 @@ jobs:
 
       - name: Test
         shell: bash
-        run: cargo test --all
+        run: cargo test --all --no-fail-fast
 
   bench:
     name: full benchmarks
