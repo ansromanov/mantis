@@ -1199,3 +1199,68 @@ fn palette_goto_line_route_enter_jumps_and_closes() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+// -- repo log overlay ---------------------------------------------------------
+
+fn repo_log_with_commits(root: PathBuf, n: usize) -> crate::search::RepoLogState {
+    let mut s = crate::search::RepoLogState::new(root);
+    s.commits = (0..n)
+        .map(|i| crate::git::Commit {
+            hash: format!("{i:040}"),
+            short: format!("{i:07}"),
+            date: "2024-01-01".to_string(),
+            author: "Test".to_string(),
+            subject: format!("commit {i}"),
+        })
+        .collect();
+    s.filtered = (0..n).collect();
+    s.selected = 0;
+    s
+}
+
+#[test]
+fn handle_repo_log_key_esc_closes() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.repo_log = Some(repo_log_with_commits(root.clone(), 2));
+    app.handle_repo_log_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+    assert!(app.repo_log.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn handle_repo_log_key_enter_enters_compare_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let mut s = repo_log_with_commits(root.clone(), 2);
+    s.selected = 1;
+    app.repo_log = Some(s);
+    app.handle_repo_log_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert!(app.repo_log.is_none());
+    assert_eq!(app.compare_base, Some(format!("{:040}", 1)));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn handle_repo_log_key_char_appends_to_query() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.repo_log = Some(repo_log_with_commits(root.clone(), 2));
+    app.handle_repo_log_key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::empty()));
+    assert_eq!(app.repo_log.as_ref().unwrap().query, "c");
+    fs::remove_dir_all(&root).ok();
+}
+
+/// With a non-empty query 'j' is a query character: it must append, not
+/// navigate, and must not trigger paging.
+#[test]
+fn handle_repo_log_key_j_with_query_is_text_not_paging() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let mut s = repo_log_with_commits(root.clone(), 2);
+    s.push('c'); // non-empty query; both fabricated subjects match "c"
+    app.repo_log = Some(s);
+    app.handle_repo_log_key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::empty()));
+    assert_eq!(app.repo_log.as_ref().unwrap().query, "cj");
+    fs::remove_dir_all(&root).ok();
+}

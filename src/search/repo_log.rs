@@ -78,7 +78,11 @@ impl RepoLogState {
         self.has_more = more.len() == PAGE_SIZE;
         self.total_loaded += more.len();
         self.commits.extend(more);
+        // Keep the user's position: refilter resets the selection to 0, which
+        // would yank the cursor back to the top mid-scroll.
+        let selected = self.selected;
         self.refilter();
+        self.selected = selected.min(self.results_len().saturating_sub(1));
         true
     }
 

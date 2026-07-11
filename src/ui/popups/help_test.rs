@@ -993,3 +993,19 @@ fn keybound_actions_are_in_help_overlay() {
         }
     }
 }
+
+#[test]
+fn help_git_section_shows_repo_commit_log_key() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    let backend = TestBackend::new(120, 200);
+    let mut terminal = Terminal::new(backend).unwrap();
+    app.help_tab = 4;
+    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(
+        joined.contains("browse all repository commits"),
+        "help overlay must list the repo commit log entry in the Git section, got:\n{joined}"
+    );
+}

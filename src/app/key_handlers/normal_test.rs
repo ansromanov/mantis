@@ -1467,3 +1467,38 @@ fn ctrl_p_includes_registered_plugin_commands() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+// -- repo log overlay ---------------------------------------------------------
+
+fn git_info() -> crate::git::GitRepoInfo {
+    crate::git::GitRepoInfo {
+        head: crate::git::GitHead::Branch("main".to_string()),
+        ahead: 0,
+        behind: 0,
+        total_changed: 0,
+        staged: 0,
+        untracked: 0,
+    }
+}
+
+#[test]
+fn shift_l_in_tree_scope_opens_repo_log() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.git_info = Some(git_info());
+    app.focus = Focus::Tree;
+    app.handle_key(key(KeyCode::Char('L')));
+    assert!(app.repo_log.is_some());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn shift_l_in_content_scope_does_not_open_repo_log() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.git_info = Some(git_info());
+    app.focus = Focus::Content;
+    app.handle_key(key(KeyCode::Char('L')));
+    assert!(app.repo_log.is_none());
+    fs::remove_dir_all(&root).ok();
+}

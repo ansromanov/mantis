@@ -611,3 +611,32 @@ fn recent_commits_returns_empty_for_non_repo() {
     let commits = recent_commits(dir.path(), 10);
     assert!(commits.is_empty());
 }
+
+// -- repo_log -----------------------------------------------------------------
+
+#[test]
+fn repo_log_pages_newest_first_with_author() {
+    let dir = tempfile::tempdir().unwrap();
+    git(dir.path(), &["init", "-q"]);
+    fs::write(dir.path().join("a.txt"), "one\n").unwrap();
+    git(dir.path(), &["add", "a.txt"]);
+    git(dir.path(), &["commit", "-q", "-m", "first"]);
+    fs::write(dir.path().join("a.txt"), "two\n").unwrap();
+    git(dir.path(), &["commit", "-q", "-am", "second"]);
+
+    let all = repo_log(dir.path(), 0, 10);
+    assert_eq!(all.len(), 2);
+    assert_eq!(all[0].subject, "second");
+    assert_eq!(all[1].subject, "first");
+    assert!(all.iter().all(|c| !c.author.is_empty()));
+
+    let page2 = repo_log(dir.path(), 1, 1);
+    assert_eq!(page2.len(), 1);
+    assert_eq!(page2[0].subject, "first");
+}
+
+#[test]
+fn repo_log_empty_outside_git_repo() {
+    let dir = tempfile::tempdir().unwrap();
+    assert!(repo_log(dir.path(), 0, 10).is_empty());
+}

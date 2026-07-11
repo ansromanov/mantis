@@ -562,6 +562,7 @@ fn canonical_action_ids_resolve_bindings() {
         "search_files",
         "search_content",
         "file_history",
+        "repo_commit_log",
         "theme_picker",
         "git_mode_toggle",
         "git_mode_flat_toggle",
@@ -719,5 +720,19 @@ fn tree_width_shrink_default_binding_is_left_bracket() {
     assert!(
         !pressed_in(&keymap.tree_width_shrink, &shrink, BindingScope::Content),
         "tree_width_shrink must NOT fire in content scope"
+    );
+}
+
+#[test]
+fn repo_commit_log_default_binding_is_shift_l_tree_scope() {
+    let keymap = Keymap::default();
+    let l = ev(KeyCode::Char('L'), KeyModifiers::empty());
+    assert!(
+        pressed_in(&keymap.repo_commit_log, &l, BindingScope::Tree),
+        "repo_commit_log must bind to 'L' in tree scope"
+    );
+    assert!(
+        !pressed_in(&keymap.repo_commit_log, &l, BindingScope::Content),
+        "repo_commit_log must NOT fire in content scope"
     );
 }

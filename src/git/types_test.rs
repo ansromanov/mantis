@@ -128,3 +128,20 @@ fn git_status_derives_debug() {
     assert_eq!(format!("{:?}", GitStatus::Ignored), "Ignored");
     assert_eq!(format!("{:?}", GitStatus::Renamed), "Renamed");
 }
+
+// -- Commit -------------------------------------------------------------------
+
+#[test]
+fn commit_carries_author() {
+    let c = Commit {
+        hash: "a".repeat(40),
+        short: "aaaaaaa".to_string(),
+        date: "2024-01-15".to_string(),
+        author: "Alice".to_string(),
+        subject: "add feature".to_string(),
+    };
+    assert_eq!(c.author, "Alice");
+    let cloned = c.clone();
+    assert_eq!(cloned.author, c.author);
+    assert_eq!(cloned.subject, c.subject);
+}

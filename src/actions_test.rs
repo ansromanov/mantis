@@ -16,6 +16,7 @@ const KEYMAP_FIELD_ACTION_IDS: &[&str] = &[
     "reload",
     "switch_panel",
     "file_history",
+    "repo_commit_log",
     "theme_picker",
     "nav_up",
     "nav_down",
@@ -376,4 +377,15 @@ fn applicability_maps_each_special_cased_action_to_its_precondition() {
         applicability_of("git_mode_flat_toggle"),
         Applicability::GitMode
     );
+}
+
+#[test]
+fn repo_commit_log_action_requires_git_repo() {
+    assert_eq!(applicability_of("repo_commit_log"), Applicability::GitRepo);
+    let spec = ACTIONS
+        .iter()
+        .find(|a| a.id == "repo_commit_log")
+        .expect("repo_commit_log must be registered in ACTIONS");
+    assert_eq!(spec.palette, Some("Browse repository commits"));
+    assert_eq!(spec.category, Some("Git"));
 }
