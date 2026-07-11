@@ -19,6 +19,7 @@ git.show_untracked
 git.status
 keys
 keys.blame_line
+keys.blame_open_commit
 keys.command_palette
 keys.content_bottom
 keys.content_left
@@ -48,6 +49,7 @@ keys.plugin_picker
 keys.quit
 keys.recent_files
 keys.reload
+keys.repo_commit_log
 keys.search_content
 keys.search_files
 keys.switch_panel
@@ -55,6 +57,7 @@ keys.theme_picker
 keys.toggle_blame
 keys.toggle_diff_side_by_side
 keys.toggle_diff_staged
+keys.toggle_file_revision
 keys.toggle_hidden
 keys.toggle_line_numbers
 keys.toggle_pretty_json
