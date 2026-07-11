@@ -847,3 +847,13 @@ fn send_command_event_without_running_plugin_is_noop() {
     // Unknown id — must not panic either.
     mgr.send_command_event("nope");
 }
+
+#[test]
+fn is_plugin_active_returns_true_when_plugin_active() {
+    let mut mgr = PluginManager::new(vec![]);
+    assert!(!mgr.is_plugin_active("markdown"));
+    mgr.plugins
+        .push(crate::plugin::Plugin::new("markdown".to_string(), vec![]));
+    assert!(mgr.is_plugin_active("markdown"));
+    assert!(!mgr.is_plugin_active("other"));
+}

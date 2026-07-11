@@ -12,6 +12,12 @@ fn plugin_new_sets_name() {
 }
 
 #[test]
+fn plugin_write_tx_initially_none() {
+    let p = Plugin::new("test-p".into(), vec![]);
+    assert!(p.write_tx.is_none());
+}
+
+#[test]
 fn plugin_new_stores_subscribed_events() {
     let p = Plugin::new("evt-p".into(), vec!["on_file_open".into()]);
     assert!(p.subscribes_to("on_file_open"));

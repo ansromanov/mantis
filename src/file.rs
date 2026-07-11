@@ -141,6 +141,12 @@ pub fn build_binary_placeholder_content(path: Option<&Path>, bytes: &[u8]) -> Ve
     content
 }
 
+/// Returns `true` if the path has a markdown extension (`.md` or `.markdown`).
+pub fn is_markdown_path(path: &Path) -> bool {
+    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+    matches!(ext, "md" | "markdown")
+}
+
 #[cfg(test)]
 #[path = "file_test.rs"]
 mod tests;

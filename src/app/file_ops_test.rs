@@ -1200,3 +1200,36 @@ fn file_at_revision_initially_none() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn open_file_with_show_raw_markdown_true_skips_plugin_open() {
+    let root = temp_dir();
+    let f = root.join("test.md");
+    fs::write(&f, "# Hello\n").unwrap();
+    let mut app = app_for(&root);
+
+    // Setup mock plugin with a channel to intercept on_file_open
+    let (tx, rx) = std::sync::mpsc::sync_channel(10);
+    let mut plugin =
+        crate::plugin::Plugin::new("markdown".to_string(), vec!["on_file_open".to_string()]);
+    plugin.write_tx = Some(tx);
+    app.plugin_manager.plugins.push(plugin);
+
+    // When show_raw_markdown is true, it should skip sending on_file_open
+    app.show_raw_markdown = true;
+    app.open_file(&f);
+    assert!(
+        rx.try_recv().is_err(),
+        "should not have sent on_file_open when show_raw_markdown is true"
+    );
+
+    // When show_raw_markdown is false, it should send on_file_open
+    app.show_raw_markdown = false;
+    app.open_file(&f);
+    let msg = rx
+        .try_recv()
+        .expect("should have sent on_file_open when show_raw_markdown is false");
+    assert!(msg.contains("on_file_open"));
+
+    fs::remove_dir_all(&root).ok();
+}

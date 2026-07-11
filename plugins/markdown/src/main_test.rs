@@ -305,15 +305,28 @@ fn keypress_toggle_rerenders_open_file() {
 
     state.handle_open(&path_str, &mut buf);
     let first_len = buf.len();
+    assert!(first_len > 0);
 
-    // Simulate the on_keypress "M" handler behavior.
+    // Simulate the on_keypress "M" handler behavior (toggle raw mode ON).
+    state.toggle_raw = !state.toggle_raw;
+    let mut buf2: Vec<u8> = Vec::new();
+    if let Some(path) = state.current_file.clone() {
+        state.handle_open(&path, &mut buf2);
+    }
+    assert_eq!(
+        buf2.len(),
+        0,
+        "when toggle_raw is true, handle_open should skip entirely"
+    );
+
+    // Toggle raw mode OFF again.
     state.toggle_raw = !state.toggle_raw;
     if let Some(path) = state.current_file.clone() {
-        state.handle_open(&path, &mut buf);
+        state.handle_open(&path, &mut buf2);
     }
     assert!(
-        buf.len() > first_len,
-        "pressing M should re-render the currently open file"
+        buf2.len() > 0,
+        "when toggle_raw is false, handle_open should render"
     );
 
     std::fs::remove_file(&tmp).ok();

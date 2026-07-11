@@ -823,3 +823,14 @@ fn app_new_starts_with_viewing_revision_hash_none() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn app_new_starts_with_show_raw_markdown_false() {
+    let root = temp_dir();
+    let app = new_app(&root, Config::default());
+    assert!(
+        !app.show_raw_markdown,
+        "App::new must set show_raw_markdown = false"
+    );
+    fs::remove_dir_all(&root).ok();
+}
