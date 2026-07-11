@@ -14,7 +14,7 @@ routes them via `PluginManager::provider_for` (`src/plugin/manager.rs`).
 
 | Capability | Declared in protocol | Handled by host | Used by a bundled plugin |
 |---|---|---|---|
-| `fold` | yes | yes — gates `set_fold_regions` in `handle_plugin_set_fold_regions` (`src/app/refresh.rs`) | **yes** — used by the bundled `rust`, `go`, `python`, and `json` language provider plugins |
+| `fold` | yes | yes — gates `set_fold_regions` in `handle_plugin_set_fold_regions` (`src/app/refresh.rs`) | **yes** — used by the bundled `rust`, `go`, `python`, `json`, and `sh` language provider plugins |
 | `highlight` | yes | **no** — accepted at registration, never checked anywhere | no |
 | `hover` | yes (reserved) | no — unimplementable in v2 (no request/response correlation) | no |
 | `diagnostics` | yes (reserved) | no — same as `hover` | no |
@@ -59,6 +59,7 @@ version history in [Plugin Development](plugin-development.md) only.
 | `rust` | process | `register_language_provider`, `set_fold_regions` | `fold` |
 | `go` | process | `register_language_provider`, `set_fold_regions` | `fold` |
 | `json` | process | `register_language_provider`, `set_fold_regions` | `fold` |
+| `sh` | process | `register_language_provider`, `set_fold_regions` | `fold` |
 | `terraform` | syntax | none (no subprocess) | n/a — extends syntect directly |
 
 ## Gaps and follow-ups
@@ -70,14 +71,17 @@ version history in [Plugin Development](plugin-development.md) only.
 2. **The language-provider fold pipeline has bundled consumers** —
    `register_language_provider` + `Capability::Fold` + `set_fold_regions` are
    used by the bundled `rust` (issue #599), `go` (issue #600), `python`
-   (issue #601), and `json` (issue #604) language provider plugins. The
-   `rust` and `go` plugins register the `fold` capability for `.rs` and `.go`
-   files via the shared `brace_fold` detector (#598); the `python` plugin
-   uses the shared `indent_fold` detector; the `json` plugin uses
-   `brace_fold_with_brackets`, a `brace_fold` variant that also folds `[…]`
-   arrays, run against the same pretty-printed text core renders (JSON
-   pretty-printing itself stays a core rendering concern, not part of the
-   plugin).
+   (issue #601), `json` (issue #604), and `sh` (issue #605) language
+   provider plugins. The `rust` and `go` plugins register the `fold`
+   capability for `.rs` and `.go` files via the shared `brace_fold` detector
+   (#598); the `python` plugin uses the shared `indent_fold` detector; the
+   `json` plugin uses `brace_fold_with_brackets`, a `brace_fold` variant that
+   also folds `[…]` arrays; the `sh` plugin uses `shell_brace_fold`, a
+   shell-specific variant that handles `#` line comments, single/double
+   quoted strings, and heredocs.
+   **Known limitation:** provider routing is extension-based; extensionless
+   scripts with a `#!/bin/bash` shebang won't route to the plugin. Shebang
+   routing is a host/protocol gap (see #605).
 3. **`Capability::Highlight` is declared but routes to nothing.** Either
    implement provider-driven highlighting in v3 or re-document it as reserved
    alongside `hover`/`diagnostics`/`definition`. Not yet tracked in a

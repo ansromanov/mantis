@@ -663,3 +663,372 @@ def foo():
     assert_eq!(r[0].start, 0);
     assert_eq!(r[0].end, 3);
 }
+
+// ---------------------------------------------------------------------------
+// shell_brace_fold tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn shell_brace_fold_empty() {
+    assert!(shell_brace_fold("").is_empty());
+}
+
+#[test]
+fn shell_brace_fold_no_braces() {
+    assert!(shell_brace_fold("echo hello\n").is_empty());
+}
+
+#[test]
+fn shell_brace_fold_single_line_block() {
+    assert!(shell_brace_fold("foo() { echo hi; }\n").is_empty());
+}
+
+#[test]
+fn shell_brace_fold_simple_function() {
+    let r = shell_brace_fold("foo() {\n    echo hi\n}\n");
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 2);
+}
+
+#[test]
+fn shell_brace_fold_nested_blocks() {
+    let r = shell_brace_fold(
+        "\
+outer() {
+    inner() {
+        echo hi
+    }
+    echo done
+}
+",
+    );
+    assert_eq!(r.len(), 2);
+    assert_eq!(r[0].start, 1);
+    assert_eq!(r[0].end, 3);
+    assert_eq!(r[1].start, 0);
+    assert_eq!(r[1].end, 5);
+}
+
+#[test]
+fn shell_brace_fold_skips_line_comment() {
+    let r = shell_brace_fold(
+        "\
+foo() {
+    # { this brace is ignored }
+    echo hi
+}
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 3);
+}
+
+#[test]
+fn shell_brace_fold_skips_single_quoted_string() {
+    let r = shell_brace_fold(
+        "\
+foo() {
+    x='hello { world }'
+    echo hi
+}
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 3);
+}
+
+#[test]
+fn shell_brace_fold_single_quote_no_escape() {
+    // In single-quoted strings, backslash is literal — it does NOT escape
+    // the following quote. So 'hello \\' ends at the second ', and the
+    // closing brace on the same line is a real fold boundary.
+    let r = shell_brace_fold(
+        "\
+foo() {
+    x='hello \\\\'}' world'
+    echo hi
+}
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 1);
+}
+
+#[test]
+fn shell_brace_fold_skips_double_quoted_string() {
+    let r = shell_brace_fold(
+        "\
+foo() {
+    x=\"hello { world }\"
+    echo hi
+}
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 3);
+}
+
+#[test]
+fn shell_brace_fold_skips_escaped_quote_in_double_quoted() {
+    let r = shell_brace_fold(
+        "\
+foo() {
+    x=\"escaped \\\" quote { brace }\"
+    echo hi
+}
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 3);
+}
+
+#[test]
+fn shell_brace_fold_skips_heredoc() {
+    let r = shell_brace_fold(
+        "\
+foo() {
+    cat <<EOF
+{ brace in heredoc }
+EOF
+    echo hi
+}
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 5);
+}
+
+#[test]
+fn shell_brace_fold_skips_heredoc_with_spaces_around_delimiter() {
+    let r = shell_brace_fold(
+        "\
+foo() {
+    cat << EOF
+{ brace }
+EOF
+    echo hi
+}
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 5);
+}
+
+#[test]
+fn shell_brace_fold_skips_indented_heredoc_delimiter() {
+    // The closing delimiter may be indented with tabs (<<- style).
+    let r = shell_brace_fold(
+        "\
+foo() {
+    cat <<-EOF
+{ brace }
+\tEOF
+    echo hi
+}
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 5);
+}
+
+#[test]
+fn shell_brace_fold_heredoc_does_not_close_on_partial_match() {
+    let r = shell_brace_fold(
+        "\
+foo() {
+    cat <<EOF
+EOF is not the end
+EOF
+    echo hi
+}
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 5);
+}
+
+#[test]
+fn shell_brace_fold_multiple_heredocs() {
+    let r = shell_brace_fold(
+        "\
+foo() {
+    cat <<A
+{ brace }
+A
+    cat <<B
+{ brace }
+B
+}
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 7);
+}
+
+#[test]
+fn shell_brace_fold_crlf() {
+    let r = shell_brace_fold("foo() {\r\n    echo hi\r\n}\r\n");
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 2);
+}
+
+#[test]
+fn shell_brace_fold_unmatched_close_is_silent() {
+    let r = shell_brace_fold("}\n{\n    echo hi\n}\n");
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 1);
+    assert_eq!(r[0].end, 3);
+}
+
+#[test]
+fn shell_brace_fold_unmatched_open_leaves_stack() {
+    let r = shell_brace_fold("{\n    echo hi\n");
+    assert!(r.is_empty());
+}
+
+#[test]
+fn shell_brace_fold_here_string_not_heredoc() {
+    // <<< is a here-string, not a heredoc — no delimiter to match.
+    let r = shell_brace_fold(
+        "\
+foo() {
+    cat <<< \"hello { world }\"
+    echo hi
+}
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 3);
+}
+
+#[test]
+fn shell_brace_fold_multiline_single_quoted_string_counts_lines() {
+    // Newlines inside '…' must advance the line counter.
+    let r = shell_brace_fold(
+        "\
+x='line one
+line two'
+foo() {
+    echo hi
+}
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 2);
+    assert_eq!(r[0].end, 4);
+}
+
+#[test]
+fn shell_brace_fold_hash_in_expansion_is_not_comment() {
+    // ${#arr[@]} and $# are parameter expansions, not comments.
+    let r = shell_brace_fold(
+        "\
+foo() {
+    n=${#arr[@]}
+    echo $#
+}
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 3);
+}
+
+#[test]
+fn shell_brace_fold_hash_after_separator_is_comment() {
+    let r = shell_brace_fold(
+        "\
+foo() {
+    echo hi; # trailing { comment }
+}
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 2);
+}
+
+#[test]
+fn shell_brace_fold_quoted_heredoc_delimiter() {
+    // <<'EOF', <<"EOF" and <<\EOF all terminate on a bare EOF line.
+    for open in ["<<'EOF'", "<<\"EOF\"", "<<\\EOF"] {
+        let src = format!(
+            "\
+foo() {{
+    cat {open}
+{{ brace }}
+EOF
+    echo hi
+}}
+"
+        );
+        let r = shell_brace_fold(&src);
+        assert_eq!(r.len(), 1, "opener {open}");
+        assert_eq!(r[0].start, 0);
+        assert_eq!(r[0].end, 5);
+    }
+}
+
+#[test]
+fn shell_brace_fold_plain_heredoc_delimiter_must_not_be_indented() {
+    // Without <<-, an indented delimiter line does not close the heredoc.
+    let r = shell_brace_fold(
+        "\
+foo() {
+    cat <<EOF
+\tEOF
+{ brace }
+EOF
+}
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 5);
+}
+
+#[test]
+fn shell_brace_fold_arithmetic_shift_is_not_heredoc() {
+    let r = shell_brace_fold(
+        "\
+foo() {
+    x=$((1<<2))
+    (( y = x << 3 ))
+    echo hi
+}
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 4);
+}
+
+#[test]
+fn shell_brace_fold_escaped_quote_outside_string() {
+    // \' and \" must not open a string state.
+    let r = shell_brace_fold(
+        "\
+foo() {
+    echo can\\'t
+    echo \\\"
+    echo hi
+}
+",
+    );
+    assert_eq!(r.len(), 1);
+    assert_eq!(r[0].start, 0);
+    assert_eq!(r[0].end, 4);
+}
