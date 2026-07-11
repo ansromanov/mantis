@@ -2,9 +2,10 @@ name: CI
 
 # Pull-request gate: format, lint, and only the tests related to the changed
 # files. Broad changes run a small smoke set (integration + plugin + bin-only
-# tests), never the full suite. The full suite, Windows and benchmarks run on
-# release (release.yml); merge to main runs a related-tests sanity pass
-# (main.yml); coverage is on demand (coverage.yml).
+# tests), never the full suite. The full suite and Windows run on release
+# (release.yml) and on demand (tests.yml); benchmarks run on release; merge to
+# main runs a related-tests sanity pass (main.yml); coverage is on demand
+# (coverage.yml).
 on:
   pull_request:
     branches: [main]

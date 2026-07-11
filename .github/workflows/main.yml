@@ -2,7 +2,8 @@ name: Main
 
 # Post-merge sanity on main: lint everything (clippy --all-targets compiles
 # benches too), run only the tests related to the merge diff, and the e2e
-# smoke. The full suite, Windows and benchmarks run on release (release.yml).
+# smoke. The full suite and Windows run on release (release.yml) and on
+# demand (tests.yml); benchmarks run on release.
 on:
   push:
     branches: [main]
