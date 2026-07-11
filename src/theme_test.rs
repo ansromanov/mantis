@@ -420,6 +420,11 @@ fn colorfgbg_parsing() {
 
 #[test]
 fn test_no_color_active_env_checks() {
+    // Holds the write side for the whole test so no other test's
+    // `no_color_active()` read (running concurrently on another thread)
+    // observes our transient env-var mutations.
+    let _guard = crate::theme::lock_no_color_test_env();
+
     let old_no_color = std::env::var_os("NO_COLOR");
     let old_term = std::env::var_os("TERM");
     let old_test_no_color = std::env::var_os("MANTIS_TEST_NO_COLOR");
