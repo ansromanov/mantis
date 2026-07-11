@@ -738,7 +738,9 @@ thread_local! {
 }
 
 /// RAII guard returned by [`lock_no_color_test_env`]; see that function.
-pub struct NoColorTestEnvGuard(std::sync::RwLockWriteGuard<'static, ()>);
+/// The held write guard is never read — only kept alive so its `Drop` runs
+/// when the caller's guard goes out of scope.
+pub struct NoColorTestEnvGuard(#[allow(dead_code)] std::sync::RwLockWriteGuard<'static, ()>);
 
 impl Drop for NoColorTestEnvGuard {
     fn drop(&mut self) {
