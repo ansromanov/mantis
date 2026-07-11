@@ -94,6 +94,7 @@ Plugins receive lifecycle and hook events from `mantis` and can respond with
 | `set_icon_map` | Sets file-type icon glyphs (requires Nerd Font) |
 | `register_language_provider` | Declares file extensions and capabilities |
 | `set_fold_regions` | Provides fold regions for a file |
+| `register_commands` | Adds commands to the Ctrl-P command palette |
 
 Each action has specific parameters; see [Plugin Development](plugin-development.md)
 for the full protocol reference.

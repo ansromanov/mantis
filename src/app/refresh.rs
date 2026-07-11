@@ -475,6 +475,7 @@ impl App {
                 self.handle_plugin_register_language_provider(name, params);
             }
             "set_fold_regions" => self.handle_plugin_set_fold_regions(name, params),
+            "register_commands" => self.handle_plugin_register_commands(name, params),
             "key_handled" => self.handle_plugin_key_handled(params),
             "plugin_error" => self.handle_plugin_error(name, params),
             _ => {}
@@ -688,6 +689,28 @@ impl App {
         if self.current_file.as_deref() == Some(&path) {
             self.apply_plugin_fold_regions(&path);
         }
+    }
+
+    /// Handles a `register_commands` action: parses the command list, stores
+    /// it in the `PluginManager`, and records the ids in the plugin's
+    /// contributions so teardown can remove exactly this plugin's commands.
+    /// An empty or missing list clears the plugin's registration.
+    fn handle_plugin_register_commands(&mut self, name: &str, params: &serde_json::Value) {
+        let commands: Vec<crate::plugin::PluginCommand> = params
+            .get("commands")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| serde_json::from_value(v.clone()).ok())
+                    .collect()
+            })
+            .unwrap_or_default();
+        let contrib = self
+            .plugin_contributions
+            .entry(name.to_string())
+            .or_default();
+        contrib.command_ids = commands.iter().map(|c| c.id.clone()).collect();
+        self.plugin_manager.register_commands(name, commands);
     }
 
     pub(crate) fn check_overlay_transitions(&mut self) {

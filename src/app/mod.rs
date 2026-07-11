@@ -461,7 +461,7 @@ impl App {
     /// Tears down all application state produced by the named plugin.
     ///
     /// Removes content, fold-region, and icon-map contributions, clears the
-    /// plugin's provider registrations, and reloads the current file if the
+    /// plugin's provider and palette-command registrations, and reloads the current file if the
     /// plugin had rendered content for it — so the display falls back to core
     /// rendering (markdown, JSON, or plain text).
     pub(crate) fn teardown_plugin_contributions(&mut self, name: &str) {
@@ -502,6 +502,16 @@ impl App {
 
         // Provider registrations (language / fold / etc.).
         self.plugin_manager.remove_provider_registrations(name);
+
+        // Plugin-contributed palette commands.
+        self.plugin_manager.remove_command_registrations(name);
+
+        // Palette commands. Close an open palette that may list this plugin's
+        // commands so a stale entry can't dispatch to the dead plugin.
+        self.plugin_manager.remove_command_registrations(name);
+        if !contrib.command_ids.is_empty() && self.command_palette.is_some() {
+            self.command_palette = None;
+        }
 
         // Re-render the current file without plugin content.
         if had_current_content {

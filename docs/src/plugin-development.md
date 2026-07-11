@@ -186,6 +186,16 @@ and `colors` carries its resolved colors (same shape as on `init`; see above).
 }
 ```
 
+### `command` (protocol 3+)
+
+Sent when the user selects one of the plugin's palette commands (see the
+`register_commands` action below). `params.id` is the command's stable `id`
+exactly as the plugin registered it.
+
+```json
+{"event":"command","params":{"id":"my-plugin.do-thing"}}
+```
+
 ### `on_quit`
 
 Sent when the user initiates a quit (before `shutdown`). Use this to do any
@@ -320,6 +330,31 @@ Fields:
 
 Once icons are active, the tree's `▶`/`▼` expand/collapse arrows are suppressed —
 the `dir_open`/`dir_closed` glyph substitutes as the expansion indicator instead.
+
+### `register_commands` (protocol 3+)
+
+Contributes commands to the Ctrl-P command palette. Typically sent once in
+response to `init`. Registered commands appear in the palette after the
+built-in commands (they participate in fuzzy search but not in frecency
+ranking) and are always applicable. When the user selects one, the host sends
+a `command` event back to the plugin with the command's `id` (see the events
+section above).
+
+```json
+{"event":"action","action":"register_commands","params":{"commands":[
+  {"id":"my-plugin.do-thing","name":"Do the thing","category":"Plugin","description":"runs the thing"}
+]}}
+```
+
+Fields per command:
+- `id` — stable identifier, echoed back in the `command` event on selection.
+  Prefix it with your plugin name to avoid collisions with built-in action ids.
+- `name` — display name shown in the palette.
+- `category` — optional grouping label shown as a dimmed prefix.
+- `description` — optional one-line description shown dim after the name.
+
+Re-registration replaces the plugin's previous command list entirely; sending
+an empty `commands` array clears it.
 
 ## Language providers
 
@@ -460,6 +495,7 @@ special cases needed.
 | `set_icon_map` | `icon_map`, `icons_enabled`, `icon_dir_open/closed`, `icon_fallback` |
 | `set_fold_regions` | `plugin_fold_regions` entries for contributed paths; active fold state reset |
 | `register_language_provider` | Provider registration removed |
+| `register_commands` | Palette command registrations removed; an open palette listing them is closed |
 
 After clearing, if the disabled plugin had rendered content for the current
 file, the file is reloaded from disk and falls back to core rendering

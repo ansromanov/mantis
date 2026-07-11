@@ -30,7 +30,8 @@ use std::time::{Duration, Instant};
 use crate::plugin::install::default_plugin_dir;
 use crate::plugin::process::Plugin;
 use crate::plugin::types::{
-    Capability, LanguageProviderRegistration, PluginEntry, PluginKind, ThemeColorsMsg, ToPlugin,
+    Capability, LanguageProviderRegistration, PluginCommand, PluginEntry, PluginKind,
+    ThemeColorsMsg, ToPlugin,
 };
 use crate::theme::Theme;
 
@@ -93,6 +94,8 @@ pub(crate) struct PluginManager {
     /// Requests sent via `send_request` awaiting a `response`, keyed by id.
     pending_requests: HashMap<u64, PendingRequest>,
     request_spans: HashMap<u64, tracing::Span>,
+    /// Plugin-contributed palette commands, keyed by plugin name.
+    command_registrations: HashMap<String, Vec<PluginCommand>>,
 }
 
 impl PluginManager {
@@ -112,6 +115,7 @@ impl PluginManager {
             next_request_id: 0,
             pending_requests: HashMap::new(),
             request_spans: HashMap::new(),
+            command_registrations: HashMap::new(),
         }
     }
 
@@ -518,6 +522,57 @@ impl PluginManager {
     pub(crate) fn remove_provider_registrations(&mut self, name: &str) {
         self.provider_registrations
             .retain(|r| r.plugin_name != name);
+    }
+
+    /// Register palette commands from a plugin. Replaces any prior
+    /// registration from the same plugin (idempotent re-registration).
+    pub(crate) fn register_commands(&mut self, plugin_name: &str, commands: Vec<PluginCommand>) {
+        if commands.is_empty() {
+            self.command_registrations.remove(plugin_name);
+        } else {
+            self.command_registrations
+                .insert(plugin_name.to_string(), commands);
+        }
+    }
+
+    /// Remove all command registrations for a named plugin (teardown).
+    pub(crate) fn remove_command_registrations(&mut self, name: &str) {
+        self.command_registrations.remove(name);
+    }
+
+    /// Which plugin owns a given command id, if any.
+    pub(crate) fn plugin_for_command(&self, command_id: &str) -> Option<&str> {
+        for (name, cmds) in &self.command_registrations {
+            if cmds.iter().any(|c| c.id == command_id) {
+                return Some(name.as_str());
+            }
+        }
+        None
+    }
+
+    /// All registered plugin commands (for palette construction).
+    pub(crate) fn all_plugin_commands(&self) -> Vec<&PluginCommand> {
+        self.command_registrations.values().flatten().collect()
+    }
+
+    /// Send a `command` event to the plugin that owns the given command id.
+    pub(crate) fn send_command_event(&mut self, command_id: &str) {
+        let Some(plugin_name) = self.plugin_for_command(command_id).map(str::to_string) else {
+            return;
+        };
+        if let Some(plugin) = self.plugins.iter_mut().find(|p| p.name == plugin_name) {
+            plugin.send(&ToPlugin {
+                event: "command".into(),
+                path: None,
+                key: None,
+                theme: None,
+                colors: None,
+                protocol_version: None,
+                id: None,
+                method: None,
+                params: Some(serde_json::json!({"id": command_id})),
+            });
+        }
     }
 
     /// Consumes and returns all buffered plugin actions since the last call.

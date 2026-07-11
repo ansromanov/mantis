@@ -1431,3 +1431,39 @@ fn tree_width_brackets_do_not_fire_in_content_mode() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn ctrl_p_includes_registered_plugin_commands() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.plugin_manager.register_commands(
+        "demo",
+        vec![crate::plugin::PluginCommand {
+            id: "demo.hello".to_string(),
+            name: "Say Hello".to_string(),
+            category: Some("Plugin".to_string()),
+            description: Some("greets".to_string()),
+        }],
+    );
+    app.handle_key(ctrl('P'));
+    let palette = app
+        .command_palette
+        .as_ref()
+        .expect("Ctrl+P must open command_palette");
+    let n = crate::command_palette::COMMANDS.len();
+    assert_eq!(
+        palette.all_commands.len(),
+        n + 1,
+        "palette must append the plugin command after the built-ins"
+    );
+    assert_eq!(palette.all_commands[n].action_id, "demo.hello");
+    assert!(
+        palette.base_order.contains(&n),
+        "plugin command must be reachable in base_order"
+    );
+    assert_eq!(
+        palette.inapplicability_reasons[n], None,
+        "plugin commands are always applicable"
+    );
+    fs::remove_dir_all(&root).ok();
+}

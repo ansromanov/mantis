@@ -40,6 +40,7 @@ use fuzzy_matcher::skim::SkimMatcherV2;
 use crate::actions::ACTIONS;
 use crate::config::Keymap;
 use crate::list_picker::ListPicker;
+use crate::plugin::PluginCommand;
 use crate::search::fuzzy_refilter;
 use crate::search::{GotoLineState, SearchState};
 
@@ -97,11 +98,12 @@ impl PaletteRoute {
     }
 }
 
+#[derive(Clone)]
 pub struct CommandEntry {
-    pub name: &'static str,
-    pub action_id: &'static str,
-    pub category: Option<&'static str>,
-    pub description: Option<&'static str>,
+    pub name: String,
+    pub action_id: String,
+    pub category: Option<String>,
+    pub description: Option<String>,
 }
 
 /// Palette-invokable actions, in `ACTIONS` order.
@@ -110,10 +112,10 @@ pub static COMMANDS: LazyLock<Vec<CommandEntry>> = LazyLock::new(|| {
         .iter()
         .filter_map(|a| {
             a.palette.map(|name| CommandEntry {
-                name,
-                action_id: a.id,
-                category: a.category,
-                description: a.description,
+                name: name.to_string(),
+                action_id: a.id.to_string(),
+                category: a.category.map(str::to_string),
+                description: a.description.map(str::to_string),
             })
         })
         .collect()
@@ -125,7 +127,8 @@ pub struct CommandPalette {
     pub selected: usize,
     pub binding_labels: Vec<String>,
     /// Index order used when the query is empty. Always a permutation of
-    /// `0..COMMANDS.len()`. Built by [`ranked_base_order`] from usage stats.
+    /// `0..all_commands.len()`. Built by [`ranked_base_order`] for the
+    /// built-in commands, with plugin commands appended after.
     pub base_order: Vec<usize>,
     /// How many of the first entries in `base_order` are pinned (recent +
     /// frequent). Used by the UI to show a star prefix for pinned commands
@@ -144,6 +147,9 @@ pub struct CommandPalette {
     pub route_search: Option<SearchState>,
     /// Sub-picker for the go-to-line route. `None` outside that route.
     pub route_goto_line: Option<GotoLineState>,
+    /// Combined list of built-in + plugin commands. Indices in `filtered`
+    /// and `base_order` reference this list.
+    pub all_commands: Vec<CommandEntry>,
 }
 
 impl Default for CommandPalette {
@@ -153,6 +159,7 @@ impl Default for CommandPalette {
             Vec::new(),
             0,
             vec![None; COMMANDS.len()],
+            Vec::new(),
         )
     }
 }
@@ -163,21 +170,36 @@ impl CommandPalette {
         base_order: Vec<usize>,
         base_pinned: usize,
         inapplicability_reasons: Vec<Option<&'static str>>,
+        plugin_commands: Vec<PluginCommand>,
     ) -> Self {
-        let binding_labels = COMMANDS
+        // Build combined command list: built-in COMMANDS + plugin commands.
+        let mut all_commands: Vec<CommandEntry> = COMMANDS.to_vec();
+        for pc in &plugin_commands {
+            all_commands.push(CommandEntry {
+                name: pc.name.clone(),
+                action_id: pc.id.clone(),
+                category: pc.category.clone(),
+                description: pc.description.clone(),
+            });
+        }
+        let total = all_commands.len();
+        let static_count = COMMANDS.len();
+
+        let binding_labels = all_commands
             .iter()
-            .map(|cmd| keymap.label_for_action(cmd.action_id))
+            .map(|cmd| keymap.label_for_action(&cmd.action_id))
             .collect();
+
         // Sanitise base_order: drop out-of-range indices, de-duplicate, then
         // append any missing indices in natural order so it is always a valid
-        // permutation of 0..COMMANDS.len().
+        // permutation of 0..all_commands.len().
         let base_order = if base_order.is_empty() {
-            (0..COMMANDS.len()).collect()
+            (0..total).collect()
         } else {
-            let mut seen = vec![false; COMMANDS.len()];
-            let mut order: Vec<usize> = Vec::with_capacity(COMMANDS.len());
+            let mut seen = vec![false; total];
+            let mut order: Vec<usize> = Vec::with_capacity(total);
             for &i in &base_order {
-                if i < COMMANDS.len() && !seen[i] {
+                if i < total && !seen[i] {
                     seen[i] = true;
                     order.push(i);
                 }
@@ -192,7 +214,8 @@ impl CommandPalette {
         };
 
         // Empty-query ranking keeps pinned/frequent ordering but sinks
-        // inapplicable entries below applicable ones.
+        // inapplicable entries below applicable ones. Only built-in commands
+        // can be pinned (plugin commands have no usage history).
         let mut applicable = Vec::new();
         let mut inapplicable = Vec::new();
         let mut applicable_pinned_count = 0;
@@ -212,6 +235,19 @@ impl CommandPalette {
         let mut base_order = applicable;
         base_order.extend(inapplicable);
 
+        // Plugin commands (indices >= static_count) are not in base_order
+        // from ranked_base_order (which only knows built-in commands), so
+        // append them at the end if missing.
+        for i in static_count..total {
+            if !base_order.contains(&i) {
+                base_order.push(i);
+            }
+        }
+
+        // Extend inapplicability_reasons for plugin commands (always applicable).
+        let mut inapplicability_reasons = inapplicability_reasons;
+        inapplicability_reasons.resize(total, None);
+
         let len = base_order.len();
         CommandPalette {
             query: String::new(),
@@ -226,6 +262,7 @@ impl CommandPalette {
             route: PaletteRoute::Commands,
             route_search: None,
             route_goto_line: None,
+            all_commands,
         }
     }
 
@@ -339,8 +376,8 @@ impl CommandPalette {
         self.filtered.get(self.selected).copied()
     }
 
-    pub fn selected_command(&self) -> Option<&'static CommandEntry> {
-        self.selected_index().map(|i| &COMMANDS[i])
+    pub fn selected_command(&self) -> Option<&CommandEntry> {
+        self.selected_index().and_then(|i| self.all_commands.get(i))
     }
 
     fn refilter(&mut self) {
@@ -351,15 +388,20 @@ impl CommandPalette {
             return;
         }
         let binding_labels = &self.binding_labels;
-        let indices: Vec<usize> = (0..COMMANDS.len()).collect();
+        let all_commands = &self.all_commands;
+        let indices: Vec<usize> = (0..all_commands.len()).collect();
         let results = fuzzy_refilter(
             &indices,
             &self.matcher,
             &self.query,
             |&i| {
-                let cmd = &COMMANDS[i];
-                let mut haystack = cmd.category.map(|c| format!("{c}: ")).unwrap_or_default();
-                haystack.push_str(cmd.name);
+                let cmd = &all_commands[i];
+                let mut haystack = cmd
+                    .category
+                    .as_deref()
+                    .map(|c| format!("{c}: "))
+                    .unwrap_or_default();
+                haystack.push_str(&cmd.name);
                 if !binding_labels[i].is_empty() {
                     haystack.push_str(&format!(" [{}]", binding_labels[i]));
                 }

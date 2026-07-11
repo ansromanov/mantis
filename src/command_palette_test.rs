@@ -6,25 +6,25 @@ fn commands_have_categories() {
         .iter()
         .position(|c| c.action_id == "git_mode_toggle")
         .expect("git_mode_toggle must be in COMMANDS");
-    assert_eq!(COMMANDS[git_idx].category, Some("Git"));
+    assert_eq!(COMMANDS[git_idx].category.as_deref(), Some("Git"));
 
     let copy_idx = COMMANDS
         .iter()
         .position(|c| c.action_id == "copy_path")
         .expect("copy_path must be in COMMANDS");
-    assert_eq!(COMMANDS[copy_idx].category, Some("Copy"));
+    assert_eq!(COMMANDS[copy_idx].category.as_deref(), Some("Copy"));
 
     let view_idx = COMMANDS
         .iter()
         .position(|c| c.action_id == "toggle_wrap")
         .expect("toggle_wrap must be in COMMANDS");
-    assert_eq!(COMMANDS[view_idx].category, Some("View"));
+    assert_eq!(COMMANDS[view_idx].category.as_deref(), Some("View"));
 
     let tree_idx = COMMANDS
         .iter()
         .position(|c| c.action_id == "find_files")
         .expect("find_files must be in COMMANDS");
-    assert_eq!(COMMANDS[tree_idx].category, Some("Tree"));
+    assert_eq!(COMMANDS[tree_idx].category.as_deref(), Some("Tree"));
 }
 
 #[test]
@@ -38,7 +38,11 @@ fn commands_have_descriptions() {
         "help command should have a description"
     );
     assert!(
-        !COMMANDS[help_idx].description.unwrap().is_empty(),
+        !COMMANDS[help_idx]
+            .description
+            .as_deref()
+            .unwrap()
+            .is_empty(),
         "description should not be empty"
     );
 }
@@ -321,7 +325,13 @@ fn ranked_base_order_typing_query_still_fuzzy() {
     // After typing a query, push/pop/refilter should use fuzzy matching.
     let usage = crate::command_usage::UsageStats::default();
     let (base, _) = ranked_base_order(&usage, true, 3);
-    let mut p = CommandPalette::new(&Keymap::default(), base, 0, vec![None; COMMANDS.len()]);
+    let mut p = CommandPalette::new(
+        &Keymap::default(),
+        base,
+        0,
+        vec![None; COMMANDS.len()],
+        Vec::new(),
+    );
     assert_eq!(p.results_len(), COMMANDS.len());
     // Type a query — results should be fuzzy-filtered
     for c in "git".chars() {
@@ -342,7 +352,13 @@ fn command_palette_list_picker_impl_delegates() {
     use crate::list_picker::ListPicker;
     let usage = crate::command_usage::UsageStats::default();
     let (base, _) = ranked_base_order(&usage, true, 0);
-    let mut p = CommandPalette::new(&Keymap::default(), base, 0, vec![None; COMMANDS.len()]);
+    let mut p = CommandPalette::new(
+        &Keymap::default(),
+        base,
+        0,
+        vec![None; COMMANDS.len()],
+        Vec::new(),
+    );
     assert!(ListPicker::query_is_empty(&p));
     assert_eq!(ListPicker::selected(&p), 0);
     ListPicker::set_selected(&mut p, 1);

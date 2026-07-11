@@ -5163,3 +5163,57 @@ fn toggle_telemetry_flips_config_persists_and_reports_status() {
 
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn teardown_plugin_contributions_removes_palette_commands_and_closes_palette() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+
+    app.plugin_manager.register_commands(
+        "demo",
+        vec![crate::plugin::PluginCommand {
+            id: "demo.hello".to_string(),
+            name: "Say Hello".to_string(),
+            category: None,
+            description: None,
+        }],
+    );
+    app.plugin_contributions
+        .entry("demo".to_string())
+        .or_default()
+        .command_ids
+        .insert("demo.hello".to_string());
+    app.command_palette = Some(crate::command_palette::CommandPalette::default());
+
+    app.teardown_plugin_contributions("demo");
+
+    assert_eq!(
+        app.plugin_manager.plugin_for_command("demo.hello"),
+        None,
+        "teardown must remove the plugin's command registrations"
+    );
+    assert!(
+        app.command_palette.is_none(),
+        "an open palette must close so stale plugin entries can't dispatch"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn teardown_plugin_contributions_keeps_palette_when_plugin_had_no_commands() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+
+    app.plugin_contributions
+        .entry("quiet".to_string())
+        .or_default();
+    app.command_palette = Some(crate::command_palette::CommandPalette::default());
+
+    app.teardown_plugin_contributions("quiet");
+
+    assert!(
+        app.command_palette.is_some(),
+        "palette must stay open when the torn-down plugin contributed no commands"
+    );
+    fs::remove_dir_all(&root).ok();
+}
