@@ -472,12 +472,20 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
                 "blame current line: hash  author  when  summary",
             ));
             rows.push(row_key_custom(
+                "blame_open_commit",
+                "open file at the commit shown on the active blame line",
+            ));
+            rows.push(row_key_custom(
                 "file_history",
                 "pick a commit -> view its diff vs your working tree",
             ));
             rows.push(row_key_custom(
                 "repo_commit_log",
                 "browse all repository commits, enter to compare",
+            ));
+            rows.push(row_key_custom(
+                "toggle_file_revision",
+                "toggle between diff and full-file snapshot at that revision",
             ));
         }
         5 => {
