@@ -70,3 +70,117 @@ and `mantis.toml`.
 
 For every bundled provider and syntax pack, including how to opt out, see
 [Plugins](plugins.md#bundled-plugins).
+
+## v0.16: review tools and language-aware reading
+
+Version 0.16 focused on making code review more legible while adding folding
+for the languages most commonly encountered in a repository.
+
+### Compare a revision and inspect blame in context
+
+To review all changes since a branch, tag, hash, or revspec, run **Compare
+against a revision** from `Ctrl+P`, choose or type the revision, and press
+`Enter`. The changed-file tree and each file's diff stay scoped to that base;
+press `Ctrl+D` to return to normal browsing.
+
+With a tracked file open, press `Ctrl+b` to open the full-file blame pane.
+It follows the content cursor and shows the hash, author, date, and subject for
+each line. Press `B` in the content pane when you only need the active line's
+blame summary. The [Git Features](git.md) guide covers both workflows.
+
+### Fold Rust, Python, and Go
+
+The bundled Rust, Python, and Go providers add fold regions for `.rs`, `.py`,
+and `.go` files. Focus the content pane, move to a foldable declaration or
+block, and press `Space` to collapse or reopen it. Folding stays available
+alongside the ordinary syntax highlighting and can be disabled per provider in
+`mantis.toml` if needed.
+
+### Faster discovery and safer diagnostics
+
+The command palette now presents categories, descriptions, match highlights,
+and context when an action cannot apply. Press `Ctrl+P`, type an action name,
+and use the displayed shortcut or `Enter` to run it.
+
+Use **Report a bug (save diagnostics locally)** from the palette to create a
+local, reviewable report, or **Toggle telemetry** to opt into the local-only
+usage log. Neither feature uploads data. See [Telemetry & Bug Reports](telemetry.md)
+for the saved locations and contents.
+
+## v0.15: navigation and compatibility polish
+
+Version 0.15 was a focused stability release rather than a new interaction
+mode. Large trees avoid an unnecessary deep scan when nothing is expanded, so
+starting a repository and moving through its top level is more responsive.
+
+Visual selection now remains visible on the active line, making it easier to
+keep your place while copying or inspecting a range. Existing configuration
+files using older `git_mode` and renamed keymap fields continue to load without
+spurious warnings; consult [Configuration](configuration.md) when you are ready
+to migrate to the current names.
+
+## v0.14: pager mode, powerful search, and familiar keys
+
+Version 0.14 made mantis more useful in command pipelines and easier to learn
+for users coming from common editors.
+
+### Use mantis as a terminal pager
+
+Pipe a diff, log, or any text into mantis to browse it interactively:
+
+```sh
+git diff | mantis
+git log -p | mantis
+kubectl logs pod | mantis
+```
+
+Diff-shaped input opens in a navigable side-by-side view. For other input, use
+`--language` when you want to force syntax highlighting. See [Pager mode](usage.md#pager-mode)
+for behavior and platform details.
+
+### Tune a search without changing its query
+
+In content search or the in-file search bar, press `Ctrl+A` for
+case-sensitive matching, `Ctrl+W` for whole-word matching, and `Ctrl+R` for a
+regular expression. The active `[Aa]`, `[\b]`, and `[.*]` indicators show
+which constraints are in effect. Press the same shortcut again to turn it off.
+
+### Learn the editor-style defaults
+
+The shipped keymap uses familiar editor-style bindings: `Ctrl+P` opens the
+palette, `Ctrl+T` finds files, `Ctrl+F` searches contents, `Ctrl+G` goes to a
+line, and `Ctrl+D` opens the changed-file review view. Press `?` or `F1` for
+the structured help overlay, then use its tabs to browse key groups. All of
+these bindings remain remappable in `mantis.toml`.
+
+Plugin authors should update manifests to `mantis_protocol = "3"` when using
+the protocol-3 request/response, key-consumption, or provider-priority
+features; [Plugin Development](plugin-development.md#protocol-version) has the
+compatibility details.
+
+## v0.13: a more dependable everyday viewer
+
+Version 0.13 improved the tools used to orient yourself in a repository and
+made plugin failures easier to diagnose.
+
+### Preview themes and use a scrollable help overlay
+
+Press `t` in the tree to open the theme picker. Moving through its entries
+previews each theme immediately; press `Enter` to keep it or `Esc` to return
+to the original theme. The [Themes](themes.md) page explains persistent theme
+configuration.
+
+Press `?` or `F1` whenever you need a reminder. Help is scrollable, and its Git
+section collects the status, diff, blame, and history shortcuts in one place.
+
+### Rely on safer sessions and clearer plugin failures
+
+Each workspace keeps independent session state, so multiple mantis instances
+no longer overwrite one another's restored view. Bundled plugins are embedded
+with the application rather than relying on a local build at startup, and old
+retired shell plugins are removed during upgrade.
+
+If a process plugin exits unexpectedly, mantis keeps its recent stderr and
+points to a local plugin log. Open the plugin picker with `p` in the tree to
+check its status; [Plugins](plugins.md) explains how to enable, disable, and
+configure plugins.
