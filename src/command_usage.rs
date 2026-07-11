@@ -107,15 +107,21 @@ impl UsageStats {
         self.last_used.as_deref()
     }
 
-    /// The `n` highest-scoring action_ids. Ties broken by action_id
+    /// The `n` highest-scoring action_ids, with frecency decay applied at
+    /// read time so entries last recorded at different moments compare on
+    /// their current (decayed) scores. Ties broken by action_id
     /// (alphabetical) so ordering is deterministic. Actions with a zero/absent
     /// score are not returned.
     pub fn top_used(&self, n: usize) -> Vec<&str> {
+        let now = unix_ts();
         let mut v: Vec<(&str, f64)> = self
             .scores
             .iter()
             .filter(|(_, e)| e.score > 0.0)
-            .map(|(k, e)| (k.as_str(), e.score))
+            .map(|(k, e)| {
+                let days = now.saturating_sub(e.last_used_ts) as f64 / SECS_PER_DAY;
+                (k.as_str(), e.score * DECAY_BASE.powf(days))
+            })
             .collect();
         v.sort_by(|a, b| {
             b.1.partial_cmp(&a.1)

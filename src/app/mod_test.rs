@@ -1445,18 +1445,25 @@ fn in_file_search_enter_closes() {
 // -- handle_content_key ----------------------------------------------------
 
 #[test]
-fn content_key_toggle_wrap_resets_scroll() {
+fn content_key_toggle_wrap_preserves_scroll_and_resets_hscroll() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
     app.focus = Focus::Content;
+    app.content_area = viewport(10);
     app.content_scroll = 10;
     app.content_hscroll = 5;
     app.keys.toggle_wrap = global_char_binding('z');
     app.handle_key(KeyEvent::new(KeyCode::Char('z'), KeyModifiers::empty()));
     assert!(app.word_wrap);
-    assert_eq!(app.content_scroll, 0);
-    assert_eq!(app.content_hscroll, 0);
+    assert_eq!(
+        app.content_scroll, 10,
+        "wrap toggle must preserve vertical scroll (clamped only)"
+    );
+    assert_eq!(
+        app.content_hscroll, 0,
+        "hscroll is meaningless when wrapped"
+    );
     fs::remove_dir_all(&root).ok();
 }
 

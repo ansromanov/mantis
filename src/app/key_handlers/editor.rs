@@ -50,11 +50,13 @@ impl App {
                 self.command_palette = None;
                 return true;
             }
-            self.command_usage.record(id);
-            self.command_usage.save();
-            // Telemetry records canonical action ids only; plugin-contributed
-            // command ids are not in ACTIONS and are skipped.
+            // Usage stats and telemetry record canonical action ids only;
+            // plugin-contributed command ids are not in ACTIONS and are
+            // skipped so they can't consume the palette's pinned-frequent
+            // slots (ranked_base_order only knows built-in commands).
             if let Some(spec) = crate::actions::ACTIONS.iter().find(|a| a.id == id) {
+                self.command_usage.record(spec.id);
+                self.command_usage.save();
                 self.telemetry
                     .record(crate::telemetry::TelemetryEvent::ActionInvoked {
                         action: spec.id,

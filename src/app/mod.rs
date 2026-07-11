@@ -503,11 +503,9 @@ impl App {
         // Provider registrations (language / fold / etc.).
         self.plugin_manager.remove_provider_registrations(name);
 
-        // Plugin-contributed palette commands.
-        self.plugin_manager.remove_command_registrations(name);
-
-        // Palette commands. Close an open palette that may list this plugin's
-        // commands so a stale entry can't dispatch to the dead plugin.
+        // Plugin-contributed palette commands. Close an open palette that may
+        // list this plugin's commands so a stale entry can't dispatch to the
+        // dead plugin.
         self.plugin_manager.remove_command_registrations(name);
         if !contrib.command_ids.is_empty() && self.command_palette.is_some() {
             self.command_palette = None;

@@ -694,14 +694,41 @@ impl App {
     /// Handles a `register_commands` action: parses the command list, stores
     /// it in the `PluginManager`, and records the ids in the plugin's
     /// contributions so teardown can remove exactly this plugin's commands.
-    /// An empty or missing list clears the plugin's registration.
+    /// An empty or missing list clears the plugin's registration. Ids that
+    /// collide with a built-in action id or a command already registered by
+    /// another plugin are skipped — otherwise the built-in dispatch arm would
+    /// shadow the plugin entry, or ownership would be ambiguous.
     fn handle_plugin_register_commands(&mut self, name: &str, params: &serde_json::Value) {
         let commands: Vec<crate::plugin::PluginCommand> = params
             .get("commands")
             .and_then(|v| v.as_array())
             .map(|arr| {
                 arr.iter()
-                    .filter_map(|v| serde_json::from_value(v.clone()).ok())
+                    .filter_map(|v| {
+                        serde_json::from_value::<crate::plugin::PluginCommand>(v.clone()).ok()
+                    })
+                    .filter(|c: &crate::plugin::PluginCommand| {
+                        let builtin = crate::actions::ACTIONS.iter().any(|a| a.id == c.id);
+                        let owned_elsewhere = self
+                            .plugin_manager
+                            .plugin_for_command(&c.id)
+                            .is_some_and(|owner| owner != name);
+                        if builtin || owned_elsewhere {
+                            self.plugin_manager.log_plugin_error_line(
+                                name,
+                                &format!(
+                                    "register_commands: skipping id {:?} ({})",
+                                    c.id,
+                                    if builtin {
+                                        "collides with a built-in action"
+                                    } else {
+                                        "already registered by another plugin"
+                                    }
+                                ),
+                            );
+                        }
+                        !(builtin || owned_elsewhere)
+                    })
                     .collect()
             })
             .unwrap_or_default();

@@ -1832,3 +1832,33 @@ fn plugin_register_commands_malformed_params_is_noop() {
     );
     assert!(app.plugin_manager.all_plugin_commands().is_empty());
 }
+
+#[test]
+fn plugin_register_commands_skips_builtin_and_cross_plugin_collisions() {
+    let mut app = create_base_app();
+    // "help" collides with a built-in action id and must be skipped.
+    app.drain_plugin_actions_for_test(
+        "cmds",
+        "register_commands",
+        serde_json::json!({"commands": [
+            {"id": "help", "name": "Hijack Help"},
+            {"id": "cmds.ok", "name": "OK"}
+        ]}),
+    );
+    assert_eq!(app.plugin_manager.plugin_for_command("help"), None);
+    assert_eq!(
+        app.plugin_manager.plugin_for_command("cmds.ok"),
+        Some("cmds")
+    );
+
+    // An id already owned by another plugin must be skipped too.
+    app.drain_plugin_actions_for_test(
+        "other",
+        "register_commands",
+        serde_json::json!({"commands": [{"id": "cmds.ok", "name": "Steal"}]}),
+    );
+    assert_eq!(
+        app.plugin_manager.plugin_for_command("cmds.ok"),
+        Some("cmds")
+    );
+}

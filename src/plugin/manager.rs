@@ -23,7 +23,7 @@
 //! [`record_plugin_error`]: PluginManager::record_plugin_error
 //! [`poll_requests`]: PluginManager::poll_requests
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
@@ -94,8 +94,9 @@ pub(crate) struct PluginManager {
     /// Requests sent via `send_request` awaiting a `response`, keyed by id.
     pending_requests: HashMap<u64, PendingRequest>,
     request_spans: HashMap<u64, tracing::Span>,
-    /// Plugin-contributed palette commands, keyed by plugin name.
-    command_registrations: HashMap<String, Vec<PluginCommand>>,
+    /// Plugin-contributed palette commands, keyed by plugin name. A
+    /// `BTreeMap` so palette ordering across plugins is deterministic.
+    command_registrations: BTreeMap<String, Vec<PluginCommand>>,
 }
 
 impl PluginManager {
@@ -115,7 +116,7 @@ impl PluginManager {
             next_request_id: 0,
             pending_requests: HashMap::new(),
             request_spans: HashMap::new(),
-            command_registrations: HashMap::new(),
+            command_registrations: BTreeMap::new(),
         }
     }
 
