@@ -926,7 +926,7 @@ fn test_dispatch_inapplicable_command_sets_status_message() {
 
     let inapplicability_reasons = crate::command_palette::COMMANDS
         .iter()
-        .map(|cmd| app.check_applicability(cmd.action_id).err())
+        .map(|cmd| app.check_applicability(&cmd.action_id).err())
         .collect();
 
     app.command_palette = Some(crate::command_palette::CommandPalette::new(
@@ -934,6 +934,7 @@ fn test_dispatch_inapplicable_command_sets_status_message() {
         vec![json_idx],
         0,
         inapplicability_reasons,
+        Vec::new(),
     ));
 
     if let Some(ref mut p) = app.command_palette {
@@ -1147,4 +1148,47 @@ fn dispatch_palette_goto_line_jumps_and_closes_palette() {
         "matches the standalone goto-line dialog"
     );
     fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn test_dispatch_plugin_command_closes_palette_and_returns_true() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = app_for(dir.path());
+
+    let plugin_cmd = crate::plugin::PluginCommand {
+        id: "demo.hello".to_string(),
+        name: "Say Hello".to_string(),
+        category: Some("Plugin".to_string()),
+        description: None,
+    };
+    app.plugin_manager
+        .register_commands("demo", vec![plugin_cmd.clone()]);
+
+    let inapplicability_reasons = crate::command_palette::COMMANDS
+        .iter()
+        .map(|cmd| app.check_applicability(&cmd.action_id).err())
+        .collect();
+    app.command_palette = Some(crate::command_palette::CommandPalette::new(
+        app.keys(),
+        Vec::new(),
+        0,
+        inapplicability_reasons,
+        vec![plugin_cmd],
+    ));
+
+    // Select the plugin command (appended after the built-ins).
+    let plugin_idx = crate::command_palette::COMMANDS.len();
+    if let Some(ref mut p) = app.command_palette {
+        let pos = p.filtered.iter().position(|&i| i == plugin_idx).unwrap();
+        p.selected = pos;
+        assert_eq!(
+            p.selected_command().map(|c| c.action_id.as_str()),
+            Some("demo.hello")
+        );
+    }
+
+    // Dispatch must claim the id (owned by "demo") and close the palette.
+    // The plugin has no live subprocess, so send_command_event is a noop.
+    assert!(app.dispatch_command());
+    assert!(app.command_palette.is_none());
 }

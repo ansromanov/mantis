@@ -77,8 +77,8 @@ pub(crate) use install::retired_bundled_plugins;
 pub(crate) use manager::PluginManager;
 pub(crate) use syntax::load_extra_syntaxes;
 pub(crate) use types::{
-    Capability, ExtraSyntax, LanguageProviderRegistration, PluginContributions, PluginEntry,
-    PluginKind,
+    Capability, ExtraSyntax, LanguageProviderRegistration, PluginCommand, PluginContributions,
+    PluginEntry, PluginKind,
 };
 
 /// Converts a crossterm `KeyEvent` into a human-readable string like `"q"`,

@@ -782,3 +782,68 @@ fn send_request_returns_none_for_missing_plugin() {
     let id = mgr.send_request("nonexistent", "method", serde_json::json!({}));
     assert!(id.is_none());
 }
+
+// -- plugin-contributed palette commands --------------------------------------
+
+fn palette_cmd(id: &str, name: &str) -> PluginCommand {
+    PluginCommand {
+        id: id.to_string(),
+        name: name.to_string(),
+        category: None,
+        description: None,
+    }
+}
+
+#[test]
+fn register_commands_stores_and_resolves_owner() {
+    let mut mgr = PluginManager::new(vec![]);
+    mgr.register_commands(
+        "demo",
+        vec![
+            palette_cmd("demo.hello", "Say Hello"),
+            palette_cmd("demo.bye", "Say Bye"),
+        ],
+    );
+    assert_eq!(mgr.all_plugin_commands().len(), 2);
+    assert_eq!(mgr.plugin_for_command("demo.hello"), Some("demo"));
+    assert_eq!(mgr.plugin_for_command("unknown"), None);
+}
+
+#[test]
+fn register_commands_replaces_prior_registration() {
+    let mut mgr = PluginManager::new(vec![]);
+    mgr.register_commands("demo", vec![palette_cmd("a", "A")]);
+    mgr.register_commands("demo", vec![palette_cmd("b", "B")]);
+    assert_eq!(mgr.plugin_for_command("a"), None);
+    assert_eq!(mgr.plugin_for_command("b"), Some("demo"));
+    assert_eq!(mgr.all_plugin_commands().len(), 1);
+}
+
+#[test]
+fn register_commands_empty_list_clears_registration() {
+    let mut mgr = PluginManager::new(vec![]);
+    mgr.register_commands("demo", vec![palette_cmd("a", "A")]);
+    mgr.register_commands("demo", vec![]);
+    assert!(mgr.all_plugin_commands().is_empty());
+    assert_eq!(mgr.plugin_for_command("a"), None);
+}
+
+#[test]
+fn remove_command_registrations_clears_only_named_plugin() {
+    let mut mgr = PluginManager::new(vec![]);
+    mgr.register_commands("one", vec![palette_cmd("one.x", "X")]);
+    mgr.register_commands("two", vec![palette_cmd("two.y", "Y")]);
+    mgr.remove_command_registrations("one");
+    assert_eq!(mgr.plugin_for_command("one.x"), None);
+    assert_eq!(mgr.plugin_for_command("two.y"), Some("two"));
+}
+
+#[test]
+fn send_command_event_without_running_plugin_is_noop() {
+    let mut mgr = PluginManager::new(vec![]);
+    mgr.register_commands("demo", vec![palette_cmd("demo.hello", "Say Hello")]);
+    // Owner resolved but no live subprocess — must not panic.
+    mgr.send_command_event("demo.hello");
+    // Unknown id — must not panic either.
+    mgr.send_command_event("nope");
+}

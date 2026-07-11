@@ -213,10 +213,13 @@ diff_hunk_prev = ["N"]
 ## Command palette ranking
 
 When you open the command palette with `ctrl+p` without typing a query, commands
-are ranked by recency and frequency rather than shown in a fixed order. The most
-recently used command is pinned at the top; the most frequently used commands
-follow it. Type any character to switch to the usual fuzzy search, which ignores
-this ordering.
+are ranked by *frecency* — a blend of how often and how recently each command
+has been used — rather than shown in a fixed order. Each use adds 1 to a
+command's score, and scores decay by 10% per day since last use, so a command
+used heavily last month gradually yields to one used a few times this week.
+The most recently used command is pinned at the top; the highest-scoring
+commands follow it. Type any character to switch to the usual fuzzy search,
+which ignores this ordering.
 
 Two options control the ranking:
 

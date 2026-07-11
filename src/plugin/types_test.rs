@@ -244,3 +244,27 @@ fn from_plugin_action_message_leaves_response_fields_none() {
     assert!(msg.error.is_none());
 }
 // Satisfying require-tests check
+
+#[test]
+fn plugin_command_deserializes_with_optional_fields_defaulting() {
+    let c: PluginCommand = serde_json::from_str(r#"{"id":"x.y","name":"X"}"#).unwrap();
+    assert_eq!(c.id, "x.y");
+    assert_eq!(c.name, "X");
+    assert!(c.category.is_none());
+    assert!(c.description.is_none());
+
+    let c2: PluginCommand = serde_json::from_str(
+        r#"{"id":"a","name":"A","category":"Plugin","description":"does a thing"}"#,
+    )
+    .unwrap();
+    assert_eq!(c2.category.as_deref(), Some("Plugin"));
+    assert_eq!(c2.description.as_deref(), Some("does a thing"));
+}
+
+#[test]
+fn plugin_contributions_tracks_command_ids() {
+    let mut contrib = PluginContributions::default();
+    assert!(contrib.command_ids.is_empty());
+    contrib.command_ids.insert("demo.hello".to_string());
+    assert!(contrib.command_ids.contains("demo.hello"));
+}

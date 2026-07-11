@@ -214,6 +214,25 @@ pub(crate) struct FromPlugin {
     pub(crate) error: Option<PluginResponseError>,
 }
 
+/// A single command a plugin contributes to the Ctrl-P command palette.
+///
+/// Received via the `register_commands` action (`{commands: [{id, name,
+/// category?, description?}]}`). When the user selects one, the host sends
+/// a `command` event back to the plugin with the command's `id`.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct PluginCommand {
+    /// Stable identifier dispatched back to the plugin on selection.
+    pub id: String,
+    /// Display name shown in the palette.
+    pub name: String,
+    /// Optional category label (e.g. "Plugin") for grouping in the palette.
+    #[serde(default)]
+    pub category: Option<String>,
+    /// Optional one-line description shown dim in the palette.
+    #[serde(default)]
+    pub description: Option<String>,
+}
+
 /// Tracks what application state a plugin has contributed so that disabling
 /// or crashing the plugin tears down exactly its output without affecting
 /// other plugins' state. One entry per running plugin.
@@ -231,4 +250,6 @@ pub(crate) struct PluginContributions {
     pub(crate) fold_region_paths: HashSet<PathBuf>,
     /// Whether this plugin set the icon map / icon fields via `set_icon_map`.
     pub(crate) has_icon_map: bool,
+    /// Command IDs registered by this plugin via `register_commands`.
+    pub(crate) command_ids: HashSet<String>,
 }

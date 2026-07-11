@@ -38,28 +38,34 @@ impl App {
         let action_id = self
             .command_palette
             .as_ref()
-            .and_then(|p| p.selected_command().map(|c| c.action_id));
-        if let Some(id) = action_id {
+            .and_then(|p| p.selected_command().map(|c| c.action_id.clone()));
+        if let Some(id) = action_id.as_deref() {
             if let Err(reason) = self.check_applicability(id) {
                 let name = crate::command_palette::COMMANDS
                     .iter()
                     .find(|c| c.action_id == id)
-                    .map(|c| c.name)
+                    .map(|c| c.name.as_str())
                     .unwrap_or(id);
                 self.set_status(format!("{}: {}", name, reason));
                 self.command_palette = None;
                 return true;
             }
-            self.command_usage.record(id);
-            self.command_usage.save();
-            self.telemetry
-                .record(crate::telemetry::TelemetryEvent::ActionInvoked {
-                    action: id,
-                    source: crate::telemetry::ActionSource::Palette,
-                });
+            // Usage stats and telemetry record canonical action ids only;
+            // plugin-contributed command ids are not in ACTIONS and are
+            // skipped so they can't consume the palette's pinned-frequent
+            // slots (ranked_base_order only knows built-in commands).
+            if let Some(spec) = crate::actions::ACTIONS.iter().find(|a| a.id == id) {
+                self.command_usage.record(spec.id);
+                self.command_usage.save();
+                self.telemetry
+                    .record(crate::telemetry::TelemetryEvent::ActionInvoked {
+                        action: spec.id,
+                        source: crate::telemetry::ActionSource::Palette,
+                    });
+            }
         }
         self.command_palette = None;
-        match action_id {
+        match action_id.as_deref() {
             Some("help") => {
                 self.show_help = !self.show_help;
                 true
@@ -321,6 +327,10 @@ impl App {
                         "markdown render toggle: not available (current file not plugin-rendered)",
                     );
                 }
+                true
+            }
+            Some(id) if self.plugin_manager.plugin_for_command(id).is_some() => {
+                self.plugin_manager.send_command_event(id);
                 true
             }
             _ => false,

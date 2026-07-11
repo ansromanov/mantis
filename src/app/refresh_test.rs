@@ -1759,3 +1759,106 @@ fn tick_flushes_palette_content_search_debounce() {
     );
     fs::remove_dir_all(&dir).ok();
 }
+
+// -- register_commands plugin action ------------------------------------------
+
+#[test]
+fn plugin_register_commands_records_commands_and_contributions() {
+    let mut app = create_base_app();
+    app.drain_plugin_actions_for_test(
+        "cmds",
+        "register_commands",
+        serde_json::json!({"commands": [
+            {"id": "cmds.hello", "name": "Say Hello", "category": "Plugin", "description": "greets"},
+            {"id": "cmds.bye", "name": "Say Bye"}
+        ]}),
+    );
+    assert_eq!(app.plugin_manager.all_plugin_commands().len(), 2);
+    assert_eq!(
+        app.plugin_manager.plugin_for_command("cmds.hello"),
+        Some("cmds")
+    );
+    let contrib = app
+        .plugin_contributions
+        .get("cmds")
+        .expect("register_commands must record a contribution entry");
+    assert!(contrib.command_ids.contains("cmds.hello"));
+    assert!(contrib.command_ids.contains("cmds.bye"));
+}
+
+#[test]
+fn plugin_register_commands_replaces_prior_and_empty_clears() {
+    let mut app = create_base_app();
+    app.drain_plugin_actions_for_test(
+        "cmds",
+        "register_commands",
+        serde_json::json!({"commands": [{"id": "a", "name": "A"}]}),
+    );
+    app.drain_plugin_actions_for_test(
+        "cmds",
+        "register_commands",
+        serde_json::json!({"commands": [{"id": "b", "name": "B"}]}),
+    );
+    assert_eq!(
+        app.plugin_manager.plugin_for_command("a"),
+        None,
+        "re-registration must replace the prior command list"
+    );
+    assert_eq!(app.plugin_manager.plugin_for_command("b"), Some("cmds"));
+
+    app.drain_plugin_actions_for_test(
+        "cmds",
+        "register_commands",
+        serde_json::json!({"commands": []}),
+    );
+    assert!(app.plugin_manager.all_plugin_commands().is_empty());
+    assert!(
+        app.plugin_contributions
+            .get("cmds")
+            .expect("contribution entry persists")
+            .command_ids
+            .is_empty(),
+        "empty registration must clear recorded command ids"
+    );
+}
+
+#[test]
+fn plugin_register_commands_malformed_params_is_noop() {
+    let mut app = create_base_app();
+    app.drain_plugin_actions_for_test(
+        "cmds",
+        "register_commands",
+        serde_json::json!({"commands": "not-an-array"}),
+    );
+    assert!(app.plugin_manager.all_plugin_commands().is_empty());
+}
+
+#[test]
+fn plugin_register_commands_skips_builtin_and_cross_plugin_collisions() {
+    let mut app = create_base_app();
+    // "help" collides with a built-in action id and must be skipped.
+    app.drain_plugin_actions_for_test(
+        "cmds",
+        "register_commands",
+        serde_json::json!({"commands": [
+            {"id": "help", "name": "Hijack Help"},
+            {"id": "cmds.ok", "name": "OK"}
+        ]}),
+    );
+    assert_eq!(app.plugin_manager.plugin_for_command("help"), None);
+    assert_eq!(
+        app.plugin_manager.plugin_for_command("cmds.ok"),
+        Some("cmds")
+    );
+
+    // An id already owned by another plugin must be skipped too.
+    app.drain_plugin_actions_for_test(
+        "other",
+        "register_commands",
+        serde_json::json!({"commands": [{"id": "cmds.ok", "name": "Steal"}]}),
+    );
+    assert_eq!(
+        app.plugin_manager.plugin_for_command("cmds.ok"),
+        Some("cmds")
+    );
+}

@@ -50,6 +50,7 @@ fn pinned_entries_show_star_prefix_when_query_empty() {
         order,
         1,
         vec![None; crate::command_palette::COMMANDS.len()],
+        Vec::new(),
     ));
 
     let backend = TestBackend::new(80, 30);
@@ -84,6 +85,7 @@ fn star_prefix_hidden_when_query_is_typed() {
         order,
         1,
         vec![None; crate::command_palette::COMMANDS.len()],
+        Vec::new(),
     );
     // Typing a query disables the pin prefix.
     palette.push('h');
@@ -116,6 +118,7 @@ fn category_label_appears_in_palette_rendering() {
         (0..crate::command_palette::COMMANDS.len()).collect(),
         0,
         vec![None; crate::command_palette::COMMANDS.len()],
+        Vec::new(),
     ));
 
     if let Some(p) = &mut app.command_palette {
@@ -149,6 +152,7 @@ fn description_appears_in_palette_rendering() {
         (0..crate::command_palette::COMMANDS.len()).collect(),
         0,
         vec![None; crate::command_palette::COMMANDS.len()],
+        Vec::new(),
     ));
 
     if let Some(p) = &mut app.command_palette {

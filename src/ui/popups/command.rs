@@ -1,13 +1,13 @@
 //! The Ctrl-P command-palette popup with prefix routing.
 //!
 //! `draw_command_palette` renders the command palette as a centered overlay: a
-//! query input on top and, below it, the fuzzy-filtered list of `COMMANDS`
-//! with the selected entry highlighted. It reads the live `CommandPalette`
-//! picker state from `App` (query, filtered-and-scored entries, selection,
-//! match positions) and is a no-op when the palette is closed. Selection and
-//! dispatch are handled elsewhere - this module is purely the visual surface,
-//! mirroring the layout of the other list-style pickers (search, history,
-//! and theme).
+//! query input on top and, below it, the fuzzy-filtered list of the picker's
+//! commands (built-in plus plugin-contributed) with the selected entry
+//! highlighted. It reads the live `CommandPalette` picker
+//! state from `App` (query, filtered-and-scored entries, selection, match
+//! positions) and is a no-op when the palette is closed. Selection and dispatch
+//! are handled elsewhere - this module is purely the visual surface, mirroring
+//! the layout of the other list-style pickers (search, history, and theme).
 //!
 //! **Prefix routing**: when the first query character is a prefix (`/`, `#`,
 //! `:`), the palette switches to file search, content search, or go-to-line
@@ -30,7 +30,6 @@ use ratatui::{
 };
 
 use crate::app::App;
-use crate::command_palette::COMMANDS;
 
 use super::util::centered_rect;
 
@@ -145,16 +144,16 @@ fn draw_command_results(
         .iter()
         .enumerate()
         .map(|(pos, &i)| {
-            let cmd = &COMMANDS[i];
+            let cmd = &picker.all_commands[i];
             let is_pinned = pos < picker.base_pinned && picker.query.is_empty();
             let prefix_str = if is_pinned { "★ " } else { "  " };
 
             let mut display_str = String::new();
-            if let Some(cat) = cmd.category {
+            if let Some(cat) = &cmd.category {
                 display_str.push_str(cat);
                 display_str.push_str(": ");
             }
-            display_str.push_str(cmd.name);
+            display_str.push_str(&cmd.name);
 
             let display_char_count = display_str.chars().count();
             let hit_positions: std::collections::HashSet<usize> = picker
@@ -218,7 +217,7 @@ fn draw_command_results(
             if let Some(reason_str) = reason {
                 name_spans.push(Span::styled(" — ".to_string(), dim));
                 name_spans.push(Span::styled(reason_str.to_string(), dim));
-            } else if let Some(desc) = cmd.description {
+            } else if let Some(desc) = &cmd.description {
                 name_spans.push(Span::styled(" — ".to_string(), dim));
                 name_spans.push(Span::styled(desc.to_string(), dim));
             }
