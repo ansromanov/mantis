@@ -1,6 +1,12 @@
 version = "0.17.3"
 date = "2026-07-11"
-whats_new = """- chore: make Windows release optional and add workflow_dispatch controls (#687)
+whats_new = """- fix: route release.yml self-hosted jobs to Linux label (#692)
+- fix: route self-hosted runners by OS label (#691)
+- fix: gate Unix-only test code and fix file_at_rev on Windows (#690)
+- fix: update config schema snapshot for keys added in #683 (#689)
+- chore: add standalone full-test-suite workflow (#688)
+- chore: release v0.17.1 [skip ci]
+- chore: make Windows release optional and add workflow_dispatch controls (#687)
 - fix: add missing help-overlay entries for toggle_file_revision and blame_open_commit (#686)
 - chore: release v0.17.0 [skip ci]
 - docs: add historical release digests (#685)
@@ -18,4 +24,4 @@ whats_new = """- chore: make Windows release optional and add workflow_dispatch 
 - test: assert json plugin listed in bundled_plugin_entries (#670)
 - ci: cap PR tests at smoke set, move full suite to release (#674)
 - chore: bump Homebrew formula to v0.16.18 [skip ci]"""
-release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.17.1"
+release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.17.3"
