@@ -84,7 +84,7 @@ jobs:
           echo "run_windows_tests=$run_windows_tests" >> "$GITHUB_OUTPUT"
 
   bump:
-    runs-on: ${{ inputs.runner == 'self-hosted' && 'self-hosted' || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.runner == 'self-hosted' && fromJSON('["self-hosted", "Linux"]') || 'ubuntu-latest' }}
     outputs:
       version: ${{ steps.version.outputs.version }}
       sha: ${{ steps.commit.outputs.sha }}
@@ -166,7 +166,7 @@ jobs:
     name: full test suite + e2e (Linux)
     needs: [bump, plan]
     if: needs.plan.outputs.run_linux_tests == 'true'
-    runs-on: ${{ inputs.runner == 'self-hosted' && 'self-hosted' || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.runner == 'self-hosted' && fromJSON('["self-hosted", "Linux"]') || 'ubuntu-latest' }}
     permissions:
       contents: read
     env:
@@ -217,7 +217,7 @@ jobs:
   bench:
     name: full benchmarks
     needs: bump
-    runs-on: ${{ inputs.runner == 'self-hosted' && 'self-hosted' || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.runner == 'self-hosted' && fromJSON('["self-hosted", "Linux"]') || 'ubuntu-latest' }}
     permissions:
       contents: read
     steps:
@@ -296,7 +296,7 @@ jobs:
       needs.build.result == 'success' &&
       (needs.test.result == 'success' || needs.test.result == 'skipped') &&
       needs.bench.result == 'success'
-    runs-on: ${{ inputs.runner == 'self-hosted' && 'self-hosted' || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.runner == 'self-hosted' && fromJSON('["self-hosted", "Linux"]') || 'ubuntu-latest' }}
     permissions:
       contents: write
     steps:
