@@ -1,4 +1,4 @@
-version = "0.16.24"
+version = "0.16.25"
 date = "2026-07-11"
 whats_new = """- fix: lower default tree width to 20%, add keyboard resize [ and ] (#665) (#666)
 - fix(plugin): enable all bundled plugins by default (#663)
