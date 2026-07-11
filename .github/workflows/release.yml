@@ -12,14 +12,79 @@ on:
           - minor
           - major
         default: none
+      release_targets:
+        description: Platforms to build and publish
+        type: choice
+        options:
+          - all
+          - mac-linux
+          - windows
+        default: all
+      test_targets:
+        description: Full test suite(s) to run before publishing (independent of release_targets)
+        type: choice
+        options:
+          - all
+          - linux
+          - windows
+          - none
+        default: all
+      runner:
+        description: Runner for the core jobs (bump/test/bench/publish); build matrix always uses GitHub-hosted OS/arch runners
+        type: choice
+        options:
+          - github-hosted
+          - self-hosted
+        default: github-hosted
 
 concurrency:
   group: main-version-writer
   cancel-in-progress: false
 
 jobs:
-  bump:
+  plan:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set.outputs.matrix }}
+      update_homebrew: ${{ steps.set.outputs.update_homebrew }}
+      run_linux_tests: ${{ steps.set.outputs.run_linux_tests }}
+      run_windows_tests: ${{ steps.set.outputs.run_windows_tests }}
+    steps:
+      - id: set
+        run: |
+          linux_x86='{"os":"ubuntu-latest","target":"x86_64-unknown-linux-musl","artifact":"mantis-linux-x86_64"}'
+          linux_arm='{"os":"ubuntu-24.04-arm","target":"aarch64-unknown-linux-musl","artifact":"mantis-linux-aarch64"}'
+          macos_arm='{"os":"macos-latest","target":"aarch64-apple-darwin","artifact":"mantis-macos-aarch64"}'
+          macos_x86='{"os":"macos-latest","target":"x86_64-apple-darwin","artifact":"mantis-macos-x86_64"}'
+          windows='{"os":"windows-latest","target":"x86_64-pc-windows-msvc","artifact":"mantis-windows-x86_64.exe"}'
+          case "${{ inputs.release_targets }}" in
+            mac-linux)
+              matrix="[$linux_x86,$linux_arm,$macos_arm,$macos_x86]"
+              update_homebrew=true
+              ;;
+            windows)
+              matrix="[$windows]"
+              update_homebrew=false
+              ;;
+            all|*)
+              matrix="[$linux_x86,$linux_arm,$macos_arm,$macos_x86,$windows]"
+              update_homebrew=true
+              ;;
+          esac
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "update_homebrew=$update_homebrew" >> "$GITHUB_OUTPUT"
+
+          case "${{ inputs.test_targets }}" in
+            linux) run_linux_tests=true;  run_windows_tests=false ;;
+            windows) run_linux_tests=false; run_windows_tests=true ;;
+            none) run_linux_tests=false; run_windows_tests=false ;;
+            all|*) run_linux_tests=true;  run_windows_tests=true ;;
+          esac
+          echo "run_linux_tests=$run_linux_tests" >> "$GITHUB_OUTPUT"
+          echo "run_windows_tests=$run_windows_tests" >> "$GITHUB_OUTPUT"
+
+  bump:
+    runs-on: ${{ inputs.runner == 'self-hosted' && 'self-hosted' || 'ubuntu-latest' }}
     outputs:
       version: ${{ steps.version.outputs.version }}
       sha: ${{ steps.commit.outputs.sha }}
@@ -99,8 +164,9 @@ jobs:
   # main.yml), so release is the single point that exercises everything.
   test:
     name: full test suite + e2e (Linux)
-    needs: bump
-    runs-on: ubuntu-latest
+    needs: [bump, plan]
+    if: needs.plan.outputs.run_linux_tests == 'true'
+    runs-on: ${{ inputs.runner == 'self-hosted' && 'self-hosted' || 'ubuntu-latest' }}
     permissions:
       contents: read
     env:
@@ -130,7 +196,9 @@ jobs:
 
   test-windows:
     name: full test suite (Windows)
-    needs: bump
+    needs: [bump, plan]
+    if: needs.plan.outputs.run_windows_tests == 'true'
+    continue-on-error: true
     runs-on: windows-latest
     permissions:
       contents: read
@@ -149,7 +217,7 @@ jobs:
   bench:
     name: full benchmarks
     needs: bump
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner == 'self-hosted' && 'self-hosted' || 'ubuntu-latest' }}
     permissions:
       contents: read
     steps:
@@ -174,27 +242,15 @@ jobs:
           path: bench-results/
 
   build:
-    needs: bump
+    needs: [bump, plan]
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-musl
-            artifact: mantis-linux-x86_64
-          - os: ubuntu-24.04-arm
-            target: aarch64-unknown-linux-musl
-            artifact: mantis-linux-aarch64
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            artifact: mantis-macos-aarch64
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            artifact: mantis-macos-x86_64
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            artifact: mantis-windows-x86_64.exe
+        include: ${{ fromJson(needs.plan.outputs.matrix) }}
     runs-on: ${{ matrix.os }}
+    # Windows binaries are best-effort: a failed Windows build never blocks the
+    # release, since it can always be rebuilt and published in a later run.
+    continue-on-error: ${{ matrix.os == 'windows-latest' }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -228,8 +284,19 @@ jobs:
           path: ${{ matrix.artifact }}
 
   publish:
-    needs: [bump, build, test, test-windows, bench]
-    runs-on: ubuntu-latest
+    needs: [bump, plan, build, test, test-windows, bench]
+    # test-windows is best-effort (continue-on-error) and may also be skipped
+    # entirely via test_targets, so its result is deliberately excluded here —
+    # Windows never blocks the release. Everything else must succeed or be
+    # explicitly skipped (test/bench are skipped only when the corresponding
+    # input opts out).
+    if: |
+      always() &&
+      needs.bump.result == 'success' &&
+      needs.build.result == 'success' &&
+      (needs.test.result == 'success' || needs.test.result == 'skipped') &&
+      needs.bench.result == 'success'
+    runs-on: ${{ inputs.runner == 'self-hosted' && 'self-hosted' || 'ubuntu-latest' }}
     permissions:
       contents: write
     steps:
@@ -262,6 +329,7 @@ jobs:
           files: artifacts/*
 
       - name: Update Homebrew formula
+        if: needs.plan.outputs.update_homebrew == 'true'
         run: |
           version="${{ needs.bump.outputs.version }}"
           sha_macos_arm=$(grep "mantis-macos-aarch64$" artifacts/SHA256SUMS | awk '{print $1}')
@@ -280,6 +348,7 @@ jobs:
           ' Formula/mantis.rb > Formula/mantis.rb.tmp && mv Formula/mantis.rb.tmp Formula/mantis.rb
 
       - name: Commit updated formula
+        if: needs.plan.outputs.update_homebrew == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
