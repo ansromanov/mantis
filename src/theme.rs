@@ -740,8 +740,10 @@ thread_local! {
 /// RAII guard returned by [`lock_no_color_test_env`]; see that function.
 /// The held write guard is never read — only kept alive so its `Drop` runs
 /// when the caller's guard goes out of scope.
-pub struct NoColorTestEnvGuard(#[allow(dead_code)] std::sync::RwLockWriteGuard<'static, ()>);
+#[cfg(test)]
+pub struct NoColorTestEnvGuard(std::sync::RwLockWriteGuard<'static, ()>);
 
+#[cfg(test)]
 impl Drop for NoColorTestEnvGuard {
     fn drop(&mut self) {
         HOLDS_NO_COLOR_TEST_WRITE_LOCK.with(|c| c.set(false));
@@ -753,6 +755,10 @@ impl Drop for NoColorTestEnvGuard {
 /// returned guard for as long as the var must keep its test-specific value,
 /// so no concurrently-running test's `no_color_active()` call observes it
 /// transiently.
+///
+/// Only callable from unit tests (`#[cfg(test)]`): the only callers are the
+/// `theme_test.rs`/`highlight_test.rs` modules compiled into this crate.
+#[cfg(test)]
 pub fn lock_no_color_test_env() -> NoColorTestEnvGuard {
     let guard = NO_COLOR_TEST_ENV_LOCK
         .write()
