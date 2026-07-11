@@ -1,6 +1,9 @@
 version = "0.17.1"
 date = "2026-07-11"
-whats_new = """- docs: add historical release digests (#685)
+whats_new = """- chore: make Windows release optional and add workflow_dispatch controls (#687)
+- fix: add missing help-overlay entries for toggle_file_revision and blame_open_commit (#686)
+- chore: release v0.17.0 [skip ci]
+- docs: add historical release digests (#685)
 - feat: view file at revision — diff ↔ snapshot toggle (#683)
 - docs: add v0.17 release digest (#684)
 - feat(git): repo-wide commit log overlay (#682)
@@ -15,4 +18,4 @@ whats_new = """- docs: add historical release digests (#685)
 - test: assert json plugin listed in bundled_plugin_entries (#670)
 - ci: cap PR tests at smoke set, move full suite to release (#674)
 - chore: bump Homebrew formula to v0.16.18 [skip ci]"""
-release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.17.0"
+release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.17.1"
