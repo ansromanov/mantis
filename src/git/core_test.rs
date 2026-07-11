@@ -296,6 +296,7 @@ fn repo_status_non_ascii_filename() {
     );
 }
 
+#[cfg(unix)]
 #[test]
 fn repo_status_filename_with_spaces() {
     let dir = tempfile::tempdir().unwrap();
@@ -416,6 +417,7 @@ fn range_status_dash_prefixed_revision_does_not_leak_as_git_flag() {
 /// for unhandled statuses would misread that path as a bogus new status
 /// entry, consuming the real next entry's status char as its own "path" and
 /// losing the real next entry entirely.
+#[cfg(unix)]
 #[test]
 fn range_status_unhandled_status_does_not_desync_following_entries() {
     let dir = tempfile::tempdir().unwrap();

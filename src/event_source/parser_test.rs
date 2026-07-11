@@ -1,4 +1,6 @@
-use super::super::{AltKeys, RawEventSource, CURRENT_ALT_KEYS};
+#[cfg(unix)]
+use super::super::RawEventSource;
+use super::super::{AltKeys, CURRENT_ALT_KEYS};
 use super::*;
 use crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers};
 
@@ -393,6 +395,7 @@ fn utf8_incomplete_four_byte_returns_none() {
     }
 }
 
+#[cfg(unix)]
 #[test]
 fn utf8_paste_split_across_fill_boundary() {
     // Simulate the lead byte and continuation byte of 'é' (0xC3 0xA9)

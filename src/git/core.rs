@@ -637,6 +637,7 @@ pub fn tags(dir: &Path) -> Vec<String> {
 /// revision, the path is not relative to the repo root, or git is unavailable.
 pub fn file_at_rev(repo_dir: &Path, rev: &str, file: &Path) -> Option<Vec<u8>> {
     let root = git_toplevel(repo_dir)?;
+    let file = file.canonicalize().ok()?;
     let rel = file.strip_prefix(&root).ok()?;
     let rel_str = rel.to_str()?;
     let spec = format!("{rev}:{rel_str}");
