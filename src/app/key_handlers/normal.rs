@@ -379,10 +379,10 @@ impl App {
                     "markdown render toggle: not available (markdown plugin not active)",
                 );
             } else {
-                let is_markdown = self.current_file.as_ref().is_some_and(|path| {
-                    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-                    matches!(ext, "md" | "markdown")
-                });
+                let is_markdown = self
+                    .current_file
+                    .as_ref()
+                    .is_some_and(|path| crate::file::is_markdown_path(path));
                 if is_markdown {
                     self.show_raw_markdown = !self.show_raw_markdown;
                     if let Some(path) = self.current_file.clone() {
@@ -394,16 +394,7 @@ impl App {
                             self.reload_content();
                         } else {
                             self.reload_content();
-                            self.plugin_manager.on_file_open(&path);
                         }
-                    }
-                    let key_str = crate::plugin::key_event_to_string(&key);
-                    if key_str != "M" {
-                        let m_key = crossterm::event::KeyEvent::new(
-                            crossterm::event::KeyCode::Char('M'),
-                            crossterm::event::KeyModifiers::SHIFT,
-                        );
-                        self.plugin_manager.on_keypress(&m_key);
                     }
                 } else {
                     self.set_status("markdown render toggle: not available (not a markdown file)");

@@ -416,10 +416,7 @@ impl App {
             self.plugin_content_active = false;
             self.set_file_watch(Some(path));
             if !self.plugin_is_opening_file {
-                let is_markdown = {
-                    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-                    matches!(ext, "md" | "markdown")
-                };
+                let is_markdown = crate::file::is_markdown_path(path);
                 if !(is_markdown && self.show_raw_markdown) {
                     self.plugin_manager.on_file_open(path);
                 }

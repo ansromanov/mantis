@@ -43,7 +43,7 @@ pub(crate) struct Plugin {
     subscribed_events: Vec<String>,
     child: Option<Child>,
     /// Sends serialised JSON lines to the plugin's stdin via the writer thread.
-    write_tx: Option<std::sync::mpsc::SyncSender<String>>,
+    pub(crate) write_tx: Option<std::sync::mpsc::SyncSender<String>>,
     action_rx: Option<std::sync::mpsc::Receiver<(String, serde_json::Value)>>,
     /// Receives `response` messages (protocol 3+), keyed by the `id` the host
     /// chose when sending the matching `request`. Separate from `action_rx`

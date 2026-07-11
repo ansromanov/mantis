@@ -112,3 +112,11 @@ fn build_binary_placeholder_content_works() {
     assert_eq!(content_no_path.len(), 1);
     assert_eq!(content_no_path[0], "[binary file — PNG image, 8 B]");
 }
+
+#[test]
+fn is_markdown_path_works() {
+    assert!(is_markdown_path(Path::new("test.md")));
+    assert!(is_markdown_path(Path::new("test.markdown")));
+    assert!(!is_markdown_path(Path::new("test.txt")));
+    assert!(!is_markdown_path(Path::new("test")));
+}
