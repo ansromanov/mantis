@@ -193,7 +193,9 @@ pub(crate) fn draw_bug_report(f: &mut Frame, app: &mut App, area: Rect) {
     } else {
         format!(
             "## {}\n\n## bug report body\n\n{}\n\n{}",
-            state.title, body_text, state.diagnostics_markdown
+            state.resolved_title(),
+            body_text,
+            state.diagnostics_markdown
         )
     };
     let preview_lines_all: Vec<String> = report_md.lines().map(String::from).collect();
@@ -283,7 +285,7 @@ pub(crate) fn draw_bug_report(f: &mut Frame, app: &mut App, area: Rect) {
             ),
             Span::styled("Cancel  ", Style::default().fg(theme.dim)),
             Span::styled(
-                "PgUp / PgDown: ",
+                "PgUp / PgDown / Mouse Wheel: ",
                 Style::default()
                     .fg(theme.accent)
                     .add_modifier(Modifier::BOLD),

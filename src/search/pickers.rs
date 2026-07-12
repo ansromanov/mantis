@@ -811,6 +811,17 @@ impl BugReportState {
         }
     }
 
+    /// The title to use when submitting or previewing the report: the trimmed
+    /// user-entered title, or "App Bug Report" when it is missing/blank.
+    pub fn resolved_title(&self) -> &str {
+        let trimmed = self.title.trim();
+        if trimmed.is_empty() {
+            "App Bug Report"
+        } else {
+            trimmed
+        }
+    }
+
     pub fn toggle_focus(&mut self) {
         self.focus = match self.focus {
             BugReportFocus::Title => BugReportFocus::Description,

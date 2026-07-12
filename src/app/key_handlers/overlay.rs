@@ -797,7 +797,9 @@ impl App {
                     } else {
                         format!(
                             "## {}\n\n## bug report body\n\n{}\n\n{}",
-                            state.title, body_text, state.diagnostics_markdown
+                            state.resolved_title(),
+                            body_text,
+                            state.diagnostics_markdown
                         )
                     };
                     let lines_count = report_md.lines().count();
