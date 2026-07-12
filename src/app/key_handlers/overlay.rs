@@ -615,11 +615,26 @@ impl App {
     /// Handles keyboard input while the revision picker is open.
     /// Uses the shared list-picker dispatcher for navigation, plus Enter to
     /// select (falling back to the typed query as a raw revspec when the
-    /// filtered list is empty) and Esc to close.
+    /// filtered list is empty) and Esc to close. Left/Right arrows switch
+    /// between tabs when the query is empty.
     pub(super) fn handle_revision_key(&mut self, key: KeyEvent) {
         let Some(ref mut p) = self.revision_picker else {
             return;
         };
+        // Left/Right switch tabs when the query is empty.
+        if p.query.is_empty() {
+            match key.code {
+                KeyCode::Left => {
+                    p.prev_tab();
+                    return;
+                }
+                KeyCode::Right => {
+                    p.next_tab();
+                    return;
+                }
+                _ => {}
+            }
+        }
         match handle_list_picker_key(p, &key) {
             OverlayKey::Activate => {
                 let rev = if p.results_len() > 0 && p.selected < p.results_len() {

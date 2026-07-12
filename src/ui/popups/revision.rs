@@ -43,10 +43,38 @@ pub(crate) fn draw_revision_picker(f: &mut Frame, app: &mut App, area: Rect) {
         .constraints([
             Constraint::Length(1),
             Constraint::Length(1),
+            Constraint::Length(1),
             Constraint::Min(0),
         ])
         .split(inner);
 
+    // Tab bar: < Commits > / < Tags > / < Branches >
+    f.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::styled(
+                "<",
+                Style::default()
+                    .fg(theme.accent)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                format!(" {} ", picker.tab.label()),
+                Style::default()
+                    .fg(theme.accent_alt)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                ">",
+                Style::default()
+                    .fg(theme.accent)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]))
+        .alignment(ratatui::layout::Alignment::Center),
+        parts[0],
+    );
+
+    // Query bar.
     f.render_widget(
         Paragraph::new(Line::from(vec![
             Span::styled(
@@ -58,14 +86,16 @@ pub(crate) fn draw_revision_picker(f: &mut Frame, app: &mut App, area: Rect) {
             Span::raw(picker.query.as_str()),
             Span::styled("█", Style::default().fg(theme.accent_alt)),
         ])),
-        parts[0],
-    );
-
-    f.render_widget(
-        Paragraph::new("─".repeat(inner.width as usize)).style(Style::default().fg(theme.dim)),
         parts[1],
     );
 
+    // Separator.
+    f.render_widget(
+        Paragraph::new("─".repeat(inner.width as usize)).style(Style::default().fg(theme.dim)),
+        parts[2],
+    );
+
+    // Filtered items list.
     let items: Vec<ListItem> = picker
         .filtered
         .iter()
@@ -81,9 +111,9 @@ pub(crate) fn draw_revision_picker(f: &mut Frame, app: &mut App, area: Rect) {
         state.select(Some(picker.selected));
     }
 
-    f.render_stateful_widget(list, parts[2], &mut state);
+    f.render_stateful_widget(list, parts[3], &mut state);
 
-    app.revision_picker_area = parts[2];
+    app.revision_picker_area = parts[3];
     app.revision_picker_offset = state.offset();
 }
 

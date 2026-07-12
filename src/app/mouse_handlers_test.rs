@@ -1151,16 +1151,12 @@ fn revision_picker_click_outside_closes() {
 fn revision_picker_double_click_selects_revision_and_enters_compare_mode() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.revision_picker = Some(crate::search::RevisionPicker {
-        items: vec![crate::search::RevisionItem {
+    app.revision_picker = Some(crate::search::RevisionPicker::for_test(vec![
+        crate::search::RevisionItem {
             rev: "HEAD".into(),
             display: "HEAD (current)".into(),
-        }],
-        query: String::new(),
-        filtered: vec![0],
-        selected: 0,
-        matcher: fuzzy_matcher::skim::SkimMatcherV2::default(),
-    });
+        },
+    ]));
     app.revision_picker_area = Rect {
         x: 10,
         y: 10,
@@ -1170,7 +1166,7 @@ fn revision_picker_double_click_selects_revision_and_enters_compare_mode() {
     // First click: select the item.
     app.handle_mouse(left_down_at(15, 10));
     assert!(app.revision_picker.is_some(), "first click must not close");
-    // Second click (same row within 400 ms): double-click → activate.
+    // Second click (same row within 400 ms): double-click -> activate.
     app.handle_mouse(left_down_at(15, 10));
     assert!(
         app.revision_picker.is_none(),
@@ -1188,16 +1184,13 @@ fn revision_picker_double_click_selects_revision_and_enters_compare_mode() {
 fn revision_picker_double_click_with_empty_filtered_list_uses_typed_query() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.revision_picker = Some(crate::search::RevisionPicker {
-        items: vec![crate::search::RevisionItem {
-            rev: "main".into(),
-            display: "branch: main".into(),
-        }],
-        query: String::from("HEAD~3"),
-        filtered: vec![],
-        selected: 0,
-        matcher: fuzzy_matcher::skim::SkimMatcherV2::default(),
-    });
+    let mut picker = crate::search::RevisionPicker::for_test(vec![crate::search::RevisionItem {
+        rev: "main".into(),
+        display: "branch: main".into(),
+    }]);
+    picker.query = "HEAD~3".to_string();
+    picker.filtered = vec![];
+    app.revision_picker = Some(picker);
     app.revision_picker_area = Rect {
         x: 10,
         y: 10,
@@ -1217,22 +1210,16 @@ fn revision_picker_double_click_with_empty_filtered_list_uses_typed_query() {
 fn revision_picker_scroll_down_navigates() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.revision_picker = Some(crate::search::RevisionPicker {
-        items: vec![
-            crate::search::RevisionItem {
-                rev: "HEAD".into(),
-                display: "HEAD (current)".into(),
-            },
-            crate::search::RevisionItem {
-                rev: "main".into(),
-                display: "branch: main".into(),
-            },
-        ],
-        query: String::new(),
-        filtered: vec![0, 1],
-        selected: 0,
-        matcher: fuzzy_matcher::skim::SkimMatcherV2::default(),
-    });
+    app.revision_picker = Some(crate::search::RevisionPicker::for_test(vec![
+        crate::search::RevisionItem {
+            rev: "HEAD".into(),
+            display: "HEAD (current)".into(),
+        },
+        crate::search::RevisionItem {
+            rev: "main".into(),
+            display: "branch: main".into(),
+        },
+    ]));
     app.revision_picker_area = Rect {
         x: 10,
         y: 10,
@@ -1252,22 +1239,17 @@ fn revision_picker_scroll_down_navigates() {
 fn revision_picker_scroll_up_navigates() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.revision_picker = Some(crate::search::RevisionPicker {
-        items: vec![
-            crate::search::RevisionItem {
-                rev: "HEAD".into(),
-                display: "HEAD (current)".into(),
-            },
-            crate::search::RevisionItem {
-                rev: "main".into(),
-                display: "branch: main".into(),
-            },
-        ],
-        query: String::new(),
-        filtered: vec![0, 1],
-        selected: 1,
-        matcher: fuzzy_matcher::skim::SkimMatcherV2::default(),
-    });
+    app.revision_picker = Some(crate::search::RevisionPicker::for_test(vec![
+        crate::search::RevisionItem {
+            rev: "HEAD".into(),
+            display: "HEAD (current)".into(),
+        },
+        crate::search::RevisionItem {
+            rev: "main".into(),
+            display: "branch: main".into(),
+        },
+    ]));
+    app.revision_picker.as_mut().unwrap().selected = 1;
     app.revision_picker_area = Rect {
         x: 10,
         y: 10,

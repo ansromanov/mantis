@@ -23,7 +23,7 @@ pub use repo_log::RepoLogState;
 #[allow(unused_imports)]
 pub use pickers::{
     BugReportState, GotoLineState, InFileMatch, InFileSearch, PluginPicker, RecentFilesState,
-    RevisionItem, RevisionPicker, ThemePicker, TreeFilter,
+    RevisionItem, RevisionPicker, RevisionTab, ThemePicker, TreeFilter,
 };
 
 use std::collections::{HashMap, HashSet};
