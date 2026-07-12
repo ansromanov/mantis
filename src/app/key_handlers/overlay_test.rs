@@ -184,13 +184,7 @@ fn handle_revision_key_enter_with_empty_query_and_empty_items_closes_without_ent
     let root = temp_tree();
     let mut app = app_for(&root);
     // A picker with no items and empty query: nothing to select and nothing typed.
-    app.revision_picker = Some(RevisionPicker {
-        items: vec![],
-        query: String::new(),
-        filtered: vec![],
-        selected: 0,
-        matcher: fuzzy_matcher::skim::SkimMatcherV2::default(),
-    });
+    app.revision_picker = Some(RevisionPicker::for_test(vec![]));
     app.handle_revision_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
     assert!(app.revision_picker.is_none());
     assert!(
@@ -217,16 +211,10 @@ fn handle_revision_key_enter_with_selection_enters_compare_mode() {
     let root = temp_tree();
     let mut app = app_for(&root);
     // Build a picker with a known item, bypassing git shell-out.
-    app.revision_picker = Some(RevisionPicker {
-        items: vec![RevisionItem {
-            rev: "HEAD".into(),
-            display: "HEAD (current)".into(),
-        }],
-        query: String::new(),
-        filtered: vec![0],
-        selected: 0,
-        matcher: fuzzy_matcher::skim::SkimMatcherV2::default(),
-    });
+    app.revision_picker = Some(RevisionPicker::for_test(vec![RevisionItem {
+        rev: "HEAD".into(),
+        display: "HEAD (current)".into(),
+    }]));
     app.handle_revision_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
     assert!(app.revision_picker.is_none());
     assert_eq!(app.compare_base.as_deref(), Some("HEAD"));
@@ -238,16 +226,14 @@ fn handle_revision_key_enter_with_selection_enters_compare_mode() {
 fn handle_revision_key_enter_with_empty_filtered_list_uses_typed_query() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.revision_picker = Some(RevisionPicker {
-        items: vec![RevisionItem {
-            rev: "main".into(),
-            display: "branch: main".into(),
-        }],
-        query: String::from("HEAD~3"),
-        filtered: vec![],
-        selected: 0,
-        matcher: fuzzy_matcher::skim::SkimMatcherV2::default(),
-    });
+    let mut picker = RevisionPicker::for_test(vec![RevisionItem {
+        rev: "main".into(),
+        display: "branch: main".into(),
+    }]);
+    picker.query = "HEAD~3".to_string();
+    // Manually clear filtered since refilter from for_test would match.
+    picker.filtered = vec![];
+    app.revision_picker = Some(picker);
     app.handle_revision_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
     assert!(app.revision_picker.is_none());
     assert_eq!(
@@ -262,24 +248,67 @@ fn handle_revision_key_enter_with_empty_filtered_list_uses_typed_query() {
 fn handle_revision_key_down_navigates_list() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.revision_picker = Some(RevisionPicker {
-        items: vec![
-            RevisionItem {
-                rev: "HEAD".into(),
-                display: "HEAD (current)".into(),
-            },
-            RevisionItem {
-                rev: "main".into(),
-                display: "branch: main".into(),
-            },
-        ],
-        query: String::new(),
-        filtered: vec![0, 1],
-        selected: 0,
-        matcher: fuzzy_matcher::skim::SkimMatcherV2::default(),
-    });
+    app.revision_picker = Some(RevisionPicker::for_test(vec![
+        RevisionItem {
+            rev: "HEAD".into(),
+            display: "HEAD (current)".into(),
+        },
+        RevisionItem {
+            rev: "main".into(),
+            display: "branch: main".into(),
+        },
+    ]));
     app.handle_revision_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
     assert_eq!(app.revision_picker.as_ref().unwrap().selected, 1);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn handle_revision_key_left_right_switches_tabs_when_query_empty() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let mut picker = RevisionPicker::for_test(vec![]);
+    // Populate lists so rebuild_items behaves correctly on tab switch.
+    picker.shortcuts = vec![RevisionItem {
+        rev: "HEAD".into(),
+        display: "HEAD (current)".into(),
+    }];
+    picker.commits = vec![RevisionItem {
+        rev: "abc1234".into(),
+        display: "abc1234 Fix".into(),
+    }];
+    picker.tags = vec![RevisionItem {
+        rev: "v1.0".into(),
+        display: "v1.0".into(),
+    }];
+    picker.rebuild_items(); // starts in Commits tab
+
+    app.revision_picker = Some(picker);
+
+    // Press Right -> switches to Tags
+    app.handle_revision_key(KeyEvent::new(KeyCode::Right, KeyModifiers::empty()));
+    assert_eq!(
+        app.revision_picker.as_ref().unwrap().tab,
+        crate::search::RevisionTab::Tags
+    );
+
+    // Press Left -> switches back to Commits
+    app.handle_revision_key(KeyEvent::new(KeyCode::Left, KeyModifiers::empty()));
+    assert_eq!(
+        app.revision_picker.as_ref().unwrap().tab,
+        crate::search::RevisionTab::Commits
+    );
+
+    // Let's type something so query is NOT empty
+    app.revision_picker.as_mut().unwrap().query = "abc".to_string();
+
+    // Press Right -> should NOT switch tab because query is not empty
+    app.handle_revision_key(KeyEvent::new(KeyCode::Right, KeyModifiers::empty()));
+    assert_eq!(
+        app.revision_picker.as_ref().unwrap().tab,
+        crate::search::RevisionTab::Commits
+    );
+
     fs::remove_dir_all(&root).ok();
 }
 

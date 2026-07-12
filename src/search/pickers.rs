@@ -190,19 +190,52 @@ pub struct RevisionItem {
     pub display: String,
 }
 
+/// Tab categories for the revision picker.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RevisionTab {
+    Commits,
+    Tags,
+    Branches,
+}
+
+impl RevisionTab {
+    /// The display label for this tab.
+    pub fn label(self) -> &'static str {
+        match self {
+            RevisionTab::Commits => "Commits",
+            RevisionTab::Tags => "Tags",
+            RevisionTab::Branches => "Branches",
+        }
+    }
+
+    /// All tabs in display order.
+    pub const ALL: [RevisionTab; 3] = [
+        RevisionTab::Commits,
+        RevisionTab::Tags,
+        RevisionTab::Branches,
+    ];
+}
+
 /// State for the revision picker overlay.
 ///
-/// Replaces the old blind-input bar for `compare_against` with a selectable
-/// list of revisions: recent commits, local branches, tags, and shortcuts
-/// like `HEAD` / `HEAD~1` / `HEAD~2`. Supports fuzzy filtering and retains
-/// free-form entry — if the filtered list is empty but the user has typed
-/// something, pressing Enter uses the typed text as a raw revspec.
+/// Presents selectable revisions in tabbed categories: Commits (default),
+/// Tags, and Branches. Supports fuzzy filtering within the active tab and
+/// retains free-form entry — if the filtered list is empty but the user has
+/// typed something, pressing Enter uses the typed text as a raw revspec.
+/// Left/Right arrows switch tabs when the query is empty.
 pub struct RevisionPicker {
     pub items: Vec<RevisionItem>,
     pub query: String,
     pub filtered: Vec<usize>,
     pub selected: usize,
     pub(crate) matcher: SkimMatcherV2,
+    /// The currently active tab.
+    pub tab: RevisionTab,
+    /// Items separated by category.
+    pub(crate) shortcuts: Vec<RevisionItem>,
+    pub(crate) commits: Vec<RevisionItem>,
+    pub(crate) tags: Vec<RevisionItem>,
+    pub(crate) branches: Vec<RevisionItem>,
 }
 
 impl RevisionPicker {
@@ -210,54 +243,91 @@ impl RevisionPicker {
     /// or the directory is not a repo, items is empty (the picker still allows
     /// free-form entry).
     pub fn new(repo_dir: &std::path::Path) -> Self {
-        let mut items: Vec<RevisionItem> = Vec::new();
+        let shortcuts = vec![
+            RevisionItem {
+                rev: "HEAD".into(),
+                display: "HEAD (current)".into(),
+            },
+            RevisionItem {
+                rev: "HEAD~1".into(),
+                display: "HEAD~1 (parent)".into(),
+            },
+            RevisionItem {
+                rev: "HEAD~2".into(),
+                display: "HEAD~2 (grandparent)".into(),
+            },
+        ];
 
-        // Static shortcuts.
-        items.push(RevisionItem {
-            rev: "HEAD".into(),
-            display: "HEAD (current)".into(),
-        });
-        items.push(RevisionItem {
-            rev: "HEAD~1".into(),
-            display: "HEAD~1 (parent)".into(),
-        });
-        items.push(RevisionItem {
-            rev: "HEAD~2".into(),
-            display: "HEAD~2 (grandparent)".into(),
-        });
-
-        // Local branches.
-        for branch in crate::git::branches(repo_dir) {
-            items.push(RevisionItem {
-                rev: branch.clone(),
-                display: format!("branch: {branch}"),
-            });
-        }
-
-        // Tags.
-        for tag in crate::git::tags(repo_dir) {
-            items.push(RevisionItem {
-                rev: tag.clone(),
-                display: format!("tag: {tag}"),
-            });
-        }
-
-        // Recent commits.
+        let mut commits = Vec::new();
         for commit in crate::git::recent_commits(repo_dir, 50) {
-            items.push(RevisionItem {
+            commits.push(RevisionItem {
                 rev: commit.hash,
                 display: format!("{} {}", commit.short, commit.subject),
             });
         }
 
-        let filtered: Vec<usize> = (0..items.len()).collect();
-        RevisionPicker {
-            items,
+        let mut tags = Vec::new();
+        for tag in crate::git::tags(repo_dir) {
+            tags.push(RevisionItem {
+                rev: tag.clone(),
+                display: tag,
+            });
+        }
+
+        let mut branches = Vec::new();
+        for branch in crate::git::branches(repo_dir) {
+            branches.push(RevisionItem {
+                rev: branch.clone(),
+                display: branch,
+            });
+        }
+
+        let mut picker = RevisionPicker {
+            items: Vec::new(),
             query: String::new(),
-            filtered,
+            filtered: Vec::new(),
             selected: 0,
             matcher: SkimMatcherV2::default(),
+            tab: RevisionTab::Commits,
+            shortcuts,
+            commits,
+            tags,
+            branches,
+        };
+        picker.rebuild_items();
+        picker
+    }
+
+    /// Rebuilds `items` and `filtered` from the current tab's category lists
+    /// plus shortcuts, then re-applies the active query filter.
+    pub(crate) fn rebuild_items(&mut self) {
+        self.items = self.shortcuts.clone();
+        match self.tab {
+            RevisionTab::Commits => self.items.extend(self.commits.clone()),
+            RevisionTab::Tags => self.items.extend(self.tags.clone()),
+            RevisionTab::Branches => self.items.extend(self.branches.clone()),
         }
+        self.refilter();
+    }
+
+    /// Switches to the next tab (wrapping) and rebuilds the items list.
+    pub fn next_tab(&mut self) {
+        let idx = RevisionTab::ALL
+            .iter()
+            .position(|&t| t == self.tab)
+            .unwrap_or(0);
+        self.tab = RevisionTab::ALL[(idx + 1) % RevisionTab::ALL.len()];
+        self.rebuild_items();
+    }
+
+    /// Switches to the previous tab (wrapping) and rebuilds the items list.
+    pub fn prev_tab(&mut self) {
+        let idx = RevisionTab::ALL
+            .iter()
+            .position(|&t| t == self.tab)
+            .unwrap_or(0);
+        self.tab = RevisionTab::ALL[(idx + RevisionTab::ALL.len() - 1) % RevisionTab::ALL.len()];
+        self.rebuild_items();
     }
 
     pub fn push(&mut self, c: char) {
@@ -314,6 +384,28 @@ impl ListPicker for RevisionPicker {
     }
     fn set_selected(&mut self, i: usize) {
         self.selected = i;
+    }
+}
+
+#[cfg(test)]
+impl RevisionPicker {
+    /// Creates a picker from a flat list of items for testing purposes.
+    /// Items are treated as the commits category; shortcuts/tags/branches
+    /// are left empty.
+    pub(crate) fn for_test(items: Vec<RevisionItem>) -> Self {
+        let filtered: Vec<usize> = (0..items.len()).collect();
+        RevisionPicker {
+            items,
+            query: String::new(),
+            filtered,
+            selected: 0,
+            matcher: SkimMatcherV2::default(),
+            tab: RevisionTab::Commits,
+            shortcuts: Vec::new(),
+            commits: Vec::new(),
+            tags: Vec::new(),
+            branches: Vec::new(),
+        }
     }
 }
 

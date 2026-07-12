@@ -98,9 +98,11 @@ git_show_deleted = false # show ghost nodes for deleted tracked files (default: 
 
 To review changes against something other than the working tree's usual
 baseline, open the command palette and run **Compare against a revision**.
-A picker overlay opens listing shortcuts (`HEAD`, `HEAD~1`, `HEAD~2`),
-local branches, tags, and recent commits. Start typing to fuzzy-filter the
-list, or enter any revision (a commit hash, tag, branch name, or something
+A picker overlay opens with three tabs — **Commits** (default), **Tags**,
+and **Branches** — switchable with the Left/Right arrow keys. Each tab
+shows only items of that category, plus HEAD shortcuts (`HEAD`, `HEAD~1`,
+`HEAD~2`) that appear in all tabs. Start typing to fuzzy-filter the list,
+or enter any revision (a commit hash, tag, branch name, or something
 like `HEAD~3`) freely — press `Enter` to select the highlighted item, or
 when no items match, the typed text is used as a raw revspec. `mantis`
 switches into git mode: the tree shows only files changed between that

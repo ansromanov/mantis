@@ -370,46 +370,33 @@ fn goto_line_state_default_is_empty() {
 fn revision_picker_new_with_nonexistent_repo_has_shortcuts_only() {
     let p = RevisionPicker::new(std::path::Path::new("/nonexistent"));
     assert_eq!(p.query, "");
-    assert!(p.filtered.len() <= p.items.len());
-    // Shortcuts should still be present (they don't need git).
     assert!(
-        p.items.iter().any(|i| i.rev == "HEAD"),
+        p.shortcuts.iter().any(|i| i.rev == "HEAD"),
         "HEAD shortcut must always be present"
     );
     assert!(
-        p.items.iter().any(|i| i.rev == "HEAD~1"),
+        p.shortcuts.iter().any(|i| i.rev == "HEAD~1"),
         "HEAD~1 shortcut must always be present"
     );
 }
 
 #[test]
 fn revision_picker_push_appends() {
-    let mut p = RevisionPicker {
-        items: vec![RevisionItem {
-            rev: "HEAD".into(),
-            display: "HEAD (current)".into(),
-        }],
-        query: String::new(),
-        filtered: vec![0],
-        selected: 0,
-        matcher: fuzzy_matcher::skim::SkimMatcherV2::default(),
-    };
+    let mut p = RevisionPicker::for_test(vec![RevisionItem {
+        rev: "HEAD".into(),
+        display: "HEAD (current)".into(),
+    }]);
     p.push('H');
     assert_eq!(p.query, "H");
 }
 
 #[test]
 fn revision_picker_pop_removes() {
-    let mut p = RevisionPicker {
-        items: vec![RevisionItem {
-            rev: "HEAD".into(),
-            display: "HEAD (current)".into(),
-        }],
-        query: String::from("HE"),
-        filtered: vec![0],
-        selected: 0,
-        matcher: fuzzy_matcher::skim::SkimMatcherV2::default(),
-    };
+    let mut p = RevisionPicker::for_test(vec![RevisionItem {
+        rev: "HEAD".into(),
+        display: "HEAD (current)".into(),
+    }]);
+    p.query = "HE".to_string();
     p.pop();
     assert_eq!(p.query, "H");
     p.pop();
@@ -418,22 +405,16 @@ fn revision_picker_pop_removes() {
 
 #[test]
 fn revision_picker_selected_rev_returns_correct_rev() {
-    let mut p = RevisionPicker {
-        items: vec![
-            RevisionItem {
-                rev: "HEAD".into(),
-                display: "HEAD (current)".into(),
-            },
-            RevisionItem {
-                rev: "abc1234".into(),
-                display: "abc1234 fix".into(),
-            },
-        ],
-        query: String::new(),
-        filtered: vec![0, 1],
-        selected: 0,
-        matcher: fuzzy_matcher::skim::SkimMatcherV2::default(),
-    };
+    let mut p = RevisionPicker::for_test(vec![
+        RevisionItem {
+            rev: "HEAD".into(),
+            display: "HEAD (current)".into(),
+        },
+        RevisionItem {
+            rev: "abc1234".into(),
+            display: "abc1234 fix".into(),
+        },
+    ]);
     assert_eq!(p.selected_rev(), Some("HEAD"));
     p.selected = 1;
     assert_eq!(p.selected_rev(), Some("abc1234"));
@@ -441,49 +422,112 @@ fn revision_picker_selected_rev_returns_correct_rev() {
 
 #[test]
 fn revision_picker_list_picker_query_methods_delegate() {
-    let mut p = RevisionPicker {
-        items: vec![RevisionItem {
-            rev: "HEAD".into(),
-            display: "HEAD (current)".into(),
-        }],
-        query: String::new(),
-        filtered: vec![0],
-        selected: 0,
-        matcher: fuzzy_matcher::skim::SkimMatcherV2::default(),
-    };
+    let mut p = RevisionPicker::for_test(vec![RevisionItem {
+        rev: "HEAD".into(),
+        display: "HEAD (current)".into(),
+    }]);
     assert!(ListPicker::query_is_empty(&p));
     ListPicker::query_push(&mut p, 'x');
     assert_eq!(p.query, "x");
     assert!(!ListPicker::query_is_empty(&p));
     ListPicker::query_pop(&mut p);
-    assert!(p.query.is_empty());
+    assert!(ListPicker::query_is_empty(&p));
 }
 
 #[test]
 fn revision_picker_refilter_filters_by_display_text() {
-    let mut p = RevisionPicker {
-        items: vec![
-            RevisionItem {
-                rev: "HEAD".into(),
-                display: "HEAD (current)".into(),
-            },
-            RevisionItem {
-                rev: "main".into(),
-                display: "branch: main".into(),
-            },
-            RevisionItem {
-                rev: "abc1234".into(),
-                display: "abc1234 fix bug".into(),
-            },
-        ],
-        query: String::from("main"),
-        filtered: vec![],
-        selected: 0,
-        matcher: fuzzy_matcher::skim::SkimMatcherV2::default(),
-    };
+    let mut p = RevisionPicker::for_test(vec![
+        RevisionItem {
+            rev: "HEAD".into(),
+            display: "HEAD (current)".into(),
+        },
+        RevisionItem {
+            rev: "main".into(),
+            display: "branch: main".into(),
+        },
+        RevisionItem {
+            rev: "abc1234".into(),
+            display: "abc1234 fix bug".into(),
+        },
+    ]);
+    p.query = "main".to_string();
     p.refilter();
     assert_eq!(p.results_len(), 1);
     assert_eq!(p.selected_rev(), Some("main"));
+}
+
+#[test]
+fn revision_picker_next_tab_cycles_through_tabs() {
+    let mut p = RevisionPicker::for_test(vec![]);
+    assert_eq!(p.tab, RevisionTab::Commits);
+    p.next_tab();
+    assert_eq!(p.tab, RevisionTab::Tags);
+    p.next_tab();
+    assert_eq!(p.tab, RevisionTab::Branches);
+    p.next_tab();
+    assert_eq!(p.tab, RevisionTab::Commits);
+}
+
+#[test]
+fn revision_picker_prev_tab_cycles_in_reverse() {
+    let mut p = RevisionPicker::for_test(vec![]);
+    assert_eq!(p.tab, RevisionTab::Commits);
+    p.prev_tab();
+    assert_eq!(p.tab, RevisionTab::Branches);
+    p.prev_tab();
+    assert_eq!(p.tab, RevisionTab::Tags);
+    p.prev_tab();
+    assert_eq!(p.tab, RevisionTab::Commits);
+}
+
+#[test]
+fn revision_picker_tab_label() {
+    assert_eq!(RevisionTab::Commits.label(), "Commits");
+    assert_eq!(RevisionTab::Tags.label(), "Tags");
+    assert_eq!(RevisionTab::Branches.label(), "Branches");
+}
+
+#[test]
+fn revision_picker_switch_tab_rebuilds_items() {
+    let mut p = RevisionPicker {
+        items: Vec::new(),
+        query: String::new(),
+        filtered: Vec::new(),
+        selected: 0,
+        matcher: SkimMatcherV2::default(),
+        tab: RevisionTab::Commits,
+        shortcuts: vec![RevisionItem {
+            rev: "HEAD".into(),
+            display: "HEAD (current)".into(),
+        }],
+        commits: vec![RevisionItem {
+            rev: "abc1234".into(),
+            display: "abc1234 fix".into(),
+        }],
+        tags: vec![RevisionItem {
+            rev: "v1.0".into(),
+            display: "v1.0".into(),
+        }],
+        branches: vec![RevisionItem {
+            rev: "main".into(),
+            display: "main".into(),
+        }],
+    };
+    p.rebuild_items();
+    // Commits tab: shortcuts + commits
+    assert_eq!(p.items.len(), 2);
+    assert_eq!(p.items[0].rev, "HEAD");
+    assert_eq!(p.items[1].rev, "abc1234");
+
+    p.next_tab(); // Tags
+    assert_eq!(p.items.len(), 2);
+    assert_eq!(p.items[0].rev, "HEAD");
+    assert_eq!(p.items[1].rev, "v1.0");
+
+    p.next_tab(); // Branches
+    assert_eq!(p.items.len(), 2);
+    assert_eq!(p.items[0].rev, "HEAD");
+    assert_eq!(p.items[1].rev, "main");
 }
 
 // -- TreeFilter --------------------------------------------------------------
@@ -751,10 +795,10 @@ fn bug_report_state_custom_diagnostics() {
 #[test]
 fn bug_report_state_total_visual_rows() {
     let mut state = BugReportState::default();
-    // Single empty line → 1 visual row
+    // Single empty line -> 1 visual row
     assert_eq!(state.total_visual_rows(10), 1);
 
-    // Short line → 1 visual row
+    // Short line -> 1 visual row
     state.insert_char('a');
     state.insert_char('b');
     assert_eq!(state.total_visual_rows(10), 1);
@@ -780,12 +824,12 @@ fn bug_report_state_total_visual_rows() {
 
     // Multiple lines with wrapping
     let mut state = BugReportState::default();
-    // line 0: 25 chars → 3 visual rows at width=10
+    // line 0: 25 chars -> 3 visual rows at width=10
     for _ in 0..25 {
         state.insert_char('a');
     }
     state.insert_newline();
-    // line 1: 3 chars → 1 visual row
+    // line 1: 3 chars -> 1 visual row
     state.insert_char('b');
     state.insert_char('c');
     state.insert_char('d');
@@ -797,7 +841,7 @@ fn bug_report_state_cursor_visual_row_single_short_line() {
     let mut state = BugReportState::default();
     state.insert_char('H');
     state.insert_char('i');
-    // cursor_col=2, single line with 2 chars, width=10 → 1 visual row
+    // cursor_col=2, single line with 2 chars, width=10 -> 1 visual row
     assert_eq!(state.cursor_visual_row(10), 0);
 }
 
@@ -808,14 +852,14 @@ fn bug_report_state_cursor_visual_row_wrapped_line() {
     for _ in 0..15 {
         state.insert_char('x');
     }
-    // cursor_col=15, width=10 → visual row = 0 + 15/10 = 1
+    // cursor_col=15, width=10 -> visual row = 0 + 15/10 = 1
     assert_eq!(state.cursor_visual_row(10), 1);
 
-    // cursor_col=9 → visual row = 0 + 9/10 = 0
+    // cursor_col=9 -> visual row = 0 + 9/10 = 0
     state.cursor_col = 9;
     assert_eq!(state.cursor_visual_row(10), 0);
 
-    // cursor_col=10 → visual row = 0 + 10/10 = 1
+    // cursor_col=10 -> visual row = 0 + 10/10 = 1
     state.cursor_col = 10;
     assert_eq!(state.cursor_visual_row(10), 1);
 }
@@ -823,12 +867,12 @@ fn bug_report_state_cursor_visual_row_wrapped_line() {
 #[test]
 fn bug_report_state_cursor_visual_row_multi_line() {
     let mut state = BugReportState::default();
-    // line 0: 20 chars → 2 visual rows at width=10
+    // line 0: 20 chars -> 2 visual rows at width=10
     for _ in 0..20 {
         state.insert_char('a');
     }
     state.insert_newline();
-    // line 1: 5 chars → 1 visual row
+    // line 1: 5 chars -> 1 visual row
     for _ in 0..5 {
         state.insert_char('b');
     }
@@ -836,7 +880,7 @@ fn bug_report_state_cursor_visual_row_multi_line() {
     // visual = visual_rows("aaa...") = 2 + 3/10 = 2
     assert_eq!(state.cursor_visual_row(10), 2);
 
-    // cursor at line 0, col 15 → visual = 0 + 15/10 = 1
+    // cursor at line 0, col 15 -> visual = 0 + 15/10 = 1
     state.cursor_row = 0;
     state.cursor_col = 15;
     assert_eq!(state.cursor_visual_row(10), 1);
@@ -845,7 +889,7 @@ fn bug_report_state_cursor_visual_row_multi_line() {
 #[test]
 fn bug_report_state_clamp_scroll_wrapped_lines() {
     let mut state = BugReportState::default();
-    // line 0: 25 chars → 3 visual rows at width=10
+    // line 0: 25 chars -> 3 visual rows at width=10
     for _ in 0..25 {
         state.insert_char('a');
     }
@@ -862,19 +906,19 @@ fn bug_report_state_clamp_scroll_wrapped_lines() {
     // Cursor below scroll_top: scroll_top should move down to keep cursor visible
     state.scroll_top = 0;
     state.clamp_scroll(1, 10);
-    // cursor_vis=2, height=1 → scroll_top = 2 - 1 + 1 = 2
+    // cursor_vis=2, height=1 -> scroll_top = 2 - 1 + 1 = 2
     assert_eq!(state.scroll_top, 2);
 }
 
 #[test]
 fn bug_report_state_clamp_scroll_wrapped_lines_multi_line() {
     let mut state = BugReportState::default();
-    // line 0: 25 chars → 3 visual rows
+    // line 0: 25 chars -> 3 visual rows
     for _ in 0..25 {
         state.insert_char('a');
     }
     state.insert_newline();
-    // line 1: 25 chars → 3 visual rows (total = 6)
+    // line 1: 25 chars -> 3 visual rows (total = 6)
     for _ in 0..25 {
         state.insert_char('b');
     }
@@ -884,8 +928,8 @@ fn bug_report_state_clamp_scroll_wrapped_lines_multi_line() {
     state.clamp_scroll(2, 10);
     assert_eq!(state.scroll_top, 4);
 
-    // Move cursor to start of line 1 → cursor_vis = 3 + 0/10 = 3
-    // cursor_vis < scroll_top (4) → scroll_top slides up to cursor_vis = 3
+    // Move cursor to start of line 1 -> cursor_vis = 3 + 0/10 = 3
+    // cursor_vis < scroll_top (4) -> scroll_top slides up to cursor_vis = 3
     state.cursor_col = 0;
     state.clamp_scroll(2, 10);
     assert_eq!(state.scroll_top, 3);
