@@ -117,7 +117,7 @@ pub(crate) fn draw_bug_report(f: &mut Frame, app: &mut App, area: Rect) {
     for (li, line_text) in state.text.iter().enumerate() {
         let char_count = line_text.chars().count();
         if char_count == 0 {
-            if li == state.cursor_row && state.cursor_col == 0 {
+            if desc_focused && li == state.cursor_row && state.cursor_col == 0 {
                 desc_lines.push(Line::from(Span::styled(
                     "█",
                     Style::default().fg(theme.accent_alt),
@@ -141,7 +141,8 @@ pub(crate) fn draw_bug_report(f: &mut Frame, app: &mut App, area: Rect) {
             let chunk: String = line_text.chars().skip(start).take(end - start).collect();
             let chunk_char_count = end - start;
 
-            if li == state.cursor_row
+            if desc_focused
+                && li == state.cursor_row
                 && state.cursor_col >= start
                 && (state.cursor_col < end || chunk_idx == num_chunks - 1)
             {
