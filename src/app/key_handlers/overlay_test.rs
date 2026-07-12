@@ -264,6 +264,55 @@ fn handle_revision_key_down_navigates_list() {
 }
 
 #[test]
+fn handle_revision_key_left_right_switches_tabs_when_query_empty() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let mut picker = RevisionPicker::for_test(vec![]);
+    // Populate lists so rebuild_items behaves correctly on tab switch.
+    picker.shortcuts = vec![RevisionItem {
+        rev: "HEAD".into(),
+        display: "HEAD (current)".into(),
+    }];
+    picker.commits = vec![RevisionItem {
+        rev: "abc1234".into(),
+        display: "abc1234 Fix".into(),
+    }];
+    picker.tags = vec![RevisionItem {
+        rev: "v1.0".into(),
+        display: "v1.0".into(),
+    }];
+    picker.rebuild_items(); // starts in Commits tab
+
+    app.revision_picker = Some(picker);
+
+    // Press Right -> switches to Tags
+    app.handle_revision_key(KeyEvent::new(KeyCode::Right, KeyModifiers::empty()));
+    assert_eq!(
+        app.revision_picker.as_ref().unwrap().tab,
+        crate::search::RevisionTab::Tags
+    );
+
+    // Press Left -> switches back to Commits
+    app.handle_revision_key(KeyEvent::new(KeyCode::Left, KeyModifiers::empty()));
+    assert_eq!(
+        app.revision_picker.as_ref().unwrap().tab,
+        crate::search::RevisionTab::Commits
+    );
+
+    // Let's type something so query is NOT empty
+    app.revision_picker.as_mut().unwrap().query = "abc".to_string();
+
+    // Press Right -> should NOT switch tab because query is not empty
+    app.handle_revision_key(KeyEvent::new(KeyCode::Right, KeyModifiers::empty()));
+    assert_eq!(
+        app.revision_picker.as_ref().unwrap().tab,
+        crate::search::RevisionTab::Commits
+    );
+
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn tree_filter_jump_scrolls_match_into_view() {
     let root = temp_tree();
     // Many files so the only match sits well below a short viewport.
