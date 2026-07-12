@@ -1868,3 +1868,104 @@ fn plugin_register_commands_skips_builtin_and_cross_plugin_collisions() {
         Some("cmds")
     );
 }
+
+#[test]
+fn reload_uses_range_status_when_compare_base_is_set() {
+    use std::process::Command;
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().to_path_buf();
+    let git = |args: &[&str]| {
+        Command::new("git")
+            .arg("-C")
+            .arg(&root)
+            .args(["-c", "user.email=t@e.x", "-c", "user.name=T"])
+            .args(args)
+            .status()
+            .unwrap();
+    };
+    git(&["init", "-q"]);
+    fs::write(root.join("a.txt"), "hello\n").unwrap();
+    git(&["add", "."]);
+    git(&["commit", "-q", "-m", "init"]);
+    git(&["tag", "v0.1"]);
+
+    // Modify a tracked file after the tag.
+    fs::write(root.join("a.txt"), "modified\n").unwrap();
+
+    let mut app = create_base_app();
+    app.root = root.canonicalize().unwrap();
+    app.git_status_enabled = true;
+    app.git_mode = true;
+    app.compare_base = Some("v0.1".to_string());
+
+    assert!(app.git_status_map.is_empty());
+
+    // Directly read the response to verify range_status is used.
+    app.request_range_status("v0.1".to_string());
+    let resp = app
+        .loader
+        .rx
+        .recv_timeout(Duration::from_secs(5))
+        .expect("worker should respond");
+    if let LoadResponse::RangeStatus { load, error, .. } = resp {
+        assert!(error.is_none(), "range_status should succeed: {error:?}");
+        assert!(
+            !load.status_map.is_empty(),
+            "range_status must return modified files"
+        );
+    } else {
+        panic!("expected RangeStatus response");
+    }
+
+    // Now verify that reload() dispatches range_status when compare_base is set.
+    app.reload();
+    // The reload dispatches range_status, not git_status_refresh, because
+    // compare_base is Some. Pump to apply the response.
+    app.pump_loads();
+
+    let a = app.root.join("a.txt");
+    assert!(
+        app.git_status_map.contains_key(&a),
+        "reload with compare_base must use range_status so changed files appear"
+    );
+}
+
+#[test]
+fn reload_uses_git_status_refresh_when_compare_base_is_none() {
+    use std::process::Command;
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().to_path_buf();
+    let git = |args: &[&str]| {
+        Command::new("git")
+            .arg("-C")
+            .arg(&root)
+            .args(["-c", "user.email=t@e.x", "-c", "user.name=T"])
+            .args(args)
+            .status()
+            .unwrap();
+    };
+    git(&["init", "-q"]);
+    fs::write(root.join("a.txt"), "hello\n").unwrap();
+    git(&["add", "."]);
+    git(&["commit", "-q", "-m", "init"]);
+
+    // Uncommitted modification.
+    fs::write(root.join("a.txt"), "modified\n").unwrap();
+
+    let mut app = create_base_app();
+    app.root = root.canonicalize().unwrap();
+    app.git_status_enabled = true;
+    app.git_mode = true;
+    // compare_base is None — plain git mode, not compare mode.
+    assert!(app.compare_base.is_none());
+
+    app.reload();
+    app.pump_loads();
+
+    // The regular git status should show the uncommitted modification.
+    let a = app.root.join("a.txt");
+    assert!(
+        app.git_status_map.contains_key(&a),
+        "reload without compare_base must use git_status_refresh"
+    );
+}
