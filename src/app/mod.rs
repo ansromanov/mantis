@@ -543,7 +543,11 @@ impl App {
     pub fn reload(&mut self) {
         self.last_refresh = self.now();
         if self.git_status_enabled {
-            self.request_git_status_refresh();
+            if let Some(ref rev) = self.compare_base.clone() {
+                self.request_range_status(rev.clone());
+            } else {
+                self.request_git_status_refresh();
+            }
         }
         let root = self.root.clone();
         let show_hidden = self.show_hidden;
