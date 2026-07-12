@@ -67,6 +67,23 @@ fn draw_bug_report_populates_areas() {
 }
 
 #[test]
+fn draw_bug_report_title_focus_does_not_panic() {
+    let mut app = test_app();
+    let mut state = BugReportState {
+        title: "Crash on startup".to_string(),
+        ..Default::default()
+    };
+    state.toggle_focus();
+    assert_eq!(state.focus, crate::search::BugReportFocus::Title);
+    app.bug_report = Some(state);
+    let backend = TestBackend::new(80, 24);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| draw_bug_report(f, &mut app, Rect::new(0, 0, 80, 24)))
+        .unwrap();
+}
+
+#[test]
 fn draw_bug_report_long_line_wraps_without_panic() {
     let mut app = test_app();
     let mut state = BugReportState::default();

@@ -793,6 +793,67 @@ fn bug_report_state_custom_diagnostics() {
 }
 
 #[test]
+fn bug_report_state_defaults_title_and_focus() {
+    let state = BugReportState::default();
+    assert_eq!(state.title, "App Bug Report");
+    assert_eq!(state.title_cursor, state.title.chars().count());
+    assert_eq!(state.focus, BugReportFocus::Description);
+}
+
+#[test]
+fn bug_report_state_toggle_focus() {
+    let mut state = BugReportState::default();
+    assert_eq!(state.focus, BugReportFocus::Description);
+    state.toggle_focus();
+    assert_eq!(state.focus, BugReportFocus::Title);
+    state.toggle_focus();
+    assert_eq!(state.focus, BugReportFocus::Description);
+}
+
+#[test]
+fn bug_report_state_title_editing_operations() {
+    let mut state = BugReportState::default();
+    state.title.clear();
+    state.title_cursor = 0;
+
+    state.title_insert_char('B');
+    state.title_insert_char('u');
+    state.title_insert_char('g');
+    assert_eq!(state.title, "Bug");
+    assert_eq!(state.title_cursor, 3);
+
+    state.title_move_left();
+    state.title_move_left();
+    assert_eq!(state.title_cursor, 1);
+
+    state.title_insert_char('!');
+    assert_eq!(state.title, "B!ug");
+    assert_eq!(state.title_cursor, 2);
+
+    state.title_delete();
+    assert_eq!(state.title, "B!g");
+
+    state.title_backspace();
+    assert_eq!(state.title, "Bg");
+    assert_eq!(state.title_cursor, 1);
+
+    state.title_move_home();
+    assert_eq!(state.title_cursor, 0);
+    // Backspace at the start of the title is a no-op.
+    state.title_backspace();
+    assert_eq!(state.title, "Bg");
+
+    state.title_move_end();
+    assert_eq!(state.title_cursor, state.title.chars().count());
+    // Delete past the end of the title is a no-op.
+    state.title_delete();
+    assert_eq!(state.title, "Bg");
+
+    state.title_move_right();
+    assert_eq!(state.title_cursor, state.title.chars().count());
+}
+
+#[test]
 fn bug_report_state_total_visual_rows() {
     let mut state = BugReportState::default();
     // Single empty line -> 1 visual row
