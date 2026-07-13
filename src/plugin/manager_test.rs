@@ -440,6 +440,63 @@ fn drain_actions_records_crash_diagnostics_and_picker_badge() {
 }
 
 #[test]
+#[cfg(unix)]
+fn crash_detail_omits_log_path_when_file_does_not_exist() {
+    use std::io::Write as _;
+    use std::os::unix::fs::PermissionsExt;
+    use std::time::{Duration, Instant};
+
+    let _lock = STATE_DIR_LOCK.lock().unwrap();
+
+    let dir = std::env::temp_dir().join(format!("tv_mgr_crash_no_log_{}", std::process::id()));
+    let state_dir = dir.join("state");
+    std::fs::create_dir_all(&state_dir).unwrap();
+    std::env::set_var("MANTIS_STATE_DIR", &state_dir);
+
+    // Script exits immediately with no stderr output.
+    let script = dir.join("silent_exit.sh");
+    let mut f = std::fs::File::create(&script).unwrap();
+    write!(f, "#!/bin/sh\nexit 1\n").unwrap();
+    drop(f);
+    std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+    let entry = PluginEntry {
+        path: script.clone(),
+        enabled: false,
+        ..Default::default()
+    };
+    let mut mgr = PluginManager::new(vec![("silent".to_string(), entry)]);
+    mgr.activate_one("silent", None)
+        .expect("spawn silent_exit.sh");
+
+    let deadline = Instant::now() + Duration::from_secs(3);
+    loop {
+        mgr.drain_actions();
+        if mgr.crash_detail("silent").is_some() {
+            break;
+        }
+        assert!(Instant::now() < deadline, "plugin never detected as dead");
+        std::thread::sleep(Duration::from_millis(25));
+    }
+
+    let detail = mgr.crash_detail("silent").expect("crash detail recorded");
+    assert_eq!(detail.last_stderr, None, "plugin produced no stderr");
+    assert!(
+        detail.log_path.is_none(),
+        "log_path must be None when the log file was never created"
+    );
+
+    let log_file = state_dir.join("plugin-logs").join("silent.log");
+    assert!(
+        !log_file.exists(),
+        "log file must not exist for a silent exit"
+    );
+
+    std::env::remove_var("MANTIS_STATE_DIR");
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
 fn take_dead_plugins_empty_by_default() {
     let mut mgr = PluginManager::new(vec![]);
     assert!(
