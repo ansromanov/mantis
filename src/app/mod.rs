@@ -700,6 +700,8 @@ impl App {
     /// report to the clipboard instead. If browser launch fails, falls back
     /// to clipboard copying and status bar instructions.
     pub(crate) fn save_bug_report(&mut self) {
+        let title_text =
+            resolve_bug_report_title(self.bug_report.as_ref().map(|br| br.title.as_str()));
         let report = crate::diagnostics::DiagnosticReport::collect(self);
         let md = report.to_markdown();
         let body_text = report.body.clone();
@@ -720,7 +722,7 @@ impl App {
 
         // 2. Prepare URL parameters.
         let base = "https://github.com/ansromanov/mantis/issues/new?template=app-bugreport.yml";
-        let title_encoded = percent_encode("App Bug Report");
+        let title_encoded = percent_encode(&title_text);
 
         let mut truncated = false;
         let (description_encoded, diagnostics_encoded) = {
@@ -947,6 +949,16 @@ pub(crate) fn restore_terminal() {
         Show
     );
     set_alternate_scroll(true);
+}
+
+/// Resolves the GitHub issue title for a bug report: the trimmed user-entered
+/// title, or the default when it is missing/blank.
+fn resolve_bug_report_title(title: Option<&str>) -> String {
+    title
+        .map(str::trim)
+        .filter(|t| !t.is_empty())
+        .unwrap_or("App Bug Report")
+        .to_string()
 }
 
 fn percent_encode(s: &str) -> String {

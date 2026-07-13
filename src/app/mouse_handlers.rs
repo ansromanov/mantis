@@ -596,8 +596,10 @@ impl App {
                             state.diagnostics_markdown.clone()
                         } else {
                             format!(
-                                "## bug report body\n\n{}\n\n{}",
-                                body_text, state.diagnostics_markdown
+                                "## {}\n\n## bug report body\n\n{}\n\n{}",
+                                state.resolved_title(),
+                                body_text,
+                                state.diagnostics_markdown
                             )
                         };
                         let total_lines = report_md.lines().count();

@@ -766,10 +766,20 @@ impl ListPicker for PluginPicker {
     }
 }
 
+/// Which field of the bug report modal currently receives keyboard input.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BugReportFocus {
+    Title,
+    Description,
+}
+
 /// State for the bug report modal.
 /// Holds the typed text lines, the cursor position, and the viewport scroll offset.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BugReportState {
+    pub title: String,
+    pub title_cursor: usize,
+    pub focus: BugReportFocus,
     pub text: Vec<String>,
     pub cursor_row: usize,
     pub cursor_col: usize,
@@ -786,7 +796,12 @@ impl Default for BugReportState {
 
 impl BugReportState {
     pub fn new(diagnostics_markdown: String) -> Self {
+        let title = "App Bug Report".to_string();
+        let title_cursor = title.chars().count();
         BugReportState {
+            title,
+            title_cursor,
+            focus: BugReportFocus::Description,
             text: vec![String::new()],
             cursor_row: 0,
             cursor_col: 0,
@@ -794,6 +809,89 @@ impl BugReportState {
             preview_scroll: crate::scroll::ScrollState::new(),
             diagnostics_markdown,
         }
+    }
+
+    /// The title to use when submitting or previewing the report: the trimmed
+    /// user-entered title, or "App Bug Report" when it is missing/blank.
+    pub fn resolved_title(&self) -> &str {
+        let trimmed = self.title.trim();
+        if trimmed.is_empty() {
+            "App Bug Report"
+        } else {
+            trimmed
+        }
+    }
+
+    pub fn toggle_focus(&mut self) {
+        self.focus = match self.focus {
+            BugReportFocus::Title => BugReportFocus::Description,
+            BugReportFocus::Description => BugReportFocus::Title,
+        };
+    }
+
+    pub fn title_insert_char(&mut self, c: char) {
+        let char_len = self.title.chars().count();
+        if self.title_cursor > char_len {
+            self.title_cursor = char_len;
+        }
+        let byte_idx = self
+            .title
+            .char_indices()
+            .map(|(i, _)| i)
+            .nth(self.title_cursor)
+            .unwrap_or(self.title.len());
+        self.title.insert(byte_idx, c);
+        self.title_cursor += 1;
+    }
+
+    pub fn title_backspace(&mut self) {
+        if self.title_cursor == 0 {
+            return;
+        }
+        let char_idx = self.title_cursor - 1;
+        let byte_idx = self
+            .title
+            .char_indices()
+            .map(|(i, _)| i)
+            .nth(char_idx)
+            .unwrap_or(self.title.len());
+        self.title.remove(byte_idx);
+        self.title_cursor -= 1;
+    }
+
+    pub fn title_delete(&mut self) {
+        let char_len = self.title.chars().count();
+        if self.title_cursor >= char_len {
+            return;
+        }
+        let byte_idx = self
+            .title
+            .char_indices()
+            .map(|(i, _)| i)
+            .nth(self.title_cursor)
+            .unwrap_or(self.title.len());
+        self.title.remove(byte_idx);
+    }
+
+    pub fn title_move_left(&mut self) {
+        if self.title_cursor > 0 {
+            self.title_cursor -= 1;
+        }
+    }
+
+    pub fn title_move_right(&mut self) {
+        let char_len = self.title.chars().count();
+        if self.title_cursor < char_len {
+            self.title_cursor += 1;
+        }
+    }
+
+    pub fn title_move_home(&mut self) {
+        self.title_cursor = 0;
+    }
+
+    pub fn title_move_end(&mut self) {
+        self.title_cursor = self.title.chars().count();
     }
 
     pub fn insert_char(&mut self, c: char) {

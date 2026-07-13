@@ -1138,6 +1138,41 @@ fn handle_bug_report_key_handling() {
 }
 
 #[test]
+fn handle_bug_report_key_title_editing_and_focus_toggle() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.bug_report = Some(BugReportState::default());
+    assert_eq!(
+        app.bug_report.as_ref().unwrap().focus,
+        crate::search::BugReportFocus::Description
+    );
+
+    // Tab switches focus to the title field.
+    app.handle_bug_report_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::empty()));
+    assert_eq!(
+        app.bug_report.as_ref().unwrap().focus,
+        crate::search::BugReportFocus::Title
+    );
+
+    // Typing while the title is focused edits the title, not the description.
+    app.handle_bug_report_key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::empty()));
+    app.handle_bug_report_key(KeyEvent::new(KeyCode::Char('!'), KeyModifiers::empty()));
+    assert_eq!(app.bug_report.as_ref().unwrap().title, "App Bug Repor!");
+    assert_eq!(app.bug_report.as_ref().unwrap().text, vec!["".to_string()]);
+
+    // Enter while the title is focused moves focus to the description instead
+    // of inserting a newline into the title.
+    app.handle_bug_report_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert_eq!(
+        app.bug_report.as_ref().unwrap().focus,
+        crate::search::BugReportFocus::Description
+    );
+    assert_eq!(app.bug_report.as_ref().unwrap().title, "App Bug Repor!");
+
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn handle_bug_report_key_esc_closes_modal() {
     let root = temp_tree();
     let mut app = app_for(&root);

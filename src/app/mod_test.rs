@@ -5098,6 +5098,49 @@ fn save_bug_report_surfaces_saved_path_in_status() {
 }
 
 #[test]
+fn save_bug_report_with_custom_title_saves_successfully() {
+    let _guard = crate::session::STATE_DIR_ENV_LOCK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    let state = tempfile::tempdir().unwrap();
+    std::env::set_var("MANTIS_STATE_DIR", state.path());
+
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let br = crate::search::BugReportState {
+        title: "Crash on startup".to_string(),
+        ..Default::default()
+    };
+    app.bug_report = Some(br);
+    app.save_bug_report();
+
+    assert!(app.bug_report.is_none(), "modal must close after submit");
+    let msg = app
+        .status_message
+        .as_ref()
+        .expect("status set")
+        .text
+        .clone();
+    assert!(msg.starts_with("bug report saved:"), "got: {msg}");
+    std::env::remove_var("MANTIS_STATE_DIR");
+}
+
+#[test]
+fn resolve_bug_report_title_uses_custom_or_falls_back_to_default() {
+    assert_eq!(
+        resolve_bug_report_title(Some("Crash on startup")),
+        "Crash on startup"
+    );
+    assert_eq!(
+        resolve_bug_report_title(Some("  padded title  ")),
+        "padded title"
+    );
+    assert_eq!(resolve_bug_report_title(Some("")), "App Bug Report");
+    assert_eq!(resolve_bug_report_title(Some("   ")), "App Bug Report");
+    assert_eq!(resolve_bug_report_title(None), "App Bug Report");
+}
+
+#[test]
 fn toggle_telemetry_flips_config_persists_and_reports_status() {
     let root = temp_tree();
     let config_path = root.join("mantis.toml");

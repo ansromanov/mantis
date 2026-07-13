@@ -1334,3 +1334,33 @@ fn repo_log_click_outside_closes_overlay() {
     assert!(app.repo_log.is_none());
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn bug_report_scroll_down_in_preview_advances_scroll() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let mut state = crate::search::BugReportState {
+        title: "Custom title".to_string(),
+        ..Default::default()
+    };
+    for c in "some description text".chars() {
+        state.insert_char(c);
+    }
+    app.bug_report = Some(state);
+    app.bug_report_preview_area = Rect::new(0, 0, 40, 2);
+
+    app.handle_bug_report_mouse(scroll_down_at(1, 1));
+    assert!(app.bug_report.as_ref().unwrap().preview_scroll.scroll > 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn bug_report_click_outside_closes_modal() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.bug_report = Some(crate::search::BugReportState::default());
+    app.bug_report_area = Rect::new(10, 10, 40, 20);
+    app.handle_bug_report_mouse(left_down_at(0, 0));
+    assert!(app.bug_report.is_none());
+    fs::remove_dir_all(&root).ok();
+}

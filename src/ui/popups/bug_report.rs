@@ -14,6 +14,7 @@ use ratatui::{
 
 use super::util::centered_rect;
 use crate::app::App;
+use crate::search::BugReportFocus;
 
 pub(crate) fn draw_bug_report(f: &mut Frame, app: &mut App, area: Rect) {
     let Some(state) = app.bug_report.as_mut() else {
@@ -44,6 +45,7 @@ pub(crate) fn draw_bug_report(f: &mut Frame, app: &mut App, area: Rect) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(1), // Header instructions
+            Constraint::Length(1), // Title input row
             Constraint::Length(1), // Separator
             Constraint::Length(7), // Description input block
             Constraint::Length(1), // Separator
@@ -62,19 +64,50 @@ pub(crate) fn draw_bug_report(f: &mut Frame, app: &mut App, area: Rect) {
         parts[0],
     );
 
-    // Separator 1
+    // Single-line title edit row (no border, to save vertical space)
+    let title_focused = state.focus == BugReportFocus::Title;
+    let label_style = Style::default()
+        .fg(if title_focused {
+            theme.accent_alt
+        } else {
+            theme.dim
+        })
+        .add_modifier(Modifier::BOLD);
+    let title_char_count = state.title.chars().count();
+    let cursor = state.title_cursor.min(title_char_count);
+    let mut title_spans = vec![Span::styled("Title: ", label_style)];
+    if title_focused {
+        let before: String = state.title.chars().take(cursor).collect();
+        let after: String = state.title.chars().skip(cursor).collect();
+        title_spans.push(Span::raw(before));
+        title_spans.push(Span::styled("█", Style::default().fg(theme.accent_alt)));
+        title_spans.push(Span::raw(after));
+    } else {
+        title_spans.push(Span::raw(state.title.clone()));
+    }
     f.render_widget(
-        Paragraph::new("─".repeat(inner.width as usize)).style(Style::default().fg(theme.dim)),
+        Paragraph::new(Line::from(title_spans)).style(Style::default().fg(theme.text)),
         parts[1],
     );
 
+    // Separator 1
+    f.render_widget(
+        Paragraph::new("─".repeat(inner.width as usize)).style(Style::default().fg(theme.dim)),
+        parts[2],
+    );
+
     // Multiline edit block
+    let desc_focused = state.focus == BugReportFocus::Description;
     let desc_block = Block::default()
         .title(" Description (What happened / steps) ")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(theme.dim));
-    let desc_inner = desc_block.inner(parts[2]);
-    f.render_widget(desc_block, parts[2]);
+        .border_style(Style::default().fg(if desc_focused {
+            theme.accent_alt
+        } else {
+            theme.dim
+        }));
+    let desc_inner = desc_block.inner(parts[3]);
+    f.render_widget(desc_block, parts[3]);
 
     let edit_width = (desc_inner.width as usize).saturating_sub(1).max(1);
     state.clamp_scroll(desc_inner.height as usize, edit_width);
@@ -84,7 +117,7 @@ pub(crate) fn draw_bug_report(f: &mut Frame, app: &mut App, area: Rect) {
     for (li, line_text) in state.text.iter().enumerate() {
         let char_count = line_text.chars().count();
         if char_count == 0 {
-            if li == state.cursor_row && state.cursor_col == 0 {
+            if desc_focused && li == state.cursor_row && state.cursor_col == 0 {
                 desc_lines.push(Line::from(Span::styled(
                     "█",
                     Style::default().fg(theme.accent_alt),
@@ -108,7 +141,8 @@ pub(crate) fn draw_bug_report(f: &mut Frame, app: &mut App, area: Rect) {
             let chunk: String = line_text.chars().skip(start).take(end - start).collect();
             let chunk_char_count = end - start;
 
-            if li == state.cursor_row
+            if desc_focused
+                && li == state.cursor_row
                 && state.cursor_col >= start
                 && (state.cursor_col < end || chunk_idx == num_chunks - 1)
             {
@@ -142,7 +176,7 @@ pub(crate) fn draw_bug_report(f: &mut Frame, app: &mut App, area: Rect) {
     // Separator 2
     f.render_widget(
         Paragraph::new("─".repeat(inner.width as usize)).style(Style::default().fg(theme.dim)),
-        parts[3],
+        parts[4],
     );
 
     // Diagnostics Preview block
@@ -150,17 +184,19 @@ pub(crate) fn draw_bug_report(f: &mut Frame, app: &mut App, area: Rect) {
         .title(" Diagnostic Payload Preview (Read-Only) ")
         .borders(Borders::ALL)
         .border_style(Style::default().fg(theme.dim));
-    let preview_inner = preview_block.inner(parts[4]);
+    let preview_inner = preview_block.inner(parts[5]);
     app.bug_report_preview_area = preview_inner;
-    f.render_widget(preview_block, parts[4]);
+    f.render_widget(preview_block, parts[5]);
 
     let body_text = state.text.join("\n");
     let report_md = if body_text.trim().is_empty() {
         state.diagnostics_markdown.clone()
     } else {
         format!(
-            "## bug report body\n\n{}\n\n{}",
-            body_text, state.diagnostics_markdown
+            "## {}\n\n## bug report body\n\n{}\n\n{}",
+            state.resolved_title(),
+            body_text,
+            state.diagnostics_markdown
         )
     };
     let preview_lines_all: Vec<String> = report_md.lines().map(String::from).collect();
@@ -222,12 +258,19 @@ pub(crate) fn draw_bug_report(f: &mut Frame, app: &mut App, area: Rect) {
     // Separator 3
     f.render_widget(
         Paragraph::new("─".repeat(inner.width as usize)).style(Style::default().fg(theme.dim)),
-        parts[5],
+        parts[6],
     );
 
     // Footer info
     f.render_widget(
         Paragraph::new(Line::from(vec![
+            Span::styled(
+                "Tab: ",
+                Style::default()
+                    .fg(theme.accent)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("Switch Field  ", Style::default().fg(theme.dim)),
             Span::styled(
                 "Ctrl+S / Ctrl+Enter: ",
                 Style::default()
@@ -250,7 +293,7 @@ pub(crate) fn draw_bug_report(f: &mut Frame, app: &mut App, area: Rect) {
             ),
             Span::styled("Scroll Preview", Style::default().fg(theme.dim)),
         ])),
-        parts[6],
+        parts[7],
     );
 }
 
