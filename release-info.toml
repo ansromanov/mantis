@@ -1,32 +1,11 @@
 version = "0.17.9"
 date = "2026-07-13"
-whats_new = """- ci: skip lld apt install on self-hosted runners (#697)
-- fix: defer release bump push until pipeline is green (#695)
-- fix: respect runner input in release test-windows job (#694)
-- feat: add self-hosted runner option to bench.yml (#693)
-- chore: release v0.17.3 [skip ci]
-- fix: route release.yml self-hosted jobs to Linux label (#692)
-- fix: route self-hosted runners by OS label (#691)
-- fix: gate Unix-only test code and fix file_at_rev on Windows (#690)
-- fix: update config schema snapshot for keys added in #683 (#689)
-- chore: add standalone full-test-suite workflow (#688)
-- chore: release v0.17.1 [skip ci]
-- chore: make Windows release optional and add workflow_dispatch controls (#687)
-- fix: add missing help-overlay entries for toggle_file_revision and blame_open_commit (#686)
-- chore: release v0.17.0 [skip ci]
-- docs: add historical release digests (#685)
-- feat: view file at revision — diff ↔ snapshot toggle (#683)
-- docs: add v0.17 release digest (#684)
-- feat(git): repo-wide commit log overlay (#682)
-- feat: palette ranking frecency decay + plugin-contributed commands (register_commands) (#681)
-- feat(plugin): add yaml language provider plugin (#669)
-- feat(sh): bundled shell language provider plugin (#676)
-- feat: unified quick-open — prefix routing in the palette (#679)
-- feat: bundle TOML, TypeScript/TSX, and Dockerfile syntax plugins (#486) (#680)
-- test(main): isolate run_app tests from real state dir (#677)
-- fix(blame): move blame UI from tree lane to content pane (#671)
-- fix: preserve scroll position on view toggles (wrap, pretty JSON, diff SBS) (#672)
-- test: assert json plugin listed in bundled_plugin_entries (#670)
-- ci: cap PR tests at smoke set, move full suite to release (#674)
-- chore: bump Homebrew formula to v0.16.18 [skip ci]"""
-release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.17.3"
+whats_new = """- feat: allow editing the GitHub issue title in bug reports (#708)
+- feat: tabbed revision picker (commits/tags/branches) (#707)
+- fix: preserve compare-base range status on reload (#706)
+- fix: resolve remaining Windows test-suite failures (#702)
+- fix: bypass markdown plugin in raw mode (#701)
+- fix: resolve Windows-only test failures (74 -> 0) (#700)
+- fix: use bash shell for windows test step (#698)
+- chore: bump Homebrew formula to v0.17.3 [skip ci]"""
+release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.17.9"
