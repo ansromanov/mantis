@@ -497,7 +497,7 @@ impl PluginManager {
                     name.clone(),
                     CrashInfo {
                         last_stderr: plugin.last_stderr_line(),
-                        log_path: plugin.log_path(),
+                        log_path: plugin.log_path().filter(|p| p.exists()),
                     },
                 );
             }
