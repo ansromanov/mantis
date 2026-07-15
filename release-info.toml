@@ -1,11 +1,5 @@
 version = "0.17.10"
-date = "2026-07-13"
-whats_new = """- feat: allow editing the GitHub issue title in bug reports (#708)
-- feat: tabbed revision picker (commits/tags/branches) (#707)
-- fix: preserve compare-base range status on reload (#706)
-- fix: resolve remaining Windows test-suite failures (#702)
-- fix: bypass markdown plugin in raw mode (#701)
-- fix: resolve Windows-only test failures (74 -> 0) (#700)
-- fix: use bash shell for windows test step (#698)
-- chore: bump Homebrew formula to v0.17.3 [skip ci]"""
-release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.17.9"
+date = "2026-07-15"
+whats_new = """- fix: omit plugin log path from error message when file does not exist (#710)
+- chore: bump Homebrew formula to v0.17.9 [skip ci]"""
+release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.17.10"
