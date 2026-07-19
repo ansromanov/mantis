@@ -397,6 +397,7 @@ impl App {
         // to a different file; a same-file reopen (reload / external edit)
         // preserves all.
         let is_new_file = self.current_file.as_deref() != Some(path);
+        let had_filter = self.filter_query.is_some();
         if is_new_file {
             self.file_at_revision = None;
             self.viewing_revision_hash = None;
@@ -449,6 +450,13 @@ impl App {
 
         if load.prettify_size_limit_exceeded {
             self.set_status("too large to pretty-print / fold");
+        }
+
+        // Same-file reload preserves the active filter, but filter_display_map
+        // was built against the old content — rebuild it so filtered lines
+        // stay correct after an auto-watch reload or external edit.
+        if !is_new_file && load.ok && had_filter {
+            self.rebuild_filter_display_map();
         }
 
         // Clamp restored cursor to current content bounds.
