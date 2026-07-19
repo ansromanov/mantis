@@ -1,5 +1,5 @@
-version = "0.17.10"
-date = "2026-07-15"
+version = "0.17.11"
+date = "2026-07-19"
 whats_new = """- fix: omit plugin log path from error message when file does not exist (#710)
 - chore: bump Homebrew formula to v0.17.9 [skip ci]"""
 release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.17.10"
