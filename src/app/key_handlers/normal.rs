@@ -444,6 +444,10 @@ impl App {
             self.show_line_numbers = !self.show_line_numbers;
             self.config.content.line_numbers = self.show_line_numbers;
             self.save_config();
+        } else if pressed_in(&k.follow_tail, &key, scope) {
+            self.toggle_follow_mode();
+        } else if pressed_in(&k.filter_lines, &key, scope) {
+            self.filter_bar = Some(crate::search::FilterBarState::new());
         } else if self.has_text_cursor() && pressed_in(&k.nav_up, &key, scope) {
             // Move active line up (non-diff content).
             if self.active_line > 0 {
@@ -471,6 +475,9 @@ impl App {
             }
             self.set_content_scroll(0);
         } else if pressed_in(&k.content_bottom, &key, scope) {
+            if self.follow_mode {
+                self.follow_pinned = true;
+            }
             if self.has_text_cursor() {
                 self.active_line = self.display_line_count().saturating_sub(1);
                 self.scroll_active_line_into_view();
@@ -504,6 +511,9 @@ impl App {
             self.copy_file_content();
         } else if self.has_text_cursor() && pressed_in(&k.blame_line, &key, scope) {
             self.show_line_blame = !self.show_line_blame;
+        }
+        if self.follow_mode && self.active_line < active_line_before {
+            self.follow_pinned = false;
         }
         if self.content_scroll != scroll_before || self.content_hscroll != hscroll_before {
             self.mark_content_scrolled();
@@ -566,7 +576,7 @@ impl App {
 
     /// Nudges `content_scroll` so `active_line` stays within the visible
     /// viewport after a cursor move. Delegates to the unified helper.
-    pub(super) fn scroll_active_line_into_view(&mut self) {
+    pub(crate) fn scroll_active_line_into_view(&mut self) {
         self.scroll_line_into_view(self.active_line);
     }
 }

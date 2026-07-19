@@ -73,6 +73,8 @@ line_numbers = true          # show the line-number gutter
 scrollbar = true             # show a scrollbar
 scroll_percentage = true     # show scroll-position percentage
 watch = false                # auto-reload the open file when it changes on disk
+follow_tail_auto = false     # auto-enable follow mode for log files
+log_colorizing = true        # enable log level and timestamp colorizing
 show_file_info = true        # encoding + line-ending info in the status bar
 prettify_size_limit = 10485760  # max bytes for JSON/YAML pretty-printing;
                                  #   larger files show as raw text (10 MiB default)

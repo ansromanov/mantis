@@ -259,6 +259,14 @@ impl App {
                 }
                 true
             }
+            Some("follow_tail") => {
+                self.toggle_follow_mode();
+                true
+            }
+            Some("filter_lines") => {
+                self.filter_bar = Some(crate::search::FilterBarState::new());
+                true
+            }
             Some("copy_path") => {
                 self.copy_path_to_clipboard(false);
                 true

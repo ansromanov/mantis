@@ -83,6 +83,10 @@ pub struct ContentConfig {
     /// Files exceeding this limit are shown as raw text via memory-mapped I/O
     /// instead of being pretty-printed or parsed for fold regions.
     pub prettify_size_limit: usize,
+    /// Auto-enter follow when opening a growing `.log`.
+    pub follow_tail_auto: bool,
+    /// Enable log level and timestamp colorizing.
+    pub log_colorizing: bool,
 }
 
 impl Default for ContentConfig {
@@ -95,6 +99,8 @@ impl Default for ContentConfig {
             watch: false,
             show_file_info: true,
             prettify_size_limit: 10 * 1024 * 1024,
+            follow_tail_auto: false,
+            log_colorizing: true,
         }
     }
 }

@@ -120,3 +120,20 @@ fn is_markdown_path_works() {
     assert!(!is_markdown_path(Path::new("test.txt")));
     assert!(!is_markdown_path(Path::new("test")));
 }
+
+#[test]
+fn is_log_file_works() {
+    assert!(is_log_file(Path::new("test.log"), &[]));
+    assert!(is_log_file(
+        Path::new("test.txt"),
+        &["[INFO] hello", "[ERROR] world"]
+    ));
+    assert!(is_log_file(
+        Path::new("test.txt"),
+        &["2026-07-19 12:00:00 message"]
+    ));
+    assert!(!is_log_file(
+        Path::new("test.txt"),
+        &["not a log line", "plain text line"]
+    ));
+}

@@ -75,11 +75,13 @@ impl App {
             && self.content_area.width >= crate::diff::MIN_SIDE_BY_SIDE_WIDTH
     }
 
-    /// Returns the number of **display** lines after folding. Equals
-    /// `line_count()` when no folds are active.
+    /// Returns the number of **display** lines after folding/filtering. Equals
+    /// `line_count()` when no folds/filters are active.
     pub fn display_line_count(&self) -> usize {
         if self.diff_sbs_active() {
             self.diff_rows.len()
+        } else if self.filter_query.is_some() {
+            self.filter_display_map.len()
         } else if self.fold_display_map.is_empty() {
             self.line_count()
         } else {
@@ -89,7 +91,12 @@ impl App {
 
     /// Maps a display-space line index to a physical file line index.
     pub fn display_to_physical(&self, display: usize) -> usize {
-        if self.fold_display_map.is_empty() {
+        if self.filter_query.is_some() {
+            self.filter_display_map
+                .get(display)
+                .copied()
+                .unwrap_or(display)
+        } else if self.fold_display_map.is_empty() {
             display
         } else {
             self.fold_display_map
@@ -100,18 +107,58 @@ impl App {
     }
 
     /// Converts a physical line index to a display line index.
-    /// When folding is inactive this is identity; when active it finds the
-    /// position of `physical` in the display map (first visible line ≥ physical
-    /// when the line itself is hidden inside a fold).
+    /// When folding/filtering is inactive this is identity; when active it finds the
+    /// position of `physical` in the display map.
     pub fn physical_to_display(&self, physical: usize) -> usize {
-        if self.fold_display_map.is_empty() {
-            return physical;
+        if self.filter_query.is_some() {
+            self.filter_display_map
+                .iter()
+                .position(|&p| p >= physical)
+                .unwrap_or(self.filter_display_map.len().saturating_sub(1))
+        } else if self.fold_display_map.is_empty() {
+            physical
+        } else {
+            // Find the first display line whose physical index is >= physical.
+            self.fold_display_map
+                .iter()
+                .position(|&p| p >= physical)
+                .unwrap_or(self.fold_display_map.len().saturating_sub(1))
         }
-        // Find the first display line whose physical index is >= physical.
-        self.fold_display_map
-            .iter()
-            .position(|&p| p >= physical)
-            .unwrap_or(self.fold_display_map.len().saturating_sub(1))
+    }
+
+    /// Rebuilds the filter display map for the current filter query, using cache if available.
+    pub fn rebuild_filter_display_map(&mut self) {
+        let query = match &self.filter_query {
+            Some(q) if !q.is_empty() => q,
+            _ => {
+                self.filter_display_map.clear();
+                return;
+            }
+        };
+
+        let cache_key = (self.content_revision, query.clone());
+        let cached = self.filter_cache.borrow().get(&cache_key).cloned();
+        if let Some(map) = cached {
+            self.filter_display_map = map;
+            return;
+        }
+
+        // Perform case-insensitive search
+        let query_lower = query.to_lowercase();
+        let total = self.line_count();
+        let mut map = Vec::new();
+        for i in 0..total {
+            if let Some(text) = self.line_text(i) {
+                if text.to_lowercase().contains(&query_lower) {
+                    map.push(i);
+                }
+            }
+        }
+
+        self.filter_cache
+            .borrow_mut()
+            .insert(cache_key, map.clone());
+        self.filter_display_map = map;
     }
 }
 

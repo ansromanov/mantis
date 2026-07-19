@@ -393,3 +393,4 @@ fn repo_commit_log_action_requires_git_repo() {
     assert_eq!(spec.palette, Some("Browse repository commits"));
     assert_eq!(spec.category, Some("Git"));
 }
+// touched for log follow mode

@@ -337,6 +337,20 @@ pub static ACTIONS: &[ActionSpec] = &[
         description: Some("Toggle the git blame annotation gutter"),
     },
     ActionSpec {
+        id: "follow_tail",
+        palette: Some("Toggle log tail follow"),
+        help: Some(("Content panel", "toggle log tail follow")),
+        category: Some("View"),
+        description: Some("Pin scroll to bottom of growing logs"),
+    },
+    ActionSpec {
+        id: "filter_lines",
+        palette: Some("Filter log lines"),
+        help: Some(("Content panel", "filter log lines")),
+        category: Some("Search"),
+        description: Some("Show only lines matching a query"),
+    },
+    ActionSpec {
         id: "file_history",
         palette: Some("Open file history"),
         help: Some(("Content panel", "git history of current file")),

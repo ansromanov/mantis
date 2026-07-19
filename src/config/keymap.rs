@@ -272,6 +272,8 @@ impl Keymap {
             "plugin_picker" => &self.plugin_picker,
             "goto_line" => &self.goto_line,
             "toggle_raw_markdown" => &self.toggle_raw_markdown,
+            "follow_tail" => &self.follow_tail,
+            "filter_lines" => &self.filter_lines,
             "tree_width_grow" => &self.tree_width_grow,
             "tree_width_shrink" => &self.tree_width_shrink,
             "tree_up_dir" => &self.tree_up_dir,
@@ -389,6 +391,8 @@ pub struct Keymap {
     pub plugin_picker: Vec<KeyBinding>,
     pub goto_line: Vec<KeyBinding>,
     pub toggle_raw_markdown: Vec<KeyBinding>,
+    pub follow_tail: Vec<KeyBinding>,
+    pub filter_lines: Vec<KeyBinding>,
     pub tree_up_dir: Vec<KeyBinding>,
 
     // --- deprecated/renamed action keys (read for backward-compat; never written) ---
@@ -470,6 +474,8 @@ impl Default for Keymap {
             plugin_picker: bind(&["tree:p"]),
             goto_line: bind(&["ctrl+g"]),
             toggle_raw_markdown: bind(&["M"]),
+            follow_tail: bind(&["content:F"]),
+            filter_lines: bind(&["content:&"]),
             tree_up_dir: bind(&["Backspace"]),
             legacy_yaml_fold_toggle: None,
             legacy_visual_line_blame: None,

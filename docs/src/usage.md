@@ -358,6 +358,14 @@ for this — bind `toggle_pretty_json` in `mantis.toml` if you want one.
 JSON pretty-printing itself is always core, not a plugin concern — the `json`
 plugin only adds fold regions on top of it.
 
+## Log follow mode
+
+When viewing log files (detected via `.log` extension or level/timestamp sniffing), mantis automatically enables log mode.
+- Press `F` to toggle log follow mode.
+- When follow mode is enabled and pinned (default), mantis auto-scrolls to the tail when new logs are appended to the file.
+- Navigating upwards (e.g., `Up`/`k`, `PageUp`) will temporarily unpin follow mode to let you read earlier lines. Navigating to the bottom (e.g., `G`/`End`) will re-pin follow mode.
+- Press `&` to open the filter bar. Typing a query will filter the visible log lines to only those containing the query.
+
 ## Mouse
 
 - **Click** a tree row to select it — opens a file, or folds/unfolds a

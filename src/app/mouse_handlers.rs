@@ -143,6 +143,26 @@ impl App {
             }
             return;
         }
+        if self.filter_bar.is_some() {
+            if let MouseEventKind::Down(MouseButton::Left) = ev.kind {
+                let ca = self.content_area;
+                let bar_y = ca.y + ca.height.saturating_sub(2);
+                let on_bar = ev.row == bar_y && ev.column >= ca.x && ev.column < ca.x + ca.width;
+                if !on_bar {
+                    if let Some(s) = &self.filter_bar {
+                        if s.query.is_empty() {
+                            self.filter_query = None;
+                        } else {
+                            self.filter_query = Some(s.query.clone());
+                        }
+                    }
+                    self.filter_bar = None;
+                    self.rebuild_filter_display_map();
+                    self.clamp_content_scroll();
+                }
+            }
+            return;
+        }
         if self.bug_report.is_some() {
             self.handle_bug_report_mouse(ev);
             return;

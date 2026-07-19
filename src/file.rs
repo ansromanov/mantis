@@ -147,6 +147,33 @@ pub fn is_markdown_path(path: &Path) -> bool {
     matches!(ext, "md" | "markdown")
 }
 
+/// Returns `true` if the file path has a `.log` extension, or if the first few lines
+/// match a level or timestamp pattern.
+pub fn is_log_file(path: &Path, first_lines: &[&str]) -> bool {
+    if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+        if ext.eq_ignore_ascii_case("log") {
+            return true;
+        }
+    }
+    if first_lines.is_empty() {
+        return false;
+    }
+    let re = match regex::Regex::new(
+        r"(?i)\b(ERROR|WARN|WARNING|INFO|DEBUG|TRACE)\b|\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}|^[A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2}",
+    ) {
+        Ok(r) => r,
+        Err(_) => return false,
+    };
+    let mut matches = 0;
+    let limit = first_lines.len().min(5);
+    for line in first_lines.iter().take(limit) {
+        if re.is_match(line) {
+            matches += 1;
+        }
+    }
+    matches >= limit.div_ceil(2)
+}
+
 #[cfg(test)]
 #[path = "file_test.rs"]
 mod tests;

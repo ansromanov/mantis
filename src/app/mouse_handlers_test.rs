@@ -1364,3 +1364,4 @@ fn bug_report_click_outside_closes_modal() {
     assert!(app.bug_report.is_none());
     fs::remove_dir_all(&root).ok();
 }
+// touched for log follow mode

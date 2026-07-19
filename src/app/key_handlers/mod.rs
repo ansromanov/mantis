@@ -150,6 +150,8 @@ impl App {
             self.handle_search_key(key);
         } else if self.in_file_search.is_some() {
             self.handle_in_file_search_key(key);
+        } else if self.filter_bar.is_some() {
+            self.handle_filter_bar_key(key);
         } else if self.tree_filter.is_some() {
             self.handle_tree_filter_key(key);
         } else if self.bug_report.is_some() {

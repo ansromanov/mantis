@@ -361,6 +361,7 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
             rows.push(row_key("toggle_wrap"));
             rows.push(row_key("toggle_line_numbers"));
             rows.push(row_key("toggle_watch"));
+            rows.push(row_key("follow_tail"));
             rows.push(row_static_key(
                 "toggle_pretty_json",
                 "toggle pretty-print for JSON files",
@@ -408,6 +409,7 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
             rows.push(gap.clone());
             rows.push(section("Filters & In-File Search"));
             rows.push(row_key("search_files"));
+            rows.push(row_key("filter_lines"));
             rows.push(row_static_key(
                 "/",
                 "start incremental search inside current file",

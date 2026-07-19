@@ -467,6 +467,15 @@ fn create_base_app() -> App {
         diff_mode: crate::app::DiffMode::default(),
         goto_line: None,
         tree_filter: None,
+        is_log: false,
+        follow_mode: false,
+        follow_pinned: false,
+        log_highlight_cache: RefCell::new(HashMap::new()),
+        content_revision: 0,
+        filter_query: None,
+        filter_display_map: Vec::new(),
+        filter_cache: RefCell::new(HashMap::new()),
+        filter_bar: None,
         new_version_available: None,
         update_rx: None,
     }
@@ -1968,4 +1977,50 @@ fn reload_uses_git_status_refresh_when_compare_base_is_none() {
         app.git_status_map.contains_key(&a),
         "reload without compare_base must use git_status_refresh"
     );
+}
+
+#[test]
+fn log_auto_follow_scrolls_to_bottom_on_grow() {
+    let dir = tempfile::tempdir().unwrap();
+    let file_path = dir.path().join("test.log");
+    fs::write(&file_path, "line 1\n").unwrap();
+
+    let mut app = create_base_app();
+    app.current_file = Some(file_path.clone());
+    app.is_log = true;
+    app.follow_mode = true;
+    app.follow_pinned = true;
+
+    // Load file
+    app.open_file(&file_path);
+    assert_eq!(app.line_count(), 1);
+
+    // Setup channel for watch events
+    let (tx, rx) = std::sync::mpsc::channel();
+    app.file_watch_rx = Some(rx);
+    app.file_watch_path = Some(file_path.clone());
+
+    // Append to file
+    let mut file = fs::OpenOptions::new()
+        .append(true)
+        .open(&file_path)
+        .unwrap();
+    use std::io::Write;
+    writeln!(file, "line 2").unwrap();
+    writeln!(file, "line 3").unwrap();
+    drop(file);
+
+    // Send notify event
+    let mut event = notify::Event::new(notify::EventKind::Modify(notify::event::ModifyKind::Data(
+        notify::event::DataChange::Any,
+    )));
+    event.paths = vec![file_path.clone()];
+    tx.send(Ok(event)).unwrap();
+
+    // Trigger tick/update
+    app.tick();
+
+    // The file should have grown, and follow pinning should scroll it to the bottom
+    assert_eq!(app.line_count(), 3);
+    assert_eq!(app.active_line, 2);
 }
