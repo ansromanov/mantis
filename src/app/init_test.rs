@@ -834,3 +834,4 @@ fn app_new_starts_with_show_raw_markdown_false() {
     );
     fs::remove_dir_all(&root).ok();
 }
+// touched for log follow mode

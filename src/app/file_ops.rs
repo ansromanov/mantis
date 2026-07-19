@@ -325,6 +325,23 @@ impl App {
         self.apply_file_load(path, load);
     }
 
+    pub fn toggle_follow_mode(&mut self) {
+        if self.current_file.is_none() {
+            self.set_status("follow: no file open");
+            return;
+        }
+        self.follow_mode = !self.follow_mode;
+        if self.follow_mode {
+            self.follow_pinned = true;
+            self.active_line = self.display_line_count().saturating_sub(1);
+            self.scroll_active_line_into_view();
+            self.set_status("log follow: active");
+        } else {
+            self.follow_pinned = false;
+            self.set_status("log follow: disabled");
+        }
+    }
+
     /// Applies a computed file load to the content panel: resets scroll and
     /// selection, then installs the rendered content/highlighting/JSON/YAML
     /// state. Shared by the synchronous and worker-thread code paths.
@@ -349,6 +366,29 @@ impl App {
                 });
         }
 
+        let is_log = if load.ok {
+            if let Some(ref vf) = load.virtual_file {
+                let mut first_lines = Vec::new();
+                for i in 0..5 {
+                    if let Some(line) = vf.line_text(i) {
+                        first_lines.push(line);
+                    }
+                }
+                crate::file::is_log_file(path, &first_lines)
+            } else {
+                let first_lines: Vec<&str> =
+                    load.content.iter().take(5).map(|s| s.as_str()).collect();
+                crate::file::is_log_file(path, &first_lines)
+            }
+        } else {
+            false
+        };
+        self.is_log = is_log;
+
+        self.content_revision += 1;
+        self.log_highlight_cache.borrow_mut().clear();
+        self.filter_cache.borrow_mut().clear();
+
         self.is_diff = false;
         self.viewing_revision = None;
         self.diff_rows = Vec::new();
@@ -367,6 +407,15 @@ impl App {
             }
             let (line, scroll) = self.cursor_positions.get(path).copied().unwrap_or((0, 0));
             self.in_file_search = None;
+            if self.config.content.follow_tail_auto && self.is_log {
+                self.follow_mode = true;
+                self.follow_pinned = true;
+            } else {
+                self.follow_mode = false;
+                self.follow_pinned = false;
+            }
+            self.filter_query = None;
+            self.filter_bar = None;
             // Assign raw: content not loaded yet, so content_scroll_max() is stale.
             // The `if is_new_file && load.ok` block below clamps once content is in place.
             self.content_scroll = scroll;
@@ -404,9 +453,14 @@ impl App {
 
         // Clamp restored cursor to current content bounds.
         if is_new_file && load.ok {
-            let max_line = self.display_line_count().saturating_sub(1);
-            self.active_line = self.active_line.min(max_line);
-            self.clamp_content_scroll();
+            if self.follow_mode && self.follow_pinned {
+                self.active_line = self.display_line_count().saturating_sub(1);
+                self.content_scroll = self.content_scroll_max();
+            } else {
+                let max_line = self.display_line_count().saturating_sub(1);
+                self.active_line = self.active_line.min(max_line);
+                self.clamp_content_scroll();
+            }
         }
 
         if load.ok {

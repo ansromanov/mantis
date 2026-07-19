@@ -345,6 +345,17 @@ pub struct App {
     pub yaml_anchor_count: usize,
     /// Number of YAML aliases (`*name`) found in the current file.
     pub yaml_alias_count: usize,
+    pub is_log: bool,
+    pub follow_mode: bool,
+    pub follow_pinned: bool,
+    pub(crate) log_highlight_cache:
+        std::cell::RefCell<std::collections::HashMap<usize, Vec<(ratatui::style::Style, String)>>>,
+    pub content_revision: u64,
+    pub filter_query: Option<String>,
+    pub filter_display_map: Vec<usize>,
+    pub(crate) filter_cache:
+        std::cell::RefCell<std::collections::HashMap<(u64, String), Vec<usize>>>,
+    pub filter_bar: Option<crate::search::FilterBarState>,
     /// Background worker that reads/highlights files and runs git diffs off the
     /// main thread so tree navigation never blocks the event loop.
     loader: Loader,

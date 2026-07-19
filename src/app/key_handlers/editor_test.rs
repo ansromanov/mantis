@@ -1276,3 +1276,4 @@ fn dispatch_repo_commit_log_noop_without_git_info() {
     assert!(app.repo_log.is_none());
     fs::remove_dir_all(&root).ok();
 }
+// touched for log follow mode

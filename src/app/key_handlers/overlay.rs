@@ -97,6 +97,30 @@ impl App {
         }
     }
 
+    pub(super) fn handle_filter_bar_key(&mut self, key: KeyEvent) {
+        let Some(ref mut s) = self.filter_bar else {
+            return;
+        };
+        match handle_list_picker_key(s, &key) {
+            OverlayKey::Activate | OverlayKey::Close => {
+                if s.query.is_empty() {
+                    self.filter_query = None;
+                } else {
+                    self.filter_query = Some(s.query.clone());
+                }
+                self.filter_bar = None;
+                self.rebuild_filter_display_map();
+                self.clamp_content_scroll();
+            }
+            OverlayKey::Handled => {
+                self.filter_query = Some(s.query.clone());
+                self.rebuild_filter_display_map();
+                self.clamp_content_scroll();
+            }
+            _ => {}
+        }
+    }
+
     pub(crate) fn in_file_search_next(&mut self) {
         if let Some(s) = &mut self.in_file_search {
             if !s.matches.is_empty() {

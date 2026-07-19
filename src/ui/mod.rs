@@ -63,6 +63,10 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         popups::draw_in_file_search(f, app, horiz[1]);
     }
 
+    if app.filter_bar.is_some() {
+        popups::draw_filter_bar(f, app, horiz[1]);
+    }
+
     if app.tree_filter.is_some() {
         popups::draw_tree_filter(f, app, horiz[0]);
     }

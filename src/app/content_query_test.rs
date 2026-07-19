@@ -37,6 +37,25 @@ fn seed_plugin(app: &mut App, path: PathBuf, lines: &[&str]) {
 }
 
 #[test]
+fn rebuild_filter_display_map_filters_correctly() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.virtual_file = None;
+    app.content = vec![
+        "error message".to_string(),
+        "info msg".to_string(),
+        "debug warning".to_string(),
+        "another error".to_string(),
+    ];
+    app.filter_query = Some("error".to_string());
+    app.rebuild_filter_display_map();
+    assert_eq!(app.display_line_count(), 2);
+    assert_eq!(app.display_to_physical(0), 0);
+    assert_eq!(app.display_to_physical(1), 3);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn line_count_reads_plugin_content() {
     let root = temp_root();
     let mut app = app_for(&root);

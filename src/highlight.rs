@@ -223,6 +223,58 @@ fn syn_color(c: syntect::highlighting::Color) -> Color {
     }
 }
 
+static LOG_RE: OnceLock<regex::Regex> = OnceLock::new();
+
+fn get_log_re() -> &'static regex::Regex {
+    LOG_RE.get_or_init(|| {
+        regex::Regex::new(
+            r"(?i)\b(ERROR|WARN|WARNING|INFO|DEBUG|TRACE)\b|(\b\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\b|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\b)"
+        ).unwrap()
+    })
+}
+
+/// Colorize a log line on the fly using regular expressions and theme roles.
+pub fn colorize_log_line(line: &str, theme: &crate::theme::Theme) -> Vec<(Style, String)> {
+    let re = get_log_re();
+    let mut spans = Vec::new();
+    let mut last_idx = 0;
+
+    for mat in re.find_iter(line) {
+        let start = mat.start();
+        let end = mat.end();
+
+        if start > last_idx {
+            spans.push((
+                Style::default().fg(theme.text),
+                line[last_idx..start].to_string(),
+            ));
+        }
+
+        let token = &line[start..end];
+        let upper = token.to_uppercase();
+        let style = match upper.as_str() {
+            "ERROR" => Style::default().fg(theme.diff_del),
+            "WARN" | "WARNING" => Style::default().fg(theme.git_dirty),
+            "INFO" => Style::default().fg(theme.git_clean),
+            "DEBUG" => Style::default().fg(theme.accent_alt),
+            "TRACE" => Style::default().fg(theme.dim),
+            _ => Style::default().fg(theme.dim), // timestamp
+        };
+
+        spans.push((style, token.to_string()));
+        last_idx = end;
+    }
+
+    if last_idx < line.len() {
+        spans.push((
+            Style::default().fg(theme.text),
+            line[last_idx..].to_string(),
+        ));
+    }
+
+    spans
+}
+
 #[cfg(test)]
 #[path = "highlight_test.rs"]
 mod tests;

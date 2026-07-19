@@ -75,3 +75,40 @@ fn external_truncation_does_not_sigbus_owned() {
     assert_eq!(vf.line_text(1), Some("line2"));
     assert_eq!(vf.line_text(2), Some("line3"));
 }
+
+#[test]
+fn update_growth_appends_new_lines_owned() {
+    let mut f = tempfile::NamedTempFile::new().unwrap();
+    f.write_all(b"line1\nline2\n").unwrap();
+    f.flush().unwrap();
+
+    let mut vf = VirtualFile::open(f.path()).unwrap();
+    assert_eq!(vf.line_count(), 2);
+    assert_eq!(vf.line_text(1), Some("line2"));
+
+    // Append some content
+    f.write_all(b"line3\n").unwrap();
+    f.flush().unwrap();
+
+    let res = vf.update_growth(f.path());
+    assert_eq!(res, Some(true));
+    assert_eq!(vf.line_count(), 3);
+    assert_eq!(vf.line_text(2), Some("line3"));
+}
+
+#[test]
+fn update_growth_truncation_reopens() {
+    let mut f = tempfile::NamedTempFile::new().unwrap();
+    f.write_all(b"line1\nline2\n").unwrap();
+    f.flush().unwrap();
+
+    let mut vf = VirtualFile::open(f.path()).unwrap();
+    assert_eq!(vf.line_count(), 2);
+
+    // Truncate it
+    f.as_file_mut().set_len(0).unwrap();
+    f.flush().unwrap();
+
+    let res = vf.update_growth(f.path());
+    assert_eq!(res, Some(false));
+}

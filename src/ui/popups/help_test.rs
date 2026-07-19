@@ -1009,3 +1009,4 @@ fn help_git_section_shows_repo_commit_log_key() {
         "help overlay must list the repo commit log entry in the Git section, got:\n{joined}"
     );
 }
+// touched for log follow mode

@@ -334,3 +334,13 @@ fn highlight_dockerfile_highlights_instructions() {
         "expected multiple spans for Dockerfile FROM instruction"
     );
 }
+
+#[test]
+fn colorize_log_line_works() {
+    let theme = crate::theme::Theme::default();
+    let spans = colorize_log_line("2026-07-19T12:00:00Z INFO application started", &theme);
+    assert!(spans.len() >= 3);
+    assert_eq!(spans[0].0.fg, Some(theme.dim));
+    let info_span = spans.iter().find(|(_, text)| text == "INFO").unwrap();
+    assert_eq!(info_span.0.fg, Some(theme.git_clean));
+}

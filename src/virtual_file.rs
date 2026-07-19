@@ -137,6 +137,81 @@ impl VirtualFile {
             .map(unicode_width::UnicodeWidthStr::width)
     }
 
+    /// Check if the file grew on disk, and if so, extend the index for the appended range only.
+    /// Returns `Some(true)` if the file grew or stayed same, and `Some(false)` if the file was
+    /// truncated (requires full reload). Returns `None` if an error occurs.
+    pub fn update_growth(&mut self, path: &Path) -> Option<bool> {
+        let old_len = self.data.as_bytes().len();
+        let file = File::open(path).ok()?;
+        let metadata = file.metadata().ok()?;
+        let new_len = metadata.len() as usize;
+
+        if new_len < old_len {
+            return Some(false); // Truncated
+        }
+        if new_len == old_len {
+            return Some(true); // No change
+        }
+
+        // Extend data
+        let mut new_data = match &mut self.data {
+            VirtualFileData::Owned(ref mut buf) => {
+                if new_len as u64 <= MMAP_THRESHOLD {
+                    use std::io::Seek;
+                    let mut file = file;
+                    file.seek(std::io::SeekFrom::Start(old_len as u64)).ok()?;
+                    let mut extra = vec![0; new_len - old_len];
+                    file.read_exact(&mut extra).ok()?;
+                    buf.extend_from_slice(&extra);
+                    None
+                } else {
+                    // Transition to mapped
+                    let mmap = unsafe { Mmap::map(&file).ok()? };
+                    Some(VirtualFileData::Mapped(mmap))
+                }
+            }
+            VirtualFileData::Mapped(_) => {
+                let mmap = unsafe { Mmap::map(&file).ok()? };
+                Some(VirtualFileData::Mapped(mmap))
+            }
+        };
+
+        if let Some(nd) = new_data.take() {
+            self.data = nd;
+        }
+
+        // Validate new UTF-8 range
+        let bytes = self.data.as_bytes();
+        let appended_bytes = &bytes[old_len..new_len];
+        if is_binary_bytes(appended_bytes) {
+            return None;
+        }
+        if std::str::from_utf8(appended_bytes).is_err() {
+            return None;
+        }
+
+        // If the file ended with a newline previously, then old_len starts a new line.
+        if old_len > 0 && bytes[old_len - 1] == b'\n' {
+            self.line_offsets.push(old_len);
+        }
+
+        // Now scan the appended bytes.
+        for (i, &b) in appended_bytes.iter().enumerate() {
+            let offset = old_len + i;
+            if b == b'\n' {
+                self.line_offsets.push(offset + 1);
+            }
+        }
+
+        // If the file ends with `\n`, pop the last offset.
+        if self.line_offsets.last().is_some_and(|&o| o == bytes.len()) {
+            self.line_offsets.pop();
+        }
+
+        self.count = self.line_offsets.len();
+        Some(true)
+    }
+
     /// Returns the raw bytes of the file (owned or memory-mapped). Used by
     /// encoding and line-ending detection in the file loader.
     pub fn raw_bytes(&self) -> &[u8] {

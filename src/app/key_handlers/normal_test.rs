@@ -1632,3 +1632,31 @@ fn esc_does_not_touch_file_at_revision_when_none() {
     assert_eq!(app.content_scroll, scroll_before);
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn log_follow_mode_toggles_and_navigation() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.is_log = true;
+    app.follow_mode = false;
+    app.follow_pinned = false;
+
+    // Toggle follow mode via keybind 'F' (follow_tail action)
+    app.handle_key(key(KeyCode::Char('F')));
+    assert!(app.follow_mode);
+    assert!(app.follow_pinned);
+
+    // Navigating up ('k') should unpin the follow mode but keep it enabled
+    app.handle_key(key(KeyCode::Char('k')));
+    assert!(app.follow_mode);
+    assert!(!app.follow_pinned);
+
+    // Navigating to bottom ('G') should pin the follow mode again
+    app.handle_key(key(KeyCode::Char('G')));
+    assert!(app.follow_mode);
+    assert!(app.follow_pinned);
+
+    fs::remove_dir_all(&root).ok();
+}

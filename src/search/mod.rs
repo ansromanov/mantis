@@ -22,8 +22,9 @@ pub use repo_log::RepoLogState;
 // target (it is used only by test code and as a field type of `InFileSearch`).
 #[allow(unused_imports)]
 pub use pickers::{
-    BugReportFocus, BugReportState, GotoLineState, InFileMatch, InFileSearch, PluginPicker,
-    RecentFilesState, RevisionItem, RevisionPicker, RevisionTab, ThemePicker, TreeFilter,
+    BugReportFocus, BugReportState, FilterBarState, GotoLineState, InFileMatch, InFileSearch,
+    PluginPicker, RecentFilesState, RevisionItem, RevisionPicker, RevisionTab, ThemePicker,
+    TreeFilter,
 };
 
 use std::collections::{HashMap, HashSet};

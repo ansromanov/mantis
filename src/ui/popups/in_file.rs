@@ -85,6 +85,50 @@ pub(crate) fn draw_in_file_search(f: &mut Frame, app: &mut App, area: Rect) {
     );
 }
 
+pub(crate) fn draw_filter_bar(f: &mut Frame, app: &mut App, area: Rect) {
+    let theme = &app.theme;
+    let Some(s) = app.filter_bar.as_ref() else {
+        return;
+    };
+    let bar_y = area.y + area.height.saturating_sub(2);
+    let bar_rect = Rect {
+        x: area.x + 1,
+        y: bar_y,
+        width: area.width.saturating_sub(2),
+        height: 1,
+    };
+    if bar_rect.width < 4 {
+        return;
+    }
+    f.render_widget(Clear, bar_rect);
+
+    let total = app.line_count();
+    let visible = app.filter_display_map.len();
+    let hidden = total.saturating_sub(visible);
+    let suffix = format!(" (hidden: {hidden})");
+    let max_w = bar_rect.width as usize;
+    let query_display: String = s
+        .query
+        .chars()
+        .take(max_w.saturating_sub(suffix.len() + 10))
+        .collect();
+
+    f.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::styled(
+                "Filter: ",
+                Style::default()
+                    .fg(theme.accent_alt)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(query_display.as_str()),
+            Span::styled("█", Style::default().fg(theme.accent_alt)),
+            Span::styled(suffix, Style::default().fg(theme.dim)),
+        ])),
+        bar_rect,
+    );
+}
+
 #[cfg(test)]
 #[path = "in_file_test.rs"]
 mod tests;

@@ -488,3 +488,4 @@ fn draw_word_wrap_off_behaves_unchanged() {
 }
 
 // Modified for test requirements
+// touched for log follow mode

@@ -46,8 +46,37 @@ impl App {
             self.config_dirty = true;
             self.config_dirty_at = Some(self.now());
         }
-        if self.auto_watch && self.drain_file_watch() {
-            self.reload_content();
+        let file_changed = self.drain_file_watch();
+        if file_changed {
+            if self.follow_mode {
+                if let Some(ref path) = self.current_file.clone() {
+                    if let Some(ref mut vf) = self.virtual_file {
+                        match vf.update_growth(path) {
+                            Some(true) => {
+                                self.content_revision += 1;
+                                self.rebuild_filter_display_map();
+                                if self.follow_pinned {
+                                    self.active_line = self.display_line_count().saturating_sub(1);
+                                    self.scroll_active_line_into_view();
+                                }
+                            }
+                            Some(false) => {
+                                self.reload_content();
+                                self.set_status("file truncated — reloaded");
+                            }
+                            None => {}
+                        }
+                    } else {
+                        self.reload_content();
+                        if self.follow_pinned {
+                            self.active_line = self.display_line_count().saturating_sub(1);
+                            self.scroll_active_line_into_view();
+                        }
+                    }
+                }
+            } else if self.auto_watch {
+                self.reload_content();
+            }
         }
         if let Some(ref mut s) = self.search {
             s.maybe_refresh();

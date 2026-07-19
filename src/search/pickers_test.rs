@@ -2,6 +2,18 @@ use super::*;
 
 use std::path::PathBuf;
 
+// -- FilterBarState ----------------------------------------------------------
+
+#[test]
+fn filter_bar_state_works() {
+    let mut f = FilterBarState::new();
+    assert_eq!(f.query, "");
+    f.query_push('x');
+    assert_eq!(f.query, "x");
+    f.query_pop();
+    assert_eq!(f.query, "");
+}
+
 // -- InFileSearch ----------------------------------------------------------
 
 #[test]

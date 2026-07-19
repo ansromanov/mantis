@@ -1233,3 +1233,4 @@ fn open_file_with_show_raw_markdown_true_skips_plugin_open() {
 
     fs::remove_dir_all(&root).ok();
 }
+// touched for log follow mode

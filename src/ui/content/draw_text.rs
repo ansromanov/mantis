@@ -133,27 +133,40 @@ pub(crate) fn render_virtual_file<'a>(
         .iter()
         .enumerate()
         .map(|(offset, &physical_idx)| {
+            let regions_owned: Vec<(Style, String)> =
+                if app.is_log && app.config.content.log_colorizing {
+                    let mut cache = app.log_highlight_cache.borrow_mut();
+                    if let Some(cached) = cache.get(&physical_idx) {
+                        cached.clone()
+                    } else {
+                        let text = vf.line_text(physical_idx).unwrap_or("");
+                        let colorized = crate::highlight::colorize_log_line(text, &app.theme);
+                        cache.insert(physical_idx, colorized.clone());
+                        colorized
+                    }
+                } else if has_highlight {
+                    if let Some(regions) = highlighted.get(offset) {
+                        regions.iter().map(|(s, t)| (*s, t.clone())).collect()
+                    } else {
+                        vec![(
+                            Style::default(),
+                            vf.line_text(physical_idx).unwrap_or("").to_string(),
+                        )]
+                    }
+                } else {
+                    vec![(
+                        Style::default(),
+                        vf.line_text(physical_idx).unwrap_or("").to_string(),
+                    )]
+                };
+
             if fold_gw > 0 {
                 if let Some(ri) = app.region_idx_at(physical_idx) {
                     if app.folded.contains(&ri) {
-                        let header_spans: Vec<Span> = if has_highlight {
-                            if let Some(regions) = highlighted.get(offset) {
-                                let regions_owned: Vec<(Style, String)> =
-                                    regions.iter().map(|(s, t)| (*s, t.clone())).collect();
-                                regions_owned
-                                    .iter()
-                                    .map(|(s, t)| Span::styled(t.clone(), *s))
-                                    .collect()
-                            } else {
-                                vec![Span::raw(
-                                    vf.line_text(physical_idx).unwrap_or("").to_string(),
-                                )]
-                            }
-                        } else {
-                            vec![Span::raw(
-                                vf.line_text(physical_idx).unwrap_or("").to_string(),
-                            )]
-                        };
+                        let header_spans: Vec<Span> = regions_owned
+                            .iter()
+                            .map(|(s, t)| Span::styled(t.clone(), *s))
+                            .collect();
                         let mut line_spans = header_spans;
                         line_spans.push(Span::styled("  …", ellipsis_style));
                         return Line::from(line_spans);
@@ -161,58 +174,30 @@ pub(crate) fn render_virtual_file<'a>(
                 }
             }
 
-            if has_highlight {
-                if let Some(regions) = highlighted.get(offset) {
-                    let regions_owned: Vec<(Style, String)> =
-                        regions.iter().map(|(s, t)| (*s, t.clone())).collect();
-                    let spans: Vec<Span> = if let Some(s) = in_file_search {
-                        apply_search_to_regions(&regions_owned, physical_idx, s, &app.theme)
-                    } else if let Some(((sl, sc), (el, ec))) = sel {
-                        if physical_idx >= sl && physical_idx <= el {
-                            let col_start = if physical_idx == sl { sc } else { 0 };
-                            let col_end = if physical_idx == el { ec } else { usize::MAX };
-                            apply_selection(
-                                &regions_owned,
-                                col_start,
-                                col_end,
-                                sel_bg,
-                                app.theme.is_monochrome(),
-                            )
-                        } else {
-                            regions_owned
-                                .iter()
-                                .map(|(s, t)| Span::styled(t.clone(), *s))
-                                .collect()
-                        }
-                    } else {
-                        regions_owned
-                            .iter()
-                            .map(|(s, t)| Span::styled(t.clone(), *s))
-                            .collect()
-                    };
-                    return Line::from(spans);
-                }
-            }
-            let text = vf.line_text(physical_idx).unwrap_or("");
-            let region = vec![(Style::default(), text.to_string())];
             let spans: Vec<Span> = if let Some(s) = in_file_search {
-                apply_search_to_regions(&region, physical_idx, s, &app.theme)
+                apply_search_to_regions(&regions_owned, physical_idx, s, &app.theme)
             } else if let Some(((sl, sc), (el, ec))) = sel {
                 if physical_idx >= sl && physical_idx <= el {
                     let col_start = if physical_idx == sl { sc } else { 0 };
                     let col_end = if physical_idx == el { ec } else { usize::MAX };
                     apply_selection(
-                        &region,
+                        &regions_owned,
                         col_start,
                         col_end,
                         sel_bg,
                         app.theme.is_monochrome(),
                     )
                 } else {
-                    vec![Span::raw(text.to_string())]
+                    regions_owned
+                        .iter()
+                        .map(|(s, t)| Span::styled(t.clone(), *s))
+                        .collect()
                 }
             } else {
-                vec![Span::raw(text.to_string())]
+                regions_owned
+                    .iter()
+                    .map(|(s, t)| Span::styled(t.clone(), *s))
+                    .collect()
             };
             Line::from(spans)
         })
@@ -283,29 +268,41 @@ pub(crate) fn render_inline_fallback<'a>(
     let content: Vec<Line> = display_phys
         .iter()
         .map(|&physical_idx| {
+            let regions_owned: Vec<(Style, String)> =
+                if app.is_log && app.config.content.log_colorizing {
+                    let mut cache = app.log_highlight_cache.borrow_mut();
+                    if let Some(cached) = cache.get(&physical_idx) {
+                        cached.clone()
+                    } else {
+                        let text = app.line_text(physical_idx).unwrap_or("");
+                        let colorized = crate::highlight::colorize_log_line(text, &app.theme);
+                        cache.insert(physical_idx, colorized.clone());
+                        colorized
+                    }
+                } else if has_highlight {
+                    if let Some(regions) = app.highlighted.get(physical_idx) {
+                        regions.iter().map(|(s, t)| (*s, t.clone())).collect()
+                    } else {
+                        vec![(
+                            Style::default(),
+                            app.line_text(physical_idx).unwrap_or("").to_string(),
+                        )]
+                    }
+                } else {
+                    vec![(
+                        Style::default(),
+                        app.line_text(physical_idx).unwrap_or("").to_string(),
+                    )]
+                };
+
             if fold_gw > 0 {
                 if let Some(ri) = app.region_idx_at(physical_idx) {
                     if app.folded.contains(&ri) {
                         let ellipsis_style = Style::default().fg(app.theme.dim);
-                        let header_spans: Vec<Span> = if has_highlight {
-                            app.highlighted
-                                .get(physical_idx)
-                                .map(|regions| {
-                                    regions
-                                        .iter()
-                                        .map(|(s, t)| Span::styled(t.clone(), *s))
-                                        .collect()
-                                })
-                                .unwrap_or_else(|| {
-                                    vec![Span::raw(
-                                        app.content.get(physical_idx).cloned().unwrap_or_default(),
-                                    )]
-                                })
-                        } else {
-                            vec![Span::raw(
-                                app.content.get(physical_idx).cloned().unwrap_or_default(),
-                            )]
-                        };
+                        let header_spans: Vec<Span> = regions_owned
+                            .iter()
+                            .map(|(s, t)| Span::styled(t.clone(), *s))
+                            .collect();
                         let mut line_spans = header_spans;
                         line_spans.push(Span::styled("  …", ellipsis_style));
                         return Line::from(line_spans);
@@ -313,62 +310,30 @@ pub(crate) fn render_inline_fallback<'a>(
                 }
             }
 
-            if has_highlight {
-                if let Some(regions) = app.highlighted.get(physical_idx) {
-                    let regions_owned: Vec<(Style, String)> =
-                        regions.iter().map(|(s, t)| (*s, t.clone())).collect();
-                    let spans: Vec<Span> = if let Some(s) = in_file_search {
-                        apply_search_to_regions(&regions_owned, physical_idx, s, &app.theme)
-                    } else if let Some(((sl, sc), (el, ec))) = sel {
-                        if physical_idx >= sl && physical_idx <= el {
-                            let col_start = if physical_idx == sl { sc } else { 0 };
-                            let col_end = if physical_idx == el { ec } else { usize::MAX };
-                            apply_selection(
-                                &regions_owned,
-                                col_start,
-                                col_end,
-                                sel_bg,
-                                app.theme.is_monochrome(),
-                            )
-                        } else {
-                            regions_owned
-                                .iter()
-                                .map(|(s, t)| Span::styled(t.clone(), *s))
-                                .collect()
-                        }
-                    } else {
-                        regions_owned
-                            .iter()
-                            .map(|(s, t)| Span::styled(t.clone(), *s))
-                            .collect()
-                    };
-                    return Line::from(spans);
-                }
-            }
-            let text = app
-                .content
-                .get(physical_idx)
-                .map(|s| s.as_str())
-                .unwrap_or("");
-            let region = vec![(Style::default(), text.to_string())];
             let spans: Vec<Span> = if let Some(s) = in_file_search {
-                apply_search_to_regions(&region, physical_idx, s, &app.theme)
+                apply_search_to_regions(&regions_owned, physical_idx, s, &app.theme)
             } else if let Some(((sl, sc), (el, ec))) = sel {
                 if physical_idx >= sl && physical_idx <= el {
                     let col_start = if physical_idx == sl { sc } else { 0 };
                     let col_end = if physical_idx == el { ec } else { usize::MAX };
                     apply_selection(
-                        &region,
+                        &regions_owned,
                         col_start,
                         col_end,
                         sel_bg,
                         app.theme.is_monochrome(),
                     )
                 } else {
-                    vec![Span::raw(text.to_string())]
+                    regions_owned
+                        .iter()
+                        .map(|(s, t)| Span::styled(t.clone(), *s))
+                        .collect()
                 }
             } else {
-                vec![Span::raw(text.to_string())]
+                regions_owned
+                    .iter()
+                    .map(|(s, t)| Span::styled(t.clone(), *s))
+                    .collect()
             };
             Line::from(spans)
         })

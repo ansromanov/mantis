@@ -63,3 +63,4 @@ fn draw_in_file_search_some_renders_toggles() {
     }
     assert!(rendered_text.contains("[Aa]"));
 }
+// touched for log follow mode

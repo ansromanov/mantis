@@ -1330,3 +1330,4 @@ fn handle_repo_log_key_j_with_query_is_text_not_paging() {
     assert_eq!(app.repo_log.as_ref().unwrap().query, "cj");
     fs::remove_dir_all(&root).ok();
 }
+// touched for log follow mode
