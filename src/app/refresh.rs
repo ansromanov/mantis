@@ -51,13 +51,17 @@ impl App {
             if self.follow_mode {
                 if let Some(ref path) = self.current_file.clone() {
                     if let Some(ref mut vf) = self.virtual_file {
+                        let lines_before = vf.line_count();
                         match vf.update_growth(path) {
                             Some(true) => {
-                                self.content_revision += 1;
-                                self.rebuild_filter_display_map();
-                                if self.follow_pinned {
-                                    self.active_line = self.display_line_count().saturating_sub(1);
-                                    self.scroll_active_line_into_view();
+                                if vf.line_count() != lines_before {
+                                    self.content_revision += 1;
+                                    self.rebuild_filter_display_map();
+                                    if self.follow_pinned {
+                                        self.active_line =
+                                            self.display_line_count().saturating_sub(1);
+                                        self.scroll_active_line_into_view();
+                                    }
                                 }
                             }
                             Some(false) => {

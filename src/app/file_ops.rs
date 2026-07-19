@@ -452,7 +452,7 @@ impl App {
         }
 
         // Clamp restored cursor to current content bounds.
-        if is_new_file && load.ok {
+        if load.ok && (is_new_file || (self.follow_mode && self.follow_pinned)) {
             if self.follow_mode && self.follow_pinned {
                 self.active_line = self.display_line_count().saturating_sub(1);
                 self.content_scroll = self.content_scroll_max();
