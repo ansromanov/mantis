@@ -337,6 +337,32 @@ Key pages to consider when changing code:
 | `pre-commit install` | Install git hooks (once after clone) |
 | `pre-commit run --all-files` | Run all hooks manually |
 
+## Worktrees (mandatory for all agents)
+
+**Every AI agent working in this repo — Claude Code, Codex, opencode, Kilo Code,
+Antigravity, or any other — must do its work in a dedicated git worktree, never
+directly in the primary checkout.** This keeps parallel agent sessions (and parallel
+tasks within one session) from clobbering each other's edits or switching the branch
+out from under a running build/test.
+
+```bash
+git worktree add .agent/worktrees/<branch-name> -b <branch-name> origin/main
+cd .agent/worktrees/<branch-name>
+```
+
+- `.agent/worktrees/` is already gitignored (and symlinked as `.claude/worktrees` /
+  `.opencode/worktrees`), so worktrees never get committed.
+- Do all editing, building, and testing inside the worktree directory, not the repo
+  root.
+- Once the PR merges (or the branch is abandoned), remove the worktree:
+  `git worktree remove .agent/worktrees/<branch-name>`.
+- This is in addition to, not a replacement for, `just new` for branch creation —
+  run `just new` (or `git worktree add -b`) from inside the fresh worktree's parent
+  checkout as shown above.
+- Claude Code subagents follow this automatically via `isolation: "worktree"` (see
+  `CLAUDE.md`); this section extends the same rule to top-level/interactive sessions
+  of every agent.
+
 ## Branching
 
 Always branch from `origin/main`, never from an existing feature branch:
