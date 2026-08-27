@@ -115,6 +115,34 @@ fn scroll_up_at_content_top_is_noop() {
 }
 
 #[test]
+fn wheel_scrolling_keeps_text_cursor_visible() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.content_area = Rect {
+        x: 40,
+        y: 0,
+        width: 40,
+        height: 10,
+    };
+    app.active_line = 0;
+
+    app.handle_mouse(scroll_down_at(50, 5));
+
+    assert_eq!(app.content_scroll, 3);
+    assert_eq!(app.active_line, 3);
+
+    app.handle_mouse(scroll_up_at(50, 5));
+
+    assert_eq!(app.content_scroll, 0);
+    assert_eq!(
+        app.active_line, 3,
+        "cursor should remain visible when scrolling up"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn scroll_outside_content_does_not_mark_dirty() {
     let root = temp_tree();
     let mut app = app_for(&root);

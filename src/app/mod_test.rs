@@ -412,6 +412,7 @@ fn scroll_wheel_scrolls_content() {
 
     app.handle_mouse(mouse(MouseEventKind::ScrollDown, 1, 1));
     assert_eq!(app.content_scroll, 3);
+    assert_eq!(app.focus, Focus::Content);
     app.handle_mouse(mouse(MouseEventKind::ScrollUp, 1, 1));
     assert_eq!(app.content_scroll, 0);
     fs::remove_dir_all(&root).ok();

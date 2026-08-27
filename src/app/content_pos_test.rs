@@ -473,3 +473,28 @@ fn scroll_blame_into_view_does_not_nudge_when_already_in_view() {
     assert_eq!(app.content_scroll, 5, "content_scroll must not change");
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn scroll_content_by_keeps_cursor_in_view() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.content = (0..50).map(|i| format!("line {i}")).collect();
+    app.virtual_file = None;
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 30,
+        height: 10,
+    };
+
+    app.scroll_content_by(3);
+
+    assert_eq!(app.content_scroll, 3);
+    assert_eq!(app.active_line, 3);
+
+    app.scroll_content_by(-3);
+
+    assert_eq!(app.content_scroll, 0);
+    assert_eq!(app.active_line, 3);
+    fs::remove_dir_all(&root).ok();
+}
