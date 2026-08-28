@@ -109,9 +109,10 @@ impl App {
         let Some(ref mut s) = self.filter_bar else {
             return;
         };
+        let cancel = key.code == KeyCode::Esc;
         match handle_list_picker_key(s, &key) {
             OverlayKey::Activate | OverlayKey::Close => {
-                if s.query.is_empty() {
+                if cancel || s.query.is_empty() {
                     self.filter_query = None;
                 } else {
                     self.filter_query = Some(s.query.clone());
