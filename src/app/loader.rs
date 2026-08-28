@@ -158,8 +158,8 @@ pub(super) fn compute_file_load(
     // Try memory-mapped virtual file first (lazy, no full content in memory).
     // JSON, YAML, and CSV/TSV are excluded (they need full content for rendering) unless
     // the file exceeds the prettify size limit.
-    if (!is_json && !is_yaml && !is_jsonl && !crate::secret_mask::content_probe(path)) || too_large
-        && !is_csv
+    if (!is_json && !is_yaml && !is_jsonl && !is_csv && !crate::secret_mask::content_probe(path))
+        || too_large
     {
         if let Some(vf) = VirtualFile::open(path) {
             let mut load = FileLoad::empty(is_json);
