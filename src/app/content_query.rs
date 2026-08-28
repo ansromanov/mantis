@@ -31,6 +31,21 @@ impl App {
         }
     }
 
+    /// Rebuilds the visible JSONL rows after an object is expanded or
+    /// collapsed, preserving the physical source-line mapping.
+    pub(crate) fn rebuild_jsonl_display(&mut self) {
+        if !self.is_jsonl {
+            return;
+        }
+        let (display, map) = crate::jsonl::build_display(&self.jsonl_source, &self.jsonl_expanded);
+        self.content = display;
+        self.jsonl_display_map = map;
+        self.highlighted = self.highlighter.highlight(
+            &self.current_file.clone().unwrap_or_default(),
+            &self.content,
+        );
+    }
+
     /// Returns the text of the 0-indexed line, consulting the active content
     /// source: plugin content, pretty JSON, virtual file, or raw content vec.
     pub fn line_text(&self, index: usize) -> Option<&str> {
@@ -96,6 +111,11 @@ impl App {
                 .get(display)
                 .copied()
                 .unwrap_or(display)
+        } else if self.is_jsonl && !self.jsonl_display_map.is_empty() {
+            self.jsonl_display_map
+                .get(display)
+                .copied()
+                .unwrap_or(display)
         } else if self.fold_display_map.is_empty() {
             display
         } else {
@@ -115,6 +135,11 @@ impl App {
                 .iter()
                 .position(|&p| p >= physical)
                 .unwrap_or(self.filter_display_map.len().saturating_sub(1))
+        } else if self.is_jsonl && !self.jsonl_display_map.is_empty() {
+            self.jsonl_display_map
+                .iter()
+                .position(|&line| line >= physical)
+                .unwrap_or(self.jsonl_display_map.len().saturating_sub(1))
         } else if self.fold_display_map.is_empty() {
             physical
         } else {

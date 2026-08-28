@@ -39,6 +39,7 @@ mod file;
 mod fold;
 mod git;
 mod highlight;
+mod jsonl;
 mod list_picker;
 mod pager;
 mod plugin;

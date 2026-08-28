@@ -26,6 +26,10 @@ impl App {
         self.current_syntax = None;
         self.virtual_file = None;
         self.is_json = false;
+        self.is_jsonl = false;
+        self.jsonl_source.clear();
+        self.jsonl_expanded.clear();
+        self.jsonl_display_map.clear();
         self.show_pretty_json = false;
         self.json_pretty_text = Vec::new();
         self.json_pretty_lines = Vec::new();

@@ -153,3 +153,18 @@ fn content_query_works_after_opening_file() {
     assert!(app.line_text(2).is_none());
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn jsonl_display_map_points_expanded_rows_to_source_line() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.virtual_file = None;
+    app.is_jsonl = true;
+    app.jsonl_source = vec![r#"{"nested":{"ok":true}}"#.into()];
+    app.jsonl_expanded.insert(0);
+    app.rebuild_jsonl_display();
+    assert!(app.line_count() > 1);
+    assert_eq!(app.display_to_physical(0), 0);
+    assert!(app.line_text(1).is_some());
+    fs::remove_dir_all(&root).ok();
+}
