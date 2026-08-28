@@ -806,6 +806,25 @@ fn help_settings_tab_references_real_open_config_action() {
     );
 }
 
+#[test]
+fn help_uses_friendly_labels_for_palette_only_actions() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    let backend = TestBackend::new(120, 100);
+    let mut terminal = Terminal::new(backend).unwrap();
+
+    app.help_tab = 2; // Content tab
+    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
+    let content = buffer_rows(&terminal).join("\n");
+    assert!(!content.contains("toggle_pretty_json"));
+
+    app.help_tab = 5; // Settings tab
+    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
+    let settings = buffer_rows(&terminal).join("\n");
+    assert!(!settings.contains("open_config_in_editor"));
+    assert!(settings.contains("Palette"));
+}
+
 /// Config/plugin/theme paths shown in help must reflect `$XDG_CONFIG_HOME`
 /// support, not just the `~/.config` default.
 #[test]
