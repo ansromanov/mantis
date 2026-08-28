@@ -361,6 +361,13 @@ for this — bind `toggle_pretty_json` in `mantis.toml` if you want one.
 JSON pretty-printing itself is always core, not a plugin concern — the `json`
 plugin only adds fold regions on top of it.
 
+## JSON Lines
+
+Files ending in `.jsonl` or `.ndjson` are shown as one compact object per line.
+Press `Space` on an object to expand it into formatted JSON in place; press
+`Space` again to collapse it. Invalid or partially-written lines remain visible
+as plain text, which keeps mixed structured logs readable.
+
 ## Log follow mode
 
 When viewing log files (detected via `.log` extension or level/timestamp sniffing), mantis automatically enables log mode.

@@ -29,6 +29,23 @@ fn json_produces_pretty_view() {
 }
 
 #[test]
+fn jsonl_loads_collapsed_rows() {
+    let mut f = tempfile::NamedTempFile::with_suffix(".jsonl").unwrap();
+    use std::io::Write;
+    f.write_all(
+        br#"{"level":"info","message":"ready"}
+{"level":"error","message":"failed"}
+"#,
+    )
+    .unwrap();
+    let load = compute_file_load(f.path(), &hl(), usize::MAX);
+    assert!(load.is_jsonl);
+    assert_eq!(load.content.len(), 2);
+    assert!(load.content[0].contains("level=\"info\""));
+    assert_eq!(load.jsonl_source.len(), 2);
+}
+
+#[test]
 fn yaml_detects_folds_and_anchors() {
     let mut f = tempfile::NamedTempFile::with_suffix(".yaml").unwrap();
     use std::io::Write;

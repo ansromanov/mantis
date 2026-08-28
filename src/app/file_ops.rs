@@ -243,6 +243,7 @@ impl App {
             self.content_hscroll = 0;
             self.active_line = 0;
             self.show_line_blame = false;
+            self.jsonl_expanded.clear();
             self.clear_selection();
             self.plugin_content_active_path = None;
         } else {
@@ -430,6 +431,13 @@ impl App {
         }
 
         self.is_json = load.is_json;
+        self.is_jsonl = load.is_jsonl;
+        self.jsonl_source = load.jsonl_source;
+        self.jsonl_display_map = if self.is_jsonl {
+            (0..load.content.len()).collect()
+        } else {
+            Vec::new()
+        };
         self.file_encoding = load.encoding;
         self.file_line_ending = load.line_ending;
         self.show_pretty_json = load.show_pretty_json;

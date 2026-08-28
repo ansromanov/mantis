@@ -82,6 +82,9 @@ fn open_pager_content_resets_scroll_and_selection() {
     app.content_hscroll = 5;
     app.active_line = 3;
     app.show_line_blame = true;
+    app.is_jsonl = true;
+    app.jsonl_source = vec!["{}".into()];
+    app.jsonl_expanded.insert(0);
     let parsed = PagerContent {
         content: vec!["a".to_string(), "b".to_string(), "c".to_string()],
         is_diff: false,
@@ -91,6 +94,9 @@ fn open_pager_content_resets_scroll_and_selection() {
     assert_eq!(app.content_hscroll, 0);
     assert_eq!(app.active_line, 0);
     assert!(!app.show_line_blame);
+    assert!(!app.is_jsonl);
+    assert!(app.jsonl_source.is_empty());
+    assert!(app.jsonl_expanded.is_empty());
     assert!(app.selection.is_none());
     fs::remove_dir_all(&root).ok();
 }

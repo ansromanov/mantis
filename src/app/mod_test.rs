@@ -23,6 +23,16 @@ fn temp_tree() -> PathBuf {
     dir.canonicalize().unwrap()
 }
 
+#[test]
+fn new_app_starts_without_jsonl_state() {
+    let root = temp_tree();
+    let app = App::new(root.clone(), Config::default(), None, None).unwrap();
+    assert!(!app.is_jsonl);
+    assert!(app.jsonl_source.is_empty());
+    assert!(app.jsonl_expanded.is_empty());
+    fs::remove_dir_all(root).ok();
+}
+
 fn app_for(root: &std::path::Path) -> App {
     App::new(root.to_path_buf(), Config::default(), None, None).unwrap()
 }

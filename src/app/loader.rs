@@ -15,7 +15,7 @@
 //! `compute_diff_load` accepts a [`crate::app::DiffMode`] parameter to choose
 //! between all-changes, staged, and unstaged diff variants.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Arc;
@@ -30,6 +30,7 @@ use crate::file::{
 use crate::fold::FoldRegion;
 use crate::git::GitStatus;
 use crate::highlight::Highlighter;
+use crate::jsonl;
 use crate::plugin::ExtraSyntax;
 use crate::theme::Theme;
 use crate::virtual_file::VirtualFile;
@@ -42,6 +43,8 @@ type Spans = Vec<Vec<(Style, String)>>;
 /// `App::apply_file_load`.
 pub(super) struct FileLoad {
     pub is_json: bool,
+    pub is_jsonl: bool,
+    pub jsonl_source: Vec<String>,
     pub virtual_file: Option<VirtualFile>,
     pub content: Vec<String>,
     pub highlighted: Spans,
@@ -93,6 +96,8 @@ impl FileLoad {
     fn empty(is_json: bool) -> Self {
         FileLoad {
             is_json,
+            is_jsonl: false,
+            jsonl_source: Vec::new(),
             virtual_file: None,
             content: Vec::new(),
             highlighted: Vec::new(),
@@ -126,6 +131,7 @@ pub(super) fn compute_file_load(
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
     let is_json = ext == "json";
     let is_yaml = matches!(ext, "yaml" | "yml");
+    let is_jsonl = matches!(ext.to_ascii_lowercase().as_str(), "jsonl" | "ndjson");
 
     // Check whether this JSON/YAML file exceeds the pretty-print size limit.
     let too_large = if is_json || is_yaml {
@@ -139,7 +145,7 @@ pub(super) fn compute_file_load(
     // Try memory-mapped virtual file first (lazy, no full content in memory).
     // JSON and YAML are excluded (they need full content for rendering) unless
     // the file exceeds the prettify size limit.
-    if (!is_json && !is_yaml) || too_large {
+    if (!is_json && !is_yaml && !is_jsonl) || too_large {
         if let Some(vf) = VirtualFile::open(path) {
             let mut load = FileLoad::empty(is_json);
             let raw = vf.raw_bytes();
@@ -198,6 +204,16 @@ pub(super) fn compute_file_load(
     load.content = s.lines().map(|l| l.to_owned()).collect();
     if load.content.is_empty() {
         load.content = vec!["[empty file]".into()];
+        return load;
+    }
+
+    if jsonl::is_jsonl(path, &load.content) {
+        load.is_jsonl = true;
+        load.jsonl_source = load.content.clone();
+        let (display, _) = jsonl::build_display(&load.jsonl_source, &HashSet::new());
+        load.content = display;
+        load.highlighted = hl.highlight(path, &load.content);
+        load.syntax_name = hl.syntax_name(path);
         return load;
     }
 

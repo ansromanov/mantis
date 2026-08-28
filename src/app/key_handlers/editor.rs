@@ -244,6 +244,18 @@ impl App {
                 true
             }
             Some("fold_toggle") => {
+                if self.is_jsonl && self.has_text_cursor() {
+                    let source_line = self.display_to_physical(self.active_line);
+                    if !self.jsonl_expanded.remove(&source_line) {
+                        self.jsonl_expanded.insert(source_line);
+                    }
+                    self.rebuild_jsonl_display();
+                    self.active_line = self
+                        .physical_to_display(source_line)
+                        .min(self.display_line_count().saturating_sub(1));
+                    self.clamp_content_scroll();
+                    return true;
+                }
                 if !self.fold_regions.is_empty() {
                     let phys = self.display_to_physical(self.content_scroll);
                     if let Some(ri) = self.region_idx_at(phys) {

@@ -42,6 +42,7 @@ fn dispatch_blame_line(app: &mut App) {
 fn editor_blame_line_action_toggles_show_line_blame() {
     let root = temp_tree();
     let mut app = app_for(&root);
+    app.virtual_file = None;
     app.open_file(&root.join("a.txt"));
     app.git_info = Some(crate::git::GitRepoInfo {
         head: crate::git::GitHead::Branch("main".to_string()),
@@ -1289,6 +1290,24 @@ fn dispatch_repo_commit_log_noop_without_git_info() {
     app.command_palette = Some(p);
     app.dispatch_command();
     assert!(app.repo_log.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn fold_toggle_expands_jsonl_row() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.virtual_file = None;
+    app.current_file = Some(root.join("events.jsonl"));
+    app.is_jsonl = true;
+    app.jsonl_source = vec![r#"{"nested":{"ok":true}}"#.into()];
+    app.content = vec!["{ nested={ok=true} }".into()];
+    app.active_line = 0;
+    let before = app.line_count();
+    app.focus = crate::app::Focus::Content;
+    app.command_palette = Some(palette_with_query("fold"));
+    app.dispatch_command();
+    assert!(app.line_count() > before);
     fs::remove_dir_all(&root).ok();
 }
 // touched for log follow mode

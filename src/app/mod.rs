@@ -355,6 +355,10 @@ pub struct App {
     /// Number of YAML aliases (`*name`) found in the current file.
     pub yaml_alias_count: usize,
     pub is_log: bool,
+    pub is_jsonl: bool,
+    pub(crate) jsonl_source: Vec<String>,
+    pub(crate) jsonl_expanded: HashSet<usize>,
+    pub(crate) jsonl_display_map: Vec<usize>,
     pub follow_mode: bool,
     pub follow_pinned: bool,
     pub(crate) log_highlight_cache:
@@ -669,7 +673,7 @@ impl App {
                 if self.current_file.is_none() {
                     return Err("no file is open");
                 }
-                if self.fold_regions.is_empty() {
+                if self.fold_regions.is_empty() && !self.is_jsonl {
                     return Err("no fold regions in file");
                 }
                 Ok(())
@@ -892,6 +896,10 @@ impl App {
         self.highlighted = Vec::new();
         self.virtual_file = None;
         self.is_json = false;
+        self.is_jsonl = false;
+        self.jsonl_source.clear();
+        self.jsonl_expanded.clear();
+        self.jsonl_display_map.clear();
         self.file_encoding = None;
         self.file_line_ending = None;
         self.show_pretty_json = false;
