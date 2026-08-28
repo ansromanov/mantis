@@ -155,22 +155,22 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
     let mut segs: Vec<(Span<'static>, StatusSegment, u8)> = Vec::new();
 
     // -- Priority 2: active-mode badges --
-    if matches!(app.focus, Focus::Tree) {
-        if app.show_hidden {
-            segs.push((
-                Span::styled(" [hidden]", badge),
-                StatusSegment::Badges,
-                P_INFO,
-            ));
-        }
-        if app.git_mode {
-            let label = if app.git_mode_flat {
-                " [git:flat]"
-            } else {
-                " [git]"
-            };
-            segs.push((Span::styled(label, badge), StatusSegment::Badges, P_INFO));
-        }
+    if matches!(app.focus, Focus::Tree) && app.show_hidden {
+        segs.push((
+            Span::styled(" [hidden]", badge),
+            StatusSegment::Badges,
+            P_INFO,
+        ));
+    }
+    if app.git_mode {
+        let label = if app.git_mode_flat {
+            " [git:flat]"
+        } else {
+            " [git]"
+        };
+        segs.push((Span::styled(label, badge), StatusSegment::Badges, P_INFO));
+    }
+    if app.git_mode {
         if let Some(ref base) = app.compare_base {
             segs.push((
                 Span::styled(format!(" [compare: {base}]"), badge),
