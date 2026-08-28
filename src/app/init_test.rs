@@ -835,3 +835,19 @@ fn app_new_starts_with_show_raw_markdown_false() {
     fs::remove_dir_all(&root).ok();
 }
 // touched for log follow mode
+
+#[test]
+fn app_new_starts_with_no_context_menu() {
+    let root = temp_dir();
+    let app = new_app(&root, Config::default());
+    assert!(
+        app.context_menu.is_none(),
+        "App::new must not open a context menu"
+    );
+    assert_eq!(
+        app.context_menu_area,
+        ratatui::layout::Rect::default(),
+        "App::new must start with a default context-menu hit area"
+    );
+    fs::remove_dir_all(&root).ok();
+}

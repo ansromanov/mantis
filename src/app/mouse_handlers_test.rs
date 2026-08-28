@@ -63,6 +63,15 @@ fn scroll_up_at(column: u16, row: u16) -> MouseEvent {
     }
 }
 
+fn right_down_at(column: u16, row: u16) -> MouseEvent {
+    MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Right),
+        column,
+        row,
+        modifiers: crossterm::event::KeyModifiers::empty(),
+    }
+}
+
 #[test]
 fn scrolling_content_marks_session_dirty() {
     let root = temp_tree();
@@ -663,6 +672,182 @@ fn tree_click_with_no_filter_selects_node_directly() {
         app.tree_selected, 1,
         "click on row 1 with no filter must select node index 1 directly"
     );
+    fs::remove_dir_all(&root).ok();
+}
+
+// -- context menu mouse dispatch ---------------------------------------------
+
+#[test]
+fn right_click_on_tree_row_opens_context_menu_on_that_row() {
+    let root = tree_with_dir();
+    let mut app = app_for(&root);
+    app.tree_area = Rect {
+        x: 0,
+        y: 1,
+        width: 40,
+        height: 20,
+    };
+    app.tree_offset = 0;
+    let target = root.join("a.txt");
+    let target_idx = app
+        .nodes
+        .iter()
+        .position(|n| n.path == target)
+        .expect("a.txt row must exist");
+
+    app.handle_mouse(right_down_at(5, 1 + target_idx as u16));
+
+    let menu = app.context_menu.expect("menu must open");
+    assert!(matches!(
+        &menu.target,
+        crate::app::ContextMenuTarget::Tree { path, index }
+            if *path == target && *index == target_idx
+    ));
+    assert_eq!(
+        app.tree_selected, target_idx,
+        "right-click must select the clicked row"
+    );
+    assert_eq!(app.focus, crate::app::Focus::Tree);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn right_click_on_directory_row_opens_tree_menu() {
+    let root = tree_with_dir();
+    let mut app = app_for(&root);
+    app.tree_area = Rect {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 20,
+    };
+    app.tree_offset = 0;
+    let sub = root.join("sub");
+
+    app.handle_mouse(right_down_at(5, 0));
+
+    let menu = app.context_menu.expect("menu must open");
+    assert!(
+        matches!(&menu.target, crate::app::ContextMenuTarget::Tree { path, .. } if *path == sub)
+    );
+    let labels: Vec<&str> = menu
+        .entries
+        .iter()
+        .filter_map(|e| match e {
+            crate::app::ContextMenuEntry::Action { label, .. } => Some(label.as_str()),
+            crate::app::ContextMenuEntry::Separator => None,
+        })
+        .collect();
+    assert!(
+        labels.contains(&"Expand"),
+        "directory menu must offer Expand/Collapse"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn right_click_in_content_pane_opens_content_menu() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.content_area = Rect {
+        x: 40,
+        y: 5,
+        width: 40,
+        height: 10,
+    };
+    app.tree_area = Rect {
+        x: 0,
+        y: 5,
+        width: 40,
+        height: 10,
+    };
+
+    app.handle_mouse(right_down_at(50, 7));
+
+    let menu = app.context_menu.expect("menu must open");
+    assert!(matches!(
+        &menu.target,
+        crate::app::ContextMenuTarget::Content
+    ));
+    assert_eq!(
+        app.focus,
+        crate::app::Focus::Content,
+        "right-click in the content pane must focus it"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn right_click_outside_panes_is_noop() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.tree_area = Rect {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 10,
+    };
+    app.content_area = Rect {
+        x: 40,
+        y: 0,
+        width: 40,
+        height: 10,
+    };
+
+    app.handle_mouse(right_down_at(100, 50));
+
+    assert!(app.context_menu.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn right_click_out_of_range_tree_row_is_noop() {
+    let root = tree_with_dir();
+    let mut app = app_for(&root);
+    app.tree_area = Rect {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 20,
+    };
+    app.tree_offset = 0;
+
+    app.handle_mouse(right_down_at(5, 100));
+
+    assert!(app.context_menu.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn open_context_menu_intercepts_subsequent_clicks() {
+    let root = tree_with_dir();
+    let mut app = app_for(&root);
+    app.tree_area = Rect {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 20,
+    };
+    app.tree_offset = 0;
+    app.handle_mouse(right_down_at(5, 1));
+    assert!(app.context_menu.is_some());
+    app.context_menu_area = Rect {
+        x: 10,
+        y: 10,
+        width: 30,
+        height: 12,
+    };
+
+    // A left click on a tree row while the menu is open must NOT touch the
+    // tree selection (it dismisses the menu via click-away instead).
+    let selected_before = app.tree_selected;
+    app.handle_mouse(left_down_at(5, 3));
+    assert!(
+        app.context_menu.is_none(),
+        "click outside the popup must close the menu"
+    );
+    assert_eq!(app.tree_selected, selected_before, "tree must be untouched");
     fs::remove_dir_all(&root).ok();
 }
 

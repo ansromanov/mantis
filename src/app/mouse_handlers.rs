@@ -5,9 +5,12 @@
 //! and search overlays intercept clicks first, then events route to the tree or
 //! content panel by hit-testing the `Rect`s recorded during the last render. It
 //! handles left-click selection, drag-selection of text, splitter dragging to
-//! resize the tree pane, scrollbar dragging, wheel scrolling, and double-click
-//! to open a picker result. All coordinate math must account for the panels'
-//! scroll offsets, which are also captured at render time.
+//! resize the tree pane, scrollbar dragging, wheel scrolling, double-click to
+//! open a picker result, and right-click to open the context menu. While the
+//! context menu is open, all pointer events route to its own handler so item
+//! clicks and click-away dismissal work without falling through to the panels.
+//! All coordinate math must account for the panels' scroll offsets, which are
+//! also captured at render time.
 
 use std::time::{Duration, Instant};
 
@@ -141,6 +144,10 @@ impl App {
                 }
                 _ => {}
             }
+            return;
+        }
+        if self.context_menu.is_some() {
+            self.handle_context_menu_mouse(ev);
             return;
         }
         if self.filter_bar.is_some() {
@@ -353,6 +360,25 @@ impl App {
                         let phys = self.display_to_physical(display_line);
                         self.set_active_line_from_physical(phys);
                     }
+                }
+            }
+            MouseEventKind::Down(MouseButton::Right) => {
+                let anchor = (ev.column, ev.row);
+                if rect_contains(self.tree_area, ev.column, ev.row) {
+                    let row = (ev.row - self.tree_area.y) as usize;
+                    let index = self.tree_offset + row;
+                    if self.tree_filter.is_some() {
+                        if let Some(ref vis) = self.tree_visible_indices {
+                            if index < vis.len() {
+                                let global = vis[index];
+                                self.open_tree_context_menu(global, anchor);
+                            }
+                        }
+                    } else if self.nodes.get(index).is_some() {
+                        self.open_tree_context_menu(index, anchor);
+                    }
+                } else if rect_contains(self.content_area, ev.column, ev.row) {
+                    self.open_content_context_menu(anchor);
                 }
             }
             MouseEventKind::Drag(MouseButton::Left) => {

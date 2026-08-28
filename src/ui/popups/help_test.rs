@@ -1009,4 +1009,20 @@ fn help_git_section_shows_repo_commit_log_key() {
         "help overlay must list the repo commit log entry in the Git section, got:\n{joined}"
     );
 }
+
+#[test]
+fn help_mouse_tab_shows_right_click_context_menu() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    let backend = TestBackend::new(120, 200);
+    let mut terminal = Terminal::new(backend).unwrap();
+    app.help_tab = 8; // Mouse tab
+    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
+    let rows = buffer_rows(&terminal);
+    let joined = rows.join("\n");
+    assert!(
+        joined.contains("Right-Click"),
+        "help overlay must document the right-click context menu, got:\n{joined}"
+    );
+}
 // touched for log follow mode

@@ -343,6 +343,8 @@ fn create_base_app() -> App {
         recent_files: None,
         recent_area: ratatui::layout::Rect::default(),
         recent_offset: 0,
+        context_menu: None,
+        context_menu_area: ratatui::layout::Rect::default(),
         show_hidden: false,
         ignore_gitignore: false,
         tree_revision: 0,
