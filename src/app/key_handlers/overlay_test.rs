@@ -713,6 +713,28 @@ fn tree_filter_esc_restores_previous_expansion_state() {
 }
 
 #[test]
+fn tree_filter_activate_restores_previous_expansion_state() {
+    let root = temp_tree();
+    fs::create_dir_all(root.join("sub")).unwrap();
+    fs::write(root.join("sub").join("needle.txt"), "hidden\n").unwrap();
+    let mut app = app_for(&root);
+    app.tree_filter = Some(TreeFilter::new());
+    for c in "needle".chars() {
+        app.handle_tree_filter_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::empty()));
+    }
+    assert!(app.expanded.contains(&root.join("sub")));
+
+    app.handle_tree_filter_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+
+    assert!(app.tree_filter.is_none());
+    assert!(
+        !app.expanded.contains(&root.join("sub")),
+        "activating a match must restore the pre-filter expansion state"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn tree_filter_backspace_to_empty_restores_previous_expansion_state() {
     let root = temp_tree();
     fs::create_dir_all(root.join("sub")).unwrap();

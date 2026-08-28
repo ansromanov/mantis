@@ -318,6 +318,7 @@ impl App {
         let is_query_edit = matches!(key.code, KeyCode::Char(_) | KeyCode::Backspace);
         match handle_list_picker_key(f, &key) {
             OverlayKey::Activate => {
+                self.restore_tree_filter_expansion();
                 self.tree_filter = None;
                 self.activate_selected();
             }
