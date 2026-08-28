@@ -79,6 +79,14 @@ fn bundled_plugin_entries_all_enabled_by_default() {
         names.contains(&"dockerfile"),
         "dockerfile syntax plugin must be listed"
     );
+    assert!(
+        names.contains(&"nginx"),
+        "nginx syntax plugin must be listed"
+    );
+    assert!(
+        names.contains(&"justfile"),
+        "justfile syntax plugin must be listed"
+    );
     assert!(names.contains(&"python"), "python plugin must be listed");
     assert!(names.contains(&"json"), "json plugin must be listed");
     assert!(names.contains(&"sh"), "sh plugin must be listed");
@@ -91,7 +99,13 @@ fn bundled_plugin_entries_all_enabled_by_default() {
     }
     // Process entries
     for (name, entry) in &entries {
-        if name == "terraform" || name == "toml" || name == "typescript" || name == "dockerfile" {
+        if name == "terraform"
+            || name == "toml"
+            || name == "typescript"
+            || name == "dockerfile"
+            || name == "nginx"
+            || name == "justfile"
+        {
             assert_eq!(
                 entry.kind,
                 PluginKind::Syntax,
@@ -199,6 +213,20 @@ fn install_bundled_plugins_creates_iconize_binary() {
             .join("dockerfile.sublime-syntax")
             .exists(),
         "dockerfile.sublime-syntax must be installed"
+    );
+    assert!(
+        plugins_dir
+            .join("syntaxes")
+            .join("nginx.sublime-syntax")
+            .exists(),
+        "nginx.sublime-syntax must be installed"
+    );
+    assert!(
+        plugins_dir
+            .join("syntaxes")
+            .join("justfile.sublime-syntax")
+            .exists(),
+        "justfile.sublime-syntax must be installed"
     );
     let iconize_name = if cfg!(windows) {
         "iconize.exe"
@@ -312,6 +340,28 @@ fn install_bundles_new_syntax_content() {
     assert!(
         docker_content.to_lowercase().contains("dockerfile"),
         "bundled dockerfile syntax must contain the Dockerfile grammar"
+    );
+
+    let nginx_content = std::fs::read_to_string(syntax_dir.join("nginx.sublime-syntax"))
+        .expect("nginx syntax should be readable");
+    assert!(
+        nginx_content.contains("%YAML"),
+        "bundled nginx syntax must be a real .sublime-syntax document"
+    );
+    assert!(
+        nginx_content.to_lowercase().contains("nginx"),
+        "bundled nginx syntax must contain the nginx grammar"
+    );
+
+    let justfile_content = std::fs::read_to_string(syntax_dir.join("justfile.sublime-syntax"))
+        .expect("justfile syntax should be readable");
+    assert!(
+        justfile_content.contains("%YAML"),
+        "bundled justfile syntax must be a real .sublime-syntax document"
+    );
+    assert!(
+        justfile_content.to_lowercase().contains("justfile"),
+        "bundled justfile syntax must contain the justfile grammar"
     );
 
     std::fs::remove_dir_all(&tmp).ok();
@@ -531,6 +581,20 @@ fn install_bundled_plugins_creates_plugin_dir_and_syntaxes() {
             .join("dockerfile.sublime-syntax")
             .exists(),
         "dockerfile.sublime-syntax must be installed"
+    );
+    assert!(
+        plugins_dir
+            .join("syntaxes")
+            .join("nginx.sublime-syntax")
+            .exists(),
+        "nginx.sublime-syntax must be installed"
+    );
+    assert!(
+        plugins_dir
+            .join("syntaxes")
+            .join("justfile.sublime-syntax")
+            .exists(),
+        "justfile.sublime-syntax must be installed"
     );
     std::fs::remove_dir_all(&tmp).ok();
 }

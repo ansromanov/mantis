@@ -9,9 +9,9 @@
 //! or fallback `cargo build` at runtime. This ensures they are always
 //! available for non-source installs (release artifacts, Homebrew, etc.).
 //!
-//! Bundled syntax plugins (`terraform`, `toml`, `typescript`, `dockerfile`)
-//! are embedded via `include_str!` and written to the `syntaxes/` subdirectory
-//! on first run.
+//! Bundled syntax plugins (`terraform`, `toml`, `typescript`, `dockerfile`,
+//! `nginx`, `justfile`) are embedded via `include_str!` and written to the
+//! `syntaxes/` subdirectory on first run.
 
 include!(concat!(env!("OUT_DIR"), "/plugin_binaries.rs"));
 
@@ -22,7 +22,8 @@ use crate::plugin::types::{PluginEntry, PluginKind};
 /// Returns `(name, PluginEntry)` pairs for every plugin that ships with `mantis`.
 ///
 /// All plugins shipped with `mantis` (markdown, iconize, python, rust, go, json, sh,
-/// yaml, terraform, toml, typescript, dockerfile) are enabled by default. User config
+/// yaml, terraform, toml, typescript, dockerfile, nginx, justfile) are enabled by
+/// default. User config
 /// entries with `or_insert` always win over these defaults, so an explicit
 /// `enabled = false` in `mantis.toml` is respected.
 pub(crate) fn bundled_plugin_entries() -> Vec<(String, PluginEntry)> {
@@ -139,6 +140,14 @@ const BUNDLED_SYNTAX_PLUGINS: &[(&str, &str)] = &[
         "dockerfile.sublime-syntax",
         include_str!("../../plugins/dockerfile/syntaxes/dockerfile.sublime-syntax"),
     ),
+    (
+        "nginx.sublime-syntax",
+        include_str!("../../plugins/nginx/syntaxes/nginx.sublime-syntax"),
+    ),
+    (
+        "justfile.sublime-syntax",
+        include_str!("../../plugins/justfile/syntaxes/justfile.sublime-syntax"),
+    ),
 ];
 
 /// List of (name, syntax_rel_path, extensions) for syntax plugin [plugins] entries.
@@ -160,6 +169,8 @@ const BUNDLED_SYNTAX_PLUGIN_ENTRIES: &[(&str, &str, &[&str])] = &[
         "syntaxes/dockerfile.sublime-syntax",
         &["dockerfile"],
     ),
+    ("nginx", "syntaxes/nginx.sublime-syntax", &[]),
+    ("justfile", "syntaxes/justfile.sublime-syntax", &[]),
 ];
 
 /// Copies every bundled plugin to the plugin directory if it doesn't already
