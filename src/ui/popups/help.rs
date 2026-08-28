@@ -595,6 +595,10 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
                 "Scroll Wheel",
                 "Scroll up / down in the hovered/focused panel",
             ));
+            rows.push(row_static_key(
+                "Right-Click",
+                "Open the context menu (file/folder/copy/toggle actions)",
+            ));
             rows.push(gap.clone());
             rows.push(section("Breadcrumb Actions"));
             rows.push(row_static_key(

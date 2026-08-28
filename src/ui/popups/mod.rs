@@ -1,8 +1,8 @@
 //! Modal overlay (popup) rendering, split into one submodule per popup.
 //!
 //! This module root collects every floating overlay the UI can draw on top of
-//! the main layout: about, command palette, help, history, recent files,
-//! in-file search, file/content search, the theme picker, and the plugin
+//! the main layout: about, command palette, context menu, help, history, recent
+//! files, in-file search, file/content search, the theme picker, and the plugin
 //! manager. Each lives in its own submodule and is re-exported as a `draw_*`
 //! function for the UI orchestrator, which decides which (if any) is visible.
 //! Shared layout helpers - notably `centered_rect` - live in `util`. Popups
@@ -12,6 +12,7 @@
 mod about;
 mod bug_report;
 mod command;
+mod context_menu;
 mod goto_line;
 mod help;
 mod history;
@@ -30,6 +31,7 @@ mod welcome;
 pub(super) use about::draw_about;
 pub(super) use bug_report::draw_bug_report;
 pub(super) use command::draw_command_palette;
+pub(super) use context_menu::draw_context_menu;
 pub(super) use goto_line::draw_goto_line;
 pub(super) use help::draw_help;
 pub(crate) use help::{help_tab_ranges, help_tab_scroll_offset, HELP_TABS};

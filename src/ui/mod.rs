@@ -123,6 +123,10 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         popups::draw_help(f, app, area);
     }
 
+    if app.context_menu.is_some() {
+        popups::draw_context_menu(f, app, area);
+    }
+
     if app.show_welcome {
         popups::draw_welcome(f, app, area);
     }

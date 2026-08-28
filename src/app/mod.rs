@@ -50,6 +50,7 @@ use crate::virtual_file::VirtualFile;
 
 mod content_pos;
 mod content_query;
+mod context_menu;
 mod diff_nav;
 mod file_ops;
 mod fold;
@@ -66,6 +67,9 @@ mod util;
 
 use loader::Loader;
 
+// Only referenced from test code (entry/state assertions).
+#[cfg_attr(not(test), allow(unused_imports))]
+pub use context_menu::{ContextActionId, ContextMenuEntry, ContextMenuState, ContextMenuTarget};
 pub use types::{DiffMode, Focus, StatusMessage};
 pub(crate) use types::{HighlightCacheKey, HighlightCacheValue, PendingKeypress};
 pub(crate) use util::{deleted_set, diff_line_style, rect_contains};
@@ -185,6 +189,11 @@ pub struct App {
     pub recent_area: Rect,
     /// Scroll offset of the recent-files list recorded during the last render.
     pub recent_offset: usize,
+    /// State for the right-click context menu. `Some` while the menu is open.
+    pub context_menu: Option<ContextMenuState>,
+    /// Hit area of the context menu recorded during the last render, used to
+    /// hit-test item clicks and click-away dismissal.
+    pub context_menu_area: ratatui::layout::Rect,
     pub show_hidden: bool,
     pub ignore_gitignore: bool,
     /// Monotonically increasing counter bumped every time the tree is rebuilt.

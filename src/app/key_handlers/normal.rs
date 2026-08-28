@@ -373,33 +373,7 @@ impl App {
                 self.set_status("pretty JSON: could not parse");
             }
         } else if pressed_in(&k.toggle_raw_markdown, &key, scope) {
-            let markdown_plugin_active = self.plugin_manager.is_plugin_active("markdown");
-            if !markdown_plugin_active {
-                self.set_status(
-                    "markdown render toggle: not available (markdown plugin not active)",
-                );
-            } else {
-                let is_markdown = self
-                    .current_file
-                    .as_ref()
-                    .is_some_and(|path| crate::file::is_markdown_path(path));
-                if is_markdown {
-                    self.show_raw_markdown = !self.show_raw_markdown;
-                    if let Some(path) = self.current_file.clone() {
-                        if self.show_raw_markdown {
-                            self.plugin_content.remove(&path);
-                            self.plugin_content_text.remove(&path);
-                            self.plugin_content_active = false;
-                            self.plugin_content_active_path = None;
-                            self.reload_content();
-                        } else {
-                            self.reload_content();
-                        }
-                    }
-                } else {
-                    self.set_status("markdown render toggle: not available (not a markdown file)");
-                }
-            }
+            self.toggle_raw_markdown();
         } else if pressed_in(&k.toggle_blame, &key, scope) {
             if self.has_text_cursor() {
                 self.show_blame = !self.show_blame;
@@ -435,11 +409,7 @@ impl App {
                 self.mark_content_scrolled();
             }
         } else if pressed_in(&k.toggle_wrap, &key, scope) {
-            self.word_wrap = !self.word_wrap;
-            self.config.content.word_wrap = self.word_wrap;
-            self.content_hscroll = 0;
-            self.clamp_content_scroll();
-            self.save_config();
+            self.toggle_word_wrap();
         } else if pressed_in(&k.toggle_line_numbers, &key, scope) {
             self.show_line_numbers = !self.show_line_numbers;
             self.config.content.line_numbers = self.show_line_numbers;
@@ -572,6 +542,43 @@ impl App {
             path.display().to_string()
         };
         self.copy_to_clipboard(text, if relative { "relative path" } else { "path" });
+    }
+
+    /// Toggles content word wrap, persisting the new value and clamping the
+    /// scroll position to the (possibly narrower) content.
+    pub(crate) fn toggle_word_wrap(&mut self) {
+        self.word_wrap = !self.word_wrap;
+        self.config.content.word_wrap = self.word_wrap;
+        self.content_hscroll = 0;
+        self.clamp_content_scroll();
+        self.save_config();
+    }
+
+    /// Toggles between rendered and raw markdown when the markdown plugin is
+    /// active on a markdown file; otherwise surfaces a status message.
+    pub(crate) fn toggle_raw_markdown(&mut self) {
+        if !self.plugin_manager.is_plugin_active("markdown") {
+            self.set_status("markdown render toggle: not available (markdown plugin not active)");
+            return;
+        }
+        let is_markdown = self
+            .current_file
+            .as_ref()
+            .is_some_and(|path| crate::file::is_markdown_path(path));
+        if !is_markdown {
+            self.set_status("markdown render toggle: not available (not a markdown file)");
+            return;
+        }
+        self.show_raw_markdown = !self.show_raw_markdown;
+        if let Some(path) = self.current_file.clone() {
+            if self.show_raw_markdown {
+                self.plugin_content.remove(&path);
+                self.plugin_content_text.remove(&path);
+                self.plugin_content_active = false;
+                self.plugin_content_active_path = None;
+            }
+            self.reload_content();
+        }
     }
 
     /// Nudges `content_scroll` so `active_line` stays within the visible

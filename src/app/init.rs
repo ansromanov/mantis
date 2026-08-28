@@ -148,6 +148,8 @@ impl App {
             recent_files: None,
             recent_area: ratatui::layout::Rect::default(),
             recent_offset: 0,
+            context_menu: None,
+            context_menu_area: ratatui::layout::Rect::default(),
             show_hidden: cfg.tree.show_hidden,
             ignore_gitignore: cfg.git.ignore_gitignore,
             tree_revision: 0,

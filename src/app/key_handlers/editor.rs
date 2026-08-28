@@ -609,7 +609,7 @@ impl App {
     /// Opens the currently selected file in the user's `$EDITOR`. Delegates
     /// to `launch_editor` for the TUI suspend/resume dance, then reloads the
     /// file content.
-    pub(super) fn open_in_editor(&mut self) {
+    pub(crate) fn open_in_editor(&mut self) {
         if let Some(p) = self.current_file.clone() {
             self.launch_editor(&p);
             self.reload_content();
@@ -633,7 +633,7 @@ impl App {
 
     /// Opens `path` in the system default application.
     /// When stdout is not a terminal (piped/headless/CI), sets a status message instead.
-    pub(super) fn open_external(&mut self, path: &Path) {
+    pub(crate) fn open_external(&mut self, path: &Path) {
         if !std::io::stdout().is_terminal() {
             self.set_status("not opening file (non-interactive)");
             return;
@@ -647,6 +647,27 @@ impl App {
                         kind: "external_open_failed",
                     });
                 self.set_status(format!("external open failed: {e}"));
+            }
+        }
+    }
+
+    /// Reveals `path` in the OS file manager: directories open directly, files
+    /// are revealed in their parent folder. Mirrors the non-interactive guard
+    /// of [`App::open_external`].
+    pub(crate) fn open_in_file_manager(&mut self, path: &Path) {
+        if !std::io::stdout().is_terminal() {
+            self.set_status("not opening file manager (non-interactive)");
+            return;
+        }
+        match spawn_reveal_in_file_manager(path) {
+            Ok(_) => self.set_status(format!("revealed {}", path.display())),
+            Err(e) => {
+                self.telemetry
+                    .record(crate::telemetry::TelemetryEvent::ErrorOccurred {
+                        module: "editor",
+                        kind: "file_manager_open_failed",
+                    });
+                self.set_status(format!("file manager open failed: {e}"));
             }
         }
     }
@@ -670,5 +691,35 @@ fn spawn_system_open(arg: &std::ffi::OsStr) -> std::io::Result<std::process::Chi
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         std::process::Command::new("xdg-open").arg(arg).spawn()
+    }
+}
+
+/// Spawns the OS file manager to reveal `path`: directories open directly,
+/// files are revealed in their parent folder. macOS prefixes `open` with `-R`
+/// to reveal the file, Windows uses `explorer /select,`, and other platforms
+/// open the parent folder with `xdg-open`.
+fn spawn_reveal_in_file_manager(path: &Path) -> std::io::Result<std::process::Child> {
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg("-R")
+            .arg(path)
+            .spawn()
+    }
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .args(["/select,"])
+            .arg(path)
+            .spawn()
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        let target = path
+            .parent()
+            .filter(|_| !path.is_dir())
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| path.to_path_buf());
+        std::process::Command::new("xdg-open").arg(target).spawn()
     }
 }

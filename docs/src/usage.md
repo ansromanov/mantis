@@ -376,3 +376,10 @@ When viewing log files (detected via `.log` extension or level/timestamp sniffin
 - **Double-click** a breadcrumb segment to navigate to that directory.
 - In the search and history popups, **single-click** selects an entry and
   **double-click** activates it.
+- **Right-click** a tree row or the content pane to open a context menu at the
+  cursor. Tree menus offer open, open in editor / default app, reveal in file
+  manager, copy absolute/relative path, expand/collapse (directory), and
+  expand/collapse all. Content menus offer copy selection/line/file, word wrap
+  and raw-markdown toggles, and reveal-in-tree. Navigate with the mouse or
+  `j/k`/arrows, activate with Enter or a left-click, and dismiss with `Esc` or
+  a click anywhere else.

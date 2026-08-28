@@ -1660,3 +1660,33 @@ fn log_follow_mode_toggles_and_navigation() {
 
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn toggle_word_wrap_method_flips_state_and_clamps_scroll() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.content_area = Rect {
+        x: 40,
+        y: 0,
+        width: 40,
+        height: 10,
+    };
+    app.word_wrap = false;
+    app.content_scroll = 5;
+
+    app.toggle_word_wrap();
+
+    assert!(app.word_wrap, "toggle_word_wrap must enable word wrap");
+    assert!(
+        app.config.content.word_wrap,
+        "toggle_word_wrap must persist to config"
+    );
+
+    app.toggle_word_wrap();
+    assert!(
+        !app.word_wrap,
+        "toggle_word_wrap must disable word wrap again"
+    );
+    fs::remove_dir_all(&root).ok();
+}
