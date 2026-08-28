@@ -720,6 +720,26 @@ fn scrollbar_drag_clamps_at_scroll_max() {
 }
 
 #[test]
+fn scrollbar_border_drag_does_not_start_text_selection() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.content_area = Rect {
+        x: 40,
+        y: 0,
+        width: 40,
+        height: 10,
+    };
+    app.show_scrollbar = true;
+
+    app.handle_mouse(left_down_at(80, 5));
+
+    assert!(app.scrollbar_drag);
+    assert!(app.drag_start.is_none());
+    assert!(app.selection.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn splitter_drag_release_saves_tree_width_to_config() {
     let root = temp_tree();
     let mut app = app_for(&root);
