@@ -116,6 +116,16 @@ fn content_focus_git_mode() {
 }
 
 #[test]
+fn content_focus_blame_mode() {
+    let mut app = make_app();
+    app.focus = Focus::Content;
+    app.current_file = Some(PathBuf::from("tracked.rs"));
+    app.show_blame = true;
+    let text = render_bar_width(&app, 120);
+    assert!(text.contains("[blame]"));
+}
+
+#[test]
 fn tree_focus_compare_badge_shows_revision() {
     let mut app = make_app();
     app.git_mode = true;
