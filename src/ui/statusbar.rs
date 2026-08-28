@@ -179,6 +179,13 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
             ));
         }
     }
+    if app.show_blame && app.has_text_cursor() {
+        segs.push((
+            Span::styled(" [blame]", badge),
+            StatusSegment::Badges,
+            P_INFO,
+        ));
+    }
     if app.auto_watch {
         segs.push((
             Span::styled(" [watch]", badge),
