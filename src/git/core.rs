@@ -126,6 +126,74 @@ pub fn ahead_behind(repo_dir: &Path) -> Option<(usize, usize)> {
     Some((ahead, behind))
 }
 
+/// Lists worktrees known to the repository, preserving git's porcelain order.
+pub fn worktree_list(repo_dir: &Path) -> Vec<Worktree> {
+    let out = git_cmd()
+        .arg("-C")
+        .arg(repo_dir)
+        .args(["worktree", "list", "--porcelain"])
+        .output();
+    let Ok(out) = out else { return Vec::new() };
+    if !out.status.success() {
+        return Vec::new();
+    }
+    parse_worktree_list(&String::from_utf8_lossy(&out.stdout))
+}
+
+pub(crate) fn parse_worktree_list(text: &str) -> Vec<Worktree> {
+    let mut result = Vec::new();
+    let mut current: Option<Worktree> = None;
+    for line in text.lines() {
+        if line.is_empty() {
+            if let Some(item) = current.take() {
+                result.push(item);
+            }
+            continue;
+        }
+        let (key, value) = line.split_once(' ').unwrap_or((line, ""));
+        match key {
+            "worktree" => {
+                if let Some(item) = current.take() {
+                    result.push(item);
+                }
+                current = Some(Worktree {
+                    path: PathBuf::from(value),
+                    head: String::new(),
+                    branch: None,
+                    locked: false,
+                    prunable: false,
+                });
+            }
+            "HEAD" => {
+                if let Some(item) = current.as_mut() {
+                    item.head = value.to_string();
+                }
+            }
+            "branch" => {
+                if let Some(item) = current.as_mut() {
+                    item.branch = value.strip_prefix("refs/heads/").map(str::to_string);
+                }
+            }
+            "detached" => {}
+            "locked" => {
+                if let Some(item) = current.as_mut() {
+                    item.locked = true;
+                }
+            }
+            "prunable" => {
+                if let Some(item) = current.as_mut() {
+                    item.prunable = true;
+                }
+            }
+            _ => {}
+        }
+    }
+    if let Some(item) = current {
+        result.push(item);
+    }
+    result
+}
+
 fn parse_branch_line(line: &str) -> GitHead {
     let line = match line.strip_prefix("## ") {
         Some(l) => l,

@@ -790,6 +790,7 @@ impl App {
             tree_filter: self.tree_filter.is_some(),
             bug_report: self.bug_report.is_some(),
             revision_picker: self.revision_picker.is_some(),
+            worktree_picker: self.worktree_picker.is_some(),
             goto_line: self.goto_line.is_some(),
             visual_mode: self.selection.is_some(),
             git_blame: self.show_blame,

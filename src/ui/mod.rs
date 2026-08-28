@@ -107,6 +107,10 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         popups::draw_revision_picker(f, app, area);
     }
 
+    if app.worktree_picker.is_some() {
+        popups::draw_worktree_picker(f, app, area);
+    }
+
     if app.goto_line.is_some() {
         popups::draw_goto_line(f, app, horiz[1]);
     }

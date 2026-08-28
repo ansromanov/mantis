@@ -162,6 +162,13 @@ pub static ACTIONS: &[ActionSpec] = &[
         description: Some("Browse and open recently opened files"),
     },
     ActionSpec {
+        id: "worktree_picker",
+        palette: Some("Open worktree switcher"),
+        help: Some(("Global", "switch git worktree")),
+        category: Some("Git"),
+        description: Some("Browse branches and changed-file counts across worktrees"),
+    },
+    ActionSpec {
         id: "git_mode_flat_toggle",
         palette: Some("Toggle git flat mode"),
         help: Some(("Global", "toggle git flat/tree view (in git mode)")),

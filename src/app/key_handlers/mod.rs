@@ -162,6 +162,8 @@ impl App {
             self.handle_bug_report_key(key);
         } else if self.revision_picker.is_some() {
             self.handle_revision_key(key);
+        } else if self.worktree_picker.is_some() {
+            self.handle_worktree_key(key);
         } else if self.goto_line.is_some() {
             self.handle_goto_line_key(key);
         } else {

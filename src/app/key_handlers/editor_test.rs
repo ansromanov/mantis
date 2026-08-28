@@ -1310,4 +1310,18 @@ fn fold_toggle_expands_jsonl_row() {
     assert!(app.line_count() > before);
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn dispatch_worktree_picker_opens_overlay() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let mut p = CommandPalette::default();
+    for c in "Open worktree switcher".chars() {
+        p.push(c);
+    }
+    app.command_palette = Some(p);
+    app.dispatch_command();
+    assert!(app.worktree_picker.is_some());
+    fs::remove_dir_all(&root).ok();
+}
 // touched for log follow mode

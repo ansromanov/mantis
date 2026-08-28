@@ -1026,3 +1026,18 @@ fn bug_report_state_clamp_scroll_empty_text() {
     state.clamp_scroll(3, 10);
     assert_eq!(state.scroll_top, 0);
 }
+
+#[test]
+fn worktree_picker_filters_by_branch() {
+    let picker = WorktreePicker::for_test(vec![crate::git::WorktreeItem {
+        worktree: crate::git::Worktree {
+            path: "/repo".into(),
+            head: "abc".into(),
+            branch: Some("feature".into()),
+            locked: false,
+            prunable: false,
+        },
+        changed: 2,
+    }]);
+    assert_eq!(picker.filtered, vec![0]);
+}

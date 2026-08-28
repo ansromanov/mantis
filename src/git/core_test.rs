@@ -16,6 +16,16 @@ fn git(dir: &Path, args: &[&str]) {
     assert!(status.success(), "git {:?} failed", args);
 }
 
+#[test]
+fn worktree_parser_keeps_detached_and_flags() {
+    let items = parse_worktree_list(
+        "worktree /one\nHEAD abc\ndetached\n\nworktree /two\nHEAD def\nlocked\nprunable old\n",
+    );
+    assert_eq!(items.len(), 2);
+    assert!(items[0].branch.is_none());
+    assert!(items[1].locked && items[1].prunable);
+}
+
 fn clone_repo(src: &Path, dst: &Path) {
     let status = Command::new("git")
         .arg("clone")

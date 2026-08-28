@@ -44,6 +44,7 @@ impl App {
         } else {
             None
         };
+        let worktree_count = crate::git::worktree_list(&root).len();
         let deleted = super::deleted_set(&git_status_map, git_show_deleted);
         let (nodes, walk_errors) = build_visible(
             &root,
@@ -167,11 +168,15 @@ impl App {
             git_show_untracked,
             git_show_ignored,
             git_info,
+            worktree_count,
             git_status_map,
             git_mode: false,
             git_mode_flat: false,
             compare_base: None,
             revision_picker: None,
+            worktree_picker: None,
+            worktree_picker_area: ratatui::layout::Rect::default(),
+            worktree_picker_offset: 0,
             bug_report: None,
             show_scrollbar: cfg.content.scrollbar,
             show_scroll_percentage: cfg.content.scroll_percentage,

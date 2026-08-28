@@ -34,6 +34,13 @@ fn make_app() -> App {
     App::new(PathBuf::from("."), cfg, None, None).unwrap()
 }
 
+#[test]
+fn statusbar_displays_worktree_count() {
+    let mut app = make_app();
+    app.worktree_count = 3;
+    assert!(render_bar(&app).contains("[worktrees: 3]"));
+}
+
 fn render_bar_width(app: &App, width: u16) -> String {
     let backend = TestBackend::new(width, 1);
     let mut terminal = Terminal::new(backend).unwrap();

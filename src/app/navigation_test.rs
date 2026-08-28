@@ -854,6 +854,21 @@ fn set_root_clears_plugin_content_active_path() {
 }
 
 #[test]
+fn set_root_accepts_a_sibling_worktree_path() {
+    let root = temp_tree();
+    let sibling = root.with_file_name(format!(
+        "{}_sibling",
+        root.file_name().unwrap().to_string_lossy()
+    ));
+    fs::create_dir_all(&sibling).unwrap();
+    let mut app = crate::app::App::new(root.clone(), Config::default(), None, None).unwrap();
+    app.set_root(&sibling);
+    assert_eq!(app.root, sibling);
+    fs::remove_dir_all(root).ok();
+    fs::remove_dir_all(sibling).ok();
+}
+
+#[test]
 fn rebuild_empty_git_mode_clears_content() {
     let root = temp_tree();
     let mut app = app_for(&root);

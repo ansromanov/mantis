@@ -82,6 +82,43 @@ pub struct BlameLine {
     pub subject: String,
 }
 
+/// A checked-out git worktree and its lightweight dashboard metadata.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Worktree {
+    pub path: PathBuf,
+    pub head: String,
+    pub branch: Option<String>,
+    pub locked: bool,
+    pub prunable: bool,
+}
+
+/// Worktree metadata prepared for the picker UI.
+#[derive(Debug, Clone)]
+pub struct WorktreeItem {
+    pub worktree: Worktree,
+    pub changed: usize,
+}
+
+impl WorktreeItem {
+    pub fn display(&self) -> String {
+        let name = self
+            .worktree
+            .path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("/");
+        let branch = self.worktree.branch.as_deref().unwrap_or("detached");
+        let mut markers = String::new();
+        if self.worktree.locked {
+            markers.push_str(" locked");
+        }
+        if self.worktree.prunable {
+            markers.push_str(" prunable");
+        }
+        format!("{name}  {branch}  {} changed{markers}", self.changed)
+    }
+}
+
 pub(crate) fn status_priority(s: GitStatus) -> u8 {
     match s {
         GitStatus::Renamed => 4,
