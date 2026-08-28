@@ -45,6 +45,9 @@ than streaming incrementally.
 
 ## Terminal compatibility
 
+The main panels require at least 80 columns to remain usable. At smaller sizes,
+mantis shows a resize message instead of rendering clipped tree and content panes.
+
 ### Keyboard enhancement
 
 Every default binding uses plain `Ctrl+letter`, a bare/Shift letter, or a

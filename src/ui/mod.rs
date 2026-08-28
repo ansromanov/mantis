@@ -10,9 +10,9 @@
 //! hit-testing, so this layer stays purely presentational.
 
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::Style,
-    widgets::Block,
+    widgets::{Block, Paragraph},
     Frame,
 };
 
@@ -22,6 +22,9 @@ mod content;
 pub(crate) mod popups;
 mod statusbar;
 pub mod tree;
+
+const MIN_LAYOUT_WIDTH: u16 = 80;
+const MIN_LAYOUT_HEIGHT: u16 = 6;
 
 pub fn draw(f: &mut Frame, app: &mut App) {
     let area = f.area();
@@ -37,6 +40,35 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(0), Constraint::Length(1)])
         .split(area);
+
+    if area.width < MIN_LAYOUT_WIDTH || area.height < MIN_LAYOUT_HEIGHT {
+        app.tree_area = Rect::default();
+        app.content_area = Rect::default();
+        app.splitter_area = Rect::default();
+        let resize_message = match (
+            area.width < MIN_LAYOUT_WIDTH,
+            area.height < MIN_LAYOUT_HEIGHT,
+        ) {
+            (true, true) => format!(
+                "Terminal too small: {MIN_LAYOUT_WIDTH} columns x {MIN_LAYOUT_HEIGHT} rows minimum."
+            ),
+            (true, false) => {
+                format!("Terminal too narrow. Resize to at least {MIN_LAYOUT_WIDTH} columns.")
+            }
+            (false, true) => {
+                format!("Terminal too short. Resize to at least {MIN_LAYOUT_HEIGHT} rows.")
+            }
+            (false, false) => unreachable!(),
+        };
+        f.render_widget(
+            Paragraph::new(resize_message)
+                .alignment(Alignment::Center)
+                .style(Style::default().fg(app.theme.text)),
+            vert[0],
+        );
+        statusbar::draw_statusbar(f, app, vert[1]);
+        return;
+    }
 
     let tree_width = app.tree_width.clamp(5, 95);
     let horiz = Layout::default()

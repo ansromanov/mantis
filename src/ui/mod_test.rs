@@ -158,6 +158,35 @@ fn draw_layout_respects_tree_width() {
 }
 
 #[test]
+fn draw_narrow_terminal_shows_resize_message_and_clears_panel_geometry() {
+    let mut app = make_app();
+    let backend = TestBackend::new(60, 18);
+    let mut terminal = Terminal::new(backend).unwrap();
+
+    terminal.draw(|f| super::draw(f, &mut app)).unwrap();
+
+    let joined = buffer_rows(&terminal).join("\n");
+    assert!(joined.contains("Terminal too"));
+    assert!(joined.contains("80 columns"));
+    assert_eq!(app.tree_area, ratatui::layout::Rect::default());
+    assert_eq!(app.content_area, ratatui::layout::Rect::default());
+    assert_eq!(app.splitter_area, ratatui::layout::Rect::default());
+}
+
+#[test]
+fn draw_short_terminal_names_height_requirement() {
+    let mut app = make_app();
+    let backend = TestBackend::new(100, 5);
+    let mut terminal = Terminal::new(backend).unwrap();
+
+    terminal.draw(|f| super::draw(f, &mut app)).unwrap();
+
+    let joined = buffer_rows(&terminal).join("\n");
+    assert!(joined.contains("Terminal too short"));
+    assert!(joined.contains("6 rows"));
+}
+
+#[test]
 fn draw_telemetry_notice_overlay() {
     let mut app = make_app();
     app.show_telemetry_notice = true;
