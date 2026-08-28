@@ -2,8 +2,8 @@ use crate::app::{App, Focus};
 use crate::command_palette::{CommandPalette, COMMANDS};
 use crate::config::Config;
 use crate::search::{
-    BugReportState, GotoLineState, InFileSearch, RevisionItem, RevisionPicker, SearchState,
-    ThemePicker, TreeFilter,
+    BugReportState, FilterBarState, GotoLineState, InFileSearch, RevisionItem, RevisionPicker,
+    SearchState, ThemePicker, TreeFilter,
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::Rect;
@@ -610,6 +610,21 @@ fn tree_filter_esc_closes() {
     app.tree_filter = Some(TreeFilter::new());
     app.handle_tree_filter_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
     assert!(app.tree_filter.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn filter_bar_escape_discards_pending_filter() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let mut bar = FilterBarState::new();
+    bar.query.push('n');
+    app.filter_bar = Some(bar);
+
+    app.handle_filter_bar_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+
+    assert!(app.filter_bar.is_none());
+    assert!(app.filter_query.is_none());
     fs::remove_dir_all(&root).ok();
 }
 
