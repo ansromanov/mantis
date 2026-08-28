@@ -51,6 +51,7 @@ fn collect_reports_open_file_facts_without_its_name() {
     assert_eq!(report.file_size_bytes, Some(13));
     assert_eq!(report.file_encoding.as_deref(), Some("UTF-8"));
     assert_eq!(report.file_syntax.as_deref(), Some("Rust"));
+    assert!(!report.file_is_csv);
 }
 
 #[test]

@@ -498,3 +498,25 @@ fn scroll_content_by_keeps_cursor_in_view() {
     assert_eq!(app.active_line, 3);
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn selection_text_csv_table_content() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    let path = root.join("items.csv");
+    fs::write(&path, "colA,colB\n1,2\n").unwrap();
+    app.open_file(&path);
+    assert!(app.is_csv);
+    assert!(app.show_csv_table);
+
+    // Line 1 is the header row "│ colA │ colB │"
+    app.selection = Some(TextSelection {
+        anchor: (1, 0),
+        active: (1, 6),
+    });
+    let text = app.selection_text();
+    assert_eq!(text.chars().count(), 6);
+    assert!(text.contains("colA") || text.contains('│'));
+
+    fs::remove_dir_all(&root).ok();
+}

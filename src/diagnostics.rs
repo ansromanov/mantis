@@ -63,6 +63,7 @@ pub struct DiagnosticReport {
     pub file_line_ending: Option<String>,
     pub file_syntax: Option<String>,
     pub file_is_json: bool,
+    pub file_is_csv: bool,
     pub file_is_diff: bool,
     pub file_uses_mmap: bool,
     // Configuration (key paths that differ from defaults; values omitted).
@@ -126,6 +127,7 @@ impl DiagnosticReport {
             file_line_ending: app.file_line_ending.clone(),
             file_syntax: app.current_syntax.clone(),
             file_is_json: app.is_json,
+            file_is_csv: app.is_csv,
             file_is_diff: app.is_diff,
             file_uses_mmap: app.virtual_file.is_some(),
             theme: app.config.theme.name.clone(),
@@ -144,37 +146,35 @@ impl DiagnosticReport {
             md.push_str("\n\n");
         }
         md.push_str("## mantis diagnostic report\n\n");
-        let opt = |v: &Option<String>| v.clone().unwrap_or_else(|| "unknown".into());
+        fn opt(v: &Option<String>) -> &str {
+            v.as_deref().unwrap_or("none")
+        }
         md.push_str(&format!(
-            "- **app**: {} ({}, released {})\n",
+            "- **app version**: {}\n\
+             - **target**: {}\n\
+             - **release date**: {}\n\
+             - **os**: {} ({} / {})\n\
+             - **arch**: {}\n\
+             - **wsl**: {}\n\
+             - **terminal**: term={} colorterm={} prog={} prog_ver={} wt={} ssh={}\n\
+             - **size**: {}\n",
             self.app_version,
             self.target_triple,
-            opt(&self.release_date)
-        ));
-        md.push_str(&format!(
-            "- **os**: {} {} — {}{}\n",
+            opt(&self.release_date),
             self.os,
-            self.arch,
             opt(&self.os_version),
-            if self.wsl { " (WSL)" } else { "" }
-        ));
-        let size = self
-            .terminal_size
-            .map(|(w, h)| format!("{w}x{h}"))
-            .unwrap_or_else(|| "unknown".into());
-        md.push_str(&format!(
-            "- **terminal**: TERM={} program={} {} colorterm={} size={}{}{}\n",
+            std::env::consts::FAMILY,
+            self.arch,
+            self.wsl,
             opt(&self.term),
+            opt(&self.colorterm),
             opt(&self.term_program),
             opt(&self.term_program_version),
-            opt(&self.colorterm),
-            size,
-            if self.windows_terminal {
-                " windows-terminal"
-            } else {
-                ""
-            },
-            if self.ssh_session { " ssh" } else { "" }
+            self.windows_terminal,
+            self.ssh_session,
+            self.terminal_size
+                .map(|(w, h)| format!("{w}x{h}"))
+                .unwrap_or_else(|| "unknown".into()),
         ));
         md.push_str(&format!(
             "- **workspace**: {} nodes ({} files / {} dirs), max depth {}, {} expanded, \
@@ -192,7 +192,7 @@ impl DiagnosticReport {
         if self.file_open {
             md.push_str(&format!(
                 "- **open file**: ext={} size={} lines={} encoding={} line-endings={} \
-                 syntax={} json={} diff={} mmap={}\n",
+                 syntax={} json={} csv={} diff={} mmap={}\n",
                 opt(&self.file_extension),
                 self.file_size_bytes
                     .map(|b| b.to_string())
@@ -204,6 +204,7 @@ impl DiagnosticReport {
                 opt(&self.file_line_ending),
                 opt(&self.file_syntax),
                 self.file_is_json,
+                self.file_is_csv,
                 self.file_is_diff,
                 self.file_uses_mmap
             ));

@@ -44,6 +44,7 @@ type Spans = Vec<Vec<(Style, String)>>;
 pub(super) struct FileLoad {
     pub is_json: bool,
     pub is_jsonl: bool,
+    pub is_csv: bool,
     pub jsonl_source: Vec<String>,
     pub virtual_file: Option<VirtualFile>,
     pub content: Vec<String>,
@@ -51,6 +52,9 @@ pub(super) struct FileLoad {
     pub json_pretty_text: Vec<String>,
     pub json_pretty_lines: Spans,
     pub show_pretty_json: bool,
+    pub csv_table_text: Vec<String>,
+    pub csv_table_lines: Spans,
+    pub show_csv_table: bool,
     pub yaml: Option<YamlLoad>,
     /// `true` when the file size exceeds the configured `prettify_size_limit`
     /// and JSON/YAML pretty-printing / fold detection was skipped.
@@ -97,6 +101,7 @@ impl FileLoad {
         FileLoad {
             is_json,
             is_jsonl: false,
+            is_csv: false,
             jsonl_source: Vec::new(),
             virtual_file: None,
             content: Vec::new(),
@@ -104,6 +109,9 @@ impl FileLoad {
             json_pretty_text: Vec::new(),
             json_pretty_lines: Vec::new(),
             show_pretty_json: false,
+            csv_table_text: Vec::new(),
+            csv_table_lines: Vec::new(),
+            show_csv_table: false,
             yaml: None,
             prettify_size_limit_exceeded: false,
             ok: true,
@@ -132,9 +140,10 @@ pub(super) fn compute_file_load(
     let is_json = ext == "json";
     let is_yaml = matches!(ext, "yaml" | "yml");
     let is_jsonl = matches!(ext.to_ascii_lowercase().as_str(), "jsonl" | "ndjson");
+    let is_csv = crate::csv_table::is_csv_file(path);
 
-    // Check whether this JSON/YAML file exceeds the pretty-print size limit.
-    let too_large = if is_json || is_yaml {
+    // Check whether this JSON/YAML/CSV file exceeds the pretty-print size limit.
+    let too_large = if is_json || is_yaml || is_csv {
         std::fs::metadata(path)
             .ok()
             .is_some_and(|meta| meta.len() > prettify_size_limit as u64)
@@ -143,11 +152,12 @@ pub(super) fn compute_file_load(
     };
 
     // Try memory-mapped virtual file first (lazy, no full content in memory).
-    // JSON and YAML are excluded (they need full content for rendering) unless
+    // JSON, YAML, and CSV/TSV are excluded (they need full content for rendering) unless
     // the file exceeds the prettify size limit.
-    if (!is_json && !is_yaml && !is_jsonl) || too_large {
+    if (!is_json && !is_yaml && !is_jsonl && !is_csv) || too_large {
         if let Some(vf) = VirtualFile::open(path) {
             let mut load = FileLoad::empty(is_json);
+            load.is_csv = is_csv;
             let raw = vf.raw_bytes();
             // VirtualFile::open already verified valid UTF-8, so skip the full
             // re-validation pass; only the BOM/ASCII prefix check is needed.
@@ -249,6 +259,17 @@ pub(super) fn compute_file_load(
                 load.json_pretty_text = pretty_lines;
                 load.show_pretty_json = true;
             }
+        }
+    }
+    if is_csv {
+        let delimiter = crate::csv_table::delimiter_for_path(path);
+        let rows = crate::csv_table::parse_delimited(&s, delimiter);
+        if !rows.is_empty() {
+            let table_text = crate::csv_table::format_table_lines(&rows);
+            load.csv_table_lines = hl.highlight(path, &table_text);
+            load.csv_table_text = table_text;
+            load.is_csv = true;
+            load.show_csv_table = true;
         }
     }
     load

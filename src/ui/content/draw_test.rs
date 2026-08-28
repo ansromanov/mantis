@@ -490,4 +490,20 @@ fn draw_content_with_show_line_blame_does_not_panic() {
     fs::remove_dir_all(&root).ok();
 }
 
-// Modified for test requirements
+#[test]
+fn draw_content_renders_csv_table_view() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let f = root.join("table.csv");
+    std::fs::write(&f, "heading1,heading2\nval1,val2\n").unwrap();
+    app.open_file(&f);
+    assert!(app.is_csv);
+    assert!(app.show_csv_table);
+
+    let out = render_to_string(&mut app);
+    assert!(out.contains('┌'), "table top border rendered: {out}");
+    assert!(out.contains("heading1"), "header rendered: {out}");
+    assert!(out.contains("val1"), "data cell rendered: {out}");
+
+    fs::remove_dir_all(&root).ok();
+}

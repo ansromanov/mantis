@@ -24,6 +24,8 @@ impl App {
         }
         if self.is_json && self.show_pretty_json && !self.json_pretty_lines.is_empty() {
             self.json_pretty_lines.len()
+        } else if self.is_csv && self.show_csv_table && !self.csv_table_lines.is_empty() {
+            self.csv_table_lines.len()
         } else if let Some(vf) = &self.virtual_file {
             vf.line_count()
         } else {
@@ -47,7 +49,7 @@ impl App {
     }
 
     /// Returns the text of the 0-indexed line, consulting the active content
-    /// source: plugin content, pretty JSON, virtual file, or raw content vec.
+    /// source: plugin content, pretty JSON, CSV table, virtual file, or raw content vec.
     pub fn line_text(&self, index: usize) -> Option<&str> {
         if let Some(path) = &self.current_file {
             if let Some(lines) = self.plugin_content_text.get(path) {
@@ -56,6 +58,8 @@ impl App {
         }
         if self.is_json && self.show_pretty_json && !self.json_pretty_text.is_empty() {
             self.json_pretty_text.get(index).map(|s| s.as_str())
+        } else if self.is_csv && self.show_csv_table && !self.csv_table_text.is_empty() {
+            self.csv_table_text.get(index).map(|s| s.as_str())
         } else if let Some(vf) = &self.virtual_file {
             vf.line_text(index)
         } else {

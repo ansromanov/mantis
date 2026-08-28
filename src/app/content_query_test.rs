@@ -168,3 +168,28 @@ fn jsonl_display_map_points_expanded_rows_to_source_line() {
     assert!(app.line_text(1).is_some());
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn content_query_csv_table_view_and_toggle() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    let f = root.join("data.csv");
+    std::fs::write(&f, "city,pop\nParis,2100000\nTokyo,14000000\n").unwrap();
+    app.open_file(&f);
+
+    assert!(app.is_csv);
+    assert!(app.show_csv_table);
+    // Table has top border, header row, middle border, 2 data rows, bottom border = 6 lines
+    assert_eq!(app.line_count(), 6);
+    assert!(app.line_text(0).unwrap().starts_with('┌'));
+    assert!(app.line_text(1).unwrap().contains("city"));
+    assert!(app.line_text(3).unwrap().contains("Paris"));
+
+    // Toggle off table view
+    app.show_csv_table = false;
+    assert_eq!(app.line_count(), 3);
+    assert_eq!(app.line_text(0), Some("city,pop"));
+    assert_eq!(app.line_text(1), Some("Paris,2100000"));
+
+    fs::remove_dir_all(&root).ok();
+}

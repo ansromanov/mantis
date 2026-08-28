@@ -756,3 +756,11 @@ fn blame_open_commit_default_binding_is_o() {
         "blame_open_commit must bind to 'o' in content scope"
     );
 }
+
+#[test]
+fn toggle_table_view_bindings_for_action() {
+    let mut keymap = Keymap::default();
+    assert!(keymap.bindings_for_action("toggle_table_view").is_empty());
+    keymap.toggle_table_view = bind(&["ctrl+t"]);
+    assert_eq!(keymap.bindings_for_action("toggle_table_view").len(), 1);
+}

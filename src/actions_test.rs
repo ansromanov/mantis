@@ -39,6 +39,7 @@ const KEYMAP_FIELD_ACTION_IDS: &[&str] = &[
     "toggle_wrap",
     "toggle_line_numbers",
     "toggle_pretty_json",
+    "toggle_table_view",
     "toggle_raw_markdown",
     "toggle_blame",
     "blame_line",
@@ -341,6 +342,10 @@ fn applicability_maps_each_special_cased_action_to_its_precondition() {
     assert_eq!(
         applicability_of("toggle_pretty_json"),
         Applicability::JsonFile
+    );
+    assert_eq!(
+        applicability_of("toggle_table_view"),
+        Applicability::CsvFile
     );
     assert_eq!(
         applicability_of("blame_line"),

@@ -32,6 +32,7 @@ mod app;
 mod command_palette;
 mod command_usage;
 mod config;
+mod csv_table;
 mod diagnostics;
 mod diff;
 mod event_source;

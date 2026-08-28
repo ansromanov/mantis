@@ -116,11 +116,15 @@ pub struct App {
     pub highlighted: Vec<Vec<(ratatui::style::Style, String)>>,
     pub virtual_file: Option<VirtualFile>,
     pub is_json: bool,
+    pub is_csv: bool,
     pub file_encoding: Option<String>,
     pub file_line_ending: Option<String>,
     pub show_pretty_json: bool,
     pub json_pretty_text: Vec<String>,
     pub json_pretty_lines: Vec<Vec<(ratatui::style::Style, String)>>,
+    pub show_csv_table: bool,
+    pub csv_table_text: Vec<String>,
+    pub csv_table_lines: Vec<Vec<(ratatui::style::Style, String)>>,
     pub content_scroll: usize,
     pub content_hscroll: usize,
     /// Cursor (active line) index in the content pane (display-line coordinate).
@@ -633,6 +637,18 @@ impl App {
                 }
                 if self.json_pretty_lines.is_empty() {
                     return Err("JSON file failed to parse");
+                }
+                Ok(())
+            }
+            crate::actions::Applicability::CsvFile => {
+                if self.current_file.is_none() {
+                    return Err("no file is open");
+                }
+                if !self.is_csv {
+                    return Err("requires CSV/TSV file");
+                }
+                if self.csv_table_lines.is_empty() {
+                    return Err("CSV/TSV table failed to parse");
                 }
                 Ok(())
             }

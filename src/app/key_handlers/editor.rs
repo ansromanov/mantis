@@ -172,6 +172,14 @@ impl App {
                 }
                 true
             }
+            Some("toggle_table_view") => {
+                if self.is_csv && !self.csv_table_lines.is_empty() {
+                    self.show_csv_table = !self.show_csv_table;
+                    self.content_hscroll = 0;
+                    self.clamp_content_scroll();
+                }
+                true
+            }
             Some("toggle_blame") => {
                 if self.has_text_cursor() {
                     self.show_blame = !self.show_blame;

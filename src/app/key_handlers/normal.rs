@@ -377,6 +377,16 @@ impl App {
             } else {
                 self.set_status("pretty JSON: could not parse");
             }
+        } else if pressed_in(&k.toggle_table_view, &key, scope) {
+            if self.is_csv && !self.csv_table_lines.is_empty() {
+                self.show_csv_table = !self.show_csv_table;
+                self.content_hscroll = 0;
+                self.clamp_content_scroll();
+            } else if !self.is_csv {
+                self.set_status("table view: not a CSV/TSV file");
+            } else {
+                self.set_status("table view: could not parse table");
+            }
         } else if pressed_in(&k.toggle_raw_markdown, &key, scope) {
             self.toggle_raw_markdown();
         } else if pressed_in(&k.toggle_blame, &key, scope) {

@@ -677,3 +677,9 @@ fn redirect_stdin_to_tty_reports_missing_controlling_terminal() {
         .expect_err("missing controlling terminal should be reported");
     assert!(err.to_string().contains("failed to open /dev/tty"));
 }
+
+#[test]
+fn csv_table_module_accessible() {
+    let path = Path::new("data.csv");
+    assert!(csv_table::is_csv_file(path));
+}
