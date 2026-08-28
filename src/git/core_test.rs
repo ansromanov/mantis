@@ -691,3 +691,34 @@ fn file_at_rev_returns_none_for_invalid_rev() {
         "file_at_rev must return None for an invalid revision"
     );
 }
+
+#[test]
+fn file_commit_diff_shows_selected_commit_not_working_tree() {
+    let dir = tempfile::tempdir().unwrap();
+    git(dir.path(), &["init", "-q"]);
+    let file = dir.path().join("f.txt");
+    fs::write(&file, "one\n").unwrap();
+    git(dir.path(), &["add", "f.txt"]);
+    git(dir.path(), &["commit", "-q", "-m", "first"]);
+    fs::write(&file, "two\n").unwrap();
+    git(dir.path(), &["commit", "-q", "-am", "second"]);
+    let second = String::from_utf8(
+        Command::new("git")
+            .args(["-C", dir.path().to_str().unwrap(), "rev-parse", "HEAD"])
+            .output()
+            .unwrap()
+            .stdout,
+    )
+    .unwrap();
+
+    // Change the working tree after the selected commit. The commit diff must
+    // remain the one-line change from "one" to "two".
+    fs::write(&file, "working tree\n").unwrap();
+    let diff = file_commit_diff(dir.path(), second.trim(), &file).join("\n");
+    assert!(diff.contains("-one"), "parent line missing: {diff}");
+    assert!(diff.contains("+two"), "commit line missing: {diff}");
+    assert!(
+        !diff.contains("working tree"),
+        "working tree leaked: {diff}"
+    );
+}

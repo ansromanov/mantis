@@ -148,7 +148,7 @@ fn file_history_opens_picker_and_shows_diff() {
     assert!(app.history.is_none());
     assert!(app.is_diff);
     assert!(app.content_title.is_some());
-    assert!(app.content.iter().any(|l| l.starts_with("+two")));
+    assert!(app.content.iter().any(|l| l.starts_with("+one")));
     fs::remove_dir_all(&root).ok();
 }
 

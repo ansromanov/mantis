@@ -680,6 +680,41 @@ pub fn file_diff(repo_dir: &Path, rev: &str, file: &Path) -> Vec<String> {
     }
 }
 
+/// Returns the patch introduced by `rev` for `file`, compared with its parent.
+/// This is the appropriate view for a file-history entry; unlike `file_diff`,
+/// it does not compare the selected commit with the current working tree.
+pub fn file_commit_diff(repo_dir: &Path, rev: &str, file: &Path) -> Vec<String> {
+    let output = git_cmd()
+        .arg("-C")
+        .arg(repo_dir)
+        .args([
+            "show",
+            "--format=",
+            "--no-color",
+            "--end-of-options",
+            rev,
+            "--",
+        ])
+        .arg(file)
+        .output();
+
+    match output {
+        Ok(o) if o.status.success() => {
+            let text = String::from_utf8_lossy(&o.stdout);
+            if text.trim().is_empty() {
+                vec!["(no changes in this commit for the selected file)".to_string()]
+            } else {
+                text.lines().map(|l| l.to_string()).collect()
+            }
+        }
+        Ok(o) => vec![format!(
+            "[git error] {}",
+            String::from_utf8_lossy(&o.stderr).trim()
+        )],
+        Err(e) => vec![format!("[git unavailable] {e}")],
+    }
+}
+
 /// Maximum number of files to keep in the blame cache. Blame is only shown
 /// for the focused file/selection, so a small cache is sufficient.
 const BLAME_CACHE_CAPACITY: usize = 16;
