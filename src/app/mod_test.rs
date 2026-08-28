@@ -4828,6 +4828,16 @@ fn panel_mode_label_git_mode_flat_returns_git_flat() {
     fs::remove_dir_all(&root).ok();
 }
 
+#[test]
+fn panel_mode_label_stays_files_when_content_blame_is_active() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.show_blame = true;
+    app.current_file = Some(root.join("file.txt"));
+    assert_eq!(app.panel_mode_label(), "Files");
+    fs::remove_dir_all(&root).ok();
+}
+
 // -- S keybinding toggles diff mode in git mode --------------------------------
 
 /// Builds a git repo with one committed file and an unstaged modification.
