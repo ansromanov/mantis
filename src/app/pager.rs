@@ -33,6 +33,7 @@ impl App {
         self.show_pretty_json = false;
         self.json_pretty_text = Vec::new();
         self.json_pretty_lines = Vec::new();
+        self.json_path_map.clear();
         self.is_csv = false;
         self.show_csv_table = false;
         self.csv_table_text = Vec::new();

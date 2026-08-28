@@ -40,6 +40,7 @@ mod file;
 mod fold;
 mod git;
 mod highlight;
+mod json_path;
 mod jsonl;
 mod list_picker;
 mod pager;

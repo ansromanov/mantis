@@ -29,6 +29,7 @@ pub mod fold;
 pub mod fold_detectors;
 pub mod git;
 pub mod highlight;
+pub mod json_path;
 pub mod jsonl;
 pub mod list_picker;
 pub mod pager;

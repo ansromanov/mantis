@@ -261,7 +261,7 @@ Unlisted segments are hidden. Set both to empty lists for an empty bar.
 # right = ["lnum", "type", "git", "version"]
 ```
 
-Valid ids: `badges` `scroll` `lnum` `type` `fileinfo` `git` `errors`
+Valid ids: `badges` `scroll` `lnum` `type` `jsonpath` `fileinfo` `git` `errors`
 `folds` `message` `version`. There is no keybinding-hint segment — the `?`/`F1`
 help overlay and the command palette are the discovery surfaces for bindings.
 

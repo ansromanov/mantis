@@ -488,6 +488,13 @@ impl App {
         self.show_pretty_json = load.show_pretty_json;
         self.json_pretty_text = load.json_pretty_text;
         self.json_pretty_lines = load.json_pretty_lines;
+        self.json_path_map = if self.is_json && self.show_pretty_json {
+            serde_json::from_str::<serde_json::Value>(&load.content.join("\n"))
+                .map(|value| crate::json_path::build_path_map(&value))
+                .unwrap_or_default()
+        } else {
+            Vec::new()
+        };
         self.is_csv = load.is_csv;
         self.show_csv_table = load.show_csv_table;
         self.csv_table_text = load.csv_table_text;

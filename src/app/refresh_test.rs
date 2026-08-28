@@ -315,6 +315,7 @@ fn create_base_app() -> App {
         show_pretty_json: false,
         json_pretty_text: Vec::new(),
         json_pretty_lines: Vec::new(),
+        json_path_map: Vec::new(),
         show_csv_table: false,
         csv_table_text: Vec::new(),
         csv_table_lines: Vec::new(),

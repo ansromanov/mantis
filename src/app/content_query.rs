@@ -42,6 +42,17 @@ impl App {
         let (display, map) = crate::jsonl::build_display(&self.jsonl_source, &self.jsonl_expanded);
         self.content = display;
         self.jsonl_display_map = map;
+        self.json_path_map.clear();
+        for (source_line, raw) in self.jsonl_source.iter().enumerate() {
+            let paths = serde_json::from_str::<serde_json::Value>(raw)
+                .map(|value| crate::json_path::build_path_map(&value))
+                .unwrap_or_else(|_| vec![None]);
+            if self.jsonl_expanded.contains(&source_line) {
+                self.json_path_map.extend(paths);
+            } else {
+                self.json_path_map.push(None);
+            }
+        }
         self.highlighted = self.highlighter.highlight(
             &self.current_file.clone().unwrap_or_default(),
             &self.content,

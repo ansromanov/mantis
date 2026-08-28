@@ -122,6 +122,8 @@ pub struct App {
     pub show_pretty_json: bool,
     pub json_pretty_text: Vec<String>,
     pub json_pretty_lines: Vec<Vec<(ratatui::style::Style, String)>>,
+    /// JSON value path aligned with pretty-printed display lines.
+    pub json_path_map: Vec<Option<String>>,
     pub show_csv_table: bool,
     pub csv_table_text: Vec<String>,
     pub csv_table_lines: Vec<Vec<(ratatui::style::Style, String)>>,
