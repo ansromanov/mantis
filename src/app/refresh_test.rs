@@ -480,6 +480,8 @@ fn create_base_app() -> App {
         jsonl_display_map: Vec::new(),
         follow_mode: false,
         follow_pinned: false,
+        follow_candidate: None,
+        follow_paused_until: None,
         log_highlight_cache: RefCell::new(HashMap::new()),
         content_revision: 0,
         filter_query: None,

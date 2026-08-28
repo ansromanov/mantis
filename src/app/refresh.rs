@@ -90,9 +90,12 @@ impl App {
                 s.maybe_refresh();
             }
         }
-        if self.drain_root_watch() {
+        if let Some(path) = self.drain_root_watch() {
             self.tree_dirty = true;
             self.tree_dirty_at = Some(self.now());
+            if self.follow_mode {
+                self.follow_candidate = Some(path);
+            }
         }
         // Debounced session save: persist 2 s after the last state change.
         if self.session_dirty {
@@ -133,11 +136,36 @@ impl App {
                 self.tree_dirty = false;
                 self.tree_dirty_at = None;
                 self.reload();
+                if self.follow_mode {
+                    self.follow_latest_candidate();
+                }
             }
         } else if self.root_watcher.is_none() && self.last_refresh.elapsed().as_secs() >= 30 {
             // No watcher (install failed): fall back to a blind periodic reload.
             self.reload();
         }
+    }
+
+    /// Opens the newest file observed by the root watcher when follow mode is
+    /// active, using a working-tree diff inside a repository and plain content
+    /// elsewhere. A paused follow session keeps the candidate for later.
+    fn follow_latest_candidate(&mut self) {
+        let Some(path) = self.follow_candidate.take() else {
+            return;
+        };
+        if self
+            .follow_paused_until
+            .is_some_and(|until| until > self.now())
+        {
+            self.follow_candidate = Some(path);
+            return;
+        }
+        if crate::git::repo_info(&self.root).is_some() {
+            self.request_working_tree_diff(&path);
+        } else {
+            self.request_open_file(&path);
+        }
+        self.follow_pinned = true;
     }
 
     /// Detected a change to the config file: re-reads, validates, hot-reloads
