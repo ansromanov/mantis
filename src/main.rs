@@ -473,7 +473,12 @@ fn run_app(
     }
 
     match initial {
-        InitialContent::File(file) => app.open_and_reveal(&file),
+        InitialContent::File(file) => {
+            // A CLI file argument is an explicit user selection and must win
+            // over the file restored by the per-root session.
+            app.current_file = None;
+            app.open_and_reveal(&file);
+        }
         InitialContent::Pager { parsed, language } => app.open_pager_content(parsed, language),
         InitialContent::None => {}
     }

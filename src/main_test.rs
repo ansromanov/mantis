@@ -605,6 +605,31 @@ fn run_app_opens_and_reveals_file() {
 }
 
 #[test]
+fn explicit_file_selection_replaces_restored_session_file() {
+    let dir = temp_dir();
+    let _state = IsolatedState::welcome_shown(&dir);
+    let old_file = dir.join("old.txt");
+    let requested = dir.join("requested.json");
+    fs::write(&old_file, "old\n").unwrap();
+    fs::write(&requested, "{\"selected\":true}\n").unwrap();
+
+    let mut app = app_for(&dir);
+    app.open_file(&old_file);
+    app.save_session();
+
+    let mut restored = app_for(&dir);
+    restored.current_file = None;
+    restored.open_and_reveal(&requested);
+
+    assert_eq!(restored.current_file.as_deref(), Some(requested.as_path()));
+    assert!(restored
+        .content
+        .iter()
+        .any(|line| line.contains("selected")));
+    fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
 fn run_app_surfaces_config_error_without_failing() {
     let dir = temp_dir();
     let _state = IsolatedState::welcome_shown(&dir);
