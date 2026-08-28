@@ -126,6 +126,15 @@ fn content_focus_blame_mode() {
 }
 
 #[test]
+fn status_bar_shows_textual_focus_indicator() {
+    let mut app = make_app();
+    assert!(render_bar_width(&app, 120).contains("[focus: tree]"));
+
+    app.focus = Focus::Content;
+    assert!(render_bar_width(&app, 120).contains("[focus: content]"));
+}
+
+#[test]
 fn tree_focus_compare_badge_shows_revision() {
     let mut app = make_app();
     app.git_mode = true;
