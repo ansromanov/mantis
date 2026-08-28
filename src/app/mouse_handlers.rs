@@ -306,48 +306,43 @@ impl App {
                             self.activate_selected();
                         }
                     }
+                } else if self.content_scrollbar_hit(ev.column, ev.row) {
+                    self.focus = Focus::Content;
+                    self.scrollbar_drag = true;
+                    self.set_scroll_from_mouse_y(ev.row);
+                    self.mark_content_scrolled();
                 } else if rect_contains(self.content_area, ev.column, ev.row) {
                     self.focus = Focus::Content;
                     let rel_col = (ev.column.saturating_sub(self.content_area.x)) as usize;
-                    let on_scrollbar = self.show_scrollbar
-                        && self.display_line_count() > self.content_area.height as usize
-                        && ev.column
-                            == self.content_area.x + self.content_area.width.saturating_sub(1);
-                    if on_scrollbar {
-                        self.scrollbar_drag = true;
-                        self.set_scroll_from_mouse_y(ev.row);
-                        self.mark_content_scrolled();
-                    } else {
-                        // Check if click is on the fold gutter (at the start of the gutter).
-                        let fold_gw = self.fold_gutter_width();
-                        if fold_gw > 0 && rel_col < fold_gw {
-                            // Find the fold region for this screen row.
-                            let hit = self
-                                .fold_gutter_rows
-                                .iter()
-                                .find(|&&(y, _)| y == ev.row)
-                                .map(|&(_, ri)| ri);
-                            if let Some(ri) = hit {
-                                self.telemetry.record(
-                                    crate::telemetry::TelemetryEvent::ActionInvoked {
-                                        action: "fold_toggle",
-                                        source: crate::telemetry::ActionSource::Mouse,
-                                    },
-                                );
-                                self.toggle_fold_region(ri);
-                                self.mark_content_scrolled();
-                                return;
-                            }
+                    // Check if click is on the fold gutter (at the start of the gutter).
+                    let fold_gw = self.fold_gutter_width();
+                    if fold_gw > 0 && rel_col < fold_gw {
+                        // Find the fold region for this screen row.
+                        let hit = self
+                            .fold_gutter_rows
+                            .iter()
+                            .find(|&&(y, _)| y == ev.row)
+                            .map(|&(_, ri)| ri);
+                        if let Some(ri) = hit {
+                            self.telemetry.record(
+                                crate::telemetry::TelemetryEvent::ActionInvoked {
+                                    action: "fold_toggle",
+                                    source: crate::telemetry::ActionSource::Mouse,
+                                },
+                            );
+                            self.toggle_fold_region(ri);
+                            self.mark_content_scrolled();
+                            return;
                         }
-                        let can_select = self.can_mouse_select();
-                        if can_select {
-                            let pos = self.content_pos(ev.column, ev.row);
-                            if self.has_text_cursor() {
-                                self.set_active_line_from_physical(pos.0);
-                            }
-                            self.drag_start = Some(pos);
-                            self.selection = None;
+                    }
+                    let can_select = self.can_mouse_select();
+                    if can_select {
+                        let pos = self.content_pos(ev.column, ev.row);
+                        if self.has_text_cursor() {
+                            self.set_active_line_from_physical(pos.0);
                         }
+                        self.drag_start = Some(pos);
+                        self.selection = None;
                     }
                 } else if self.show_blame
                     && self.has_text_cursor()
@@ -615,6 +610,18 @@ impl App {
         {
             self.activate_search_selection();
         }
+    }
+
+    /// Returns whether a click is on the painted scrollbar or its adjacent pane border.
+    fn content_scrollbar_hit(&self, column: u16, row: u16) -> bool {
+        let ca = self.content_area;
+        let row_inside = row >= ca.y && row < ca.y.saturating_add(ca.height);
+        let right_cell = ca.x.saturating_add(ca.width.saturating_sub(1));
+        let adjacent_border = ca.x.saturating_add(ca.width);
+        self.show_scrollbar
+            && self.display_line_count() > ca.height as usize
+            && row_inside
+            && (column == right_cell || column == adjacent_border)
     }
 
     /// Maps a mouse row to a content scroll position, used for scrollbar dragging.
