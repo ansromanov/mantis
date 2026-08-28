@@ -914,3 +914,41 @@ fn is_plugin_active_returns_true_when_plugin_active() {
     assert!(mgr.is_plugin_active("markdown"));
     assert!(!mgr.is_plugin_active("other"));
 }
+
+#[test]
+fn activate_all_ensures_bundled_plugins_installed() {
+    let _guard = super::ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let tmp = std::env::temp_dir().join(format!(
+        "mantis_mgr_activate_install_{}_{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0)
+    ));
+    std::fs::create_dir_all(&tmp).unwrap();
+    let var = if cfg!(windows) {
+        "APPDATA"
+    } else {
+        "XDG_CONFIG_HOME"
+    };
+    let old = std::env::var_os(var);
+    unsafe { std::env::set_var(var, &tmp) };
+
+    let mut mgr = PluginManager::new(vec![]);
+    mgr.activate_all(Some("default"), &Theme::default());
+
+    let plugin_dir = tmp.join("mantis").join("plugins");
+    assert!(
+        plugin_dir.exists(),
+        "activate_all must ensure plugin_dir is created"
+    );
+
+    unsafe {
+        match old {
+            Some(v) => std::env::set_var(var, v),
+            None => std::env::remove_var(var),
+        }
+    }
+    std::fs::remove_dir_all(&tmp).ok();
+}

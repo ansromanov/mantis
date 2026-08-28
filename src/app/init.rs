@@ -55,6 +55,9 @@ impl App {
         );
         let theme = cfg.theme.resolve();
 
+        // Ensure bundled plugins and syntaxes are installed to the plugin directory.
+        plugin::install_bundled_plugins();
+
         // Seed bundled plugins into the config map (insert-if-absent) so the
         // plugin palette shows them even when mantis.toml has no [plugins] section.
         for (name, entry) in plugin::bundled_plugin_entries() {

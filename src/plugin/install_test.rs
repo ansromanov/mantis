@@ -707,3 +707,42 @@ path = "mantis-plugin-markdown"
 
     std::fs::remove_dir_all(&tmp).ok();
 }
+
+#[test]
+fn install_bundled_plugins_atomic_replace_preserves_executable_permissions() {
+    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let tmp = fresh_plugin_dir();
+    std::fs::create_dir_all(&tmp).unwrap();
+    let var = config_home_var();
+    let old = std::env::var_os(var);
+    unsafe { std::env::set_var(var, &tmp) };
+
+    let plugins_dir = tmp.join("mantis").join("plugins");
+    std::fs::create_dir_all(&plugins_dir).unwrap();
+
+    let iconize_name = if cfg!(windows) {
+        "iconize.exe"
+    } else {
+        "iconize"
+    };
+    let iconize_path = plugins_dir.join(iconize_name);
+    std::fs::write(&iconize_path, b"dummy old iconize").unwrap();
+
+    install_bundled_plugins();
+
+    assert!(iconize_path.exists());
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let perms = std::fs::metadata(&iconize_path).unwrap().permissions();
+        assert_eq!(perms.mode() & 0o111, 0o111, "binary must be executable");
+    }
+
+    unsafe {
+        match old {
+            Some(v) => std::env::set_var(var, v),
+            None => std::env::remove_var(var),
+        }
+    }
+    std::fs::remove_dir_all(&tmp).ok();
+}

@@ -304,9 +304,11 @@ impl PluginManager {
     }
 
     /// Spawns all enabled *process* plugins and sends them the `init` event.
+    /// Ensures bundled plugins are installed on disk before spawning.
     pub(crate) fn activate_all(&mut self, theme_name: Option<&str>, theme: &Theme) {
         self.active_theme = theme_name.map(|s| s.to_string());
         self.active_theme_colors = Some(ThemeColorsMsg::from(theme));
+        crate::plugin::install_bundled_plugins();
         let plugin_dir = default_plugin_dir();
         for (name, entry) in &self.entries {
             if !entry.enabled || entry.kind != PluginKind::Process {

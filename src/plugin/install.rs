@@ -1,13 +1,14 @@
 //! Plugin installation and default directory discovery.
 //!
 //! Locates the platform-specific plugin directory, writes out the bundled
-//! binary plugins embedded at compile time, and installs syntax definitions
-//! into `{plugin_dir}/syntaxes/`.
+//! binary plugins embedded at compile time via atomic file replacement, and
+//! installs syntax definitions into `{plugin_dir}/syntaxes/`.
 //!
-//! Bundled binary plugins (`iconize`, `markdown`) are embedded at compile
-//! time via `build.rs` → `$OUT_DIR/plugin_binaries.rs` — no search-path dance
-//! or fallback `cargo build` at runtime. This ensures they are always
-//! available for non-source installs (release artifacts, Homebrew, etc.).
+//! Bundled binary plugins (`iconize`, `markdown`, `python`, `rust`, `go`,
+//! `json`, `sh`, `yaml`) are embedded at compile time via `build.rs` →
+//! `$OUT_DIR/plugin_binaries.rs` — no search-path dance or fallback `cargo
+//! build` at runtime. This ensures they are always available for non-source
+//! installs (release artifacts, Homebrew, etc.).
 //!
 //! Bundled syntax plugins (`terraform`, `toml`, `typescript`, `dockerfile`,
 //! `nginx`, `justfile`) are embedded via `include_str!` and written to the
@@ -202,21 +203,49 @@ pub(crate) fn install_bundled_plugins() {
             set_executable(&plugin_path);
             continue;
         }
-        if std::fs::write(&plugin_path, data).is_ok() {
-            set_executable(&plugin_path);
-        }
+        write_binary_atomically(&dir, &plugin_path, &binary_filename, data);
     }
 
     let syntax_dir = dir.join("syntaxes");
     let _ = std::fs::create_dir_all(&syntax_dir);
     for (name, content) in BUNDLED_SYNTAX_PLUGINS {
         let path = syntax_dir.join(name);
-        if !path.exists() {
-            let _ = std::fs::write(&path, content);
+        let up_to_date = std::fs::read_to_string(&path)
+            .map(|existing| existing == *content)
+            .unwrap_or(false);
+        if !up_to_date {
+            write_file_atomically(&syntax_dir, &path, name, content.as_bytes());
         }
     }
 
     remove_retired_bundled_plugins();
+}
+
+fn write_binary_atomically(dir: &Path, plugin_path: &Path, filename: &str, data: &[u8]) {
+    let tmp_path = dir.join(format!(".{filename}.tmp.{}", std::process::id()));
+    if std::fs::write(&tmp_path, data).is_ok() {
+        set_executable(&tmp_path);
+        if std::fs::rename(&tmp_path, plugin_path).is_err() {
+            let _ = std::fs::remove_file(plugin_path);
+            if std::fs::rename(&tmp_path, plugin_path).is_err()
+                && std::fs::write(plugin_path, data).is_ok()
+            {
+                set_executable(plugin_path);
+            }
+        }
+        let _ = std::fs::remove_file(&tmp_path);
+    }
+}
+
+fn write_file_atomically(dir: &Path, file_path: &Path, filename: &str, data: &[u8]) {
+    let tmp_path = dir.join(format!(".{filename}.tmp.{}", std::process::id()));
+    if std::fs::write(&tmp_path, data).is_ok() {
+        if std::fs::rename(&tmp_path, file_path).is_err() {
+            let _ = std::fs::remove_file(file_path);
+            let _ = std::fs::rename(&tmp_path, file_path);
+        }
+        let _ = std::fs::remove_file(&tmp_path);
+    }
 }
 
 /// Removes retired bundled plugin files from the plugin directory.

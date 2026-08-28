@@ -898,3 +898,45 @@ fn app_new_starts_without_csv_state() {
     assert!(app.csv_table_lines.is_empty());
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn app_new_installs_bundled_plugins_on_startup() {
+    let _guard = crate::plugin::ENV_LOCK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    let tmp = std::env::temp_dir().join(format!(
+        "mantis_app_new_plugin_install_{}_{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0)
+    ));
+    std::fs::create_dir_all(&tmp).unwrap();
+    let var = if cfg!(windows) {
+        "APPDATA"
+    } else {
+        "XDG_CONFIG_HOME"
+    };
+    let old = std::env::var_os(var);
+    unsafe { std::env::set_var(var, &tmp) };
+
+    let root = temp_dir();
+    let mut app = new_app(&root, Config::default());
+    app.plugin_manager.deactivate_all();
+
+    let plugin_dir = tmp.join("mantis").join("plugins");
+    assert!(
+        plugin_dir.exists(),
+        "App::new must ensure default plugin dir is created and populated"
+    );
+
+    unsafe {
+        match old {
+            Some(v) => std::env::set_var(var, v),
+            None => std::env::remove_var(var),
+        }
+    }
+    fs::remove_dir_all(&root).ok();
+    std::fs::remove_dir_all(&tmp).ok();
+}
