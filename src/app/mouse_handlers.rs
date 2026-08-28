@@ -405,13 +405,15 @@ impl App {
                 if rect_contains(self.content_area, ev.column, ev.row)
                     || (self.show_blame && rect_contains(self.blame_area, ev.column, ev.row))
                 {
+                    self.focus = Focus::Content;
                     self.telemetry
                         .record(crate::telemetry::TelemetryEvent::ActionInvoked {
                             action: "content_scroll_down",
                             source: crate::telemetry::ActionSource::Mouse,
                         });
-                    self.set_content_scroll(self.content_scroll.saturating_add(WHEEL_STEP));
+                    self.scroll_content_by(WHEEL_STEP as isize);
                 } else if rect_contains(self.tree_area, ev.column, ev.row) {
+                    self.focus = Focus::Tree;
                     self.telemetry
                         .record(crate::telemetry::TelemetryEvent::ActionInvoked {
                             action: "tree_scroll_down",
@@ -424,13 +426,15 @@ impl App {
                 if rect_contains(self.content_area, ev.column, ev.row)
                     || (self.show_blame && rect_contains(self.blame_area, ev.column, ev.row))
                 {
+                    self.focus = Focus::Content;
                     self.telemetry
                         .record(crate::telemetry::TelemetryEvent::ActionInvoked {
                             action: "content_scroll_up",
                             source: crate::telemetry::ActionSource::Mouse,
                         });
-                    self.set_content_scroll(self.content_scroll.saturating_sub(WHEEL_STEP));
+                    self.scroll_content_by(-(WHEEL_STEP as isize));
                 } else if rect_contains(self.tree_area, ev.column, ev.row) {
+                    self.focus = Focus::Tree;
                     self.telemetry
                         .record(crate::telemetry::TelemetryEvent::ActionInvoked {
                             action: "tree_scroll_up",

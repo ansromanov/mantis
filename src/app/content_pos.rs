@@ -265,6 +265,33 @@ impl App {
         }
     }
 
+    /// Scrolls the content viewport by a signed number of display lines.
+    ///
+    /// Mouse scrolling is allowed to move the viewport independently of the
+    /// text cursor, but the cursor must not be left off-screen: the next
+    /// cursor movement would otherwise snap the viewport back to it. When the
+    /// viewport passes the cursor, move the cursor to the nearest visible
+    /// display line instead.
+    pub fn scroll_content_by(&mut self, delta: isize) {
+        let next = if delta.is_negative() {
+            self.content_scroll.saturating_sub(delta.unsigned_abs())
+        } else {
+            self.content_scroll.saturating_add(delta as usize)
+        };
+        let previous = self.content_scroll;
+        self.set_content_scroll(next);
+        if previous == self.content_scroll || !self.has_text_cursor() {
+            return;
+        }
+
+        let last_line = self.display_line_count().saturating_sub(1);
+        let last_visible = self
+            .content_scroll
+            .saturating_add((self.content_area.height as usize).max(1).saturating_sub(1))
+            .min(last_line);
+        self.active_line = self.active_line.clamp(self.content_scroll, last_visible);
+    }
+
     /// Ensures `active_line` is visible in the content pane viewport. Since
     /// the blame annotation strip now shares `content_scroll` with the file
     /// content (both live in the content pane), this delegates to
