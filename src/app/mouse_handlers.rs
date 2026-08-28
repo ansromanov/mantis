@@ -255,7 +255,7 @@ impl App {
             match ev.kind {
                 MouseEventKind::ScrollDown => self.in_file_search_next(),
                 MouseEventKind::ScrollUp => self.in_file_search_prev(),
-                _ => {}
+                _ => return,
             }
             return;
         }
@@ -267,11 +267,16 @@ impl App {
                 MouseEventKind::ScrollUp => {
                     self.handle_tree_filter_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()))
                 }
-                _ => {}
+                _ => return,
             }
             return;
         }
-        if self.goto_line.is_some() {
+        if self.goto_line.is_some()
+            && matches!(
+                ev.kind,
+                MouseEventKind::ScrollDown | MouseEventKind::ScrollUp
+            )
+        {
             return;
         }
         let scroll_before = self.content_scroll;

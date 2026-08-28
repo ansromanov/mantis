@@ -307,7 +307,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         (0..content_lines.len()).collect()
     };
 
-    if app.word_wrap && leading_rows > 0 {
+    if app.word_wrap && ln_width > 0 && leading_rows > 0 {
         let skip = leading_rows.min(content_lines.len());
         content_lines.drain(..skip);
         ln_lines.drain(..skip);

@@ -603,7 +603,7 @@ impl App {
                 self.plugin_content_active_path = Some(path.clone());
             }
             self.reload_content();
-            self.active_line = active_line;
+            self.active_line = active_line.min(self.display_line_count().saturating_sub(1));
             self.set_content_scroll(scroll);
             self.clamp_content_scroll();
         }

@@ -170,7 +170,7 @@ impl App {
                     let scroll = self.content_scroll;
                     self.show_pretty_json = !self.show_pretty_json;
                     self.content_hscroll = 0;
-                    self.active_line = active_line;
+                    self.active_line = active_line.min(self.display_line_count().saturating_sub(1));
                     self.clamp_content_scroll();
                     // Clamp against the new representation, then restore the
                     // old viewport offset (which may have been illegal for
