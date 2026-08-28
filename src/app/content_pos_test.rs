@@ -500,6 +500,36 @@ fn scroll_content_by_keeps_cursor_in_view() {
 }
 
 #[test]
+fn wrapped_content_uses_visual_rows_for_scroll_bounds() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.virtual_file = None;
+    app.content = vec!["x".repeat(100), "tail".into()];
+    app.word_wrap = true;
+    app.show_line_numbers = false;
+    app.content_area = Rect::new(0, 0, 20, 4);
+
+    assert_eq!(app.wrapped_content_rows(), 7);
+    assert_eq!(app.content_scroll_max(), 3);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn wrapped_scroll_into_view_accounts_for_rows_before_cursor() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.virtual_file = None;
+    app.content = vec!["x".repeat(100), "tail".into()];
+    app.word_wrap = true;
+    app.show_line_numbers = false;
+    app.content_area = Rect::new(0, 0, 20, 4);
+    app.scroll_line_into_view(1);
+
+    assert_eq!(app.content_scroll, 3);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn selection_text_csv_table_content() {
     let root = temp_root();
     let mut app = app_for(&root);

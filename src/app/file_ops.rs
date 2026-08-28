@@ -248,6 +248,9 @@ impl App {
     /// Applies a computed working-tree diff to the content panel. Shared by the
     /// synchronous and worker-thread code paths.
     pub(super) fn apply_diff_load(&mut self, path: &Path, load: DiffLoad) {
+        // A diff load replaces the complete rendered buffer. Any cached
+        // highlighting from the previous source must not survive that swap.
+        *self.content_highlight_cache.borrow_mut() = None;
         // Capture whether this is a genuine file switch before we overwrite
         // current_file with the new path.
         let is_new_file = self.current_file.as_deref() != Some(path);
@@ -778,6 +781,8 @@ impl App {
                     self.active_line = saved.active_line;
                     self.diff_side_by_side = saved.side_by_side;
                     self.show_line_blame = false;
+                    self.show_blame = self.blame_before_commit;
+                    self.blame_before_commit = false;
                     self.clear_selection();
                     self.content_title = Some(saved.content_title);
                     self.highlighted = saved.highlighted;
@@ -889,6 +894,7 @@ impl App {
         };
         let hash = bl.commit_hash.clone();
         let short = bl.short_hash.clone();
+        self.blame_before_commit = self.show_blame;
         self.show_blame = false;
         let diff = crate::git::file_diff(&self.root, &hash, &path);
         self.show_diff(&path, &short, &diff, Some(&hash));

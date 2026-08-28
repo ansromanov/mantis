@@ -223,10 +223,12 @@ impl App {
         if !self.git_status_enabled {
             self.git_status_enabled = true;
         }
+        // Avoid displaying the previously selected file's diff while the
+        // range status request is in flight.
+        self.git_status_map.clear();
+        self.rebuild(false);
         self.request_range_status(rev);
         self.expand_git_dirs();
-        self.rebuild(true);
-        self.try_open_selected();
         self.focus = crate::app::Focus::Tree;
         self.mark_session_dirty();
     }

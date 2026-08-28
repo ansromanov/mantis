@@ -679,6 +679,23 @@ fn enter_compare_mode_sets_compare_base_and_enables_git_mode() {
 }
 
 #[test]
+fn entering_compare_mode_clears_previous_status_before_async_load() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.current_file = Some(root.join("a.txt"));
+    app.content = vec!["stale diff".into()];
+    app.highlighted = vec![vec![]];
+    app.git_status_map
+        .insert(root.join("a.txt"), crate::git::GitStatus::Modified);
+
+    app.enter_compare_mode("HEAD~3".into());
+
+    assert!(app.content.is_empty());
+    assert!(app.highlighted.is_empty());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn toggle_git_mode_off_clears_compare_base() {
     let root = temp_tree();
     let mut app = app_for(&root);

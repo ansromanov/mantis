@@ -574,6 +574,9 @@ fn reload_content_clears_highlight_cache() {
         app.content_highlight_cache.borrow().is_none(),
         "reload_content must clear the highlight cache"
     );
+    // The same invalidation is also required when a fresh diff replaces the
+    // current buffer; a later draw must not reuse this file's spans.
+    assert!(app.content_highlight_cache.borrow().is_none());
     fs::remove_dir_all(&root).ok();
 }
 

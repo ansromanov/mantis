@@ -723,7 +723,13 @@ fn toggle_raw_markdown_active_toggles_state() {
 
     // Create a markdown file and open it
     let md_path = root.join("test.md");
-    fs::write(&md_path, "# Hello").unwrap();
+    fs::write(
+        &md_path,
+        (1..=20)
+            .map(|i| format!("# Heading {i}\n"))
+            .collect::<String>(),
+    )
+    .unwrap();
     app.open_file(&md_path);
 
     // Mock active markdown plugin
@@ -736,9 +742,14 @@ fn toggle_raw_markdown_active_toggles_state() {
         "initially show_raw_markdown should be false"
     );
 
+    app.content_area = Rect::new(0, 0, 80, 2);
+    app.content_scroll = 5;
+    app.active_line = 5;
+
     // Pressing 'M' should toggle it
     app.handle_key(key(KeyCode::Char('M')));
     assert!(app.show_raw_markdown, "should toggle to true");
+    assert_eq!(app.content_scroll, 5);
 
     // Pressing 'M' again should toggle it back
     app.handle_key(key(KeyCode::Char('M')));
@@ -1557,6 +1568,7 @@ fn esc_closes_file_at_revision_and_its_commit_diff() {
     // Simulate being in a file-at-revision snapshot.
     app.viewing_revision = Some("abc1234".into());
     app.is_diff = false;
+    app.blame_before_commit = true;
     app.file_at_revision = Some(FileAtRevision {
         short: "abc1234".into(),
         hash: "abc1234def5678".into(),
@@ -1579,6 +1591,10 @@ fn esc_closes_file_at_revision_and_its_commit_diff() {
     );
     assert!(!app.is_diff, "Esc must close the transient commit diff");
     assert!(app.viewing_revision.is_none());
+    assert!(
+        app.show_blame,
+        "Esc must restore blame mode after a blame commit"
+    );
     fs::remove_dir_all(&root).ok();
 }
 

@@ -482,6 +482,7 @@ fn blame_area_initialises_to_default() {
         ratatui::layout::Rect::default(),
         "blame_area must be default (inactive) until first render"
     );
+    assert!(!app.blame_before_commit);
     fs::remove_dir_all(&root).ok();
 }
 

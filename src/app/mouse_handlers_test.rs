@@ -7,6 +7,7 @@ use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::Rect;
 
 use crate::app::App;
+use crate::app::Focus;
 use crate::config::Config;
 use crate::list_picker::ListPicker;
 
@@ -993,6 +994,25 @@ fn plugin_picker_click_outside_closes() {
     };
     app.handle_mouse(left_down_at(1, 1)); // outside popup
     assert!(app.plugin_picker.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn wheel_over_tree_filter_does_not_scroll_underlying_panels() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.content = (0..50).map(|i| format!("line {i}")).collect();
+    app.content_area = Rect::new(40, 0, 40, 10);
+    app.tree_filter = Some(crate::search::TreeFilter::new());
+    app.focus = Focus::Tree;
+    let content_scroll = app.content_scroll;
+    let tree_scroll = app.tree_scroll;
+
+    app.handle_mouse(scroll_down_at(5, 5));
+
+    assert_eq!(app.content_scroll, content_scroll);
+    assert_eq!(app.tree_scroll, tree_scroll);
+    assert_eq!(app.focus, Focus::Tree);
     fs::remove_dir_all(&root).ok();
 }
 

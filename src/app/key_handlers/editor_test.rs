@@ -1162,6 +1162,7 @@ fn toggle_pretty_json_via_command_preserves_content_scroll() {
         app.content_scroll, 2,
         "toggle_pretty_json must preserve content_scroll"
     );
+    assert_eq!(app.active_line, 0);
     fs::remove_dir_all(&root).ok();
 }
 

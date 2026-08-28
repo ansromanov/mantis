@@ -111,7 +111,22 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     let view_height = inner.height as usize;
     let total_lines = app.display_line_count();
     let scroll = app.content_scroll.min(app.content_scroll_max());
-    let visible_end = (scroll + view_height).min(total_lines);
+    let (render_scroll, leading_rows) = if app.word_wrap {
+        app.wrapped_display_position(scroll)
+    } else {
+        (scroll, 0)
+    };
+    let visible_end = if app.word_wrap {
+        let mut end = render_scroll;
+        while end < total_lines
+            && app.wrapped_line_start(end + 1).saturating_sub(scroll) < view_height
+        {
+            end += 1;
+        }
+        end.saturating_add(1).min(total_lines)
+    } else {
+        (render_scroll + view_height).min(total_lines)
+    };
 
     // Rendered-content source from plugins.
     let render_lines: Option<&Vec<Vec<(ratatui::style::Style, String)>>> = app
@@ -150,7 +165,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         render_preformatted_lines(
             app,
             &app.json_pretty_lines,
-            scroll,
+            render_scroll,
             visible_end,
             show_ln,
             in_file_search,
@@ -161,7 +176,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         render_preformatted_lines(
             app,
             &app.csv_table_lines,
-            scroll,
+            render_scroll,
             visible_end,
             show_ln,
             in_file_search,
@@ -175,11 +190,11 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         // (rendering collapses blank lines, strips code fences, etc.). This
         // matches line_prefix_width() which already returns 0 for rendered
         // markdown, keeping input and render math consistent.
-        let lines: Vec<Line> = md_lines[scroll..visible_end]
+        let lines: Vec<Line> = md_lines[render_scroll..visible_end]
             .iter()
             .enumerate()
             .map(|(offset, spans)| {
-                let logical_idx = scroll + offset;
+                let logical_idx = render_scroll + offset;
                 let regions_owned: Vec<(Style, String)> =
                     spans.iter().map(|(s, t)| (*s, t.clone())).collect();
                 if let Some(s) = in_file_search {
@@ -224,7 +239,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
             app,
             vf,
             inner,
-            scroll,
+            render_scroll,
             visible_end,
             show_ln,
             in_file_search,
@@ -235,7 +250,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         render_inline_fallback(
             app,
             inner,
-            scroll,
+            render_scroll,
             visible_end,
             show_ln,
             in_file_search,
@@ -271,7 +286,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     // Word-wrap expansion: break content + gutters into visual rows so they
     // stay aligned under wrap (ratatui's Wrap can't communicate row count to
     // the gutter Paragraph, causing cumulative drift on each wrapped line).
-    let visual_to_display: Vec<usize> = if app.word_wrap && ln_width > 0 {
+    let mut visual_to_display: Vec<usize> = if app.word_wrap && ln_width > 0 {
         let cw = inner.width.saturating_sub(ln_width as u16) as usize;
         if cw > 0 {
             let (exp_gutters, exp_content, vmap, updated_fold) = wrap_content(
@@ -291,6 +306,16 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     } else {
         (0..content_lines.len()).collect()
     };
+
+    if app.word_wrap && ln_width > 0 && leading_rows > 0 {
+        let skip = leading_rows.min(content_lines.len());
+        content_lines.drain(..skip);
+        ln_lines.drain(..skip);
+        // The map is parallel to the expanded rows and must be clipped with
+        // them, otherwise active-line highlighting is shifted after the first
+        // partially visible wrapped line.
+        visual_to_display.drain(..skip);
+    }
 
     // Active-line highlight: full-width row background + gutter caret.
     if app.has_text_cursor() && !app.diff_sbs_active() {
@@ -315,7 +340,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         });
         for (j, line) in content_lines.iter_mut().enumerate() {
             let display_line = visual_to_display.get(j).copied().unwrap_or(0);
-            if sel_covers_active || scroll + display_line != app.active_line {
+            if sel_covers_active || render_scroll + display_line != app.active_line {
                 continue;
             }
             // Full-width content highlight
@@ -333,7 +358,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         // Gutter caret: brighten the active line's gutter foreground
         for (j, gutter) in ln_lines.iter_mut().enumerate() {
             let display_line = visual_to_display.get(j).copied().unwrap_or(0);
-            if scroll + display_line == app.active_line {
+            if render_scroll + display_line == app.active_line {
                 for span in &mut gutter.spans {
                     span.style = span.style.bg(active_bg).fg(app.theme.accent);
                 }
