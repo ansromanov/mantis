@@ -219,7 +219,7 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
                 .unwrap_or(0)
                 .min(100);
             segs.push((
-                Span::styled(format!("  {pct}%"), base),
+                Span::styled(format!("  Top {pct}%"), base),
                 StatusSegment::Scroll,
                 P_INFO,
             ));
@@ -230,7 +230,7 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
     if app.current_file.is_some() && !app.is_diff {
         let ln = app.active_line + 1;
         segs.push((
-            Span::styled(format!(" Ln {ln}"), dim),
+            Span::styled(format!(" Cursor Ln {ln}"), dim),
             StatusSegment::Lnum,
             P_INFO,
         ));

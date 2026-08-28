@@ -159,8 +159,29 @@ fn scroll_percentage_shown() {
         height: 10,
     };
     app.content_scroll = 25;
-    let text = render_bar_width(&app, 120);
-    assert!(text.contains("%"));
+    let text = render_bar_width(&app, 200);
+    assert!(text.contains("Top 62%"));
+}
+
+#[test]
+fn status_bar_labels_viewport_and_cursor_positions() {
+    let mut app = make_app();
+    app.show_scroll_percentage = true;
+    app.current_file = Some(PathBuf::from("Cargo.toml"));
+    app.content = vec!["x".to_string(); 50];
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 10,
+    };
+    app.content_scroll = 25;
+    app.active_line = 3;
+
+    let text = render_bar_width(&app, 160);
+
+    assert!(text.contains("Top 62%"));
+    assert!(text.contains("Cursor Ln 4"));
 }
 
 #[test]
@@ -387,7 +408,7 @@ fn ln_shown_when_file_open() {
     app.current_file = Some(PathBuf::from("Cargo.toml"));
     app.active_line = 10;
     let text = render_bar_width(&app, 120);
-    assert!(text.contains("Ln 11"));
+    assert!(text.contains("Cursor Ln 11"));
     assert!(!text.contains("Col"));
 }
 
@@ -396,7 +417,7 @@ fn ln_col_hidden_when_no_file() {
     let mut app = make_app();
     app.current_file = None;
     let text = render_bar_width(&app, 120);
-    assert!(!text.contains("Ln "));
+    assert!(!text.contains("Cursor Ln "));
 }
 
 #[test]
@@ -405,7 +426,7 @@ fn ln_col_hidden_when_diff() {
     app.current_file = Some(PathBuf::from("file.patch"));
     app.is_diff = true;
     let text = render_bar_width(&app, 120);
-    assert!(!text.contains("Ln "));
+    assert!(!text.contains("Cursor Ln "));
 }
 
 #[test]
@@ -425,8 +446,8 @@ fn syntax_name_hidden_when_none() {
     app.current_file = Some(PathBuf::from("plain.txt"));
     app.current_syntax = None;
     let text = render_bar_width(&app, 120);
-    // No syntax badge appears; only Ln is shown.
-    assert!(text.contains("Ln 1"));
+    // No syntax badge appears; only the cursor line is shown.
+    assert!(text.contains("Cursor Ln 1"));
     assert!(!text.contains("Col")); // no Col indicator
     assert!(!text.contains("plain")); // no "[plain]" badge
 }
@@ -849,8 +870,8 @@ fn default_config_lnum_right_side() {
     app.current_file = Some(PathBuf::from("Cargo.toml"));
     app.active_line = 10;
     let text = render_bar_width(&app, 200);
-    // Ln 11 should be in the right-anchored block, past the padding gap.
-    let lnum_pos = text.find("Ln 11").unwrap();
+    // Cursor Ln 11 should be in the right-anchored block, past the padding gap.
+    let lnum_pos = text.find("Cursor Ln 11").unwrap();
     assert!(
         lnum_pos > 100,
         "Ln should be right-aligned, got Ln at {lnum_pos}"
