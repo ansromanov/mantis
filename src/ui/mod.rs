@@ -45,12 +45,25 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         app.tree_area = Rect::default();
         app.content_area = Rect::default();
         app.splitter_area = Rect::default();
+        let resize_message = match (
+            area.width < MIN_LAYOUT_WIDTH,
+            area.height < MIN_LAYOUT_HEIGHT,
+        ) {
+            (true, true) => format!(
+                "Terminal too small: {MIN_LAYOUT_WIDTH} columns x {MIN_LAYOUT_HEIGHT} rows minimum."
+            ),
+            (true, false) => {
+                format!("Terminal too narrow. Resize to at least {MIN_LAYOUT_WIDTH} columns.")
+            }
+            (false, true) => {
+                format!("Terminal too short. Resize to at least {MIN_LAYOUT_HEIGHT} rows.")
+            }
+            (false, false) => unreachable!(),
+        };
         f.render_widget(
-            Paragraph::new(format!(
-                "Terminal too small. Resize to at least {MIN_LAYOUT_WIDTH} columns."
-            ))
-            .alignment(Alignment::Center)
-            .style(Style::default().fg(app.theme.text)),
+            Paragraph::new(resize_message)
+                .alignment(Alignment::Center)
+                .style(Style::default().fg(app.theme.text)),
             vert[0],
         );
         statusbar::draw_statusbar(f, app, vert[1]);
