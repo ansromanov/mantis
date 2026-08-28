@@ -870,8 +870,8 @@ fn default_config_lnum_right_side() {
     app.current_file = Some(PathBuf::from("Cargo.toml"));
     app.active_line = 10;
     let text = render_bar_width(&app, 200);
-    // Ln 11 should be in the right-anchored block, past the padding gap.
-    let lnum_pos = text.find("Ln 11").unwrap();
+    // Cursor Ln 11 should be in the right-anchored block, past the padding gap.
+    let lnum_pos = text.find("Cursor Ln 11").unwrap();
     assert!(
         lnum_pos > 100,
         "Ln should be right-aligned, got Ln at {lnum_pos}"
