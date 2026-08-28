@@ -180,6 +180,31 @@ impl App {
                 }
                 true
             }
+            Some("toggle_secret_reveal") => {
+                if self.secret_original.is_empty() || !self.secret_masked {
+                    self.set_status("secret masking: no detected credentials");
+                } else {
+                    self.secret_revealed = !self.secret_revealed;
+                    self.content = if self.secret_revealed {
+                        self.secret_original.clone()
+                    } else {
+                        self.secret_original
+                            .iter()
+                            .map(|line| crate::secret_mask::mask_line(line))
+                            .collect()
+                    };
+                    self.highlighted = self.highlighter.highlight(
+                        &self.current_file.clone().unwrap_or_default(),
+                        &self.content,
+                    );
+                    self.set_status(if self.secret_revealed {
+                        "secrets revealed"
+                    } else {
+                        "secrets masked"
+                    });
+                }
+                true
+            }
             Some("toggle_blame") => {
                 if self.has_text_cursor() {
                     self.show_blame = !self.show_blame;

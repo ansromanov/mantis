@@ -87,6 +87,8 @@ pub struct ContentConfig {
     pub follow_tail_auto: bool,
     /// Enable log level and timestamp colorizing.
     pub log_colorizing: bool,
+    /// Mask credential-shaped file values in the content pane by default.
+    pub mask_secrets: bool,
 }
 
 impl Default for ContentConfig {
@@ -101,6 +103,7 @@ impl Default for ContentConfig {
             prettify_size_limit: 10 * 1024 * 1024,
             follow_tail_auto: false,
             log_colorizing: true,
+            mask_secrets: true,
         }
     }
 }

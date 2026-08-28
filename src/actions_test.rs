@@ -5,6 +5,13 @@ fn worktree_picker_is_registered() {
     assert!(ACTIONS.iter().any(|action| action.id == "worktree_picker"));
 }
 
+#[test]
+fn secret_reveal_action_is_registered() {
+    assert!(ACTIONS
+        .iter()
+        .any(|action| action.id == "toggle_secret_reveal"));
+}
+
 /// Every `Keymap` field that represents a real bound action, by its canonical
 /// action id (matching the field name, or the id `Keymap::bindings_for_action`
 /// maps to that field - see `config::keymap`). Kept in sync by hand since Rust

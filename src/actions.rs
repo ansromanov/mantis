@@ -82,6 +82,13 @@ pub static ACTIONS: &[ActionSpec] = &[
         description: Some("Show or hide dotfiles in the tree"),
     },
     ActionSpec {
+        id: "toggle_secret_reveal",
+        palette: Some("Toggle secret reveal"),
+        help: Some(("Global", "reveal or mask detected secrets")),
+        category: Some("Safety"),
+        description: Some("Temporarily reveal credential-shaped file values"),
+    },
+    ActionSpec {
         id: "toggle_telemetry",
         palette: Some("Toggle telemetry"),
         help: None,

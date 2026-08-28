@@ -372,6 +372,15 @@ Press `Space` on an object to expand it into formatted JSON in place; press
 `Space` again to collapse it. Invalid or partially-written lines remain visible
 as plain text, which keeps mixed structured logs readable.
 
+## Secret masking
+
+Credential-shaped files such as `.env`, `.pem`, `credentials`, and `kubeconfig`
+are masked by default. Values use a fixed-width placeholder so their length is
+not exposed. Use the command palette action `Toggle secret reveal` to reveal or
+mask the current file for the session; the value is never persisted.
+
+Set `content.mask_secrets = false` to disable this protection.
+
 ## Log follow mode
 
 When viewing log files (detected via `.log` extension or level/timestamp sniffing), mantis automatically enables log mode.

@@ -1347,3 +1347,20 @@ fn dispatch_toggle_table_view_toggles_show_csv_table() {
 
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn toggle_secret_reveal_switches_display_content() {
+    let root = temp_tree();
+    let path = root.join(".env");
+    fs::write(&path, "API_TOKEN=super-secret\n").unwrap();
+    let mut app = app_for(&root);
+    app.open_file(&path);
+    let mut p = CommandPalette::default();
+    for c in "Toggle secret reveal".chars() {
+        p.push(c);
+    }
+    app.command_palette = Some(p);
+    app.dispatch_command();
+    assert_eq!(app.content[0], "API_TOKEN=super-secret");
+    fs::remove_dir_all(&root).ok();
+}

@@ -72,6 +72,8 @@ pub(super) struct FileLoad {
     /// `None` for plain text or when syntect has no match. Populated by the
     /// worker thread so the main thread never calls `find_syntax_for_file`.
     pub syntax_name: Option<String>,
+    pub secret_original: Vec<String>,
+    pub secret_masked: bool,
 }
 
 /// YAML-specific derived state, computed only for `.yaml`/`.yml` files.
@@ -118,6 +120,8 @@ impl FileLoad {
             encoding: None,
             line_ending: None,
             syntax_name: None,
+            secret_original: Vec::new(),
+            secret_masked: false,
         }
     }
 }
@@ -154,7 +158,9 @@ pub(super) fn compute_file_load(
     // Try memory-mapped virtual file first (lazy, no full content in memory).
     // JSON, YAML, and CSV/TSV are excluded (they need full content for rendering) unless
     // the file exceeds the prettify size limit.
-    if (!is_json && !is_yaml && !is_jsonl && !is_csv) || too_large {
+    if (!is_json && !is_yaml && !is_jsonl && !crate::secret_mask::content_probe(path)) || too_large
+        && !is_csv
+    {
         if let Some(vf) = VirtualFile::open(path) {
             let mut load = FileLoad::empty(is_json);
             load.is_csv = is_csv;
@@ -215,6 +221,13 @@ pub(super) fn compute_file_load(
     if load.content.is_empty() {
         load.content = vec!["[empty file]".into()];
         return load;
+    }
+
+    let (masked, detected) = crate::secret_mask::mask_lines(path, &load.content, true);
+    if detected {
+        load.secret_original = load.content.clone();
+        load.secret_masked = true;
+        load.content = masked;
     }
 
     if jsonl::is_jsonl(path, &load.content) {

@@ -29,6 +29,46 @@ fn json_produces_pretty_view() {
 }
 
 #[test]
+fn credential_file_is_masked_before_rendering() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join(".env");
+    let mut f = std::fs::File::create(&path).unwrap();
+    use std::io::Write;
+    f.write_all(b"API_TOKEN=super-secret\nNAME=mantis\n")
+        .unwrap();
+    let load = compute_file_load(&path, &hl(), usize::MAX);
+    assert!(load.secret_masked);
+    assert_eq!(load.content[0], "API_TOKEN=********");
+    assert_eq!(load.secret_original[0], "API_TOKEN=super-secret");
+}
+
+#[test]
+fn ordinary_file_with_secret_shape_is_not_memory_mapped() {
+    let file = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(file.path(), "SERVICE_TOKEN=secret-value\n").unwrap();
+    let load = compute_file_load(file.path(), &hl(), usize::MAX);
+    assert!(load.secret_masked);
+    assert_eq!(load.content, vec!["SERVICE_TOKEN=********"]);
+    assert_eq!(load.secret_original, vec!["SERVICE_TOKEN=secret-value"]);
+    assert!(load.virtual_file.is_none());
+}
+
+#[test]
+fn pem_file_masks_the_private_key_body() {
+    let file = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(
+        file.path(),
+        format!(
+            "-----BEGIN {marker}\nprivate-key-body\n-----END {marker}\n",
+            marker = "PRIVATE KEY-----"
+        ),
+    )
+    .unwrap();
+    let load = compute_file_load(file.path(), &hl(), usize::MAX);
+    assert_eq!(load.content, vec!["********", "********", "********"]);
+}
+
+#[test]
 fn jsonl_loads_collapsed_rows() {
     let mut f = tempfile::NamedTempFile::with_suffix(".jsonl").unwrap();
     use std::io::Write;

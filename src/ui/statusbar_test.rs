@@ -1259,3 +1259,10 @@ fn update_notice_absent_by_default() {
         "no notice means no update segment"
     );
 }
+
+#[test]
+fn statusbar_shows_secret_mask_state() {
+    let mut app = make_app();
+    app.secret_masked = true;
+    assert!(render_bar(&app).contains("[secrets: masked]"));
+}

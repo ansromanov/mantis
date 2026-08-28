@@ -47,6 +47,7 @@ mod plugin;
 mod release_info;
 mod scroll;
 mod search;
+mod secret_mask;
 mod selection;
 mod session;
 mod sys_info;
