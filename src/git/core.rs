@@ -150,7 +150,11 @@ pub(crate) fn parse_worktree_list(text: &str) -> Vec<Worktree> {
             }
             continue;
         }
-        let (key, value) = line.split_once(' ').unwrap_or((line, ""));
+        let (key, value) = if let Some(rest) = line.strip_prefix("worktree ") {
+            ("worktree", rest)
+        } else {
+            line.split_once(' ').unwrap_or((line, ""))
+        };
         match key {
             "worktree" => {
                 if let Some(item) = current.take() {
