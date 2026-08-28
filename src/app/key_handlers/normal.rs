@@ -53,8 +53,13 @@ impl App {
                 return;
             }
             if self.file_at_revision.is_some() {
-                self.toggle_file_revision();
-                return;
+                self.file_at_revision = None;
+                // A blame commit opens a file-at-revision snapshot on top of
+                // the commit diff. Esc closes that whole transient view,
+                // matching the single-step close used by file history.
+                if self.viewing_revision.is_none() {
+                    return;
+                }
             }
             if self.viewing_revision.is_some() {
                 self.viewing_revision = None;

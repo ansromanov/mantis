@@ -1546,7 +1546,7 @@ fn shift_l_in_content_scope_does_not_open_repo_log() {
 // -- file_at_revision Esc handling --------------------------------------------
 
 #[test]
-fn esc_toggles_back_from_file_at_revision_to_diff() {
+fn esc_closes_file_at_revision_and_its_commit_diff() {
     use crate::app::types::{FileAtRevision, SavedDiffState};
 
     let root = temp_tree();
@@ -1577,8 +1577,8 @@ fn esc_toggles_back_from_file_at_revision_to_diff() {
         app.file_at_revision.is_none(),
         "Esc must clear file_at_revision"
     );
-    assert!(app.is_diff, "Esc must restore diff mode");
-    assert_eq!(app.content, vec!["+diff line"]);
+    assert!(!app.is_diff, "Esc must close the transient commit diff");
+    assert!(app.viewing_revision.is_none());
     fs::remove_dir_all(&root).ok();
 }
 
