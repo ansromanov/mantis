@@ -340,6 +340,8 @@ fn create_base_app() -> App {
         search: None,
         last_search_query: String::new(),
         in_file_search: None,
+        json_query: None,
+        json_query_original: Vec::new(),
         command_palette: None,
         history: None,
         repo_log: None,

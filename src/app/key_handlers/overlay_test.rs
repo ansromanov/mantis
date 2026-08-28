@@ -27,6 +27,27 @@ fn app_for(root: &std::path::Path) -> App {
 }
 
 #[test]
+fn json_query_replaces_results_and_escape_restores_content() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.is_json = true;
+    app.json_pretty_text = vec!["{\"name\":\"mantis\"}".into()];
+    app.content = app.json_pretty_text.clone();
+    app.open_json_query();
+    app.handle_json_query_key(KeyEvent::new(KeyCode::Char('.'), KeyModifiers::empty()));
+    for character in "name".chars() {
+        app.handle_json_query_key(KeyEvent::new(
+            KeyCode::Char(character),
+            KeyModifiers::empty(),
+        ));
+    }
+    assert!(app.content.iter().any(|line| line.contains("mantis")));
+    app.handle_json_query_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+    assert_eq!(app.content, vec!["{\"name\":\"mantis\"}"]);
+    fs::remove_dir_all(root).ok();
+}
+
+#[test]
 fn handle_goto_line_key_open_binding_not_appended_to_query() {
     let root = temp_tree();
     let mut app = app_for(&root);

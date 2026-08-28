@@ -272,6 +272,8 @@ impl App {
         self.file_line_ending = None;
         if is_new_file {
             self.in_file_search = None;
+            self.json_query = None;
+            self.json_query_original.clear();
             self.set_content_scroll(0);
             self.content_hscroll = 0;
             self.active_line = 0;

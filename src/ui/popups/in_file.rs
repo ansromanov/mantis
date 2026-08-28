@@ -21,6 +21,27 @@ use crate::app::App;
 
 pub(crate) fn draw_in_file_search(f: &mut Frame, app: &mut App, area: Rect) {
     let theme = &app.theme;
+    if let Some(query) = app.json_query.as_ref() {
+        let bar_y = area.y + area.height.saturating_sub(2);
+        let bar_rect = Rect {
+            x: area.x + 1,
+            y: bar_y,
+            width: area.width.saturating_sub(2),
+            height: 1,
+        };
+        if bar_rect.width >= 4 {
+            f.render_widget(Clear, bar_rect);
+            f.render_widget(
+                Paragraph::new(Line::from(vec![
+                    Span::styled("jq: ", Style::default().fg(theme.accent_alt)),
+                    Span::raw(query.as_str()),
+                    Span::styled("█", Style::default().fg(theme.accent_alt)),
+                ])),
+                bar_rect,
+            );
+        }
+        return;
+    }
     let Some(s) = app.in_file_search.as_ref() else {
         return;
     };

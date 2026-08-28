@@ -435,6 +435,13 @@ pub static ACTIONS: &[ActionSpec] = &[
         description: Some("Toggle CSV/TSV table view in the content panel"),
     },
     ActionSpec {
+        id: "json_query",
+        palette: Some("Open JSON query bar"),
+        help: None,
+        category: Some("View"),
+        description: Some("Filter or project JSON and JSONL content"),
+    },
+    ActionSpec {
         id: "blame_line",
         palette: Some("Blame active line"),
         help: None,

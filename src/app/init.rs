@@ -140,6 +140,8 @@ impl App {
             search: None,
             last_search_query: String::new(),
             in_file_search: None,
+            json_query: None,
+            json_query_original: Vec::new(),
             tree_filter: None,
             goto_line: None,
             command_usage: crate::command_usage::UsageStats::load(),

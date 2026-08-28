@@ -13,10 +13,109 @@ use crossterm::event::{KeyCode, KeyEvent};
 use crate::config::static_keys;
 use crate::list_picker::{handle_list_picker_key, OverlayKey};
 use crate::theme::Theme;
+use serde_json::Value;
 
 use super::super::App;
 
 impl App {
+    pub(super) fn open_json_query(&mut self) {
+        if !self.is_json && !self.is_jsonl {
+            self.set_status("JSON query: requires JSON or JSONL content");
+            return;
+        }
+        self.json_query_original = self.content.clone();
+        self.json_query = Some(String::new());
+    }
+
+    fn apply_json_query(&mut self) {
+        let Some(input) = self.json_query.clone() else {
+            return;
+        };
+        let parsed = match crate::json_query::parse(&input) {
+            Ok(query) => query,
+            Err(error) => {
+                self.set_status(format!("JSON query: {error}"));
+                return;
+            }
+        };
+        let values: Vec<Value> = if self.is_jsonl {
+            self.jsonl_source
+                .iter()
+                .filter_map(|line| serde_json::from_str(line).ok())
+                .flat_map(|value| crate::json_query::evaluate(&parsed, &value))
+                .collect()
+        } else {
+            let source = self.json_pretty_text.join("\n");
+            serde_json::from_str(&source)
+                .ok()
+                .map_or_else(Vec::new, |value| {
+                    crate::json_query::evaluate(&parsed, &value)
+                })
+        };
+        self.content = values
+            .iter()
+            .flat_map(|value| {
+                serde_json::to_string_pretty(value)
+                    .unwrap_or_else(|_| value.to_string())
+                    .lines()
+                    .map(str::to_owned)
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        if self.content.is_empty() {
+            self.content.push("[query returned no results]".into());
+        }
+        self.highlighted = self.highlighter.highlight(
+            self.current_file
+                .as_deref()
+                .unwrap_or(std::path::Path::new("")),
+            &self.content,
+        );
+        self.active_line = 0;
+        self.set_content_scroll(0);
+    }
+
+    pub(super) fn handle_json_query_key(&mut self, key: KeyEvent) {
+        if key.code == KeyCode::Esc {
+            self.content = std::mem::take(&mut self.json_query_original);
+            self.json_query = None;
+            self.highlighted = self.highlighter.highlight(
+                self.current_file
+                    .as_deref()
+                    .unwrap_or(std::path::Path::new("")),
+                &self.content,
+            );
+            self.clamp_content_scroll();
+            return;
+        }
+        match key.code {
+            KeyCode::Backspace => {
+                if let Some(query) = &mut self.json_query {
+                    query.pop();
+                }
+                if self.json_query.as_deref() == Some("") {
+                    self.content = self.json_query_original.clone();
+                    self.highlighted = self.highlighter.highlight(
+                        self.current_file
+                            .as_deref()
+                            .unwrap_or(std::path::Path::new("")),
+                        &self.content,
+                    );
+                } else {
+                    self.apply_json_query();
+                }
+            }
+            KeyCode::Char(c) => {
+                if let Some(query) = &mut self.json_query {
+                    query.push(c);
+                }
+                self.apply_json_query();
+            }
+            KeyCode::Enter => {}
+            _ => {}
+        }
+    }
+
     /// Handles keyboard input while the search overlay is open.
     /// Extra keys: Tab toggles file/content mode.
     pub(super) fn handle_search_key(&mut self, key: KeyEvent) {

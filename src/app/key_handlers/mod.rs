@@ -153,6 +153,8 @@ impl App {
             self.handle_recent_key(key);
         } else if self.search.is_some() {
             self.handle_search_key(key);
+        } else if self.json_query.is_some() {
+            self.handle_json_query_key(key);
         } else if self.in_file_search.is_some() {
             self.handle_in_file_search_key(key);
         } else if self.filter_bar.is_some() {

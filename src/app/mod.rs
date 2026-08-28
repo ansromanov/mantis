@@ -173,6 +173,9 @@ pub struct App {
     pub search: Option<SearchState>,
     pub last_search_query: String,
     pub in_file_search: Option<InFileSearch>,
+    /// JSON query input overlay; active only for JSON and JSONL content.
+    pub json_query: Option<String>,
+    pub json_query_original: Vec<String>,
     /// Inline tree name filter, open when the user presses `/` with the tree
     /// focused. `None` means no filter is active; the full node list is shown.
     pub tree_filter: Option<TreeFilter>,
@@ -961,6 +964,8 @@ impl App {
         self.yaml_anchor_count = 0;
         self.yaml_alias_count = 0;
         self.in_file_search = None;
+        self.json_query = None;
+        self.json_query_original.clear();
         self.plugin_content_active = false;
         self.plugin_content.clear();
         self.plugin_content_text.clear();

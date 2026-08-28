@@ -1,6 +1,11 @@
 use super::*;
 
 #[test]
+fn json_query_action_is_registered() {
+    assert!(ACTIONS.iter().any(|action| action.id == "json_query"));
+}
+
+#[test]
 fn worktree_picker_is_registered() {
     assert!(ACTIONS.iter().any(|action| action.id == "worktree_picker"));
 }

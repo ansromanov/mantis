@@ -48,6 +48,8 @@ impl App {
         self.show_line_blame = false;
         self.clear_selection();
         self.in_file_search = None;
+        self.json_query = None;
+        self.json_query_original.clear();
 
         self.is_diff = parsed.is_diff;
         if parsed.is_diff {

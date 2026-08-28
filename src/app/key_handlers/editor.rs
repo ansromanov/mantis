@@ -205,6 +205,10 @@ impl App {
                 }
                 true
             }
+            Some("json_query") => {
+                self.open_json_query();
+                true
+            }
             Some("toggle_blame") => {
                 if self.has_text_cursor() {
                     self.show_blame = !self.show_blame;

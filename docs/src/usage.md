@@ -381,6 +381,11 @@ mask the current file for the session; the value is never persisted.
 
 Set `content.mask_secrets = false` to disable this protection.
 
+Use the command palette action `Open JSON query bar` to filter or project JSON
+and JSONL. The supported subset includes `.a.b[0]`, `.items[]`, `{name, image}`
+and `select(.level == "error")`. Invalid queries keep the last valid result;
+press `Esc` to restore the unfiltered view.
+
 ## Log follow mode
 
 When viewing log files (detected via `.log` extension or level/timestamp sniffing), mantis automatically enables log mode.
