@@ -1,4 +1,4 @@
-version = "0.18.1"
+version = "0.18.2"
 date = "2026-08-28"
 whats_new = """- feat: follow the newest changed file (#753)
 - feat: add git worktree switcher (#755)
