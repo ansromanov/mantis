@@ -336,6 +336,70 @@ fn highlight_dockerfile_highlights_instructions() {
 }
 
 #[test]
+fn syntax_name_resolves_nginx_conf_by_filename() {
+    let extra = extra_syntax("nginx");
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[extra]);
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("nginx.conf");
+    std::fs::write(&path, "server {\n    listen 80;\n}\n").unwrap();
+    let name = h.syntax_name(&path);
+    assert_eq!(name.as_deref(), Some("Nginx"));
+}
+
+#[test]
+fn syntax_name_does_not_claim_generic_conf_files() {
+    let extra = extra_syntax("nginx");
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[extra]);
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("system.conf");
+    std::fs::write(&path, "setting = 1\n").unwrap();
+    let name = h.syntax_name(&path);
+    assert_eq!(
+        name, None,
+        "generic .conf files should not be highlighted as nginx"
+    );
+}
+
+#[test]
+fn highlight_nginx_highlights_directives() {
+    let extra = extra_syntax("nginx");
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[extra]);
+    let result = h.highlight(Path::new("nginx.conf"), &["server {".to_string()]);
+    assert!(
+        result[0].len() > 1,
+        "expected multiple spans for nginx server directive"
+    );
+}
+
+#[test]
+fn syntax_name_resolves_justfile_by_filename() {
+    let extra = extra_syntax("justfile");
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[extra]);
+    for filename in ["justfile", "Justfile", "JUSTFILE", ".justfile"] {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(filename);
+        std::fs::write(&path, "build:\n\techo build\n").unwrap();
+        let name = h.syntax_name(&path);
+        assert_eq!(
+            name.as_deref(),
+            Some("Justfile"),
+            "expected Justfile for filename {filename}"
+        );
+    }
+}
+
+#[test]
+fn highlight_justfile_highlights_rule() {
+    let extra = extra_syntax("justfile");
+    let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[extra]);
+    let result = h.highlight(Path::new("justfile"), &["build:".to_string()]);
+    assert!(
+        result[0].len() > 1,
+        "expected multiple spans for justfile rule line"
+    );
+}
+
+#[test]
 fn colorize_log_line_works() {
     let theme = crate::theme::Theme::default();
     let spans = colorize_log_line("2026-07-19T12:00:00Z INFO application started", &theme);

@@ -1,0 +1,101 @@
+%YAML 1.2
+---
+# Just (justfile) syntax definition for syntect.
+# Highlights assignments, rules, recipes, settings, comments, and the
+# `{{ ... }}` interpolation syntax shared across all of them.
+name: Justfile
+scope: source.just
+contexts:
+  main:
+    - include: comments
+    - include: strings
+    - include: interpolation
+    - include: settings
+    - include: assignments
+    - include: aliases
+    - include: rules
+    - include: variables
+    - include: modifiers
+    - include: numbers
+
+  comments:
+    - match: '#.*$'
+      scope: comment.line.number-sign.just
+
+  strings:
+    - match: '"'
+      scope: punctuation.definition.string.begin.just
+      push: string_double
+    - match: "'"
+      scope: punctuation.definition.string.begin.just
+      push: string_single
+    - match: "`"
+      scope: punctuation.definition.string.begin.just
+      push: string_backtick
+
+  string_double:
+    - meta_scope: string.quoted.double.just
+    - match: '"'
+      scope: punctuation.definition.string.end.just
+      pop: true
+    - match: '\\.'
+      scope: constant.character.escape.just
+    - include: interpolation
+
+  string_single:
+    - meta_scope: string.quoted.single.just
+    - match: "'"
+      scope: punctuation.definition.string.end.just
+      pop: true
+    - match: '\\.'
+      scope: constant.character.escape.just
+
+  string_backtick:
+    - meta_scope: string.quoted.backtick.just
+    - match: "`"
+      scope: punctuation.definition.string.end.just
+      pop: true
+
+  interpolation:
+    - match: '(\{\{)\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*(\}\})'
+      scope: variable.other.just
+
+  settings:
+    - match: '^\s*(set)\s+([a-zA-Z_][a-zA-Z0-9_-]*)'
+      captures:
+        1: keyword.control.set.just
+        2: entity.name.tag.just
+
+  assignments:
+    - match: '^\s*(export\s+)?([a-zA-Z_][a-zA-Z0-9_-]*)\s*:='
+      captures:
+        1: keyword.control.export.just
+        2: entity.name.function.just
+    - match: '^\s*(import)\s+'
+      scope: keyword.control.import.just
+
+  aliases:
+    - match: '^\s*(alias)\s+([a-zA-Z_][a-zA-Z0-9_-]*)\s*:='
+      captures:
+        1: keyword.control.alias.just
+        2: entity.name.tag.just
+
+  rules:
+    # A rule line: `name arg1 arg2: dep1 dep2` (the colon terminates the name).
+    - match: '^\s*([a-zA-Z_][a-zA-Z0-9_-]*)((?:[ \t]+[a-zA-Z_][a-zA-Z0-9_=-]*)*)(:)'
+      captures:
+        1: entity.name.function.just
+        2: variable.parameter.just
+        3: punctuation.section.rule.just
+
+  modifiers:
+    - match: '^\s*(@|--|-|quiet|private|confirm|env|dotenv)'
+      scope: keyword.control.modifier.just
+
+  variables:
+    - match: '\b[a-zA-Z_][a-zA-Z0-9_]*\b'
+      scope: variable.other.just
+
+  numbers:
+    - match: '\b\d+\b'
+      scope: constant.numeric.just

@@ -1,0 +1,63 @@
+%YAML 1.2
+---
+# Nginx configuration syntax definition for syntect.
+# Highlights directives, block contexts, comments, strings, and variables.
+name: Nginx
+scope: source.nginx
+contexts:
+  main:
+    - include: comments
+    - include: strings
+    - include: variables
+    - include: directives
+    - include: punctuation
+    - include: numbers
+
+  comments:
+    - match: '#.*$'
+      scope: comment.line.number-sign.nginx
+
+  strings:
+    - match: '"'
+      scope: punctuation.definition.string.begin.nginx
+      push: string_double
+    - match: "'"
+      scope: punctuation.definition.string.begin.nginx
+      push: string_single
+
+  string_double:
+    - meta_scope: string.quoted.double.nginx
+    - match: '"'
+      scope: punctuation.definition.string.end.nginx
+      pop: true
+    - match: '\\.'
+      scope: constant.character.escape.nginx
+    - include: variables
+
+  string_single:
+    - meta_scope: string.quoted.single.nginx
+    - match: "'"
+      scope: punctuation.definition.string.end.nginx
+      pop: true
+    - match: '\\.'
+      scope: constant.character.escape.nginx
+
+  variables:
+    - match: '\$\{?[a-zA-Z_][a-zA-Z0-9_]*\}?'
+      scope: variable.other.nginx
+
+  directives:
+    # Block directives that open a { .. } scope.
+    - match: '^\s*(http|server|location|upstream|events|if|limit_except|split_clients|geo|map|types|log_format|charset_map)\b'
+      scope: keyword.control.block.nginx
+    # Regular terminal directives taking arguments and a trailing ';'.
+    - match: '^\s*[a-zA-Z_][a-zA-Z0-9_-]*'
+      scope: keyword.control.directive.nginx
+
+  punctuation:
+    - match: '[{};]'
+      scope: punctuation.definition.nginx
+
+  numbers:
+    - match: '\b\d+[kmgKMG]?\b'
+      scope: constant.numeric.nginx

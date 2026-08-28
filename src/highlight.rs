@@ -13,9 +13,9 @@
 //! [`with_extra_syntaxes`]; each is a `.sublime-syntax` file loaded into the
 //! `SyntaxSet` so its file extensions are recognised during highlighting.
 //!
-//! For extensionless well-known filenames (e.g. `Dockerfile`, `Containerfile`),
-//! [`resolve_syntax_for_file`] falls back to a name-based lookup when
-//! syntect's extension matching fails.
+//! For well-known filenames that syntect's extension matching can't resolve
+//! (e.g. `Dockerfile`, `Containerfile`, `justfile`, `nginx.conf`),
+//! [`resolve_syntax_for_file`] falls back to a name-based lookup.
 
 use ratatui::style::{Color, Modifier, Style};
 use std::fs;
@@ -182,13 +182,17 @@ fn resolve_syntax_for_file(ss: &SyntaxSet, path: &Path) -> Option<String> {
         .map(|s| s.name.clone())
 }
 
-/// Looks up a syntax for an extensionless well-known filename by matching it
-/// against syntax names (e.g. `Dockerfile`), with aliases for filenames that
-/// share a grammar under a different name (`Containerfile` → `Dockerfile`).
+/// Looks up a syntax for a well-known filename by matching it against syntax
+/// names (e.g. `Dockerfile`), with aliases for filenames that share a grammar
+/// under a different name (`Containerfile` → `Dockerfile`), differ in case
+/// (`justfile` → `Justfile`), or bundle a file extension into the config
+/// filename (`nginx.conf` → `Nginx`).
 fn find_syntax_by_file_name<'a>(ss: &'a SyntaxSet, path: &Path) -> Option<&'a SyntaxReference> {
     let name = path.file_name()?.to_str()?;
     let name = match name {
         "Containerfile" => "Dockerfile",
+        "justfile" | "Justfile" | "JUSTFILE" | ".justfile" => "Justfile",
+        "nginx.conf" => "Nginx",
         other => other,
     };
     ss.find_syntax_by_name(name)

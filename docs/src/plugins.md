@@ -70,6 +70,8 @@ typescript = { kind = "syntax", syntax_file = "syntaxes/typescript.sublime-synta
                extensions = ["ts", "tsx", "mts", "cts", "jsx"] }
 dockerfile = { kind = "syntax", syntax_file = "syntaxes/dockerfile.sublime-syntax",
                extensions = ["dockerfile"] }
+nginx = { kind = "syntax", syntax_file = "syntaxes/nginx.sublime-syntax" }
+justfile = { kind = "syntax", syntax_file = "syntaxes/justfile.sublime-syntax" }
 ```
 
 - **`kind`** — `"syntax"` for syntax-definition plugins (default: `"process"`).
@@ -180,6 +182,8 @@ additional file types without spawning a subprocess.
 | toml | `.toml` | TOML configuration files (`Cargo.toml`, `mantis.toml`, `pyproject.toml`, etc.) |
 | typescript | `.ts`, `.tsx`, `.mts`, `.cts`, `.jsx` | TypeScript and TSX (JSX) source files |
 | dockerfile | `Dockerfile`, `Containerfile` | Dockerfile instructions (matched by filename, no extension) |
+| nginx | `nginx.conf` | Nginx server configuration (matched by filename, no extension claim) |
+| justfile | `justfile` | Just (justfile) task recipes (matched by filename, no extension) |
 
 All bundled plugins are compiled as workspace members and installed to the
 plugin directory the first time `mantis` creates its global config. They are all
