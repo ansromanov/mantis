@@ -2,6 +2,7 @@ content
 content.follow_tail_auto
 content.line_numbers
 content.log_colorizing
+content.mask_secrets
 content.prettify_size_limit
 content.scroll_percentage
 content.scrollbar
