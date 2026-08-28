@@ -669,3 +669,11 @@ fn restore_terminal_is_idempotent() {
     crate::app::restore_terminal();
     crate::app::restore_terminal();
 }
+
+#[cfg(unix)]
+#[test]
+fn redirect_stdin_to_tty_reports_missing_controlling_terminal() {
+    let err = redirect_stdin_to_tty_with(|| Err(std::io::Error::other("no controlling terminal")))
+        .expect_err("missing controlling terminal should be reported");
+    assert!(err.to_string().contains("failed to open /dev/tty"));
+}
