@@ -141,13 +141,14 @@ impl App {
         }
     }
 
-    /// Drains root-watch events and returns the newest qualifying file path.
-    /// Access-only events, directories, paths outside the root, and `.git`
-    /// internals are ignored so follow mode reacts only to real file changes.
-    pub(super) fn drain_root_watch(&self) -> Option<PathBuf> {
+    /// Drains root-watch events and returns whether the tree changed plus the
+    /// newest qualifying file path. Directory events still invalidate the tree;
+    /// only file paths can become follow-mode candidates.
+    pub(super) fn drain_root_watch(&self) -> (bool, Option<PathBuf>) {
         let Some(rx) = &self.root_watch_rx else {
-            return None;
+            return (false, None);
         };
+        let mut tree_changed = false;
         let mut newest: Option<(std::time::SystemTime, PathBuf)> = None;
         while let Ok(res) = rx.try_recv() {
             if let Ok(evt) = res {
@@ -156,10 +157,12 @@ impl App {
                     EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)
                 ) {
                     for path in evt.paths {
-                        if !path.starts_with(&self.root)
-                            || path.starts_with(self.root.join(".git"))
-                            || !path.is_file()
+                        if !path.starts_with(&self.root) || path.starts_with(self.root.join(".git"))
                         {
+                            continue;
+                        }
+                        tree_changed = true;
+                        if !path.is_file() {
                             continue;
                         }
                         let modified = std::fs::metadata(&path)
@@ -172,7 +175,7 @@ impl App {
                 }
             }
         }
-        newest.map(|(_, path)| path)
+        (tree_changed, newest.map(|(_, path)| path))
     }
 
     /// Drains all pending file-watch events and returns `true` if the watched

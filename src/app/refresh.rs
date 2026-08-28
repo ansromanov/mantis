@@ -90,11 +90,14 @@ impl App {
                 s.maybe_refresh();
             }
         }
-        if let Some(path) = self.drain_root_watch() {
+        let (root_changed, follow_path) = self.drain_root_watch();
+        if root_changed {
             self.tree_dirty = true;
             self.tree_dirty_at = Some(self.now());
             if self.follow_mode {
-                self.follow_candidate = Some(path);
+                if let Some(path) = follow_path {
+                    self.follow_candidate = Some(path);
+                }
             }
         }
         // Debounced session save: persist 2 s after the last state change.
