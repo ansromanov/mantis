@@ -563,3 +563,55 @@ fn load_preserves_all_plugins_when_none_are_retired() {
 
     fs::remove_dir_all(&dir).ok();
 }
+
+#[test]
+fn sparse_toml_omits_default_bundled_plugins() {
+    let mut cfg = Config::default();
+    for (name, entry) in crate::plugin::bundled_plugin_entries() {
+        cfg.plugins.insert(name, entry);
+    }
+    let out = sparse_toml(&cfg);
+    assert!(
+        !out.contains("[plugins"),
+        "default bundled plugins should be omitted from sparse TOML: {out}"
+    );
+}
+
+#[test]
+fn sparse_toml_keeps_overridden_or_custom_plugins() {
+    let mut cfg = Config::default();
+    for (name, entry) in crate::plugin::bundled_plugin_entries() {
+        cfg.plugins.insert(name, entry);
+    }
+    // Disable rust plugin
+    if let Some(rust_entry) = cfg.plugins.get_mut("rust") {
+        rust_entry.enabled = false;
+    }
+    // Add custom plugin
+    cfg.plugins.insert(
+        "custom-clock".to_string(),
+        crate::plugin::PluginEntry {
+            path: PathBuf::from("clock.sh"),
+            enabled: true,
+            ..Default::default()
+        },
+    );
+
+    let out = sparse_toml(&cfg);
+    assert!(
+        out.contains("[plugins"),
+        "overridden/custom plugins must be serialized: {out}"
+    );
+    assert!(
+        out.contains("rust"),
+        "disabled rust plugin must be serialized: {out}"
+    );
+    assert!(
+        out.contains("custom-clock"),
+        "custom plugin must be serialized: {out}"
+    );
+    assert!(
+        !out.contains("markdown"),
+        "unmodified markdown plugin should not be serialized: {out}"
+    );
+}

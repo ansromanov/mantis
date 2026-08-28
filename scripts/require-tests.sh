@@ -47,6 +47,7 @@ fi
 # Build a set of all changed files for fast lookup.
 declare -A changed=()
 for f in "${files[@]}"; do
+    [[ -z "$f" ]] && continue
     changed["$f"]=1
 done
 

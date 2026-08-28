@@ -42,6 +42,7 @@ pub use types::{GitConfig, GitDiffConfig, TreeConfig};
 // Only referenced in doc links or via field access — never named in code.
 #[allow(unused_imports)]
 pub use keymap::KeyBinding;
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 #[allow(unused_imports)]
@@ -119,6 +120,10 @@ pub fn save(config: &Config, path: &Path) -> std::io::Result<()> {
 /// `Config::default()`. This keeps the user's `mantis.toml` a minimal override file:
 /// untouched settings fall through to the embedded defaults rather than being
 /// pinned to their current value (which would also mask future default changes).
+///
+/// For `[plugins]`, entries matching the default bundled definitions are omitted,
+/// serialising only user-defined customizations (e.g. disabled bundled plugins or
+/// custom plugin paths).
 pub fn sparse_toml(config: &Config) -> String {
     let current = toml::Value::try_from(config);
     let default = toml::Value::try_from(Config::default());
@@ -127,9 +132,34 @@ pub fn sparse_toml(config: &Config) -> String {
         // dump rather than losing the user's settings.
         return toml::to_string_pretty(config).unwrap_or_default();
     };
+    let bundled_defaults: HashMap<String, crate::plugin::PluginEntry> =
+        crate::plugin::bundled_plugin_entries()
+            .into_iter()
+            .collect();
     let mut out = toml::map::Map::new();
     for (k, v) in &cur {
-        if def.get(k) != Some(v) {
+        if k == "plugins" {
+            if let toml::Value::Table(ref plugins_map) = v {
+                let mut sparse_plugins = toml::map::Map::new();
+                for (pname, pval) in plugins_map {
+                    let is_default = if let Some(bundled_entry) = bundled_defaults.get(pname) {
+                        config
+                            .plugins
+                            .get(pname)
+                            .map(|e| e == bundled_entry)
+                            .unwrap_or(false)
+                    } else {
+                        false
+                    };
+                    if !is_default {
+                        sparse_plugins.insert(pname.clone(), pval.clone());
+                    }
+                }
+                if !sparse_plugins.is_empty() {
+                    out.insert(k.clone(), toml::Value::Table(sparse_plugins));
+                }
+            }
+        } else if def.get(k) != Some(v) {
             out.insert(k.clone(), v.clone());
         }
     }
