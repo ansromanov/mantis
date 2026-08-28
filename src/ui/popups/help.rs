@@ -363,7 +363,7 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
             rows.push(row_key("toggle_watch"));
             rows.push(row_key("follow_tail"));
             rows.push(row_static_key(
-                "toggle_pretty_json",
+                "Palette",
                 "toggle pretty-print for JSON files",
             ));
             rows.push(row_key("toggle_raw_markdown"));
@@ -500,7 +500,7 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
                 "You can open your configuration file directly in your system's editor:",
             ));
             rows.push(row_static_key(
-                "open_config_in_editor",
+                "Palette",
                 "open configuration file (palette only)",
             ));
             rows.push(gap.clone());
