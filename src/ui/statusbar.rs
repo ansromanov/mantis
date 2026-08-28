@@ -35,6 +35,7 @@ pub(crate) enum StatusSegment {
     Scroll,
     Lnum,
     Type,
+    JsonPath,
     FileInfo,
     Git,
     Errors,
@@ -52,6 +53,7 @@ impl StatusSegment {
             StatusSegment::Scroll => "scroll",
             StatusSegment::Lnum => "lnum",
             StatusSegment::Type => "type",
+            StatusSegment::JsonPath => "jsonpath",
             StatusSegment::FileInfo => "fileinfo",
             StatusSegment::Git => "git",
             StatusSegment::Errors => "errors",
@@ -67,7 +69,7 @@ impl StatusSegment {
     /// (both `left` and `right` are `None`). Explicit mode uses `split_sides`
     /// directly and never calls this.
     fn side(self) -> StatusSide {
-        if ["lnum", "type", "git", "version", "update"].contains(&self.id_str()) {
+        if ["lnum", "type", "jsonpath", "git", "version", "update"].contains(&self.id_str()) {
             StatusSide::Right
         } else {
             StatusSide::Left
@@ -271,6 +273,17 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
                 StatusSegment::Type,
                 P_INFO,
             ));
+        }
+        if app.is_json || app.is_jsonl {
+            if let Some(Some(path)) = app.json_path_map.get(app.active_line) {
+                if !path.is_empty() {
+                    segs.push((
+                        Span::styled(format!(" {path}"), dim),
+                        StatusSegment::JsonPath,
+                        P_INFO,
+                    ));
+                }
+            }
         }
     }
 

@@ -18,6 +18,15 @@ fn make_app() -> App {
     App::new(PathBuf::from("."), cfg, None, None).unwrap()
 }
 
+#[test]
+fn draw_handles_json_query_overlay() {
+    let mut app = make_app();
+    app.json_query = Some(".level".into());
+    let backend = TestBackend::new(80, 24);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|f| super::draw(f, &mut app)).unwrap();
+}
+
 fn buffer_rows(terminal: &Terminal<TestBackend>) -> Vec<String> {
     let buf = terminal.backend().buffer();
     let area = buf.area;

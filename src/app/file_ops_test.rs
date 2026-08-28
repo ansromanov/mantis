@@ -1319,3 +1319,15 @@ fn config_can_disable_secret_masking() {
     assert_eq!(app.content[0], "API_TOKEN=super-secret");
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn opening_non_json_clears_json_path_map() {
+    let root = temp_dir();
+    let path = root.join("plain.txt");
+    fs::write(&path, "plain\n").unwrap();
+    let mut app = app_for(&root);
+    app.json_path_map = vec![Some(".stale".into())];
+    app.open_file(&path);
+    assert!(app.json_path_map.is_empty());
+    fs::remove_dir_all(&root).ok();
+}

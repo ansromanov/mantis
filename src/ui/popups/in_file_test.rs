@@ -30,6 +30,18 @@ fn draw_in_file_search_none_does_not_panic() {
 }
 
 #[test]
+fn draw_json_query_bar_does_not_panic() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    app.json_query = Some(".level".into());
+    let backend = TestBackend::new(80, 24);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| draw_in_file_search(f, &mut app, Rect::new(0, 0, 80, 24)))
+        .unwrap();
+}
+
+#[test]
 fn draw_in_file_search_some_does_not_panic() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());

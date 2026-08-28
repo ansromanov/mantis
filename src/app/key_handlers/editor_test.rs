@@ -29,6 +29,18 @@ fn palette_with_query(query: &str) -> CommandPalette {
     p
 }
 
+#[test]
+fn dispatch_json_query_opens_query_bar() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.is_json = true;
+    app.json_pretty_lines = vec![vec![]];
+    app.command_palette = Some(palette_with_query("Open JSON query bar"));
+    assert!(app.dispatch_command());
+    assert_eq!(app.json_query.as_deref(), Some(""));
+    fs::remove_dir_all(root).ok();
+}
+
 fn dispatch_blame_line(app: &mut App) {
     let mut p = CommandPalette::default();
     for c in "Blame active".chars() {

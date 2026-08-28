@@ -1266,3 +1266,12 @@ fn statusbar_shows_secret_mask_state() {
     app.secret_masked = true;
     assert!(render_bar(&app).contains("[secrets: masked]"));
 }
+
+#[test]
+fn statusbar_shows_active_json_path() {
+    let mut app = make_app();
+    app.is_json = true;
+    app.current_file = Some("config.json".into());
+    app.json_path_map = vec![Some(".server.port".into())];
+    assert!(render_bar(&app).contains(".server.port"));
+}

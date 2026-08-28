@@ -193,3 +193,21 @@ fn content_query_csv_table_view_and_toggle() {
 
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn jsonl_display_rebuild_keeps_path_map_aligned() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.virtual_file = None;
+    app.is_jsonl = true;
+    app.jsonl_source = vec![r#"{"spec":{"image":"app"}}"#.into()];
+    app.jsonl_expanded.insert(0);
+    app.rebuild_jsonl_display();
+    assert_eq!(app.json_path_map.len(), app.content.len());
+    assert!(app
+        .json_path_map
+        .iter()
+        .flatten()
+        .any(|p| p == ".spec.image"));
+    fs::remove_dir_all(&root).ok();
+}

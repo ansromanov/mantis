@@ -19,6 +19,16 @@ fn app_for(root: &std::path::Path) -> App {
     App::new(root.to_path_buf(), Config::default(), None, None).unwrap()
 }
 
+#[test]
+fn json_query_overlay_takes_key_precedence() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.json_query = Some(String::new());
+    app.handle_key(KeyEvent::new(KeyCode::Char('.'), KeyModifiers::empty()));
+    assert_eq!(app.json_query.as_deref(), Some("."));
+    fs::remove_dir_all(root).ok();
+}
+
 fn key(code: KeyCode) -> KeyEvent {
     KeyEvent::new(code, KeyModifiers::empty())
 }

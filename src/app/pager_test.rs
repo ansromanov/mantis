@@ -88,6 +88,8 @@ fn open_pager_content_resets_scroll_and_selection() {
     app.is_csv = true;
     app.show_csv_table = true;
     app.csv_table_text = vec!["table".into()];
+    app.json_query = Some(".level".into());
+    app.json_query_original = vec!["{}".into()];
     let parsed = PagerContent {
         content: vec!["a".to_string(), "b".to_string(), "c".to_string()],
         is_diff: false,
@@ -104,6 +106,8 @@ fn open_pager_content_resets_scroll_and_selection() {
     assert!(!app.show_csv_table);
     assert!(app.csv_table_text.is_empty());
     assert!(app.csv_table_lines.is_empty());
+    assert!(app.json_query.is_none());
+    assert!(app.json_query_original.is_empty());
     assert!(app.selection.is_none());
     fs::remove_dir_all(&root).ok();
 }

@@ -40,6 +40,9 @@ mod file;
 mod fold;
 mod git;
 mod highlight;
+mod json_path;
+#[allow(dead_code)]
+mod json_query;
 mod jsonl;
 mod list_picker;
 mod pager;
