@@ -1242,4 +1242,16 @@ fn open_file_with_show_raw_markdown_true_skips_plugin_open() {
 
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn opening_jsonl_marks_the_active_source() {
+    let root = temp_dir();
+    let path = root.join("events.jsonl");
+    fs::write(&path, "{\"level\":\"info\"}\n").unwrap();
+    let mut app = app_for(&root);
+    app.open_file(&path);
+    assert!(app.is_jsonl);
+    assert_eq!(app.jsonl_source.len(), 1);
+    fs::remove_dir_all(&root).ok();
+}
 // touched for log follow mode

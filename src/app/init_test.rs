@@ -851,3 +851,12 @@ fn app_new_starts_with_no_context_menu() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn app_new_starts_without_jsonl_state() {
+    let root = temp_dir();
+    let app = new_app(&root, Config::default());
+    assert!(!app.is_jsonl);
+    assert!(app.jsonl_source.is_empty());
+    fs::remove_dir_all(&root).ok();
+}
