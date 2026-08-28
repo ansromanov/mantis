@@ -1,5 +1,7 @@
 content
+content.follow_tail_auto
 content.line_numbers
+content.log_colorizing
 content.prettify_size_limit
 content.scroll_percentage
 content.scrollbar
@@ -35,8 +37,10 @@ keys.copy_relative_path
 keys.diff_hunk_next
 keys.diff_hunk_prev
 keys.file_history
+keys.filter_lines
 keys.find_files
 keys.fold_toggle
+keys.follow_tail
 keys.git_mode_flat_toggle
 keys.git_mode_toggle
 keys.goto_line

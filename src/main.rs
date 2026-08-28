@@ -288,6 +288,35 @@ fn redirect_stdin_to_console() -> io::Result<()> {
     Ok(())
 }
 
+/// Replaces stdin with the controlling terminal before crossterm configures
+/// raw mode. Pager mode consumes the original stdin pipe before the TUI starts,
+/// so Unix raw-mode setup would otherwise fail while the event source is
+/// correctly prepared to read from `/dev/tty`.
+#[cfg(unix)]
+fn redirect_stdin_to_tty() -> io::Result<()> {
+    redirect_stdin_to_tty_with(|| {
+        std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open("/dev/tty")
+    })
+}
+
+/// Redirects stdin using an injected terminal opener so failure handling can
+/// be tested without changing the test process's standard input.
+#[cfg(unix)]
+fn redirect_stdin_to_tty_with(open: impl FnOnce() -> io::Result<std::fs::File>) -> io::Result<()> {
+    use std::os::unix::io::AsRawFd;
+
+    let tty =
+        open().map_err(|e| io::Error::new(e.kind(), format!("failed to open /dev/tty: {e}")))?;
+    let result = unsafe { libc::dup2(tty.as_raw_fd(), libc::STDIN_FILENO) };
+    if result == -1 {
+        return Err(io::Error::last_os_error());
+    }
+    Ok(())
+}
+
 fn main() -> anyhow::Result<()> {
     use tracing_subscriber::prelude::*;
     let layer = crate::telemetry::TelemetryLayer;
@@ -370,6 +399,11 @@ fn launch_tui(root: PathBuf, initial: InitialContent) -> anyhow::Result<()> {
     #[cfg(windows)]
     if stdin_not_tty {
         let _ = redirect_stdin_to_console();
+    }
+
+    #[cfg(unix)]
+    if stdin_not_tty {
+        redirect_stdin_to_tty()?;
     }
 
     enable_raw_mode()?;
