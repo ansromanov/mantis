@@ -868,3 +868,12 @@ fn app_new_starts_without_jsonl_state() {
     assert!(app.jsonl_source.is_empty());
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn app_new_starts_with_follow_mode_disabled() {
+    let root = temp_dir();
+    let app = new_app(&root, Config::default());
+    assert!(!app.follow_mode);
+    assert!(!app.follow_pinned);
+    fs::remove_dir_all(&root).ok();
+}
