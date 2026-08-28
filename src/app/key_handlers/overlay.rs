@@ -59,12 +59,20 @@ impl App {
     /// Handles keyboard input while in-file search is active.
     /// Extra keys: n/N/Tab/BackTab/Ctrl-p/Up/Down navigate matches.
     pub(super) fn handle_in_file_search_key(&mut self, key: KeyEvent) {
+        let query_is_empty = self
+            .in_file_search
+            .as_ref()
+            .is_some_and(|search| search.query.is_empty());
+        let text_navigation_key = matches!(
+            key.code,
+            KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Tab | KeyCode::BackTab
+        );
         // Extra keys first
-        if static_keys::is_next_match(&key) {
+        if (!text_navigation_key || query_is_empty) && static_keys::is_next_match(&key) {
             self.in_file_search_next();
             return;
         }
-        if static_keys::is_prev_match(&key) {
+        if (!text_navigation_key || query_is_empty) && static_keys::is_prev_match(&key) {
             self.in_file_search_prev();
             return;
         }

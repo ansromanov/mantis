@@ -2194,6 +2194,7 @@ fn in_file_search_n_next_match_wraps() {
     let root = temp_tree();
     let mut app = app_for(&root);
     setup_in_file_search(&mut app);
+    app.in_file_search.as_mut().unwrap().query.clear();
     assert_eq!(app.in_file_search.as_ref().unwrap().current, 0);
     assert_eq!(app.in_file_search.as_ref().unwrap().current, 0);
     app.handle_key(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::empty()));
@@ -2217,6 +2218,7 @@ fn in_file_search_n_prev_match() {
     let root = temp_tree();
     let mut app = app_for(&root);
     setup_in_file_search(&mut app);
+    app.in_file_search.as_mut().unwrap().query.clear();
     app.in_file_search.as_mut().unwrap().current = 1;
     app.handle_key(KeyEvent::new(KeyCode::Char('N'), KeyModifiers::SHIFT));
     assert_eq!(app.in_file_search.as_ref().unwrap().current, 0);
@@ -2232,6 +2234,7 @@ fn in_file_search_prev_wraps_to_last() {
     let root = temp_tree();
     let mut app = app_for(&root);
     setup_in_file_search(&mut app);
+    app.in_file_search.as_mut().unwrap().query.clear();
     assert_eq!(app.in_file_search.as_ref().unwrap().current, 0);
     app.handle_key(KeyEvent::new(KeyCode::Char('N'), KeyModifiers::SHIFT));
     let last = app.in_file_search.as_ref().unwrap().matches.len() - 1;
@@ -2244,6 +2247,7 @@ fn in_file_search_ctrl_p_goes_prev() {
     let root = temp_tree();
     let mut app = app_for(&root);
     setup_in_file_search(&mut app);
+    app.in_file_search.as_mut().unwrap().query.clear();
     app.in_file_search.as_mut().unwrap().current = 1;
     app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL));
     assert_eq!(app.in_file_search.as_ref().unwrap().current, 0);
@@ -2255,6 +2259,7 @@ fn in_file_search_tab_and_backtab() {
     let root = temp_tree();
     let mut app = app_for(&root);
     setup_in_file_search(&mut app);
+    app.in_file_search.as_mut().unwrap().query.clear();
     app.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::empty()));
     assert_eq!(app.in_file_search.as_ref().unwrap().current, 1);
     app.in_file_search.as_mut().unwrap().current = 0;
@@ -2297,6 +2302,7 @@ fn in_file_search_no_matches_is_noop() {
     };
     app.handle_key(KeyEvent::new(KeyCode::Char('z'), KeyModifiers::empty()));
     // No matches, next/prev should not crash
+    app.in_file_search.as_mut().unwrap().query.clear();
     app.handle_key(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::empty()));
     app.handle_key(KeyEvent::new(KeyCode::Char('P'), KeyModifiers::SHIFT));
     assert_eq!(app.in_file_search.as_ref().unwrap().current, 0);
