@@ -321,6 +321,10 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
             rows.push(row_key("switch_panel"));
             rows.push(gap.clone());
             rows.push(section("Tree Panel Navigation"));
+            rows.push(row_static_key(
+                "/",
+                "context-sensitive: tree filter here; file search elsewhere",
+            ));
             rows.push(row_key("nav_up"));
             rows.push(row_key("nav_down"));
             rows.push(row_key("tree_expand"));

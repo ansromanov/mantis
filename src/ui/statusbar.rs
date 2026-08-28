@@ -186,6 +186,15 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
             P_INFO,
         ));
     }
+    let focus_label = match app.focus {
+        Focus::Tree => " [focus: tree]",
+        Focus::Content => " [focus: content]",
+    };
+    segs.push((
+        Span::styled(focus_label, badge),
+        StatusSegment::Badges,
+        P_INFO,
+    ));
     if app.auto_watch {
         segs.push((
             Span::styled(" [watch]", badge),

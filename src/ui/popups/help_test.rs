@@ -825,6 +825,19 @@ fn help_uses_friendly_labels_for_palette_only_actions() {
     assert!(settings.contains("Palette"));
 }
 
+#[test]
+fn help_explains_context_sensitive_slash_key() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    app.help_tab = 1; // Navigation tab
+    let backend = TestBackend::new(120, 100);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
+    let text = buffer_rows(&terminal).join("\n");
+    assert!(text.contains("context-sensitive"));
+    assert!(text.contains("tree filter"));
+}
+
 /// Config/plugin/theme paths shown in help must reflect `$XDG_CONFIG_HOME`
 /// support, not just the `~/.config` default.
 #[test]
