@@ -189,6 +189,7 @@ impl App {
             show_scroll_percentage: cfg.content.scroll_percentage,
             show_line_numbers: cfg.content.line_numbers,
             show_blame: false,
+            blame_before_commit: false,
             show_about: false,
             show_telemetry_notice: false,
             show_welcome: false,

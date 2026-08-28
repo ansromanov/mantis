@@ -243,6 +243,9 @@ pub struct App {
     pub show_scroll_percentage: bool,
     pub show_line_numbers: bool,
     pub show_blame: bool,
+    /// Whether the full-file blame pane was visible before opening a blame
+    /// commit snapshot, so Esc can restore the originating view.
+    pub blame_before_commit: bool,
     pub show_about: bool,
     pub show_telemetry_notice: bool,
     /// When `true`, the welcome overlay is shown on top of everything else.

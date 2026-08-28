@@ -58,6 +58,8 @@ impl App {
                 // the commit diff. Esc closes that whole transient view,
                 // matching the single-step close used by file history.
                 if self.viewing_revision.is_none() {
+                    self.show_blame = self.blame_before_commit;
+                    self.blame_before_commit = false;
                     return;
                 }
             }
@@ -70,6 +72,8 @@ impl App {
                         self.reopen_file(&path);
                     }
                 }
+                self.show_blame = self.blame_before_commit;
+                self.blame_before_commit = false;
                 return;
             }
         }
@@ -586,13 +590,22 @@ impl App {
         }
         self.show_raw_markdown = !self.show_raw_markdown;
         if let Some(path) = self.current_file.clone() {
+            let scroll = self.content_scroll;
+            let active_line = self.active_line;
             if self.show_raw_markdown {
                 self.plugin_content.remove(&path);
                 self.plugin_content_text.remove(&path);
                 self.plugin_content_active = false;
                 self.plugin_content_active_path = None;
+            } else {
+                // Plugin rendering is asynchronous; identify this as a
+                // same-file mode switch so its response preserves the view.
+                self.plugin_content_active_path = Some(path.clone());
             }
             self.reload_content();
+            self.active_line = active_line;
+            self.set_content_scroll(scroll);
+            self.clamp_content_scroll();
         }
     }
 

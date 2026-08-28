@@ -166,9 +166,16 @@ impl App {
             }
             Some("toggle_pretty_json") => {
                 if self.is_json && !self.json_pretty_lines.is_empty() {
+                    let active_line = self.active_line;
+                    let scroll = self.content_scroll;
                     self.show_pretty_json = !self.show_pretty_json;
                     self.content_hscroll = 0;
+                    self.active_line = active_line;
                     self.clamp_content_scroll();
+                    // Clamp against the new representation, then restore the
+                    // old viewport offset (which may have been illegal for
+                    // the representation that was active before the toggle).
+                    self.set_content_scroll(scroll);
                 }
                 true
             }

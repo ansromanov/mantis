@@ -41,6 +41,23 @@ fn active_line_initialises_to_zero_on_open() {
 }
 
 #[test]
+fn wrapped_draw_handles_a_long_single_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.content = vec!["x".repeat(500), "tail".into()];
+    app.virtual_file = None;
+    app.word_wrap = true;
+    app.content_area = ratatui::layout::Rect::new(0, 0, 30, 8);
+    let backend = TestBackend::new(30, 8);
+    let mut terminal = ratatui::Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| draw_content(frame, &mut app, frame.area()))
+        .unwrap();
+    assert!(app.content_scroll_max() > 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn active_line_saturates_at_last_line() {
     let root = temp_tree();
     let mut app = app_for(&root);

@@ -300,7 +300,7 @@ impl App {
     /// Handles keyboard input while the inline tree filter is open.
     /// Up/Down/PageUp/PageDown navigate between matches; other keys
     /// (typing, Backspace, Esc, Enter) go through the generic picker.
-    pub(super) fn handle_tree_filter_key(&mut self, key: KeyEvent) {
+    pub(crate) fn handle_tree_filter_key(&mut self, key: KeyEvent) {
         if self.tree_filter.is_none() {
             return;
         }

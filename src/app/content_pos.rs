@@ -95,9 +95,72 @@ impl App {
     /// Maximum valid content_scroll so the last line sits at the bottom edge,
     /// not the top. Falls back to `total - 1` before the first render (height 0).
     pub fn content_scroll_max(&self) -> usize {
-        let total = self.display_line_count();
         let vh = (self.content_area.height as usize).max(1);
+        let total = if self.word_wrap {
+            self.wrapped_content_rows()
+        } else {
+            self.display_line_count()
+        };
         total.saturating_sub(vh)
+    }
+
+    /// Returns the number of visual rows occupied by the current content when
+    /// wrapping is enabled. The calculation is shared by scrolling and
+    /// rendering so a long logical line cannot make the viewport appear stuck.
+    pub(crate) fn wrapped_content_rows(&self) -> usize {
+        if !self.word_wrap {
+            return self.display_line_count();
+        }
+        let width = (self.content_area.width as usize).saturating_sub(self.line_prefix_width());
+        if width == 0 {
+            return self.display_line_count();
+        }
+        (0..self.display_line_count())
+            .map(|display| {
+                self.line_width(self.display_to_physical(display))
+                    .unwrap_or(0)
+                    .div_ceil(width)
+                    .max(1)
+            })
+            .sum()
+    }
+
+    /// Maps a visual wrapped-row offset to its logical display line and the
+    /// number of visual rows to skip within that line.
+    pub(crate) fn wrapped_display_position(&self, visual_offset: usize) -> (usize, usize) {
+        let width = (self.content_area.width as usize).saturating_sub(self.line_prefix_width());
+        if width == 0 {
+            return (visual_offset.min(self.display_line_count()), 0);
+        }
+        let mut remaining = visual_offset;
+        for display in 0..self.display_line_count() {
+            let rows = self
+                .line_width(self.display_to_physical(display))
+                .unwrap_or(0)
+                .div_ceil(width)
+                .max(1);
+            if remaining < rows {
+                return (display, remaining);
+            }
+            remaining -= rows;
+        }
+        (self.display_line_count().saturating_sub(1), 0)
+    }
+
+    /// Returns the visual row at which a logical display line begins.
+    pub(crate) fn wrapped_line_start(&self, target: usize) -> usize {
+        let width = (self.content_area.width as usize).saturating_sub(self.line_prefix_width());
+        if width == 0 {
+            return target;
+        }
+        (0..target.min(self.display_line_count()))
+            .map(|display| {
+                self.line_width(self.display_to_physical(display))
+                    .unwrap_or(0)
+                    .div_ceil(width)
+                    .max(1)
+            })
+            .sum()
     }
 
     /// Width of the line-number gutter (fold marker + digits + space), or 0.
@@ -134,8 +197,10 @@ impl App {
             if let Some(wrap_nz) = NonZeroUsize::new(raw_wrap) {
                 let wrap_width = wrap_nz.get();
                 let display_total = self.display_line_count();
-                let mut visual_remaining = rel_row;
-                for display_idx in self.content_scroll..display_total {
+                let (first_display, leading_rows) =
+                    self.wrapped_display_position(self.content_scroll);
+                let mut visual_remaining = leading_rows + rel_row;
+                for display_idx in first_display..display_total {
                     let physical_idx = self.display_to_physical(display_idx);
                     let display_width: usize = if let Some(ref path) = self.current_file {
                         if let Some(plugin_lines) = self.plugin_content.get(path) {
@@ -293,12 +358,21 @@ impl App {
             return;
         }
 
-        let last_line = self.display_line_count().saturating_sub(1);
-        let last_visible = self
-            .content_scroll
-            .saturating_add((self.content_area.height as usize).max(1).saturating_sub(1))
-            .min(last_line);
-        self.active_line = self.active_line.clamp(self.content_scroll, last_visible);
+        if self.word_wrap {
+            let (first, _) = self.wrapped_display_position(self.content_scroll);
+            let (last, _) = self.wrapped_display_position(
+                self.content_scroll
+                    .saturating_add((self.content_area.height as usize).max(1).saturating_sub(1)),
+            );
+            self.active_line = self.active_line.clamp(first, last);
+        } else {
+            let last_line = self.display_line_count().saturating_sub(1);
+            let last_visible = self
+                .content_scroll
+                .saturating_add((self.content_area.height as usize).max(1).saturating_sub(1))
+                .min(last_line);
+            self.active_line = self.active_line.clamp(self.content_scroll, last_visible);
+        }
     }
 
     /// Ensures `active_line` is visible in the content pane viewport. Since
@@ -343,6 +417,24 @@ impl App {
     /// `display_line` becomes visible. No-op when already visible.
     pub fn scroll_line_into_view(&mut self, display_line: usize) {
         let view_height = (self.content_area.height as usize).max(1);
+        if self.word_wrap {
+            let start = self.wrapped_line_start(display_line);
+            let rows = self
+                .line_width(self.display_to_physical(display_line))
+                .unwrap_or(0)
+                .div_ceil(
+                    (self.content_area.width as usize)
+                        .saturating_sub(self.line_prefix_width())
+                        .max(1),
+                )
+                .max(1);
+            if start < self.content_scroll {
+                self.set_content_scroll(start);
+            } else if start.saturating_add(rows) > self.content_scroll.saturating_add(view_height) {
+                self.set_content_scroll(start.saturating_add(rows).saturating_sub(view_height));
+            }
+            return;
+        }
         if display_line < self.content_scroll {
             self.set_content_scroll(display_line);
         } else if display_line >= self.content_scroll + view_height {

@@ -14,7 +14,7 @@
 
 use std::time::{Duration, Instant};
 
-use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::Rect;
 
 use crate::list_picker::ListPicker;
@@ -246,6 +246,32 @@ impl App {
         }
         if self.search.is_some() {
             self.handle_search_mouse(ev);
+            return;
+        }
+        // Keep wheel events inside the same overlay precedence chain as keys.
+        // Without this guard, a wheel over an inline prompt falls through to
+        // the tree/content handlers and changes the underlying view/focus.
+        if self.in_file_search.is_some() {
+            match ev.kind {
+                MouseEventKind::ScrollDown => self.in_file_search_next(),
+                MouseEventKind::ScrollUp => self.in_file_search_prev(),
+                _ => {}
+            }
+            return;
+        }
+        if self.tree_filter.is_some() {
+            match ev.kind {
+                MouseEventKind::ScrollDown => {
+                    self.handle_tree_filter_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()))
+                }
+                MouseEventKind::ScrollUp => {
+                    self.handle_tree_filter_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()))
+                }
+                _ => {}
+            }
+            return;
+        }
+        if self.goto_line.is_some() {
             return;
         }
         let scroll_before = self.content_scroll;

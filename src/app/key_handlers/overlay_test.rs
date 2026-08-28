@@ -1395,4 +1395,12 @@ fn worktree_picker_escape_closes() {
     assert!(app.worktree_picker.is_none());
     fs::remove_dir_all(&root).ok();
 }
-// touched for log follow mode
+#[test]
+fn tree_filter_key_handler_owns_navigation_while_open() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.tree_filter = Some(crate::search::TreeFilter::new());
+    app.handle_tree_filter_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
+    assert!(app.tree_filter.is_some());
+    fs::remove_dir_all(&root).ok();
+}
