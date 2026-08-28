@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{Duration, SystemTime};
 
@@ -14,6 +14,23 @@ fn git(dir: &Path, args: &[&str]) {
         .status()
         .unwrap();
     assert!(status.success(), "git {:?} failed", args);
+}
+
+#[test]
+fn worktree_parser_keeps_detached_and_flags() {
+    let items = parse_worktree_list(
+        "worktree /one\nHEAD abc\ndetached\n\nworktree /two\nHEAD def\nlocked\nprunable old\n",
+    );
+    assert_eq!(items.len(), 2);
+    assert!(items[0].branch.is_none());
+    assert!(items[1].locked && items[1].prunable);
+}
+
+#[test]
+fn worktree_parser_preserves_spaces_in_paths() {
+    let items =
+        parse_worktree_list("worktree /tmp/agent worktree\nHEAD abc\nbranch refs/heads/topic\n");
+    assert_eq!(items[0].path, PathBuf::from("/tmp/agent worktree"));
 }
 
 fn clone_repo(src: &Path, dst: &Path) {

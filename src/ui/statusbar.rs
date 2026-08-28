@@ -170,6 +170,13 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
         };
         segs.push((Span::styled(label, badge), StatusSegment::Badges, P_INFO));
     }
+    if app.worktree_count > 1 {
+        segs.push((
+            Span::styled(format!(" [worktrees: {}]", app.worktree_count), badge),
+            StatusSegment::Badges,
+            P_INFO,
+        ));
+    }
     if app.git_mode {
         if let Some(ref base) = app.compare_base {
             segs.push((

@@ -323,6 +323,10 @@ impl App {
                 self.open_recent_files();
                 true
             }
+            Some("worktree_picker") => {
+                self.worktree_picker = Some(crate::search::WorktreePicker::new(&self.root));
+                true
+            }
             Some("toggle_watch") => {
                 self.auto_watch = !self.auto_watch;
                 self.config.content.watch = self.auto_watch;

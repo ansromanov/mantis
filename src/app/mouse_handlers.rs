@@ -199,6 +199,26 @@ impl App {
             }
             return;
         }
+        if self.worktree_picker.is_some() {
+            if handle_picker_mouse(
+                ev,
+                self.worktree_picker_area,
+                self.worktree_picker_offset,
+                &mut self.worktree_picker,
+                &mut self.last_click,
+            ) == PickerMouseAction::Activate
+            {
+                let path = self
+                    .worktree_picker
+                    .as_ref()
+                    .and_then(|p| p.selected_path());
+                self.worktree_picker = None;
+                if let Some(path) = path {
+                    self.set_root(&path);
+                }
+            }
+            return;
+        }
         if self.theme_picker.is_some() {
             self.handle_theme_mouse(ev);
             return;

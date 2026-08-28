@@ -24,7 +24,7 @@ pub use repo_log::RepoLogState;
 pub use pickers::{
     BugReportFocus, BugReportState, FilterBarState, GotoLineState, InFileMatch, InFileSearch,
     PluginPicker, RecentFilesState, RevisionItem, RevisionPicker, RevisionTab, ThemePicker,
-    TreeFilter,
+    TreeFilter, WorktreePicker,
 };
 
 use std::collections::{HashMap, HashSet};

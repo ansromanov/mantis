@@ -1597,4 +1597,15 @@ fn bug_report_click_outside_closes_modal() {
     assert!(app.bug_report.is_none());
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn worktree_picker_click_outside_closes() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.worktree_picker = Some(crate::search::WorktreePicker::for_test(Vec::new()));
+    app.worktree_picker_area = Rect::new(10, 10, 20, 5);
+    app.handle_mouse(left_down_at(0, 0));
+    assert!(app.worktree_picker.is_none());
+    fs::remove_dir_all(&root).ok();
+}
 // touched for log follow mode

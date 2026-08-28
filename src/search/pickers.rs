@@ -10,6 +10,96 @@ use fuzzy_matcher::skim::SkimMatcherV2;
 
 use crate::list_picker::ListPicker;
 
+/// Fuzzy-filterable worktree overview shown by the worktree switcher.
+pub struct WorktreePicker {
+    pub items: Vec<crate::git::WorktreeItem>,
+    pub query: String,
+    pub filtered: Vec<usize>,
+    pub selected: usize,
+    matcher: SkimMatcherV2,
+}
+
+impl WorktreePicker {
+    #[cfg(test)]
+    pub fn for_test(items: Vec<crate::git::WorktreeItem>) -> Self {
+        let mut picker = Self {
+            items,
+            query: String::new(),
+            filtered: Vec::new(),
+            selected: 0,
+            matcher: SkimMatcherV2::default(),
+        };
+        picker.refresh();
+        picker
+    }
+
+    pub fn new(root: &std::path::Path) -> Self {
+        let items = crate::git::worktree_list(root)
+            .into_iter()
+            .map(|worktree| {
+                let info = crate::git::repo_info(&worktree.path);
+                crate::git::WorktreeItem {
+                    worktree,
+                    changed: info.map_or(0, |i| i.total_changed),
+                }
+            })
+            .collect();
+        let mut picker = Self {
+            items,
+            query: String::new(),
+            filtered: Vec::new(),
+            selected: 0,
+            matcher: SkimMatcherV2::default(),
+        };
+        picker.refresh();
+        picker
+    }
+
+    fn refresh(&mut self) {
+        self.filtered = crate::search::fuzzy_refilter(
+            &self.items,
+            &self.matcher,
+            &self.query,
+            |item| std::borrow::Cow::Owned(item.display()),
+            false,
+        )
+        .into_iter()
+        .map(|(index, _)| index)
+        .collect();
+        self.selected = self.selected.min(self.filtered.len().saturating_sub(1));
+    }
+
+    pub fn selected_path(&self) -> Option<std::path::PathBuf> {
+        self.filtered
+            .get(self.selected)
+            .and_then(|&i| self.items.get(i))
+            .map(|i| i.worktree.path.clone())
+    }
+}
+
+impl ListPicker for WorktreePicker {
+    fn query_push(&mut self, c: char) {
+        self.query.push(c);
+        self.refresh();
+    }
+    fn query_pop(&mut self) {
+        self.query.pop();
+        self.refresh();
+    }
+    fn query_is_empty(&self) -> bool {
+        self.query.is_empty()
+    }
+    fn results_len(&self) -> usize {
+        self.filtered.len()
+    }
+    fn selected(&self) -> usize {
+        self.selected
+    }
+    fn set_selected(&mut self, i: usize) {
+        self.selected = i.min(self.filtered.len().saturating_sub(1));
+    }
+}
+
 /// State for the inline tree filter (/ while the tree panel is focused).
 ///
 /// The query is matched case-insensitively against each node's file/directory

@@ -393,3 +393,11 @@ When viewing log files (detected via `.log` extension or level/timestamp sniffin
   and raw-markdown toggles, and reveal-in-tree. Navigate with the mouse or
   `j/k`/arrows, activate with Enter or a left-click, and dismiss with `Esc` or
   a click anywhere else.
+
+### Worktree switcher
+
+When a repository has multiple linked worktrees, use the command palette and
+choose `Open worktree switcher`. The picker shows each worktree's branch and
+changed-file count; type to filter, then press Enter to switch the tree to that
+worktree. The status bar shows the total worktree count when more than one is
+available.

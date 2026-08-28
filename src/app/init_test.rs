@@ -800,6 +800,14 @@ fn app_new_starts_without_repo_log_overlay() {
     fs::remove_dir_all(&root).ok();
 }
 
+#[test]
+fn app_new_starts_without_worktree_picker() {
+    let root = temp_dir();
+    let app = new_app(&root, Config::default());
+    assert!(app.worktree_picker.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
 // -- file_at_revision / viewing_revision_hash ----------------------------------
 
 #[test]

@@ -334,16 +334,13 @@ impl App {
     /// `App`. When you add a new field to `App` that caches file or view state,
     /// add a reset here or verify that its default value is correct after a root
     /// change.
-    fn set_root(&mut self, path: &std::path::Path) {
-        let path_buf = if path.starts_with(&self.initial_root) {
-            path.to_path_buf()
-        } else {
-            self.initial_root.clone()
-        };
+    pub(crate) fn set_root(&mut self, path: &std::path::Path) {
+        let path_buf = path.to_path_buf();
         if path_buf == self.root {
             return;
         }
         self.root = path_buf;
+        self.worktree_count = crate::git::worktree_list(&self.root).len();
         self.expanded.clear();
         self.clear_content_state();
         self.file_watcher = None;

@@ -19,6 +19,14 @@ fn detects_object_lines_without_jsonl_extension() {
 }
 
 #[test]
+fn does_not_classify_single_line_json_as_jsonl() {
+    assert!(!is_jsonl(
+        Path::new("config.json"),
+        &[r#"{"key":true}"#.into()]
+    ));
+}
+
+#[test]
 fn collapsed_rows_preserve_invalid_lines() {
     let source = vec![
         r#"{"level":"info","message":"ready"}"#.into(),

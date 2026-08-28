@@ -42,6 +42,7 @@ use crate::plugin::{ExtraSyntax, PluginContributions, PluginManager};
 use crate::search::{
     BugReportState, CommandPalette, GotoLineState, HistoryState, InFileSearch, PluginPicker,
     RecentFilesState, RepoLogState, RevisionPicker, SearchState, ThemePicker, TreeFilter,
+    WorktreePicker,
 };
 use crate::selection::TextSelection;
 use crate::theme::Theme;
@@ -89,6 +90,7 @@ pub(crate) struct ActiveOverlays {
     pub tree_filter: bool,
     pub bug_report: bool,
     pub revision_picker: bool,
+    pub worktree_picker: bool,
     pub goto_line: bool,
     pub visual_mode: bool,
     pub git_blame: bool,
@@ -213,6 +215,8 @@ pub struct App {
     pub git_show_untracked: bool,
     pub git_show_ignored: bool,
     pub git_info: Option<crate::git::GitRepoInfo>,
+    /// Number of worktrees in the containing repository, used for discovery.
+    pub worktree_count: usize,
     pub git_status_map: HashMap<PathBuf, GitStatus>,
     pub git_mode: bool,
     pub git_mode_flat: bool,
@@ -223,6 +227,10 @@ pub struct App {
     /// State for the compare-against-revision picker overlay. `Some` while the
     /// picker is open; `None` otherwise.
     pub revision_picker: Option<RevisionPicker>,
+    /// State for the git worktree switcher overlay.
+    pub worktree_picker: Option<WorktreePicker>,
+    pub worktree_picker_area: Rect,
+    pub worktree_picker_offset: usize,
     pub bug_report: Option<BugReportState>,
     pub show_scrollbar: bool,
     pub show_scroll_percentage: bool,

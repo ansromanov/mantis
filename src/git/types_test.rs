@@ -4,6 +4,16 @@ use std::path::PathBuf;
 use super::*;
 
 #[test]
+fn parses_worktree_porcelain_metadata() {
+    let text = "worktree /repo\nHEAD abc\nbranch refs/heads/main\n\nworktree /tmp/other\nHEAD def\ndetached\nlocked reason\n\nworktree /tmp/stale\nHEAD ghi\nbranch refs/heads/topic\nprunable gone\n";
+    let items = super::super::core::parse_worktree_list(text);
+    assert_eq!(items.len(), 3);
+    assert_eq!(items[0].branch.as_deref(), Some("main"));
+    assert!(items[1].branch.is_none() && items[1].locked);
+    assert!(items[2].prunable);
+}
+
+#[test]
 fn git_head_display_branch() {
     assert_eq!(GitHead::Branch("main".to_string()).display(), "main");
     assert_eq!(

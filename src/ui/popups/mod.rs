@@ -27,6 +27,7 @@ mod theme;
 mod tree_filter;
 mod util;
 mod welcome;
+mod worktree;
 
 pub(super) use about::draw_about;
 pub(super) use bug_report::draw_bug_report;
@@ -46,6 +47,7 @@ pub(super) use telemetry_notice::draw_telemetry_notice;
 pub(super) use theme::draw_theme;
 pub(super) use tree_filter::draw_tree_filter;
 pub(super) use welcome::draw_welcome;
+pub(super) use worktree::draw_worktree_picker;
 
 #[cfg(test)]
 #[path = "popups_test.rs"]

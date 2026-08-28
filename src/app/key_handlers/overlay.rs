@@ -690,6 +690,24 @@ impl App {
         }
     }
 
+    /// Handles keyboard input for the worktree picker and switches roots on Enter.
+    pub(super) fn handle_worktree_key(&mut self, key: KeyEvent) {
+        let Some(ref mut picker) = self.worktree_picker else {
+            return;
+        };
+        match handle_list_picker_key(picker, &key) {
+            OverlayKey::Activate => {
+                let path = picker.selected_path();
+                self.worktree_picker = None;
+                if let Some(path) = path {
+                    self.set_root(&path);
+                }
+            }
+            OverlayKey::Close => self.worktree_picker = None,
+            _ => {}
+        }
+    }
+
     /// Handles keyboard input while the go-to-line dialog is open.
     /// Extra keys: filters out the open binding so it is not appended.
     pub(super) fn handle_goto_line_key(&mut self, key: KeyEvent) {
