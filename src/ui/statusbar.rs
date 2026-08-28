@@ -209,6 +209,14 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
             P_INFO,
         ));
     }
+    if app.secret_masked {
+        let label = if app.secret_revealed {
+            " [secrets: revealed]"
+        } else {
+            " [secrets: masked]"
+        };
+        segs.push((Span::styled(label, badge), StatusSegment::Badges, P_INFO));
+    }
     if !app.plugin_manager.is_empty() {
         segs.push((
             Span::styled(" [plugin]", badge),

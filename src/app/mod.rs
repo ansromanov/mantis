@@ -125,6 +125,9 @@ pub struct App {
     pub show_csv_table: bool,
     pub csv_table_text: Vec<String>,
     pub csv_table_lines: Vec<Vec<(ratatui::style::Style, String)>>,
+    pub secret_original: Vec<String>,
+    pub secret_masked: bool,
+    pub secret_revealed: bool,
     pub content_scroll: usize,
     pub content_hscroll: usize,
     /// Cursor (active line) index in the content pane (display-line coordinate).
@@ -933,6 +936,9 @@ impl App {
         self.show_pretty_json = false;
         self.json_pretty_text = Vec::new();
         self.json_pretty_lines = Vec::new();
+        self.secret_original.clear();
+        self.secret_masked = false;
+        self.secret_revealed = false;
         self.viewing_revision = None;
         self.viewing_revision_hash = None;
         self.file_at_revision = None;

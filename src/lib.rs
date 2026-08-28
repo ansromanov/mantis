@@ -36,6 +36,7 @@ pub mod plugin;
 pub mod release_info;
 pub mod scroll;
 pub mod search;
+pub mod secret_mask;
 pub mod selection;
 pub mod session;
 pub mod sys_info;

@@ -559,6 +559,16 @@ fn app_new_clipboard_capture_starts_empty() {
 }
 
 #[test]
+fn app_new_secret_masking_state_starts_clear() {
+    let root = temp_dir();
+    let app = new_app(&root, Config::default());
+    assert!(app.secret_original.is_empty());
+    assert!(!app.secret_masked);
+    assert!(!app.secret_revealed);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn app_new_ignore_gitignore_includes_ignored_in_status_map() {
     let root = temp_dir();
     let git = |args: &[&str]| {

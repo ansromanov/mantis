@@ -71,6 +71,11 @@ fn icons_false_round_trips_through_serde() {
     assert!(!parsed.tree.icons);
 }
 
+#[test]
+fn mask_secrets_defaults_to_true() {
+    assert!(Config::default().content.mask_secrets);
+}
+
 // -- find_files keybinding ---------------------------------------------------
 
 #[test]

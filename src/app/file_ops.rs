@@ -286,6 +286,10 @@ impl App {
         self.highlighted = load.highlighted;
         self.diff_rows = load.diff_rows;
         self.content = load.content;
+        if self.secret_masked && !self.config.content.mask_secrets {
+            self.content = self.secret_original.clone();
+            self.secret_masked = false;
+        }
         if !is_new_file {
             // Same-file reload: clamp scroll and refresh in-file search.
             self.clamp_content_scroll();
@@ -488,10 +492,22 @@ impl App {
         self.show_csv_table = load.show_csv_table;
         self.csv_table_text = load.csv_table_text;
         self.csv_table_lines = load.csv_table_lines;
+        self.secret_original = load.secret_original;
+        self.secret_masked = load.secret_masked;
+        self.secret_revealed = false;
         self.clear_fold_state();
         self.virtual_file = load.virtual_file;
         self.content = load.content;
-        self.highlighted = load.highlighted;
+        if self.secret_masked && !self.config.content.mask_secrets {
+            self.content = self.secret_original.clone();
+            self.secret_masked = false;
+        }
+        self.highlighted = if !self.config.content.mask_secrets && !self.secret_original.is_empty()
+        {
+            self.highlighter.highlight(path, &self.content)
+        } else {
+            load.highlighted
+        };
         if let Some(y) = load.yaml {
             self.fold_regions = y.fold_regions;
             self.yaml_error = y.error;
