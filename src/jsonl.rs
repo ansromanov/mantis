@@ -26,7 +26,9 @@ pub fn is_jsonl(path: &std::path::Path, lines: &[String]) -> bool {
         .filter(|line| !line.trim().is_empty())
         .take(8)
         .collect();
-    !non_empty.is_empty()
+    // A single object per line is ordinary compact JSON, not JSONL. Require
+    // at least two records before content-based detection opts into log mode.
+    non_empty.len() >= 2
         && non_empty.iter().all(|line| {
             matches!(
                 serde_json::from_str::<serde_json::Value>(line),
