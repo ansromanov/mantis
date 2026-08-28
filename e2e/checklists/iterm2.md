@@ -4,8 +4,8 @@ Use this checklist to manually verify features and keybindings on **iTerm2**.
 Mark items as `[x] Pass`, `[ ] Fail`, or `[ ] N/A` in the `Status` column. If an item fails, detail the issue in the `Notes` column and commit the file so the AI agent can address it.
 
 ## System Info
-* **OS Version**: macOS 
-* **iTerm2 Version**: 
+* **OS Version**: macOS
+* **iTerm2 Version**:
 * **Shell**: (e.g. zsh, bash)
 
 ---
@@ -47,10 +47,10 @@ Mark items as `[x] Pass`, `[ ] Fail`, or `[ ] N/A` in the `Status` column. If an
 | [ ] | **Switch Panel** | `Tab` | Global | Toggles focus between Tree and Content pane. | |
 | [ ] | **Command Palette** | `Ctrl+P` | Global | Opens the Ctrl+P command palette overlay. | |
 | [ ] | **Recent Files** | `Ctrl+O` | Global | Opens the recent files list overlay. | |
-| [ ] | **Find Files** | `Ctrl+T` | Global | Opens fuzzy file-name search. | |
-| [ ] | **Global Search** | `Ctrl+F` | Global | Opens full-text project search. | |
-| [ ] | **Go to Line** | `Ctrl+G` | Content | Opens the line-jump prompt. | |
-| [ ] | **Git Mode** | `Ctrl+D` | Global | Toggles git mode (shows changed files in tree). | |
+| [ ] | **Find Files** | `Ctrl+F` | Global | Opens fuzzy file-name search. | |
+| [ ] | **Global Search** | `f` | Tree | Opens full-text project search. | |
+| [ ] | **Go to Line** | `:` | Content | Opens the line-jump prompt. | |
+| [ ] | **Git Mode** | `Ctrl+G` | Global | Toggles git mode (shows changed files in tree). | |
 | [ ] | **Toggle Hidden** | `.` | Tree | Toggles visibility of hidden files/directories. | |
 | [ ] | **Theme Picker** | `t` | Tree | Opens the theme picker overlay. | |
 | [ ] | **File History** | `H` | Tree | Opens git history overlay for selected file. | |
@@ -71,7 +71,7 @@ Mark items as `[x] Pass`, `[ ] Fail`, or `[ ] N/A` in the `Status` column. If an
 | [ ] | **Jump to Top** | `g` or `ctrl+Home` | Content | Jumps to the first line of the file. | |
 | [ ] | **Jump to Bottom**| `G` or `ctrl+End` | Content | Jumps to the last line of the file. | |
 | [ ] | **Fold Toggle** | `Space` | Content | Collapses or expands fold region at cursor. | |
-| [ ] | **Toggle Blame** | `Ctrl+B` | Content | Toggles persistent single-line blame on statusbar. | |
+| [ ] | **Toggle Blame** | `b` | Content | Toggles persistent single-line blame on statusbar. | |
 | [ ] | **Blame Line** | `B` | Content | Opens Git Blame details popup for the line. | |
 | [ ] | **Raw Markdown** | `M` | Content | Toggles rendering raw Markdown file content. | |
 | [ ] | **Next Hunk** | `n` | Content | In diff view: jumps cursor to next hunk header. | |
