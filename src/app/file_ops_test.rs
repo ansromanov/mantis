@@ -355,6 +355,15 @@ fn viewing_revision_persists_across_reload_content_in_git_mode() {
         "title before: {:?}",
         title_before
     );
+    let selected_diff = app.content.join("\n");
+    assert!(
+        selected_diff.contains("-v1") && selected_diff.contains("+v2"),
+        "history should show the selected commit's parent diff: {selected_diff:?}"
+    );
+    assert!(
+        !selected_diff.contains("v3"),
+        "history diff must not compare against the working tree: {selected_diff:?}"
+    );
 
     // reload_content must NOT clobber the revision diff.
     app.reload_content();

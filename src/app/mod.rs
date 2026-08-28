@@ -866,12 +866,10 @@ impl App {
     }
 
     /// Human-readable label for the tree panel's current view mode, shown as the
-    /// panel's border title. Extends as new modes are added (blame, functions,
-    /// file structure, …); today it reflects only Files vs Git vs Blame.
+    /// panel's border title. Extends as new tree modes are added (functions,
+    /// file structure, …); today it reflects only Files vs Git.
     pub fn panel_mode_label(&self) -> &'static str {
-        if self.show_blame && self.has_text_cursor() {
-            "Blame"
-        } else if self.git_mode {
+        if self.git_mode {
             if self.git_mode_flat {
                 "Git · flat"
             } else {

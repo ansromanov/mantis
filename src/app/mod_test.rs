@@ -148,7 +148,7 @@ fn file_history_opens_picker_and_shows_diff() {
     assert!(app.history.is_none());
     assert!(app.is_diff);
     assert!(app.content_title.is_some());
-    assert!(app.content.iter().any(|l| l.starts_with("+two")));
+    assert!(app.content.iter().any(|l| l.starts_with("+one")));
     fs::remove_dir_all(&root).ok();
 }
 
@@ -4825,6 +4825,16 @@ fn panel_mode_label_git_mode_flat_returns_git_flat() {
     app.git_mode = true;
     app.git_mode_flat = true;
     assert_eq!(app.panel_mode_label(), "Git · flat");
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn panel_mode_label_stays_files_when_content_blame_is_active() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.show_blame = true;
+    app.current_file = Some(root.join("file.txt"));
+    assert_eq!(app.panel_mode_label(), "Files");
     fs::remove_dir_all(&root).ok();
 }
 

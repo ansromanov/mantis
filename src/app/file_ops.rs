@@ -589,7 +589,7 @@ impl App {
         self.history = None;
         if let Some((hash, short, file)) = picked {
             self.last_open_source = crate::telemetry::FileSourceKind::History;
-            let diff = crate::git::file_diff(&self.root, &hash, &file);
+            let diff = crate::git::file_commit_diff(&self.root, &hash, &file);
             self.show_diff(&file, &short, &diff, Some(&hash));
         }
     }
