@@ -877,3 +877,14 @@ fn app_new_starts_with_follow_mode_disabled() {
     assert!(!app.follow_pinned);
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn app_new_starts_without_csv_state() {
+    let root = temp_dir();
+    let app = new_app(&root, Config::default());
+    assert!(!app.is_csv);
+    assert!(!app.show_csv_table);
+    assert!(app.csv_table_text.is_empty());
+    assert!(app.csv_table_lines.is_empty());
+    fs::remove_dir_all(&root).ok();
+}

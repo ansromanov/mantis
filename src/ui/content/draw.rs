@@ -19,6 +19,7 @@ use ratatui::{
 use unicode_width::UnicodeWidthStr;
 
 use crate::app::{App, Focus};
+use crate::search::InFileSearch;
 
 use super::blame;
 use super::diff::draw_side_by_side_diff;
@@ -146,66 +147,27 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
             .collect();
         (0, vec![], lines, vec![])
     } else if app.is_json && app.show_pretty_json && !app.json_pretty_lines.is_empty() {
-        // JSON pretty view: iterate only the visible window of pre-highlighted lines.
-        let ln_style = Style::default().fg(app.theme.dim);
-        let lw = app.line_count().to_string().len().max(1);
-        let gutters: Vec<Line> = if show_ln {
-            (scroll..visible_end)
-                .map(|i| {
-                    Line::from(Span::styled(
-                        format!("{:>width$} ", i + 1, width = lw),
-                        ln_style,
-                    ))
-                })
-                .collect()
-        } else {
-            vec![]
-        };
-        let ln_w = if show_ln { lw + 1 } else { 0 };
-        let lines: Vec<Line> = app.json_pretty_lines[scroll..visible_end]
-            .iter()
-            .enumerate()
-            .map(|(offset, spans)| {
-                let logical_idx = scroll + offset;
-                let regions_owned: Vec<(Style, String)> =
-                    spans.iter().map(|(s, t)| (*s, t.clone())).collect();
-                if let Some(s) = in_file_search {
-                    Line::from(apply_search_to_regions(
-                        &regions_owned,
-                        logical_idx,
-                        s,
-                        &app.theme,
-                    ))
-                } else if let Some(((sl, sc), (el, ec))) = sel {
-                    if logical_idx >= sl && logical_idx <= el {
-                        let col_start = if logical_idx == sl { sc } else { 0 };
-                        let col_end = if logical_idx == el { ec } else { usize::MAX };
-                        Line::from(apply_selection(
-                            &regions_owned,
-                            col_start,
-                            col_end,
-                            sel_bg,
-                            app.theme.is_monochrome(),
-                        ))
-                    } else {
-                        Line::from(
-                            regions_owned
-                                .iter()
-                                .map(|(s, t)| Span::styled(t.clone(), *s))
-                                .collect::<Vec<_>>(),
-                        )
-                    }
-                } else {
-                    Line::from(
-                        regions_owned
-                            .iter()
-                            .map(|(s, t)| Span::styled(t.clone(), *s))
-                            .collect::<Vec<_>>(),
-                    )
-                }
-            })
-            .collect();
-        (ln_w, gutters, lines, vec![])
+        render_preformatted_lines(
+            app,
+            &app.json_pretty_lines,
+            scroll,
+            visible_end,
+            show_ln,
+            in_file_search,
+            sel,
+            sel_bg,
+        )
+    } else if app.is_csv && app.show_csv_table && !app.csv_table_lines.is_empty() {
+        render_preformatted_lines(
+            app,
+            &app.csv_table_lines,
+            scroll,
+            visible_end,
+            show_ln,
+            in_file_search,
+            sel,
+            sel_bg,
+        )
     } else if let Some(md_lines) = render_lines {
         // Rendered content (plugin): iterate only the visible
         // window of pre-rendered lines. Line numbers are hidden for rendered
@@ -444,6 +406,80 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     if line_blame_area.height > 0 {
         blame::draw_bottom_bar_blame(f, app, line_blame_area);
     }
+}
+
+/// Renders lines from precomputed styled spans (pretty JSON or CSV/TSV table view).
+/// Returns (ln_width, gutter_lines, content_lines, fold_gutter_rows).
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
+fn render_preformatted_lines<'a>(
+    app: &'a App,
+    spans_slice: &'a [Vec<(Style, String)>],
+    scroll: usize,
+    visible_end: usize,
+    show_ln: bool,
+    in_file_search: Option<&'a InFileSearch>,
+    sel: Option<((usize, usize), (usize, usize))>,
+    sel_bg: ratatui::style::Color,
+) -> (usize, Vec<Line<'a>>, Vec<Line<'a>>, Vec<(u16, usize)>) {
+    let ln_style = Style::default().fg(app.theme.dim);
+    let lw = app.line_count().to_string().len().max(1);
+    let gutters: Vec<Line> = if show_ln {
+        (scroll..visible_end)
+            .map(|i| {
+                Line::from(Span::styled(
+                    format!("{:>width$} ", i + 1, width = lw),
+                    ln_style,
+                ))
+            })
+            .collect()
+    } else {
+        vec![]
+    };
+    let ln_w = if show_ln { lw + 1 } else { 0 };
+    let lines: Vec<Line> = spans_slice[scroll..visible_end]
+        .iter()
+        .enumerate()
+        .map(|(offset, spans)| {
+            let logical_idx = scroll + offset;
+            let regions_owned: Vec<(Style, String)> =
+                spans.iter().map(|(s, t)| (*s, t.clone())).collect();
+            if let Some(s) = in_file_search {
+                Line::from(apply_search_to_regions(
+                    &regions_owned,
+                    logical_idx,
+                    s,
+                    &app.theme,
+                ))
+            } else if let Some(((sl, sc), (el, ec))) = sel {
+                if logical_idx >= sl && logical_idx <= el {
+                    let col_start = if logical_idx == sl { sc } else { 0 };
+                    let col_end = if logical_idx == el { ec } else { usize::MAX };
+                    Line::from(apply_selection(
+                        &regions_owned,
+                        col_start,
+                        col_end,
+                        sel_bg,
+                        app.theme.is_monochrome(),
+                    ))
+                } else {
+                    Line::from(
+                        regions_owned
+                            .iter()
+                            .map(|(s, t)| Span::styled(t.clone(), *s))
+                            .collect::<Vec<_>>(),
+                    )
+                }
+            } else {
+                Line::from(
+                    regions_owned
+                        .iter()
+                        .map(|(s, t)| Span::styled(t.clone(), *s))
+                        .collect::<Vec<_>>(),
+                )
+            }
+        })
+        .collect();
+    (ln_w, gutters, lines, vec![])
 }
 
 #[cfg(test)]

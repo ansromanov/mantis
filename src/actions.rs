@@ -421,6 +421,13 @@ pub static ACTIONS: &[ActionSpec] = &[
         description: Some("Toggle JSON pretty-printing in the content panel"),
     },
     ActionSpec {
+        id: "toggle_table_view",
+        palette: Some("Toggle CSV/TSV table view"),
+        help: None,
+        category: Some("View"),
+        description: Some("Toggle CSV/TSV table view in the content panel"),
+    },
+    ActionSpec {
         id: "blame_line",
         palette: Some("Blame active line"),
         help: None,
@@ -522,6 +529,8 @@ pub enum Applicability {
     OpenFile,
     /// Requires an open JSON file.
     JsonFile,
+    /// Requires an open CSV/TSV file.
+    CsvFile,
     /// Requires being in a git repository.
     GitRepo,
     /// Requires being in a git repository and having an open file.
@@ -545,6 +554,7 @@ impl ActionSpec {
     pub fn applicability(&self) -> Applicability {
         match self.id {
             "toggle_pretty_json" => Applicability::JsonFile,
+            "toggle_table_view" => Applicability::CsvFile,
             "blame_line" | "toggle_blame" => Applicability::GitRepoAndNoDiff,
             "file_history" => Applicability::GitRepoAndFile,
             "repo_commit_log" => Applicability::GitRepo,

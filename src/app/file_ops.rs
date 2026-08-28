@@ -65,10 +65,14 @@ impl App {
     /// horizontal scroll, and view-mode toggles.
     pub(super) fn reopen_file(&mut self, path: &std::path::Path) {
         let pretty = self.show_pretty_json;
+        let csv_table = self.show_csv_table;
         self.preserving_scroll(|s| {
             s.open_file(path);
             if s.is_json {
                 s.show_pretty_json = pretty;
+            }
+            if s.is_csv {
+                s.show_csv_table = csv_table;
             }
         });
     }
@@ -258,6 +262,10 @@ impl App {
         self.show_pretty_json = false;
         self.json_pretty_text = Vec::new();
         self.json_pretty_lines = Vec::new();
+        self.is_csv = false;
+        self.show_csv_table = false;
+        self.csv_table_text = Vec::new();
+        self.csv_table_lines = Vec::new();
         self.is_diff = true;
         self.clear_fold_state();
         self.file_encoding = None;
@@ -308,6 +316,10 @@ impl App {
         self.show_pretty_json = false;
         self.json_pretty_text = Vec::new();
         self.json_pretty_lines = Vec::new();
+        self.is_csv = false;
+        self.show_csv_table = false;
+        self.csv_table_text = Vec::new();
+        self.csv_table_lines = Vec::new();
         self.clear_fold_state();
         self.file_encoding = None;
         self.file_line_ending = None;
@@ -472,6 +484,10 @@ impl App {
         self.show_pretty_json = load.show_pretty_json;
         self.json_pretty_text = load.json_pretty_text;
         self.json_pretty_lines = load.json_pretty_lines;
+        self.is_csv = load.is_csv;
+        self.show_csv_table = load.show_csv_table;
+        self.csv_table_text = load.csv_table_text;
+        self.csv_table_lines = load.csv_table_lines;
         self.clear_fold_state();
         self.virtual_file = load.virtual_file;
         self.content = load.content;
@@ -652,6 +668,10 @@ impl App {
         self.show_pretty_json = false;
         self.json_pretty_text = Vec::new();
         self.json_pretty_lines = Vec::new();
+        self.is_csv = false;
+        self.show_csv_table = false;
+        self.csv_table_text = Vec::new();
+        self.csv_table_lines = Vec::new();
         self.is_diff = true;
         self.viewing_revision = Some(short.to_string());
         self.viewing_revision_hash = full_hash.map(|h| h.to_string());
@@ -725,6 +745,10 @@ impl App {
                     self.show_pretty_json = false;
                     self.json_pretty_text = Vec::new();
                     self.json_pretty_lines = Vec::new();
+                    self.is_csv = false;
+                    self.show_csv_table = false;
+                    self.csv_table_text = Vec::new();
+                    self.csv_table_lines = Vec::new();
                     self.content_scroll = saved.content_scroll;
                     self.active_line = saved.active_line;
                     self.diff_side_by_side = saved.side_by_side;
@@ -796,6 +820,10 @@ impl App {
         self.show_pretty_json = false;
         self.json_pretty_text = Vec::new();
         self.json_pretty_lines = Vec::new();
+        self.is_csv = false;
+        self.show_csv_table = false;
+        self.csv_table_text = Vec::new();
+        self.csv_table_lines = Vec::new();
         self.clear_fold_state();
         self.file_encoding = None;
         self.file_line_ending = None;

@@ -301,3 +301,44 @@ fn compute_file_load_sets_no_syntax_name_for_unknown_extension() {
     let load = compute_file_load(f.path(), &hl(), usize::MAX);
     assert_eq!(load.syntax_name, None);
 }
+
+#[test]
+fn compute_file_load_csv_builds_table() {
+    let mut f = tempfile::NamedTempFile::with_suffix(".csv").unwrap();
+    use std::io::Write;
+    f.write_all(b"name,age\nAlice,30\nBob,25\n").unwrap();
+    let load = compute_file_load(f.path(), &hl(), usize::MAX);
+    assert!(load.is_csv);
+    assert!(load.show_csv_table);
+    assert!(!load.csv_table_text.is_empty());
+    assert!(!load.csv_table_lines.is_empty());
+    assert!(load.csv_table_text[0].contains('┌'));
+    assert!(load.csv_table_text[1].contains("name"));
+    assert!(load.csv_table_text[1].contains("age"));
+}
+
+#[test]
+fn compute_file_load_tsv_builds_table() {
+    let mut f = tempfile::NamedTempFile::with_suffix(".tsv").unwrap();
+    use std::io::Write;
+    f.write_all(b"colA\tcolB\n1\t2\n").unwrap();
+    let load = compute_file_load(f.path(), &hl(), usize::MAX);
+    assert!(load.is_csv);
+    assert!(load.show_csv_table);
+    assert!(!load.csv_table_text.is_empty());
+    assert!(load.csv_table_text[1].contains("colA"));
+    assert!(load.csv_table_text[1].contains("colB"));
+}
+
+#[test]
+fn compute_file_load_csv_exceeding_prettify_limit_falls_back() {
+    let mut f = tempfile::NamedTempFile::with_suffix(".csv").unwrap();
+    use std::io::Write;
+    f.write_all(b"a,b,c\n1,2,3\n").unwrap();
+    // Set size limit to 3 bytes (smaller than the file)
+    let load = compute_file_load(f.path(), &hl(), 3);
+    assert!(load.is_csv);
+    assert!(load.prettify_size_limit_exceeded);
+    assert!(!load.show_csv_table);
+    assert!(load.virtual_file.is_some() || !load.content.is_empty());
+}

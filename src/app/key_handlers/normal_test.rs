@@ -1690,3 +1690,39 @@ fn toggle_word_wrap_method_flips_state_and_clamps_scroll() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn toggle_table_view_key_toggles_show_csv_table() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let f = root.join("items.csv");
+    std::fs::write(&f, "a,b\n1,2\n").unwrap();
+    app.open_file(&f);
+    app.focus = Focus::Content;
+
+    // Bind custom key for toggle_table_view
+    app.keys.toggle_table_view = crate::config::bind(&["T"]);
+    assert!(app.show_csv_table);
+
+    // Press T
+    app.handle_key(key(KeyCode::Char('T')));
+    assert!(!app.show_csv_table);
+
+    // Press T again
+    app.handle_key(key(KeyCode::Char('T')));
+    assert!(app.show_csv_table);
+
+    // On non-CSV file
+    let non_csv = root.join("plain.txt");
+    std::fs::write(&non_csv, "hello\n").unwrap();
+    app.open_file(&non_csv);
+    app.handle_key(key(KeyCode::Char('T')));
+    assert!(app
+        .status_message
+        .as_ref()
+        .unwrap()
+        .text
+        .contains("not a CSV/TSV file"));
+
+    fs::remove_dir_all(&root).ok();
+}

@@ -173,9 +173,13 @@ When full-file blame is toggled on (`Ctrl+b`), the tree panel is replaced by a d
 | `n`/`N`        | Next / previous hunk (in a diff) |
 | `M`            | Toggle raw/rendered markdown (provided by markdown plugin) |
 
-Word wrap, line numbers, JSON pretty-print, side-by-side diff, and the
+Word wrap, line numbers, JSON pretty-print, CSV/TSV table view, side-by-side diff, and the
 staged/unstaged diff cycle have no default content-pane key — use the command
 palette (`Ctrl+P`) or bind one yourself in `mantis.toml`.
+
+### CSV and TSV table view
+
+`.csv` and `.tsv` files are parsed (supporting RFC 4180 quotes and escaped characters) and rendered as aligned tables with Unicode box-drawing borders and headers. Like JSON pretty-printing, table formatting respects `prettify_size_limit` (files exceeding the limit show as raw text). You can toggle between table view and raw text using the command palette (`Ctrl+P` → "Toggle CSV/TSV table view") or by binding `toggle_table_view` in `mantis.toml`. Wide tables can be scrolled horizontally with `Left`/`Right`.
 
 ### Rendered plugin content and line numbers
 

@@ -5296,3 +5296,28 @@ fn teardown_plugin_contributions_keeps_palette_when_plugin_had_no_commands() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn check_applicability_csv_file() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+
+    // No file open
+    assert!(app.check_applicability("toggle_table_view").is_err());
+
+    // Non-CSV file open
+    app.current_file = Some(root.join("a.txt"));
+    app.is_csv = false;
+    assert!(app.check_applicability("toggle_table_view").is_err());
+
+    // CSV file but table lines empty
+    app.is_csv = true;
+    app.csv_table_lines = Vec::new();
+    assert!(app.check_applicability("toggle_table_view").is_err());
+
+    // CSV file with valid table lines
+    app.csv_table_lines = vec![vec![(ratatui::style::Style::default(), "line".to_string())]];
+    assert!(app.check_applicability("toggle_table_view").is_ok());
+
+    fs::remove_dir_all(&root).ok();
+}

@@ -1324,4 +1324,26 @@ fn dispatch_worktree_picker_opens_overlay() {
     assert!(app.worktree_picker.is_some());
     fs::remove_dir_all(&root).ok();
 }
-// touched for log follow mode
+
+#[test]
+fn dispatch_toggle_table_view_toggles_show_csv_table() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let f = root.join("test.csv");
+    std::fs::write(&f, "a,b\n1,2\n").unwrap();
+    app.open_file(&f);
+    assert!(app.is_csv);
+    assert!(app.show_csv_table);
+
+    // Dispatch "Toggle CSV/TSV table view"
+    app.command_palette = Some(palette_with_query("Toggle CSV/TSV table view"));
+    app.dispatch_command();
+    assert!(!app.show_csv_table);
+
+    // Dispatch again
+    app.command_palette = Some(palette_with_query("Toggle CSV/TSV table view"));
+    app.dispatch_command();
+    assert!(app.show_csv_table);
+
+    fs::remove_dir_all(&root).ok();
+}

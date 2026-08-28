@@ -1275,4 +1275,22 @@ fn opening_jsonl_marks_the_active_source() {
     assert_eq!(app.jsonl_source.len(), 1);
     fs::remove_dir_all(&root).ok();
 }
-// touched for log follow mode
+
+#[test]
+fn reopen_file_preserves_show_csv_table() {
+    let root = temp_dir();
+    let path = root.join("items.csv");
+    fs::write(&path, "item,qty\napple,5\n").unwrap();
+    let mut app = app_for(&root);
+    app.open_file(&path);
+    assert!(app.is_csv);
+    assert!(app.show_csv_table);
+
+    // Toggle off table view and reopen
+    app.show_csv_table = false;
+    app.reopen_file(&path);
+    assert!(app.is_csv);
+    assert!(!app.show_csv_table);
+
+    fs::remove_dir_all(&root).ok();
+}

@@ -76,7 +76,7 @@ watch = false                # auto-reload the open file when it changes on disk
 follow_tail_auto = false     # auto-enable follow mode for log files
 log_colorizing = true        # enable log level and timestamp colorizing
 show_file_info = true        # encoding + line-ending info in the status bar
-prettify_size_limit = 10485760  # max bytes for JSON/YAML pretty-printing;
+prettify_size_limit = 10485760  # max bytes for JSON/YAML pretty-printing and CSV/TSV tables;
                                  #   larger files show as raw text (10 MiB default)
 
 [search]
@@ -188,7 +188,7 @@ content_bottom = ["ctrl+End", "G", "tree:End"]
 content_page_up = ["PageUp"]
 content_page_down = ["PageDown"]
 content_reset_col = ["Home", "0"]
-# toggle_wrap, toggle_line_numbers, toggle_pretty_json,
+# toggle_wrap, toggle_line_numbers, toggle_pretty_json, toggle_table_view,
 # toggle_diff_side_by_side, and toggle_diff_staged have no default binding —
 # they're reachable from the command palette (Ctrl+P); bind them here
 # if you'd like a dedicated key.

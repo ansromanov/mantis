@@ -34,6 +34,7 @@ fn test_snapshot() -> SessionSnapshot {
         file_line_ending: None,
         file_syntax: None,
         file_is_json: false,
+        file_is_csv: false,
         file_is_diff: false,
         file_uses_mmap: false,
         theme: None,

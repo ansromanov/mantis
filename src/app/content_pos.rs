@@ -55,6 +55,42 @@ fn spans_selection_text(
     result
 }
 
+/// Extract the selected text from raw string lines (pretty JSON, CSV table, or
+/// inline fallback). `start`/`end` are normalized selection bounds in (line,
+/// char-column) space.
+fn raw_lines_selection_text(
+    lines: &[String],
+    start_line: usize,
+    start_col: usize,
+    end_line: usize,
+    end_col: usize,
+) -> String {
+    if start_line >= lines.len() {
+        return String::new();
+    }
+    let mut result = String::new();
+    let last = end_line.min(lines.len().saturating_sub(1));
+    for (line_idx, line) in lines
+        .iter()
+        .enumerate()
+        .skip(start_line)
+        .take(last - start_line + 1)
+    {
+        let chars: Vec<char> = line.chars().collect();
+        let col_start = if line_idx == start_line { start_col } else { 0 };
+        let col_end = if line_idx == end_line {
+            end_col.min(chars.len())
+        } else {
+            chars.len()
+        };
+        if !result.is_empty() {
+            result.push('\n');
+        }
+        result.extend(&chars[col_start.min(chars.len())..col_end]);
+    }
+    result
+}
+
 impl App {
     /// Maximum valid content_scroll so the last line sits at the bottom edge,
     /// not the top. Falls back to `total - 1` before the first render (height 0).
@@ -165,59 +201,32 @@ impl App {
             }
         }
         if self.is_json && self.show_pretty_json && !self.json_pretty_text.is_empty() {
-            let lines = &self.json_pretty_text;
-            if start_line >= lines.len() {
-                return String::new();
-            }
-            let mut result = String::new();
-            let last = end_line.min(lines.len().saturating_sub(1));
-            for (line_idx, line) in lines
-                .iter()
-                .enumerate()
-                .skip(start_line)
-                .take(last - start_line + 1)
-            {
-                let chars: Vec<char> = line.chars().collect();
-                let col_start = if line_idx == start_line { start_col } else { 0 };
-                let col_end = if line_idx == end_line {
-                    end_col.min(chars.len())
-                } else {
-                    chars.len()
-                };
-                if !result.is_empty() {
-                    result.push('\n');
-                }
-                result.extend(&chars[col_start.min(chars.len())..col_end]);
-            }
-            return result;
+            return raw_lines_selection_text(
+                &self.json_pretty_text,
+                start_line,
+                start_col,
+                end_line,
+                end_col,
+            );
+        }
+        if self.is_csv && self.show_csv_table && !self.csv_table_text.is_empty() {
+            return raw_lines_selection_text(
+                &self.csv_table_text,
+                start_line,
+                start_col,
+                end_line,
+                end_col,
+            );
         }
         if self.virtual_file.is_none() {
             // Fallback for inline content (diffs, errors, etc.)
-            let lines = &self.content;
-            if start_line >= lines.len() {
-                return String::new();
-            }
-            let mut result = String::new();
-            let last = end_line.min(lines.len().saturating_sub(1));
-            for (line_idx, line) in lines
-                .iter()
-                .enumerate()
-                .skip(start_line)
-                .take(last - start_line + 1)
-            {
-                let chars: Vec<char> = line.chars().collect();
-                let col_start = if line_idx == start_line { start_col } else { 0 };
-                let col_end = if line_idx == end_line {
-                    end_col.min(chars.len())
-                } else {
-                    chars.len()
-                };
-                if !result.is_empty() {
-                    result.push('\n');
-                }
-                result.extend(&chars[col_start.min(chars.len())..col_end]);
-            }
-            return result;
+            return raw_lines_selection_text(
+                &self.content,
+                start_line,
+                start_col,
+                end_line,
+                end_col,
+            );
         }
         // VirtualFile path
         if start_line >= total {

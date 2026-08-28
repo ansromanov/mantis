@@ -66,6 +66,7 @@ keys.toggle_hidden
 keys.toggle_line_numbers
 keys.toggle_pretty_json
 keys.toggle_raw_markdown
+keys.toggle_table_view
 keys.toggle_watch
 keys.toggle_wrap
 keys.tree_collapse

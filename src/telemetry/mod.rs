@@ -168,6 +168,7 @@ pub enum TelemetryEvent {
         file_line_ending: Option<String>,
         file_syntax: Option<String>,
         file_is_json: bool,
+        file_is_csv: bool,
         file_is_diff: bool,
         file_uses_mmap: bool,
         // ---- Config overview ----
@@ -249,6 +250,7 @@ pub struct SessionSnapshot {
     pub file_line_ending: Option<String>,
     pub file_syntax: Option<String>,
     pub file_is_json: bool,
+    pub file_is_csv: bool,
     pub file_is_diff: bool,
     pub file_uses_mmap: bool,
     // Config overview.
@@ -299,6 +301,7 @@ impl SessionSnapshot {
             file_line_ending: app.file_line_ending.clone(),
             file_syntax: app.current_syntax.clone(),
             file_is_json: app.is_json,
+            file_is_csv: app.is_csv,
             file_is_diff: app.is_diff,
             file_uses_mmap: app.virtual_file.is_some(),
             theme: app.config.theme.name.clone(),
@@ -518,6 +521,7 @@ impl Telemetry {
             file_line_ending: snapshot.file_line_ending,
             file_syntax: snapshot.file_syntax,
             file_is_json: snapshot.file_is_json,
+            file_is_csv: snapshot.file_is_csv,
             file_is_diff: snapshot.file_is_diff,
             file_uses_mmap: snapshot.file_uses_mmap,
             theme: snapshot.theme,
