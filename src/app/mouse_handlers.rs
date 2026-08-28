@@ -99,6 +99,7 @@ impl App {
     /// on click location (tree vs content panel). Handles left-click, drag,
     /// scroll, and double-click for search/history/theme results.
     pub fn handle_mouse(&mut self, ev: MouseEvent) {
+        self.pause_follow_for_input();
         if self.show_welcome {
             if let MouseEventKind::Down(MouseButton::Left) = ev.kind {
                 if !rect_contains(self.welcome_area, ev.column, ev.row) {

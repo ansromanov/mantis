@@ -369,6 +369,10 @@ pub struct App {
     pub(crate) jsonl_display_map: Vec<usize>,
     pub follow_mode: bool,
     pub follow_pinned: bool,
+    /// Most recent qualifying filesystem event waiting for follow-mode handling.
+    pub(crate) follow_candidate: Option<PathBuf>,
+    /// User interaction temporarily pauses automatic file switching.
+    pub(crate) follow_paused_until: Option<Instant>,
     pub(crate) log_highlight_cache:
         std::cell::RefCell<std::collections::HashMap<usize, Vec<(ratatui::style::Style, String)>>>,
     pub content_revision: u64,

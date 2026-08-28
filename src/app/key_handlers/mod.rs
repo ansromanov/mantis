@@ -68,6 +68,7 @@ impl App {
         if key.kind == KeyEventKind::Release {
             return;
         }
+        self.pause_follow_for_input();
         // Notify plugins of each keypress *only* in normal mode (no overlay
         // active) so search/picker input is not broadcast. Plugins receive
         // the key as a readable string: "q", "ctrl+c", "Enter", etc.

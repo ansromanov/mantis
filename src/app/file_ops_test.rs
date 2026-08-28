@@ -19,6 +19,27 @@ fn app_for(root: &std::path::Path) -> App {
     App::new(root.to_path_buf(), Config::default(), None, None).unwrap()
 }
 
+#[test]
+fn user_input_pauses_follow_mode_and_toggle_clears_pause() {
+    let root = temp_dir();
+    let path = root.join("a.txt");
+    fs::write(&path, "a\n").unwrap();
+    let mut app = app_for(&root);
+    app.current_file = Some(path);
+    app.follow_mode = true;
+    app.follow_pinned = true;
+
+    app.pause_follow_for_input();
+    assert!(!app.follow_pinned);
+    assert!(app.follow_paused_until.is_some());
+
+    app.toggle_follow_mode();
+    app.toggle_follow_mode();
+    assert!(app.follow_pinned);
+    assert!(app.follow_paused_until.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
 // -- push_recent ------------------------------------------------------------
 
 #[test]

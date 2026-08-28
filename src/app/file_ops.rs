@@ -10,6 +10,7 @@
 //! per-file watcher so an open file auto-reloads when it changes on disk.
 
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use notify::{EventKind, RecursiveMode, Watcher};
 
@@ -20,6 +21,14 @@ use super::loader::{compute_diff_load, compute_file_load, DiffLoad, FileLoad};
 use super::{diff_line_style, App, Focus};
 
 impl App {
+    /// Suspends automatic follow-mode navigation after user interaction.
+    pub(super) fn pause_follow_for_input(&mut self) {
+        if self.follow_mode {
+            self.follow_pinned = false;
+            self.follow_paused_until = Some(self.now() + Duration::from_secs(5));
+        }
+    }
+
     /// Re-reads the current file from disk and re-renders it into the content
     /// buffer while preserving scroll position. No-op for historical revision
     /// diffs (which are immutable) and for normal-mode commit diffs, but
@@ -132,25 +141,41 @@ impl App {
         }
     }
 
-    /// Drains all pending root-watch events and returns `true` if any of them
-    /// created, modified, or removed a path since the last check. Access-only
-    /// events are ignored so merely reading files doesn't trigger reloads.
-    pub(super) fn drain_root_watch(&self) -> bool {
+    /// Drains root-watch events and returns whether the tree changed plus the
+    /// newest qualifying file path. Directory events still invalidate the tree;
+    /// only file paths can become follow-mode candidates.
+    pub(super) fn drain_root_watch(&self) -> (bool, Option<PathBuf>) {
         let Some(rx) = &self.root_watch_rx else {
-            return false;
+            return (false, None);
         };
-        let mut changed = false;
+        let mut tree_changed = false;
+        let mut newest: Option<(std::time::SystemTime, PathBuf)> = None;
         while let Ok(res) = rx.try_recv() {
             if let Ok(evt) = res {
                 if matches!(
                     evt.kind,
                     EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)
                 ) {
-                    changed = true;
+                    for path in evt.paths {
+                        if !path.starts_with(&self.root) || path.starts_with(self.root.join(".git"))
+                        {
+                            continue;
+                        }
+                        tree_changed = true;
+                        if !path.is_file() {
+                            continue;
+                        }
+                        let modified = std::fs::metadata(&path)
+                            .and_then(|metadata| metadata.modified())
+                            .unwrap_or(std::time::UNIX_EPOCH);
+                        if newest.as_ref().is_none_or(|(time, _)| modified > *time) {
+                            newest = Some((modified, path));
+                        }
+                    }
                 }
             }
         }
-        changed
+        (tree_changed, newest.map(|(_, path)| path))
     }
 
     /// Drains all pending file-watch events and returns `true` if the watched
@@ -334,11 +359,15 @@ impl App {
         self.follow_mode = !self.follow_mode;
         if self.follow_mode {
             self.follow_pinned = true;
+            self.follow_paused_until = None;
+            self.follow_candidate = None;
             self.active_line = self.display_line_count().saturating_sub(1);
             self.scroll_active_line_into_view();
             self.set_status("log follow: active");
         } else {
             self.follow_pinned = false;
+            self.follow_paused_until = None;
+            self.follow_candidate = None;
             self.set_status("log follow: disabled");
         }
     }

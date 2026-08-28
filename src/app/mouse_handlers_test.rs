@@ -1608,4 +1608,16 @@ fn worktree_picker_click_outside_closes() {
     assert!(app.worktree_picker.is_none());
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn mouse_input_pauses_follow_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.follow_mode = true;
+    app.follow_pinned = true;
+    app.handle_mouse(scroll_down_at(0, 0));
+    assert!(!app.follow_pinned);
+    assert!(app.follow_paused_until.is_some());
+    fs::remove_dir_all(&root).ok();
+}
 // touched for log follow mode
