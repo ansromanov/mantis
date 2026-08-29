@@ -72,7 +72,7 @@ fn plugin_entries_reports_syntax_active_from_enabled_flag() {
 #[test]
 fn activate_one_errors_on_unknown_name() {
     let mut mgr = PluginManager::new(vec![]);
-    assert!(mgr.activate_one("ghost", None).is_err());
+    assert!(mgr.activate_one("ghost", None, None).is_err());
 }
 
 #[test]
@@ -83,7 +83,7 @@ fn activate_one_errors_on_bad_path() {
         ..Default::default()
     };
     let mut mgr = PluginManager::new(vec![("bad".to_string(), entry)]);
-    assert!(mgr.activate_one("bad", None).is_err());
+    assert!(mgr.activate_one("bad", None, None).is_err());
 }
 
 #[test]
@@ -112,7 +112,8 @@ fn activate_one_then_deactivate_one_updates_running_state() {
         !mgr.plugin_entries()[0].1,
         "should not be running before activate"
     );
-    mgr.activate_one("cat-stub", None).expect("spawn /bin/cat");
+    mgr.activate_one("cat-stub", None, None)
+        .expect("spawn /bin/cat");
     assert!(
         mgr.plugin_entries()[0].1,
         "should be running after activate"
@@ -133,8 +134,9 @@ fn activate_one_is_noop_when_already_running() {
         ..Default::default()
     };
     let mut mgr = PluginManager::new(vec![("cat-stub".to_string(), entry)]);
-    mgr.activate_one("cat-stub", None).expect("first spawn");
-    mgr.activate_one("cat-stub", None)
+    mgr.activate_one("cat-stub", None, None)
+        .expect("first spawn");
+    mgr.activate_one("cat-stub", None, None)
         .expect("second call must be noop");
     assert_eq!(
         mgr.plugin_entries()
@@ -171,7 +173,7 @@ fn activate_one_sends_init_with_protocol_version() {
         ..Default::default()
     };
     let mut mgr = PluginManager::new(vec![("rec".to_string(), entry)]);
-    mgr.activate_one("rec", None).expect("spawn rec.sh");
+    mgr.activate_one("rec", None, None).expect("spawn rec.sh");
     // Closing stdin lets the stub flush and exit.
     mgr.deactivate_one("rec");
 
@@ -408,7 +410,8 @@ fn drain_actions_records_crash_diagnostics_and_picker_badge() {
         ..Default::default()
     };
     let mut mgr = PluginManager::new(vec![("crashy".to_string(), entry)]);
-    mgr.activate_one("crashy", None).expect("spawn crash.sh");
+    mgr.activate_one("crashy", None, None)
+        .expect("spawn crash.sh");
 
     let deadline = Instant::now() + Duration::from_secs(3);
     loop {
@@ -466,7 +469,7 @@ fn crash_detail_omits_log_path_when_file_does_not_exist() {
         ..Default::default()
     };
     let mut mgr = PluginManager::new(vec![("silent".to_string(), entry)]);
-    mgr.activate_one("silent", None)
+    mgr.activate_one("silent", None, None)
         .expect("spawn silent_exit.sh");
 
     let deadline = Instant::now() + Duration::from_secs(3);
@@ -625,7 +628,8 @@ fn plugin_entries_badges_active_plugin_with_recorded_error() {
         ..Default::default()
     };
     let mut mgr = PluginManager::new(vec![("noisy".to_string(), entry)]);
-    mgr.activate_one("noisy", None).expect("spawn /bin/cat");
+    mgr.activate_one("noisy", None, None)
+        .expect("spawn /bin/cat");
     mgr.record_plugin_error(
         "noisy",
         "bad thing happened".into(),
@@ -666,7 +670,7 @@ fn has_keypress_subscriber_true_when_a_plugin_subscribes() {
         ..Default::default()
     };
     let mut mgr = PluginManager::new(vec![("kp".to_string(), entry)]);
-    mgr.activate_one("kp", None).expect("spawn /bin/cat");
+    mgr.activate_one("kp", None, None).expect("spawn /bin/cat");
     assert!(mgr.has_keypress_subscriber());
     mgr.deactivate_all();
 }
@@ -681,7 +685,7 @@ fn has_keypress_subscriber_false_when_plugin_subscribes_to_other_events_only() {
         ..Default::default()
     };
     let mut mgr = PluginManager::new(vec![("fo".to_string(), entry)]);
-    mgr.activate_one("fo", None).expect("spawn /bin/cat");
+    mgr.activate_one("fo", None, None).expect("spawn /bin/cat");
     assert!(!mgr.has_keypress_subscriber());
     mgr.deactivate_all();
 }
@@ -701,7 +705,8 @@ fn has_keypress_subscriber_false_for_wildcard_plugin_with_no_events_filter() {
         ..Default::default()
     };
     let mut mgr = PluginManager::new(vec![("wild".to_string(), entry)]);
-    mgr.activate_one("wild", None).expect("spawn /bin/cat");
+    mgr.activate_one("wild", None, None)
+        .expect("spawn /bin/cat");
     assert!(!mgr.has_keypress_subscriber());
     mgr.deactivate_all();
 }
@@ -752,7 +757,7 @@ fn send_request_and_poll_requests_matches_response_by_id() {
         ..Default::default()
     };
     let mut mgr = PluginManager::new(vec![("responder".to_string(), entry)]);
-    mgr.activate_one("responder", None)
+    mgr.activate_one("responder", None, None)
         .expect("spawn respond.sh");
 
     let id = mgr
@@ -806,7 +811,8 @@ fn send_request_times_out_without_response() {
         ..Default::default()
     };
     let mut mgr = PluginManager::new(vec![("silent".to_string(), entry)]);
-    mgr.activate_one("silent", None).expect("spawn silent.sh");
+    mgr.activate_one("silent", None, None)
+        .expect("spawn silent.sh");
 
     let id = mgr
         .send_request("silent", "fold_regions", serde_json::json!({}))

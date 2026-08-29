@@ -108,6 +108,10 @@ fn toggle_plugin_picker_selection_noop_when_no_picker() {
         !app.config.plugins.get("my-syntax").unwrap().enabled,
         "with no picker open there is no selection to toggle"
     );
+    assert!(
+        app.plugin_manager.plugin_entries().is_empty(),
+        "a missing picker must not activate any process plugin"
+    );
     fs::remove_dir_all(&root).ok();
 }
 

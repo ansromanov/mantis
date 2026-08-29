@@ -652,6 +652,7 @@ impl PluginManager {
         &mut self,
         name: &str,
         current_file: Option<&Path>,
+        current_line: Option<usize>,
     ) -> Result<(), String> {
         if self.plugins.iter().any(|p| p.name == name) {
             return Ok(());
@@ -705,7 +706,7 @@ impl PluginManager {
             plugin.send(&ToPlugin {
                 event: "on_selection_change".into(),
                 path: Some(path_s),
-                line: Some(0),
+                line: current_line,
                 key: None,
                 theme: None,
                 colors: None,

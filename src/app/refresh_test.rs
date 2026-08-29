@@ -1613,7 +1613,7 @@ fn drain_plugin_actions_surfaces_crash_diagnostics_in_plugin_message() {
         ..create_base_app()
     };
     app.plugin_manager
-        .activate_one("crashy", None)
+        .activate_one("crashy", None, None)
         .expect("spawn crash.sh");
 
     let deadline = Instant::now() + Duration::from_secs(3);
