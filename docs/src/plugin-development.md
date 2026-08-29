@@ -53,7 +53,7 @@ dynamically.
 |---|---|---|
 | `"1"` | 0.7.x | Initial protocol. Events: init, on_file_open, on_keypress, on_selection_change, on_theme_change, on_quit, shutdown. Actions: show_message, open_file, set_content, set_icon_map. Git features (set_file_statuses, set_blame_data, set_status_bar_git_info) were removed in 0.11.22 — git is now built in only. |
 | `"2"` | 0.8.x | Language providers (register_language_provider, set_fold_regions), event subscription (`events` field in manifest), protocol hardening (bounded queues, line caps), `protocol_version` field on init event. `init`/`on_theme_change` additionally carry an optional `colors` object (0.13.x, additive — does not bump this version) with the active theme's actual role colors as `#rrggbb` hex. |
-| `"3"` | 0.14.x | Request/response correlation (`request`/`response` events) so the host can ask a plugin for something and match the reply; a `plugin_error` action for reporting failures outside the request/response flow; key-consumption semantics for `on_keypress` (`key_handled` action, host waits up to one tick); `priority` field on `register_language_provider` plus a status-bar warning on conflicting registrations; manifest field renamed `tv_protocol` → `mantis_protocol` (alias kept, see above). As with every prior protocol bump, discovery requires an exact version match: a manifest still declaring `"2"` is silently skipped, not loaded in a reduced-compatibility mode — plugins must declare `"3"` (via `mantis_protocol`, or its `tv_protocol` alias) to be discovered on this host. `highlight` capability remains formally reserved and unimplemented: real syntax highlighting continues to flow through syntax plugins (`.sublime-syntax` + syntect), not language providers. |
+| `"3"` | 0.14.x | Request/response correlation (`request`/`response` events) so the host can ask a plugin for something and match the reply; a `plugin_error` action for reporting failures outside the request/response flow; key-consumption semantics for `on_keypress` (`key_handled` action, host waits up to one tick); `priority` field on `register_language_provider` plus a status-bar warning on conflicting registrations; manifest field renamed `tv_protocol` → `mantis_protocol` (alias kept, see above). As with every prior protocol bump, discovery requires an exact version match: a manifest still declaring `"2"` is silently skipped, not loaded in a reduced-compatibility mode — plugins must declare `"3"` (via `mantis_protocol`, or its `tv_protocol` alias) to be discovered on this host. `highlight` capability remains formally reserved and unimplemented: real syntax highlighting continues to flow through syntax plugins (`.sublime-syntax` + syntect), not language providers. A `status_facts` capability plus `set_status_facts` action (0.18.x, additive — does not bump this version) let a provider push a free-text status-bar summary for a file, gated the same way as `fold`/`set_fold_regions`; the bundled `k8s` plugin uses it to report Kubernetes resource identity and per-kind counts for `.yaml`/`.yml` files without conflicting with the `yaml` plugin's `fold` registration on the same extensions. |
 
 ### Discovery
 
@@ -386,13 +386,19 @@ lifecycle:
    `priority` wins; ties break by registration order (first registered
    wins). The first time this happens for a given extension+capability pair,
    `mantis` shows a one-time status-bar warning naming both plugins, so the
-   conflict isn't silent. Currently only `fold` capability drives backend
-   state (fold regions); `highlight` is reserved for future use (see below).
+   conflict isn't silent. Two providers can register the *same extension*
+   without conflicting as long as they declare *different* capabilities —
+   e.g. the bundled `yaml` plugin owns `fold` for `.yaml`/`.yml` while the
+   bundled `k8s` plugin owns `status_facts` for the same extensions. `fold`
+   and `status_facts` drive backend state (fold regions, status-bar text,
+   respectively); `highlight` is reserved for future use (see below).
 
 3. **Response.** For each declared capability, the plugin should respond to
    file-related events with the corresponding action:
    - `fold` → respond with `set_fold_regions` when a matching file is opened
       (see below).
+   - `status_facts` → respond with `set_status_facts` when a matching file is
+      opened (see below).
    - `highlight` → reserved for future use.
 
 4. **Lifetime.** Provider registrations persist for the entire plugin session.
@@ -423,8 +429,8 @@ file.
 
 Fields:
 - `extensions` — lowercase file extensions (no leading dot) this provider handles.
-- `capabilities` — one or more of `"highlight"` or `"fold"`. Reserved for
-  future use: `"hover"`, `"diagnostics"`, `"definition"`.
+- `capabilities` — one or more of `"highlight"`, `"fold"`, or `"status_facts"`.
+  Reserved for future use: `"hover"`, `"diagnostics"`, `"definition"`.
 - `priority` — optional signed integer, default `0` (protocol 3+). Used only
   to break ties when two providers register the same extension+capability
   pair; higher wins. Absent on protocol 2 plugins, which are treated as
@@ -466,6 +472,28 @@ discarded.
 }}
 ```
 
+### `set_status_facts`
+
+Provides a short, plugin-owned summary string shown in the status bar
+alongside the fold-count segment when the named file is the one currently
+open — e.g. `3 pubs · 12 fns` for a Rust file, or a Kubernetes resource's
+identity (`Deployment/nginx (default)`). Unlike `set_fold_regions`, this
+carries free text rather than a structured value, so the host does not
+interpret it beyond displaying it.
+
+Status facts from a plugin are only accepted when `mantis` has a registered
+language provider with the `status_facts` capability for the file's
+extension. An empty `text` clears any previously set fact for that path
+(useful when a provider detects the file no longer qualifies, e.g. a YAML
+file that stopped looking like a Kubernetes manifest after an edit).
+
+```json
+{"event":"action","action":"set_status_facts","params":{
+  "path": "/absolute/path/to/file",
+  "text": "Deployment/nginx (default)"
+}}
+```
+
 ## Rules
 
 - **One JSON object per line.** No pretty-printing, no multi-line objects.
@@ -494,6 +522,7 @@ special cases needed.
 | `set_content` | `plugin_content` / `plugin_content_text` entries for contributed paths |
 | `set_icon_map` | `icon_map`, `icons_enabled`, `icon_dir_open/closed`, `icon_fallback` |
 | `set_fold_regions` | `plugin_fold_regions` entries for contributed paths; active fold state reset |
+| `set_status_facts` | `plugin_status_facts` entries for contributed paths |
 | `register_language_provider` | Provider registration removed |
 | `register_commands` | Palette command registrations removed; an open palette listing them is closed |
 

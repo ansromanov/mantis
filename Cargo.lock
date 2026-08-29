@@ -864,6 +864,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "k8s"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
 name = "kqueue"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

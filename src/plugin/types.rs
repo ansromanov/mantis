@@ -98,6 +98,12 @@ pub enum Capability {
     Diagnostics,
     /// Go-to-definition navigation (reserved; not implemented in 0.8).
     Definition,
+    /// Free-text status-bar facts for declared file extensions, delivered via
+    /// `set_status_facts` (protocol 3+). Parallel to YAML's built-in
+    /// anchor/alias counts, but generic: any provider can contribute a short
+    /// summary string (e.g. resource identity, per-kind counts) without the
+    /// host special-casing a language.
+    StatusFacts,
 }
 
 /// A language provider registration received from a plugin via the
@@ -248,6 +254,8 @@ pub(crate) struct PluginContributions {
     pub(crate) content_paths: HashSet<PathBuf>,
     /// Paths in `plugin_fold_regions` registered by this plugin.
     pub(crate) fold_region_paths: HashSet<PathBuf>,
+    /// Paths in `plugin_status_facts` registered by this plugin.
+    pub(crate) status_fact_paths: HashSet<PathBuf>,
     /// Whether this plugin set the icon map / icon fields via `set_icon_map`.
     pub(crate) has_icon_map: bool,
     /// Command IDs registered by this plugin via `register_commands`.

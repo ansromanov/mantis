@@ -96,6 +96,7 @@ Plugins receive lifecycle and hook events from `mantis` and can respond with
 | `set_icon_map` | Sets file-type icon glyphs (requires Nerd Font) |
 | `register_language_provider` | Declares file extensions and capabilities |
 | `set_fold_regions` | Provides fold regions for a file |
+| `set_status_facts` | Provides a short status-bar summary for a file |
 | `register_commands` | Adds commands to the Ctrl-P command palette |
 
 Each action has specific parameters; see [Plugin Development](plugin-development.md)
@@ -170,6 +171,7 @@ compiled alongside `mantis` and installed on first run.
 | json | `json` | Registers as a language provider for `.json` files with the `fold` capability. On file open, computes fold regions for multi-line objects and arrays in the displayed JSON. |
 | sh | `sh` | Registers as a language provider for `.sh`, `.bash`, and `.zsh` files with the `fold` capability. On file open, computes fold regions for function bodies and compound blocks, aware of `#` comments, quoted strings, and heredocs. |
 | yaml | `yaml` | Registers as a language provider for `.yaml`/`.yml` files with the `fold` capability. On file open, computes and registers collapsible indentation-based fold regions. When enabled, its regions take precedence over the built-in YAML folding. |
+| k8s | `k8s` | Registers as a language provider for `.yaml`/`.yml` files with the `status_facts` capability — coexists with the `yaml` plugin's `fold` registration on the same extensions since they declare different capabilities. On file open, heuristically detects Kubernetes manifests (`apiVersion:` + `kind:`) and reports the first resource's identity (`Kind/name (namespace)`) plus per-kind counts across `---`-separated documents (e.g. `Deployment/nginx (default) · 3 Deployments · 2 Services · 1 ConfigMap`) in the status bar. Files without both `apiVersion` and `kind` show no facts. |
 
 ### Bundled syntax plugins
 

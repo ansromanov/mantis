@@ -15,6 +15,7 @@ routes them via `PluginManager::provider_for` (`src/plugin/manager.rs`).
 | Capability | Declared in protocol | Handled by host | Used by a bundled plugin |
 |---|---|---|---|
 | `fold` | yes | yes — gates `set_fold_regions` in `handle_plugin_set_fold_regions` (`src/app/refresh.rs`) | **yes** — used by the bundled `rust`, `go`, `python`, `json`, `sh`, and `yaml` language provider plugins |
+| `status_facts` | yes (0.18.x) | yes — gates `set_status_facts` in `handle_plugin_set_status_facts` (`src/app/refresh.rs`) | **yes** — used by the bundled `k8s` plugin, coexisting with `yaml`'s `fold` registration on the same `.yaml`/`.yml` extensions |
 | `highlight` | yes | **no** — accepted at registration, never checked anywhere | no |
 | `hover` | yes (reserved) | no — unimplementable in v2 (no request/response correlation) | no |
 | `diagnostics` | yes (reserved) | no — same as `hover` | no |
@@ -37,8 +38,9 @@ Every action the host accepts, dispatched in `App::handle_plugin_action`
 | `open_file` | yes | no (one-shot navigation) | n/a | no |
 | `set_icon_map` | yes | `has_icon_map` | yes — icon map/fields cleared | yes — iconize |
 | `set_content` | yes | `content_paths` | yes — content removed, current file re-rendered | yes — markdown |
-| `register_language_provider` | yes | provider registration in `PluginManager` | yes — `remove_provider_registrations` | yes — rust, python, json, yaml |
+| `register_language_provider` | yes | provider registration in `PluginManager` | yes — `remove_provider_registrations` | yes — rust, python, json, yaml, k8s |
 | `set_fold_regions` | yes | `fold_region_paths` | yes — regions removed, fold state reset | yes — rust, python, json, yaml |
+| `set_status_facts` | yes | `status_fact_paths` | yes — facts removed for contributed paths | yes — k8s |
 
 Teardown status: **every stateful `set_*` action stamps `PluginContributions`
 and is cleared by `App::teardown_plugin_contributions`** (`src/app/mod.rs`).
@@ -61,6 +63,7 @@ version history in [Plugin Development](plugin-development.md) only.
 | `json` | process | `register_language_provider`, `set_fold_regions` | `fold` |
 | `sh` | process | `register_language_provider`, `set_fold_regions` | `fold` |
 | `yaml` | process | `register_language_provider`, `set_fold_regions` | `fold` |
+| `k8s` | process | `register_language_provider`, `set_status_facts` | `status_facts` |
 | `terraform` | syntax | none (no subprocess) | n/a — extends syntect directly |
 
 ## Gaps and follow-ups
@@ -97,3 +100,16 @@ version history in [Plugin Development](plugin-development.md) only.
    implement provider-driven highlighting in v3 or re-document it as reserved
    alongside `hover`/`diagnostics`/`definition`. Not yet tracked in a
    dedicated issue; candidate checklist item for #481.
+4. **`status_facts`/`set_status_facts` (0.18.x) resolves the protocol gap
+   that blocked issue #606** (k8s manifest awareness): the epic's "per-language
+   statusbar facts" item (originally #482, merged into #602) had no protocol
+   surface, and #606 was filed as a proposal rather than a build order for
+   exactly that reason. The new capability is deliberately generic free text,
+   not a structured breadcrumb — the bundled `k8s` plugin uses it for both
+   candidate features from #606 (resource identity and multi-doc per-kind
+   counts) combined into one string, rather than adding a second `breadcrumb`
+   capability. **Not yet solved:** per-cursor "which resource is the viewport
+   in right now" needs the host to send line/cursor position on
+   `on_selection_change`, which the protocol still doesn't carry — the `k8s`
+   plugin reports the first resource in the file instead of the one under the
+   cursor. That's a separate, still-open protocol gap.

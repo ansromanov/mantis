@@ -40,6 +40,7 @@ pub(crate) enum StatusSegment {
     Git,
     Errors,
     Folds,
+    PluginFacts,
     Message,
     PluginError,
     Version,
@@ -58,6 +59,7 @@ impl StatusSegment {
             StatusSegment::Git => "git",
             StatusSegment::Errors => "errors",
             StatusSegment::Folds => "folds",
+            StatusSegment::PluginFacts => "pluginfacts",
             StatusSegment::Message => "message",
             StatusSegment::PluginError => "pluginerror",
             StatusSegment::Version => "version",
@@ -354,6 +356,19 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
                 base.fg(app.theme.accent),
             ),
             StatusSegment::Folds,
+            P_INFO,
+        ));
+    }
+
+    // -- Priority 2: plugin-supplied status facts (`set_status_facts`) --
+    if let Some(facts) = app
+        .current_file
+        .as_deref()
+        .and_then(|p| app.plugin_status_facts.get(p))
+    {
+        segs.push((
+            Span::styled(format!(" [{facts}]"), base.fg(app.theme.accent)),
+            StatusSegment::PluginFacts,
             P_INFO,
         ));
     }

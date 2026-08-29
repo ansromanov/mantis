@@ -366,6 +366,11 @@ pub struct App {
     /// Per-path fold regions supplied by language providers via `set_fold_regions`.
     /// When the named path is the current file, regions are applied immediately.
     pub plugin_fold_regions: HashMap<PathBuf, Vec<FoldRegion>>,
+    /// Per-path status-bar summary text supplied by language providers via
+    /// `set_status_facts` (protocol 3+). Shown for the current file alongside
+    /// the fold-count segment, parallel to YAML's built-in anchor/alias counts
+    /// but generic to any provider.
+    pub plugin_status_facts: HashMap<PathBuf, String>,
     /// display_line → physical_line mapping; empty when no folds are active.
     pub fold_display_map: Vec<usize>,
     /// (screen_y, region_idx) pairs recorded during the last render, used for
@@ -557,6 +562,11 @@ impl App {
             .any(|p| self.current_file.as_deref() == Some(p))
         {
             self.clear_fold_state();
+        }
+
+        // Status-bar facts.
+        for path in &contrib.status_fact_paths {
+            self.plugin_status_facts.remove(path);
         }
 
         // Icon map (Nerd Font glyphs).

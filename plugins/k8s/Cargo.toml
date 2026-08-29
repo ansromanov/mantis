@@ -1,0 +1,10 @@
+[package]
+name = "k8s"
+version = "0.1.0"
+edition = "2021"
+description = "Bundled Kubernetes manifest awareness plugin for mantis. Provides status_facts capability (resource identity, per-kind counts) for YAML files detected as k8s manifests."
+license = "GPL-3.0-or-later"
+repository = "https://github.com/ansromanov/mantis"
+
+[dependencies]
+serde_json = "1"

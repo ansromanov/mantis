@@ -448,6 +448,7 @@ fn create_base_app() -> App {
         fold_regions: Vec::new(),
         folded: HashSet::new(),
         plugin_fold_regions: HashMap::new(),
+        plugin_status_facts: HashMap::new(),
         fold_display_map: Vec::new(),
         fold_gutter_rows: Vec::new(),
         yaml_error: None,
@@ -1085,6 +1086,97 @@ fn set_fold_regions_ignored_without_registered_provider() {
     );
 }
 
+#[test]
+fn set_status_facts_applies_to_current_file() {
+    let mut app = create_base_app();
+    let path = std::path::PathBuf::from("/some/manifest.yaml");
+    app.current_file = Some(path.clone());
+
+    app.drain_plugin_actions_for_test(
+        "k8s-plugin",
+        "register_language_provider",
+        serde_json::json!({"extensions": ["yaml"], "capabilities": ["status_facts"]}),
+    );
+    app.drain_plugin_actions_for_test(
+        "k8s-plugin",
+        "set_status_facts",
+        serde_json::json!({
+            "path": "/some/manifest.yaml",
+            "text": "Deployment/nginx (default)"
+        }),
+    );
+
+    assert_eq!(
+        app.plugin_status_facts.get(&path).map(String::as_str),
+        Some("Deployment/nginx (default)")
+    );
+}
+
+#[test]
+fn set_status_facts_ignored_without_registered_provider() {
+    let mut app = create_base_app();
+    let path = std::path::PathBuf::from("/some/manifest.yaml");
+    app.current_file = Some(path.clone());
+
+    // No register_language_provider sent — the gate must reject the text.
+    app.drain_plugin_actions_for_test(
+        "k8s-plugin",
+        "set_status_facts",
+        serde_json::json!({"path": "/some/manifest.yaml", "text": "Deployment/nginx"}),
+    );
+
+    assert!(
+        !app.plugin_status_facts.contains_key(&path),
+        "facts from an unregistered provider must not be cached"
+    );
+}
+
+#[test]
+fn set_status_facts_empty_text_clears_existing_fact() {
+    let mut app = create_base_app();
+    let path = std::path::PathBuf::from("/some/manifest.yaml");
+    app.plugin_status_facts
+        .insert(path.clone(), "stale fact".to_string());
+
+    app.drain_plugin_actions_for_test(
+        "k8s-plugin",
+        "register_language_provider",
+        serde_json::json!({"extensions": ["yaml"], "capabilities": ["status_facts"]}),
+    );
+    app.drain_plugin_actions_for_test(
+        "k8s-plugin",
+        "set_status_facts",
+        serde_json::json!({"path": "/some/manifest.yaml", "text": ""}),
+    );
+
+    assert!(
+        !app.plugin_status_facts.contains_key(&path),
+        "empty text must clear a previously set fact"
+    );
+}
+
+#[test]
+fn set_status_facts_stamps_contribution() {
+    let mut app = create_base_app();
+    app.drain_plugin_actions_for_test(
+        "k8s-plugin",
+        "register_language_provider",
+        serde_json::json!({"extensions": ["yaml"], "capabilities": ["status_facts"]}),
+    );
+    app.drain_plugin_actions_for_test(
+        "k8s-plugin",
+        "set_status_facts",
+        serde_json::json!({"path": "/tmp/doc.yaml", "text": "Pod/web"}),
+    );
+    let contrib = app.plugin_contributions.get("k8s-plugin").unwrap();
+    assert!(
+        contrib
+            .status_fact_paths
+            .contains(&std::path::PathBuf::from("/tmp/doc.yaml")),
+        "status_fact_paths must track the path"
+    );
+}
+
 // -- plugin contribution tracking tests ---------------------------------------
 
 #[test]
@@ -1238,6 +1330,32 @@ fn teardown_clears_fold_regions() {
     assert!(
         app.fold_regions.is_empty(),
         "active fold state must be cleared"
+    );
+}
+
+#[test]
+fn teardown_clears_status_facts() {
+    let mut app = create_base_app();
+    let path = std::path::PathBuf::from("/tmp/doc.yaml");
+    app.plugin_status_facts
+        .insert(path.clone(), "Pod/web".to_string());
+    app.plugin_contributions.insert(
+        "k8s-plugin".to_string(),
+        crate::plugin::PluginContributions {
+            status_fact_paths: {
+                let mut s = std::collections::HashSet::new();
+                s.insert(path.clone());
+                s
+            },
+            ..Default::default()
+        },
+    );
+
+    app.teardown_plugin_contributions("k8s-plugin");
+
+    assert!(
+        !app.plugin_status_facts.contains_key(&path),
+        "status facts must be removed"
     );
 }
 

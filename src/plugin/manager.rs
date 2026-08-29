@@ -754,5 +754,6 @@ fn capability_label(cap: &Capability) -> &'static str {
         Capability::Hover => "hover",
         Capability::Diagnostics => "diagnostics",
         Capability::Definition => "definition",
+        Capability::StatusFacts => "status_facts",
     }
 }

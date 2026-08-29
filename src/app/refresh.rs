@@ -539,6 +539,7 @@ impl App {
                 self.handle_plugin_register_language_provider(name, params);
             }
             "set_fold_regions" => self.handle_plugin_set_fold_regions(name, params),
+            "set_status_facts" => self.handle_plugin_set_status_facts(name, params),
             "register_commands" => self.handle_plugin_register_commands(name, params),
             "key_handled" => self.handle_plugin_key_handled(params),
             "plugin_error" => self.handle_plugin_error(name, params),
@@ -753,6 +754,45 @@ impl App {
         if self.current_file.as_deref() == Some(&path) {
             self.apply_plugin_fold_regions(&path);
         }
+    }
+
+    /// Handles a `set_status_facts` action (protocol 3+): stores a short
+    /// plugin-supplied summary string for `path`, shown in the status bar
+    /// alongside the fold-count segment when `path` is the current file.
+    /// Only accepted from a provider that registered the file's extension
+    /// with the `StatusFacts` capability, mirroring `set_fold_regions`'s
+    /// capability gate.
+    fn handle_plugin_set_status_facts(&mut self, name: &str, params: &serde_json::Value) {
+        let path = match params.get("path").and_then(|v| v.as_str()) {
+            Some(p) => std::path::PathBuf::from(p),
+            None => return,
+        };
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or_default();
+        if self
+            .plugin_manager
+            .provider_for(ext, &crate::plugin::Capability::StatusFacts)
+            .is_none()
+        {
+            return;
+        }
+        let text = params
+            .get("text")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+        if text.is_empty() {
+            self.plugin_status_facts.remove(&path);
+        } else {
+            self.plugin_status_facts.insert(path.clone(), text);
+        }
+        self.plugin_contributions
+            .entry(name.to_string())
+            .or_default()
+            .status_fact_paths
+            .insert(path);
     }
 
     /// Handles a `register_commands` action: parses the command list, stores

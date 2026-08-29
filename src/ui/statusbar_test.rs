@@ -725,6 +725,38 @@ fn fold_stats_with_yaml_anchors() {
 }
 
 #[test]
+fn plugin_status_facts_shown_for_current_file() {
+    let mut app = make_app();
+    app.focus = Focus::Content;
+    app.current_file = Some(PathBuf::from("deploy.yaml"));
+    app.plugin_status_facts.insert(
+        PathBuf::from("deploy.yaml"),
+        "Deployment/nginx (default)".to_string(),
+    );
+    let text = render_bar(&app);
+    assert!(
+        text.contains("[Deployment/nginx (default)]"),
+        "expected plugin status facts in {text:?}"
+    );
+}
+
+#[test]
+fn plugin_status_facts_not_shown_for_a_different_file() {
+    let mut app = make_app();
+    app.focus = Focus::Content;
+    app.current_file = Some(PathBuf::from("other.yaml"));
+    app.plugin_status_facts.insert(
+        PathBuf::from("deploy.yaml"),
+        "Deployment/nginx (default)".to_string(),
+    );
+    let text = render_bar(&app);
+    assert!(
+        !text.contains("Deployment/nginx"),
+        "facts for an unrelated path must not leak into the bar: {text:?}"
+    );
+}
+
+#[test]
 fn bar_never_overflows_various_widths() {
     let mut app = make_app();
     app.show_hidden = true;
