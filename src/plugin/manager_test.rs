@@ -358,7 +358,7 @@ fn event_dispatch_with_no_active_plugins_is_noop() {
     let mut mgr = PluginManager::new(vec![]);
     mgr.on_file_open(std::path::Path::new("/tmp/x.rs"));
     mgr.on_theme_change("dark", &crate::theme::Theme::default());
-    mgr.on_selection_change(Some(std::path::Path::new("/tmp/x.rs")));
+    mgr.on_selection_change_at(Some(std::path::Path::new("/tmp/x.rs")), Some(7));
     mgr.on_quit();
 }
 

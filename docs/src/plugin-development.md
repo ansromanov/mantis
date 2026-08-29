@@ -162,11 +162,13 @@ through to normal handling.
 
 ### `on_selection_change`
 
-Sent when the tree cursor moves to a different entry. `path` is absent if the
-tree is empty.
+Sent when the tree cursor moves to a different entry or the content cursor
+moves to a different source line. `path` is absent if the tree is empty. When
+the selection refers to an open text file, `line` contains its zero-based
+physical source line; tree-only selections omit it.
 
 ```json
-{"event":"on_selection_change","path":"/absolute/path/to/entry"}
+{"event":"on_selection_change","path":"/absolute/path/to/entry","line":12}
 ```
 
 ### `on_theme_change`

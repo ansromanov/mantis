@@ -613,5 +613,10 @@ impl App {
     /// viewport after a cursor move. Delegates to the unified helper.
     pub(crate) fn scroll_active_line_into_view(&mut self) {
         self.scroll_line_into_view(self.active_line);
+        let line = self
+            .has_text_cursor()
+            .then(|| self.display_to_physical(self.active_line));
+        self.plugin_manager
+            .on_selection_change_at(self.current_file.as_deref(), line);
     }
 }
