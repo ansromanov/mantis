@@ -91,6 +91,10 @@ fn app_new_starts_with_empty_plugin_content() {
         app.plugin_content_text.is_empty(),
         "plugin_content_text must start empty"
     );
+    assert!(
+        app.plugin_status_facts.is_empty(),
+        "plugin_status_facts must start empty"
+    );
     fs::remove_dir_all(&root).ok();
 }
 

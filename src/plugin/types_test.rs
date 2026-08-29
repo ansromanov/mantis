@@ -42,7 +42,16 @@ fn capability_variants_are_distinct() {
     set.insert(Capability::Hover);
     set.insert(Capability::Diagnostics);
     set.insert(Capability::Definition);
-    assert_eq!(set.len(), 5);
+    set.insert(Capability::StatusFacts);
+    assert_eq!(set.len(), 6);
+}
+
+#[test]
+fn capability_status_facts_serializes_as_snake_case() {
+    let json = serde_json::to_string(&Capability::StatusFacts).unwrap();
+    assert_eq!(json, r#""status_facts""#);
+    let back: Capability = serde_json::from_str(&json).unwrap();
+    assert_eq!(back, Capability::StatusFacts);
 }
 
 #[test]
@@ -67,6 +76,7 @@ fn plugin_contributions_default_is_empty() {
     let c = PluginContributions::default();
     assert!(c.content_paths.is_empty());
     assert!(c.fold_region_paths.is_empty());
+    assert!(c.status_fact_paths.is_empty());
     assert!(!c.has_icon_map);
 }
 
@@ -75,8 +85,10 @@ fn plugin_contributions_tracks_inserted_paths() {
     let mut c = PluginContributions::default();
     let p = std::path::PathBuf::from("/tmp/file.rs");
     c.content_paths.insert(p.clone());
+    c.status_fact_paths.insert(p.clone());
     c.has_icon_map = true;
     assert!(c.content_paths.contains(&p));
+    assert!(c.status_fact_paths.contains(&p));
     assert!(c.has_icon_map);
 }
 

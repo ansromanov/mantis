@@ -564,6 +564,36 @@ fn provider_for_equal_priority_keeps_first_registered() {
 }
 
 #[test]
+fn register_provider_same_extension_different_capability_does_not_conflict() {
+    // yaml (fold) and k8s (status_facts) both register .yaml/.yml — different
+    // capabilities on the same extension must not trip the conflict warning.
+    let mut mgr = PluginManager::new(vec![]);
+    let warning1 = mgr.register_provider(make_reg("yaml", &["yaml", "yml"], &[Capability::Fold]));
+    assert!(warning1.is_none());
+    let warning2 = mgr.register_provider(make_reg(
+        "k8s",
+        &["yaml", "yml"],
+        &[Capability::StatusFacts],
+    ));
+    assert!(
+        warning2.is_none(),
+        "different capabilities on the same extension must coexist"
+    );
+    assert!(mgr.provider_for("yaml", &Capability::Fold).is_some());
+    assert!(mgr.provider_for("yaml", &Capability::StatusFacts).is_some());
+}
+
+#[test]
+fn register_provider_warns_on_conflict_with_status_facts_label() {
+    let mut mgr = PluginManager::new(vec![]);
+    mgr.register_provider(make_reg("first", &["yaml"], &[Capability::StatusFacts]));
+    let warning = mgr
+        .register_provider(make_reg("second", &["yaml"], &[Capability::StatusFacts]))
+        .expect("conflicting registration must warn");
+    assert!(warning.contains("status_facts"));
+}
+
+#[test]
 fn register_provider_warns_once_on_conflict() {
     let mut mgr = PluginManager::new(vec![]);
     let warning1 = mgr.register_provider(make_reg("first", &["rs"], &[Capability::Fold]));

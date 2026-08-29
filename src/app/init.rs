@@ -257,6 +257,7 @@ impl App {
             fold_regions: Vec::new(),
             folded: HashSet::new(),
             plugin_fold_regions: HashMap::new(),
+            plugin_status_facts: HashMap::new(),
             fold_display_map: Vec::new(),
             fold_gutter_rows: Vec::new(),
             yaml_error: None,

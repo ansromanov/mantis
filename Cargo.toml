@@ -8,6 +8,7 @@ members = [
     "plugins/json",
     "plugins/sh",
     "plugins/yaml",
+    "plugins/k8s",
 ]
 resolver = "2"
 

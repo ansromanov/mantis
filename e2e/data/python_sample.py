@@ -51,7 +51,7 @@ class RepositoryExplorer:
         print("=" * 40)
         files = self.list_files()
         print(f"Total files found: {len(files)}")
-        
+
         stats = self.get_extension_stats(files)
         print("\nExtension breakdown:")
         for ext, count in stats.most_common():

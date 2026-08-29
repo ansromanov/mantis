@@ -23,7 +23,7 @@ use crate::plugin::types::{PluginEntry, PluginKind};
 /// Returns `(name, PluginEntry)` pairs for every plugin that ships with `mantis`.
 ///
 /// All plugins shipped with `mantis` (markdown, iconize, python, rust, go, json, sh,
-/// yaml, terraform, toml, typescript, dockerfile, nginx, justfile) are enabled by
+/// yaml, k8s, terraform, toml, typescript, dockerfile, nginx, justfile) are enabled by
 /// default. User config
 /// entries with `or_insert` always win over these defaults, so an explicit
 /// `enabled = false` in `mantis.toml` is respected.
@@ -106,6 +106,7 @@ pub(crate) const BUNDLED_PLUGINS: &[(&str, &str, &[u8])] = &[
     ("json", "json", JSON),
     ("sh", "sh", SH),
     ("yaml", "yaml", YAML),
+    ("k8s", "k8s", K8S),
 ];
 
 /// Filenames of old shell-script plugins superseded by the current Rust binaries.
