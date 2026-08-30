@@ -55,6 +55,7 @@ toml = "0.8"
 notify = "6"
 unicode-width = "0.2"
 arboard = "3"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp"] }
 memmap2 = "0.9"
 regex = "1"
 tracing = "0.1"
