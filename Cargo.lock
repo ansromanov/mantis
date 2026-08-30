@@ -983,7 +983,7 @@ dependencies = [
 
 [[package]]
 name = "mantis"
-version = "0.18.5"
+version = "0.18.6"
 dependencies = [
  "anyhow",
  "arboard",
