@@ -92,15 +92,70 @@ fn format_size(bytes: u64) -> String {
     }
 }
 
+/// Detects a raster image format from magic bytes, falling back to the file
+/// extension when the bytes are truncated/ambiguous. Returns the
+/// human-readable format name shown in the placeholder message.
+fn image_format_label(path: Option<&Path>, bytes: &[u8]) -> Option<&'static str> {
+    if bytes.starts_with(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) {
+        return Some("PNG");
+    }
+    if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        return Some("JPEG");
+    }
+    if bytes.starts_with(b"GIF89a") || bytes.starts_with(b"GIF87a") {
+        return Some("GIF");
+    }
+    if bytes.starts_with(b"BM") {
+        return Some("BMP");
+    }
+    if bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
+        return Some("WebP");
+    }
+    match path
+        .and_then(|p| p.extension())
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("png") => Some("PNG"),
+        Some("jpg") | Some("jpeg") => Some("JPEG"),
+        Some("gif") => Some("GIF"),
+        Some("bmp") => Some("BMP"),
+        Some("webp") => Some("WebP"),
+        _ => None,
+    }
+}
+
+/// Reads just the image header to get pixel dimensions, without decoding
+/// pixel data. Returns `None` for a corrupt/truncated file or a format the
+/// `image` crate can't recognize from `bytes` alone (e.g. a renamed file with
+/// a misleading extension but no real image data) — the caller falls back to
+/// omitting dimensions rather than failing the whole placeholder.
+fn image_dimensions(bytes: &[u8]) -> Option<(u32, u32)> {
+    image::ImageReader::new(std::io::Cursor::new(bytes))
+        .with_guessed_format()
+        .ok()?
+        .into_dimensions()
+        .ok()
+}
+
 /// Generates a descriptive placeholder content list for a binary file.
 pub fn build_binary_placeholder_content(path: Option<&Path>, bytes: &[u8]) -> Vec<String> {
-    let type_str = if bytes.starts_with(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) {
-        "PNG image".to_string()
-    } else if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
-        "JPEG image".to_string()
-    } else if bytes.starts_with(b"GIF89a") || bytes.starts_with(b"GIF87a") {
-        "GIF image".to_string()
-    } else if bytes.starts_with(b"%PDF-") {
+    let size_str = format_size(bytes.len() as u64);
+
+    if let Some(format) = image_format_label(path, bytes) {
+        let dims = image_dimensions(bytes)
+            .map(|(w, h)| format!("{w}x{h}, "))
+            .unwrap_or_default();
+        let mut content = vec![format!("[image file — {format}, {dims}{size_str}]")];
+        if path.is_some() {
+            content.push("".into());
+            content.push("press o to open with the system default app".into());
+        }
+        return content;
+    }
+
+    let type_str = if bytes.starts_with(b"%PDF-") {
         "PDF document".to_string()
     } else if bytes.starts_with(&[0x50, 0x4B, 0x03, 0x04]) {
         "ZIP archive".to_string()
@@ -114,9 +169,6 @@ pub fn build_binary_placeholder_content(path: Option<&Path>, bytes: &[u8]) -> Ve
         "SQLite database".to_string()
     } else if let Some(ext) = path.and_then(|p| p.extension()).and_then(|e| e.to_str()) {
         match ext.to_lowercase().as_str() {
-            "png" => "PNG image".to_string(),
-            "jpg" | "jpeg" => "JPEG image".to_string(),
-            "gif" => "GIF image".to_string(),
             "pdf" => "PDF document".to_string(),
             "zip" => "ZIP archive".to_string(),
             "gz" | "tgz" => "GZIP archive".to_string(),
@@ -132,7 +184,6 @@ pub fn build_binary_placeholder_content(path: Option<&Path>, bytes: &[u8]) -> Ve
         "unknown type".to_string()
     };
 
-    let size_str = format_size(bytes.len() as u64);
     let mut content = vec![format!("[binary file — {}, {}]", type_str, size_str)];
     if path.is_some() {
         content.push("".into());
