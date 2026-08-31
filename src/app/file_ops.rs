@@ -290,6 +290,7 @@ impl App {
         self.content_title = Some(load.content_title);
         self.highlighted = load.highlighted;
         self.diff_rows = load.diff_rows;
+        self.content_image = None;
         self.content = load.content;
         if self.secret_masked && !self.config.content.mask_secrets {
             self.content = self.secret_original.clone();
@@ -509,6 +510,11 @@ impl App {
         self.secret_revealed = false;
         self.clear_fold_state();
         self.virtual_file = load.virtual_file;
+        self.content_image = if self.config.content.image_preview {
+            load.image
+        } else {
+            None
+        };
         self.content = load.content;
         if self.secret_masked && !self.config.content.mask_secrets {
             self.content = self.secret_original.clone();

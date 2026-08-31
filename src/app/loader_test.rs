@@ -163,6 +163,39 @@ fn binary_file_sets_binary_encoding() {
     );
 }
 
+fn png_1x1() -> Vec<u8> {
+    let img = image::RgbImage::from_pixel(1, 1, image::Rgb([1, 2, 3]));
+    let mut buf = Vec::new();
+    image::DynamicImage::ImageRgb8(img)
+        .write_to(&mut std::io::Cursor::new(&mut buf), image::ImageFormat::Png)
+        .unwrap();
+    buf
+}
+
+#[test]
+fn compute_file_load_builds_image_placeholder_and_leaves_inline_image_unset() {
+    // The test process never runs `graphics::detect::detect`, so Kitty support
+    // stays at its cached default (false); `image` is expected to stay unset
+    // even though the bytes are a real, decodable PNG.
+    let mut f = tempfile::NamedTempFile::with_suffix(".png").unwrap();
+    use std::io::Write;
+    f.write_all(&png_1x1()).unwrap();
+    let load = compute_file_load(f.path(), &hl(), usize::MAX);
+    assert_eq!(load.encoding.as_deref(), Some("BINARY"));
+    assert!(load.content[0].starts_with("[image file — PNG, 1x1,"));
+    assert!(load.image.is_none());
+}
+
+#[test]
+fn decode_inline_image_is_none_without_graphics_support() {
+    assert!(decode_inline_image(std::path::Path::new("pixel.png"), &png_1x1()).is_none());
+}
+
+#[test]
+fn decode_inline_image_is_none_for_non_image_bytes() {
+    assert!(decode_inline_image(std::path::Path::new("pixel.png"), b"not an image").is_none());
+}
+
 #[test]
 fn worker_round_trip_returns_matching_seq() {
     let mut f = tempfile::NamedTempFile::with_suffix(".rs").unwrap();

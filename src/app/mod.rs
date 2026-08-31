@@ -294,6 +294,13 @@ pub struct App {
     /// recomputed only when the tree is rebuilt rather than on every render.
     pub(crate) tree_guide_cache: Option<(u64, Vec<Vec<bool>>)>,
     pub content_area: Rect,
+    /// Raw bytes + dimensions of the image in `current_file`, when it is an
+    /// image and the terminal supports inline rendering. `None` otherwise. Set
+    /// by the loader; consumed by `graphics::render_overlay` after each frame.
+    pub content_image: Option<crate::graphics::ContentImage>,
+    /// Cell rectangle the content pane reserved for the inline image during the
+    /// last render. `Rect::default()` when no image is being shown.
+    pub image_area: Rect,
     /// Hit area of the blame annotation strip recorded during the last render.
     /// `Rect::default()` when blame is not shown or there is no blame data.
     pub blame_area: Rect,
@@ -942,6 +949,7 @@ impl App {
         self.current_file = None;
         self.current_syntax = None;
         self.content = Vec::new();
+        self.content_image = None;
         self.highlighted = Vec::new();
         self.virtual_file = None;
         self.is_json = false;
@@ -1021,6 +1029,9 @@ pub(crate) fn restore_terminal() {
     use crossterm::terminal::{disable_raw_mode, LeaveAlternateScreen};
 
     let _ = crate::event_source::pop_keyboard_enhancement_flags();
+    // Remove any inline image before leaving the alternate screen so it does not
+    // linger on the primary buffer. No-op unless graphics were detected.
+    crate::graphics::clear_all(&mut io::stdout());
     let _ = disable_raw_mode();
     let _ = execute!(
         io::stdout(),

@@ -550,3 +550,29 @@ fn selection_text_csv_table_content() {
 
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn image_overlay_not_suppressed_by_default() {
+    let root = temp_root();
+    let app = app_for(&root);
+    assert!(!app.image_overlay_suppressed());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn image_overlay_suppressed_while_help_is_shown() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.show_help = true;
+    assert!(app.image_overlay_suppressed());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn image_overlay_suppressed_while_search_popup_is_open() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.search = Some(crate::search::SearchState::new(&root, false, true, 0, None));
+    assert!(app.image_overlay_suppressed());
+    fs::remove_dir_all(&root).ok();
+}

@@ -76,6 +76,19 @@ fn mask_secrets_defaults_to_true() {
     assert!(Config::default().content.mask_secrets);
 }
 
+#[test]
+fn image_preview_defaults_to_true() {
+    assert!(Config::default().content.image_preview);
+}
+
+#[test]
+fn image_preview_round_trips_through_toml() {
+    let mut cfg = Config::default();
+    cfg.content.image_preview = false;
+    let parsed: Config = toml::from_str(&toml::to_string_pretty(&cfg).unwrap()).unwrap();
+    assert!(!parsed.content.image_preview);
+}
+
 // -- find_files keybinding ---------------------------------------------------
 
 #[test]
