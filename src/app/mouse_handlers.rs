@@ -263,7 +263,12 @@ impl App {
             }
             return;
         }
-        if self.tree_filter.is_some() {
+        if self.tree_filter.is_some()
+            && matches!(
+                ev.kind,
+                MouseEventKind::ScrollDown | MouseEventKind::ScrollUp
+            )
+        {
             match ev.kind {
                 MouseEventKind::ScrollDown => {
                     self.handle_tree_filter_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()))

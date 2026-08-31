@@ -666,6 +666,14 @@ fn help_shows_recent_files_and_toggle_blame() {
         joined_4.contains("toggle git blame gutter"),
         "help must list 'toggle git blame gutter', got:\n{joined_4}"
     );
+
+    app.help_tab = 1;
+    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
+    let joined_1 = buffer_rows(&terminal).join("\n");
+    assert!(
+        joined_1.contains("toggle bookmark") && joined_1.contains("bookmarks picker"),
+        "help must list bookmark actions, got:\n{joined_1}"
+    );
 }
 
 #[test]
