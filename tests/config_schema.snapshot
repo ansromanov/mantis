@@ -1,5 +1,6 @@
 content
 content.follow_tail_auto
+content.image_preview
 content.line_numbers
 content.log_colorizing
 content.mask_secrets
