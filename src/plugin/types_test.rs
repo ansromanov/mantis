@@ -97,6 +97,7 @@ fn to_plugin_init_serializes_protocol_version() {
     let msg = ToPlugin {
         event: "init".into(),
         path: None,
+        line: None,
         key: None,
         theme: Some("default".into()),
         colors: None,
@@ -118,6 +119,7 @@ fn to_plugin_serializes_colors_when_present() {
     let msg = ToPlugin {
         event: "on_theme_change".into(),
         path: None,
+        line: None,
         key: None,
         theme: Some("default".into()),
         colors: Some(ThemeColorsMsg::from(&Theme::default())),
@@ -137,6 +139,7 @@ fn to_plugin_omits_colors_when_none() {
     let msg = ToPlugin {
         event: "on_keypress".into(),
         path: None,
+        line: None,
         key: Some("q".into()),
         theme: None,
         colors: None,
@@ -162,6 +165,7 @@ fn to_plugin_omits_protocol_version_when_none() {
     let msg = ToPlugin {
         event: "on_file_open".into(),
         path: Some("/a/b.rs".into()),
+        line: None,
         key: None,
         theme: None,
         colors: None,
@@ -175,6 +179,24 @@ fn to_plugin_omits_protocol_version_when_none() {
         !json.contains("protocol_version"),
         "non-init events must not carry protocol_version"
     );
+}
+
+#[test]
+fn to_plugin_selection_change_serializes_zero_based_line() {
+    let msg = ToPlugin {
+        event: "on_selection_change".into(),
+        path: Some("/a/b.yaml".into()),
+        line: Some(12),
+        key: None,
+        theme: None,
+        colors: None,
+        protocol_version: None,
+        id: None,
+        method: None,
+        params: None,
+    };
+    let json = serde_json::to_string(&msg).unwrap();
+    assert!(json.contains(r#""line":12"#));
 }
 
 #[test]
@@ -194,6 +216,7 @@ fn to_plugin_request_serializes_id_method_params() {
     let msg = ToPlugin {
         event: "request".into(),
         path: None,
+        line: None,
         key: None,
         theme: None,
         colors: None,
@@ -214,6 +237,7 @@ fn to_plugin_omits_request_fields_when_none() {
     let msg = ToPlugin {
         event: "on_file_open".into(),
         path: Some("/a/b.rs".into()),
+        line: None,
         key: None,
         theme: None,
         colors: None,

@@ -612,6 +612,17 @@ impl App {
     /// Nudges `content_scroll` so `active_line` stays within the visible
     /// viewport after a cursor move. Delegates to the unified helper.
     pub(crate) fn scroll_active_line_into_view(&mut self) {
+        let previous_path = self.current_file.clone();
+        let previous_line = self
+            .has_text_cursor()
+            .then(|| self.display_to_physical(self.active_line));
         self.scroll_line_into_view(self.active_line);
+        let line = self
+            .has_text_cursor()
+            .then(|| self.display_to_physical(self.active_line));
+        if previous_path != self.current_file || previous_line != line {
+            self.plugin_manager
+                .on_selection_change_at(self.current_file.as_deref(), line);
+        }
     }
 }

@@ -109,7 +109,7 @@ fn spawn_keypress_responder(app: &mut App, dir: &std::path::Path, reply: bool) {
     };
     app.plugin_manager = crate::plugin::PluginManager::new(vec![("kp".to_string(), entry)]);
     app.plugin_manager
-        .activate_one("kp", None)
+        .activate_one("kp", None, None)
         .expect("spawn kp.sh");
 }
 

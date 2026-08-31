@@ -203,6 +203,7 @@ impl PluginManager {
         plugin.send(&ToPlugin {
             event: "request".into(),
             path: None,
+            line: None,
             key: None,
             theme: None,
             colors: None,
@@ -328,6 +329,7 @@ impl PluginManager {
             plugin.send(&ToPlugin {
                 event: "init".into(),
                 path: None,
+                line: None,
                 key: None,
                 theme: self.active_theme.clone(),
                 colors: self.active_theme_colors.clone(),
@@ -353,6 +355,7 @@ impl PluginManager {
             plugin.send(&ToPlugin {
                 event: "shutdown".into(),
                 path: None,
+                line: None,
                 key: None,
                 theme: None,
                 colors: None,
@@ -377,6 +380,7 @@ impl PluginManager {
             plugin.send(&ToPlugin {
                 event: "on_file_open".into(),
                 path: Some(path_s.clone()),
+                line: None,
                 key: None,
                 theme: None,
                 colors: None,
@@ -398,6 +402,7 @@ impl PluginManager {
             plugin.send(&ToPlugin {
                 event: "on_keypress".into(),
                 path: None,
+                line: None,
                 key: Some(key_str.clone()),
                 theme: None,
                 colors: None,
@@ -421,6 +426,7 @@ impl PluginManager {
             plugin.send(&ToPlugin {
                 event: "on_theme_change".into(),
                 path: None,
+                line: None,
                 key: None,
                 theme: Some(theme_name.into()),
                 colors: self.active_theme_colors.clone(),
@@ -432,8 +438,15 @@ impl PluginManager {
         }
     }
 
-    /// Sends `on_selection_change` to all subscribed active plugins.
+    /// Sends a path-only `on_selection_change` to all subscribed active plugins.
     pub(crate) fn on_selection_change(&mut self, path: Option<&Path>) {
+        self.on_selection_change_at(path, None);
+    }
+
+    /// Sends `on_selection_change` with an optional zero-based physical line.
+    /// The line is additive, so existing plugins can continue to consume only
+    /// the path while language-aware plugins can track the active document.
+    pub(crate) fn on_selection_change_at(&mut self, path: Option<&Path>, line: Option<usize>) {
         let path_s = path.map(|p| p.to_string_lossy().into_owned());
         for plugin in &mut self.plugins {
             if !plugin.subscribes_to("on_selection_change") {
@@ -442,6 +455,7 @@ impl PluginManager {
             plugin.send(&ToPlugin {
                 event: "on_selection_change".into(),
                 path: path_s.clone(),
+                line,
                 key: None,
                 theme: None,
                 colors: None,
@@ -463,6 +477,7 @@ impl PluginManager {
             plugin.send(&ToPlugin {
                 event: "on_quit".into(),
                 path: None,
+                line: None,
                 key: None,
                 theme: None,
                 colors: None,
@@ -567,6 +582,7 @@ impl PluginManager {
             plugin.send(&ToPlugin {
                 event: "command".into(),
                 path: None,
+                line: None,
                 key: None,
                 theme: None,
                 colors: None,
@@ -636,6 +652,7 @@ impl PluginManager {
         &mut self,
         name: &str,
         current_file: Option<&Path>,
+        current_line: Option<usize>,
     ) -> Result<(), String> {
         if self.plugins.iter().any(|p| p.name == name) {
             return Ok(());
@@ -663,6 +680,7 @@ impl PluginManager {
         plugin.send(&ToPlugin {
             event: "init".into(),
             path: None,
+            line: None,
             key: None,
             theme: self.active_theme.clone(),
             colors: self.active_theme_colors.clone(),
@@ -676,6 +694,7 @@ impl PluginManager {
             plugin.send(&ToPlugin {
                 event: "on_file_open".into(),
                 path: Some(path_s.clone()),
+                line: None,
                 key: None,
                 theme: None,
                 colors: None,
@@ -687,6 +706,7 @@ impl PluginManager {
             plugin.send(&ToPlugin {
                 event: "on_selection_change".into(),
                 path: Some(path_s),
+                line: current_line,
                 key: None,
                 theme: None,
                 colors: None,
@@ -712,6 +732,7 @@ impl PluginManager {
         plugin.send(&ToPlugin {
             event: "shutdown".into(),
             path: None,
+            line: None,
             key: None,
             theme: None,
             colors: None,

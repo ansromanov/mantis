@@ -60,6 +60,26 @@ fn content_gg_resets_active_line_to_zero() {
 }
 
 #[test]
+fn content_cursor_scroll_helper_accepts_physical_line_notifications() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = Focus::Content;
+    app.active_line = 7;
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 10,
+    };
+
+    app.scroll_active_line_into_view();
+
+    assert_eq!(app.display_to_physical(app.active_line), 7);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 #[allow(non_snake_case)]
 fn content_G_marks_session_dirty() {
     let root = temp_tree();

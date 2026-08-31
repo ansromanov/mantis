@@ -58,10 +58,14 @@ impl App {
         } else {
             // Ensure the plugin file is present on disk before spawning.
             plugin::install_bundled_plugins();
-            match self
-                .plugin_manager
-                .activate_one(&name, self.current_file.as_deref())
-            {
+            let current_line = self
+                .has_text_cursor()
+                .then(|| self.display_to_physical(self.active_line));
+            match self.plugin_manager.activate_one(
+                &name,
+                self.current_file.as_deref(),
+                current_line,
+            ) {
                 Ok(()) => {
                     self.telemetry
                         .record(crate::telemetry::TelemetryEvent::PluginToggled {

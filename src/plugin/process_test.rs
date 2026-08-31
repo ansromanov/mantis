@@ -46,6 +46,7 @@ fn send_is_noop_when_no_writer() {
     p.send(&ToPlugin {
         event: "test".into(),
         path: None,
+        line: None,
         key: None,
         theme: None,
         colors: None,

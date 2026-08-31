@@ -164,6 +164,10 @@ pub(crate) struct ToPlugin {
     pub(crate) event: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) path: Option<String>,
+    /// Zero-based physical source line associated with a selection change.
+    /// Omitted for tree-only selections and events without a content cursor.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) line: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) key: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
