@@ -89,6 +89,10 @@ pub struct ContentConfig {
     pub log_colorizing: bool,
     /// Mask credential-shaped file values in the content pane by default.
     pub mask_secrets: bool,
+    /// Render image files inline in the content pane when the terminal supports
+    /// the Kitty graphics protocol (Ghostty, Kitty, WezTerm, Konsole). When
+    /// `false`, or on any other terminal, the text placeholder is shown instead.
+    pub image_preview: bool,
 }
 
 impl Default for ContentConfig {
@@ -104,6 +108,7 @@ impl Default for ContentConfig {
             follow_tail_auto: false,
             log_colorizing: true,
             mask_secrets: true,
+            image_preview: true,
         }
     }
 }

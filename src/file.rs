@@ -95,7 +95,7 @@ fn format_size(bytes: u64) -> String {
 /// Detects a raster image format from magic bytes, falling back to the file
 /// extension when the bytes are truncated/ambiguous. Returns the
 /// human-readable format name shown in the placeholder message.
-fn image_format_label(path: Option<&Path>, bytes: &[u8]) -> Option<&'static str> {
+pub(crate) fn image_format_label(path: Option<&Path>, bytes: &[u8]) -> Option<&'static str> {
     if bytes.starts_with(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) {
         return Some("PNG");
     }

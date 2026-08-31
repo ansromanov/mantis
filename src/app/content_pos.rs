@@ -413,6 +413,31 @@ impl App {
         !self.is_diff
     }
 
+    /// Returns `true` when a popup, modal, or picker is drawn over the content
+    /// pane, so the inline image overlay must be withheld for this frame (it is
+    /// written straight to the terminal and would otherwise cover the popup).
+    pub(crate) fn image_overlay_suppressed(&self) -> bool {
+        self.show_help
+            || self.show_about
+            || self.show_welcome
+            || self.show_telemetry_notice
+            || self.theme_picker.is_some()
+            || self.plugin_picker.is_some()
+            || self.command_palette.is_some()
+            || self.history.is_some()
+            || self.repo_log.is_some()
+            || self.recent_files.is_some()
+            || self.bug_report.is_some()
+            || self.revision_picker.is_some()
+            || self.worktree_picker.is_some()
+            || self.goto_line.is_some()
+            || self.search.is_some()
+            || self.context_menu.is_some()
+            || self.in_file_search.is_some()
+            || self.json_query.is_some()
+            || self.filter_bar.is_some()
+    }
+
     /// Unified scroll-into-view helper: nudges `content_scroll` so the given
     /// `display_line` becomes visible. No-op when already visible.
     pub fn scroll_line_into_view(&mut self, display_line: usize) {

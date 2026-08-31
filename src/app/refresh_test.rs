@@ -412,6 +412,8 @@ fn create_base_app() -> App {
         tree_visible_indices: None,
         tree_guide_cache: None,
         content_area: ratatui::layout::Rect::default(),
+        content_image: None,
+        image_area: ratatui::layout::Rect::default(),
         search_area: ratatui::layout::Rect::default(),
         search_offset: 0,
         command_palette_area: ratatui::layout::Rect::default(),

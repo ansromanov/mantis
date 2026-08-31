@@ -10,10 +10,10 @@
 //! the content `Rect` and scroll offsets back onto `App` for mouse hit-testing.
 
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::Style,
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Wrap},
+    widgets::{Block, Borders, Clear, Paragraph, Wrap},
     Frame,
 };
 use unicode_width::UnicodeWidthStr;
@@ -67,6 +67,10 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     let mut inner = block.inner(area);
     let mut line_blame_area = Rect::default();
 
+    // Cleared here; the image branch below is the only path that sets a real
+    // rect, so any other view leaves the post-frame overlay with nothing to do.
+    app.image_area = Rect::default();
+
     // Side-by-side diff layout takes over the whole content pane when toggled
     // on and the pane is wide enough; otherwise we fall through to unified.
     if app.is_diff
@@ -75,6 +79,15 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         && inner.width >= crate::diff::MIN_SIDE_BY_SIDE_WIDTH
     {
         draw_side_by_side_diff(f, app, area, block);
+        return;
+    }
+
+    // Inline image preview: an image file on a Kitty-graphics terminal. The
+    // bitmap itself is written straight to the terminal by
+    // `graphics::render_overlay` after ratatui paints this frame; here we just
+    // paint the border, blank the region it will occupy, and caption it.
+    if app.content_image.is_some() && !app.is_diff {
+        draw_image_preview(f, app, area, block);
         return;
     }
 
@@ -431,6 +444,51 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     if line_blame_area.height > 0 {
         blame::draw_bottom_bar_blame(f, app, line_blame_area);
     }
+}
+
+/// Draws the frame for an inline image preview: the pane border, a blanked
+/// region the terminal will draw the bitmap into (recorded as `app.image_area`),
+/// and the text placeholder as a caption underneath. The bitmap is emitted
+/// post-frame by `crate::graphics::render_overlay`.
+fn draw_image_preview(f: &mut Frame, app: &mut App, area: Rect, block: Block) {
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+    app.content_area = inner;
+
+    if inner.width == 0 || inner.height == 0 {
+        app.image_area = Rect::default();
+        return;
+    }
+
+    // Reserve the last rows for the caption (`app.content` holds the
+    // `[image file — PNG, WxH, size]` placeholder built by the loader).
+    let caption: Vec<Line> = app
+        .content
+        .iter()
+        .filter(|l| !l.is_empty())
+        .map(|l| Line::from(Span::styled(l.clone(), Style::default().fg(app.theme.dim))))
+        .collect();
+    let caption_h = (caption.len() as u16 + 1).min(inner.height / 2);
+
+    let img_area = Rect {
+        height: inner.height - caption_h,
+        ..inner
+    };
+    let caption_area = Rect {
+        y: inner.y + inner.height - caption_h,
+        height: caption_h,
+        ..inner
+    };
+
+    // Blank the bitmap region so ratatui owns those cells and erases any stale
+    // glyphs from a previous view; the terminal then paints the image on top.
+    f.render_widget(Clear, img_area);
+    f.render_widget(
+        Paragraph::new(caption).alignment(Alignment::Center),
+        caption_area,
+    );
+
+    app.image_area = img_area;
 }
 
 /// Renders lines from precomputed styled spans (pretty JSON or CSV/TSV table view).

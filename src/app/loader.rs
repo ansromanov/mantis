@@ -74,6 +74,10 @@ pub(super) struct FileLoad {
     pub syntax_name: Option<String>,
     pub secret_original: Vec<String>,
     pub secret_masked: bool,
+    /// Decoded image for inline rendering, when the file is an image and the
+    /// terminal supports the Kitty graphics protocol. `None` otherwise — the
+    /// text placeholder in `content` is used instead.
+    pub image: Option<crate::graphics::ContentImage>,
 }
 
 /// YAML-specific derived state, computed only for `.yaml`/`.yml` files.
@@ -122,8 +126,20 @@ impl FileLoad {
             syntax_name: None,
             secret_original: Vec::new(),
             secret_masked: false,
+            image: None,
         }
     }
+}
+
+/// Decodes `bytes` for inline rendering when they are a recognised image format
+/// and the terminal supports the Kitty graphics protocol. Returns `None`
+/// otherwise, so the caller falls back to the text placeholder.
+fn decode_inline_image(path: &Path, bytes: &[u8]) -> Option<crate::graphics::ContentImage> {
+    if !crate::graphics::detect::kitty_graphics_supported() {
+        return None;
+    }
+    crate::file::image_format_label(Some(path), bytes)?;
+    crate::graphics::ContentImage::from_bytes(bytes)
 }
 
 /// Reads `path`, detects binary/json/yaml, and produces the rendered content.
@@ -190,6 +206,7 @@ pub(super) fn compute_file_load(
     if is_binary_bytes(&bytes) {
         load.content = build_binary_placeholder_content(Some(path), &bytes);
         load.encoding = Some("BINARY".into());
+        load.image = decode_inline_image(path, &bytes);
         return load;
     }
     // Detect line endings and BOM/ASCII classification before consuming bytes.
@@ -203,6 +220,7 @@ pub(super) fn compute_file_load(
             let original_bytes = e.into_bytes();
             load.content = build_binary_placeholder_content(Some(path), &original_bytes);
             load.encoding = Some("BINARY".into());
+            load.image = decode_inline_image(path, &original_bytes);
             return load;
         }
     };

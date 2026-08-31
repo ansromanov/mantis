@@ -28,6 +28,7 @@ pub mod file;
 pub mod fold;
 pub mod fold_detectors;
 pub mod git;
+pub mod graphics;
 pub mod highlight;
 pub mod json_path;
 pub mod json_query;

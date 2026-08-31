@@ -39,6 +39,7 @@ mod event_source;
 mod file;
 mod fold;
 mod git;
+mod graphics;
 mod highlight;
 mod json_path;
 #[allow(dead_code)]
@@ -414,6 +415,9 @@ fn launch_tui(root: PathBuf, initial: InitialContent) -> anyhow::Result<()> {
 
     enable_raw_mode()?;
     crate::theme::detect_terminal_background();
+    // Probe Kitty graphics support before the alternate screen is entered, same
+    // as the background query above; the terminal replies land on stdin.
+    crate::graphics::detect::detect();
     let _guard = TerminalGuard;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
@@ -548,8 +552,14 @@ fn render_frame(terminal: &mut Terminal<impl Backend>, app: &mut App) -> anyhow:
         terminal.clear()?;
         terminal.hide_cursor()?;
         app.needs_clear = false;
+        // A full clear wipes any inline image too; drop our record of it so the
+        // overlay re-transmits on the next frame instead of only re-placing.
+        crate::graphics::clear_all(&mut io::stdout());
     }
     terminal.draw(|f| ui::draw(f, app))?;
+    // Inline images are written straight to the terminal on top of the region
+    // the content pane reserved for them, after ratatui has painted the frame.
+    crate::graphics::render_overlay(app, &mut io::stdout());
     Ok(())
 }
 
