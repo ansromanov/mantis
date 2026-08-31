@@ -96,9 +96,10 @@ fn query_terminal() -> bool {
             if byte == b'c' && buf.contains(&0x1b) {
                 break;
             }
-        } else {
-            break;
         }
+        // `ret == 0` (poll's own sub-timeout) or `ret < 0` (e.g. EINTR) does not
+        // mean the 200ms budget is exhausted — let the outer `while` re-check
+        // the real elapsed time and retry instead of bailing out early.
     }
 
     let resp = String::from_utf8_lossy(&buf);
