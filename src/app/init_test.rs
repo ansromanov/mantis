@@ -904,6 +904,15 @@ fn app_new_starts_without_csv_state() {
 }
 
 #[test]
+fn app_new_starts_without_inline_image_state() {
+    let root = temp_dir();
+    let app = new_app(&root, Config::default());
+    assert!(app.content_image.is_none());
+    assert_eq!(app.image_area, ratatui::layout::Rect::default());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn app_new_installs_bundled_plugins_on_startup() {
     let _guard = crate::plugin::ENV_LOCK
         .lock()

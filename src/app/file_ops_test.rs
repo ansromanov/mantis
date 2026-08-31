@@ -717,6 +717,31 @@ fn same_diff_reload_preserves_scroll_and_in_file_search() {
 }
 
 #[test]
+fn showing_a_diff_clears_a_previously_shown_inline_image() {
+    let root = temp_git_with_history();
+    let f = root.join("tracked.txt");
+    let mut app = app_for(&root);
+    app.git_mode = true;
+    let png_1x1 = {
+        let img = image::RgbImage::from_pixel(1, 1, image::Rgb([1, 2, 3]));
+        let mut buf = Vec::new();
+        image::DynamicImage::ImageRgb8(img)
+            .write_to(&mut std::io::Cursor::new(&mut buf), image::ImageFormat::Png)
+            .unwrap();
+        buf
+    };
+    app.content_image = crate::graphics::ContentImage::from_bytes(&png_1x1);
+    assert!(
+        app.content_image.is_some(),
+        "precondition: a real image was set"
+    );
+    app.show_working_tree_diff(&f);
+    assert!(app.is_diff, "precondition: must be showing a diff");
+    assert!(app.content_image.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn different_diff_resets_scroll_and_in_file_search() {
     let root = temp_git_with_history();
     let a = root.join("tracked.txt");
@@ -1332,5 +1357,31 @@ fn opening_non_json_clears_json_path_map() {
     app.json_path_map = vec![Some(".stale".into())];
     app.open_file(&path);
     assert!(app.json_path_map.is_empty());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn opening_a_file_clears_a_previously_shown_inline_image() {
+    // Regression guard: apply_file_load must not leave a stale image drawn
+    // over a newly opened, unrelated file.
+    let root = temp_dir();
+    let path = root.join("plain.txt");
+    fs::write(&path, "plain\n").unwrap();
+    let mut app = app_for(&root);
+    let png_1x1 = {
+        let img = image::RgbImage::from_pixel(1, 1, image::Rgb([1, 2, 3]));
+        let mut buf = Vec::new();
+        image::DynamicImage::ImageRgb8(img)
+            .write_to(&mut std::io::Cursor::new(&mut buf), image::ImageFormat::Png)
+            .unwrap();
+        buf
+    };
+    app.content_image = crate::graphics::ContentImage::from_bytes(&png_1x1);
+    assert!(
+        app.content_image.is_some(),
+        "precondition: a real image was set"
+    );
+    app.open_file(&path);
+    assert!(app.content_image.is_none());
     fs::remove_dir_all(&root).ok();
 }

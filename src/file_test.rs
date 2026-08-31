@@ -152,6 +152,27 @@ fn image_format_label_falls_back_to_extension_for_other_raster_formats() {
     assert_eq!(content[0], "[image file — WebP, 4 B]");
 }
 
+// --- image_format_label (pub(crate): used directly by app::loader) ---
+
+#[test]
+fn image_format_label_detects_png_magic_bytes() {
+    let png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+    assert_eq!(image_format_label(None, &png), Some("PNG"));
+}
+
+#[test]
+fn image_format_label_falls_back_to_extension() {
+    assert_eq!(
+        image_format_label(Some(Path::new("photo.webp")), b"not really webp data"),
+        Some("WebP")
+    );
+}
+
+#[test]
+fn image_format_label_none_for_non_image() {
+    assert_eq!(image_format_label(None, b"plain text"), None);
+}
+
 #[test]
 fn is_markdown_path_works() {
     assert!(is_markdown_path(Path::new("test.md")));

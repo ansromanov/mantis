@@ -508,6 +508,44 @@ fn draw_content_with_show_line_blame_does_not_panic() {
 }
 
 #[test]
+fn draw_content_reserves_a_blanked_region_and_shows_the_caption_for_an_inline_image() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let path = root.join("pixel.png");
+    let png_1x1 = {
+        let img = image::RgbImage::from_pixel(1, 1, image::Rgb([1, 2, 3]));
+        let mut buf = Vec::new();
+        image::DynamicImage::ImageRgb8(img)
+            .write_to(&mut std::io::Cursor::new(&mut buf), image::ImageFormat::Png)
+            .unwrap();
+        buf
+    };
+    fs::write(&path, &png_1x1).unwrap();
+    app.current_file = Some(path);
+    app.content = vec![
+        "[image file — PNG, 1x1, 70 B]".into(),
+        "".into(),
+        "press o to open with the system default app".into(),
+    ];
+    app.content_image = crate::graphics::ContentImage::from_bytes(&png_1x1);
+    assert!(app.content_image.is_some(), "precondition: image decodes");
+
+    let out = render_to_string(&mut app);
+
+    assert_ne!(app.image_area, ratatui::layout::Rect::default());
+    assert!(
+        app.image_area.height < app.content_area.height,
+        "the caption rows must be excluded from the reserved image region"
+    );
+    assert!(
+        out.contains("press o to open"),
+        "caption rendered underneath the reserved region: {out}"
+    );
+
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn draw_content_renders_csv_table_view() {
     let root = temp_tree();
     let mut app = app_for(&root);
