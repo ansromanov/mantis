@@ -41,4 +41,16 @@ fn draw_recent_some_does_not_panic() {
         .unwrap();
 }
 
+#[test]
+fn draw_bookmarks_some_does_not_panic() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    app.bookmarks = Some(RecentFilesState::new(vec![]));
+    let backend = TestBackend::new(80, 24);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| crate::ui::popups::draw_bookmarks(f, &mut app, Rect::new(0, 0, 80, 24)))
+        .unwrap();
+}
+
 // Modified for test requirements

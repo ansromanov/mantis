@@ -85,6 +85,7 @@ pub(crate) struct ActiveOverlays {
     pub history: bool,
     pub repo_log: bool,
     pub recent_files: bool,
+    pub bookmarks: bool,
     pub search: bool,
     pub in_file_search: bool,
     pub tree_filter: bool,
@@ -199,6 +200,10 @@ pub struct App {
     pub recent_ring: Vec<PathBuf>,
     /// State for the recent-files overlay. `Some` while the picker is open.
     pub recent_files: Option<RecentFilesState>,
+    /// Files pinned by the user for quick access within this workspace.
+    pub bookmark_paths: Vec<PathBuf>,
+    /// State for the bookmarks overlay. `Some` while the picker is open.
+    pub bookmarks: Option<RecentFilesState>,
     /// Hit area of the recent-files list recorded during the last render.
     pub recent_area: Rect,
     /// Scroll offset of the recent-files list recorded during the last render.
@@ -520,6 +525,7 @@ impl App {
     pub(crate) fn save_session(&mut self) {
         let state = crate::session::SessionState {
             expanded: self.expanded.iter().cloned().collect(),
+            bookmarks: self.bookmark_paths.clone(),
             current_file: self.current_file.clone(),
             content_scroll: self.content_scroll,
             active_line: self.active_line,

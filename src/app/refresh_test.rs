@@ -23,6 +23,14 @@ fn tick_debounce_holds_while_not_quiet() {
 }
 
 #[test]
+fn active_overlays_tracks_bookmarks_picker() {
+    let mut app = create_base_app();
+    app.bookmarks = Some(crate::search::RecentFilesState::new(Vec::new()));
+    app.check_overlay_transitions();
+    assert!(app.active_overlays.bookmarks);
+}
+
+#[test]
 fn tick_debounce_clears_dirty_after_quiet_period() {
     let mut app = create_base_app();
     app.tree_dirty = true;
@@ -351,6 +359,8 @@ fn create_base_app() -> App {
         plugin_picker_offset: 0,
         recent_ring: Vec::new(),
         recent_files: None,
+        bookmark_paths: Vec::new(),
+        bookmarks: None,
         recent_area: ratatui::layout::Rect::default(),
         recent_offset: 0,
         context_menu: None,

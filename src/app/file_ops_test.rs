@@ -145,6 +145,28 @@ fn open_recent_files_opens_overlay_with_non_current_paths() {
     fs::remove_dir_all(&root).ok();
 }
 
+#[test]
+fn bookmarks_toggle_and_picker_use_current_file() {
+    let root = temp_dir();
+    let path = root.join("bookmarked.txt");
+    fs::write(&path, "bookmark me\n").unwrap();
+    let mut app = app_for(&root);
+    app.current_file = Some(path.clone());
+
+    app.toggle_bookmark();
+    assert_eq!(app.bookmark_paths, vec![path.clone()]);
+    app.open_bookmarks();
+    assert_eq!(
+        app.bookmarks
+            .as_ref()
+            .and_then(|picker| picker.selected_path()),
+        Some(&path)
+    );
+    app.toggle_bookmark();
+    assert!(app.bookmark_paths.is_empty());
+    fs::remove_dir_all(&root).ok();
+}
+
 // -- active_line / show_line_blame reset on navigation ----------------------
 
 #[test]

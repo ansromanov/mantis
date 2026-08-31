@@ -38,6 +38,7 @@ fn round_trip_preserves_all_fields() {
 
     let state = SessionState {
         expanded: vec![sub],
+        bookmarks: vec![env.root.join("f.txt")],
         current_file: Some(env.root.join("f.txt")),
         content_scroll: 10,
         active_line: 12,
@@ -97,6 +98,27 @@ fn stale_current_file_is_filtered() {
 
     let loaded = load(&env.root).unwrap();
     assert!(loaded.current_file.is_none());
+}
+
+#[test]
+fn stale_bookmarks_are_filtered() {
+    let _lock = SESSION_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let env = TestEnv::new("stale_bookmarks");
+    let valid = env.root.join("valid.txt");
+    let outside = env.root.parent().unwrap().join("outside.txt");
+    fs::write(&valid, "valid\n").unwrap();
+    fs::write(&outside, "outside\n").unwrap();
+    save(
+        &env.root,
+        &SessionState {
+            bookmarks: vec![valid.clone(), env.root.join("gone.txt"), outside.clone()],
+            ..SessionState::default()
+        },
+    );
+
+    let loaded = load(&env.root).unwrap();
+    assert_eq!(loaded.bookmarks, vec![valid]);
+    fs::remove_file(outside).ok();
 }
 
 #[test]
@@ -252,6 +274,7 @@ fn save_load_round_trip_uses_per_root_file() {
 
     let state = SessionState {
         expanded: vec![],
+        bookmarks: vec![],
         current_file: None,
         content_scroll: 3,
         active_line: 0,

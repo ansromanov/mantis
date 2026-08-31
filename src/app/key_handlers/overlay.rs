@@ -378,6 +378,18 @@ impl App {
         }
     }
 
+    /// Handles keyboard input while the bookmarks overlay is open.
+    pub(super) fn handle_bookmarks_key(&mut self, key: KeyEvent) {
+        let Some(ref mut picker) = self.bookmarks else {
+            return;
+        };
+        match handle_list_picker_key(picker, &key) {
+            OverlayKey::Activate => self.activate_bookmark_selection(),
+            OverlayKey::Close => self.bookmarks = None,
+            _ => {}
+        }
+    }
+
     /// Handles keyboard input while the plugin manager overlay is open.
     /// Extra keys: Space toggles; j/k navigate (handled by list_picker now).
     pub(super) fn handle_plugin_key(&mut self, key: KeyEvent) {

@@ -25,6 +25,9 @@ pub struct SessionState {
     /// Absolute paths of expanded directories.
     #[serde(default)]
     pub expanded: Vec<PathBuf>,
+    /// Files pinned as bookmarks for this workspace.
+    #[serde(default)]
+    pub bookmarks: Vec<PathBuf>,
     /// Currently open file path, if any.
     pub current_file: Option<PathBuf>,
     /// Vertical scroll offset in the content pane.
@@ -92,6 +95,11 @@ pub fn load(root: &Path) -> Option<SessionState> {
             state.current_file = None;
         }
     }
+
+    // Filter out bookmarks that no longer exist or belong to another root.
+    state
+        .bookmarks
+        .retain(|p| p.starts_with(root) && p.is_file());
 
     Some(state)
 }

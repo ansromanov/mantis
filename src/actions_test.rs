@@ -17,6 +17,12 @@ fn secret_reveal_action_is_registered() {
         .any(|action| action.id == "toggle_secret_reveal"));
 }
 
+#[test]
+fn bookmark_actions_are_registered() {
+    assert!(ACTIONS.iter().any(|action| action.id == "toggle_bookmark"));
+    assert!(ACTIONS.iter().any(|action| action.id == "bookmarks"));
+}
+
 /// Every `Keymap` field that represents a real bound action, by its canonical
 /// action id (matching the field name, or the id `Keymap::bindings_for_action`
 /// maps to that field - see `config::keymap`). Kept in sync by hand since Rust
@@ -67,6 +73,8 @@ const KEYMAP_FIELD_ACTION_IDS: &[&str] = &[
     "fold_toggle",
     "toggle_watch",
     "recent_files",
+    "toggle_bookmark",
+    "bookmarks",
     "copy_path",
     "copy_relative_path",
     "copy_line",

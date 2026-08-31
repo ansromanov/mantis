@@ -169,6 +169,20 @@ pub static ACTIONS: &[ActionSpec] = &[
         description: Some("Browse and open recently opened files"),
     },
     ActionSpec {
+        id: "toggle_bookmark",
+        palette: Some("Toggle bookmark"),
+        help: Some(("Tree panel", "toggle bookmark on current file")),
+        category: Some("Navigate"),
+        description: Some("Pin or unpin the current file"),
+    },
+    ActionSpec {
+        id: "bookmarks",
+        palette: Some("Bookmarks"),
+        help: Some(("Tree panel", "bookmarks picker")),
+        category: Some("Navigate"),
+        description: Some("Browse and open bookmarked files"),
+    },
+    ActionSpec {
         id: "worktree_picker",
         palette: Some("Open worktree switcher"),
         help: Some(("Global", "switch git worktree")),

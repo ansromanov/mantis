@@ -856,6 +856,7 @@ impl App {
             history: self.history.is_some(),
             repo_log: self.repo_log.is_some(),
             recent_files: self.recent_files.is_some(),
+            bookmarks: self.bookmarks.is_some(),
             search: self.search.is_some(),
             in_file_search: self.in_file_search.is_some(),
             tree_filter: self.tree_filter.is_some(),

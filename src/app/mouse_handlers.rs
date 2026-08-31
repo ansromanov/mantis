@@ -244,6 +244,10 @@ impl App {
             self.handle_recent_mouse(ev);
             return;
         }
+        if self.bookmarks.is_some() {
+            self.handle_bookmarks_mouse(ev);
+            return;
+        }
         if self.search.is_some() {
             self.handle_search_mouse(ev);
             return;
@@ -555,6 +559,43 @@ impl App {
                 if let Some(r) = &mut self.recent_files {
                     if r.selected + 1 < r.results_len() {
                         r.selected += 1;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Handles mouse events on the bookmarks overlay.
+    fn handle_bookmarks_mouse(&mut self, ev: MouseEvent) {
+        match ev.kind {
+            MouseEventKind::Down(MouseButton::Left) => {
+                if rect_contains(self.recent_area, ev.column, ev.row) {
+                    let row = (ev.row - self.recent_area.y) as usize;
+                    let index = self.recent_offset + row;
+                    let in_range = self
+                        .bookmarks
+                        .as_ref()
+                        .is_some_and(|picker| index < picker.results_len());
+                    if in_range {
+                        if let Some(picker) = &mut self.bookmarks {
+                            picker.selected = index;
+                        }
+                        self.activate_bookmark_selection();
+                    }
+                } else {
+                    self.bookmarks = None;
+                }
+            }
+            MouseEventKind::ScrollUp => {
+                if let Some(picker) = &mut self.bookmarks {
+                    picker.selected = picker.selected.saturating_sub(1);
+                }
+            }
+            MouseEventKind::ScrollDown => {
+                if let Some(picker) = &mut self.bookmarks {
+                    if picker.selected + 1 < picker.results_len() {
+                        picker.selected += 1;
                     }
                 }
             }
