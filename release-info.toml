@@ -1,5 +1,5 @@
-version = "0.18.8"
-date = "2026-08-31"
+version = "0.18.9"
+date = "2026-09-01"
 whats_new = """- feat: follow the newest changed file (#753)
 - feat: add git worktree switcher (#755)
 - feat: render JSONL rows with in-place expansion (#754)
