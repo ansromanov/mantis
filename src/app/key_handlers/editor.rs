@@ -367,6 +367,14 @@ impl App {
                 self.open_recent_files();
                 true
             }
+            Some("toggle_bookmark") => {
+                self.toggle_bookmark();
+                true
+            }
+            Some("bookmarks") => {
+                self.open_bookmarks();
+                true
+            }
             Some("worktree_picker") => {
                 self.worktree_picker = Some(crate::search::WorktreePicker::new(&self.root));
                 true

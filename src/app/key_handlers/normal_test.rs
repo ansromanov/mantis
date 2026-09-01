@@ -60,6 +60,19 @@ fn content_gg_resets_active_line_to_zero() {
 }
 
 #[test]
+#[allow(non_snake_case)]
+fn tree_B_toggles_bookmark_for_open_file() {
+    let root = temp_tree();
+    let path = root.join("a.txt");
+    let mut app = app_for(&root);
+    app.current_file = Some(path.clone());
+    app.focus = Focus::Tree;
+    app.handle_key(key(KeyCode::Char('B')));
+    assert_eq!(app.bookmark_paths, vec![path]);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn content_cursor_scroll_helper_accepts_physical_line_notifications() {
     let root = temp_tree();
     let mut app = app_for(&root);

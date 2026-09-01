@@ -698,6 +698,7 @@ fn app_new_initializes_initial_root() {
     let root = temp_dir();
     let app = new_app(&root, Config::default());
     assert_eq!(app.initial_root, root);
+    assert!(app.bookmark_paths.is_empty());
     fs::remove_dir_all(&root).ok();
 }
 
@@ -721,6 +722,7 @@ fn app_new_ignores_stale_initial_root_not_an_ancestor_of_launch_root() {
         &root,
         &crate::session::SessionState {
             expanded: Vec::new(),
+            bookmarks: Vec::new(),
             current_file: None,
             content_scroll: 0,
             active_line: 0,
@@ -759,6 +761,7 @@ fn app_new_ignores_stale_initial_root_that_is_ancestor_of_launch_root() {
         &root,
         &crate::session::SessionState {
             expanded: Vec::new(),
+            bookmarks: Vec::new(),
             current_file: None,
             content_scroll: 0,
             active_line: 0,

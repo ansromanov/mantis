@@ -631,6 +631,44 @@ impl App {
         }
     }
 
+    /// Toggles a bookmark for the currently open file and persists the change.
+    pub(super) fn toggle_bookmark(&mut self) {
+        let Some(path) = self.current_file.clone() else {
+            self.set_status("bookmark: no file is open");
+            return;
+        };
+        if let Some(index) = self.bookmark_paths.iter().position(|p| p == &path) {
+            self.bookmark_paths.remove(index);
+            self.set_status("bookmark removed");
+        } else {
+            self.bookmark_paths.push(path);
+            self.set_status("bookmark added");
+        }
+        self.mark_session_dirty();
+    }
+
+    /// Opens the bookmark picker when at least one bookmark exists.
+    pub(super) fn open_bookmarks(&mut self) {
+        if self.bookmark_paths.is_empty() {
+            self.set_status("bookmarks: no files bookmarked");
+            return;
+        }
+        self.bookmarks = Some(RecentFilesState::new(self.bookmark_paths.clone()));
+    }
+
+    /// Opens the selected bookmark and closes the picker.
+    pub(super) fn activate_bookmark_selection(&mut self) {
+        let path = self
+            .bookmarks
+            .as_ref()
+            .and_then(|picker| picker.selected_path().cloned());
+        self.bookmarks = None;
+        if let Some(path) = path {
+            self.last_open_source = crate::telemetry::FileSourceKind::RecentFiles;
+            self.open_and_reveal(&path);
+        }
+    }
+
     /// Opens the global fuzzy file-name picker (SearchState in Files mode),
     /// scoped to git-changed files when in git mode. Focus-independent.
     pub fn open_file_search(&mut self) {

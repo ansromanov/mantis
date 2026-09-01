@@ -41,6 +41,17 @@ fn dispatch_json_query_opens_query_bar() {
     fs::remove_dir_all(root).ok();
 }
 
+#[test]
+fn dispatch_bookmarks_command_opens_picker() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.bookmark_paths.push(root.join("a.txt"));
+    app.command_palette = Some(palette_with_query("Bookmarks"));
+    assert!(app.dispatch_command());
+    assert!(app.bookmarks.is_some());
+    fs::remove_dir_all(root).ok();
+}
+
 fn dispatch_blame_line(app: &mut App) {
     let mut p = CommandPalette::default();
     for c in "Blame active".chars() {

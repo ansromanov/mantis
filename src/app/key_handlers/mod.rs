@@ -151,6 +151,8 @@ impl App {
             self.handle_repo_log_key(key);
         } else if self.recent_files.is_some() {
             self.handle_recent_key(key);
+        } else if self.bookmarks.is_some() {
+            self.handle_bookmarks_key(key);
         } else if self.search.is_some() {
             self.handle_search_key(key);
         } else if self.json_query.is_some() {

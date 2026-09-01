@@ -143,6 +143,10 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         popups::draw_recent(f, app, area);
     }
 
+    if app.bookmarks.is_some() {
+        popups::draw_bookmarks(f, app, area);
+    }
+
     if app.bug_report.is_some() {
         popups::draw_bug_report(f, app, area);
     }

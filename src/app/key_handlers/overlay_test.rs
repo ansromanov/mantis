@@ -2,8 +2,8 @@ use crate::app::{App, Focus};
 use crate::command_palette::{CommandPalette, COMMANDS};
 use crate::config::Config;
 use crate::search::{
-    BugReportState, FilterBarState, GotoLineState, InFileSearch, RevisionItem, RevisionPicker,
-    SearchState, ThemePicker, TreeFilter,
+    BugReportState, FilterBarState, GotoLineState, InFileSearch, RecentFilesState, RevisionItem,
+    RevisionPicker, SearchState, ThemePicker, TreeFilter,
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::Rect;
@@ -45,6 +45,16 @@ fn json_query_replaces_results_and_escape_restores_content() {
     app.handle_json_query_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
     assert_eq!(app.content, vec!["{\"name\":\"mantis\"}"]);
     fs::remove_dir_all(root).ok();
+}
+
+#[test]
+fn bookmarks_overlay_escape_closes_picker() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.bookmarks = Some(RecentFilesState::new(vec![root.join("a.txt")]));
+    app.handle_bookmarks_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+    assert!(app.bookmarks.is_none());
+    fs::remove_dir_all(&root).ok();
 }
 
 #[test]

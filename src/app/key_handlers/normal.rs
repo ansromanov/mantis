@@ -132,6 +132,10 @@ impl App {
             self.open_repo_log();
         } else if pressed_in(&k.recent_files, &key, scope) {
             self.open_recent_files();
+        } else if pressed_in(&k.toggle_bookmark, &key, scope) {
+            self.toggle_bookmark();
+        } else if pressed_in(&k.bookmarks, &key, scope) {
+            self.open_bookmarks();
         } else if pressed_in(&k.theme_picker, &key, scope) {
             self.theme_picker = Some(ThemePicker::default());
         } else if pressed_in(&k.plugin_picker, &key, scope) {

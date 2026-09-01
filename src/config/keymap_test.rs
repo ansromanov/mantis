@@ -567,6 +567,8 @@ fn canonical_action_ids_resolve_bindings() {
         "git_mode_toggle",
         "git_mode_flat_toggle",
         "recent_files",
+        "toggle_bookmark",
+        "bookmarks",
         "plugin_picker",
         "goto_line",
     ] {

@@ -37,6 +37,19 @@ fn app_for(root: &std::path::Path) -> App {
     App::new(root.to_path_buf(), Config::default(), None, None).unwrap()
 }
 
+#[test]
+fn clicking_outside_bookmarks_closes_picker() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.bookmarks = Some(crate::search::RecentFilesState::new(vec![
+        root.join("long.txt")
+    ]));
+    app.recent_area = Rect::new(10, 10, 20, 5);
+    app.handle_mouse(left_down_at(0, 0));
+    assert!(app.bookmarks.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
 fn left_down_at(column: u16, row: u16) -> MouseEvent {
     MouseEvent {
         kind: MouseEventKind::Down(MouseButton::Left),

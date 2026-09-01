@@ -160,6 +160,8 @@ impl App {
             plugin_picker_offset: 0,
             recent_ring: Vec::new(),
             recent_files: None,
+            bookmark_paths: Vec::new(),
+            bookmarks: None,
             recent_area: ratatui::layout::Rect::default(),
             recent_offset: 0,
             context_menu: None,
@@ -332,6 +334,12 @@ impl App {
 
         // If the session specifies a file, select it in the tree.
         if let Some(ref s) = session_state {
+            app.bookmark_paths = s
+                .bookmarks
+                .iter()
+                .filter(|p| p.starts_with(&app.root) && p.is_file())
+                .cloned()
+                .collect();
             if let Some(ref cf) = s.current_file {
                 if let Some(i) = app.nodes.iter().position(|n| n.path == *cf) {
                     app.tree_selected = i;

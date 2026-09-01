@@ -17,20 +17,47 @@ use ratatui::{
 };
 
 use crate::app::App;
+use crate::search::RecentFilesState;
+use crate::theme::Theme;
 
 use super::util::centered_rect;
 
 pub(crate) fn draw_recent(f: &mut Frame, app: &mut App, area: Rect) {
-    let theme = &app.theme;
     let Some(recent) = app.recent_files.as_ref() else {
         return;
     };
+    let theme = app.theme.clone();
+    let root = app.root.clone();
+    let (list_area, offset) = draw_path_picker(f, &theme, &root, area, "Recent files", recent);
+    app.recent_area = list_area;
+    app.recent_offset = offset;
+}
 
+/// Draws the bookmarks picker using the same path-picker layout as recent files.
+pub(crate) fn draw_bookmarks(f: &mut Frame, app: &mut App, area: Rect) {
+    let Some(bookmarks) = app.bookmarks.as_ref() else {
+        return;
+    };
+    let theme = app.theme.clone();
+    let root = app.root.clone();
+    let (list_area, offset) = draw_path_picker(f, &theme, &root, area, "Bookmarks", bookmarks);
+    app.recent_area = list_area;
+    app.recent_offset = offset;
+}
+
+fn draw_path_picker(
+    f: &mut Frame,
+    theme: &Theme,
+    root: &std::path::Path,
+    area: Rect,
+    title: &str,
+    recent: &RecentFilesState,
+) -> (Rect, usize) {
     let popup = centered_rect(72, 75, area);
     f.render_widget(Clear, popup);
 
     let block = Block::default()
-        .title(" Recent files ")
+        .title(format!(" {title} "))
         .borders(Borders::ALL)
         .style(Style::default().bg(theme.background))
         .border_style(Style::default().fg(theme.accent_alt));
@@ -66,7 +93,6 @@ pub(crate) fn draw_recent(f: &mut Frame, app: &mut App, area: Rect) {
         parts[1],
     );
 
-    let root = &app.root;
     let items: Vec<ListItem> = recent
         .filtered
         .iter()
@@ -89,8 +115,7 @@ pub(crate) fn draw_recent(f: &mut Frame, app: &mut App, area: Rect) {
 
     f.render_stateful_widget(list, parts[2], &mut state);
 
-    app.recent_area = parts[2];
-    app.recent_offset = state.offset();
+    (parts[2], state.offset())
 }
 
 #[cfg(test)]

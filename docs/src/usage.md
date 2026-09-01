@@ -152,6 +152,13 @@ These work no matter which panel is focused.
 | `Backspace`          | Go up one directory (stops at the directory mantis was launched from) |
 | `-`/`=`              | Collapse all / expand all    |
 | `g`/`Home`, `G`/`End` | Jump to first / last entry  |
+| `B`                  | Toggle bookmark on the open file |
+| `b`                  | Open the bookmarks picker    |
+
+Bookmarks are stored per workspace and restored across sessions. Use the
+bookmarks picker to fuzzy-filter the pinned files, then press `Enter` to open
+one. The default bindings are tree-scoped; you can change them in
+`mantis.toml`.
 
 ## Content panel
 
