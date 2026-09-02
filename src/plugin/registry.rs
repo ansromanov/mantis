@@ -107,6 +107,16 @@ pub fn clone_or_pull() -> Result<(), String> {
     let repo = registry_repo();
 
     if dir.join(".git").is_dir() {
+        let branch = Command::new("git")
+            .arg("-C")
+            .arg(&dir)
+            .args(["symbolic-ref", "--quiet", "--short", "HEAD"])
+            .output()
+            .map_err(|e| format!("failed to inspect registry branch: {e}"))?;
+        if !branch.status.success() || String::from_utf8_lossy(&branch.stdout).trim() != "main" {
+            return refresh_clean(&dir, &repo)
+                .map_err(|e| format!("registry cache is not on main; recovery failed: {e}"));
+        }
         let output = Command::new("git")
             .arg("-C")
             .arg(&dir)
@@ -188,7 +198,11 @@ pub fn verify_artifact(path: &std::path::Path, entry: &RegistryEntry) -> Result<
         .sha256
         .as_deref()
         .ok_or_else(|| format!("plugin '{}' has no SHA-256 checksum", entry.name))?;
-    if expected.len() != 64 || !expected.bytes().all(|b| b.is_ascii_hexdigit()) {
+    if expected.len() != 64
+        || !expected
+            .bytes()
+            .all(|b| b.is_ascii_digit() || matches!(b, b'a'..=b'f'))
+    {
         return Err(format!(
             "plugin '{}' has an invalid SHA-256 checksum",
             entry.name
@@ -197,7 +211,7 @@ pub fn verify_artifact(path: &std::path::Path, entry: &RegistryEntry) -> Result<
     let bytes = std::fs::read(path)
         .map_err(|e| format!("failed to read plugin artifact '{}': {e}", path.display()))?;
     let actual = format!("{:x}", Sha256::digest(bytes));
-    if actual.eq_ignore_ascii_case(expected) {
+    if actual == expected {
         Ok(())
     } else {
         Err(format!("checksum mismatch for plugin '{}'", entry.name))

@@ -225,6 +225,12 @@ fn verify_artifact_rejects_mismatch_and_missing_checksum() {
     assert!(verify_artifact(&path, &entry).is_err());
     entry.sha256 = None;
     assert!(verify_artifact(&path, &entry).is_err());
+    entry.sha256 = Some("deadbeef".into());
+    assert!(verify_artifact(&path, &entry).is_err());
+    entry.sha256 = Some("Z".repeat(64));
+    assert!(verify_artifact(&path, &entry).is_err());
+    entry.sha256 = Some("B5F7C6F9E8C4F6F1BDE8D0F2F4C77B9D3A7E7D8C1E0D5F8D4E4C9F1F4A3F2F1".into());
+    assert!(verify_artifact(&path, &entry).is_err());
     std::fs::remove_file(path).ok();
 }
 

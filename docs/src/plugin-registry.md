@@ -87,7 +87,7 @@ following structure:
 | `description` | Yes | One-line description shown in search results. |
 | `repo` | Yes | Git repository URL (HTTPS or SSH). |
 | `tag` | Yes | Git tag or branch to check out when installing. |
-| `sha256` | Required for installation | Lowercase hexadecimal SHA-256 digest of the released artifact. Legacy entries may omit it for discovery, but installation must reject them. |
+| `sha256` | Required for installation | Lowercase hexadecimal SHA-256 digest of the released artifact. Legacy entries may omit it for discovery, but installation must reject them. Uppercase letters are invalid. |
 
 ## Trust and consent
 
