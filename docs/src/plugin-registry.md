@@ -9,8 +9,14 @@ uses `git clone` and `git pull` to sync the registry.
 
 1. On first access, `mantis` clones the registry repository into the local cache at
    `~/.config/mantis/registry/`.
-2. On subsequent access, `mantis` refreshes the cache with `git pull --ff-only`.
+2. On subsequent access, `mantis` refreshes the cache from the pinned `main`
+   branch with `git pull --ff-only`.
 3. The `index.json` file is parsed to build the list of available plugins.
+
+Registry refreshes that cannot be fast-forwarded are recovered by cloning a
+fresh `main` checkout and replacing the cache only after the clone contains a
+valid `index.json`. If recovery fails, the previous cache is preserved when
+possible and the error is reported to the caller.
 
 Bundled plugins (such as the built-in `python` language provider at
 `plugins/python/`) are not listed in the registry — they ship with `mantis`
@@ -59,13 +65,15 @@ following structure:
       "name": "git-tools",
       "description": "git diff/log integration",
       "repo": "https://github.com/example/tv-git-tools",
-      "tag": "v0.1.0"
+      "tag": "v0.1.0",
+      "sha256": "<64 lowercase hexadecimal characters>"
     },
     {
       "name": "markdown-preview",
       "description": "Live markdown preview panel",
       "repo": "https://github.com/example/tv-md-preview",
-      "tag": "v0.2.0"
+      "tag": "v0.2.0",
+      "sha256": "<64 lowercase hexadecimal characters>"
     }
   ]
 }
@@ -79,6 +87,18 @@ following structure:
 | `description` | Yes | One-line description shown in search results. |
 | `repo` | Yes | Git repository URL (HTTPS or SSH). |
 | `tag` | Yes | Git tag or branch to check out when installing. |
+| `sha256` | Required for installation | Lowercase hexadecimal SHA-256 digest of the released artifact. Legacy entries may omit it for discovery, but installation must reject them. |
+
+## Trust and consent
+
+Registry entries are metadata only; a plugin must be verified before its
+artifact is installed. The host compares the downloaded artifact with the
+entry's `sha256` value and refuses a mismatch or a missing digest.
+
+Discovered third-party plugin manifests are disabled by default. Discovery
+does not execute plugin code; the user must explicitly enable a plugin from
+the plugin manager or configuration. The manifest's `permissions` field is
+advisory and describes requested access for review—it is not a sandbox.
 
 ## Searching
 

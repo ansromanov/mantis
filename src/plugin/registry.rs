@@ -4,7 +4,10 @@
 //! lists available plugins with their repo URL and tag. The registry is cloned
 //! into `~/.config/mantis/registry/` (or `$XDG_CONFIG_HOME/mantis/registry/`)
 //! and refreshed via `git pull`. No HTTP crate is used — all communication with
-//! the registry happens through the `git` CLI.
+//! the registry happens through the `git` CLI. Registry refreshes are pinned to
+//! the `main` branch and recover by cloning a clean cache when an existing
+//! checkout cannot be updated safely. Plugin artifacts can be checked against
+//! the SHA-256 digest recorded in the index before they are installed.
 //!
 //! The default registry URL is a GitHub repo, overridable via the
 //! `MANTIS_PLUGIN_REGISTRY` environment variable.
@@ -19,6 +22,7 @@
 //! - `load_index` — parse `index.json` from the cache directory
 //! - `search` — substring match on name/description
 //! - `resolve` — find a single entry by exact name
+//! - `verify_artifact` — validate a downloaded artifact against its index digest
 
 #![allow(dead_code)]
 // All items are `pub` API surface ready for the plugin search/install UI
@@ -28,6 +32,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 /// Default remote registry repository URL.
 ///
@@ -41,6 +46,11 @@ pub struct RegistryEntry {
     pub description: String,
     pub repo: String,
     pub tag: String,
+    /// SHA-256 digest of the released artifact, encoded as lowercase hex.
+    /// Missing digests are accepted for backwards-compatible index parsing but
+    /// rejected by [`verify_artifact`].
+    #[serde(default)]
+    pub sha256: Option<String>,
 }
 
 /// Top-level structure of `index.json`.
@@ -87,45 +97,110 @@ fn registry_repo() -> String {
 
 /// Ensures the local registry cache exists and is up to date.
 ///
-/// If the cache directory does not exist, performs a `git clone`. If it does
-/// exist, runs `git pull` to refresh. Returns `Ok(())` on success; returns
-/// `Err` with a description on any failure (git unavailable, clone/pull error,
-/// or permission issues).
+/// If the cache directory does not exist, performs a single-branch clone of
+/// `main`. Existing checkouts are updated with a fast-forward-only pull. If
+/// that update fails, a clean clone is prepared beside the cache and swapped
+/// in atomically enough to preserve the last known-good checkout when recovery
+/// also fails.
 pub fn clone_or_pull() -> Result<(), String> {
     let dir = registry_dir();
     let repo = registry_repo();
 
-    if dir.join("index.json").exists() {
-        // Refresh via pull.
+    if dir.join(".git").is_dir() {
         let output = Command::new("git")
             .arg("-C")
             .arg(&dir)
-            .args(["pull", "--ff-only", "-q"])
+            .args(["pull", "--ff-only", "-q", "origin", "main"])
             .output()
             .map_err(|e| format!("failed to run git pull: {e}"))?;
 
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("git pull failed: {}", stderr.trim()));
+        if output.status.success() && dir.join("index.json").is_file() {
+            return Ok(());
         }
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let pull_error = if stderr.trim().is_empty() {
+            "registry checkout is missing index.json".to_string()
+        } else {
+            format!("git pull failed: {}", stderr.trim())
+        };
+        return refresh_clean(&dir, &repo)
+            .map_err(|e| format!("{pull_error}; recovery failed: {e}"));
+    }
+
+    refresh_clean(&dir, &repo)
+}
+
+fn refresh_clean(dir: &std::path::Path, repo: &str) -> Result<(), String> {
+    let Some(parent) = dir.parent() else {
+        return Err("registry cache has no parent directory".into());
+    };
+    std::fs::create_dir_all(parent)
+        .map_err(|e| format!("failed to create registry directory: {e}"))?;
+    let temp = parent.join(format!(".registry.tmp.{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&temp);
+    let output = Command::new("git")
+        .args(["clone", "-q", "--branch", "main", "--single-branch", repo])
+        .arg(&temp)
+        .output()
+        .map_err(|e| format!("failed to run git clone: {e}"))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let _ = std::fs::remove_dir_all(&temp);
+        return Err(format!("git clone failed: {}", stderr.trim()));
+    }
+    if !temp.join("index.json").is_file() {
+        let _ = std::fs::remove_dir_all(&temp);
+        return Err("cloned registry does not contain index.json".into());
+    }
+    replace_cache(dir, &temp)
+}
+
+fn replace_cache(dir: &std::path::Path, temp: &std::path::Path) -> Result<(), String> {
+    let backup = dir
+        .parent()
+        .ok_or_else(|| "registry cache has no parent directory".to_string())?
+        .join(format!(".registry.backup.{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&backup);
+    let had_cache = dir.exists();
+    if had_cache {
+        std::fs::rename(dir, &backup)
+            .map_err(|e| format!("failed to stage old registry cache: {e}"))?;
+    }
+    if let Err(error) = std::fs::rename(temp, dir) {
+        if had_cache {
+            let _ = std::fs::rename(&backup, dir);
+        }
+        let _ = std::fs::remove_dir_all(temp);
+        return Err(format!("failed to install fresh registry cache: {error}"));
+    }
+    if had_cache {
+        let _ = std::fs::remove_dir_all(backup);
+    }
+    Ok(())
+}
+
+/// Verifies an artifact against the SHA-256 digest recorded for a registry entry.
+///
+/// A missing or malformed digest is rejected. The returned error is suitable for
+/// surfacing in the plugin installation UI and includes no artifact contents.
+pub fn verify_artifact(path: &std::path::Path, entry: &RegistryEntry) -> Result<(), String> {
+    let expected = entry
+        .sha256
+        .as_deref()
+        .ok_or_else(|| format!("plugin '{}' has no SHA-256 checksum", entry.name))?;
+    if expected.len() != 64 || !expected.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err(format!(
+            "plugin '{}' has an invalid SHA-256 checksum",
+            entry.name
+        ));
+    }
+    let bytes = std::fs::read(path)
+        .map_err(|e| format!("failed to read plugin artifact '{}': {e}", path.display()))?;
+    let actual = format!("{:x}", Sha256::digest(bytes));
+    if actual.eq_ignore_ascii_case(expected) {
         Ok(())
     } else {
-        // Fresh clone.
-        if let Some(parent) = dir.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| format!("failed to create registry directory: {e}"))?;
-        }
-        let output = Command::new("git")
-            .args(["clone", "-q", &repo])
-            .arg(&dir)
-            .output()
-            .map_err(|e| format!("failed to run git clone: {e}"))?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("git clone failed: {}", stderr.trim()));
-        }
-        Ok(())
+        Err(format!("checksum mismatch for plugin '{}'", entry.name))
     }
 }
 

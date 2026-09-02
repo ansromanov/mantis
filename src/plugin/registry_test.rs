@@ -1,4 +1,5 @@
 use super::*;
+use sha2::Digest;
 
 fn sample_index() -> RegistryIndex {
     RegistryIndex {
@@ -8,18 +9,21 @@ fn sample_index() -> RegistryIndex {
                 description: "git diff/log integration for tv".into(),
                 repo: "https://github.com/example/tv-git-tools".into(),
                 tag: "v0.1.0".into(),
+                sha256: None,
             },
             RegistryEntry {
                 name: "markdown-preview".into(),
                 description: "Live markdown preview panel".into(),
                 repo: "https://github.com/example/tv-md-preview".into(),
                 tag: "v0.2.0".into(),
+                sha256: None,
             },
             RegistryEntry {
                 name: "hex-viewer".into(),
                 description: "hexadecimal file viewer".into(),
                 repo: "https://github.com/example/tv-hex".into(),
                 tag: "v0.1.1".into(),
+                sha256: None,
             },
         ],
     }
@@ -31,8 +35,8 @@ fn sample_index() -> RegistryIndex {
 fn parse_valid_index() {
     let json = r#"{
         "plugins": [
-            { "name": "a", "description": "desc a", "repo": "https://r.com/a", "tag": "v1" },
-            { "name": "b", "description": "desc b", "repo": "https://r.com/b", "tag": "v2" }
+            { "name": "a", "description": "desc a", "repo": "https://r.com/a", "tag": "v1", "sha256": null },
+            { "name": "b", "description": "desc b", "repo": "https://r.com/b", "tag": "v2", "sha256": null }
         ]
     }"#;
     let index: RegistryIndex = serde_json::from_str(json).unwrap();
@@ -52,7 +56,7 @@ fn parse_empty_plugins_array() {
 fn parse_minimal_entry() {
     let json = r#"{
         "plugins": [
-            { "name": "x", "description": "", "repo": "https://x.com/x", "tag": "latest" }
+            { "name": "x", "description": "", "repo": "https://x.com/x", "tag": "latest", "sha256": null }
         ]
     }"#;
     let index: RegistryIndex = serde_json::from_str(json).unwrap();
@@ -140,12 +144,14 @@ fn search_results_sorted_by_name() {
                 description: "z".into(),
                 repo: "https://r.com/z".into(),
                 tag: "v1".into(),
+                sha256: None,
             },
             RegistryEntry {
                 name: "alpha".into(),
                 description: "a".into(),
                 repo: "https://r.com/a".into(),
                 tag: "v1".into(),
+                sha256: None,
             },
         ],
     };
@@ -186,6 +192,42 @@ fn resolve_empty_index_returns_none() {
     assert!(resolve(&index, "anything").is_none());
 }
 
+// -- artifact verification --------------------------------------------------
+
+#[test]
+fn verify_artifact_accepts_matching_sha256() {
+    let path = std::env::temp_dir().join(format!("mantis_plugin_artifact_{}", std::process::id()));
+    std::fs::write(&path, b"plugin bytes").unwrap();
+    let digest = format!("{:x}", sha2::Sha256::digest(b"plugin bytes"));
+    let entry = RegistryEntry {
+        name: "test-plugin".into(),
+        description: String::new(),
+        repo: String::new(),
+        tag: "v1".into(),
+        sha256: Some(digest),
+    };
+    assert!(verify_artifact(&path, &entry).is_ok());
+    std::fs::remove_file(path).ok();
+}
+
+#[test]
+fn verify_artifact_rejects_mismatch_and_missing_checksum() {
+    let path =
+        std::env::temp_dir().join(format!("mantis_plugin_bad_artifact_{}", std::process::id()));
+    std::fs::write(&path, b"plugin bytes").unwrap();
+    let mut entry = RegistryEntry {
+        name: "test-plugin".into(),
+        description: String::new(),
+        repo: String::new(),
+        tag: "v1".into(),
+        sha256: Some("00".repeat(32)),
+    };
+    assert!(verify_artifact(&path, &entry).is_err());
+    entry.sha256 = None;
+    assert!(verify_artifact(&path, &entry).is_err());
+    std::fs::remove_file(path).ok();
+}
+
 // -- registry_dir -----------------------------------------------------------
 
 #[test]
@@ -219,7 +261,7 @@ fn clone_or_pull_initializes_bare_registry() {
     let remote = std::env::temp_dir().join(format!("mantis_reg_remote_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&remote);
     let status = Command::new("git")
-        .args(["init", "-q", "--bare"])
+        .args(["init", "-q", "--bare", "--initial-branch", "main"])
         .arg(&remote)
         .status()
         .expect("git init --bare");

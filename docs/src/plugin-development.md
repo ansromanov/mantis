@@ -39,7 +39,7 @@ Fields:
 | `mantis_protocol` | Yes | IPC protocol version (`"3"` for the current protocol). Plugins declaring a different version are skipped. The field was named `tv_protocol` through protocol 2 (pre-rename); `mantis_protocol` is the current name and `tv_protocol` remains accepted as an alias — if both are present, `mantis_protocol` wins. New plugins should use `mantis_protocol`. |
 | `platforms` | No | OS filter: list of `"linux"`, `"macos"`, `"windows"`. Absent = all. |
 | `events` | No | Events this plugin subscribes to; only listed events are sent to it. Empty or absent means all events are sent (back-compat with pre-subscription plugins). |
-| `permissions` | No | Permissions the plugin needs (advisory, shown at install). |
+| `permissions` | No | Permissions the plugin needs (advisory, shown for review). |
 
 ### Protocol version
 
