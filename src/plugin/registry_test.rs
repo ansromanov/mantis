@@ -340,9 +340,27 @@ fn clone_or_pull_initializes_bare_registry() {
     assert_eq!(index.as_ref().unwrap().plugins.len(), 1);
     assert_eq!(index.unwrap().plugins[0].name, "test-plug");
 
-    // Second call: pull should also succeed.
+    // A cache moved onto another branch must be replaced by a clean main clone.
+    let status = Command::new("git")
+        .arg("-C")
+        .arg(&cache)
+        .args(["checkout", "-q", "-b", "stale-cache-branch"])
+        .status()
+        .unwrap();
+    assert!(status.success());
     let result = clone_or_pull();
-    assert!(result.is_ok(), "pull should succeed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "branch recovery should succeed: {:?}",
+        result.err()
+    );
+    let branch = Command::new("git")
+        .arg("-C")
+        .arg(&cache)
+        .args(["symbolic-ref", "--quiet", "--short", "HEAD"])
+        .output()
+        .unwrap();
+    assert_eq!(String::from_utf8_lossy(&branch.stdout).trim(), "main");
 
     // Cleanup.
     let _ = std::fs::remove_dir_all(&remote);
