@@ -35,6 +35,9 @@ impl App {
     /// periodic reload so the view never goes permanently stale.
     pub fn tick(&mut self) {
         self.check_overlay_transitions();
+        if let Some(picker) = &mut self.worktree_picker {
+            picker.poll_changed_counts();
+        }
         self.drain_loads();
         if let Some(latest) = self.update_rx.as_ref().and_then(|rx| rx.try_recv().ok()) {
             self.new_version_available = Some(latest);

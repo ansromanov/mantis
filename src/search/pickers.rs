@@ -3,12 +3,28 @@
 //! `GotoLineState`, `TreeFilter`, and `InFileSearch`/`InFileMatch`, plus
 //! their `ListPicker` implementations.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+use std::sync::mpsc::{self, Receiver};
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 use fuzzy_matcher::skim::SkimMatcherV2;
 
 use crate::list_picker::ListPicker;
+
+const WORKTREE_CACHE_TTL: Duration = Duration::from_secs(5);
+
+struct WorktreeCacheEntry {
+    updated: Instant,
+    items: Vec<crate::git::WorktreeItem>,
+}
+
+static WORKTREE_CACHE: OnceLock<Mutex<HashMap<PathBuf, WorktreeCacheEntry>>> = OnceLock::new();
+
+fn worktree_cache() -> &'static Mutex<HashMap<PathBuf, WorktreeCacheEntry>> {
+    WORKTREE_CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
 
 /// Fuzzy-filterable worktree overview shown by the worktree switcher.
 pub struct WorktreePicker {
@@ -17,6 +33,8 @@ pub struct WorktreePicker {
     pub filtered: Vec<usize>,
     pub selected: usize,
     matcher: SkimMatcherV2,
+    changed_rx: Option<Receiver<Vec<(PathBuf, usize)>>>,
+    cache_key: PathBuf,
 }
 
 impl WorktreePicker {
@@ -28,31 +46,102 @@ impl WorktreePicker {
             filtered: Vec::new(),
             selected: 0,
             matcher: SkimMatcherV2::default(),
+            changed_rx: None,
+            cache_key: PathBuf::new(),
         };
         picker.refresh();
         picker
     }
 
     pub fn new(root: &std::path::Path) -> Self {
-        let items = crate::git::worktree_list(root)
-            .into_iter()
-            .map(|worktree| {
-                let info = crate::git::repo_info(&worktree.path);
-                crate::git::WorktreeItem {
+        let cache_key = root.to_path_buf();
+        let cached = worktree_cache()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .get(&cache_key)
+            .filter(|entry| entry.updated.elapsed() < WORKTREE_CACHE_TTL)
+            .map(|entry| entry.items.clone());
+        let needs_scan = cached.is_none();
+        let items = cached.unwrap_or_else(|| {
+            crate::git::worktree_list(root)
+                .into_iter()
+                .map(|worktree| crate::git::WorktreeItem {
                     worktree,
-                    changed: info.map_or(0, |i| i.total_changed),
-                }
-            })
-            .collect();
+                    changed: 0,
+                })
+                .collect()
+        });
+        let paths = items
+            .iter()
+            .map(|item| item.worktree.path.clone())
+            .collect::<Vec<_>>();
+        let changed_rx = if needs_scan {
+            let (changed_tx, changed_rx) = mpsc::channel();
+            std::thread::Builder::new()
+                .name("mantis-worktree-info".into())
+                .spawn(move || {
+                    let updates = paths
+                        .into_iter()
+                        .map(|path| {
+                            let changed =
+                                crate::git::repo_info(&path).map_or(0, |info| info.total_changed);
+                            (path, changed)
+                        })
+                        .collect();
+                    let _ = changed_tx.send(updates);
+                })
+                .ok();
+            Some(changed_rx)
+        } else {
+            None
+        };
         let mut picker = Self {
             items,
             query: String::new(),
             filtered: Vec::new(),
             selected: 0,
             matcher: SkimMatcherV2::default(),
+            changed_rx,
+            cache_key,
         };
         picker.refresh();
         picker
+    }
+
+    /// Applies any completed background changed-file count scan.
+    pub(crate) fn poll_changed_counts(&mut self) {
+        let Some(rx) = &self.changed_rx else {
+            return;
+        };
+        let updates = match rx.try_recv() {
+            Ok(updates) => updates,
+            Err(mpsc::TryRecvError::Empty) => return,
+            Err(mpsc::TryRecvError::Disconnected) => {
+                self.changed_rx = None;
+                return;
+            }
+        };
+        self.changed_rx = None;
+        for (path, changed) in updates {
+            if let Some(item) = self
+                .items
+                .iter_mut()
+                .find(|item| item.worktree.path == path)
+            {
+                item.changed = changed;
+            }
+        }
+        worktree_cache()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .insert(
+                self.cache_key.clone(),
+                WorktreeCacheEntry {
+                    updated: Instant::now(),
+                    items: self.items.clone(),
+                },
+            );
+        self.refresh();
     }
 
     fn refresh(&mut self) {

@@ -1447,6 +1447,34 @@ fn status_message_survives_fresh_tick() {
 }
 
 #[test]
+fn tick_polls_worktree_changed_counts() {
+    let dir = tempfile::tempdir().unwrap();
+    std::process::Command::new("git")
+        .args(["init", "--quiet"])
+        .current_dir(dir.path())
+        .status()
+        .unwrap();
+    fs::write(dir.path().join("untracked.txt"), "changed").unwrap();
+
+    let mut app = create_base_app();
+    app.worktree_picker = Some(crate::search::WorktreePicker::new(dir.path()));
+
+    for _ in 0..100 {
+        app.tick();
+        if app
+            .worktree_picker
+            .as_ref()
+            .is_some_and(|picker| picker.items.iter().any(|item| item.changed > 0))
+        {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+
+    panic!("worktree changed-file count was not applied by tick");
+}
+
+#[test]
 fn set_status_creates_message_with_timestamp() {
     let mut app = create_base_app();
     app.set_status("test message");
