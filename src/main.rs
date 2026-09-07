@@ -25,6 +25,8 @@ use crossterm::{
 use ratatui::{backend::Backend, backend::CrosstermBackend, Terminal};
 
 use crate::app::App;
+use crate::session::WorkspaceState;
+use crate::workspace::Tabs;
 
 mod actions;
 mod ansi;
@@ -61,6 +63,7 @@ mod tree;
 mod ui;
 mod update;
 mod virtual_file;
+mod workspace;
 mod yaml_fold;
 
 // ---------------------------------------------------------------------------
@@ -86,9 +89,9 @@ mod yaml_fold;
     max_term_width = 80
 )]
 struct Cli {
-    /// File or directory to open (default: current directory)
+    /// File(s) or directory(ies) to open, each as its own tab (default: current directory)
     #[arg(value_name = "PATH")]
-    path: Option<PathBuf>,
+    paths: Vec<PathBuf>,
 
     /// Force the syntax highlighting language for piped stdin
     #[arg(long = "language", short = 'l', value_name = "LANG")]
@@ -174,13 +177,17 @@ fn resolve_input_path(arg: Option<PathBuf>) -> anyhow::Result<PathBuf> {
     Ok(path.canonicalize()?)
 }
 
-/// What `main` should do once arguments are parsed: launch the TUI for `root`,
-/// optionally revealing `file`, or read piped stdin into a pager view.
+/// What `main` should do once arguments are parsed: launch the TUI for one
+/// tab per root (optionally revealing `file` in the first), or read piped
+/// stdin into a pager view.
 enum Startup {
-    /// Launch the UI for `root`, optionally revealing `file`.
+    /// Launch the UI with one tab per entry in `roots`, optionally revealing
+    /// `file` in the first tab. `active` indexes the tab that should start
+    /// focused (only non-zero when restoring a previous workspace).
     Launch {
-        root: PathBuf,
+        roots: Vec<PathBuf>,
         file: Option<PathBuf>,
+        active: usize,
     },
     /// Read stdin into the content pane instead of walking a directory
     /// (`git diff | mantis`). `root` still anchors the (collapsed) tree pane.
@@ -190,26 +197,57 @@ enum Startup {
     },
 }
 
-/// Decides what to do with the parsed CLI argument. Pure and fully testable:
-/// the only side-effecting work (terminal setup, reading stdin, the event
-/// loop) is deferred to `main` based on the returned `Startup`.
+/// Decides what to do with the parsed CLI arguments. Pure and fully
+/// testable: the only side-effecting work (terminal setup, reading stdin,
+/// the event loop) is deferred to `main` based on the returned `Startup`.
+/// `restore` is whatever workspace `main` already loaded (gated on
+/// `[tabs] restore_on_launch`) before calling this — kept as a plain
+/// parameter rather than read here so this function stays pure.
 fn plan_startup(
-    path: Option<PathBuf>,
+    paths: Vec<PathBuf>,
     language: Option<String>,
     stdin_piped: bool,
+    restore: Option<WorkspaceState>,
 ) -> anyhow::Result<Startup> {
     // Pager mode triggers when no real path argument was given (missing, or
     // flag-like — the same rule `resolve_input_path` uses to fall back to the
     // current dir) and stdin is a pipe rather than a terminal.
-    let has_path_arg = path
-        .as_deref()
+    let has_path_arg = paths
+        .first()
         .is_some_and(|a| !a.to_string_lossy().starts_with('-'));
     if stdin_piped && !has_path_arg {
         let root = resolve_input_path(None)?;
         return Ok(Startup::Pager { root, language });
     }
-    let (root, file) = resolve_root_and_file(&resolve_input_path(path)?);
-    Ok(Startup::Launch { root, file })
+    if !paths.is_empty() {
+        let mut roots = Vec::with_capacity(paths.len());
+        let mut file = None;
+        for (i, path) in paths.into_iter().enumerate() {
+            let (root, f) = resolve_root_and_file(&resolve_input_path(Some(path))?);
+            if i == 0 {
+                file = f;
+            }
+            roots.push(root);
+        }
+        return Ok(Startup::Launch {
+            roots,
+            file,
+            active: 0,
+        });
+    }
+    if let Some(ws) = restore {
+        return Ok(Startup::Launch {
+            roots: ws.roots,
+            file: None,
+            active: ws.active,
+        });
+    }
+    let (root, file) = resolve_root_and_file(&resolve_input_path(None)?);
+    Ok(Startup::Launch {
+        roots: vec![root],
+        file,
+        active: 0,
+    })
 }
 
 /// A source of input events for the event loop. Abstracted so the loop can be
@@ -346,19 +384,42 @@ fn main() -> anyhow::Result<()> {
     }
 
     let stdin_piped = pager::is_piped_stdin();
-    match plan_startup(cli.path, cli.language, stdin_piped)? {
-        Startup::Launch { root, file } => {
+    let restore = if cli.paths.is_empty() && !stdin_piped {
+        load_restorable_workspace()
+    } else {
+        None
+    };
+    match plan_startup(cli.paths, cli.language, stdin_piped, restore)? {
+        Startup::Launch {
+            roots,
+            file,
+            active,
+        } => {
             let initial = file.map_or(InitialContent::None, InitialContent::File);
-            launch_tui(root, initial)
+            launch_tui(roots, active, initial)
         }
         Startup::Pager { root, language } => {
             // Read stdin to EOF before touching the terminal, mirroring how
             // `less`/`git`'s built-in pager behave.
             let bytes = pager::read_stdin_bytes()?;
             let parsed = pager::parse_pager_bytes(&bytes);
-            launch_tui(root, InitialContent::Pager { parsed, language })
+            launch_tui(vec![root], 0, InitialContent::Pager { parsed, language })
         }
     }
+}
+
+/// Loads the persisted workspace manifest, gated on the `[tabs]
+/// restore_on_launch` setting of whatever config would apply to the current
+/// directory (the only sensible config to consult before any tab root is
+/// known). Returns `None` when restore is disabled, no manifest exists, or
+/// every root it named is now gone.
+fn load_restorable_workspace() -> Option<WorkspaceState> {
+    let cwd = std::env::current_dir().ok()?;
+    let (cfg, _, _) = config::load(&cwd);
+    if !cfg.tabs.restore_on_launch {
+        return None;
+    }
+    crate::session::load_workspace()
 }
 
 /// What the content pane should show right after startup: nothing (default),
@@ -388,7 +449,7 @@ impl Drop for TerminalGuard {
     }
 }
 
-fn launch_tui(root: PathBuf, initial: InitialContent) -> anyhow::Result<()> {
+fn launch_tui(roots: Vec<PathBuf>, active: usize, initial: InitialContent) -> anyhow::Result<()> {
     // Whenever stdin isn't the terminal (piped/redirected, e.g. `mantis <
     // /dev/null` or `echo x | mantis some/path`), fd 0 can't supply keyboard
     // events, regardless of whether pager mode is showing piped content or a
@@ -458,53 +519,65 @@ fn launch_tui(root: PathBuf, initial: InitialContent) -> anyhow::Result<()> {
     #[cfg(not(unix))]
     let _ = keyboard_enhanced;
 
-    run_app(&mut terminal, root, initial, events.as_mut())
+    run_app(&mut terminal, roots, active, initial, events.as_mut())
 }
 
-/// Builds the app for `root`, applies `initial` (a revealed file, piped
-/// stdin content, or nothing), runs the event loop against `terminal`, and
-/// reports any config error after the loop exits. Generic over the backend
-/// so tests can drive it with `TestBackend`.
+/// Builds one `App` per entry in `roots`, applies `initial` (a revealed file,
+/// piped stdin content, or nothing) to the first tab, runs the event loop
+/// against `terminal`, and reports any config error after the loop exits.
+/// Generic over the backend so tests can drive it with `TestBackend`.
 fn run_app(
     terminal: &mut Terminal<impl Backend>,
-    root: PathBuf,
+    roots: Vec<PathBuf>,
+    active: usize,
     initial: InitialContent,
     events: &mut dyn EventSource,
 ) -> anyhow::Result<()> {
-    let (cfg, cfg_path, cfg_error) = config::load(&root);
-    let mut app = App::new(root, cfg, cfg_path, cfg_error)?;
+    let mut apps = Vec::with_capacity(roots.len());
+    for root in roots {
+        let (cfg, cfg_path, cfg_error) = config::load(&root);
+        let mut app = App::new(root, cfg, cfg_path, cfg_error)?;
+        // Drive tree/git refreshes from filesystem events rather than a blind timer.
+        app.watch_root();
+        app.install_config_watcher();
+        apps.push(app);
+    }
 
-    // Show the first-run welcome overlay if it has never been dismissed.
+    let mut tabs = Tabs::new(apps, active);
+
+    // Show the first-run welcome overlay (once ever) on the starting tab.
     if !crate::session::is_welcome_shown() {
-        app.show_welcome = true;
+        tabs.active_app_mut().show_welcome = true;
     }
 
     match initial {
         InitialContent::File(file) => {
             // A CLI file argument is an explicit user selection and must win
             // over the file restored by the per-root session.
+            let app = tabs.active_app_mut();
             app.current_file = None;
             app.open_and_reveal(&file);
         }
-        InitialContent::Pager { parsed, language } => app.open_pager_content(parsed, language),
+        InitialContent::Pager { parsed, language } => {
+            tabs.active_app_mut().open_pager_content(parsed, language)
+        }
         InitialContent::None => {}
     }
-    // Drive tree/git refreshes from filesystem events rather than a blind timer.
-    app.watch_root();
-    app.install_config_watcher();
 
-    let loop_result = run_event_loop(terminal, &mut app, events);
+    let loop_result = run_event_loop(terminal, &mut tabs, events);
 
-    // Persist session state (expanded dirs, open file, scroll pos, git mode).
-    app.save_session();
+    // Persist every tab's session and the workspace manifest.
+    tabs.save_all_and_persist_workspace();
 
     // Notify plugins of quit on every exit path, then shut them down.
-    app.plugin_manager.on_quit();
-    app.plugin_manager.deactivate_all();
+    for app in &mut tabs.apps {
+        app.plugin_manager.on_quit();
+        app.plugin_manager.deactivate_all();
+    }
 
     loop_result?;
 
-    if let Some(err) = &app.config_error {
+    if let Some(err) = &tabs.active_app().config_error {
         eprintln!("mantis: ignoring invalid config: {err}");
     }
 
@@ -518,18 +591,18 @@ fn run_app(
 /// drained before the next render so the burst collapses into a single frame.
 fn run_event_loop(
     terminal: &mut Terminal<impl Backend>,
-    app: &mut App,
+    tabs: &mut Tabs,
     events: &mut dyn EventSource,
 ) -> anyhow::Result<()> {
     loop {
-        render_frame(terminal, app)?;
+        render_frame(terminal, tabs)?;
 
         if let Some(event) = events.next_event()? {
-            dispatch_event(app, event);
+            dispatch_event(tabs, event);
             // Drain a burst (e.g. mouse-wheel) so it applies in one frame.
             let mut drained = 0;
             while let Some(event) = events.try_next_event()? {
-                dispatch_event(app, event);
+                dispatch_event(tabs, event);
                 drained += 1;
                 if drained >= 256 {
                     break; // safety cap: never starve the render
@@ -537,39 +610,36 @@ fn run_event_loop(
             }
         }
 
-        if app.should_quit {
+        if tabs.active_app().should_quit {
             break;
         }
 
-        app.tick();
+        tabs.active_app_mut().tick();
     }
     Ok(())
 }
 
 /// Clears the terminal when requested, then renders one frame of the UI.
-fn render_frame(terminal: &mut Terminal<impl Backend>, app: &mut App) -> anyhow::Result<()> {
-    if app.needs_clear {
+fn render_frame(terminal: &mut Terminal<impl Backend>, tabs: &mut Tabs) -> anyhow::Result<()> {
+    if tabs.active_app().needs_clear {
         terminal.clear()?;
         terminal.hide_cursor()?;
-        app.needs_clear = false;
+        tabs.active_app_mut().needs_clear = false;
         // A full clear wipes any inline image too; drop our record of it so the
         // overlay re-transmits on the next frame instead of only re-placing.
         crate::graphics::clear_all(&mut io::stdout());
     }
-    terminal.draw(|f| ui::draw(f, app))?;
+    terminal.draw(|f| ui::draw_workspace(f, tabs))?;
     // Inline images are written straight to the terminal on top of the region
     // the content pane reserved for them, after ratatui has painted the frame.
-    crate::graphics::render_overlay(app, &mut io::stdout());
+    crate::graphics::render_overlay(tabs.active_app_mut(), &mut io::stdout());
     Ok(())
 }
 
-/// Dispatches a single terminal event to the app's key/mouse handlers.
-fn dispatch_event(app: &mut App, event: Event) {
-    match event {
-        Event::Key(key) => app.handle_key(key),
-        Event::Mouse(m) => app.handle_mouse(m),
-        _ => {}
-    }
+/// Dispatches a single terminal event to the active tab, handling tab-strip
+/// clicks and tab-lifecycle actions along the way (see `Tabs::dispatch_event`).
+fn dispatch_event(tabs: &mut Tabs, event: Event) {
+    tabs.dispatch_event(event);
 }
 
 #[cfg(test)]

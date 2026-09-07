@@ -101,6 +101,12 @@ check = true                 # check for newer releases (at most once per day)
 enabled = false              # collect anonymous usage events locally
 
 
+# --- tabs ---------------------------------------------------------------
+# Multiple project tabs and workspace restore.
+[tabs]
+restore_on_launch = true     # reopen last session's tabs when launched with no path
+
+
 # --- keybindings ------------------------------------------------------------
 # Each action takes a list of key specs. A spec is a single character ("q",
 # "?", "0") or a named key (Up Down Left Right Enter Tab Esc Backspace PageUp

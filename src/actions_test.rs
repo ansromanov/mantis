@@ -23,6 +23,19 @@ fn bookmark_actions_are_registered() {
     assert!(ACTIONS.iter().any(|action| action.id == "bookmarks"));
 }
 
+#[test]
+fn tab_actions_are_registered_with_palette_entries() {
+    for id in ["new_tab", "close_tab", "next_tab", "prev_tab"] {
+        let action = ACTIONS
+            .iter()
+            .find(|a| a.id == id)
+            .unwrap_or_else(|| panic!("'{id}' missing from ACTIONS"));
+        assert!(action.palette.is_some(), "'{id}' must be palette-invokable");
+        assert_eq!(action.category, Some("Tabs"), "'{id}' category");
+        assert!(action.description.is_some(), "'{id}' needs a description");
+    }
+}
+
 /// Every `Keymap` field that represents a real bound action, by its canonical
 /// action id (matching the field name, or the id `Keymap::bindings_for_action`
 /// maps to that field - see `config::keymap`). Kept in sync by hand since Rust

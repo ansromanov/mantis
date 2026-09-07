@@ -177,6 +177,7 @@ impl App {
             bug_report_area: ratatui::layout::Rect::default(),
             bug_report_preview_area: ratatui::layout::Rect::default(),
             should_quit: false,
+            tab_action_request: None,
             theme,
             git_status_enabled,
             git_show_deleted,

@@ -17,6 +17,18 @@ pub enum Focus {
     Content,
 }
 
+/// A tab-lifecycle action requested via a keybinding or the command palette.
+/// `App` cannot act on these itself (it owns exactly one project root); the
+/// `Tabs` wrapper checks `App::tab_action_request` after every event and
+/// clears it once handled.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TabAction {
+    New,
+    Close,
+    Next,
+    Prev,
+}
+
 /// Which git diff view is active in the content pane.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]

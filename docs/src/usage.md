@@ -99,6 +99,28 @@ dotfiles into the repository. Each workspace root gets its own file under
 the `sessions/` subdirectory. To reset the session for a directory, quit
 and delete its file from the `sessions/` subdirectory in the state directory.
 
+## Tabs
+
+Open more than one project at once: pass multiple paths on the command line
+(`mantis dir1 dir2`), or use the command palette's `Open project as new tab`
+(type a directory path, `Enter` to open it, `Esc` to cancel). A tab strip
+appears above the tree/content panes whenever more than one tab is open —
+click a tab to switch to it, or its `×` to close it.
+
+| Key              | Action                        |
+| ---------------- | ------------------------------ |
+| `Ctrl+n`         | Open project as new tab        |
+| `Ctrl+w`         | Close the current tab          |
+| `Ctrl+PageDown`  | Next tab                       |
+| `Ctrl+PageUp`    | Previous tab                   |
+
+Each tab is fully independent — its own tree, open file, scroll position, and
+git mode — using the same per-root [session persistence](#session-persistence)
+as a single-root launch. The set of open tabs and which one was active are
+also remembered and restored automatically the next time you launch `mantis`
+with no path arguments; disable this with `[tabs] restore_on_launch = false`
+in `mantis.toml` (see [Configuration](configuration.md)).
+
 > 💡 **Can't remember a key?** Press `?` or `F1` for the help overlay, or `Ctrl+P`
 > to open the command palette and search for an action by name — it shows you
 > the shortcut too. New to `mantis`? Start with the [Quick Start](quickstart.md).

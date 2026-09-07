@@ -49,4 +49,5 @@ pub mod tree;
 pub mod ui;
 pub mod update;
 pub mod virtual_file;
+pub mod workspace;
 pub mod yaml_fold;

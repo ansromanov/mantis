@@ -1,5 +1,15 @@
 use super::*;
 
+// -- TabAction --------------------------------------------------------------
+
+#[test]
+fn tab_action_is_copy_and_comparable() {
+    let a = TabAction::Next;
+    let b = a; // Copy, not move
+    assert_eq!(a, b);
+    assert_ne!(TabAction::New, TabAction::Close);
+}
+
 // -- DiffMode -----------------------------------------------------------------
 
 #[test]

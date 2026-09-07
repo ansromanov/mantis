@@ -16,7 +16,7 @@ use crate::search::{
     CommandPalette, GotoLineState, InFileSearch, PluginPicker, SearchState, ThemePicker, TreeFilter,
 };
 
-use super::super::{App, Focus};
+use super::super::{App, Focus, TabAction};
 
 impl App {
     /// Handles all key events when no overlay is active. Dispatches global
@@ -215,6 +215,14 @@ impl App {
             self.copy_path_to_clipboard(false);
         } else if pressed_in(&k.copy_relative_path, &key, scope) {
             self.copy_path_to_clipboard(true);
+        } else if pressed_in(&k.new_tab, &key, scope) {
+            self.tab_action_request = Some(TabAction::New);
+        } else if pressed_in(&k.close_tab, &key, scope) {
+            self.tab_action_request = Some(TabAction::Close);
+        } else if pressed_in(&k.next_tab, &key, scope) {
+            self.tab_action_request = Some(TabAction::Next);
+        } else if pressed_in(&k.prev_tab, &key, scope) {
+            self.tab_action_request = Some(TabAction::Prev);
         } else {
             match self.focus {
                 Focus::Tree => self.handle_tree_key(key),

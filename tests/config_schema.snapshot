@@ -25,6 +25,7 @@ keys
 keys.blame_line
 keys.blame_open_commit
 keys.bookmarks
+keys.close_tab
 keys.command_palette
 keys.content_bottom
 keys.content_left
@@ -50,9 +51,12 @@ keys.goto_line
 keys.help
 keys.nav_down
 keys.nav_up
+keys.new_tab
+keys.next_tab
 keys.open_external
 keys.open_in_editor
 keys.plugin_picker
+keys.prev_tab
 keys.quit
 keys.recent_files
 keys.reload
@@ -91,6 +95,8 @@ search.keep_query
 statusbar
 statusbar.left
 statusbar.right
+tabs
+tabs.restore_on_launch
 telemetry
 telemetry.enabled
 telemetry.notice_shown

@@ -43,6 +43,27 @@ fn ctrl(c: char) -> KeyEvent {
     KeyEvent::new(KeyCode::Char(c), KeyModifiers::CONTROL)
 }
 
+// -- tab actions ----------------------------------------------------------
+
+#[test]
+fn ctrl_n_records_a_new_tab_action_request() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(ctrl('n'));
+    assert_eq!(app.tab_action_request, Some(crate::app::TabAction::New));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn ctrl_pagedown_records_a_next_tab_action_request_from_content_focus() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = Focus::Content;
+    app.handle_key(KeyEvent::new(KeyCode::PageDown, KeyModifiers::CONTROL));
+    assert_eq!(app.tab_action_request, Some(crate::app::TabAction::Next));
+    fs::remove_dir_all(&root).ok();
+}
+
 // -- active-line navigation --------------------------------------------------
 
 #[test]
