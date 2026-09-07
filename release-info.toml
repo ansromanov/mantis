@@ -1,5 +1,5 @@
-version = "0.19.3"
-date = "2026-09-06"
+version = "0.19.4"
+date = "2026-09-07"
 whats_new = """- test: update release test expectations (#790)
 - fix: scroll wrapped markdown by visual rows (#781)
 - docs: add language and format coverage roadmap spec (#602) (#789)
