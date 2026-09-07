@@ -1041,3 +1041,15 @@ fn worktree_picker_filters_by_branch() {
     }]);
     assert_eq!(picker.filtered, vec![0]);
 }
+
+#[test]
+fn worktree_picker_drops_disconnected_changed_count_worker() {
+    let (tx, rx) = std::sync::mpsc::channel();
+    drop(tx);
+    let mut picker = WorktreePicker::for_test(Vec::new());
+    picker.changed_rx = Some(rx);
+
+    picker.poll_changed_counts();
+
+    assert!(picker.changed_rx.is_none());
+}

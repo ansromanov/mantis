@@ -113,8 +113,13 @@ impl WorktreePicker {
         let Some(rx) = &self.changed_rx else {
             return;
         };
-        let Ok(updates) = rx.try_recv() else {
-            return;
+        let updates = match rx.try_recv() {
+            Ok(updates) => updates,
+            Err(mpsc::TryRecvError::Empty) => return,
+            Err(mpsc::TryRecvError::Disconnected) => {
+                self.changed_rx = None;
+                return;
+            }
         };
         self.changed_rx = None;
         for (path, changed) in updates {

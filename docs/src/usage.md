@@ -429,5 +429,5 @@ When a repository has multiple linked worktrees, use the command palette and
 choose `Open worktree switcher`. The picker shows each worktree's branch and
 changed-file count; type to filter, then press Enter to switch the tree to that
 worktree. The picker opens immediately; changed-file counts are filled in as
-the background scan completes. The status bar shows the total worktree count when more than one is
-available.
+the background scan completes. The status bar shows the total worktree count
+when more than one is available.
