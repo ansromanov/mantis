@@ -1,8 +1,7 @@
 version = "0.20.2"
 date = "2026-09-08"
-whats_new = """- fix: keep worktree switcher responsive (#796)
-- feat: add TypeScript and template folding plugins (#795)
-- docs: clarify mandatory worktrees (#792)
-- feat: add CSS and TOML folding plugins (#793)
-- chore: bump Homebrew formula to v0.19.0 [skip ci]"""
-release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.20.0"
+whats_new = """- feat: capability-sweep skill — parallel multi-agent E2E verification (#798)
+- feat: add bundled ini and sql language providers (#799)
+- feat: tabs for multiple projects + workspace restore (#797)
+- chore: bump Homebrew formula to v0.20.0 [skip ci]"""
+release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.20.2"
