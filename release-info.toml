@@ -1,16 +1,8 @@
-version = "0.19.4"
-date = "2026-09-07"
-whats_new = """- test: update release test expectations (#790)
-- fix: scroll wrapped markdown by visual rows (#781)
-- docs: add language and format coverage roadmap spec (#602) (#789)
-- feat: harden plugin registry trust model (#780)
-- feat: add per-workspace file bookmarks (#775)
-- feat: render images inline via the Kitty graphics protocol (#774)
-- feat: expose cursor line to selection-change plugins (#772)
-- feat: show real image dimensions in the binary-file placeholder (#773)
-- feat: status_facts plugin capability + bundled k8s manifest plugin (#771)
-- Fix wrapped scrolling and transient view state (#769)
-- feat: add JSON path breadcrumb and query bar (#758)
-- fix(plugin): ensure safe default plugin installation and sparse config saving (#768)
-- chore: bump Homebrew formula to v0.18.0 [skip ci]"""
-release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.19.0"
+version = "0.20.0"
+date = "2026-09-08"
+whats_new = """- fix: keep worktree switcher responsive (#796)
+- feat: add TypeScript and template folding plugins (#795)
+- docs: clarify mandatory worktrees (#792)
+- feat: add CSS and TOML folding plugins (#793)
+- chore: bump Homebrew formula to v0.19.0 [skip ci]"""
+release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.20.0"
