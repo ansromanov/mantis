@@ -1149,20 +1149,26 @@ fn handle_in_file_search_key_toggles() {
 }
 
 #[test]
-fn in_file_search_navigation_keys_can_be_entered_in_query() {
+fn in_file_search_navigation_keys_navigate_with_query_active() {
     let root = temp_tree();
     let mut app = app_for(&root);
+    app.current_file = None;
+    app.virtual_file = None;
+    app.content = vec!["foo foo".to_string(), "bar".to_string()];
     app.in_file_search = Some(InFileSearch::new());
     app.in_file_search.as_mut().unwrap().push('o');
     app.refresh_in_file_search();
+    assert!(app.in_file_search.as_ref().unwrap().matches.len() >= 2);
 
     app.handle_in_file_search_key(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::empty()));
+    assert_eq!(app.in_file_search.as_ref().unwrap().current, 1);
     app.handle_in_file_search_key(KeyEvent::new(KeyCode::Char('N'), KeyModifiers::SHIFT));
-    assert_eq!(app.in_file_search.as_ref().unwrap().query, "onN");
+    assert_eq!(app.in_file_search.as_ref().unwrap().current, 0);
+    assert_eq!(app.in_file_search.as_ref().unwrap().query, "o");
 
     app.handle_in_file_search_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::empty()));
     app.handle_in_file_search_key(KeyEvent::new(KeyCode::BackTab, KeyModifiers::empty()));
-    assert_eq!(app.in_file_search.as_ref().unwrap().query, "onN");
+    assert_eq!(app.in_file_search.as_ref().unwrap().current, 0);
     fs::remove_dir_all(&root).ok();
 }
 

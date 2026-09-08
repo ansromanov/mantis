@@ -76,6 +76,10 @@ impl App {
                 self.blame_before_commit = false;
                 return;
             }
+            if self.git_mode && self.compare_base.is_some() {
+                self.toggle_git_mode();
+                return;
+            }
         }
         let scope = match self.focus {
             Focus::Tree => BindingScope::Tree,
