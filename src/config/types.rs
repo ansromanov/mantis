@@ -233,6 +233,24 @@ pub struct TelemetryConfig {
     pub notice_shown: bool,
 }
 
+/// Tabs/workspace configuration, grouped under `[tabs]` in the TOML.
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[serde(default)]
+pub struct TabsConfig {
+    /// When launching with no path arguments, reopen the tabs (project roots)
+    /// that were open at last quit instead of opening the current directory.
+    /// Default: true.
+    pub restore_on_launch: bool,
+}
+
+impl Default for TabsConfig {
+    fn default() -> Self {
+        TabsConfig {
+            restore_on_launch: true,
+        }
+    }
+}
+
 /// The root mantis configuration object.
 ///
 /// Every field carries `#[serde(default)]` so a partial TOML file or an older
@@ -271,6 +289,8 @@ pub struct Config {
     pub updates: UpdatesConfig,
     /// Grouped local-telemetry settings.
     pub telemetry: TelemetryConfig,
+    /// Grouped tabs/workspace settings.
+    pub tabs: TabsConfig,
 
     // --- deprecated flat keys (read for backward-compat; never written) ---
     #[serde(default, skip_serializing, rename = "git_status")]
@@ -334,6 +354,7 @@ impl Default for Config {
             statusbar: StatusBarConfig::default(),
             updates: UpdatesConfig::default(),
             telemetry: TelemetryConfig::default(),
+            tabs: TabsConfig::default(),
 
             legacy_git_status: None,
             legacy_git_show_deleted: None,

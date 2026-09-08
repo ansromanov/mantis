@@ -42,6 +42,30 @@ fn dispatch_json_query_opens_query_bar() {
 }
 
 #[test]
+fn dispatch_new_tab_records_a_tab_action_request() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.command_palette = Some(palette_with_query("Open project as new tab"));
+    assert!(app.dispatch_command());
+    assert_eq!(
+        app.tab_action_request,
+        Some(crate::app::TabAction::New),
+        "the wrapper picks this up after the event"
+    );
+    fs::remove_dir_all(root).ok();
+}
+
+#[test]
+fn dispatch_next_tab_records_a_tab_action_request() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.command_palette = Some(palette_with_query("Next tab"));
+    assert!(app.dispatch_command());
+    assert_eq!(app.tab_action_request, Some(crate::app::TabAction::Next));
+    fs::remove_dir_all(root).ok();
+}
+
+#[test]
 fn dispatch_bookmarks_command_opens_picker() {
     let root = temp_tree();
     let mut app = app_for(&root);

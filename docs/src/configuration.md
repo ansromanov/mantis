@@ -99,6 +99,9 @@ side_by_side = false         # start the diff view in side-by-side layout
 
 [telemetry]
 enabled = false              # anonymous, local-only usage log — see Telemetry & Bug Reports
+
+[tabs]
+restore_on_launch = true     # reopen last session's tabs when launched with no path
 ```
 
 ## Keybindings
@@ -164,6 +167,12 @@ file_history = ["tree:H"]
 goto_line = ["ctrl+g"]
 git_mode_toggle = ["ctrl+d"]
 git_mode_flat_toggle = ["tree:F"]
+
+# tabs
+new_tab = ["ctrl+n"]
+close_tab = ["ctrl+w"]
+next_tab = ["ctrl+PageDown"]
+prev_tab = ["ctrl+PageUp"]
 
 # search
 search_files = ["/"]          # contextual: tree filter / in-file search

@@ -314,6 +314,12 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
             rows.push(row_key("recent_files"));
             rows.push(row_key("toggle_hidden"));
             rows.push(gap.clone());
+            rows.push(section("Tabs"));
+            rows.push(row_key("new_tab"));
+            rows.push(row_key("close_tab"));
+            rows.push(row_key("next_tab"));
+            rows.push(row_key("prev_tab"));
+            rows.push(gap.clone());
         }
         1 => {
             // Navigation

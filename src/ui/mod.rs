@@ -21,14 +21,36 @@ use crate::app::App;
 mod content;
 pub(crate) mod popups;
 mod statusbar;
+pub(crate) mod tabstrip;
 pub mod tree;
 
 const MIN_LAYOUT_WIDTH: u16 = 80;
 const MIN_LAYOUT_HEIGHT: u16 = 6;
 
+/// Draws the whole workspace: the tab strip (only when more than one tab is
+/// open, or the "open project as new tab" prompt is active) above the
+/// regular single-root frame for the active tab. With exactly one tab and no
+/// prompt open, this renders identically to calling [`draw`] directly.
+pub fn draw_workspace(f: &mut Frame, tabs: &mut crate::workspace::Tabs) {
+    let full = f.area();
+    if tabs.apps.len() > 1 || tabs.new_tab_prompt.is_some() {
+        let vert = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(1), Constraint::Min(0)])
+            .split(full);
+        tabstrip::draw_tabstrip(f, tabs, vert[0]);
+        draw_area(f, tabs.active_app_mut(), vert[1]);
+    } else {
+        draw(f, tabs.active_app_mut());
+    }
+}
+
 pub fn draw(f: &mut Frame, app: &mut App) {
     let area = f.area();
+    draw_area(f, app, area);
+}
 
+fn draw_area(f: &mut Frame, app: &mut App, area: Rect) {
     // Paint the themed background; widgets that don't set their own bg inherit
     // it. With the default theme this is Color::Reset (the terminal default).
     f.render_widget(

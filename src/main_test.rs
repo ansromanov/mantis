@@ -7,6 +7,7 @@ use ratatui::backend::TestBackend;
 
 use crate::app::App;
 use crate::config::Config;
+use crate::workspace::Tabs;
 
 fn temp_dir() -> PathBuf {
     static COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -133,7 +134,7 @@ impl EventSource for IdleThenQuit {
 #[test]
 fn cli_defaults() {
     let cli = Cli::try_parse_from(["mantis"]).unwrap();
-    assert!(cli.path.is_none());
+    assert!(cli.paths.is_empty());
     assert!(cli.language.is_none());
     assert!(cli.completions.is_none());
     assert!(!cli.print_man_page);
@@ -143,7 +144,20 @@ fn cli_defaults() {
 #[test]
 fn cli_parses_path() {
     let cli = Cli::try_parse_from(["mantis", "/some/path"]).unwrap();
-    assert_eq!(cli.path, Some(PathBuf::from("/some/path")));
+    assert_eq!(cli.paths, vec![PathBuf::from("/some/path")]);
+}
+
+#[test]
+fn cli_parses_multiple_paths() {
+    let cli = Cli::try_parse_from(["mantis", "/a", "/b", "/c"]).unwrap();
+    assert_eq!(
+        cli.paths,
+        vec![
+            PathBuf::from("/a"),
+            PathBuf::from("/b"),
+            PathBuf::from("/c")
+        ]
+    );
 }
 
 #[test]
@@ -192,7 +206,7 @@ fn cli_parses_telemetry_status() {
 fn cli_parses_path_and_language() {
     let cli = Cli::try_parse_from(["mantis", "--language", "rust", "/some/path"]).unwrap();
     assert_eq!(cli.language.as_deref(), Some("rust"));
-    assert_eq!(cli.path, Some(PathBuf::from("/some/path")));
+    assert_eq!(cli.paths, vec![PathBuf::from("/some/path")]);
 }
 
 #[test]
@@ -316,10 +330,10 @@ fn resolve_input_path_errors_on_missing_path() {
 #[test]
 fn plan_startup_directory_returns_launch() {
     let dir = temp_dir();
-    let startup = plan_startup(Some(dir.clone()), None, false).unwrap();
+    let startup = plan_startup(vec![dir.clone()], None, false, None).unwrap();
     match startup {
-        Startup::Launch { root, file, .. } => {
-            assert_eq!(root, dir);
+        Startup::Launch { roots, file, .. } => {
+            assert_eq!(roots, vec![dir.clone()]);
             assert!(file.is_none());
         }
         _ => panic!("expected Launch for a directory"),
@@ -333,10 +347,10 @@ fn plan_startup_file_returns_launch_with_file() {
     let file_path = dir.join("a.txt");
     fs::write(&file_path, "hello\n").unwrap();
     let canonical = file_path.canonicalize().unwrap();
-    let startup = plan_startup(Some(canonical.clone()), None, false).unwrap();
+    let startup = plan_startup(vec![canonical.clone()], None, false, None).unwrap();
     match startup {
-        Startup::Launch { root, file, .. } => {
-            assert_eq!(root, dir);
+        Startup::Launch { roots, file, .. } => {
+            assert_eq!(roots, vec![dir.clone()]);
             assert_eq!(file, Some(canonical));
         }
         _ => panic!("expected Launch for a file"),
@@ -347,12 +361,33 @@ fn plan_startup_file_returns_launch_with_file() {
 #[test]
 fn plan_startup_missing_path_errors() {
     let missing = std::env::temp_dir().join("tv_plan_missing_xyz_98765");
-    assert!(plan_startup(Some(missing), None, false).is_err());
+    assert!(plan_startup(vec![missing], None, false, None).is_err());
+}
+
+#[test]
+fn plan_startup_multiple_paths_returns_one_tab_per_root() {
+    let a = temp_dir();
+    let b = temp_dir();
+    let startup = plan_startup(vec![a.clone(), b.clone()], None, false, None).unwrap();
+    match startup {
+        Startup::Launch {
+            roots,
+            file,
+            active,
+        } => {
+            assert_eq!(roots, vec![a.clone(), b.clone()]);
+            assert!(file.is_none());
+            assert_eq!(active, 0);
+        }
+        _ => panic!("expected Launch for multiple directories"),
+    }
+    fs::remove_dir_all(&a).ok();
+    fs::remove_dir_all(&b).ok();
 }
 
 #[test]
 fn plan_startup_piped_stdin_with_no_path_returns_pager() {
-    let startup = plan_startup(None, Some("rust".to_string()), true).unwrap();
+    let startup = plan_startup(vec![], Some("rust".to_string()), true, None).unwrap();
     match startup {
         Startup::Pager { root, language } => {
             assert_eq!(root, PathBuf::from(".").canonicalize().unwrap());
@@ -366,7 +401,7 @@ fn plan_startup_piped_stdin_with_no_path_returns_pager() {
 fn plan_startup_piped_stdin_with_flag_arg_returns_pager() {
     // A flag-like first arg (e.g. `mantis --language rust < file`) must not be
     // mistaken for a path argument.
-    let startup = plan_startup(Some(PathBuf::from("--language")), None, true).unwrap();
+    let startup = plan_startup(vec![PathBuf::from("--language")], None, true, None).unwrap();
     assert!(matches!(startup, Startup::Pager { .. }));
 }
 
@@ -374,21 +409,63 @@ fn plan_startup_piped_stdin_with_flag_arg_returns_pager() {
 fn plan_startup_piped_stdin_with_real_path_returns_launch() {
     // An explicit path argument takes precedence over piped stdin.
     let dir = temp_dir();
-    let startup = plan_startup(Some(dir.clone()), None, true).unwrap();
+    let startup = plan_startup(vec![dir.clone()], None, true, None).unwrap();
     assert!(matches!(startup, Startup::Launch { .. }));
     fs::remove_dir_all(&dir).ok();
 }
 
 #[test]
 fn plan_startup_no_path_without_piped_stdin_returns_launch() {
-    let startup = plan_startup(None, None, false).unwrap();
+    let startup = plan_startup(vec![], None, false, None).unwrap();
     match startup {
-        Startup::Launch { root, file, .. } => {
-            assert_eq!(root, PathBuf::from(".").canonicalize().unwrap());
+        Startup::Launch { roots, file, .. } => {
+            assert_eq!(roots, vec![PathBuf::from(".").canonicalize().unwrap()]);
             assert!(file.is_none());
         }
         _ => panic!("expected Launch when stdin is a tty"),
     }
+}
+
+#[test]
+fn plan_startup_restore_used_when_no_paths_given() {
+    let a = temp_dir();
+    let b = temp_dir();
+    let restore = crate::session::WorkspaceState {
+        roots: vec![a.clone(), b.clone()],
+        active: 1,
+    };
+    let startup = plan_startup(vec![], None, false, Some(restore)).unwrap();
+    match startup {
+        Startup::Launch {
+            roots,
+            file,
+            active,
+        } => {
+            assert_eq!(roots, vec![a.clone(), b.clone()]);
+            assert!(file.is_none());
+            assert_eq!(active, 1);
+        }
+        _ => panic!("expected Launch from a restored workspace"),
+    }
+    fs::remove_dir_all(&a).ok();
+    fs::remove_dir_all(&b).ok();
+}
+
+#[test]
+fn plan_startup_explicit_paths_override_restore() {
+    let explicit = temp_dir();
+    let restored = temp_dir();
+    let restore = crate::session::WorkspaceState {
+        roots: vec![restored.clone()],
+        active: 0,
+    };
+    let startup = plan_startup(vec![explicit.clone()], None, false, Some(restore)).unwrap();
+    match startup {
+        Startup::Launch { roots, .. } => assert_eq!(roots, vec![explicit.clone()]),
+        _ => panic!("expected Launch for the explicit path"),
+    }
+    fs::remove_dir_all(&explicit).ok();
+    fs::remove_dir_all(&restored).ok();
 }
 
 // ---------------------------------------------------------------------------
@@ -398,18 +475,18 @@ fn plan_startup_no_path_without_piped_stdin_returns_launch() {
 #[test]
 fn dispatch_event_routes_key_to_handler() {
     let dir = temp_dir();
-    let mut app = app_for(&dir);
-    dispatch_event(&mut app, key_event('q'));
-    assert!(app.should_quit);
+    let mut tabs = Tabs::new(vec![app_for(&dir)], 0);
+    dispatch_event(&mut tabs, key_event('q'));
+    assert!(tabs.active_app().should_quit);
     fs::remove_dir_all(&dir).ok();
 }
 
 #[test]
 fn dispatch_event_ignores_non_key_mouse_events() {
     let dir = temp_dir();
-    let mut app = app_for(&dir);
-    dispatch_event(&mut app, Event::FocusGained);
-    assert!(!app.should_quit);
+    let mut tabs = Tabs::new(vec![app_for(&dir)], 0);
+    dispatch_event(&mut tabs, Event::FocusGained);
+    assert!(!tabs.active_app().should_quit);
     fs::remove_dir_all(&dir).ok();
 }
 
@@ -418,7 +495,7 @@ fn dispatch_event_routes_mouse_event() {
     use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
     let dir = temp_dir();
     fs::write(dir.join("a.txt"), "hello\n").unwrap();
-    let mut app = app_for(&dir);
+    let mut tabs = Tabs::new(vec![app_for(&dir)], 0);
     let mouse = Event::Mouse(MouseEvent {
         kind: MouseEventKind::Down(MouseButton::Left),
         column: 0,
@@ -426,9 +503,34 @@ fn dispatch_event_routes_mouse_event() {
         modifiers: KeyModifiers::empty(),
     });
     // Just needs to route to handle_mouse without panicking.
-    dispatch_event(&mut app, mouse);
-    assert!(!app.should_quit);
+    dispatch_event(&mut tabs, mouse);
+    assert!(!tabs.active_app().should_quit);
     fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn dispatch_event_switches_tab_on_strip_click() {
+    use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
+    let a = temp_dir();
+    let b = temp_dir();
+    let mut tabs = Tabs::new(vec![app_for(&a), app_for(&b)], 0);
+    tabs.strip_area = ratatui::layout::Rect::new(0, 0, 60, 1);
+    // Column 1 lands inside the first tab's label (" {label} ").
+    let mouse = Event::Mouse(MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: 1,
+        row: 0,
+        modifiers: KeyModifiers::empty(),
+    });
+    // Force-select tab 1 first so the click actually changes something.
+    tabs.active = 1;
+    dispatch_event(&mut tabs, mouse);
+    assert_eq!(
+        tabs.active, 0,
+        "clicking the first tab's label must switch to it"
+    );
+    fs::remove_dir_all(&a).ok();
+    fs::remove_dir_all(&b).ok();
 }
 
 // ---------------------------------------------------------------------------
@@ -507,12 +609,12 @@ fn event_loop_key_command_palette_toggles() {
 fn run_event_loop_quits_on_q() {
     let dir = temp_dir();
     fs::write(dir.join("a.txt"), "hello\n").unwrap();
-    let mut app = app_for(&dir);
+    let mut tabs = Tabs::new(vec![app_for(&dir)], 0);
     let backend = TestBackend::new(80, 30);
     let mut terminal = ratatui::Terminal::new(backend).unwrap();
     let mut events = ScriptedEvents::new(vec![key_event('q')]);
-    run_event_loop(&mut terminal, &mut app, &mut events).unwrap();
-    assert!(app.should_quit);
+    run_event_loop(&mut terminal, &mut tabs, &mut events).unwrap();
+    assert!(tabs.active_app().should_quit);
     fs::remove_dir_all(&dir).ok();
 }
 
@@ -520,14 +622,14 @@ fn run_event_loop_quits_on_q() {
 fn run_event_loop_processes_events_before_quit() {
     let dir = temp_dir();
     fs::write(dir.join("a.txt"), "hello\n").unwrap();
-    let mut app = app_for(&dir);
+    let mut tabs = Tabs::new(vec![app_for(&dir)], 0);
     let backend = TestBackend::new(80, 30);
     let mut terminal = ratatui::Terminal::new(backend).unwrap();
     // Open search, close it, then quit; the loop renders between each event.
     let mut events = ScriptedEvents::new(vec![key_event('/'), esc_event(), key_event('q')]);
-    run_event_loop(&mut terminal, &mut app, &mut events).unwrap();
-    assert!(app.should_quit);
-    assert!(app.search.is_none());
+    run_event_loop(&mut terminal, &mut tabs, &mut events).unwrap();
+    assert!(tabs.active_app().should_quit);
+    assert!(tabs.active_app().search.is_none());
     fs::remove_dir_all(&dir).ok();
 }
 
@@ -535,13 +637,13 @@ fn run_event_loop_processes_events_before_quit() {
 fn run_event_loop_handles_idle_none_event() {
     let dir = temp_dir();
     fs::write(dir.join("a.txt"), "hello\n").unwrap();
-    let mut app = app_for(&dir);
+    let mut tabs = Tabs::new(vec![app_for(&dir)], 0);
     let backend = TestBackend::new(80, 30);
     let mut terminal = ratatui::Terminal::new(backend).unwrap();
     // An idle frame (None) then quit exercises the no-event tick() path.
     let mut events = IdleThenQuit::new();
-    run_event_loop(&mut terminal, &mut app, &mut events).unwrap();
-    assert!(app.should_quit);
+    run_event_loop(&mut terminal, &mut tabs, &mut events).unwrap();
+    assert!(tabs.active_app().should_quit);
     fs::remove_dir_all(&dir).ok();
 }
 
@@ -549,13 +651,26 @@ fn run_event_loop_handles_idle_none_event() {
 fn render_frame_clears_when_requested() {
     let dir = temp_dir();
     fs::write(dir.join("a.txt"), "hello\n").unwrap();
-    let mut app = app_for(&dir);
-    app.needs_clear = true;
+    let mut tabs = Tabs::new(vec![app_for(&dir)], 0);
+    tabs.active_app_mut().needs_clear = true;
     let backend = TestBackend::new(80, 30);
     let mut terminal = ratatui::Terminal::new(backend).unwrap();
-    render_frame(&mut terminal, &mut app).unwrap();
-    assert!(!app.needs_clear);
+    render_frame(&mut terminal, &mut tabs).unwrap();
+    assert!(!tabs.active_app().needs_clear);
     fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn render_frame_draws_tab_strip_with_multiple_tabs() {
+    let a = temp_dir();
+    let b = temp_dir();
+    let mut tabs = Tabs::new(vec![app_for(&a), app_for(&b)], 0);
+    let backend = TestBackend::new(80, 30);
+    let mut terminal = ratatui::Terminal::new(backend).unwrap();
+    render_frame(&mut terminal, &mut tabs).unwrap();
+    assert_eq!(tabs.strip_area.height, 1, "the strip must reserve one row");
+    fs::remove_dir_all(&a).ok();
+    fs::remove_dir_all(&b).ok();
 }
 
 // ---------------------------------------------------------------------------
@@ -572,12 +687,38 @@ fn run_app_builds_and_runs_to_quit() {
     let mut events = ScriptedEvents::new(vec![key_event('q')]);
     run_app(
         &mut terminal,
-        dir.clone(),
+        vec![dir.clone()],
+        0,
         InitialContent::None,
         &mut events,
     )
     .unwrap();
     fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn run_app_opens_one_tab_per_root_and_persists_the_workspace_on_quit() {
+    let a = temp_dir();
+    let b = temp_dir();
+    let _state = IsolatedState::welcome_shown(&a);
+    fs::write(a.join("a.txt"), "hello\n").unwrap();
+    fs::write(b.join("b.txt"), "hello\n").unwrap();
+    let backend = TestBackend::new(80, 30);
+    let mut terminal = ratatui::Terminal::new(backend).unwrap();
+    let mut events = ScriptedEvents::new(vec![key_event('q')]);
+    run_app(
+        &mut terminal,
+        vec![a.clone(), b.clone()],
+        1,
+        InitialContent::None,
+        &mut events,
+    )
+    .unwrap();
+    let workspace = crate::session::load_workspace().expect("quitting must persist the workspace");
+    assert_eq!(workspace.roots, vec![a.clone(), b.clone()]);
+    assert_eq!(workspace.active, 1);
+    fs::remove_dir_all(&a).ok();
+    fs::remove_dir_all(&b).ok();
 }
 
 #[test]
@@ -596,7 +737,8 @@ fn run_app_opens_and_reveals_file() {
     ))]);
     run_app(
         &mut terminal,
-        dir.clone(),
+        vec![dir.clone()],
+        0,
         InitialContent::File(file_path),
         &mut events,
     )
@@ -641,7 +783,8 @@ fn run_app_surfaces_config_error_without_failing() {
     // A bad config is reported (to stderr) but must not abort the run.
     run_app(
         &mut terminal,
-        dir.clone(),
+        vec![dir.clone()],
+        0,
         InitialContent::None,
         &mut events,
     )
@@ -661,7 +804,8 @@ fn run_app_first_run_shows_welcome_then_esc_dismisses_and_persists() {
     let mut events = ScriptedEvents::new(vec![esc_event(), key_event('q')]);
     run_app(
         &mut terminal,
-        dir.clone(),
+        vec![dir.clone()],
+        0,
         InitialContent::None,
         &mut events,
     )

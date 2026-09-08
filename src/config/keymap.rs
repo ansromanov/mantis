@@ -280,6 +280,10 @@ impl Keymap {
             "tree_width_grow" => &self.tree_width_grow,
             "tree_width_shrink" => &self.tree_width_shrink,
             "tree_up_dir" => &self.tree_up_dir,
+            "new_tab" => &self.new_tab,
+            "close_tab" => &self.close_tab,
+            "next_tab" => &self.next_tab,
+            "prev_tab" => &self.prev_tab,
             _ => &[],
         }
     }
@@ -400,6 +404,11 @@ pub struct Keymap {
     pub follow_tail: Vec<KeyBinding>,
     pub filter_lines: Vec<KeyBinding>,
     pub tree_up_dir: Vec<KeyBinding>,
+    // Tabs
+    pub new_tab: Vec<KeyBinding>,
+    pub close_tab: Vec<KeyBinding>,
+    pub next_tab: Vec<KeyBinding>,
+    pub prev_tab: Vec<KeyBinding>,
 
     // --- deprecated/renamed action keys (read for backward-compat; never written) ---
     /// Old name for `fold_toggle` (#553).
@@ -486,6 +495,10 @@ impl Default for Keymap {
             follow_tail: bind(&["content:F"]),
             filter_lines: bind(&["content:&"]),
             tree_up_dir: bind(&["Backspace"]),
+            new_tab: bind(&["ctrl+n"]),
+            close_tab: bind(&["ctrl+w"]),
+            next_tab: bind(&["ctrl+PageDown"]),
+            prev_tab: bind(&["ctrl+PageUp"]),
             legacy_yaml_fold_toggle: None,
             legacy_visual_line_blame: None,
         };

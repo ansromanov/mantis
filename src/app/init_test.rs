@@ -916,6 +916,14 @@ fn app_new_starts_without_inline_image_state() {
 }
 
 #[test]
+fn app_new_starts_with_no_pending_tab_action() {
+    let root = temp_dir();
+    let app = new_app(&root, Config::default());
+    assert!(app.tab_action_request.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn app_new_installs_bundled_plugins_on_startup() {
     let _guard = crate::plugin::ENV_LOCK
         .lock()

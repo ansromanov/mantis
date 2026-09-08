@@ -950,6 +950,25 @@ fn help_shows_command_palette_entry() {
 }
 
 #[test]
+fn help_getting_started_lists_tab_actions() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    let backend = TestBackend::new(120, 100);
+    let mut terminal = Terminal::new(backend).unwrap();
+    app.help_tab = 0; // Getting started tab
+    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
+    let joined = buffer_rows(&terminal).join("\n");
+    assert!(
+        joined.contains("open another project as a new tab"),
+        "help must list the new_tab action, got:\n{joined}"
+    );
+    assert!(
+        joined.contains("switch to the next tab"),
+        "help must list the next_tab action, got:\n{joined}"
+    );
+}
+
+#[test]
 fn help_shows_goto_line_entry() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());

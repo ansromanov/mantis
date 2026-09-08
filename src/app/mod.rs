@@ -71,7 +71,7 @@ use loader::Loader;
 // Only referenced from test code (entry/state assertions).
 #[cfg_attr(not(test), allow(unused_imports))]
 pub use context_menu::{ContextActionId, ContextMenuEntry, ContextMenuState, ContextMenuTarget};
-pub use types::{DiffMode, Focus, StatusMessage};
+pub use types::{DiffMode, Focus, StatusMessage, TabAction};
 pub(crate) use types::{HighlightCacheKey, HighlightCacheValue, PendingKeypress};
 pub(crate) use util::{deleted_set, diff_line_style, rect_contains};
 
@@ -226,6 +226,11 @@ pub struct App {
     pub bug_report_area: ratatui::layout::Rect,
     pub bug_report_preview_area: ratatui::layout::Rect,
     pub should_quit: bool,
+    /// Set by the tab-related keybindings/palette entries (`new_tab`,
+    /// `close_tab`, `next_tab`, `prev_tab`), which this single-root `App` has
+    /// no way to act on itself. The `Tabs` wrapper (`src/workspace.rs`) that
+    /// owns the set of open tabs checks and clears this after every event.
+    pub tab_action_request: Option<TabAction>,
     pub theme: Theme,
     pub git_status_enabled: bool,
     pub git_show_deleted: bool,

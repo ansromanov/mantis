@@ -209,6 +209,58 @@ fn root_key(root: &Path) -> String {
     s.trim_end_matches(['/', '\\']).to_string()
 }
 
+/// The set of tabs (project roots) open across a `mantis` session, restored
+/// on the next launch that has no explicit path arguments.
+///
+/// Each root's own tree/content/scroll state stays in its existing per-root
+/// [`SessionState`] file — this manifest only records which roots were open
+/// and which one was active, so `Tabs` (see `src/workspace.rs`) can rebuild
+/// the same set of `App`s next time.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct WorkspaceState {
+    /// Open tab roots, in tab order.
+    pub roots: Vec<PathBuf>,
+    /// Index into `roots` of the tab that was active.
+    pub active: usize,
+}
+
+const WORKSPACE_FILE_NAME: &str = "workspace.json";
+
+/// Returns the path to the workspace manifest file, or `None` when the
+/// platform has no suitable state dir.
+pub fn workspace_path() -> Option<PathBuf> {
+    state_dir().map(|d| d.join(WORKSPACE_FILE_NAME))
+}
+
+/// Loads the workspace manifest, filtering out roots that no longer exist and
+/// clamping `active` to the filtered list. Returns `None` when there is no
+/// manifest, it's unreadable, or every root it named is now gone.
+pub fn load_workspace() -> Option<WorkspaceState> {
+    let path = workspace_path()?;
+    let raw = fs::read_to_string(&path).ok()?;
+    let mut state: WorkspaceState = serde_json::from_str(&raw).ok()?;
+    state.roots.retain(|r| r.is_dir());
+    if state.roots.is_empty() {
+        return None;
+    }
+    state.active = state.active.min(state.roots.len() - 1);
+    Some(state)
+}
+
+/// Saves the workspace manifest. I/O errors are silently ignored, same as
+/// [`save`].
+pub fn save_workspace(state: &WorkspaceState) {
+    let Some(path) = workspace_path() else {
+        return;
+    };
+    if let Ok(json) = serde_json::to_string_pretty(state) {
+        let tmp = path.with_extension("json.tmp");
+        if fs::write(&tmp, &json).is_ok() {
+            let _ = fs::rename(&tmp, &path);
+        }
+    }
+}
+
 /// Returns the path to the global `welcome_shown.flag` file in the state dir.
 /// The file's mere existence (not its content) indicates the welcome overlay
 /// has been dismissed.

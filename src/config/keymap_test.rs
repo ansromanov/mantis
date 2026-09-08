@@ -726,6 +726,49 @@ fn tree_width_shrink_default_binding_is_left_bracket() {
 }
 
 #[test]
+fn new_tab_default_binding_is_ctrl_n_global() {
+    let keymap = Keymap::default();
+    let key = ev(KeyCode::Char('n'), KeyModifiers::CONTROL);
+    assert!(pressed_in(&keymap.new_tab, &key, BindingScope::Tree));
+    assert!(pressed_in(&keymap.new_tab, &key, BindingScope::Content));
+}
+
+#[test]
+fn close_tab_default_binding_is_ctrl_w_global() {
+    let keymap = Keymap::default();
+    let key = ev(KeyCode::Char('w'), KeyModifiers::CONTROL);
+    assert!(pressed_in(&keymap.close_tab, &key, BindingScope::Tree));
+}
+
+#[test]
+fn next_tab_default_binding_is_ctrl_pagedown() {
+    let keymap = Keymap::default();
+    let key = ev(KeyCode::PageDown, KeyModifiers::CONTROL);
+    assert!(pressed_in(&keymap.next_tab, &key, BindingScope::Global));
+}
+
+#[test]
+fn prev_tab_default_binding_is_ctrl_pageup() {
+    let keymap = Keymap::default();
+    let key = ev(KeyCode::PageUp, KeyModifiers::CONTROL);
+    assert!(pressed_in(&keymap.prev_tab, &key, BindingScope::Global));
+}
+
+#[test]
+fn action_for_key_resolves_next_tab_globally_regardless_of_scope() {
+    let keymap = Keymap::default();
+    let key = ev(KeyCode::PageDown, KeyModifiers::CONTROL);
+    assert_eq!(
+        keymap.action_for_key(&key, BindingScope::Tree),
+        Some("next_tab")
+    );
+    assert_eq!(
+        keymap.action_for_key(&key, BindingScope::Content),
+        Some("next_tab")
+    );
+}
+
+#[test]
 fn repo_commit_log_default_binding_is_shift_l_tree_scope() {
     let keymap = Keymap::default();
     let l = ev(KeyCode::Char('L'), KeyModifiers::SHIFT);

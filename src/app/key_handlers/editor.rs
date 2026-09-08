@@ -132,6 +132,22 @@ impl App {
                 self.theme_picker = Some(ThemePicker::default());
                 true
             }
+            Some("new_tab") => {
+                self.tab_action_request = Some(super::super::TabAction::New);
+                true
+            }
+            Some("close_tab") => {
+                self.tab_action_request = Some(super::super::TabAction::Close);
+                true
+            }
+            Some("next_tab") => {
+                self.tab_action_request = Some(super::super::TabAction::Next);
+                true
+            }
+            Some("prev_tab") => {
+                self.tab_action_request = Some(super::super::TabAction::Prev);
+                true
+            }
             Some("plugin_picker") => {
                 let entries = self.plugin_manager.plugin_entries();
                 self.plugin_picker = Some(PluginPicker::new(entries));

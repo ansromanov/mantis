@@ -341,3 +341,62 @@ fn welcome_shown_path_returns_some_when_state_dir_available() {
         "must end with welcome_shown.flag"
     );
 }
+
+// ---------------------------------------------------------------------------
+// WorkspaceState
+// ---------------------------------------------------------------------------
+
+#[test]
+fn workspace_round_trip_preserves_roots_and_active() {
+    let _lock = SESSION_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let env = TestEnv::new("workspace_round_trip");
+    let a = env.root.join("a");
+    let b = env.root.join("b");
+    fs::create_dir_all(&a).unwrap();
+    fs::create_dir_all(&b).unwrap();
+
+    let state = WorkspaceState {
+        roots: vec![a.clone(), b.clone()],
+        active: 1,
+    };
+    save_workspace(&state);
+    let loaded = load_workspace().expect("should load saved workspace");
+    assert_eq!(loaded, state);
+}
+
+#[test]
+fn workspace_load_returns_none_when_missing() {
+    let _lock = SESSION_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _env = TestEnv::new("workspace_missing");
+    assert!(load_workspace().is_none());
+}
+
+#[test]
+fn workspace_load_filters_stale_roots_and_clamps_active() {
+    let _lock = SESSION_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let env = TestEnv::new("workspace_stale");
+    let a = env.root.join("a");
+    fs::create_dir_all(&a).unwrap();
+    let gone = env.root.join("gone");
+
+    let state = WorkspaceState {
+        roots: vec![a.clone(), gone],
+        active: 1,
+    };
+    save_workspace(&state);
+    let loaded = load_workspace().expect("one root still exists");
+    assert_eq!(loaded.roots, vec![a]);
+    assert_eq!(loaded.active, 0);
+}
+
+#[test]
+fn workspace_load_returns_none_when_every_root_is_gone() {
+    let _lock = SESSION_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let env = TestEnv::new("workspace_all_stale");
+    let state = WorkspaceState {
+        roots: vec![env.root.join("gone1"), env.root.join("gone2")],
+        active: 0,
+    };
+    save_workspace(&state);
+    assert!(load_workspace().is_none());
+}
