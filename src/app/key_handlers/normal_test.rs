@@ -1447,6 +1447,21 @@ fn normal_key_o_triggers_open_external() {
 }
 
 #[test]
+fn esc_exits_compare_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.enter_compare_mode("HEAD~1".to_string());
+    assert!(app.git_mode);
+    assert!(app.compare_base.is_some());
+
+    app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+
+    assert!(!app.git_mode);
+    assert!(app.compare_base.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn normal_telemetry_check() {
     let root = temp_tree();
     let app = app_for(&root);
