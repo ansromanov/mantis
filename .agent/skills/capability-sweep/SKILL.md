@@ -37,8 +37,9 @@ caller supplies them as arguments each run.
    path, and a project-local `mantis.toml` outranks `XDG_CONFIG_HOME`. So
    for every target dir (the caller repos, this repo, `e2e/data`'s repo)
    that contains a `mantis.toml`, copy it aside now
-   (`cp <target>/mantis.toml <scratch>/save-<n>.toml`) and restore it in
-   Phase 2. The generated fixture has no `mantis.toml`, so setting-toggle
+   (`cp <target>/mantis.toml <scratch>/save-1.toml`, then increment the
+   numeric suffix for each additional target) and restore each copy in Phase
+   2. The generated fixture has no `mantis.toml`, so setting-toggle
    scenarios there are safe.
 2. **Build the binary.**
    ```bash
@@ -234,9 +235,10 @@ When all agents return:
 6. Clean up: kill any surviving `capsweep-*` tmux sessions, `rm -rf` the
    fixture dir and any leftover `MANTIS_STATE_DIR` / `XDG_CONFIG_HOME` temp
    dirs the agents reported. **Restore every target `mantis.toml`** from the
-   copies saved in Phase 0 (`cp <scratch>/save-<n>.toml <target>/mantis.toml`)
-   and confirm each target repo is clean (`git -C <target> status --porcelain`
-   should be empty for that path) — report any target left dirty.
+   copies saved in Phase 0 (`cp <scratch>/save-1.toml <target>/mantis.toml`,
+   using the matching numeric suffix) and confirm each target config is clean
+   (`git -C <target> status --porcelain -- mantis.toml` should be empty) —
+   report any target whose `mantis.toml` remains dirty.
 7. Before believing a keybinding FAIL, cross-check the id against
    `Keymap::default` in `src/config/keymap.rs` — a run that forgot to set
    `XDG_CONFIG_HOME` will have inherited the operator's remaps.
