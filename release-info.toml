@@ -1,4 +1,4 @@
-version = "0.20.1"
+version = "0.20.2"
 date = "2026-09-08"
 whats_new = """- fix: keep worktree switcher responsive (#796)
 - feat: add TypeScript and template folding plugins (#795)
