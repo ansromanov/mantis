@@ -1,4 +1,4 @@
-version = "0.20.2"
+version = "0.20.3"
 date = "2026-09-08"
 whats_new = """- feat: capability-sweep skill — parallel multi-agent E2E verification (#798)
 - feat: add bundled ini and sql language providers (#799)
