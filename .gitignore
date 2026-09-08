@@ -3,3 +3,5 @@
 /.claude/worktrees
 /docs/book
 /bench-results/
+__pycache__/
+*.pyc
