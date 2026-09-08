@@ -40,8 +40,8 @@ An audit of real-world multi-repo environments identified that backend, DevOps, 
 | **TypeScript / TSX / JSX** | `.ts`, `.tsx`, `.jsx`, `.mts` | ✅ Bundled syntax pack | 💤 Planned (`brace_fold`) | `plugins/typescript` | Tracked |
 | **JavaScript** | `.js`, `.mjs`, `.cjs` | ✅ Syntect built-in | 💤 Planned (`brace_fold`) | `plugins/typescript` / `plugins/javascript` | Tracked |
 | **Terraform & HCL** | `.tf`, `.tfvars`, `.hcl` | ✅ Bundled `.tf` + `.hcl` | ✅ `hcl_brace_fold` | `plugins/terraform` | Shipped (#782) |
-| **INI & Systemd** | `.ini`, `.service`, `.timer`, `.conf`, `.properties` | ✅ Syntect built-in | 💤 Planned (`section_fold`) | `plugins/ini` | Tracked |
-| **SQL** | `.sql` | ✅ Syntect built-in | 💤 Planned (`sql_fold`) | `plugins/sql` | Tracked |
+| **INI & Systemd** | `.ini`, `.service`, `.timer`, `.conf`, `.properties`, `.cfg`, `.desktop` | ✅ Syntect built-in | ✅ `section_fold` | `plugins/ini` | Shipped |
+| **SQL** | `.sql` | ✅ Syntect built-in | ✅ `sql_fold` | `plugins/sql` | Shipped |
 | **PowerShell** | `.ps1`, `.psm1`, `.powershell` | 💤 Needs `.sublime-syntax` | 💤 Planned (`brace_fold`) | `plugins/powershell` | Tracked |
 | **Templates (Helm/Jinja)** | `.tpl`, `.tmpl`, `.template` | 💤 Needs `.sublime-syntax` | 💤 Planned (`template_fold`) | `plugins/template` | Tracked |
 | **CSS** | `.css`, `.scss`, `.less` | ✅ Syntect built-in | 💤 Planned (`brace_fold`) | `plugins/css` | Tracked |
@@ -65,13 +65,13 @@ An audit of real-world multi-repo environments identified that backend, DevOps, 
    - Add `.hcl` mapping to `plugins/terraform/syntaxes/terraform.sublime-syntax`.
    - Upgrade `plugins/terraform` to a language provider registering `fold` for `tf`, `tfvars`, `hcl` using `brace_fold` with `#` and `//` comment skipping.
 
-3. **INI, Systemd & Conf Section Folding (`ini`):**
-   - Implement `pub fn section_fold(text: &str) -> Vec<FoldRegion>` in `src/fold_detectors.rs` (folds `[section]` blocks up to next section header or EOF).
-   - Create bundled `plugins/ini` covering `.ini`, `.service`, `.timer`, `.conf`, `.properties`, `.cfg`.
+3. **INI, Systemd & Conf Section Folding (`ini`) — shipped:**
+   - `section_fold` handles INI/TOML headers and trims trailing blank/comment lines.
+   - Bundled `plugins/ini` covers `.ini`, `.service`, `.timer`, `.conf`, `.properties`, `.cfg`, and `.desktop`.
 
-4. **SQL Statement & Block Folding (`sql`):**
-   - Implement `pub fn sql_fold(text: &str) -> Vec<FoldRegion>` in `src/fold_detectors.rs` (handles `BEGIN...END`, `CREATE FUNCTION/PROCEDURE/TABLE`, `CASE...END`, multiline statements).
-   - Create bundled `plugins/sql` for `.sql`.
+4. **SQL Statement & Block Folding (`sql`) — shipped:**
+   - `sql_fold` handles multiline statements, `BEGIN...END`, `CASE...END`, and common procedural blocks while skipping comments and quoted strings.
+   - Bundled `plugins/sql` provides folding for `.sql`.
 
 5. **PowerShell Syntax & Folding (`ps1`):**
    - Add bundled `powershell.sublime-syntax` for `.ps1`, `.psm1`, `.psd1`, `.powershell`.

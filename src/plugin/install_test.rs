@@ -80,6 +80,8 @@ fn bundled_plugin_entries_all_enabled_by_default() {
         "toml syntax plugin must be listed"
     );
     assert!(names.contains(&"css"), "css plugin must be listed");
+    assert!(names.contains(&"ini"), "ini plugin must be listed");
+    assert!(names.contains(&"sql"), "sql plugin must be listed");
     assert!(
         names.contains(&"template"),
         "template plugin must be listed"

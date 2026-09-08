@@ -113,6 +113,8 @@ pub(crate) const BUNDLED_PLUGINS: &[(&str, &str, &[u8])] = &[
     ("css", "css", CSS),
     ("typescript", "typescript", TYPESCRIPT),
     ("template", "template", TEMPLATE),
+    ("ini", "ini", INI),
+    ("sql", "sql", SQL),
 ];
 
 /// Filenames of old shell-script plugins superseded by the current Rust binaries.
