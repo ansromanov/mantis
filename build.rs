@@ -51,6 +51,8 @@ fn main() {
         "css",
         "typescript",
         "template",
+        "ini",
+        "sql",
     ];
 
     if std::env::var("MANTIS_IN_PLUGIN_SUBBUILD").is_ok() {

@@ -389,6 +389,11 @@ Terraform / HCL files (`.tf`, `.tfvars`, `.hcl`) fold via the bundled
 `terraform` language provider plugin, which detects HCL blocks while ignoring
 `#`/`//`/`/* */` comments, quoted strings, and heredocs.
 
+INI-family files (`.ini`, `.service`, `.timer`, `.conf`, `.properties`, `.cfg`,
+`.desktop`) fold by section. SQL files (`.sql`) fold multiline statements and
+common procedural blocks such as `BEGIN`, `CASE`, `IF`, and `LOOP`; comments and
+quoted strings are ignored.
+
 ## JSON pretty-printing
 
 Viewing a JSON file? Use the command palette (`Ctrl+P` → "Toggle JSON

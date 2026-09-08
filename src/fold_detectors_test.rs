@@ -1243,3 +1243,23 @@ fn yaml_fold_delegates_to_yaml_fold_detect_fold_regions() {
     assert_eq!(via_detect_fold_regions[0].start, r[0].start);
     assert_eq!(via_detect_fold_regions[0].end, r[0].end);
 }
+
+#[test]
+fn section_fold_ignores_ini_trailing_comments() {
+    let regions = section_fold(
+        "[Unit] ; header comment\nDescription=demo\n\n# trailing\n; also trailing\n[Service]\nExecStart=demo\n",
+    );
+    assert_eq!(
+        regions.iter().map(|r| (r.start, r.end)).collect::<Vec<_>>(),
+        vec![(0, 1), (5, 6)]
+    );
+}
+
+#[test]
+fn sql_fold_handles_statements_blocks_comments_and_strings() {
+    let regions = sql_fold(
+        "CREATE TABLE users (\n  note TEXT DEFAULT 'END; BEGIN'\n);\n\nBEGIN\n  SELECT 1;\nEND;\n",
+    );
+    let ranges: Vec<_> = regions.iter().map(|r| (r.start, r.end)).collect();
+    assert_eq!(ranges, vec![(0, 2), (4, 6)]);
+}

@@ -3,9 +3,9 @@
 `mantis` supports two kinds of plugins: **process plugins** (subprocess-based) and
 **syntax plugins** (syntax definitions loaded into the highlighter).
 
-The bundled `toml` and `css` process plugins provide folding for TOML tables and
-CSS-family rulesets. TOML syntax highlighting remains available through the
-bundled `toml-syntax` syntax plugin.
+The bundled `toml`, `css`, `ini`, and `sql` process plugins provide folding for
+configuration sections, CSS-family rulesets, and SQL statements. TOML syntax
+highlighting remains available through the bundled `toml-syntax` syntax plugin.
 
 Process plugins are standalone executables that hook into app events and issue
 actions back to the viewer. They run in separate processes; `mantis` talks to them
@@ -181,6 +181,8 @@ compiled alongside `mantis` and installed on first run.
 | css | `css` | Registers as a language provider for `.css`, `.scss`, and `.less` files with the `fold` capability. Folds nested rulesets, media queries, and keyframes while ignoring comments and quoted strings. |
 | typescript | `typescript` | Registers as a language provider for TypeScript, TSX, JavaScript, and JSX extensions with the `fold` capability. Disabled by default because the existing syntax pack owns these extensions; enable it explicitly to add folding. |
 | template | `template` | Registers as a language provider for Go-template, Helm, and Jinja2 extensions with the `fold` capability. |
+| ini | `ini` | Registers as a language provider for `.ini`, `.service`, `.timer`, `.conf`, `.properties`, `.cfg`, and `.desktop` files. Folds sections through their last meaningful line. |
+| sql | `sql` | Registers as a language provider for `.sql` files. Folds multiline statements and common `BEGIN`, `CASE`, `IF`, and `LOOP` blocks while ignoring comments and quoted strings. |
 
 ### Bundled syntax plugins
 

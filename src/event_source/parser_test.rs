@@ -1,4 +1,4 @@
-#[cfg(unix)]
+#[cfg(all(test, unix))]
 use super::super::RawEventSource;
 use super::super::{AltKeys, CURRENT_ALT_KEYS};
 use super::*;
@@ -395,7 +395,7 @@ fn utf8_incomplete_four_byte_returns_none() {
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(test, unix))]
 #[test]
 fn utf8_paste_split_across_fill_boundary() {
     // Simulate the lead byte and continuation byte of 'é' (0xC3 0xA9)

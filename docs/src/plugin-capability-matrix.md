@@ -14,7 +14,7 @@ routes them via `PluginManager::provider_for` (`src/plugin/manager.rs`).
 
 | Capability | Declared in protocol | Handled by host | Used by a bundled plugin |
 |---|---|---|---|
-| `fold` | yes | yes — gates `set_fold_regions` in `handle_plugin_set_fold_regions` (`src/app/refresh.rs`) | **yes** — used by the bundled `rust`, `go`, `python`, `json`, `sh`, `yaml`, and `terraform` language provider plugins |
+| `fold` | yes | yes — gates `set_fold_regions` in `handle_plugin_set_fold_regions` (`src/app/refresh.rs`) | **yes** — used by the bundled `rust`, `go`, `python`, `json`, `sh`, `yaml`, `terraform`, `ini`, and `sql` language provider plugins |
 | `status_facts` | yes (0.18.x) | yes — gates `set_status_facts` in `handle_plugin_set_status_facts` (`src/app/refresh.rs`) | **yes** — used by the bundled `k8s` plugin, coexisting with `yaml`'s `fold` registration on the same `.yaml`/`.yml` extensions |
 | `highlight` | yes | **no** — accepted at registration, never checked anywhere | no |
 | `hover` | yes (reserved) | no — unimplementable in v2 (no request/response correlation) | no |
@@ -66,6 +66,8 @@ version history in [Plugin Development](plugin-development.md) only.
 | `yaml` | process | `register_language_provider`, `set_fold_regions` | `fold` |
 | `k8s` | process | `register_language_provider`, `set_status_facts` | `status_facts` |
 | `terraform` | process | `register_language_provider`, `set_fold_regions` | `fold` |
+| `ini` | process | `register_language_provider`, `set_fold_regions` | `fold` |
+| `sql` | process | `register_language_provider`, `set_fold_regions` | `fold` |
 
 ## Gaps and follow-ups
 
