@@ -331,6 +331,7 @@ impl App {
             OverlayKey::Activate => self.apply_selected_theme(),
             OverlayKey::Close => {
                 self.theme_picker = None;
+                self.context_menu = None;
                 // Revert to the original theme that was active before the picker
                 // opened (self.config.theme is never written during preview).
                 let config_theme = self.config.theme.clone();
