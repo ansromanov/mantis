@@ -29,6 +29,8 @@ use super::scrollbar::draw_content_scrollbar;
 /// aligned row-for-row so the two halves scroll together.
 pub(crate) fn draw_side_by_side_diff(f: &mut Frame, app: &mut App, area: Rect, block: Block) {
     let inner = block.inner(area);
+    app.content_area = inner;
+    app.fold_gutter_rows = Vec::new();
     f.render_widget(block, area);
 
     let total = app.diff_rows.len();
@@ -144,14 +146,6 @@ pub(crate) fn draw_side_by_side_diff(f: &mut Frame, app: &mut App, area: Rect, b
         inner.height,
         hscroll,
     );
-
-    app.content_area = Rect {
-        x: area.x + 1,
-        y: area.y + 1,
-        width: area.width.saturating_sub(2),
-        height: area.height.saturating_sub(2),
-    };
-    app.fold_gutter_rows = Vec::new();
 
     draw_content_scrollbar(
         f,

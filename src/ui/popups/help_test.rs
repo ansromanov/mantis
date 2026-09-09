@@ -1064,7 +1064,7 @@ fn help_git_section_shows_repo_commit_log_key() {
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
     assert!(
-        joined.contains("browse all repository commits"),
+        joined.contains("enter to view commit diff"),
         "help overlay must list the repo commit log entry in the Git section, got:\n{joined}"
     );
 }

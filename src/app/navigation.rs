@@ -30,7 +30,10 @@ impl App {
     pub(crate) fn rebuild(&mut self, recenter: bool) {
         self.tree_revision += 1;
         let prev = self.nodes.get(self.tree_selected).map(|n| n.path.clone());
-        let deleted = super::deleted_set(&self.git_status_map, self.git_show_deleted);
+        // Git mode is a change review surface: deleted tracked files must be
+        // visible there even when ghost rows are disabled in the normal tree.
+        let deleted =
+            super::deleted_set(&self.git_status_map, self.git_show_deleted || self.git_mode);
 
         if self.git_mode {
             if self.git_mode_flat {
@@ -159,7 +162,9 @@ impl App {
             .nodes
             .get(self.tree_selected)
             .is_some_and(|n| n.deleted);
-        if deleted {
+        if self.commit_base.is_some() {
+            self.show_commit_diff(path);
+        } else if deleted {
             self.show_deleted(path);
         } else if self.git_mode {
             self.request_working_tree_diff(path);
@@ -188,7 +193,8 @@ impl App {
             self.rebuild(true);
             self.try_open_selected();
         } else {
-            if self.compare_base.take().is_some() && self.git_status_enabled {
+            let leaving_commit = self.commit_base.take().is_some();
+            if (self.compare_base.take().is_some() || leaving_commit) && self.git_status_enabled {
                 // `git_status_map` currently holds range-status data (diffed
                 // against the compare revision). Refresh it now so a later
                 // `toggle_git_mode` back on shows real git status instead of
@@ -217,6 +223,13 @@ impl App {
     /// Sets `git_mode`, populates `git_status_map` with the range diff, expands
     /// changed directories, and opens the selected file's diff.
     pub fn enter_compare_mode(&mut self, rev: String) {
+        if self.git_info.is_some() || crate::git::repo_info(&self.root).is_some() {
+            if let Err(error) = crate::git::verify_revision(&self.root, &rev) {
+                self.set_status(format!("compare: {error}"));
+                return;
+            }
+        }
+        self.commit_base = None;
         self.compare_base = Some(rev.clone());
         self.git_mode = true;
         self.git_mode_flat = false;
@@ -231,6 +244,44 @@ impl App {
         self.expand_git_dirs();
         self.focus = crate::app::Focus::Tree;
         self.mark_session_dirty();
+    }
+
+    /// Enters a read-only repository commit view using the selected commit's
+    /// own parent-to-commit file list and diffs.
+    pub fn enter_commit_mode(&mut self, rev: String) {
+        if let Err(error) = crate::git::verify_revision(&self.root, &rev) {
+            self.set_status(format!("commit: {error}"));
+            return;
+        }
+        let status_map = match crate::git::commit_status(&self.root, &rev) {
+            Ok(map) => map,
+            Err(error) => {
+                self.set_status(format!("commit: {error}"));
+                return;
+            }
+        };
+        self.compare_base = None;
+        self.commit_base = Some(rev);
+        self.git_mode = true;
+        self.git_mode_flat = false;
+        self.git_status_enabled = true;
+        self.git_status_map = status_map;
+        self.expand_git_dirs();
+        self.rebuild(false);
+        self.try_open_selected();
+        self.focus = crate::app::Focus::Tree;
+        self.mark_session_dirty();
+    }
+
+    fn show_commit_diff(&mut self, path: &std::path::Path) {
+        let Some(rev) = self.commit_base.clone() else {
+            return;
+        };
+        let short = crate::git::short_revision(&self.root, &rev).unwrap_or(rev.clone());
+        let diff = crate::git::file_commit_diff(&self.root, &rev, path);
+        self.show_diff(path, &short, &diff, None);
+        self.viewing_revision = None;
+        self.viewing_revision_hash = None;
     }
 
     /// Acts on the currently selected node: toggles a directory's fold state,
@@ -251,7 +302,9 @@ impl App {
         } else {
             let p = node.path.clone();
             let deleted = node.deleted;
-            if deleted {
+            if self.commit_base.is_some() {
+                self.show_commit_diff(&p);
+            } else if deleted {
                 self.show_deleted(&p);
             } else if self.git_mode {
                 self.request_working_tree_diff(&p);

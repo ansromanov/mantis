@@ -379,17 +379,10 @@ fn goto_line_state_default_is_empty() {
 // -- RevisionPicker -----------------------------------------------------------
 
 #[test]
-fn revision_picker_new_with_nonexistent_repo_has_shortcuts_only() {
+fn revision_picker_new_with_nonexistent_repo_has_no_shortcuts() {
     let p = RevisionPicker::new(std::path::Path::new("/nonexistent"));
     assert_eq!(p.query, "");
-    assert!(
-        p.shortcuts.iter().any(|i| i.rev == "HEAD"),
-        "HEAD shortcut must always be present"
-    );
-    assert!(
-        p.shortcuts.iter().any(|i| i.rev == "HEAD~1"),
-        "HEAD~1 shortcut must always be present"
-    );
+    assert!(p.shortcuts.is_empty());
 }
 
 #[test]

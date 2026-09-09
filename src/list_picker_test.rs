@@ -100,6 +100,21 @@ fn char_pushes_to_query() {
 }
 
 #[test]
+fn control_modified_chars_do_not_enter_query() {
+    let mut p = TestPicker::new(vec!["a".into()]);
+    for modifiers in [
+        KeyModifiers::CONTROL,
+        KeyModifiers::ALT,
+        KeyModifiers::SUPER,
+    ] {
+        let result = handle_list_picker_key(&mut p, &KeyEvent::new(KeyCode::Char('p'), modifiers));
+        assert_eq!(result, OverlayKey::Pass);
+    }
+    assert!(p.query.is_empty());
+    assert_eq!(p.push_count, 0);
+}
+
+#[test]
 fn up_navigates_with_clamping() {
     let mut p = TestPicker::new(vec!["a".into(), "b".into(), "c".into()]);
     p.selected = 1;

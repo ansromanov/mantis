@@ -1235,7 +1235,7 @@ fn viewing_revision_hash_initially_none() {
 }
 
 #[test]
-fn show_repo_log_compare_enters_compare_mode_for_selected() {
+fn show_repo_log_compare_rejects_unresolvable_selected_revision() {
     let root = temp_dir();
     fs::write(root.join("a.txt"), "hi\n").unwrap();
     let mut app = app_for(&root);
@@ -1252,7 +1252,9 @@ fn show_repo_log_compare_enters_compare_mode_for_selected() {
     app.repo_log = Some(state);
     app.show_repo_log_compare();
     assert!(app.repo_log.is_none(), "overlay closes on activate");
-    assert_eq!(app.compare_base, Some("a".repeat(40)));
+    assert!(app.compare_base.is_none());
+    assert!(app.commit_base.is_none());
+    assert!(app.status_message.is_some());
     fs::remove_dir_all(&root).ok();
 }
 
@@ -1267,6 +1269,27 @@ fn show_repo_log_compare_without_selection_only_closes() {
     app.show_repo_log_compare();
     assert!(app.repo_log.is_none());
     assert!(app.compare_base.is_none());
+    assert!(app.commit_base.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn repo_log_commit_view_uses_commit_files_and_diff() {
+    let root = temp_git_with_history();
+    let mut app = app_for(&root);
+    let commits = crate::git::repo_log(&root, 0, 10);
+    let selected = commits
+        .iter()
+        .find(|commit| commit.subject == "second")
+        .expect("second commit");
+
+    app.enter_commit_mode(selected.hash.clone());
+
+    assert_eq!(app.commit_base.as_deref(), Some(selected.hash.as_str()));
+    assert!(app.git_status_map.contains_key(&root.join("tracked.txt")));
+    let content = app.content.join("\n");
+    assert!(content.contains("-v1") && content.contains("+v2"));
+    assert!(!content.contains("v3"));
     fs::remove_dir_all(&root).ok();
 }
 

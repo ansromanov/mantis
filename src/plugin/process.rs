@@ -24,11 +24,11 @@ use std::time::{Duration, Instant};
 
 use crate::plugin::types::{FromPlugin, ToPlugin};
 
-/// Maximum line length from a plugin's stdout (4 MiB). Lines exceeding this
+/// Maximum line length from a plugin's stdout (16 MiB). Lines exceeding this
 /// are discarded and the reader continues. Sized to hold a fully rendered
 /// document in one `set_content` message (a large markdown file with wide
 /// tables serializes to ~70 KB); the cap only guards against a runaway plugin.
-pub(crate) const MAX_LINE_LEN: usize = 4 * 1024 * 1024;
+pub(crate) const MAX_LINE_LEN: usize = 16 * 1024 * 1024;
 
 /// Maximum size of a plugin's on-disk stderr log before older lines are
 /// dropped to make room for new ones. Keeps a crashing plugin from filling

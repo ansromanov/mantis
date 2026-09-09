@@ -189,6 +189,13 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
                 P_INFO,
             ));
         }
+        if let Some(ref commit) = app.commit_base {
+            segs.push((
+                Span::styled(format!(" [commit: {commit}]"), badge),
+                StatusSegment::Badges,
+                P_INFO,
+            ));
+        }
     }
     if app.show_blame && app.has_text_cursor() {
         segs.push((
@@ -249,12 +256,20 @@ fn build_normal_line(app: &App, base: Style, max_width: u16) -> Line<'static> {
     if app.show_scroll_percentage && app.current_file.is_some() {
         let max = app.content_scroll_max();
         if max > 0 {
+            let at_end = app.content_scroll >= max;
             let pct = (app.content_scroll * 100)
                 .checked_div(max)
                 .unwrap_or(0)
                 .min(100);
             segs.push((
-                Span::styled(format!("  Top {pct}%"), base),
+                Span::styled(
+                    if at_end {
+                        "  Bottom 100%".to_string()
+                    } else {
+                        format!("  Top {pct}%")
+                    },
+                    base,
+                ),
                 StatusSegment::Scroll,
                 P_INFO,
             ));

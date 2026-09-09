@@ -495,7 +495,7 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
             ));
             rows.push(row_key_custom(
                 "repo_commit_log",
-                "browse all repository commits, enter to compare",
+                "browse all repository commits, enter to view commit diff",
             ));
             rows.push(row_key_custom(
                 "toggle_file_revision",

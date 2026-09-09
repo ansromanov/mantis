@@ -181,14 +181,23 @@ pub(super) fn compute_file_load(
             let mut load = FileLoad::empty(is_json);
             load.is_csv = is_csv;
             let raw = vf.raw_bytes();
-            // VirtualFile::open already verified valid UTF-8, so skip the full
-            // re-validation pass; only the BOM/ASCII prefix check is needed.
-            load.encoding = Some(detect_encoding_prefix(raw).unwrap_or("UTF-8").to_string());
-            load.line_ending = detect_line_ending(raw).map(|s| s.to_string());
-            load.syntax_name = hl.syntax_name(path);
-            load.virtual_file = Some(vf);
-            load.prettify_size_limit_exceeded = too_large;
-            return load;
+            if std::str::from_utf8(raw)
+                .ok()
+                .is_some_and(crate::ansi::contains_terminal_controls)
+            {
+                // Keep terminal control sequences out of the mmap-backed
+                // renderer. The fallback below sanitizes each line before it
+                // can reach ratatui.
+            } else {
+                // VirtualFile::open already verified valid UTF-8, so skip the full
+                // re-validation pass; only the BOM/ASCII prefix check is needed.
+                load.encoding = Some(detect_encoding_prefix(raw).unwrap_or("UTF-8").to_string());
+                load.line_ending = detect_line_ending(raw).map(|s| s.to_string());
+                load.syntax_name = hl.syntax_name(path);
+                load.virtual_file = Some(vf);
+                load.prettify_size_limit_exceeded = too_large;
+                return load;
+            }
         }
     }
 
@@ -230,6 +239,7 @@ pub(super) fn compute_file_load(
     // str::lines() does not treat bare \r as a line terminator, so CR-only
     // files would render as a single line with embedded \r control characters.
     // Normalize CR and CRLF to LF before splitting.
+    let s = crate::ansi::sanitize_terminal_text(&s);
     let s = if s.contains('\r') {
         s.replace("\r\n", "\n").replace('\r', "\n")
     } else {
@@ -283,7 +293,7 @@ pub(super) fn compute_file_load(
     load.highlighted = hl.highlight(path, &load.content);
     load.syntax_name = hl.syntax_name(path);
     if is_json {
-        if let Ok(value) = serde_json::from_str::<serde_json::Value>(&s) {
+        if let Ok(value) = parse_json_value(&s) {
             if let Ok(pretty) = serde_json::to_string_pretty(&value) {
                 let pretty_lines: Vec<String> = pretty.lines().map(|l| l.to_owned()).collect();
                 load.json_pretty_lines = hl.highlight(path, &pretty_lines);
@@ -304,6 +314,19 @@ pub(super) fn compute_file_load(
         }
     }
     load
+}
+
+/// Parses JSON without imposing serde_json's default nesting limit. Valid
+/// generated documents can legitimately exceed that limit, while the parser
+/// still reports malformed input through the same `Result` path.
+pub(super) fn parse_json_value(text: &str) -> Result<serde_json::Value, serde_json::Error> {
+    use serde::Deserialize;
+
+    let mut deserializer = serde_json::Deserializer::from_str(text);
+    deserializer.disable_recursion_limit();
+    let value = serde_json::Value::deserialize(&mut deserializer)?;
+    deserializer.end()?;
+    Ok(value)
 }
 
 /// Runs `repo_status` + `repo_info` for `root` off the UI thread.
@@ -339,6 +362,10 @@ pub(super) fn compute_diff_load(
             DiffMode::Unstaged => crate::git::unstaged_diff(root, path),
         }
     };
+    let lines: Vec<String> = lines
+        .iter()
+        .map(|line| crate::ansi::sanitize_terminal_text(line))
+        .collect();
     let rel = path.strip_prefix(root).unwrap_or(path);
     let highlighted = lines
         .iter()

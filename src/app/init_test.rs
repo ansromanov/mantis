@@ -920,6 +920,7 @@ fn app_new_starts_with_no_pending_tab_action() {
     let root = temp_dir();
     let app = new_app(&root, Config::default());
     assert!(app.tab_action_request.is_none());
+    assert!(app.commit_base.is_none());
     fs::remove_dir_all(&root).ok();
 }
 

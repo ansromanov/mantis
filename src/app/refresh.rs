@@ -324,15 +324,16 @@ impl App {
     /// (e.g. an unknown revision) as a status message instead of silently
     /// leaving an empty tree.
     pub(super) fn apply_range_status_load(&mut self, load: GitStatusLoad, error: Option<String>) {
+        if let Some(e) = error {
+            self.set_status(format!("compare: {e}"));
+            return;
+        }
         self.git_status_map = load.status_map;
         self.git_info = load.info;
         if self.git_mode {
             self.expand_git_dirs();
             self.rebuild(false);
             self.try_open_selected();
-        }
-        if let Some(e) = error {
-            self.set_status(format!("compare: {e}"));
         }
     }
 

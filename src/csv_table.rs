@@ -127,7 +127,8 @@ pub fn parse_delimited(content: &str, delimiter: char) -> Vec<Vec<String>> {
 /// Formats parsed CSV/TSV rows into aligned table lines with box-drawing borders.
 ///
 /// If `rows` is empty, returns a single placeholder `"[empty table]"`.
-/// The first row is formatted as a header row followed by a separator line.
+/// All rows are formatted uniformly; the parser does not guess whether the
+/// first row is a header because CSV/TSV has no reliable header marker.
 pub fn format_table_lines(rows: &[Vec<String>]) -> Vec<String> {
     if rows.is_empty() {
         return vec!["[empty table]".into()];
@@ -152,29 +153,14 @@ pub fn format_table_lines(rows: &[Vec<String>]) -> Vec<String> {
     // Top border
     lines.push(table_border('┌', '─', '┬', '┐', &col_widths));
 
-    // Header row (row 0)
-    let mut header_line = String::from("│");
-    for (i, w) in col_widths.iter().enumerate() {
-        let text = rows[0].get(i).map(|s| s.as_str()).unwrap_or("");
-        let pad = w.saturating_sub(UnicodeWidthStr::width(text));
-        header_line.push_str(&format!(" {text}{} │", " ".repeat(pad)));
-    }
-    lines.push(header_line);
-
-    // Header separator (if >1 row)
-    if rows.len() > 1 {
-        lines.push(table_border('├', '─', '┼', '┤', &col_widths));
-
-        // Data rows (rows 1..)
-        for row in &rows[1..] {
-            let mut row_line = String::from("│");
-            for (i, w) in col_widths.iter().enumerate() {
-                let text = row.get(i).map(|s| s.as_str()).unwrap_or("");
-                let pad = w.saturating_sub(UnicodeWidthStr::width(text));
-                row_line.push_str(&format!(" {text}{} │", " ".repeat(pad)));
-            }
-            lines.push(row_line);
+    for row in rows {
+        let mut row_line = String::from("│");
+        for (i, w) in col_widths.iter().enumerate() {
+            let text = row.get(i).map(|s| s.as_str()).unwrap_or("");
+            let pad = w.saturating_sub(UnicodeWidthStr::width(text));
+            row_line.push_str(&format!(" {text}{} │", " ".repeat(pad)));
         }
+        lines.push(row_line);
     }
 
     // Bottom border

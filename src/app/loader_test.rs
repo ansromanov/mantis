@@ -17,6 +17,20 @@ fn plain_file_uses_virtual_file() {
 }
 
 #[test]
+fn terminal_controls_force_sanitized_inline_content() {
+    let file = tempfile::NamedTempFile::with_suffix(".rs").unwrap();
+    std::fs::write(
+        file.path(),
+        "plain\n\x1b[41mred\x1b[0m\n\x1b]0;HIJACKED\x07after\n",
+    )
+    .unwrap();
+    let load = compute_file_load(file.path(), &hl(), usize::MAX);
+    assert!(load.virtual_file.is_none());
+    assert_eq!(load.content[1], "red");
+    assert_eq!(load.content[2], "after");
+}
+
+#[test]
 fn json_produces_pretty_view() {
     let mut f = tempfile::NamedTempFile::with_suffix(".json").unwrap();
     use std::io::Write;
@@ -26,6 +40,25 @@ fn json_produces_pretty_view() {
     assert!(load.show_pretty_json);
     assert!(!load.json_pretty_text.is_empty());
     assert!(!load.json_pretty_lines.is_empty());
+}
+
+#[test]
+fn deeply_nested_json_produces_pretty_view() {
+    let f = tempfile::NamedTempFile::with_suffix(".json").unwrap();
+    let depth = 256;
+    let mut raw = String::new();
+    for _ in 0..depth {
+        raw.push_str("{\"nested\":");
+    }
+    raw.push('0');
+    raw.push('}');
+    for _ in 1..depth {
+        raw.push('}');
+    }
+    std::fs::write(f.path(), raw).unwrap();
+    let load = compute_file_load(f.path(), &hl(), usize::MAX);
+    assert!(load.show_pretty_json);
+    assert!(!load.json_pretty_text.is_empty());
 }
 
 #[test]

@@ -190,3 +190,16 @@ fn side_by_side_diff_scroll_within_bounds_does_not_panic() {
     app.content_scroll = 10;
     let _buffer = render_diff(&mut app, rows);
 }
+
+#[test]
+fn side_by_side_diff_scroll_uses_diff_rows_before_first_render_geometry() {
+    let (mut app, _dir) = render_app();
+    let mut lines = vec!["@@ -1,50 +1,50 @@".to_string()];
+    lines.extend((0..50).map(|i| format!(" context line {i}")));
+    let rows = crate::diff::parse_side_by_side(&lines);
+    app.content_scroll = 10;
+    let buffer = render_diff(&mut app, rows);
+    let text = buffer_text(&buffer);
+    assert!(text.contains("context line 10"));
+    assert!(!text.contains("context line 0"));
+}

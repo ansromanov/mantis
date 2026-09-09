@@ -75,6 +75,124 @@ pub fn parse_ansi_line(line: &str) -> Vec<(Style, String)> {
     spans
 }
 
+/// Returns whether `text` contains characters or escape sequences that must be
+/// sanitized before being rendered directly into the terminal.
+pub fn contains_terminal_controls(text: &str) -> bool {
+    text.chars().any(|c| {
+        c == '\x1b'
+            || ('\u{80}'..='\u{9f}').contains(&c)
+            || (c.is_control() && c != '\n' && c != '\r')
+            || matches!(
+                c,
+                '\u{200e}'
+                    | '\u{200f}'
+                    | '\u{202a}'
+                    | '\u{202b}'
+                    | '\u{202c}'
+                    | '\u{202d}'
+                    | '\u{202e}'
+                    | '\u{2066}'
+                    | '\u{2067}'
+                    | '\u{2068}'
+                    | '\u{2069}'
+            )
+    })
+}
+
+/// Removes terminal control sequences and unsafe directional controls from
+/// text that will be emitted through ratatui. Tabs become spaces so they cannot
+/// alter the terminal grid; CSI and OSC sequences are consumed as a whole.
+pub fn sanitize_terminal_text(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            consume_escape_sequence(&mut chars);
+        } else if ('\u{80}'..='\u{9f}').contains(&c) {
+            consume_c1_sequence(c, &mut chars);
+        } else if c == '\t' {
+            out.push(' ');
+        } else if c == '\n' || c == '\r' {
+            out.push(c);
+        } else if c.is_control() {
+            // C0 controls have no useful visual representation in a file pane.
+        } else if is_directional_control(c) {
+            out.push_str(&format!("<U+{:04X}>", c as u32));
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
+fn consume_escape_sequence<I>(chars: &mut std::iter::Peekable<I>)
+where
+    I: Iterator<Item = char>,
+{
+    match chars.next() {
+        Some('[') => consume_csi_sequence(chars),
+        Some(']') => consume_osc_sequence(chars),
+        Some(_) => {}
+        None => {}
+    }
+}
+
+fn consume_c1_sequence<I>(c: char, chars: &mut std::iter::Peekable<I>)
+where
+    I: Iterator<Item = char>,
+{
+    match c {
+        '\u{9b}' => consume_csi_sequence(chars),
+        '\u{9d}' => consume_osc_sequence(chars),
+        _ => {}
+    }
+}
+
+fn consume_csi_sequence<I>(chars: &mut std::iter::Peekable<I>)
+where
+    I: Iterator<Item = char>,
+{
+    for c in chars.by_ref() {
+        if ('@'..='~').contains(&c) {
+            break;
+        }
+    }
+}
+
+fn consume_osc_sequence<I>(chars: &mut std::iter::Peekable<I>)
+where
+    I: Iterator<Item = char>,
+{
+    for c in chars.by_ref() {
+        if c == '\u{07}' {
+            break;
+        }
+        if c == '\x1b' {
+            if chars.peek() == Some(&'\\') {
+                chars.next();
+            }
+            break;
+        }
+    }
+}
+
+fn is_directional_control(c: char) -> bool {
+    matches!(
+        c,
+        '\u{200e}'
+            | '\u{200f}'
+            | '\u{202a}'
+            | '\u{202b}'
+            | '\u{202c}'
+            | '\u{202d}'
+            | '\u{202e}'
+            | '\u{2066}'
+            | '\u{2067}'
+            | '\u{2068}'
+            | '\u{2069}'
+    )
+}
+
 /// Parses an SGR parameter string and applies it to `style`.
 ///
 /// The parameter string is the part between `\x1b[` and `m`, e.g. `"1;31"`

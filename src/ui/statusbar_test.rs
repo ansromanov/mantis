@@ -160,6 +160,15 @@ fn tree_focus_compare_badge_hidden_when_not_comparing() {
 }
 
 #[test]
+fn tree_focus_commit_badge_shows_revision() {
+    let mut app = make_app();
+    app.git_mode = true;
+    app.commit_base = Some("abc1234".to_string());
+    let text = render_bar_width(&app, 120);
+    assert!(text.contains("[commit: abc1234]"));
+}
+
+#[test]
 fn tree_focus_git_flat() {
     let mut app = make_app();
     app.git_mode = true;
@@ -226,6 +235,24 @@ fn scroll_percentage_no_file() {
     app.current_file = None;
     let text = render_bar_width(&app, 120);
     assert!(!text.contains("%"));
+}
+
+#[test]
+fn scroll_percentage_labels_the_end_as_bottom() {
+    let mut app = make_app();
+    app.show_scroll_percentage = true;
+    app.current_file = Some(PathBuf::from("Cargo.toml"));
+    app.content = vec!["x".to_string(); 50];
+    app.content_area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 10,
+    };
+    app.content_scroll = app.content_scroll_max();
+    let text = render_bar_width(&app, 200);
+    assert!(text.contains("Bottom 100%"));
+    assert!(!text.contains("Top 100%"));
 }
 
 #[test]

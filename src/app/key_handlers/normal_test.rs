@@ -1054,6 +1054,19 @@ fn esc_clears_viewing_revision_in_git_mode() {
 }
 
 #[test]
+fn esc_exits_commit_compare_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.git_mode = true;
+    app.commit_base = Some("HEAD".to_string());
+    app.focus = Focus::Tree;
+    app.handle_key(key(KeyCode::Esc));
+    assert!(!app.git_mode);
+    assert!(app.commit_base.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn content_search_key_scopes_search_in_git_mode() {
     let root = temp_tree();
     let mut app = app_for(&root);

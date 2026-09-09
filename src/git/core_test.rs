@@ -33,6 +33,32 @@ fn worktree_parser_preserves_spaces_in_paths() {
     assert_eq!(items[0].path, PathBuf::from("/tmp/agent worktree"));
 }
 
+#[test]
+fn repo_info_keeps_unborn_branch_name() {
+    let text = "## No commits yet on main\nA  staged.txt\n";
+    let info = parse_repo_info(text);
+    assert_eq!(info.head, GitHead::Branch("main".to_string()));
+    assert_eq!(info.total_changed, 1);
+    assert_eq!(info.staged, 1);
+}
+
+#[test]
+fn verify_revision_rejects_unknown_revision() {
+    let dir = tempfile::tempdir().unwrap();
+    git(dir.path(), &["init", "-q"]);
+    assert!(verify_revision(dir.path(), "HEAD").is_err());
+}
+
+#[test]
+fn verify_revision_accepts_commit() {
+    let dir = tempfile::tempdir().unwrap();
+    git(dir.path(), &["init", "-q"]);
+    fs::write(dir.path().join("file.txt"), "content\n").unwrap();
+    git(dir.path(), &["add", "file.txt"]);
+    git(dir.path(), &["commit", "-q", "-m", "init"]);
+    assert!(verify_revision(dir.path(), "HEAD").is_ok());
+}
+
 fn clone_repo(src: &Path, dst: &Path) {
     let status = Command::new("git")
         .arg("clone")
@@ -412,6 +438,25 @@ fn range_status_unknown_revision_is_err() {
 
     let result = range_status(dir.path(), "not-a-real-revision");
     assert!(result.is_err(), "unknown revision should return Err");
+}
+
+#[test]
+fn commit_status_reports_only_the_selected_commit() {
+    let dir = tempfile::tempdir().unwrap();
+    git(dir.path(), &["init", "-q"]);
+    fs::write(dir.path().join("first.txt"), "one\n").unwrap();
+    git(dir.path(), &["add", "first.txt"]);
+    git(dir.path(), &["commit", "-q", "-m", "first"]);
+    fs::write(dir.path().join("second.txt"), "two\n").unwrap();
+    git(dir.path(), &["add", "second.txt"]);
+    git(dir.path(), &["commit", "-q", "-m", "second"]);
+    fs::write(dir.path().join("working-only.txt"), "working\n").unwrap();
+
+    let map = commit_status(dir.path(), "HEAD").unwrap();
+    let root = repo_root(dir.path());
+    assert_eq!(map.get(&root.join("second.txt")), Some(&GitStatus::New));
+    assert!(!map.contains_key(&root.join("first.txt")));
+    assert!(!map.contains_key(&root.join("working-only.txt")));
 }
 
 #[test]

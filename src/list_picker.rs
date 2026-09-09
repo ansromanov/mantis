@@ -7,7 +7,7 @@
 //! handle extra keys first, fall through to the shared dispatcher, then map
 //! `Activate`/`Close` to the overlay-specific action.
 
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 /// Outcome of a key handled by the shared dispatcher.
 #[derive(Debug, PartialEq, Eq)]
@@ -82,6 +82,13 @@ pub fn handle_list_picker_key<P: ListPicker>(p: &mut P, key: &KeyEvent) -> Overl
                 p.query_pop();
                 OverlayKey::Handled
             }
+        }
+        KeyCode::Char(_)
+            if key
+                .modifiers
+                .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT | KeyModifiers::SUPER) =>
+        {
+            OverlayKey::Pass
         }
         KeyCode::Char(c) => {
             p.query_push(c);

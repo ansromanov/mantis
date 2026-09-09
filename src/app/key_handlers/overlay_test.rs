@@ -229,11 +229,12 @@ fn handle_revision_key_enter_with_empty_query_and_empty_items_closes_without_ent
 fn handle_revision_key_enter_with_empty_query_selects_first_item() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    // Picker with shortcuts: pressing Enter selects HEAD.
+    // An unborn repository has no resolvable shortcut, so Enter must not
+    // enter compare mode.
     app.revision_picker = Some(RevisionPicker::new(&root));
     app.handle_revision_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
     assert!(app.revision_picker.is_none());
-    assert_eq!(app.compare_base.as_deref(), Some("HEAD"));
+    assert!(app.compare_base.is_none());
     fs::remove_dir_all(&root).ok();
 }
 
@@ -249,7 +250,7 @@ fn handle_revision_key_enter_with_selection_enters_compare_mode() {
     app.handle_revision_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
     assert!(app.revision_picker.is_none());
     assert_eq!(app.compare_base.as_deref(), Some("HEAD"));
-    assert!(app.git_mode, "entering compare mode should enable git mode");
+    assert!(app.git_mode);
     fs::remove_dir_all(&root).ok();
 }
 
@@ -267,11 +268,8 @@ fn handle_revision_key_enter_with_empty_filtered_list_uses_typed_query() {
     app.revision_picker = Some(picker);
     app.handle_revision_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
     assert!(app.revision_picker.is_none());
-    assert_eq!(
-        app.compare_base.as_deref(),
-        Some("HEAD~3"),
-        "when filtered list is empty, the typed query should be used as the revspec"
-    );
+    assert_eq!(app.compare_base.as_deref(), Some("HEAD~3"));
+    assert!(app.git_mode);
     fs::remove_dir_all(&root).ok();
 }
 
@@ -1387,7 +1385,7 @@ fn handle_repo_log_key_esc_closes() {
 }
 
 #[test]
-fn handle_repo_log_key_enter_enters_compare_mode() {
+fn handle_repo_log_key_enter_enters_commit_mode() {
     let root = temp_tree();
     let mut app = app_for(&root);
     let mut s = repo_log_with_commits(root.clone(), 2);
@@ -1395,7 +1393,8 @@ fn handle_repo_log_key_enter_enters_compare_mode() {
     app.repo_log = Some(s);
     app.handle_repo_log_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
     assert!(app.repo_log.is_none());
-    assert_eq!(app.compare_base, Some(format!("{:040}", 1)));
+    assert_eq!(app.commit_base, None);
+    assert!(app.status_message.is_some());
     fs::remove_dir_all(&root).ok();
 }
 

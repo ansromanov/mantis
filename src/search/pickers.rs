@@ -422,7 +422,7 @@ impl RevisionPicker {
     /// or the directory is not a repo, items is empty (the picker still allows
     /// free-form entry).
     pub fn new(repo_dir: &std::path::Path) -> Self {
-        let shortcuts = vec![
+        let mut shortcuts = vec![
             RevisionItem {
                 rev: "HEAD".into(),
                 display: "HEAD (current)".into(),
@@ -436,6 +436,7 @@ impl RevisionPicker {
                 display: "HEAD~2 (grandparent)".into(),
             },
         ];
+        shortcuts.retain(|item| crate::git::verify_revision(repo_dir, &item.rev).is_ok());
 
         let mut commits = Vec::new();
         for commit in crate::git::recent_commits(repo_dir, 50) {

@@ -23,6 +23,10 @@
 //! which opens a revision picker overlay (see `key_handlers/overlay.rs`) for
 //! the target revision. Exiting git mode (Esc / toggle) clears `compare_base`
 //! and returns to normal browsing.
+//!
+//! When `commit_base` is `Some(rev)`, the tree and content pane show the
+//! selected commit's parent-to-commit changes, as chosen from the repository
+//! commit log. This mode is also cleared when git mode is exited.
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -246,6 +250,8 @@ pub struct App {
     /// and the working tree (compare mode). Set from the command palette (or
     /// the history overlay). Cleared when exiting git mode.
     pub compare_base: Option<String>,
+    /// When set, git mode shows the selected commit's parent-to-commit diff.
+    pub commit_base: Option<String>,
     /// State for the compare-against-revision picker overlay. `Some` while the
     /// picker is open; `None` otherwise.
     pub revision_picker: Option<RevisionPicker>,
@@ -624,6 +630,13 @@ impl App {
         if self.git_status_enabled {
             if let Some(ref rev) = self.compare_base.clone() {
                 self.request_range_status(rev.clone());
+            } else if let Some(ref rev) = self.commit_base.clone() {
+                if let Ok(map) = crate::git::commit_status(&self.root, rev) {
+                    self.git_status_map = map;
+                    self.expand_git_dirs();
+                    self.rebuild(false);
+                    self.try_open_selected();
+                }
             } else {
                 self.request_git_status_refresh();
             }
