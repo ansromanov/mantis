@@ -91,8 +91,11 @@ Diffs refresh on the 30-second auto-reload tick and on manual `r`.
 
 ```toml
 git_status = true        # colour tree entries by git status (default: true)
-git_show_deleted = false # show ghost nodes for deleted tracked files (default: false)
+git_show_deleted = false # show ghost nodes outside git mode (default: false)
 ```
+
+Git mode always includes deleted tracked files so the change list remains
+complete, regardless of this setting.
 
 ## Compare mode
 

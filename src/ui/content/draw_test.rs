@@ -9,6 +9,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::backend::TestBackend;
+use ratatui::style::Style;
 
 use crate::app::{App, Focus};
 use crate::config::Config;
@@ -37,6 +38,51 @@ fn active_line_initialises_to_zero_on_open() {
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
     assert_eq!(app.active_line, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn draw_content_sanitizes_terminal_controls_in_title() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.content_title = Some("safe\u{1b}]0;hijack\u{07}".to_string());
+    app.content = vec!["content".to_string()];
+    let output = render_to_string(&mut app);
+    assert!(!output.contains("hijack"));
+    assert!(output.contains("safe"));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn draw_content_clears_glyphs_left_by_a_previous_file() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.current_file = None;
+    app.virtual_file = None;
+    app.content = vec!["previously-long-content".to_string()];
+    app.highlighted = vec![vec![(
+        Style::default(),
+        "previously-long-content".to_string(),
+    )]];
+
+    let backend = TestBackend::new(80, 24);
+    let mut terminal = ratatui::Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| draw_content(frame, &mut app, frame.area()))
+        .unwrap();
+    app.content = vec!["x".to_string()];
+    app.highlighted = vec![vec![(Style::default(), "x".to_string())]];
+    terminal
+        .draw(|frame| draw_content(frame, &mut app, frame.area()))
+        .unwrap();
+    let text: String = terminal
+        .backend()
+        .buffer()
+        .content()
+        .iter()
+        .map(|cell| cell.symbol())
+        .collect();
+    assert!(!text.contains("previously-long-content"));
     fs::remove_dir_all(&root).ok();
 }
 

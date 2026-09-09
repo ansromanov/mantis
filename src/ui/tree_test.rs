@@ -172,6 +172,15 @@ fn draw_tree_title_shows_files_label() {
 }
 
 #[test]
+fn draw_tree_sanitizes_terminal_controls_in_file_names() {
+    let mut app = make_app(false, HashMap::new());
+    app.nodes = vec![make_node("safe\u{1b}]0;hijack\u{07}.txt", false, false)];
+    let text = all_text(&render_tree(&mut app, 60, 5));
+    assert!(!text.contains("hijack"));
+    assert!(text.contains("safe"));
+}
+
+#[test]
 fn draw_tree_git_mode_shows_git_label() {
     let mut app = make_app(false, HashMap::new());
     app.root = PathBuf::from("repo");

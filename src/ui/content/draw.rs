@@ -45,12 +45,12 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     };
 
     let mut title = if let Some(t) = &app.content_title {
-        t.clone()
+        crate::ansi::sanitize_terminal_text(t)
     } else {
         app.current_file
             .as_ref()
             .and_then(|p| p.strip_prefix(&app.root).ok())
-            .map(|rel| format!(" {} ", rel.display()))
+            .map(|rel| crate::ansi::sanitize_terminal_text(&format!(" {} ", rel.display())))
             .unwrap_or_else(|| " No file ".into())
     };
     // While a background load is in flight the previous file's content stays on
@@ -66,6 +66,11 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
 
     let mut inner = block.inner(area);
     let mut line_blame_area = Rect::default();
+
+    // Paragraph widgets do not clear cells that were occupied by a longer
+    // previous line. Clear the inner pane before every repaint so switching
+    // files cannot leave stale glyphs behind.
+    f.render_widget(Clear, inner);
 
     // Cleared here; the image branch below is the only path that sets a real
     // rect, so any other view leaves the post-frame overlay with nothing to do.

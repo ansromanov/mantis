@@ -186,6 +186,20 @@ fn non_sgr_escape_stripped() {
 }
 
 #[test]
+fn terminal_sanitizer_removes_csi_and_osc_sequences() {
+    let text = "before\x1b[2J\x1b]0;HIJACKED\x07after";
+    assert_eq!(sanitize_terminal_text(text), "beforeafter");
+    assert!(contains_terminal_controls(text));
+}
+
+#[test]
+fn terminal_sanitizer_replaces_tabs_and_marks_directional_controls() {
+    let text = "a\tb\u{202e}c";
+    assert_eq!(sanitize_terminal_text(text), "a b<U+202E>c");
+    assert!(contains_terminal_controls(text));
+}
+
+#[test]
 fn multi_style_without_resets() {
     // Each SGR sequence creates a style boundary (flush point).
     let result = parse_ansi_line("\x1b[1mbold \x1b[31mred bold\x1b[0m");

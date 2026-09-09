@@ -495,7 +495,7 @@ impl App {
         self.json_pretty_text = load.json_pretty_text;
         self.json_pretty_lines = load.json_pretty_lines;
         self.json_path_map = if self.is_json && self.show_pretty_json {
-            serde_json::from_str::<serde_json::Value>(&load.content.join("\n"))
+            super::loader::parse_json_value(&load.content.join("\n"))
                 .map(|value| crate::json_path::build_path_map(&value))
                 .unwrap_or_default()
         } else {
@@ -758,12 +758,16 @@ impl App {
         self.clear_selection();
         let rel = file.strip_prefix(&self.root).unwrap_or(file);
         self.content_title = Some(format!(" diff {} — {} ", short, rel.display()));
+        let lines: Vec<String> = lines
+            .iter()
+            .map(|line| crate::ansi::sanitize_terminal_text(line))
+            .collect();
         self.highlighted = lines
             .iter()
             .map(|l| vec![(diff_line_style(l, &self.theme), l.clone())])
             .collect();
-        self.diff_rows = crate::diff::parse_side_by_side(lines);
-        self.content = lines.to_vec();
+        self.diff_rows = crate::diff::parse_side_by_side(&lines);
+        self.content = lines;
         self.focus = Focus::Content;
         self.set_file_watch(None);
     }
@@ -790,7 +794,7 @@ impl App {
             .and_then(|r| r.selected_commit().map(|c| c.hash.clone()));
         self.repo_log = None;
         if let Some(hash) = picked {
-            self.enter_compare_mode(hash);
+            self.enter_commit_mode(hash);
         }
     }
 

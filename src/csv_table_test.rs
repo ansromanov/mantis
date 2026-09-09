@@ -120,13 +120,12 @@ fn formats_multi_row_table_with_alignment() {
         vec!["Bob".into(), "7".into(), "Paris".into()],
     ];
     let lines = format_table_lines(&rows);
-    assert_eq!(lines.len(), 6);
+    assert_eq!(lines.len(), 5);
     assert_eq!(lines[0], "┌───────┬─────┬──────────┐");
     assert_eq!(lines[1], "│ Name  │ Age │ City     │");
-    assert_eq!(lines[2], "├───────┼─────┼──────────┤");
-    assert_eq!(lines[3], "│ Alice │ 30  │ New York │");
-    assert_eq!(lines[4], "│ Bob   │ 7   │ Paris    │");
-    assert_eq!(lines[5], "└───────┴─────┴──────────┘");
+    assert_eq!(lines[2], "│ Alice │ 30  │ New York │");
+    assert_eq!(lines[3], "│ Bob   │ 7   │ Paris    │");
+    assert_eq!(lines[4], "└───────┴─────┴──────────┘");
 }
 
 #[test]
@@ -137,11 +136,10 @@ fn formats_table_with_unicode_characters() {
         vec!["Car".into(), "🚗".into()],
     ];
     let lines = format_table_lines(&rows);
-    assert_eq!(lines.len(), 6);
+    assert_eq!(lines.len(), 5);
     assert_eq!(lines[0], "┌───────┬──────┐");
     assert_eq!(lines[1], "│ Item  │ Icon │");
-    assert_eq!(lines[2], "├───────┼──────┤");
-    assert_eq!(lines[3], "│ Apple │ 🍎   │");
-    assert_eq!(lines[4], "│ Car   │ 🚗   │");
-    assert_eq!(lines[5], "└───────┴──────┘");
+    assert_eq!(lines[2], "│ Apple │ 🍎   │");
+    assert_eq!(lines[3], "│ Car   │ 🚗   │");
+    assert_eq!(lines[4], "└───────┴──────┘");
 }

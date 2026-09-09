@@ -281,6 +281,24 @@ fn ghost_nodes_appear_for_deleted_files() {
 }
 
 #[test]
+fn ghost_nodes_include_missing_deleted_parent_directories() {
+    let root = dir_tree();
+    let removed_dir = root.join("removed");
+    let deleted_file = removed_dir.join("nested.rs");
+    let expanded = HashSet::from([root.clone(), removed_dir.clone()]);
+    let deleted = HashSet::from([deleted_file]);
+    let (nodes, _) = build_visible(&root, &expanded, false, true, &deleted);
+
+    assert!(nodes
+        .iter()
+        .any(|node| node.path == removed_dir && node.is_dir));
+    assert!(nodes
+        .iter()
+        .any(|node| node.path == root.join("removed/nested.rs")));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn collect_all_files_returns_flat_file_list() {
     let root = dir_tree();
     let files = collect_all_files(&root, false, true);

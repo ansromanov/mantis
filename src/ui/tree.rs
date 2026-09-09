@@ -295,12 +295,23 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
             // Inline tree-filter match highlighting
             let name_spans = if let Some(ref filter) = app.tree_filter {
                 if filter.is_empty() {
-                    vec![Span::styled(node.name.clone(), name_style)]
+                    vec![Span::styled(
+                        crate::ansi::sanitize_terminal_text(&node.name),
+                        name_style,
+                    )]
                 } else {
-                    highlight_matches(&node.name, &filter.query, name_style, theme)
+                    highlight_matches(
+                        &crate::ansi::sanitize_terminal_text(&node.name),
+                        &filter.query,
+                        name_style,
+                        theme,
+                    )
                 }
             } else {
-                vec![Span::styled(node.name.clone(), name_style)]
+                vec![Span::styled(
+                    crate::ansi::sanitize_terminal_text(&node.name),
+                    name_style,
+                )]
             };
             spans.extend(name_spans);
 
@@ -420,7 +431,10 @@ fn compute_breadcrumb(app: &App) -> Vec<(String, PathBuf)> {
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_default();
-        segments.push((label, current.to_path_buf()));
+        segments.push((
+            crate::ansi::sanitize_terminal_text(&label),
+            current.to_path_buf(),
+        ));
         match current.parent() {
             Some(parent) if parent != current => current = parent,
             _ => break,

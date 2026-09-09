@@ -90,7 +90,7 @@ keep_query = false           # restore the last query when reopening search
 status = true                # show git status colours/markers in the tree
 show_untracked = true        # include untracked (??) files
 show_ignored = false         # include ignored (!!) files
-show_deleted = false         # ghost nodes for deleted tracked files
+show_deleted = false         # ghost nodes outside git mode
 ignore_gitignore = false     # respect .gitignore when listing files
 
 [git.diff]

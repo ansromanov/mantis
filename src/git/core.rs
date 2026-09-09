@@ -56,6 +56,47 @@ fn git_toplevel(dir: &Path) -> Option<PathBuf> {
     PathBuf::from(s).canonicalize().ok()
 }
 
+/// Verifies that `rev` resolves to a commit in the repository containing
+/// `dir`. The returned error is suitable for showing in the status bar.
+pub fn verify_revision(dir: &Path, rev: &str) -> Result<(), String> {
+    let Some(root) = git_toplevel(dir) else {
+        return Err("not a git repository".to_string());
+    };
+    let spec = format!("{rev}^{{commit}}");
+    let output = git_cmd()
+        .arg("-C")
+        .arg(root)
+        .args(["rev-parse", "--verify", "--end-of-options"])
+        .arg(spec)
+        .output()
+        .map_err(|e| e.to_string())?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "revision '{rev}' not found: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ))
+    }
+}
+
+/// Returns the short hash for a verified revision.
+pub fn short_revision(dir: &Path, rev: &str) -> Option<String> {
+    let root = git_toplevel(dir)?;
+    let spec = format!("{rev}^{{commit}}");
+    let output = git_cmd()
+        .arg("-C")
+        .arg(root)
+        .args(["rev-parse", "--short", "--end-of-options"])
+        .arg(spec)
+        .output()
+        .ok()?;
+    output
+        .status
+        .success()
+        .then(|| String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
 /// Returns rich git repository info for the directory containing `dir`, or
 /// `None` if not in a git repo or git is unavailable.
 ///
@@ -204,11 +245,15 @@ fn parse_branch_line(line: &str) -> GitHead {
         None => return GitHead::default(),
     };
 
-    if line.starts_with("HEAD (no branch)")
-        || line.starts_with("Initial commit on ")
-        || line.starts_with("No commits yet on ")
-    {
+    if line.starts_with("HEAD (no branch)") {
         return GitHead::Detached;
+    }
+
+    if let Some(branch) = line
+        .strip_prefix("Initial commit on ")
+        .or_else(|| line.strip_prefix("No commits yet on "))
+    {
+        return GitHead::Branch(branch.to_string());
     }
 
     let branch = if let Some(pos) = line.find("...") {
@@ -397,8 +442,12 @@ pub fn range_status(dir: &Path, rev: &str) -> Result<HashMap<PathBuf, GitStatus>
         Err(e) => return Err(e.to_string()),
     };
 
+    Ok(parse_name_status(&root, &out.stdout))
+}
+
+/// Parses NUL-delimited git name-status output and adds parent directories.
+fn parse_name_status(root: &Path, bytes: &[u8]) -> HashMap<PathBuf, GitStatus> {
     let mut map: HashMap<PathBuf, GitStatus> = HashMap::new();
-    let bytes = &out.stdout;
     let mut segs: Vec<&[u8]> = bytes.split(|&b| b == 0).collect();
     if segs.last().is_some_and(|s| s.is_empty()) {
         segs.pop();
@@ -453,7 +502,7 @@ pub fn range_status(dir: &Path, rev: &str) -> Result<HashMap<PathBuf, GitStatus>
         // Include parent directories with highest-priority child status.
         let mut cur = abs.parent();
         while let Some(d) = cur {
-            if d == root.as_path() || !d.starts_with(&root) {
+            if d == root || !d.starts_with(root) {
                 break;
             }
             set_if_higher(&mut map, d.to_path_buf(), status);
@@ -463,7 +512,34 @@ pub fn range_status(dir: &Path, rev: &str) -> Result<HashMap<PathBuf, GitStatus>
         i += 1;
     }
 
-    Ok(map)
+    map
+}
+
+/// Returns the files changed by a single commit, compared with its parent.
+/// `--root` also makes the first commit report its added files correctly.
+pub fn commit_status(dir: &Path, rev: &str) -> Result<HashMap<PathBuf, GitStatus>, String> {
+    let Some(root) = git_toplevel(dir) else {
+        return Err("not a git repository".to_string());
+    };
+    let output = git_cmd()
+        .arg("-C")
+        .arg(&root)
+        .args([
+            "diff-tree",
+            "--root",
+            "--name-status",
+            "-r",
+            "--format=",
+            "-z",
+            "--end-of-options",
+            rev,
+        ])
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+    }
+    Ok(parse_name_status(&root, &output.stdout))
 }
 
 /// Returns the working-tree diff for `file` compared to HEAD, as lines.

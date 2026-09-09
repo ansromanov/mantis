@@ -667,14 +667,21 @@ fn toggle_git_mode_key_flips_git_mode_flag() {
 }
 
 #[test]
-fn enter_compare_mode_sets_compare_base_and_enables_git_mode() {
+fn enter_compare_mode_rejects_unresolvable_revision() {
     let root = temp_tree();
     let mut app = app_for(&root);
+    app.git_info = Some(crate::git::GitRepoInfo {
+        head: crate::git::GitHead::Branch("main".into()),
+        ahead: 0,
+        behind: 0,
+        total_changed: 0,
+        staged: 0,
+        untracked: 0,
+    });
     app.enter_compare_mode("HEAD~3".to_string());
-    assert_eq!(app.compare_base.as_deref(), Some("HEAD~3"));
-    assert!(app.git_mode);
-    assert!(!app.git_mode_flat);
-    assert!(app.git_status_enabled);
+    assert!(app.compare_base.is_none());
+    assert!(!app.git_mode);
+    assert!(app.status_message.is_some());
     fs::remove_dir_all(&root).ok();
 }
 
@@ -692,6 +699,26 @@ fn entering_compare_mode_clears_previous_status_before_async_load() {
 
     assert!(app.content.is_empty());
     assert!(app.highlighted.is_empty());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn git_mode_shows_deleted_files_even_when_ghost_rows_are_disabled() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let deleted = root.join("removed.txt");
+    app.git_mode = true;
+    app.git_show_deleted = false;
+    app.git_status_map
+        .insert(deleted.clone(), crate::git::GitStatus::Deleted);
+    app.rebuild(false);
+
+    let node = app.nodes.iter().find(|node| node.path == deleted);
+    assert!(
+        node.is_some(),
+        "deleted tracked files must be visible in git mode"
+    );
+    assert!(node.is_some_and(|node| node.deleted));
     fs::remove_dir_all(&root).ok();
 }
 

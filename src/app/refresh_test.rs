@@ -388,6 +388,7 @@ fn create_base_app() -> App {
         git_mode: false,
         git_mode_flat: false,
         compare_base: None,
+        commit_base: None,
         revision_picker: None,
         worktree_picker: None,
         worktree_picker_area: ratatui::layout::Rect::default(),

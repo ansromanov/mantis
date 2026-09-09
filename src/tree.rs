@@ -111,8 +111,32 @@ pub fn build_visible(
     }
 
     let mut nodes = Vec::new();
-    append_dir(root, 0, &children, expanded, deleted_files, &mut nodes);
+    let deleted_dirs = deleted_ancestor_dirs(root, deleted_files);
+    append_dir(
+        root,
+        0,
+        &children,
+        expanded,
+        deleted_files,
+        &deleted_dirs,
+        &mut nodes,
+    );
     (nodes, error_count)
+}
+
+fn deleted_ancestor_dirs(root: &Path, deleted_files: &HashSet<PathBuf>) -> HashSet<PathBuf> {
+    let mut dirs = HashSet::new();
+    for file in deleted_files {
+        let mut current = file.parent();
+        while let Some(dir) = current {
+            if dir == root || !dir.starts_with(root) || dir.exists() {
+                break;
+            }
+            dirs.insert(dir.to_path_buf());
+            current = dir.parent();
+        }
+    }
+    dirs
 }
 
 /// Recursive helper for `build_visible`. Sorts one directory's entries
@@ -124,6 +148,7 @@ fn append_dir(
     children: &HashMap<PathBuf, Vec<DirEntry>>,
     expanded: &HashSet<PathBuf>,
     deleted_files: &HashSet<PathBuf>,
+    deleted_dirs: &HashSet<PathBuf>,
     out: &mut Vec<TreeNode>,
 ) {
     let mut entries: Vec<&DirEntry> = match children.get(dir) {
@@ -166,7 +191,44 @@ fn append_dir(
         });
 
         if is_dir && expanded.contains(&path) {
-            append_dir(&path, depth + 1, children, expanded, deleted_files, out);
+            append_dir(
+                &path,
+                depth + 1,
+                children,
+                expanded,
+                deleted_files,
+                deleted_dirs,
+                out,
+            );
+        }
+    }
+
+    let mut missing_dirs: Vec<&PathBuf> = deleted_dirs
+        .iter()
+        .filter(|p| p.parent() == Some(dir))
+        .collect();
+    missing_dirs.sort();
+    for path in missing_dirs {
+        let Some(name) = path.file_name() else {
+            continue;
+        };
+        out.push(TreeNode {
+            path: path.clone(),
+            name: name.to_string_lossy().to_string(),
+            depth,
+            is_dir: true,
+            deleted: true,
+        });
+        if expanded.contains(path) {
+            append_dir(
+                path,
+                depth + 1,
+                children,
+                expanded,
+                deleted_files,
+                deleted_dirs,
+                out,
+            );
         }
     }
 
