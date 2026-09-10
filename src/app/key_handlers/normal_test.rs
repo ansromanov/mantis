@@ -1380,6 +1380,18 @@ fn slash_opens_in_file_search_when_content_focused_with_file() {
 }
 
 #[test]
+fn slash_search_handler_keeps_search_state_owned_by_content() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt"));
+    app.focus = Focus::Content;
+    app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
+    assert!(app.in_file_search.is_some());
+    assert!(matches!(app.focus, Focus::Content));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn slash_opens_file_picker_when_content_focused_no_file() {
     let root = temp_tree();
     let mut app = app_for(&root);
