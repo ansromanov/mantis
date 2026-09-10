@@ -255,7 +255,7 @@ impl App {
         // Keep wheel events inside the same overlay precedence chain as keys.
         // Without this guard, a wheel over an inline prompt falls through to
         // the tree/content handlers and changes the underlying view/focus.
-        if self.in_file_search.is_some() {
+        if self.in_file_search_open {
             match ev.kind {
                 MouseEventKind::ScrollDown => self.in_file_search_next(),
                 MouseEventKind::ScrollUp => self.in_file_search_prev(),

@@ -231,6 +231,30 @@ fn help_overlay_wheel_up_does_not_underflow() {
 }
 
 #[test]
+fn closed_in_file_search_does_not_capture_mouse_wheel() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.in_file_search = Some(crate::search::InFileSearch::new());
+    app.in_file_search_open = false;
+    app.in_file_search.as_mut().unwrap().matches = vec![
+        crate::search::InFileMatch {
+            line: 0,
+            col: 0,
+            len: 1,
+        },
+        crate::search::InFileMatch {
+            line: 1,
+            col: 0,
+            len: 1,
+        },
+    ];
+    app.handle_mouse(scroll_down_at(40, 5));
+    assert_eq!(app.in_file_search.as_ref().unwrap().current, 0);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn help_overlay_mouse_click_actions() {
     let root = temp_tree();
     let mut app = app_for(&root);
