@@ -1436,7 +1436,8 @@ fn in_file_search_esc_closes() {
     app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
     assert!(app.in_file_search.is_some());
     app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
-    assert!(app.in_file_search.is_none());
+    assert!(app.in_file_search.is_some());
+    assert!(!app.in_file_search_open);
     fs::remove_dir_all(&root).ok();
 }
 
@@ -1449,7 +1450,8 @@ fn in_file_search_enter_closes() {
     app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::empty()));
     assert!(app.in_file_search.is_some());
     app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
-    assert!(app.in_file_search.is_none());
+    assert!(app.in_file_search.is_some());
+    assert!(!app.in_file_search_open);
     fs::remove_dir_all(&root).ok();
 }
 
@@ -2286,6 +2288,7 @@ fn in_file_search_backspace_and_char() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.in_file_search = Some(InFileSearch::new());
+    app.in_file_search_open = true;
     app.content = vec!["hello".to_string()];
     app.content_area = Rect {
         x: 0,
