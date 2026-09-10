@@ -1480,4 +1480,12 @@ fn draw_bottom_bar_blame_does_not_panic_without_blame_data() {
         .unwrap();
 }
 
+#[test]
+fn long_tree_names_get_an_ellipsis_affordance() {
+    let name = "a".repeat(100);
+    let rendered = truncate_tree_name(&name, 30);
+    assert!(rendered.ends_with("..."));
+    assert!(rendered.len() < name.len());
+}
+
 // Modified for test requirements

@@ -292,16 +292,22 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
                 }
             }
 
+            let affordance = tree_affordance(node);
+            if !affordance.is_empty() {
+                spans.push(Span::styled(format!("{affordance} "), badge_style));
+            }
+
             // Inline tree-filter match highlighting
+            let display_name = truncate_tree_name(&node.name, list_area.width as usize);
             let name_spans = if let Some(ref filter) = app.tree_filter {
                 if filter.is_empty() {
                     vec![Span::styled(
-                        crate::ansi::sanitize_terminal_text(&node.name),
+                        crate::ansi::sanitize_terminal_text(&display_name),
                         name_style,
                     )]
                 } else {
                     highlight_matches(
-                        &crate::ansi::sanitize_terminal_text(&node.name),
+                        &crate::ansi::sanitize_terminal_text(&display_name),
                         &filter.query,
                         name_style,
                         theme,
@@ -309,7 +315,7 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
                 }
             } else {
                 vec![Span::styled(
-                    crate::ansi::sanitize_terminal_text(&node.name),
+                    crate::ansi::sanitize_terminal_text(&display_name),
                     name_style,
                 )]
             };
@@ -351,6 +357,42 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
     } else {
         None
     };
+}
+
+fn tree_affordance(node: &crate::tree::TreeNode) -> &'static str {
+    if node.deleted {
+        return "[deleted]";
+    }
+    if std::fs::symlink_metadata(&node.path)
+        .map(|m| m.file_type().is_symlink())
+        .unwrap_or(false)
+    {
+        return "[link]";
+    }
+    if node.is_dir {
+        match std::fs::read_dir(&node.path) {
+            Ok(mut entries) => {
+                if entries.next().is_none() {
+                    "[empty]"
+                } else {
+                    ""
+                }
+            }
+            Err(_) => "[unreadable]",
+        }
+    } else {
+        ""
+    }
+}
+
+fn truncate_tree_name(name: &str, width: usize) -> String {
+    let max_chars = width.saturating_sub(8).max(12);
+    let chars: Vec<char> = name.chars().collect();
+    if chars.len() <= max_chars {
+        return name.to_string();
+    }
+    let keep = max_chars.saturating_sub(3);
+    format!("{}...", chars[..keep].iter().collect::<String>())
 }
 
 /// Splits `name` into spans, highlighting substrings that match `query`

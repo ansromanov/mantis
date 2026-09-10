@@ -54,6 +54,16 @@ fn selection_text_single_line_plugin_content() {
 }
 
 #[test]
+fn closed_search_does_not_suppress_inline_images() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.in_file_search = Some(crate::search::InFileSearch::new());
+    app.in_file_search_open = false;
+    assert!(!app.image_overlay_suppressed());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn selection_text_multi_line_plugin_content() {
     let root = temp_root();
     let mut app = app_for(&root);

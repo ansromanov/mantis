@@ -69,6 +69,16 @@ impl App {
             return;
         }
         self.pause_follow_for_input();
+        // Ctrl+L is a recovery hatch when a terminal frame is corrupted.
+        if key.code == KeyCode::Char('l')
+            && key
+                .modifiers
+                .contains(crossterm::event::KeyModifiers::CONTROL)
+        {
+            self.needs_clear = true;
+            self.set_status("Full redraw requested");
+            return;
+        }
         // Notify plugins of each keypress *only* in normal mode (no overlay
         // active) so search/picker input is not broadcast. Plugins receive
         // the key as a readable string: "q", "ctrl+c", "Enter", etc.
@@ -157,7 +167,7 @@ impl App {
             self.handle_search_key(key);
         } else if self.json_query.is_some() {
             self.handle_json_query_key(key);
-        } else if self.in_file_search.is_some() {
+        } else if self.in_file_search_open {
             self.handle_in_file_search_key(key);
         } else if self.filter_bar.is_some() {
             self.handle_filter_bar_key(key);

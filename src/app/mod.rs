@@ -178,6 +178,8 @@ pub struct App {
     pub search: Option<SearchState>,
     pub last_search_query: String,
     pub in_file_search: Option<InFileSearch>,
+    /// Whether the in-file search bar currently owns keyboard input.
+    pub in_file_search_open: bool,
     /// JSON query input overlay; active only for JSON and JSONL content.
     pub json_query: Option<String>,
     pub json_query_original: Vec<String>,
@@ -1012,6 +1014,7 @@ impl App {
         self.yaml_anchor_count = 0;
         self.yaml_alias_count = 0;
         self.in_file_search = None;
+        self.in_file_search_open = false;
         self.json_query = None;
         self.json_query_original.clear();
         self.plugin_content_active = false;

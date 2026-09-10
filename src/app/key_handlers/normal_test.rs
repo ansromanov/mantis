@@ -9,6 +9,18 @@ use crate::app::{App, Focus};
 use crate::config::Config;
 use crate::search::SearchMode;
 
+#[test]
+fn opening_in_file_search_marks_the_bar_active() {
+    let root = std::env::temp_dir().join(format!("mantis-search-open-{}", std::process::id()));
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(root.join("file.txt"), "searchable\n").unwrap();
+    let mut app = App::new(root.clone(), Config::default(), None, None).unwrap();
+    app.focus = Focus::Content;
+    app.handle_key(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::NONE));
+    assert!(app.in_file_search_open);
+    let _ = std::fs::remove_dir_all(root);
+}
+
 #[cfg(unix)]
 use crate::event_source::{AltKeys, CURRENT_ALT_KEYS};
 

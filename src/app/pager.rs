@@ -48,6 +48,7 @@ impl App {
         self.show_line_blame = false;
         self.clear_selection();
         self.in_file_search = None;
+        self.in_file_search_open = false;
         self.json_query = None;
         self.json_query_original.clear();
 

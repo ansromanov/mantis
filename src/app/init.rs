@@ -143,6 +143,7 @@ impl App {
             search: None,
             last_search_query: String::new(),
             in_file_search: None,
+            in_file_search_open: false,
             json_query: None,
             json_query_original: Vec::new(),
             tree_filter: None,

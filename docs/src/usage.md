@@ -147,6 +147,7 @@ These work no matter which panel is focused.
 | `/`                    | Tree filter (tree) / in-file search (content) |
 | `Ctrl+T`               | Global fuzzy file-name picker |
 | `Ctrl+F`, `f` (tree)   | Content (full-text) search |
+| `Ctrl+L`                | Force a full redraw if the terminal frame is corrupted |
 | `Ctrl+r`, `F5`, `r` (tree) | Reload tree         |
 | `Ctrl+e`, `e` (tree)   | Open current file in `$EDITOR` |
 | `y` (tree)             | Copy absolute path to clipboard |

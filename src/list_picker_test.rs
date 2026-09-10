@@ -265,3 +265,11 @@ fn vim_jk_push_to_query_when_non_empty() {
     assert_eq!(p.query, "xjk");
     assert_eq!(p.selected, 0, "selection must not change");
 }
+
+#[test]
+fn modifier_characters_are_not_inserted_as_query_text() {
+    let mut p = TestPicker::new(vec!["a".into()]);
+    let key = KeyEvent::new(KeyCode::Char('x'), KeyModifiers::CONTROL);
+    assert_eq!(handle_list_picker_key(&mut p, &key), OverlayKey::Pass);
+    assert!(p.query.is_empty());
+}

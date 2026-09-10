@@ -862,7 +862,7 @@ impl App {
             recent_files: self.recent_files.is_some(),
             bookmarks: self.bookmarks.is_some(),
             search: self.search.is_some(),
-            in_file_search: self.in_file_search.is_some(),
+            in_file_search: self.in_file_search_open,
             tree_filter: self.tree_filter.is_some(),
             bug_report: self.bug_report.is_some(),
             revision_picker: self.revision_picker.is_some(),

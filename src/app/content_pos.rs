@@ -433,7 +433,7 @@ impl App {
             || self.goto_line.is_some()
             || self.search.is_some()
             || self.context_menu.is_some()
-            || self.in_file_search.is_some()
+            || self.in_file_search_open
             || self.json_query.is_some()
             || self.filter_bar.is_some()
     }

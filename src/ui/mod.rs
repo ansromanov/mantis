@@ -113,7 +113,7 @@ fn draw_area(f: &mut Frame, app: &mut App, area: Rect) {
     content::draw_content(f, app, horiz[1]);
     statusbar::draw_statusbar(f, app, vert[1]);
 
-    if app.in_file_search.is_some() || app.json_query.is_some() {
+    if app.in_file_search_open || app.json_query.is_some() {
         popups::draw_in_file_search(f, app, horiz[1]);
     }
 
