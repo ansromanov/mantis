@@ -2186,6 +2186,7 @@ fn setup_in_file_search(app: &mut App) {
         height: 20,
     };
     app.in_file_search = Some(InFileSearch::new());
+    app.in_file_search_open = true;
     app.in_file_search.as_mut().unwrap().push('o');
     app.refresh_in_file_search();
 }
