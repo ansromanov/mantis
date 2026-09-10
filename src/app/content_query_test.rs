@@ -179,11 +179,12 @@ fn content_query_csv_table_view_and_toggle() {
 
     assert!(app.is_csv);
     assert!(app.show_csv_table);
-    // Table has top border, header row, middle border, 2 data rows, bottom border = 6 lines
-    assert_eq!(app.line_count(), 6);
+    // Table has top border, 3 uniform rows, and a bottom border = 5 lines.
+    // CSV/TSV has no reliable header marker, so the first row is not promoted.
+    assert_eq!(app.line_count(), 5);
     assert!(app.line_text(0).unwrap().starts_with('┌'));
     assert!(app.line_text(1).unwrap().contains("city"));
-    assert!(app.line_text(3).unwrap().contains("Paris"));
+    assert!(app.line_text(2).unwrap().contains("Paris"));
 
     // Toggle off table view
     app.show_csv_table = false;
