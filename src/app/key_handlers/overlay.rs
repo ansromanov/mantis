@@ -328,7 +328,10 @@ impl App {
             (result, selected_name, selected_theme)
         };
         match result {
-            OverlayKey::Activate => self.apply_selected_theme(),
+            OverlayKey::Activate => {
+                self.apply_selected_theme();
+                self.context_menu = None;
+            }
             OverlayKey::Close => {
                 self.theme_picker = None;
                 self.context_menu = None;
