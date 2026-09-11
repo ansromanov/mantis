@@ -99,7 +99,7 @@ def run_e2e_test():
             # Phase 3: Wait for process to exit and verify exit code
             exit_success = False
             exit_start = time.time()
-            while time.time() - exit_start < 5.0:
+            while time.time() - exit_start < 30.0:
                 # Wait for child process status change
                 try:
                     wpid, status = os.waitpid(pid, os.WNOHANG)
@@ -125,14 +125,13 @@ def run_e2e_test():
                 print("E2E whole-binary smoke test PASSED!")
                 return True
             else:
-                print("Mantis did not acknowledge the PTY quit request; stopping it after the smoke check.")
+                print("Mantis failed to exit cleanly or exited with non-zero status.")
                 try:
                     os.kill(pid, signal.SIGTERM)
                     os.waitpid(pid, 0)
                 except ChildProcessError:
                     pass
-                print("E2E whole-binary smoke test PASSED!")
-                return True
+                return False
 
         except Exception as e:
             print(f"E2E test encountered an exception: {e}")
