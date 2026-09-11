@@ -54,6 +54,25 @@ fn esc_closes_about() {
 }
 
 #[test]
+fn esc_closes_theme_picker_even_if_a_stale_context_menu_exists() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.theme_picker = Some(crate::search::ThemePicker::default());
+    app.context_menu = Some(crate::app::ContextMenuState {
+        entries: Vec::new(),
+        selected: 0,
+        anchor: (0, 0),
+        target: crate::app::ContextMenuTarget::Content,
+    });
+
+    app.handle_key(key(KeyCode::Esc));
+
+    assert!(app.theme_picker.is_none());
+    assert!(app.context_menu.is_none());
+    fs::remove_dir_all(root).ok();
+}
+
+#[test]
 fn q_closes_about() {
     let root = temp_tree();
     let mut app = app_for(&root);

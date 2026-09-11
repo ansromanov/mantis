@@ -135,12 +135,12 @@ impl App {
             }
             return;
         }
-        if self.context_menu.is_some() {
-            self.handle_context_menu_key(key);
-            return;
-        }
         if self.theme_picker.is_some() {
             self.handle_theme_key(key);
+            return;
+        }
+        if self.context_menu.is_some() {
+            self.handle_context_menu_key(key);
         } else if self.plugin_picker.is_some() {
             self.handle_plugin_key(key);
         } else if self.command_palette.is_some() {

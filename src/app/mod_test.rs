@@ -2260,7 +2260,9 @@ fn in_file_search_ctrl_p_goes_prev() {
     app.in_file_search.as_mut().unwrap().query.clear();
     app.in_file_search.as_mut().unwrap().current = 1;
     app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL));
-    assert_eq!(app.in_file_search.as_ref().unwrap().current, 0);
+    // Ctrl+P remains available for the command palette while the search bar
+    // is open, so it must not navigate the search matches.
+    assert_eq!(app.in_file_search.as_ref().unwrap().current, 1);
     fs::remove_dir_all(&root).ok();
 }
 

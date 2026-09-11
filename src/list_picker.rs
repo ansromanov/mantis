@@ -86,7 +86,8 @@ pub fn handle_list_picker_key<P: ListPicker>(p: &mut P, key: &KeyEvent) -> Overl
         KeyCode::Char(_)
             if key
                 .modifiers
-                .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT | KeyModifiers::SUPER) =>
+                .intersects(KeyModifiers::CONTROL | KeyModifiers::SUPER)
+                && !key.modifiers.contains(KeyModifiers::ALT) =>
         {
             OverlayKey::Pass
         }

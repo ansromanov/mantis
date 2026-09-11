@@ -141,6 +141,7 @@ impl App {
         } else if pressed_in(&k.bookmarks, &key, scope) {
             self.open_bookmarks();
         } else if pressed_in(&k.theme_picker, &key, scope) {
+            self.context_menu = None;
             self.theme_picker = Some(ThemePicker::default());
         } else if pressed_in(&k.plugin_picker, &key, scope) {
             let entries = self.plugin_manager.plugin_entries();

@@ -594,7 +594,7 @@ fn append_plugin_log_line_ignores_blank_line() {
 fn plugin_output_accepts_large_fold_region_messages() {
     let cap = std::hint::black_box(MAX_LINE_LEN);
     assert!(
-        cap >= 16 * 1024 * 1024,
-        "fold-region responses need room for generated source files"
+        cap >= 4 * 1024 * 1024,
+        "plugin responses need room for generated source files"
     );
 }

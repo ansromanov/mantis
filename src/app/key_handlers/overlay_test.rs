@@ -958,6 +958,26 @@ fn handle_theme_key_esc_closes_and_reverts() {
 }
 
 #[test]
+fn theme_activation_clears_a_stale_context_menu() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.theme_picker = Some(ThemePicker::default());
+    app.context_menu = Some(crate::app::ContextMenuState {
+        entries: Vec::new(),
+        selected: 0,
+        anchor: (0, 0),
+        target: crate::app::ContextMenuTarget::Tree {
+            path: root.join("a.txt"),
+            index: 0,
+        },
+    });
+    app.handle_theme_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert!(app.theme_picker.is_none());
+    assert!(app.context_menu.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn handle_theme_key_esc_falls_back_to_default_for_unloadable_config_theme() {
     let root = temp_tree();
     let mut app = app_for(&root);

@@ -102,16 +102,26 @@ fn char_pushes_to_query() {
 #[test]
 fn control_modified_chars_do_not_enter_query() {
     let mut p = TestPicker::new(vec!["a".into()]);
-    for modifiers in [
-        KeyModifiers::CONTROL,
-        KeyModifiers::ALT,
-        KeyModifiers::SUPER,
-    ] {
+    for modifiers in [KeyModifiers::CONTROL, KeyModifiers::SUPER] {
         let result = handle_list_picker_key(&mut p, &KeyEvent::new(KeyCode::Char('p'), modifiers));
         assert_eq!(result, OverlayKey::Pass);
     }
     assert!(p.query.is_empty());
     assert_eq!(p.push_count, 0);
+}
+
+#[test]
+fn altgr_characters_are_inserted_into_query() {
+    let mut p = TestPicker::new(vec!["a".into()]);
+    let result = handle_list_picker_key(
+        &mut p,
+        &KeyEvent::new(
+            KeyCode::Char('@'),
+            KeyModifiers::ALT | KeyModifiers::CONTROL,
+        ),
+    );
+    assert_eq!(result, OverlayKey::Handled);
+    assert_eq!(p.query, "@");
 }
 
 #[test]

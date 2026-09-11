@@ -631,11 +631,14 @@ impl App {
             if let Some(ref rev) = self.compare_base.clone() {
                 self.request_range_status(rev.clone());
             } else if let Some(ref rev) = self.commit_base.clone() {
-                if let Ok(map) = crate::git::commit_status(&self.root, rev) {
-                    self.git_status_map = map;
-                    self.expand_git_dirs();
-                    self.rebuild(false);
-                    self.try_open_selected();
+                match crate::git::commit_status(&self.root, rev) {
+                    Ok(map) => {
+                        self.git_status_map = map;
+                        self.expand_git_dirs();
+                        self.rebuild(false);
+                        self.try_open_selected();
+                    }
+                    Err(error) => self.set_status(format!("git commit status failed: {error}")),
                 }
             } else {
                 self.request_git_status_refresh();
