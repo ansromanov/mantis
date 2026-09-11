@@ -149,6 +149,7 @@ fn draw_in_file_search_overlay() {
     s.push('x');
     s.refresh(0, |_| None);
     app.in_file_search = Some(s);
+    app.in_file_search_open = true;
     let rows = render(&mut app);
     let joined = rows.join("\n");
     assert!(joined.contains("/x"));
