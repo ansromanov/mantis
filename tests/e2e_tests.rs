@@ -200,9 +200,10 @@ fn test_compare_mode_records_base_revision() {
     let mut app = init_app();
     assert!(app.compare_base.is_none());
 
-    app.enter_compare_mode("HEAD~1".to_string());
+    // CI uses a shallow checkout, so HEAD~1 is not guaranteed to exist.
+    app.enter_compare_mode("HEAD".to_string());
 
-    assert_eq!(app.compare_base.as_deref(), Some("HEAD~1"));
+    assert_eq!(app.compare_base.as_deref(), Some("HEAD"));
 }
 
 /// Regression test for PRs #621/#638/#639: the bug-report and telemetry
