@@ -12,6 +12,12 @@ use super::*;
 use crate::app::DiffMode;
 use crate::config::{Config, ContentConfig};
 
+#[test]
+fn new_app_starts_with_search_bar_closed() {
+    let app = App::new(std::path::PathBuf::from("."), Config::default(), None, None).unwrap();
+    assert!(!app.in_file_search_open);
+}
+
 fn temp_dir() -> PathBuf {
     static COUNTER: AtomicUsize = AtomicUsize::new(0);
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);

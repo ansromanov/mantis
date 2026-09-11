@@ -178,6 +178,7 @@ impl App {
                 }
             }
             self.refresh_in_file_search();
+            self.search_input_feedback();
             self.scroll_in_file_search_to_current();
             return;
         }
@@ -186,10 +187,11 @@ impl App {
         };
         match handle_list_picker_key(s, &key) {
             OverlayKey::Activate | OverlayKey::Close => {
-                self.in_file_search = None;
+                self.in_file_search_open = false;
             }
             OverlayKey::Handled => {
                 self.refresh_in_file_search();
+                self.search_input_feedback();
                 self.scroll_in_file_search_to_current();
             }
             _ => {}
@@ -267,6 +269,21 @@ impl App {
             return;
         };
         s.refresh(total, |i| lines.get(i).cloned());
+    }
+
+    /// Shows immediate feedback for an edited in-file query.
+    pub(crate) fn search_input_feedback(&mut self) {
+        let Some(s) = self.in_file_search.as_ref() else {
+            return;
+        };
+        if s.query.is_empty() {
+            return;
+        }
+        if s.matches.is_empty() {
+            self.set_status("Search: no matches");
+        } else {
+            self.set_status(format!("Search: {} matches", s.matches.len()));
+        }
     }
 
     /// Handles keyboard input while the git-history overlay is open.

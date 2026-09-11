@@ -8,6 +8,20 @@ use crate::pager::PagerContent;
 
 static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
+#[test]
+fn pager_open_closes_persistent_search_bar() {
+    let mut app = App::new(std::path::PathBuf::from("."), Config::default(), None, None).unwrap();
+    app.in_file_search_open = true;
+    app.open_pager_content(
+        PagerContent {
+            content: vec![],
+            is_diff: false,
+        },
+        None,
+    );
+    assert!(!app.in_file_search_open);
+}
+
 fn temp_dir() -> PathBuf {
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
     let dir = std::env::temp_dir().join(format!("tv_app_pager_{}_{n}", std::process::id()));

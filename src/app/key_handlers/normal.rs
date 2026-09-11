@@ -105,6 +105,7 @@ impl App {
             if self.focus == Focus::Content && has_content && self.config.search.in_file_search {
                 // Content focused with something loaded: open the in-file search bar.
                 self.in_file_search = Some(InFileSearch::new());
+                self.in_file_search_open = true;
             } else if self.focus == Focus::Tree {
                 // Tree focused: open the inline tree name filter.
                 self.tree_filter = Some(TreeFilter::new());

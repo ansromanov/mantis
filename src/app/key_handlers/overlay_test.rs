@@ -48,6 +48,16 @@ fn json_query_replaces_results_and_escape_restores_content() {
 }
 
 #[test]
+fn ctrl_l_requests_a_full_redraw_even_while_an_overlay_is_open() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.search = Some(SearchState::new(&root, false, false, 0, None));
+    app.handle_key(KeyEvent::new(KeyCode::Char('l'), KeyModifiers::CONTROL));
+    assert!(app.needs_clear);
+    assert!(app.search.is_some());
+}
+
+#[test]
 fn bookmarks_overlay_escape_closes_picker() {
     let root = temp_tree();
     let mut app = app_for(&root);
