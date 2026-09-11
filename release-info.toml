@@ -1,7 +1,9 @@
-version = "0.20.7"
+version = "0.21.0"
 date = "2026-09-11"
-whats_new = """- feat: capability-sweep skill — parallel multi-agent E2E verification (#798)
-- feat: add bundled ini and sql language providers (#799)
-- feat: tabs for multiple projects + workspace restore (#797)
-- chore: bump Homebrew formula to v0.20.0 [skip ci]"""
-release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.20.2"
+whats_new = """- test: use shallow-checkout-safe compare revision (#823)
+- feat: improve overlay and tree UX (#822)
+- fix: close theme picker with one escape (#821)
+- fix: resolve bug batch 804-816 (#820)
+- fix: restore compare exit and search navigation keys (#803)
+- chore: bump Homebrew formula to v0.20.2 [skip ci]"""
+release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.21.0"
