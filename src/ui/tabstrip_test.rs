@@ -142,3 +142,86 @@ fn git_branch_and_changed_count_are_shown_when_the_strip_has_room() {
     fs::remove_dir_all(&root).ok();
     fs::remove_dir_all(&second_root).ok();
 }
+
+#[test]
+fn segments_show_scroll_affordances_around_hidden_tabs() {
+    let dirs: Vec<_> = (0..6).map(|i| temp_dir(&format!("scroll_{i}"))).collect();
+    let apps: Vec<_> = dirs.iter().map(|dir| app_for(dir)).collect();
+    let tabs = Tabs::new(apps, 2);
+    let area = Rect::new(0, 0, 30, 1);
+
+    let left_edge = build_segments_with(&tabs, 0, area);
+    assert!(!left_edge
+        .iter()
+        .any(|segment| segment.hit == TabHit::ScrollLeft));
+    assert!(left_edge
+        .iter()
+        .any(|segment| segment.hit == TabHit::ScrollRight));
+    assert!(left_edge
+        .iter()
+        .any(|segment| segment.hit == TabHit::Switch(0)));
+
+    let middle = build_segments_with(&tabs, 2, area);
+    assert!(middle
+        .iter()
+        .any(|segment| segment.hit == TabHit::ScrollLeft));
+    assert!(middle
+        .iter()
+        .any(|segment| segment.hit == TabHit::ScrollRight));
+    assert!(middle
+        .iter()
+        .any(|segment| segment.hit == TabHit::Switch(2)));
+
+    for dir in &dirs {
+        fs::remove_dir_all(dir).ok();
+    }
+}
+
+#[test]
+fn every_rendered_segment_round_trips_through_hit_testing() {
+    let dirs: Vec<_> = (0..6)
+        .map(|i| temp_dir(&format!("roundtrip_{i}")))
+        .collect();
+    let apps: Vec<_> = dirs.iter().map(|dir| app_for(dir)).collect();
+    let mut tabs = Tabs::new(apps, 2);
+    tabs.first_visible = 2;
+    let area = Rect::new(5, 0, 35, 1);
+
+    for segment in build_segments(&tabs, area) {
+        for column in segment.start..segment.end {
+            assert_eq!(hit_test(&tabs, area, column, area.y), Some(segment.hit));
+        }
+    }
+
+    for dir in &dirs {
+        fs::remove_dir_all(dir).ok();
+    }
+}
+
+#[test]
+fn active_tab_can_be_rendered_after_horizontal_navigation() {
+    let dirs: Vec<_> = (0..12)
+        .map(|i| temp_dir(&format!("active_{i:02}")))
+        .collect();
+    let apps: Vec<_> = dirs.iter().map(|dir| app_for(dir)).collect();
+    let mut tabs = Tabs::new(apps, 0);
+    let area = Rect::new(0, 0, 80, 1);
+
+    for index in 0..tabs.apps.len() {
+        tabs.set_active(index);
+        let segments = build_segments(&tabs, area);
+        assert!(segments
+            .iter()
+            .any(|segment| segment.hit == TabHit::Switch(index)));
+        assert!(is_tab_visible(
+            &tabs,
+            tabs.first_visible,
+            tabs.active,
+            area.width
+        ));
+    }
+
+    for dir in &dirs {
+        fs::remove_dir_all(dir).ok();
+    }
+}

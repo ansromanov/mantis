@@ -5,7 +5,9 @@
 //! and content pane. Rather than exploding `App`'s already-large field set
 //! into a nested per-tab structure, `Tabs` treats **one `App` = one tab** and
 //! is a thin wrapper around `Vec<App>` — every tab is built, driven, and torn
-//! down exactly the way a single-root `mantis` launch already works. `App`
+//! down exactly the way a single-root `mantis` launch already works. `Tabs`
+//! tracks the first visible tab so the active tab remains in view and routes
+//! mouse input for the tab-strip scroll affordances. `App`
 //! itself is untouched aside from one field, `tab_action_request`, that the
 //! tab keybindings/command-palette entries set (since a single-root `App` has
 //! no way to act on "next tab" itself) and that [`Tabs::dispatch_event`] here
@@ -23,6 +25,8 @@ use crate::app::{App, TabAction};
 pub struct Tabs {
     pub apps: Vec<App>,
     pub active: usize,
+    /// Index of the first visible tab in the tab strip (horizontal scroll offset).
+    pub first_visible: usize,
     /// Path being typed for "open project as new tab"; `Some` while that
     /// inline prompt is open.
     pub new_tab_prompt: Option<String>,
@@ -42,19 +46,22 @@ pub struct Tabs {
 
 impl Tabs {
     /// Wraps an already-built set of `App`s (one per tab). `active` is
-    /// clamped to a valid index.
+    /// clamped to a valid index and scrolled into view.
     pub fn new(apps: Vec<App>, active: usize) -> Self {
         let active = active.min(apps.len().saturating_sub(1));
-        Tabs {
+        let mut tabs = Tabs {
             apps,
             active,
+            first_visible: 0,
             new_tab_prompt: None,
             strip_area: Rect::default(),
             closed_tabs: VecDeque::new(),
             tab_picker: None,
             tab_picker_area: Rect::default(),
             drag_tab: None,
-        }
+        };
+        tabs.ensure_active_visible();
+        tabs
     }
 
     pub fn active_app(&self) -> &App {
@@ -63,6 +70,55 @@ impl Tabs {
 
     pub fn active_app_mut(&mut self) -> &mut App {
         &mut self.apps[self.active]
+    }
+
+    /// Ensures that the active tab is visible, using the last drawn strip width.
+    pub fn ensure_active_visible(&mut self) {
+        let width = if self.strip_area.width > 0 {
+            self.strip_area.width
+        } else {
+            80
+        };
+        self.ensure_active_visible_for_width(width);
+    }
+
+    /// Ensures that the active tab is visible for a specific strip width.
+    pub fn ensure_active_visible_for_width(&mut self, width: u16) {
+        if self.apps.is_empty() {
+            self.active = 0;
+            self.first_visible = 0;
+            return;
+        }
+        self.active = self.active.min(self.apps.len() - 1);
+        self.first_visible = self.first_visible.min(self.apps.len() - 1);
+        if self.active < self.first_visible {
+            self.first_visible = self.active;
+        }
+        while self.first_visible < self.active
+            && !crate::ui::tabstrip::is_tab_visible(self, self.first_visible, self.active, width)
+        {
+            self.first_visible += 1;
+        }
+    }
+
+    /// Scrolls the tab strip one tab to the left, if possible.
+    pub fn scroll_strip_left(&mut self) {
+        self.first_visible = self.first_visible.saturating_sub(1);
+    }
+
+    /// Scrolls the tab strip one tab to the right, if possible.
+    pub fn scroll_strip_right(&mut self) {
+        if self.first_visible + 1 < self.apps.len() {
+            self.first_visible += 1;
+        }
+    }
+
+    /// Selects a tab, clamping the requested index to the last open tab.
+    pub fn set_active(&mut self, index: usize) {
+        if !self.apps.is_empty() {
+            self.active = index.min(self.apps.len() - 1);
+            self.ensure_active_visible();
+        }
     }
 
     /// Builds a new `App` for `root` (loading its own `mantis.toml`, exactly
@@ -74,6 +130,7 @@ impl Tabs {
         app.install_config_watcher();
         self.apps.push(app);
         self.active = self.apps.len() - 1;
+        self.ensure_active_visible();
         Ok(())
     }
 
@@ -95,12 +152,15 @@ impl Tabs {
         if self.active >= self.apps.len() {
             self.active = self.apps.len() - 1;
         }
+        self.first_visible = self.first_visible.min(self.apps.len() - 1);
+        self.ensure_active_visible();
     }
 
     /// Switches to the next tab, wrapping around. No-op with one tab.
     pub fn next_tab(&mut self) {
         if self.apps.len() > 1 {
             self.active = (self.active + 1) % self.apps.len();
+            self.ensure_active_visible();
         }
     }
 
@@ -108,13 +168,14 @@ impl Tabs {
     pub fn prev_tab(&mut self) {
         if self.apps.len() > 1 {
             self.active = (self.active + self.apps.len() - 1) % self.apps.len();
+            self.ensure_active_visible();
         }
     }
 
     /// Selects a tab, clamping the requested index to the last open tab.
     pub fn select_tab(&mut self, index: usize) {
         if !self.apps.is_empty() {
-            self.active = index.min(self.apps.len() - 1);
+            self.set_active(index);
         }
     }
 
@@ -126,6 +187,7 @@ impl Tabs {
         let app = self.apps.remove(from);
         self.apps.insert(to, app);
         self.active = to;
+        self.ensure_active_visible();
         self.persist_manifest();
     }
 
@@ -293,6 +355,23 @@ impl Tabs {
         if self.apps.len() <= 1 || strip_area.height == 0 {
             return false;
         }
+        if m.row >= strip_area.y
+            && m.row < strip_area.y.saturating_add(strip_area.height)
+            && m.column >= strip_area.x
+            && m.column < strip_area.x.saturating_add(strip_area.width)
+        {
+            match m.kind {
+                MouseEventKind::ScrollUp => {
+                    self.scroll_strip_left();
+                    return true;
+                }
+                MouseEventKind::ScrollDown => {
+                    self.scroll_strip_right();
+                    return true;
+                }
+                _ => {}
+            }
+        }
         let Some(hit) = crate::ui::tabstrip::hit_test(self, strip_area, m.column, m.row) else {
             if matches!(
                 m.kind,
@@ -305,22 +384,28 @@ impl Tabs {
         match m.kind {
             MouseEventKind::Down(crossterm::event::MouseButton::Left) => match hit {
                 crate::ui::tabstrip::TabHit::Switch(i) => {
-                    self.active = i;
+                    self.set_active(i);
                     self.drag_tab = Some(i);
                 }
                 crate::ui::tabstrip::TabHit::Close(i) => {
                     self.drag_tab = None;
-                    self.active = i;
+                    self.set_active(i);
                     self.close_active_tab();
                 }
+                crate::ui::tabstrip::TabHit::ScrollLeft => self.scroll_strip_left(),
+                crate::ui::tabstrip::TabHit::ScrollRight => self.scroll_strip_right(),
             },
             MouseEventKind::Up(crossterm::event::MouseButton::Left) => {
                 if let Some(from) = self.drag_tab.take() {
                     let to = match hit {
                         crate::ui::tabstrip::TabHit::Switch(i)
-                        | crate::ui::tabstrip::TabHit::Close(i) => i,
+                        | crate::ui::tabstrip::TabHit::Close(i) => Some(i),
+                        crate::ui::tabstrip::TabHit::ScrollLeft
+                        | crate::ui::tabstrip::TabHit::ScrollRight => None,
                     };
-                    self.move_tab(from, to);
+                    if let Some(to) = to {
+                        self.move_tab(from, to);
+                    }
                 }
             }
             _ => {}
