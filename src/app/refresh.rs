@@ -10,6 +10,8 @@
 //! Config-file (`mantis.toml`) changes follow the same debounce before
 //! `handle_config_change` runs, so an editor's atomic save doesn't trigger
 //! more than one reload.
+//! Content-cursor plugin notifications use a 100 ms quiet period and keep only
+//! the latest position from a burst of cursor movements.
 //!
 //! `tick` also resolves any `pending_keypress` (protocol 3+ `on_keypress` key
 //! consumption): once a `key_handled` reply arrives or the deadline passes,
@@ -27,6 +29,8 @@ use super::App;
 impl App {
     /// How long a status message lingers before auto-expiring (3 seconds).
     const STATUS_TTL: Duration = Duration::from_secs(3);
+    /// Quiet period used to coalesce rapid content-cursor movements.
+    const CONTENT_CURSOR_DEBOUNCE: Duration = Duration::from_millis(100);
 
     /// Per-frame update. Refreshes the open file from its watcher, advances the
     /// debounced content search, and drives the tree/git refresh: when the root
@@ -45,6 +49,7 @@ impl App {
         }
         self.drain_plugin_actions();
         self.process_pending_keypress();
+        self.flush_pending_content_cursor();
         if self.drain_config_watch() {
             self.config_dirty = true;
             self.config_dirty_at = Some(self.now());
@@ -150,6 +155,39 @@ impl App {
             // No watcher (install failed): fall back to a blind periodic reload.
             self.reload();
         }
+    }
+
+    /// Sends only the most recent content-cursor position after movement has
+    /// been quiet long enough for one plugin update.
+    fn flush_pending_content_cursor(&mut self) {
+        let quiet = self
+            .content_cursor_dirty_at
+            .is_some_and(|at| at.elapsed() >= Self::CONTENT_CURSOR_DEBOUNCE);
+        if !quiet {
+            return;
+        }
+        self.content_cursor_dirty_at = None;
+        if let Some((path, line, column)) = self.pending_content_cursor.take() {
+            if self.has_text_cursor() && self.current_file.as_ref() == Some(&path) {
+                self.plugin_manager
+                    .on_content_cursor_change(&path, line, column);
+            }
+        }
+    }
+
+    /// Queues the current source position for debounced plugin notification.
+    pub(crate) fn schedule_content_cursor_change(&mut self) {
+        if !self.has_text_cursor() {
+            return;
+        }
+        let Some(path) = self.current_file.clone() else {
+            return;
+        };
+        let line = self.display_to_physical(self.active_line).saturating_add(1);
+        // The content cursor selects whole lines, so its source column is the
+        // first column of that line.
+        self.pending_content_cursor = Some((path, line, 1));
+        self.content_cursor_dirty_at = Some(self.now());
     }
 
     /// Opens the newest file observed by the root watcher when follow mode is

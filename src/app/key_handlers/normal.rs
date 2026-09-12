@@ -281,6 +281,7 @@ impl App {
             } else if pressed_in(&k.content_top, &key, scope) {
                 self.active_line = 0;
                 self.set_content_scroll(0);
+                self.scroll_active_line_into_view();
             } else if pressed_in(&k.content_bottom, &key, scope) {
                 self.active_line = self.display_line_count().saturating_sub(1);
                 self.scroll_active_line_into_view();
@@ -495,6 +496,7 @@ impl App {
         } else if pressed_in(&k.content_top, &key, scope) {
             if self.has_text_cursor() {
                 self.active_line = 0;
+                self.scroll_active_line_into_view();
             }
             self.set_content_scroll(0);
         } else if pressed_in(&k.content_bottom, &key, scope) {
@@ -658,5 +660,6 @@ impl App {
             self.plugin_manager
                 .on_selection_change_at(self.current_file.as_deref(), line);
         }
+        self.schedule_content_cursor_change();
     }
 }

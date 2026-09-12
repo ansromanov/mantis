@@ -259,6 +259,8 @@ impl App {
             config_watch_rx: None,
             config_dirty: false,
             config_dirty_at: None,
+            pending_content_cursor: None,
+            content_cursor_dirty_at: None,
             tree_dirty: false,
             tree_dirty_at: None,
             selection: None,

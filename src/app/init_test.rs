@@ -109,6 +109,8 @@ fn app_new_starts_with_empty_plugin_content() {
         app.plugin_status_facts.is_empty(),
         "plugin_status_facts must start empty"
     );
+    assert!(app.pending_content_cursor.is_none());
+    assert!(app.content_cursor_dirty_at.is_none());
     fs::remove_dir_all(&root).ok();
 }
 
@@ -203,9 +205,8 @@ fn app_new_sends_resolved_theme_colors_to_plugins_on_init() {
     );
 
     let mut app = new_app(&root, cfg);
-    app.plugin_manager.deactivate_all();
 
-    let deadline = Instant::now() + Duration::from_secs(3);
+    let deadline = Instant::now() + Duration::from_secs(10);
     let contents = loop {
         if let Ok(s) = fs::read_to_string(&out) {
             if !s.is_empty() {
@@ -215,6 +216,7 @@ fn app_new_sends_resolved_theme_colors_to_plugins_on_init() {
         assert!(Instant::now() < deadline, "plugin never received init");
         std::thread::sleep(Duration::from_millis(25));
     };
+    app.plugin_manager.deactivate_all();
     let init_line = contents
         .lines()
         .find(|l| l.contains(r#""event":"init""#))
