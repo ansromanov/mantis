@@ -238,6 +238,48 @@ fn draw_short_terminal_names_height_requirement() {
 }
 
 #[test]
+fn draw_two_row_statusbar_reserves_last_two_rows() {
+    let mut app = make_app();
+    app.config.statusbar.height = 2;
+    app.show_hidden = true;
+    app.git_info = Some(crate::git::GitRepoInfo {
+        head: crate::git::GitHead::Branch("main".into()),
+        ahead: 0,
+        behind: 0,
+        total_changed: 0,
+        staged: 0,
+        untracked: 0,
+    });
+    let rows = render(&mut app); // 80x30
+    let version = format!("v{}", env!("CARGO_PKG_VERSION"));
+    assert!(
+        rows[29].contains(&version),
+        "bottom status row should hold the right group, got {:?}",
+        rows[29]
+    );
+    assert!(
+        rows[28].contains("[hidden]"),
+        "top status row should hold the left group, got {:?}",
+        rows[28]
+    );
+    assert!(
+        !rows[28].contains("[main]"),
+        "git must stay on the bottom row"
+    );
+    assert!(
+        !rows[29].contains("[hidden]"),
+        "badges must stay on the top row"
+    );
+}
+
+#[test]
+fn draw_double_checks_default_config_honoured_default_layout() {
+    // Single-row default: everything fits on the last row.
+    let mut app = make_app();
+    let rows = render(&mut app); // 80x30
+    assert!(rows[29].contains(&format!("v{}", env!("CARGO_PKG_VERSION"))));
+}
+#[test]
 fn draw_telemetry_notice_overlay() {
     let mut app = make_app();
     app.show_telemetry_notice = true;

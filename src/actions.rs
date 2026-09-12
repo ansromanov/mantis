@@ -61,11 +61,11 @@ pub static ACTIONS: &[ActionSpec] = &[
     },
     ActionSpec {
         id: "menu_bar",
-        palette: None,
+        palette: Some("Toggle the action menu"),
         help: Some(("Global", "open the action menu")),
-        category: None,
-        menu: None,
-        description: None,
+        category: Some("General"),
+        menu: Some(("General", 9)),
+        description: Some("Toggle the menu bar"),
     },
     ActionSpec {
         id: "bug_report",

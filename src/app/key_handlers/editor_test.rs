@@ -89,6 +89,16 @@ fn dispatch_tab_picker_and_reopen_actions() {
 }
 
 #[test]
+fn dispatch_menu_bar_opens_the_action_menu() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.command_palette = Some(palette_with_query("Toggle the action menu"));
+    assert!(app.dispatch_command());
+    assert!(app.menu_bar_state.is_some());
+    fs::remove_dir_all(root).ok();
+}
+
+#[test]
 fn dispatch_bookmarks_command_opens_picker() {
     let root = temp_tree();
     let mut app = app_for(&root);

@@ -278,16 +278,48 @@ Unlisted segments are hidden. Set both to empty lists for an empty bar.
 
 ```toml
 [statusbar]
-# left = ["badges", "worktrees", "scroll", "lnum", "type", "jsonpath",
-#         "fileinfo", "git", "errors", "folds", "pluginfacts", "message",
-#         "pluginerror", "update"]
+# left = ["badges", "scroll", "lnum", "type", "fileinfo", "git", "errors", "folds", "message"]
 # right = ["lnum", "type", "git", "version"]
+separator = " "  # drawn before every segment (default: " ")
+height = 1       # 1 = single row, 2 = spread the two groups over two rows
 ```
 
-Valid ids: `badges` `worktrees` `scroll` `lnum` `type` `jsonpath` `fileinfo`
-`git` `errors` `folds` `pluginfacts` `message` `pluginerror` `version` `update`.
-There is no keybinding-hint segment — the `?`/`F1`
-help overlay and the command palette are the discovery surfaces for bindings.
+Valid ids: `badges` `worktrees` `scroll` `lnum` `type` `jsonpath` `fileinfo` `git` `errors`
+`folds` `pluginfacts` `message` `pluginerror` `version` `update`. There is no
+keybinding-hint segment — the `?`/`F1` help overlay and the command palette are
+the discovery surfaces for bindings.
+
+### Separator
+
+`separator` is the string drawn before every segment. The default `" "` matches
+the historical single-space layout. A wider separator (e.g. `" | "`) consumes
+width from the same elision budget as the segments themselves, so on a narrow
+terminal more or different segments may be dropped to make room.
+
+### Colors
+
+Per-segment foreground overrides assign any [theme color role](themes.md) to a
+segment id; the override replaces only the foreground, keeping the bar
+background and the segment's modifiers:
+
+```toml
+[statusbar.colors]
+git = "accent"      # git segment in the accent color
+version = "dim"
+errors = "diff_del"
+```
+
+Unknown segment ids or theme roles are reported by config validation on reload.
+
+### Two rows (`height = 2`)
+
+With `height = 2` the left-aligned group renders on the top row and the
+right-aligned group on the bottom row, right-anchored. Instead of dropping low
+priority segments from one crowded line, a narrow terminal spreads them across
+the second row. Elision still applies per row, so each row independently drops
+its lowest-priority segments when they don't fit. Overlay hints (search, theme
+picker, …) render on a single line regardless of this setting. The value is
+clamped to 1 or 2.
 
 ## Theme
 

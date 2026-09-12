@@ -455,3 +455,31 @@ fn test_no_color_active_env_checks() {
         std::env::set_var("MANTIS_TEST_NO_COLOR", v);
     }
 }
+
+#[test]
+fn role_color_resolves_known_roles() {
+    let t = Theme::load("default").expect("default theme must load");
+    assert_eq!(t.role_color("accent"), Some(t.accent));
+    assert_eq!(t.role_color("text"), Some(t.text));
+    assert_eq!(t.role_color("git_dirty"), Some(t.git_dirty));
+    assert_eq!(t.role_color("breadcrumb_fg"), Some(t.breadcrumb_fg));
+}
+
+#[test]
+fn role_color_returns_none_for_unknown_role() {
+    let t = Theme::load("default").expect("default theme must load");
+    assert_eq!(t.role_color("not_a_real_role"), None);
+    assert_eq!(t.role_color(""), None);
+}
+
+#[test]
+fn theme_color_roles_constant_covers_role_color_branches() {
+    // Every role handled by role_color must appear in THEME_COLOR_ROLES.
+    let known = Theme::load("default").expect("default theme must load");
+    for role in THEME_COLOR_ROLES {
+        assert!(
+            known.role_color(role).is_some(),
+            "role `{role}` is in THEME_COLOR_ROLES but role_color does not handle it"
+        );
+    }
+}

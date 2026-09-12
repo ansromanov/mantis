@@ -61,6 +61,62 @@ fn validate_keys_accepts_statusbar_left_right() {
 }
 
 #[test]
+fn validate_keys_accepts_statusbar_separator_colors_height() {
+    let warnings = validate_keys(
+        "[statusbar]\nseparator = \" | \"\nheight = 2\n\
+         [statusbar.colors]\ngit = \"accent\"\nversion = \"dim\"\n",
+    );
+    assert!(
+        warnings.is_empty(),
+        "statusbar.separator/colors/height should be known: {warnings:?}"
+    );
+}
+
+#[test]
+fn validate_keys_rejects_invalid_statusbar_height() {
+    let warnings = validate_keys("[statusbar]\nheight = 3\n");
+    assert!(
+        warnings.iter().any(|w| w.contains("height")),
+        "height outside {{1,2}} should warn: {warnings:?}"
+    );
+}
+
+#[test]
+fn validate_keys_rejects_unknown_statusbar_color_role() {
+    let warnings = validate_keys("[statusbar.colors]\ngit = \"not_a_role\"\n");
+    assert!(
+        warnings
+            .iter()
+            .any(|w| w.contains("not_a_role") && w.contains("statusbar.colors.git")),
+        "unknown role should name the path: {warnings:?}"
+    );
+}
+
+#[test]
+fn validate_keys_rejects_non_string_statusbar_color_value() {
+    let warnings = validate_keys("[statusbar.colors]\ngit = 42\n");
+    assert!(
+        warnings
+            .iter()
+            .any(|w| w.contains("statusbar.colors.git") && w.contains("string")),
+        "non-string color value should warn: {warnings:?}"
+    );
+}
+
+#[test]
+fn validate_keys_rejects_not_a_role_for_unknown_segment_too() {
+    // Unknown segment ids already fail schema path checking; the role-name
+    // check must not panic or produce a duplicate misleading message.
+    let warnings = validate_keys("[statusbar.colors]\nbogus_segment = \"accent\"\n");
+    assert!(
+        warnings
+            .iter()
+            .any(|w| w.contains("statusbar.colors.bogus_segment")),
+        "unknown segment id should be flagged: {warnings:?}"
+    );
+}
+
+#[test]
 fn validate_keys_rejects_statusbar_typo() {
     let warnings = validate_keys("[statusbar]\nlefft = [\"hint\"]\n");
     assert!(
@@ -133,6 +189,10 @@ fn schema_paths_includes_all_known_config_paths() {
     // Statusbar
     assert!(paths.contains(&"statusbar.left".to_string()));
     assert!(paths.contains(&"statusbar.right".to_string()));
+    assert!(paths.contains(&"statusbar.separator".to_string()));
+    assert!(paths.contains(&"statusbar.height".to_string()));
+    assert!(paths.contains(&"statusbar.colors.git".to_string()));
+    assert!(paths.contains(&"statusbar.colors.version".to_string()));
 
     // Telemetry
     assert!(paths.contains(&"telemetry.enabled".to_string()));

@@ -11,7 +11,7 @@
 //! input is left to the caller's error path.
 
 use super::{Config, StatusBarConfig};
-use crate::theme::ThemeConfig;
+use crate::theme::{ThemeConfig, THEME_COLOR_ROLES};
 
 /// Deprecated keys accepted without warning, by full dotted path. Either folded
 /// into their new home by a `migrate_legacy_*` step, or genuinely gone and safe
@@ -96,13 +96,15 @@ fn collect_schema_paths(table: &toml::Table, prefix: &str, out: &mut Vec<String>
 /// Validates the raw TOML against the config schema, returning a message for
 /// every unrecognized key (with a nearest-match suggestion where one is close
 /// enough). Keys are reported by full path, e.g. `keys.qiut` or `theme.acent`.
-/// Returns an empty list for a fully valid config.
+/// Value-level violations (invalid statusbar segment ids, color roles, or
+/// height) are appended as well. Returns an empty list for a fully valid config.
 pub(crate) fn validate_keys(src: &str) -> Vec<String> {
     let Ok(actual) = src.parse::<toml::Table>() else {
         return Vec::new(); // unparseable input is handled by the caller's error path
     };
     let mut out = Vec::new();
     collect_unknown(&actual, &schema_table(), "", &mut out);
+    out.extend(validate_statusbar_values(&actual));
     out
 }
 
@@ -157,6 +159,42 @@ fn collect_unknown(
             }
         }
     }
+}
+
+/// Value-level validation for `[statusbar]`: the minuscule set of keys whose
+/// *values* carry meaning the schema can't encode. `height` must be 1 or 2;
+/// each `[statusbar.colors]` value must name a valid theme color role. Segment
+/// ids already surface via schema key checks (`statusbar.colors.<id>`), so a
+/// color configured for an unknown segment is reported there.
+fn validate_statusbar_values(table: &toml::Table) -> Vec<String> {
+    let Some(statusbar) = table.get("statusbar").and_then(toml::Value::as_table) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+
+    if let Some(h) = statusbar.get("height") {
+        let ok = matches!(h.as_integer(), Some(1 | 2));
+        if !ok {
+            out.push("invalid statusbar.height: must be 1 or 2".to_string());
+        }
+    }
+    // Validation of `[statusbar.colors]` values (role names). Bad values
+    // silently fall back to the segment's default styling, so they must be
+    // reported rather than ignored.
+    if let Some(colors) = statusbar.get("colors").and_then(toml::Value::as_table) {
+        for (seg, val) in colors {
+            match val.as_str() {
+                Some(role) if THEME_COLOR_ROLES.contains(&role) => {}
+                Some(role) => out.push(format!(
+                    "invalid theme color role '{role}' for statusbar.colors.{seg}"
+                )),
+                None => out.push(format!(
+                    "statusbar.colors.{seg} must be a theme color role name (a string)"
+                )),
+            }
+        }
+    }
+    out
 }
 
 /// Returns the candidate closest to `input` by edit distance, if one is within

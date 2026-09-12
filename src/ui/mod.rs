@@ -64,19 +64,22 @@ fn draw_area(f: &mut Frame, app: &mut App, area: Rect) {
 
     let menu_visible = app.config.ui.menu_bar || app.menu_bar_state.is_some();
     let min_height = MIN_LAYOUT_HEIGHT + u16::from(menu_visible);
+    // Allocate the status bar its configured number of rows (1 or 2), so a
+    // two-row bar has room to spread segments instead of eliding them.
+    let sb_height = app.config.statusbar.height.clamp(1, 2) as u16;
     let vert = if menu_visible {
         Layout::default()
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(1),
                 Constraint::Min(0),
-                Constraint::Length(1),
+                Constraint::Length(sb_height),
             ])
             .split(area)
     } else {
         Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Min(0), Constraint::Length(1)])
+            .constraints([Constraint::Min(0), Constraint::Length(sb_height)])
             .split(area)
     };
     let menu_area = if menu_visible {

@@ -91,6 +91,10 @@ impl App {
                 self.show_help = !self.show_help;
                 true
             }
+            Some("menu_bar") => {
+                self.open_menu_bar();
+                true
+            }
             Some("bug_report") => {
                 let report = crate::diagnostics::DiagnosticReport::collect(self);
                 self.bug_report = Some(crate::search::BugReportState::new(report.to_markdown()));
