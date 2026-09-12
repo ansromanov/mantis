@@ -41,6 +41,15 @@ fn new_app_has_no_pending_tab_action() {
     fs::remove_dir_all(root).ok();
 }
 
+#[test]
+fn statusbar_action_targets_keep_their_rendered_row() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.statusbar_segments = vec![(crate::ui::statusbar::StatusSegment::Git, 2, 8, 1)];
+    assert_eq!(app.statusbar_segments[0].3, 1);
+    fs::remove_dir_all(root).ok();
+}
+
 fn app_for(root: &std::path::Path) -> App {
     App::new(root.to_path_buf(), Config::default(), None, None).unwrap()
 }

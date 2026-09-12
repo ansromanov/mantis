@@ -349,7 +349,7 @@ pub struct App {
     /// Hit area of the splitter bar between tree and content panes.
     pub splitter_area: Rect,
     /// Clickable status-bar column ranges recorded during the last render.
-    pub(crate) statusbar_segments: Vec<(crate::ui::statusbar::StatusSegment, u16, u16)>,
+    pub(crate) statusbar_segments: Vec<crate::ui::statusbar::StatusbarHit>,
     // Time and result index of the last search-result click, for double-click.
     last_click: Option<(Instant, usize)>,
     last_breadcrumb_click: Option<(Instant, std::path::PathBuf)>,

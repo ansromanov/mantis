@@ -91,7 +91,7 @@ fn statusbar_segment_click_opens_revision_picker_and_blank_space_is_noop() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.statusbar_area = Rect::new(0, 0, 30, 1);
-    app.statusbar_segments = vec![(crate::ui::statusbar::StatusSegment::Git, 4, 14)];
+    app.statusbar_segments = vec![(crate::ui::statusbar::StatusSegment::Git, 4, 14, 0)];
 
     app.handle_mouse(left_down_at(7, 0));
     assert!(app.revision_picker.is_some());
@@ -123,7 +123,7 @@ fn statusbar_clicks_open_each_mapped_picker_and_toggle_folds() {
     app.statusbar_area = Rect::new(0, 0, 30, 1);
 
     let click = |app: &mut App, segment| {
-        app.statusbar_segments = vec![(segment, 2, 8)];
+        app.statusbar_segments = vec![(segment, 2, 8, 0)];
         app.handle_mouse(left_down_at(4, 0));
     };
 

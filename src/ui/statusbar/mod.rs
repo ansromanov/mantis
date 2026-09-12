@@ -34,7 +34,9 @@ use crate::app::{App, Focus};
 use crate::git::{GitHead, GitRepoInfo};
 
 pub(super) mod fit;
-use self::fit::{fit_two_row, fit_two_sided, P_ERR, P_GIT, P_INFO, P_META, P_VER};
+use self::fit::{
+    fit_two_row_with_ranges, fit_two_sided_with_ranges, P_ERR, P_GIT, P_INFO, P_META, P_VER,
+};
 
 /// Named segment identifiers for status-bar alignment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -55,6 +57,9 @@ pub(crate) enum StatusSegment {
     Version,
     Update,
 }
+
+/// Rendered horizontal bounds and screen row for an actionable status segment.
+pub(crate) type StatusbarHit = (StatusSegment, u16, u16, u16);
 
 impl StatusSegment {
     fn id_str(self) -> &'static str {
@@ -110,11 +115,7 @@ enum StatusSide {
     Right,
 }
 
-pub(super) fn draw_statusbar(
-    f: &mut Frame,
-    app: &App,
-    area: Rect,
-) -> Vec<(StatusSegment, u16, u16)> {
+pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) -> Vec<StatusbarHit> {
     let theme = &app.theme;
     let base = if theme.is_monochrome() {
         Style::default().add_modifier(Modifier::REVERSED)
@@ -123,42 +124,55 @@ pub(super) fn draw_statusbar(
     };
 
     let (lines, segments) = if app.goto_line.is_some() {
-        (vec![overlay_line(
-            " type line number  Enter jump  Esc cancel  +N forward  -N back",
-            base,
-            area.width,
-        )], Vec::new())
+        (
+            vec![overlay_line(
+                " type line number  Enter jump  Esc cancel  +N forward  -N back",
+                base,
+                area.width,
+            )],
+            Vec::new(),
+        )
     } else if app.theme_picker.is_some() {
-        (vec![overlay_line(
-            " \u{2191}\u{2193} navigate  type to filter  Enter apply theme  Esc cancel",
-            base,
-            area.width,
-        )], Vec::new())
+        (
+            vec![overlay_line(
+                " \u{2191}\u{2193} navigate  type to filter  Enter apply theme  Esc cancel",
+                base,
+                area.width,
+            )],
+            Vec::new(),
+        )
     } else if app.history.is_some() {
-        (vec![overlay_line(
-            " \u{2191}\u{2193} navigate  type to filter  Enter show diff  Esc cancel",
-            base,
-            area.width,
-        )], Vec::new())
+        (
+            vec![overlay_line(
+                " \u{2191}\u{2193} navigate  type to filter  Enter show diff  Esc cancel",
+                base,
+                area.width,
+            )],
+            Vec::new(),
+        )
     } else if app.search.is_some() {
-        (vec![overlay_line(
-            " \u{2191}\u{2193} navigate  Enter select  Tab toggle mode  Esc cancel",
-            base,
-            area.width,
-        )], Vec::new())
+        (
+            vec![overlay_line(
+                " \u{2191}\u{2193} navigate  Enter select  Tab toggle mode  Esc cancel",
+                base,
+                area.width,
+            )],
+            Vec::new(),
+        )
     } else {
-        (build_normal_lines(app, base, area.width), Vec::new())
+        build_normal_lines(app, base, area.width)
     };
 
     f.render_widget(Paragraph::new(lines).style(base), area);
     segments
         .into_iter()
-        .filter(|(segment, _, _)| segment.action_id().is_some())
-        .map(|(segment, start, end)| {
+        .filter(|(segment, _, _, _)| segment.action_id().is_some())
+        .map(|(segment, start, end, row)| {
             (
                 segment,
                 area.x.saturating_add(start),
                 area.x.saturating_add(end),
+                area.y.saturating_add(row),
             )
         })
         .collect()
@@ -166,15 +180,17 @@ pub(super) fn draw_statusbar(
 
 /// Returns the segment under a click using geometry generated with the line.
 pub(crate) fn hit_test(app: &App, column: u16, row: u16) -> Option<StatusSegment> {
-    if row < app.statusbar_area.y || row >= app.statusbar_area.bottom()
-        || column < app.statusbar_area.x || column >= app.statusbar_area.right()
+    if row < app.statusbar_area.y
+        || row >= app.statusbar_area.bottom()
+        || column < app.statusbar_area.x
+        || column >= app.statusbar_area.right()
     {
         return None;
     }
     app.statusbar_segments
         .iter()
-        .find(|(_, start, end)| column >= *start && column < *end)
-        .map(|(segment, _, _)| *segment)
+        .find(|(_, start, end, target_row)| row == *target_row && column >= *start && column < *end)
+        .map(|(segment, _, _, _)| *segment)
 }
 
 /// Returns visible status-bar text under a right-click, excluding the spacer
@@ -183,7 +199,7 @@ pub(crate) fn segment_at(app: &App, area: Rect, column: u16, row: u16) -> Option
     if column < area.x || column >= area.right() || row < area.y || row >= area.bottom() {
         return None;
     }
-    let lines = build_normal_lines(app, Style::default(), area.width);
+    let (lines, _) = build_normal_lines(app, Style::default(), area.width);
     let row_index = usize::from(row.saturating_sub(area.y));
     let line = lines.get(row_index)?;
     let mut x = area.x;
@@ -220,7 +236,11 @@ fn overlay_line(text: &str, style: Style, max_width: u16) -> Line<'static> {
 /// left/right alignment per segment. Returns one row in default `height = 1`
 /// mode and two rows (left group on top, right group on the bottom) when the
 /// config sets `height = 2`.
-fn build_normal_lines(app: &App, base: Style, max_width: u16) -> Vec<Line<'static>> {
+fn build_normal_lines(
+    app: &App,
+    base: Style,
+    max_width: u16,
+) -> (Vec<Line<'static>>, Vec<StatusbarHit>) {
     let badge = base.fg(app.theme.accent).add_modifier(Modifier::BOLD);
     let err_style = base.fg(app.theme.diff_del).add_modifier(Modifier::BOLD);
     let dim = base.fg(app.theme.dim);
@@ -506,16 +526,37 @@ fn build_normal_lines(app: &App, base: Style, max_width: u16) -> Vec<Line<'stati
 
     let statusbar = &app.config.statusbar;
     if statusbar.height >= 2 {
-        let (top, bottom) = fit_two_row(segs, max_width as usize, statusbar, &app.theme);
-        vec![top, bottom]
+        let (top, bottom, hits) =
+            fit_two_row_with_ranges(segs, max_width as usize, statusbar, &app.theme);
+        (vec![top, bottom], hits)
     } else {
-        vec![fit_two_sided(
-            segs,
-            max_width as usize,
-            statusbar,
-            &app.theme,
-        )]
+        let (line, hits) =
+            fit_two_sided_with_ranges(segs, max_width as usize, statusbar, &app.theme);
+        (
+            vec![line],
+            hits.into_iter()
+                .map(|(segment, start, end)| (segment, start, end, 0))
+                .collect(),
+        )
     }
+}
+
+#[cfg(test)]
+fn build_normal_line(
+    app: &App,
+    base: Style,
+    max_width: u16,
+) -> (Line<'static>, Vec<(StatusSegment, u16, u16)>) {
+    let (mut lines, hits) = build_normal_lines(app, base, max_width);
+    let line = lines
+        .pop()
+        .unwrap_or_else(|| Line::from(Vec::<Span>::new()));
+    (
+        line,
+        hits.into_iter()
+            .map(|(segment, start, end, _)| (segment, start, end))
+            .collect(),
+    )
 }
 
 fn git_info_str(info: &GitRepoInfo) -> String {

@@ -134,12 +134,31 @@ fn statusbar_hit_test_returns_the_visible_segment_text() {
     let mut app = make_app();
     app.worktree_count = 3;
     let area = ratatui::layout::Rect::new(0, 5, 80, 1);
-    let segment = segment_at(&app, area, 2).expect("worktree count span is visible");
+    let segment = segment_at(&app, area, 2, 5).expect("worktree count span is visible");
     assert!(segment.contains("worktrees: 3"));
     assert_eq!(
-        segment_at(&app, area, 79),
+        segment_at(&app, area, 79, 5),
         Some(format!(" v{}", env!("CARGO_PKG_VERSION")))
     );
+}
+
+#[test]
+fn two_row_statusbar_hits_record_their_rendered_row() {
+    let mut app = make_app();
+    app.config.statusbar.height = 2;
+    app.current_file = Some(PathBuf::from("file.rs"));
+    app.current_syntax = Some("Rust".to_string());
+    let backend = TestBackend::new(100, 2);
+    let mut terminal = Terminal::new(backend).unwrap();
+    let mut hits = Vec::new();
+    terminal
+        .draw(|f| {
+            hits = draw_statusbar(f, &app, f.area());
+        })
+        .unwrap();
+    assert!(hits
+        .iter()
+        .any(|(segment, _, _, row)| *segment == StatusSegment::Type && *row == 1));
 }
 
 fn render_bar_width(app: &App, width: u16) -> String {
@@ -1295,7 +1314,11 @@ fn statusbar_shows_active_json_path() {
 fn render_two_row_bar(app: &App, width: u16) -> Vec<String> {
     let backend = TestBackend::new(width, 2);
     let mut terminal = Terminal::new(backend).unwrap();
-    terminal.draw(|f| draw_statusbar(f, app, f.area())).unwrap();
+    terminal
+        .draw(|f| {
+            draw_statusbar(f, app, f.area());
+        })
+        .unwrap();
     let buf = terminal.backend().buffer();
     (0..2)
         .map(|y| {
@@ -1423,6 +1446,7 @@ fn segment_ids_match_config_valid_segments() {
     // Every StatusSegment must have an id the config schema/validation knows.
     let ids: Vec<&str> = [
         StatusSegment::Badges,
+        StatusSegment::Worktrees,
         StatusSegment::Scroll,
         StatusSegment::Lnum,
         StatusSegment::Type,

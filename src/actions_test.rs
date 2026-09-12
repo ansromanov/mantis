@@ -20,6 +20,17 @@ fn context_menu_action_is_palette_invokable() {
 }
 
 #[test]
+fn menu_bar_action_is_palette_invokable_and_menu_registered() {
+    let action = ACTIONS
+        .iter()
+        .find(|action| action.id == "menu_bar")
+        .expect("menu_bar action is registered");
+    assert_eq!(action.palette, Some("Toggle the action menu"));
+    assert_eq!(action.category, Some("General"));
+    assert_eq!(action.menu, Some(("General", 9)));
+}
+
+#[test]
 fn secret_reveal_action_is_registered() {
     assert!(ACTIONS
         .iter()
@@ -178,7 +189,6 @@ const KEYMAP_ONLY_ALLOWLIST: &[&str] = &[
     "content_page_down",
     "content_reset_col",
     "switch_panel",
-    "menu_bar",
     "command_palette",
     "select_tab",
 ];

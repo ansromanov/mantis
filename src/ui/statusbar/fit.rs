@@ -14,7 +14,9 @@ use ratatui::text::{Line, Span};
 use crate::config::StatusBarConfig;
 use crate::theme::Theme;
 
-use super::{StatusSegment, StatusSide};
+use super::{StatusSegment, StatusSide, StatusbarHit};
+
+type SegmentRange = (StatusSegment, u16, u16);
 
 /// Priority levels for status-bar segments (higher = kept when eliding).
 pub(super) const P_META: u8 = 1; // plugin/status messages
@@ -37,49 +39,121 @@ type Seg = (Span<'static>, StatusSegment, u8);
 ///
 /// In explicit allowlist mode (either `left` or `right` is `Some`), segments
 /// not listed in either list are filtered out before any width/elision math.
+#[cfg(test)]
 pub(super) fn fit_two_sided(
     segs: Vec<Seg>,
     max_width: usize,
     config: &StatusBarConfig,
     theme: &Theme,
 ) -> Line<'static> {
-    if segs.is_empty() || max_width == 0 {
-        return Line::from(Vec::<Span>::new());
-    }
-    let segs = filter_allowlist(segs, config);
-    // After filtering, might be empty.
-    if segs.is_empty() {
-        return Line::from(Vec::<Span>::new());
-    }
-    let elided = elide(segs, max_width, &config.separator);
-    let (left, right) = split_sides(elided, config);
-    let (left, right) = apply_color_overrides(left, right, config, theme);
-    compose_left_right(left, right, max_width, &config.separator)
+    fit_two_sided_with_ranges(segs, max_width, config, theme).0
 }
 
-/// Two-row variant of [`fit_two_sided`]: the left-aligned group renders on the
-/// top row, the right-aligned group on the bottom row. Each row elides
-/// independently to `max_width`, so on a narrow terminal segments spread across
-/// the second row instead of being dropped outright; elision priorities still
-/// apply per row.
-pub(super) fn fit_two_row(
+/// Fits a single row and returns the displayed columns for actionable segments.
+pub(super) fn fit_two_sided_with_ranges(
     segs: Vec<Seg>,
     max_width: usize,
     config: &StatusBarConfig,
     theme: &Theme,
-) -> (Line<'static>, Line<'static>) {
+) -> (Line<'static>, Vec<(StatusSegment, u16, u16)>) {
+    if segs.is_empty() || max_width == 0 {
+        return (Line::from(Vec::<Span>::new()), Vec::new());
+    }
+    let segs = filter_allowlist(segs, config);
+    // After filtering, might be empty.
+    if segs.is_empty() {
+        return (Line::from(Vec::<Span>::new()), Vec::new());
+    }
+    let elided = elide(segs, max_width, &config.separator);
+    let (left, right) = split_sides(elided, config);
+    let (left, right) = apply_color_overrides(left, right, config, theme);
+    compose_tagged(left, right, max_width, &config.separator)
+}
+
+/// Two-row variant that also returns the row and columns of actionable items.
+pub(super) fn fit_two_row_with_ranges(
+    segs: Vec<Seg>,
+    max_width: usize,
+    config: &StatusBarConfig,
+    theme: &Theme,
+) -> (Line<'static>, Line<'static>, Vec<StatusbarHit>) {
     if segs.is_empty() || max_width == 0 {
         let empty = Line::from(Vec::<Span>::new());
-        return (empty.clone(), empty);
+        return (empty.clone(), empty, Vec::new());
     }
     let segs = filter_allowlist(segs, config);
     let (left, right) = split_sides(segs, config);
     let left = elide(left, max_width, &config.separator);
     let right = elide(right, max_width, &config.separator);
     let (left, right) = apply_color_overrides(left, right, config, theme);
-    let top = compose_left_right(left, Vec::new(), max_width, &config.separator);
-    let bottom = compose_left_right(Vec::new(), right, max_width, &config.separator);
-    (top, bottom)
+    let (top, top_hits) = compose_tagged(left, Vec::new(), max_width, &config.separator);
+    let (bottom, bottom_hits) = compose_tagged(Vec::new(), right, max_width, &config.separator);
+    let hits = top_hits
+        .into_iter()
+        .map(|(segment, start, end)| (segment, start, end, 0))
+        .chain(
+            bottom_hits
+                .into_iter()
+                .map(|(segment, start, end)| (segment, start, end, 1)),
+        )
+        .collect();
+    (top, bottom, hits)
+}
+
+/// Composes tagged segments and records each segment's rendered column range.
+fn compose_tagged(
+    left: Vec<Seg>,
+    right: Vec<Seg>,
+    max_width: usize,
+    separator: &str,
+) -> (Line<'static>, Vec<SegmentRange>) {
+    let left_width: usize = left
+        .iter()
+        .map(|(span, _, _)| segment_width_with_separator(span, separator))
+        .sum();
+    let right_width: usize = right
+        .iter()
+        .map(|(span, _, _)| segment_width_with_separator(span, separator))
+        .sum();
+    let gap = max_width.saturating_sub(left_width + right_width);
+    let mut spans = Vec::new();
+    let mut hits = Vec::new();
+    append_tagged(&mut spans, &mut hits, left, 0, separator);
+    if gap > 0 {
+        spans.push(Span::raw(" ".repeat(gap)));
+    }
+    append_tagged(
+        &mut spans,
+        &mut hits,
+        right,
+        max_width.saturating_sub(right_width),
+        separator,
+    );
+    (Line::from(spans), hits)
+}
+
+fn append_tagged(
+    output: &mut Vec<Span<'static>>,
+    hits: &mut Vec<SegmentRange>,
+    segments: Vec<Seg>,
+    mut column: usize,
+    separator: &str,
+) {
+    for (mut span, segment, _) in segments {
+        let content = span.content.to_string();
+        let stripped = content.strip_prefix(' ').unwrap_or(&content).to_string();
+        let start = column;
+        if !separator.is_empty() {
+            output.push(Span::styled(separator.to_string(), span.style));
+            column += Span::raw(separator.to_string()).width();
+        }
+        span.content = std::borrow::Cow::Owned(stripped);
+        column += span.width();
+        if segment.action_id().is_some() && column > start {
+            hits.push((segment, start as u16, column as u16));
+        }
+        output.push(span);
+    }
 }
 
 /// Applies `[statusbar]` allowlist filtering: in explicit mode (either `left`
@@ -160,7 +234,7 @@ fn apply_color_overrides(
     mut right: Vec<Seg>,
     config: &StatusBarConfig,
     theme: &Theme,
-) -> (Vec<Span<'static>>, Vec<Span<'static>>) {
+) -> (Vec<Seg>, Vec<Seg>) {
     let recolor = |triples: &mut [Seg]| {
         for (span, id, _) in triples.iter_mut() {
             let Some(role) = config.colors.get(id.id_str()) else {
@@ -174,10 +248,7 @@ fn apply_color_overrides(
     };
     recolor(&mut left);
     recolor(&mut right);
-    (
-        left.into_iter().map(|(s, _, _)| s).collect(),
-        right.into_iter().map(|(s, _, _)| s).collect(),
-    )
+    (left, right)
 }
 
 /// Split kept segments into left and right groups by config.
@@ -228,6 +299,7 @@ pub(super) fn split_sides(segs: Vec<Seg>, config: &StatusBarConfig) -> (Vec<Seg>
 /// configured `separator`; the segment's own historical leading space is
 /// consumed by that prefix, so the default `" "` separator reproduces the
 /// old bytes exactly.
+#[cfg(test)]
 pub(super) fn compose_left_right(
     left: Vec<Span<'static>>,
     right: Vec<Span<'static>>,
@@ -253,6 +325,7 @@ pub(super) fn compose_left_right(
 /// baked into segment text) and prefixes it with the configured separator
 /// instead. The separator inherits the following segment's style so the
 /// default single space is styled identically to how the baked-in space was.
+#[cfg(test)]
 fn assemble_segments(spans: Vec<Span<'static>>, separator: &str) -> Vec<Span<'static>> {
     let mut out: Vec<Span<'static>> = Vec::with_capacity(spans.len() * 2);
     for mut span in spans {

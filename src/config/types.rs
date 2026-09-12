@@ -237,7 +237,7 @@ impl Default for StatusBarConfig {
 impl StatusBarConfig {
     /// Every valid status-bar segment id, in canonical (build) order. This is
     /// the source of truth for schema building and value validation; the
-    /// `StatusSegment::id_str` mapping in `src/ui/statusbar.rs` must agree.
+    /// `StatusSegment::id_str` mapping in `src/ui/statusbar/mod.rs` must agree.
     pub(crate) const VALID_SEGMENTS: &[&str] = &[
         "badges",
         "worktrees",
