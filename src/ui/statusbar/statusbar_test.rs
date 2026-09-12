@@ -138,7 +138,7 @@ fn statusbar_hit_test_returns_the_visible_segment_text() {
     assert!(segment.contains("worktrees: 3"));
     assert_eq!(
         segment_at(&app, area, 79, 5),
-        Some(format!(" v{}", env!("CARGO_PKG_VERSION")))
+        Some(format!("v{}", env!("CARGO_PKG_VERSION")))
     );
 }
 
