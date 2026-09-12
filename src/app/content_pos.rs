@@ -239,6 +239,7 @@ impl App {
     pub(super) fn set_active_line_from_physical(&mut self, physical: usize) {
         let max = self.display_line_count().saturating_sub(1);
         self.active_line = self.physical_to_display(physical).min(max);
+        self.schedule_content_cursor_change();
         self.mark_session_dirty();
     }
 
@@ -347,6 +348,7 @@ impl App {
     /// viewport passes the cursor, move the cursor to the nearest visible
     /// display line instead.
     pub fn scroll_content_by(&mut self, delta: isize) {
+        let previous_active_line = self.active_line;
         let next = if delta.is_negative() {
             self.content_scroll.saturating_sub(delta.unsigned_abs())
         } else {
@@ -372,6 +374,9 @@ impl App {
                 .saturating_add((self.content_area.height as usize).max(1).saturating_sub(1))
                 .min(last_line);
             self.active_line = self.active_line.clamp(self.content_scroll, last_visible);
+        }
+        if self.active_line != previous_active_line {
+            self.schedule_content_cursor_change();
         }
     }
 

@@ -17,6 +17,7 @@
 //!    {"event":"on_file_open","path":"/some/file"}
 //!    {"event":"on_keypress","key":"ctrl+p"}
 //!    {"event":"on_selection_change","path":"/some/file","line":12}
+//!    {"event":"on_content_cursor_change","path":"/some/file","line":13,"column":1}
 //!    {"event":"on_quit"}
 //!    {"event":"shutdown"}
 //!    {"event":"request","id":1,"method":"fold_regions","params":{"path":"/some/file"}}

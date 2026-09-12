@@ -361,7 +361,31 @@ fn event_dispatch_with_no_active_plugins_is_noop() {
     mgr.on_file_open(std::path::Path::new("/tmp/x.rs"));
     mgr.on_theme_change("dark", &crate::theme::Theme::default());
     mgr.on_selection_change_at(Some(std::path::Path::new("/tmp/x.rs")), Some(7));
+    mgr.on_content_cursor_change(std::path::Path::new("/tmp/x.rs"), 8, 1);
     mgr.on_quit();
+}
+
+#[test]
+fn content_cursor_event_only_reaches_subscribers_with_one_based_position() {
+    let mut mgr = PluginManager::new(vec![]);
+    let (cursor_tx, cursor_rx) = std::sync::mpsc::sync_channel(4);
+    let mut cursor_plugin = Plugin::new("cursor".into(), vec!["on_content_cursor_change".into()]);
+    cursor_plugin.write_tx = Some(cursor_tx);
+    mgr.plugins.push(cursor_plugin);
+
+    let (other_tx, other_rx) = std::sync::mpsc::sync_channel(4);
+    let mut other_plugin = Plugin::new("other".into(), vec!["on_file_open".into()]);
+    other_plugin.write_tx = Some(other_tx);
+    mgr.plugins.push(other_plugin);
+
+    mgr.on_content_cursor_change(std::path::Path::new("/tmp/x.yaml"), 12, 1);
+
+    let message: serde_json::Value = serde_json::from_str(&cursor_rx.try_recv().unwrap()).unwrap();
+    assert_eq!(message["event"], "on_content_cursor_change");
+    assert_eq!(message["path"], "/tmp/x.yaml");
+    assert_eq!(message["line"], 12);
+    assert_eq!(message["column"], 1);
+    assert!(other_rx.try_recv().is_err());
 }
 
 #[test]

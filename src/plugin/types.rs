@@ -168,6 +168,10 @@ pub(crate) struct ToPlugin {
     /// Omitted for tree-only selections and events without a content cursor.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) line: Option<usize>,
+    /// One-based source column for `on_content_cursor_change` events.
+    /// Omitted for events without a content cursor.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) column: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) key: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

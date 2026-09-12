@@ -3,7 +3,7 @@
 //! [`PluginManager`] owns all registered plugin entries, the running subprocess
 //! instances, and any buffered action responses. It provides the public API
 //! that `App` calls on file-open, keypress, theme-change, selection-change,
-//! and shutdown events.
+//! debounced content-cursor, and shutdown events.
 //!
 //! Protocol 3 additions: [`PluginManager::send_request`]/[`poll_requests`]
 //! implement the host side of the `request`/`response` correlation (see
@@ -204,6 +204,7 @@ impl PluginManager {
             event: "request".into(),
             path: None,
             line: None,
+            column: None,
             key: None,
             theme: None,
             colors: None,
@@ -330,6 +331,7 @@ impl PluginManager {
                 event: "init".into(),
                 path: None,
                 line: None,
+                column: None,
                 key: None,
                 theme: self.active_theme.clone(),
                 colors: self.active_theme_colors.clone(),
@@ -356,6 +358,7 @@ impl PluginManager {
                 event: "shutdown".into(),
                 path: None,
                 line: None,
+                column: None,
                 key: None,
                 theme: None,
                 colors: None,
@@ -381,6 +384,7 @@ impl PluginManager {
                 event: "on_file_open".into(),
                 path: Some(path_s.clone()),
                 line: None,
+                column: None,
                 key: None,
                 theme: None,
                 colors: None,
@@ -403,6 +407,7 @@ impl PluginManager {
                 event: "on_keypress".into(),
                 path: None,
                 line: None,
+                column: None,
                 key: Some(key_str.clone()),
                 theme: None,
                 colors: None,
@@ -427,6 +432,7 @@ impl PluginManager {
                 event: "on_theme_change".into(),
                 path: None,
                 line: None,
+                column: None,
                 key: None,
                 theme: Some(theme_name.into()),
                 colors: self.active_theme_colors.clone(),
@@ -456,6 +462,31 @@ impl PluginManager {
                 event: "on_selection_change".into(),
                 path: path_s.clone(),
                 line,
+                column: None,
+                key: None,
+                theme: None,
+                colors: None,
+                protocol_version: None,
+                id: None,
+                method: None,
+                params: None,
+            });
+        }
+    }
+
+    /// Sends a content-cursor position to plugins that subscribe to
+    /// `on_content_cursor_change`. Coordinates are one-based for plugin use.
+    pub(crate) fn on_content_cursor_change(&mut self, path: &Path, line: usize, column: usize) {
+        let path = path.to_string_lossy().into_owned();
+        for plugin in &mut self.plugins {
+            if !plugin.subscribes_to("on_content_cursor_change") {
+                continue;
+            }
+            plugin.send(&ToPlugin {
+                event: "on_content_cursor_change".into(),
+                path: Some(path.clone()),
+                line: Some(line),
+                column: Some(column),
                 key: None,
                 theme: None,
                 colors: None,
@@ -478,6 +509,7 @@ impl PluginManager {
                 event: "on_quit".into(),
                 path: None,
                 line: None,
+                column: None,
                 key: None,
                 theme: None,
                 colors: None,
@@ -583,6 +615,7 @@ impl PluginManager {
                 event: "command".into(),
                 path: None,
                 line: None,
+                column: None,
                 key: None,
                 theme: None,
                 colors: None,
@@ -681,6 +714,7 @@ impl PluginManager {
             event: "init".into(),
             path: None,
             line: None,
+            column: None,
             key: None,
             theme: self.active_theme.clone(),
             colors: self.active_theme_colors.clone(),
@@ -695,6 +729,7 @@ impl PluginManager {
                 event: "on_file_open".into(),
                 path: Some(path_s.clone()),
                 line: None,
+                column: None,
                 key: None,
                 theme: None,
                 colors: None,
@@ -707,6 +742,7 @@ impl PluginManager {
                 event: "on_selection_change".into(),
                 path: Some(path_s),
                 line: current_line,
+                column: None,
                 key: None,
                 theme: None,
                 colors: None,
@@ -733,6 +769,7 @@ impl PluginManager {
             event: "shutdown".into(),
             path: None,
             line: None,
+            column: None,
             key: None,
             theme: None,
             colors: None,
