@@ -1,4 +1,4 @@
-version = "0.21.1"
+version = "0.21.2"
 date = "2026-09-12"
 whats_new = """- test: use shallow-checkout-safe compare revision (#823)
 - feat: improve overlay and tree UX (#822)
