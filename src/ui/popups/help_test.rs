@@ -1054,6 +1054,34 @@ fn keybound_actions_are_in_help_overlay() {
 }
 
 #[test]
+fn help_lists_the_new_tab_controls() {
+    let help_rs_content = std::fs::read_to_string("src/ui/popups/help.rs").unwrap();
+    for id in [
+        "select_tab",
+        "move_tab_prev",
+        "move_tab_next",
+        "tab_picker",
+        "reopen_tab",
+    ] {
+        assert!(help_rs_content.contains(&format!("row_key(\"{id}\")")));
+    }
+}
+
+#[test]
+fn help_shows_compact_numeric_tab_selection_binding() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    app.help_tab = 0;
+    let backend = TestBackend::new(100, 60);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| draw_help(frame, &mut app, frame.area()))
+        .unwrap();
+    let joined = buffer_rows(&terminal).join("\n");
+    assert!(joined.contains("Ctrl+1-9/0"));
+}
+
+#[test]
 fn help_git_section_shows_repo_commit_log_key() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());

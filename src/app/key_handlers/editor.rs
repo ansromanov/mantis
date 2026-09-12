@@ -165,6 +165,22 @@ impl App {
                 self.tab_action_request = Some(super::super::TabAction::Prev);
                 true
             }
+            Some("move_tab_prev") => {
+                self.tab_action_request = Some(super::super::TabAction::MovePrev);
+                true
+            }
+            Some("move_tab_next") => {
+                self.tab_action_request = Some(super::super::TabAction::MoveNext);
+                true
+            }
+            Some("tab_picker") => {
+                self.tab_action_request = Some(super::super::TabAction::Picker);
+                true
+            }
+            Some("reopen_tab") => {
+                self.tab_action_request = Some(super::super::TabAction::Reopen);
+                true
+            }
             Some("plugin_picker") => {
                 let entries = self.plugin_manager.plugin_entries();
                 self.plugin_picker = Some(PluginPicker::new(entries));

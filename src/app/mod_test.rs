@@ -33,6 +33,14 @@ fn new_app_starts_without_jsonl_state() {
     fs::remove_dir_all(root).ok();
 }
 
+#[test]
+fn new_app_has_no_pending_tab_action() {
+    let root = temp_tree();
+    let app = app_for(&root);
+    assert!(app.tab_action_request.is_none());
+    fs::remove_dir_all(root).ok();
+}
+
 fn app_for(root: &std::path::Path) -> App {
     App::new(root.to_path_buf(), Config::default(), None, None).unwrap()
 }

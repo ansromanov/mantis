@@ -25,7 +25,16 @@ fn bookmark_actions_are_registered() {
 
 #[test]
 fn tab_actions_are_registered_with_palette_entries() {
-    for id in ["new_tab", "close_tab", "next_tab", "prev_tab"] {
+    for id in [
+        "new_tab",
+        "close_tab",
+        "next_tab",
+        "prev_tab",
+        "move_tab_prev",
+        "move_tab_next",
+        "tab_picker",
+        "reopen_tab",
+    ] {
         let action = ACTIONS
             .iter()
             .find(|a| a.id == id)
@@ -123,6 +132,15 @@ const KEYMAP_FIELD_ACTION_IDS: &[&str] = &[
     "tree_width_shrink",
     "toggle_file_revision",
     "blame_open_commit",
+    "new_tab",
+    "close_tab",
+    "next_tab",
+    "prev_tab",
+    "select_tab",
+    "move_tab_prev",
+    "move_tab_next",
+    "tab_picker",
+    "reopen_tab",
 ];
 
 /// Pure-navigation actions that are inherently keymap-only: they should never
@@ -144,6 +162,7 @@ const NAV_ONLY_ALLOWLIST: &[&str] = &[
     "content_reset_col",
     "switch_panel",
     "command_palette",
+    "select_tab",
 ];
 
 #[test]

@@ -115,6 +115,17 @@ click a tab to switch to it, or its `×` to close it.
 | `Ctrl+w`         | Close the current tab          |
 | `Ctrl+PageDown`  | Next tab                       |
 | `Ctrl+PageUp`    | Previous tab                   |
+| `Ctrl+1` … `Ctrl+9` | Select tab 1 … 9             |
+| `Ctrl+0`         | Select the last tab             |
+| `Ctrl+[` / `Ctrl+]` | Move the current tab left / right |
+| `Ctrl+Tab`       | Search open tabs                 |
+| `Ctrl+Backspace` | Reopen the last closed tab       |
+
+Tabs can also be reordered by dragging their labels in the strip. Duplicate
+root names expand to the shortest unique path suffix, and Git repositories
+show their branch and changed-file count when the strip has room. Reordering
+is saved with the workspace manifest; closing a tab saves its per-root session
+so reopening it restores that state.
 
 Each tab is fully independent — its own tree, open file, scroll position, and
 git mode — using the same per-root [session persistence](#session-persistence)

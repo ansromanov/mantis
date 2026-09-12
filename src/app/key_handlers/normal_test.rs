@@ -3,6 +3,24 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+#[test]
+fn ctrl_brackets_request_tab_reordering() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(KeyEvent::new(KeyCode::Char('['), KeyModifiers::CONTROL));
+    assert_eq!(
+        app.tab_action_request,
+        Some(crate::app::TabAction::MovePrev)
+    );
+    app.tab_action_request = None;
+    app.handle_key(KeyEvent::new(KeyCode::Char(']'), KeyModifiers::CONTROL));
+    assert_eq!(
+        app.tab_action_request,
+        Some(crate::app::TabAction::MoveNext)
+    );
+    fs::remove_dir_all(root).ok();
+}
 use ratatui::layout::Rect;
 
 use crate::app::{App, Focus};

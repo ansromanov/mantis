@@ -1,5 +1,12 @@
 use super::*;
 
+#[test]
+fn tab_picker_is_exported_from_search_module() {
+    let picker = TabPicker::new(&[]);
+    assert!(picker.items.is_empty());
+    assert!(picker.filtered.is_empty());
+}
+
 use std::fs;
 use std::sync::atomic::AtomicUsize;
 static TEST_COUNTER: AtomicUsize = AtomicUsize::new(0);

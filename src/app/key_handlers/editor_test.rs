@@ -66,6 +66,19 @@ fn dispatch_next_tab_records_a_tab_action_request() {
 }
 
 #[test]
+fn dispatch_tab_picker_and_reopen_actions() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.command_palette = Some(palette_with_query("Pick an open tab"));
+    assert!(app.dispatch_command());
+    assert_eq!(app.tab_action_request, Some(crate::app::TabAction::Picker));
+    app.command_palette = Some(palette_with_query("Reopen closed tab"));
+    assert!(app.dispatch_command());
+    assert_eq!(app.tab_action_request, Some(crate::app::TabAction::Reopen));
+    fs::remove_dir_all(root).ok();
+}
+
+#[test]
 fn dispatch_bookmarks_command_opens_picker() {
     let root = temp_tree();
     let mut app = app_for(&root);

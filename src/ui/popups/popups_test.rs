@@ -3,8 +3,13 @@ use ratatui::layout::Rect;
 use crate::ui::popups::util::centered_rect;
 use crate::ui::popups::{
     draw_about, draw_command_palette, draw_help, draw_history, draw_in_file_search, draw_recent,
-    draw_search, draw_theme, draw_tree_filter,
+    draw_search, draw_tab_picker, draw_theme, draw_tree_filter,
 };
+
+#[test]
+fn tab_picker_renderer_is_available_from_popup_registry() {
+    let _draw = draw_tab_picker;
+}
 
 #[test]
 fn centered_rect_returns_inner_rectangle() {

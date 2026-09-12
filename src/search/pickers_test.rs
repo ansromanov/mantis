@@ -14,6 +14,38 @@ fn filter_bar_state_works() {
     assert_eq!(f.query, "");
 }
 
+#[test]
+fn tab_picker_filters_roots_and_returns_original_tab_index() {
+    let items = vec![
+        TabPickerItem {
+            index: 0,
+            root: PathBuf::from("/work/api"),
+            branch: Some("main".to_string()),
+            changed: 3,
+        },
+        TabPickerItem {
+            index: 1,
+            root: PathBuf::from("/work/web"),
+            branch: Some("feature".to_string()),
+            changed: 0,
+        },
+    ];
+    let mut picker = TabPicker {
+        items,
+        query: String::new(),
+        filtered: Vec::new(),
+        selected: 0,
+        matcher: SkimMatcherV2::default(),
+    };
+    picker.refresh();
+    picker.query_push('w');
+    picker.query_push('e');
+    picker.query_push('b');
+    assert_eq!(picker.filtered, vec![1]);
+    assert_eq!(picker.selected_tab(), Some(1));
+    assert!(picker.items[0].display().contains("●3"));
+}
+
 // -- InFileSearch ----------------------------------------------------------
 
 #[test]

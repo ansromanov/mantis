@@ -23,8 +23,8 @@ pub use repo_log::RepoLogState;
 #[allow(unused_imports)]
 pub use pickers::{
     BugReportFocus, BugReportState, FilterBarState, GotoLineState, InFileMatch, InFileSearch,
-    PluginPicker, RecentFilesState, RevisionItem, RevisionPicker, RevisionTab, ThemePicker,
-    TreeFilter, WorktreePicker,
+    PluginPicker, RecentFilesState, RevisionItem, RevisionPicker, RevisionTab, TabPicker,
+    TabPickerItem, ThemePicker, TreeFilter, WorktreePicker,
 };
 
 use std::collections::{HashMap, HashSet};

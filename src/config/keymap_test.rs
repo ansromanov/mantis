@@ -56,6 +56,25 @@ fn parses_modifiers() {
 }
 
 #[test]
+fn tab_actions_have_non_alt_default_bindings() {
+    let map = Keymap::default();
+    for action in [
+        "select_tab",
+        "move_tab_prev",
+        "move_tab_next",
+        "tab_picker",
+        "reopen_tab",
+    ] {
+        let bindings = map.bindings_for_action(action);
+        assert!(
+            !bindings.is_empty(),
+            "{action} should have a default binding"
+        );
+        assert!(bindings.iter().all(|binding| !binding.alt));
+    }
+}
+
+#[test]
 fn modifier_aliases_accepted() {
     assert!(parse_binding("control+a").unwrap().ctrl);
     assert!(parse_binding("meta+a").unwrap().alt);
