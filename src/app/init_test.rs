@@ -16,6 +16,8 @@ use crate::config::{Config, ContentConfig};
 fn new_app_starts_with_search_bar_closed() {
     let app = App::new(std::path::PathBuf::from("."), Config::default(), None, None).unwrap();
     assert!(!app.in_file_search_open);
+    assert_eq!(app.statusbar_area, ratatui::layout::Rect::default());
+    assert!(app.statusbar_segments.is_empty());
 }
 
 fn temp_dir() -> PathBuf {

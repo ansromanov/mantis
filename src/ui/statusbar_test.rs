@@ -41,10 +41,101 @@ fn statusbar_displays_worktree_count() {
     assert!(render_bar(&app).contains("[worktrees: 3]"));
 }
 
+#[test]
+fn worktree_status_segment_can_be_selected_in_explicit_config() {
+    let mut app = make_app();
+    app.worktree_count = 3;
+    app.config.statusbar.left = Some(vec!["worktrees".to_string()]);
+    app.config.statusbar.right = Some(Vec::new());
+
+    let (line, ranges) = build_normal_line(&app, Style::default(), 80);
+    let text = line
+        .spans
+        .iter()
+        .map(|span| span.content.as_ref())
+        .collect::<String>();
+    assert!(text.contains("[worktrees: 3]"));
+    assert_eq!(ranges.len(), 1);
+    assert_eq!(ranges[0].0, StatusSegment::Worktrees);
+}
+
+#[test]
+fn statusbar_segments_map_to_their_existing_actions() {
+    let cases = [
+        (StatusSegment::Git, Some("compare_against")),
+        (StatusSegment::Worktrees, Some("worktree_picker")),
+        (StatusSegment::Lnum, Some("goto_line")),
+        (StatusSegment::Type, Some("theme_picker")),
+        (StatusSegment::Folds, Some("fold_all")),
+        (StatusSegment::Errors, Some("plugin_picker")),
+        (StatusSegment::PluginError, Some("plugin_picker")),
+        (StatusSegment::Update, Some("show_about")),
+        (StatusSegment::FileInfo, Some("copy_path")),
+        (StatusSegment::Badges, None),
+        (StatusSegment::Scroll, None),
+        (StatusSegment::JsonPath, None),
+        (StatusSegment::PluginFacts, None),
+        (StatusSegment::Message, None),
+        (StatusSegment::Version, None),
+    ];
+    for (segment, action) in cases {
+        assert_eq!(
+            segment.action_id(),
+            action,
+            "unexpected action for {segment:?}"
+        );
+    }
+}
+
+#[test]
+fn statusbar_ranges_follow_elision_at_narrow_widths() {
+    let mut app = make_app();
+    app.worktree_count = 3;
+    app.show_hidden = true;
+    app.git_info = Some(GitRepoInfo {
+        head: GitHead::Branch("main".into()),
+        ahead: 2,
+        behind: 1,
+        total_changed: 4,
+        staged: 1,
+        untracked: 0,
+    });
+    app.current_file = Some(PathBuf::from("file.rs"));
+    app.current_syntax = Some("Rust".to_string());
+    app.fold_regions = vec![crate::fold::FoldRegion { start: 0, end: 4 }];
+    app.file_encoding = Some("UTF-8".to_string());
+    app.show_file_info = true;
+
+    for width in [10, 20, 40, 80, 140] {
+        let (line, ranges) = build_normal_line(&app, Style::default(), width);
+        assert_eq!(line.width(), width as usize);
+        assert!(ranges
+            .iter()
+            .all(|(_, start, end)| { *start < *end && *end <= width }));
+        for pair in ranges.windows(2) {
+            assert!(pair[0].2 <= pair[1].1 || pair[1].2 <= pair[0].1);
+        }
+        if width == 10 {
+            assert!(!ranges
+                .iter()
+                .any(|(segment, _, _)| { *segment == StatusSegment::Worktrees }));
+        }
+        if width == 140 {
+            assert!(ranges
+                .iter()
+                .any(|(segment, _, _)| { *segment == StatusSegment::Worktrees }));
+        }
+    }
+}
+
 fn render_bar_width(app: &App, width: u16) -> String {
     let backend = TestBackend::new(width, 1);
     let mut terminal = Terminal::new(backend).unwrap();
-    terminal.draw(|f| draw_statusbar(f, app, f.area())).unwrap();
+    terminal
+        .draw(|f| {
+            draw_statusbar(f, app, f.area());
+        })
+        .unwrap();
     let buf = terminal.backend().buffer();
     (0..width)
         .map(|x| buf[(x, 0)].symbol().to_string())
@@ -1282,7 +1373,9 @@ fn monochrome_theme_uses_reversed_modifier_not_bg_color() {
     let backend = TestBackend::new(20, 1);
     let mut terminal = Terminal::new(backend).unwrap();
     terminal
-        .draw(|f| draw_statusbar(f, &app, f.area()))
+        .draw(|f| {
+            draw_statusbar(f, &app, f.area());
+        })
         .unwrap();
     let buf = terminal.backend().buffer();
     let cell = &buf[(0, 0)];

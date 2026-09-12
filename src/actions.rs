@@ -160,6 +160,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: None,
         help: Some(("Tabs", "select tab by number")),
         category: None,
+        menu: None,
         description: None,
     },
     ActionSpec {
@@ -167,6 +168,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Move tab left"),
         help: Some(("Global", "move tab left")),
         category: Some("Tabs"),
+        menu: Some(("Tabs", 4)),
         description: Some("Move the current tab one position left"),
     },
     ActionSpec {
@@ -174,6 +176,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Move tab right"),
         help: Some(("Global", "move tab right")),
         category: Some("Tabs"),
+        menu: Some(("Tabs", 5)),
         description: Some("Move the current tab one position right"),
     },
     ActionSpec {
@@ -181,6 +184,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Pick an open tab"),
         help: Some(("Global", "pick an open tab")),
         category: Some("Tabs"),
+        menu: Some(("Tabs", 6)),
         description: Some("Fuzzy-search open tabs by root and branch"),
     },
     ActionSpec {
@@ -188,6 +192,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Reopen closed tab"),
         help: Some(("Global", "reopen the most recently closed tab")),
         category: Some("Tabs"),
+        menu: Some(("Tabs", 7)),
         description: Some("Restore the most recently closed tab"),
     },
     ActionSpec {

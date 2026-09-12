@@ -297,6 +297,14 @@ impl App {
         {
             return;
         }
+        if rect_contains(self.statusbar_area, ev.column, ev.row) {
+            if let MouseEventKind::Down(MouseButton::Left) = ev.kind {
+                if let Some(segment) = crate::ui::statusbar::hit_test(self, ev.column, ev.row) {
+                    self.activate_statusbar_segment(segment);
+                }
+            }
+            return;
+        }
         let scroll_before = self.content_scroll;
         match ev.kind {
             MouseEventKind::Down(MouseButton::Left) => {
@@ -539,6 +547,70 @@ impl App {
         if self.content_scroll != scroll_before {
             self.mark_content_scrolled();
             self.mark_session_dirty();
+        }
+    }
+
+    /// Runs the existing action associated with an interactive status-bar
+    /// segment. The segment geometry itself comes from the last rendered line.
+    fn activate_statusbar_segment(&mut self, segment: crate::ui::statusbar::StatusSegment) {
+        let fold_action = if segment == crate::ui::statusbar::StatusSegment::Folds
+            && !self.fold_regions.is_empty()
+            && self.folded.len() == self.fold_regions.len()
+        {
+            "unfold_all"
+        } else {
+            "fold_all"
+        };
+        let action = if segment == crate::ui::statusbar::StatusSegment::Folds {
+            fold_action
+        } else if let Some(action) = segment.action_id() {
+            action
+        } else {
+            return;
+        };
+        self.telemetry
+            .record(crate::telemetry::TelemetryEvent::ActionInvoked {
+                action,
+                source: crate::telemetry::ActionSource::Mouse,
+            });
+
+        match action {
+            "compare_against" => {
+                self.revision_picker = Some(crate::search::RevisionPicker::new(&self.root));
+            }
+            "worktree_picker" => {
+                self.worktree_picker = Some(crate::search::WorktreePicker::new(&self.root));
+            }
+            "goto_line" => {
+                self.focus = Focus::Content;
+                self.goto_line = Some(crate::search::GotoLineState::new());
+            }
+            "theme_picker" => {
+                self.context_menu = None;
+                self.theme_picker = Some(crate::search::ThemePicker::default());
+            }
+            "fold_all" => {
+                if !self.fold_regions.is_empty() {
+                    self.fold_all();
+                    self.mark_content_scrolled();
+                }
+            }
+            "unfold_all" => {
+                if !self.fold_regions.is_empty() {
+                    self.unfold_all();
+                    self.mark_content_scrolled();
+                }
+            }
+            "plugin_picker" => {
+                let entries = self.plugin_manager.plugin_entries();
+                self.plugin_picker = Some(crate::search::PluginPicker::new(entries));
+            }
+            "show_about" => self.show_about = !self.show_about,
+            "copy_path" => {
+                self.focus = Focus::Content;
+                self.copy_path_to_clipboard(false);
+            }
+            _ => {}
         }
     }
 

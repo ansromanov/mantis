@@ -382,6 +382,10 @@ about the open file:
   scrolled.
 - **Encoding and line endings** — shown when `I` (file info) is toggled on.
 
+Click the git, worktree, line, language, fold, error, update, or file-info
+segment to open its related picker or perform its action. Segments hidden by
+the status-bar width limit cannot be clicked.
+
 ## Code folding
 
 Press `Space` to fold or unfold the block at the cursor. A fold gutter appears
@@ -457,6 +461,9 @@ same menu even when the persistent row is disabled.
   directory.
 - **Double-click** a directory to make it the new tree root.
 - **Click** a pane to focus it.
+- **Click** a status-bar segment to open its related picker or perform its
+  action. The git, worktree, line, language, fold, error, update, and file-info
+  segments are clickable when visible.
 - **Scroll wheel** scrolls whichever pane is under the cursor.
 - **Double-click** a breadcrumb segment to navigate to that directory.
 - In the search and history popups, **single-click** selects an entry and

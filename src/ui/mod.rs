@@ -21,7 +21,7 @@ use crate::app::App;
 mod content;
 pub(crate) mod menu_bar;
 pub(crate) mod popups;
-mod statusbar;
+pub(crate) mod statusbar;
 pub(crate) mod tabstrip;
 pub mod tree;
 
@@ -111,7 +111,8 @@ fn draw_area(f: &mut Frame, app: &mut App, area: Rect) {
                 .style(Style::default().fg(app.theme.text)),
             body_area,
         );
-        statusbar::draw_statusbar(f, app, status_area);
+        app.statusbar_area = status_area;
+        app.statusbar_segments = statusbar::draw_statusbar(f, app, status_area);
         if menu_visible {
             menu_bar::draw_menu_bar(f, app, menu_area);
         }
@@ -137,7 +138,8 @@ fn draw_area(f: &mut Frame, app: &mut App, area: Rect) {
 
     tree::draw_tree(f, app, horiz[0]);
     content::draw_content(f, app, horiz[1]);
-    statusbar::draw_statusbar(f, app, status_area);
+    app.statusbar_area = status_area;
+    app.statusbar_segments = statusbar::draw_statusbar(f, app, status_area);
 
     if app.in_file_search_open || app.json_query.is_some() {
         popups::draw_in_file_search(f, app, horiz[1]);

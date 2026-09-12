@@ -143,11 +143,9 @@ const KEYMAP_FIELD_ACTION_IDS: &[&str] = &[
     "reopen_tab",
 ];
 
-/// Pure-navigation actions that are inherently keymap-only: they should never
-/// need a palette entry, and their help-overlay coverage (if any) is already
-/// captured by their `ACTIONS` entry's `.help` field. Listed here only so the
-/// parity test below can assert "every keymap field has an ACTIONS entry"
-/// without also demanding they carry a palette name.
+/// Keymap-only actions that intentionally have no palette entry. Their help
+/// coverage, when present, is captured by the `.help` field in `ACTIONS`.
+/// Listed here so parity checks can distinguish them from missing actions.
 const NAV_ONLY_ALLOWLIST: &[&str] = &[
     "nav_up",
     "nav_down",
@@ -161,6 +159,7 @@ const NAV_ONLY_ALLOWLIST: &[&str] = &[
     "content_page_down",
     "content_reset_col",
     "switch_panel",
+    "menu_bar",
     "command_palette",
     "select_tab",
 ];

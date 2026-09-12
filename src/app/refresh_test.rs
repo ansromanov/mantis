@@ -441,6 +441,8 @@ fn create_base_app() -> App {
         theme_area: ratatui::layout::Rect::default(),
         theme_offset: 0,
         splitter_area: ratatui::layout::Rect::default(),
+        statusbar_area: ratatui::layout::Rect::default(),
+        statusbar_segments: Vec::new(),
         last_click: None,
         last_breadcrumb_click: None,
         content_scrolled_at: std::time::Instant::now() - std::time::Duration::from_secs(10),
