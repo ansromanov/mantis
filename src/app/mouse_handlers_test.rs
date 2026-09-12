@@ -152,6 +152,8 @@ fn statusbar_clicks_open_each_mapped_picker_and_toggle_folds() {
 
     click(&mut app, crate::ui::statusbar::StatusSegment::Update);
     assert!(app.show_about);
+    click(&mut app, crate::ui::statusbar::StatusSegment::Update);
+    assert!(!app.show_about);
 
     fs::remove_dir_all(&root).ok();
 }
