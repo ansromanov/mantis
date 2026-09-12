@@ -1678,3 +1678,20 @@ fn mouse_input_pauses_follow_mode() {
     fs::remove_dir_all(&root).ok();
 }
 // touched for log follow mode
+
+#[test]
+fn hovering_a_visible_menu_label_opens_its_dropdown() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.config.ui.menu_bar = true;
+    app.menu_bar_area = Rect::new(0, 0, 80, 1);
+    let (start, _) = crate::ui::menu_bar::menu_ranges(app.menu_bar_area)[1];
+    app.handle_mouse(MouseEvent {
+        kind: MouseEventKind::Moved,
+        column: start,
+        row: 0,
+        modifiers: crossterm::event::KeyModifiers::empty(),
+    });
+    assert_eq!(app.menu_bar_state.unwrap().menu_index, 1);
+    fs::remove_dir_all(root).ok();
+}

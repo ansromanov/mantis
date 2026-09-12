@@ -49,6 +49,7 @@ keys.git_mode_flat_toggle
 keys.git_mode_toggle
 keys.goto_line
 keys.help
+keys.menu_bar
 keys.nav_down
 keys.nav_up
 keys.new_tab
@@ -132,5 +133,7 @@ tree.indent_guides
 tree.independent_scroll
 tree.show_hidden
 tree.width
+ui
+ui.menu_bar
 updates
 updates.check

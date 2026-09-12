@@ -726,6 +726,15 @@ fn tree_width_shrink_default_binding_is_left_bracket() {
 }
 
 #[test]
+fn menu_bar_defaults_to_f10_and_has_a_display_label() {
+    let keymap = Keymap::default();
+    let f10 = KeyEvent::new(KeyCode::F(10), KeyModifiers::empty());
+    assert!(pressed_in(&keymap.menu_bar, &f10, BindingScope::Tree));
+    assert!(pressed_in(&keymap.menu_bar, &f10, BindingScope::Content));
+    assert_eq!(keymap.label_for_action("menu_bar"), "F10");
+}
+
+#[test]
 fn new_tab_default_binding_is_ctrl_n_global() {
     let keymap = Keymap::default();
     let key = ev(KeyCode::Char('n'), KeyModifiers::CONTROL);

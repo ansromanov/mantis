@@ -1412,3 +1412,13 @@ fn toggle_secret_reveal_switches_display_content() {
     assert_eq!(app.content[0], "API_TOKEN=super-secret");
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn generic_action_dispatch_runs_without_a_command_palette() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    assert!(app.dispatch_action_id("quit", crate::telemetry::ActionSource::Menu));
+    assert!(app.should_quit);
+    assert!(app.command_palette.is_none());
+    fs::remove_dir_all(root).ok();
+}

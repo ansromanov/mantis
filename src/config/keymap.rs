@@ -223,6 +223,7 @@ impl Keymap {
     fn bindings_for_action(&self, action_id: &str) -> &[KeyBinding] {
         match action_id {
             "help" => &self.help,
+            "menu_bar" => &self.menu_bar,
             "toggle_hidden" => &self.toggle_hidden,
             "search_files" => &self.search_files,
             "find_files" => &self.find_files,
@@ -342,6 +343,8 @@ pub struct Keymap {
     // Global
     pub quit: Vec<KeyBinding>,
     pub help: Vec<KeyBinding>,
+    /// Opens the registry-driven action menu bar.
+    pub menu_bar: Vec<KeyBinding>,
     pub toggle_hidden: Vec<KeyBinding>,
     pub search_files: Vec<KeyBinding>,
     pub find_files: Vec<KeyBinding>,
@@ -432,13 +435,14 @@ impl Default for Keymap {
     /// No default uses Ctrl+Shift (kitty's `kitty_mod`, Windows Terminal's
     /// own palette/search, indistinguishable from plain Ctrl on legacy
     /// terminals), the Alt modifier (unreliable across terminals), F-keys
-    /// beyond the F1/F5 conveniences (poor macOS ergonomics), or the
+    /// beyond F1/F5 and the F10 menu-bar shortcut (poor macOS ergonomics), or the
     /// terminal-critical Ctrl+S/Q/Z/L combinations.
     fn default() -> Self {
         #[allow(unused_mut)]
         let mut map = Keymap {
             quit: bind(&["ctrl+c", "tree:q"]),
             help: bind(&["F1", "?"]),
+            menu_bar: bind(&["F10"]),
             toggle_hidden: bind(&["tree:."]),
             search_files: bind(&["/"]),
             find_files: bind(&["ctrl+t"]),

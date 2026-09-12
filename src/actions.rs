@@ -9,7 +9,8 @@
 //! display name (if any), and its help-overlay placement (if any) are
 //! declared. `command_palette::COMMANDS` filters this list for
 //! `palette.is_some()`; `ui::popups::help` groups it by `.help`'s section
-//! name. `Keymap::bindings_for_action` and
+//! name; the optional menu bar groups entries by `.menu`.
+//! `Keymap::bindings_for_action` and
 //! `app::key_handlers::editor::dispatch_command` both match on these same
 //! canonical ids — see `actions_test.rs` for the parity test that keeps all
 //! three surfaces and the keymap fields in sync.
@@ -36,6 +37,10 @@ pub struct ActionSpec {
     /// When set, the palette prefixes entries with `"{category}: "`, making the
     /// palette browsable by domain via fuzzy matching.
     pub category: Option<&'static str>,
+    /// Optional menu-bar group and order within that group. Menu entries are
+    /// derived from the action registry, so palette actions with this field
+    /// appear once in the corresponding dropdown.
+    pub menu: Option<(&'static str, u8)>,
     /// Optional one-line description shown dim after the palette entry name.
     /// Makes the palette self-documenting.
     pub description: Option<&'static str>,
@@ -51,13 +56,23 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Toggle help"),
         help: Some(("Global", "toggle this help")),
         category: Some("General"),
+        menu: Some(("General", 0)),
         description: Some("Toggle the keybinding help overlay"),
+    },
+    ActionSpec {
+        id: "menu_bar",
+        palette: None,
+        help: Some(("Global", "open the action menu")),
+        category: None,
+        menu: None,
+        description: None,
     },
     ActionSpec {
         id: "bug_report",
         palette: Some("Report a bug (save diagnostics locally)"),
         help: None,
         category: Some("General"),
+        menu: Some(("General", 1)),
         description: Some("Save diagnostics for a bug report"),
     },
     ActionSpec {
@@ -65,6 +80,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: None,
         help: Some(("Global", "switch panel")),
         category: None,
+        menu: None,
         description: None,
     },
     ActionSpec {
@@ -72,6 +88,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Quit"),
         help: Some(("Global", "quit")),
         category: Some("General"),
+        menu: Some(("General", 2)),
         description: Some("Exit the application"),
     },
     ActionSpec {
@@ -79,6 +96,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Toggle hidden files"),
         help: Some(("Global", "toggle hidden files")),
         category: Some("General"),
+        menu: Some(("General", 3)),
         description: Some("Show or hide dotfiles in the tree"),
     },
     ActionSpec {
@@ -86,6 +104,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Toggle secret reveal"),
         help: Some(("Global", "reveal or mask detected secrets")),
         category: Some("Safety"),
+        menu: Some(("Safety", 0)),
         description: Some("Temporarily reveal credential-shaped file values"),
     },
     ActionSpec {
@@ -93,6 +112,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Toggle telemetry"),
         help: None,
         category: Some("General"),
+        menu: Some(("General", 4)),
         description: Some("Enable or disable local usage telemetry"),
     },
     ActionSpec {
@@ -100,6 +120,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Open theme picker"),
         help: Some(("Global", "pick a theme")),
         category: Some("View"),
+        menu: Some(("View", 0)),
         description: Some("Switch the color theme"),
     },
     ActionSpec {
@@ -107,6 +128,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Open project as new tab"),
         help: Some(("Global", "open another project as a new tab")),
         category: Some("Tabs"),
+        menu: Some(("Tabs", 0)),
         description: Some("Type a directory path to open it in a new tab"),
     },
     ActionSpec {
@@ -114,6 +136,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Close tab"),
         help: Some(("Global", "close the current tab")),
         category: Some("Tabs"),
+        menu: Some(("Tabs", 1)),
         description: Some("Close the current tab (kept open if it's the only one)"),
     },
     ActionSpec {
@@ -121,6 +144,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Next tab"),
         help: Some(("Global", "switch to the next tab")),
         category: Some("Tabs"),
+        menu: Some(("Tabs", 2)),
         description: Some("Switch to the next tab"),
     },
     ActionSpec {
@@ -128,6 +152,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Previous tab"),
         help: Some(("Global", "switch to the previous tab")),
         category: Some("Tabs"),
+        menu: Some(("Tabs", 3)),
         description: Some("Switch to the previous tab"),
     },
     ActionSpec {
@@ -135,6 +160,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Open plugin manager"),
         help: Some(("Global", "plugin manager")),
         category: Some("View"),
+        menu: Some(("View", 1)),
         description: Some("Manage installed plugins"),
     },
     ActionSpec {
@@ -142,6 +168,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Toggle git mode"),
         help: Some(("Global", "toggle git mode (changed files only + diffs)")),
         category: Some("Git"),
+        menu: Some(("Git", 0)),
         description: Some("Filter tree to changed files and show diffs"),
     },
     ActionSpec {
@@ -149,6 +176,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Open in editor"),
         help: Some(("Global", "open file in $EDITOR")),
         category: Some("General"),
+        menu: Some(("General", 5)),
         description: Some("Open the selected file in your editor"),
     },
     ActionSpec {
@@ -156,6 +184,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Open with default app"),
         help: Some(("Global", "open file with system default app")),
         category: Some("General"),
+        menu: Some(("General", 6)),
         description: Some("Open the selected file with the system default app"),
     },
     ActionSpec {
@@ -163,6 +192,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Copy absolute path"),
         help: Some(("Global", "copy absolute path to clipboard")),
         category: Some("Copy"),
+        menu: Some(("Copy", 0)),
         description: Some("Copy the absolute file path to the clipboard"),
     },
     ActionSpec {
@@ -170,6 +200,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Copy relative path"),
         help: Some(("Global", "copy path relative to tree root to clipboard")),
         category: Some("Copy"),
+        menu: Some(("Copy", 1)),
         description: Some("Copy the relative file path to the clipboard"),
     },
     ActionSpec {
@@ -180,6 +211,7 @@ pub static ACTIONS: &[ActionSpec] = &[
             "copy current line (or selection if any) to clipboard",
         )),
         category: Some("Copy"),
+        menu: Some(("Copy", 2)),
         description: Some("Copy the current line or visual selection"),
     },
     ActionSpec {
@@ -187,6 +219,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Copy entire file"),
         help: Some(("Content panel", "copy entire file content to clipboard")),
         category: Some("Copy"),
+        menu: Some(("Copy", 3)),
         description: Some("Copy the entire file content to the clipboard"),
     },
     ActionSpec {
@@ -194,6 +227,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Recent files"),
         help: Some(("Global", "recent files picker")),
         category: Some("Navigate"),
+        menu: Some(("Navigate", 0)),
         description: Some("Browse and open recently opened files"),
     },
     ActionSpec {
@@ -201,6 +235,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Toggle bookmark"),
         help: Some(("Tree panel", "toggle bookmark on current file")),
         category: Some("Navigate"),
+        menu: Some(("Navigate", 1)),
         description: Some("Pin or unpin the current file"),
     },
     ActionSpec {
@@ -208,6 +243,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Bookmarks"),
         help: Some(("Tree panel", "bookmarks picker")),
         category: Some("Navigate"),
+        menu: Some(("Navigate", 2)),
         description: Some("Browse and open bookmarked files"),
     },
     ActionSpec {
@@ -215,6 +251,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Open worktree switcher"),
         help: Some(("Global", "switch git worktree")),
         category: Some("Git"),
+        menu: Some(("Git", 1)),
         description: Some("Browse branches and changed-file counts across worktrees"),
     },
     ActionSpec {
@@ -222,6 +259,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Toggle git flat mode"),
         help: Some(("Global", "toggle git flat/tree view (in git mode)")),
         category: Some("Git"),
+        menu: Some(("Git", 2)),
         description: Some("Switch between flat and tree view in git mode"),
     },
     // -- Tree panel ---------------------------------------------------------
@@ -230,6 +268,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: None,
         help: Some(("Tree panel", "move up")),
         category: None,
+        menu: None,
         description: None,
     },
     ActionSpec {
@@ -237,6 +276,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: None,
         help: Some(("Tree panel", "move down")),
         category: None,
+        menu: None,
         description: None,
     },
     ActionSpec {
@@ -244,6 +284,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: None,
         help: Some(("Tree panel", "expand dir / open file")),
         category: None,
+        menu: None,
         description: None,
     },
     ActionSpec {
@@ -251,6 +292,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: None,
         help: Some(("Tree panel", "collapse dir")),
         category: None,
+        menu: None,
         description: None,
     },
     ActionSpec {
@@ -258,6 +300,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Go up one directory"),
         help: Some(("Tree panel", "go up one directory")),
         category: Some("Tree"),
+        menu: Some(("Tree", 0)),
         description: Some("Navigate to the parent directory"),
     },
     ActionSpec {
@@ -265,6 +308,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Collapse all directories"),
         help: Some(("Tree panel", "collapse all directories")),
         category: Some("Tree"),
+        menu: Some(("Tree", 1)),
         description: Some("Collapse every expanded directory"),
     },
     ActionSpec {
@@ -272,6 +316,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Expand all directories"),
         help: Some(("Tree panel", "expand all directories")),
         category: Some("Tree"),
+        menu: Some(("Tree", 2)),
         description: Some("Expand every directory in the tree"),
     },
     ActionSpec {
@@ -279,6 +324,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Grow tree pane width"),
         help: Some(("Tree panel", "increase tree pane width")),
         category: Some("View"),
+        menu: Some(("View", 2)),
         description: Some("Increase the tree pane width percentage"),
     },
     ActionSpec {
@@ -286,6 +332,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Shrink tree pane width"),
         help: Some(("Tree panel", "decrease tree pane width")),
         category: Some("View"),
+        menu: Some(("View", 3)),
         description: Some("Decrease the tree pane width percentage"),
     },
     ActionSpec {
@@ -293,6 +340,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Find files"),
         help: Some(("Tree panel", "global fuzzy file-name picker")),
         category: Some("Tree"),
+        menu: Some(("Tree", 3)),
         description: Some("Fuzzy-find files by name across the whole tree"),
     },
     ActionSpec {
@@ -300,6 +348,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Open file search"),
         help: Some(("Tree panel", "tree filter / in-file search")),
         category: Some("Tree"),
+        menu: Some(("Tree", 4)),
         description: Some("Filter the tree by file name"),
     },
     ActionSpec {
@@ -307,6 +356,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Open content search"),
         help: Some(("Tree panel", "fuzzy content search")),
         category: Some("Tree"),
+        menu: Some(("Tree", 5)),
         description: Some("Search file contents across the whole tree"),
     },
     ActionSpec {
@@ -314,6 +364,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Reload"),
         help: Some(("Tree panel", "reload tree")),
         category: Some("Tree"),
+        menu: Some(("Tree", 6)),
         description: Some("Reload the file tree from disk"),
     },
     // -- Content panel --------------------------------------------------
@@ -327,6 +378,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: None,
         help: Some(("Content panel", "page scroll")),
         category: None,
+        menu: None,
         description: None,
     },
     ActionSpec {
@@ -334,6 +386,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: None,
         help: Some(("Content panel", "page scroll")),
         category: None,
+        menu: None,
         description: None,
     },
     ActionSpec {
@@ -341,6 +394,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: None,
         help: Some(("Content panel", "horizontal scroll")),
         category: None,
+        menu: None,
         description: None,
     },
     ActionSpec {
@@ -348,6 +402,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: None,
         help: Some(("Content panel", "horizontal scroll")),
         category: None,
+        menu: None,
         description: None,
     },
     ActionSpec {
@@ -355,6 +410,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: None,
         help: Some(("Content panel", "reset horizontal scroll")),
         category: None,
+        menu: None,
         description: None,
     },
     ActionSpec {
@@ -362,6 +418,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: None,
         help: Some(("Content panel", "go to top")),
         category: None,
+        menu: None,
         description: None,
     },
     ActionSpec {
@@ -369,6 +426,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: None,
         help: Some(("Content panel", "go to bottom")),
         category: None,
+        menu: None,
         description: None,
     },
     ActionSpec {
@@ -376,6 +434,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Toggle word wrap"),
         help: Some(("Content panel", "toggle word wrap")),
         category: Some("View"),
+        menu: Some(("View", 4)),
         description: Some("Toggle word wrapping in the content panel"),
     },
     ActionSpec {
@@ -383,6 +442,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Toggle line numbers"),
         help: Some(("Content panel", "toggle line numbers")),
         category: Some("View"),
+        menu: Some(("View", 5)),
         description: Some("Toggle the line number gutter"),
     },
     ActionSpec {
@@ -390,6 +450,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Toggle blame"),
         help: Some(("Content panel", "toggle git blame gutter")),
         category: Some("View"),
+        menu: Some(("View", 6)),
         description: Some("Toggle the git blame annotation gutter"),
     },
     ActionSpec {
@@ -397,6 +458,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Toggle log tail follow"),
         help: Some(("Content panel", "toggle log tail follow")),
         category: Some("View"),
+        menu: Some(("View", 7)),
         description: Some("Pin scroll to bottom of growing logs"),
     },
     ActionSpec {
@@ -404,6 +466,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Filter log lines"),
         help: Some(("Content panel", "filter log lines")),
         category: Some("Search"),
+        menu: Some(("Navigate", 3)),
         description: Some("Show only lines matching a query"),
     },
     ActionSpec {
@@ -411,6 +474,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Open file history"),
         help: Some(("Content panel", "git history of current file")),
         category: Some("Git"),
+        menu: Some(("Git", 3)),
         description: Some("Browse the git log for the current file"),
     },
     ActionSpec {
@@ -418,6 +482,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Browse repository commits"),
         help: Some(("Global", "browse repository-wide commit log")),
         category: Some("Git"),
+        menu: Some(("Git", 4)),
         description: Some("Browse all commits in the repository"),
     },
     ActionSpec {
@@ -425,6 +490,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Toggle side-by-side diff"),
         help: Some(("Content panel", "toggle side-by-side diff (in a diff)")),
         category: Some("Diff"),
+        menu: Some(("Git", 5)),
         description: Some("Switch between unified and side-by-side diff view"),
     },
     ActionSpec {
@@ -432,6 +498,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Next diff hunk"),
         help: Some(("Content panel", "next / previous hunk (in a diff)")),
         category: Some("Diff"),
+        menu: Some(("Git", 6)),
         description: Some("Jump to the next diff hunk"),
     },
     ActionSpec {
@@ -439,6 +506,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Previous diff hunk"),
         help: Some(("Content panel", "next / previous hunk (in a diff)")),
         category: Some("Diff"),
+        menu: Some(("Git", 7)),
         description: Some("Jump to the previous diff hunk"),
     },
     ActionSpec {
@@ -446,6 +514,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Toggle fold at cursor"),
         help: Some(("Content panel", "toggle fold at cursor")),
         category: Some("Fold"),
+        menu: Some(("View", 8)),
         description: Some("Fold or unfold the section at the cursor"),
     },
     ActionSpec {
@@ -456,6 +525,7 @@ pub static ACTIONS: &[ActionSpec] = &[
             "toggle markdown render (md files, markdown plugin)",
         )),
         category: Some("View"),
+        menu: Some(("View", 9)),
         description: Some("Toggle between rendered and raw markdown"),
     },
     // -- Bound actions with no keymap-section help row -------------------
@@ -467,6 +537,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Toggle JSON pretty-print"),
         help: None,
         category: Some("View"),
+        menu: Some(("View", 10)),
         description: Some("Toggle JSON pretty-printing in the content panel"),
     },
     ActionSpec {
@@ -474,6 +545,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Toggle CSV/TSV table view"),
         help: None,
         category: Some("View"),
+        menu: Some(("View", 11)),
         description: Some("Toggle CSV/TSV table view in the content panel"),
     },
     ActionSpec {
@@ -481,6 +553,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Open JSON query bar"),
         help: None,
         category: Some("View"),
+        menu: Some(("View", 12)),
         description: Some("Filter or project JSON and JSONL content"),
     },
     ActionSpec {
@@ -488,6 +561,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Blame active line"),
         help: None,
         category: Some("Git"),
+        menu: Some(("Git", 8)),
         description: Some("Show git blame for the current line"),
     },
     ActionSpec {
@@ -495,6 +569,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Cycle diff source (staged/unstaged)"),
         help: None,
         category: Some("Git"),
+        menu: Some(("Git", 9)),
         description: Some("Toggle between staged and unstaged diff view"),
     },
     ActionSpec {
@@ -502,6 +577,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: None,
         help: Some(("Global", "open command palette (all commands + keys)")),
         category: None,
+        menu: None,
         description: None,
     },
     ActionSpec {
@@ -509,6 +585,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Toggle auto watch (reload on file change)"),
         help: None,
         category: Some("View"),
+        menu: Some(("View", 13)),
         description: Some("Auto-reload the file tree on filesystem changes"),
     },
     ActionSpec {
@@ -516,6 +593,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Go to line"),
         help: None,
         category: Some("Navigate"),
+        menu: Some(("Navigate", 4)),
         description: Some("Jump to a specific line number"),
     },
     ActionSpec {
@@ -523,6 +601,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Compare against a revision"),
         help: None,
         category: Some("Git"),
+        menu: Some(("Git", 10)),
         description: Some("Compare the current file against a git revision"),
     },
     ActionSpec {
@@ -533,6 +612,7 @@ pub static ACTIONS: &[ActionSpec] = &[
             "toggle between diff and file at revision (in a revision diff)",
         )),
         category: Some("Git"),
+        menu: Some(("Git", 11)),
         description: Some("Switch between revision diff and file content at that commit"),
     },
     ActionSpec {
@@ -543,6 +623,7 @@ pub static ACTIONS: &[ActionSpec] = &[
             "open file at the commit shown on the active blame line",
         )),
         category: Some("Git"),
+        menu: Some(("Git", 12)),
         description: Some("View the file content at the commit under the blame cursor"),
     },
     // -- Palette/menu-only actions: no keymap binding --------------------
@@ -551,6 +632,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Open config in editor"),
         help: None,
         category: Some("General"),
+        menu: Some(("General", 7)),
         description: Some("Open the mantis configuration file in your editor"),
     },
     ActionSpec {
@@ -558,6 +640,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("About mantis"),
         help: None,
         category: Some("General"),
+        menu: Some(("General", 8)),
         description: Some("Show version, credits, and release notes"),
     },
     ActionSpec {
@@ -565,6 +648,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Fold all"),
         help: None,
         category: Some("Fold"),
+        menu: Some(("View", 14)),
         description: Some("Fold all foldable regions in the current file"),
     },
     ActionSpec {
@@ -572,6 +656,7 @@ pub static ACTIONS: &[ActionSpec] = &[
         palette: Some("Unfold all"),
         help: None,
         category: Some("Fold"),
+        menu: Some(("View", 15)),
         description: Some("Unfold all folded regions in the current file"),
     },
 ];

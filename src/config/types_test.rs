@@ -618,4 +618,11 @@ fn tree_width_default_differs_from_old_28() {
     // (see #665). We expect it to stay at 20 after the fix.
     assert_ne!(Config::default().tree.width, 28);
 }
+
+#[test]
+fn ui_menu_bar_defaults_off_and_deserializes() {
+    assert!(!Config::default().ui.menu_bar);
+    let config: Config = toml::from_str("[ui]\nmenu_bar = true\n").unwrap();
+    assert!(config.ui.menu_bar);
+}
 // touched for log follow mode

@@ -15,7 +15,8 @@
 //! reported in `SessionEnd`) rather than ever stalling the render loop.  When
 //! disabled, the handle is a no-op: no thread is spawned and no files are
 //! created.  Public items: [`Telemetry`], [`TelemetryEvent`], [`ActionSource`],
-//! [`SessionSnapshot`].
+//! [`SessionSnapshot`]. `ActionSource` distinguishes palette, key, mouse, and
+//! menu-bar invocations without capturing input text.
 
 mod sink;
 
@@ -38,6 +39,7 @@ pub enum ActionSource {
     Palette,
     Key,
     Mouse,
+    Menu,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]

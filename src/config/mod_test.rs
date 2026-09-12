@@ -615,3 +615,9 @@ fn sparse_toml_keeps_overridden_or_custom_plugins() {
         "unmodified markdown plugin should not be serialized: {out}"
     );
 }
+
+#[test]
+fn ui_config_is_exported_for_callers() {
+    let ui = super::UiConfig::default();
+    assert!(!ui.menu_bar);
+}

@@ -1085,3 +1085,16 @@ fn help_mouse_tab_shows_right_click_context_menu() {
     );
 }
 // touched for log follow mode
+
+#[test]
+fn help_shows_menu_bar_shortcut() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    app.show_help = true;
+    app.help_tab = 0;
+    let terminal = &mut Terminal::new(TestBackend::new(120, 40)).unwrap();
+    terminal.draw(|f| crate::ui::draw(f, &mut app)).unwrap();
+    let rows = buffer_rows(terminal).join("\n");
+    assert!(rows.contains("F10"));
+    assert!(rows.contains("open the action menu"));
+}

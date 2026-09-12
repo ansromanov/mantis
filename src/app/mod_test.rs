@@ -5327,3 +5327,15 @@ fn check_applicability_csv_file() {
 
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn menu_bar_overlay_state_is_separate_from_persistent_visibility() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    assert!(!app.config.ui.menu_bar);
+    assert!(app.menu_bar_state.is_none());
+    app.open_menu_bar();
+    assert!(app.menu_bar_state.is_some());
+    assert!(!app.config.ui.menu_bar);
+    fs::remove_dir_all(root).ok();
+}
