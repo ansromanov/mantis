@@ -980,6 +980,7 @@ fn theme_activation_clears_a_stale_context_menu() {
             path: root.join("a.txt"),
             index: 0,
         },
+        submenu_stack: Vec::new(),
     });
     app.handle_theme_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
     assert!(app.theme_picker.is_none());

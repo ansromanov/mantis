@@ -63,6 +63,7 @@ fn esc_closes_theme_picker_even_if_a_stale_context_menu_exists() {
         selected: 0,
         anchor: (0, 0),
         target: crate::app::ContextMenuTarget::Content,
+        submenu_stack: Vec::new(),
     });
 
     app.handle_key(key(KeyCode::Esc));

@@ -23,6 +23,7 @@ fn menu(entries: Vec<ContextMenuEntry>) -> ContextMenuState {
         selected: 0,
         anchor: (5, 5),
         target: ContextMenuTarget::Content,
+        submenu_stack: Vec::new(),
     }
 }
 
@@ -60,6 +61,7 @@ fn menu_rect_clamps_to_area_left_and_top() {
         selected: 0,
         anchor: (0, 0),
         target: ContextMenuTarget::Content,
+        submenu_stack: Vec::new(),
     };
     let r = menu_rect(&state, Rect::new(0, 0, 80, 24));
     assert_eq!(r.x, 1);

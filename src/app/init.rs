@@ -170,6 +170,7 @@ impl App {
             menu_bar_state: None,
             menu_bar_area: ratatui::layout::Rect::default(),
             menu_dropdown_area: ratatui::layout::Rect::default(),
+            statusbar_area: ratatui::layout::Rect::default(),
             show_hidden: cfg.tree.show_hidden,
             ignore_gitignore: cfg.git.ignore_gitignore,
             tree_revision: 0,

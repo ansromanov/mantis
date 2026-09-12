@@ -3,12 +3,18 @@ use super::*;
 // -- TabAction --------------------------------------------------------------
 
 #[test]
-fn tab_action_is_copy_and_comparable() {
+fn tab_action_is_cloneable_and_comparable() {
     let a = TabAction::Next;
-    let b = a; // Copy, not move
+    let b = a.clone();
     assert_eq!(a, b);
     assert_ne!(TabAction::New, TabAction::Close);
     assert_eq!(TabAction::Select(3), TabAction::Select(3));
+}
+
+#[test]
+fn tab_action_can_carry_a_directory_path() {
+    let path = PathBuf::from("/tmp/project");
+    assert_eq!(TabAction::Open(path.clone()), TabAction::Open(path));
 }
 
 // -- DiffMode -----------------------------------------------------------------

@@ -226,6 +226,8 @@ pub struct App {
     pub(crate) menu_bar_area: Rect,
     /// Hit area of the currently open menu dropdown.
     pub(crate) menu_dropdown_area: Rect,
+    /// Status-bar hit area recorded during the last render.
+    pub statusbar_area: ratatui::layout::Rect,
     pub show_hidden: bool,
     pub ignore_gitignore: bool,
     /// Monotonically increasing counter bumped every time the tree is rebuilt.

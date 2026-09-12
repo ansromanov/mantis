@@ -471,13 +471,19 @@ same menu even when the persistent row is disabled.
 - **Double-click** a breadcrumb segment to navigate to that directory.
 - In the search and history popups, **single-click** selects an entry and
   **double-click** activates it.
-- **Right-click** a tree row or the content pane to open a context menu at the
-  cursor. Tree menus offer open, open in editor / default app, reveal in file
-  manager, copy absolute/relative path, expand/collapse (directory), and
-  expand/collapse all. Content menus offer copy selection/line/file, word wrap
-  and raw-markdown toggles, and reveal-in-tree. Navigate with the mouse or
-  `j/k`/arrows, activate with Enter or a left-click, and dismiss with `Esc` or
-  a click anywhere else.
+- **Right-click** a tree row, content line, breadcrumb, blame annotation, diff
+  hunk, or tab to open its context menu. `Menu` or `Shift+F10` opens the menu
+  for the focused tree row or content cursor, and **Open context menu** is also
+  available in the command palette. Tree menus include file and directory
+  operations, bookmarks, scoped search, copying, and a Git submenu when the
+  action applies. Content menus include copy, go-to-line, blame, fold, and
+  revision actions. Breadcrumb, tab, and status-bar menus offer navigation and
+  picker actions. Status-bar menus use the clicked visible segment to offer its
+  related navigation action, such as go-to-line on the cursor segment or Git
+  history on the branch segment.
+  Navigate with the mouse or `j/k`/arrows, open a submenu with Enter or Right,
+  return with Left or Esc, activate with Enter or a left-click, and dismiss
+  with `Esc` or a click anywhere else.
 
 ### Worktree switcher
 

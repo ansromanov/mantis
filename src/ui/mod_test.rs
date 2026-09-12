@@ -246,3 +246,11 @@ fn draw_telemetry_notice_overlay() {
     assert!(joined.contains("Telemetry Enabled"));
     assert!(joined.contains("Storage directory:"));
 }
+
+#[test]
+fn draw_records_statusbar_geometry_for_mouse_hit_testing() {
+    let mut app = make_app();
+    let rows = render(&mut app);
+    assert_eq!(app.statusbar_area.height, 1);
+    assert_eq!(app.statusbar_area.y as usize, rows.len() - 1);
+}

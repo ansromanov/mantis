@@ -21,9 +21,15 @@ pub enum Focus {
 /// `App` cannot act on these itself (it owns exactly one project root); the
 /// `Tabs` wrapper checks `App::tab_action_request` after every event and
 /// clears it once handled.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TabAction {
     New,
+    /// Open a known directory immediately, without the path prompt.
+    Open(PathBuf),
+    /// Close all tabs except the tab at this index.
+    CloseOthers(usize),
+    /// Close tabs to the right of the tab at this index.
+    CloseToRight(usize),
     Close,
     Next,
     Prev,

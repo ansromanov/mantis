@@ -310,7 +310,6 @@ fn ctrl_number_selects_tab_and_zero_selects_last() {
 
 #[test]
 fn dragging_a_tab_reorders_it_on_release() {
-    use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
     let a = temp_dir("drag_alpha");
     let b = temp_dir("drag_beta");
     let _state = IsolatedState::new(&a);
@@ -333,6 +332,27 @@ fn dragging_a_tab_reorders_it_on_release() {
     assert_eq!(tabs.apps[0].root, b);
     assert_eq!(tabs.active_app().root, a);
     assert!(tabs.drag_tab.is_none());
+    fs::remove_dir_all(&a).ok();
+    fs::remove_dir_all(&b).ok();
+}
+
+#[test]
+fn right_clicking_a_tab_opens_tab_context_menu() {
+    let a = temp_dir("tab_menu_a");
+    let b = temp_dir("tab_menu_b");
+    let mut tabs = Tabs::new(vec![app_for(&a), app_for(&b)], 0);
+    tabs.strip_area = Rect::new(0, 0, 80, 1);
+    tabs.dispatch_event(Event::Mouse(MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Right),
+        column: 2,
+        row: 0,
+        modifiers: KeyModifiers::empty(),
+    }));
+    assert_eq!(tabs.active, 0);
+    assert!(
+        matches!(tabs.active_app().context_menu.as_ref().map(|m| &m.target),
+        Some(crate::app::ContextMenuTarget::Tab { root, index: 0 }) if root == &a)
+    );
     fs::remove_dir_all(&a).ok();
     fs::remove_dir_all(&b).ok();
 }
@@ -421,4 +441,35 @@ fn tab_strip_clicks_and_wheel_scroll_horizontally() {
     for dir in &dirs {
         fs::remove_dir_all(dir).ok();
     }
+}
+
+#[test]
+fn close_tabs_to_right_keeps_the_target_tab_active() {
+    let a = temp_dir("close_right_a");
+    let b = temp_dir("close_right_b");
+    let c = temp_dir("close_right_c");
+    let mut tabs = Tabs::new(vec![app_for(&a), app_for(&b), app_for(&c)], 0);
+    tabs.close_tabs_to_right(1);
+    assert_eq!(tabs.apps.len(), 2);
+    assert_eq!(tabs.active, 1);
+    assert_eq!(tabs.active_app().root, b);
+    fs::remove_dir_all(&a).ok();
+    fs::remove_dir_all(&b).ok();
+    fs::remove_dir_all(&c).ok();
+}
+
+#[test]
+fn close_other_tabs_preserves_only_the_target_tab() {
+    let a = temp_dir("close_others_a");
+    let b = temp_dir("close_others_b");
+    let c = temp_dir("close_others_c");
+    let mut tabs = Tabs::new(vec![app_for(&a), app_for(&b), app_for(&c)], 2);
+    tabs.close_other_tabs(1);
+    assert_eq!(tabs.apps.len(), 1);
+    assert_eq!(tabs.active, 0);
+    assert_eq!(tabs.active_app().root, b);
+    fs::remove_dir_all(&a).ok();
+    fs::remove_dir_all(&b).ok();
+    fs::remove_dir_all(&c).ok();
+}
 }

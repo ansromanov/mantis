@@ -87,7 +87,9 @@ impl App {
             Focus::Content => BindingScope::Content,
         };
         let k = &self.keys;
-        if pressed_in(&k.menu_bar, &key, scope)
+        if pressed_in(&k.context_menu, &key, scope) {
+            self.open_focused_context_menu();
+        } else if pressed_in(&k.menu_bar, &key, scope)
             || (key.code == crossterm::event::KeyCode::Null
                 && key.modifiers == crossterm::event::KeyModifiers::ALT)
         {

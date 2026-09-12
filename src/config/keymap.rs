@@ -5,8 +5,9 @@
 //! `pressed_in`, `bind`, `parse_binding`). Keybinding strings follow the
 //! convention `[scope:][modifier+]key` where scope is `tree` or `content`
 //! (restricting the binding to that focused panel; no scope = global),
-//! modifier is `ctrl`, `alt`, `cmd`/`super`, and key is a single character
-//! (preserving case) or a named key like `Enter`, `Up`, `PageDown`, `F5`.
+//! modifier is `ctrl`, `alt`, `cmd`/`super`, or `shift` for named special keys;
+//! key is a single character (preserving case) or a named key like `Enter`,
+//! `Up`, `PageDown`, `F5`, or `Menu`.
 //! Serde deserialization of `KeyBinding` goes through `parse_binding`; the
 //! `Keymap::default()` provides the shipped bindings, which differ between
 //! macOS (`cmd+` primaries with `ctrl+` fallbacks) and other platforms.
@@ -18,7 +19,8 @@
 //! its own palette and search, and legacy terminals (macOS Terminal.app, plain
 //! xterm, SSH) can't distinguish `Ctrl+Shift+Letter` from `Ctrl+Letter` at all.
 //! Every default binding therefore uses plain `ctrl+<lowercase letter>`,
-//! Shift via char case on unmodified keys, or named keys. Modifier+letter
+//! Shift via char case on characters and explicit modifiers on named keys,
+//! or unmodified named keys. Modifier+letter
 //! bindings are matched case-insensitively (and `parse_binding` normalizes
 //! them to lowercase), so CapsLock, a held Shift, or a config written as
 //! `ctrl+P`/`ctrl+shift+p` all resolve to the same `ctrl+p` action.
@@ -54,6 +56,8 @@ pub struct KeyBinding {
     pub code: KeyCode,
     pub ctrl: bool,
     pub alt: bool,
+    /// Shift modifier for non-character keycodes (e.g. Shift+F10).
+    pub shift: bool,
     pub super_key: bool,
     pub scope: BindingScope,
 }
@@ -89,8 +93,8 @@ fn us_shifted(c: char) -> char {
 }
 
 impl KeyBinding {
-    /// Whether a key event matches this binding. Shift is intentionally
-    /// ignored because crossterm already encodes it in the char case.
+    /// Whether a key event matches this binding. Character-key shift remains
+    /// encoded by character case; special keys can carry an explicit shift.
     ///
     /// On terminals that support the kitty keyboard protocol with
     /// `REPORT_ALTERNATE_KEYS`, the event carries alternate keycodes — the
@@ -153,6 +157,11 @@ impl KeyBinding {
             && key.modifiers.contains(KeyModifiers::CONTROL) == self.ctrl
             && key.modifiers.contains(KeyModifiers::ALT) == self.alt
             && key.modifiers.contains(KeyModifiers::SUPER) == self.super_key
+            && (matches!(
+                self.code,
+                KeyCode::Char(_) | KeyCode::Up | KeyCode::Down | KeyCode::Left | KeyCode::Right
+            ) || !self.shift
+                || key.modifiers.contains(KeyModifiers::SHIFT))
     }
 
     /// Returns a human-readable label for this binding, e.g. `"Ctrl+P"`,
@@ -181,6 +190,7 @@ impl KeyBinding {
             KeyCode::PageDown => "PageDown".to_string(),
             KeyCode::Home => "Home".to_string(),
             KeyCode::End => "End".to_string(),
+            KeyCode::Menu => "Menu".to_string(),
             KeyCode::F(n) => format!("F{n}"),
             ref other => format!("{other:?}"),
         };
@@ -191,6 +201,11 @@ impl KeyBinding {
             (false, false, true) => format!("Cmd+{key}"),
             (true, false, true) => format!("Ctrl+Cmd+{key}"),
             _ => key,
+        };
+        let base = if self.shift {
+            format!("Shift+{base}")
+        } else {
+            base
         };
         match self.scope {
             BindingScope::Global => base,
@@ -230,6 +245,7 @@ impl Keymap {
             "search_content" => &self.search_content,
             "reload" => &self.reload,
             "switch_panel" => &self.switch_panel,
+            "context_menu" => &self.context_menu,
             "file_history" => &self.file_history,
             "repo_commit_log" => &self.repo_commit_log,
             "theme_picker" => &self.theme_picker,
@@ -356,6 +372,7 @@ pub struct Keymap {
     pub search_content: Vec<KeyBinding>,
     pub reload: Vec<KeyBinding>,
     pub switch_panel: Vec<KeyBinding>,
+    pub context_menu: Vec<KeyBinding>,
     pub file_history: Vec<KeyBinding>,
     pub repo_commit_log: Vec<KeyBinding>,
     pub theme_picker: Vec<KeyBinding>,
@@ -460,6 +477,7 @@ impl Default for Keymap {
             search_content: bind(&["ctrl+f", "tree:f"]),
             reload: bind(&["ctrl+r", "F5", "tree:r"]),
             switch_panel: bind(&["Tab"]),
+            context_menu: bind(&["Menu", "shift+F10"]),
             file_history: bind(&["tree:H"]),
             repo_commit_log: bind(&["tree:L"]),
             theme_picker: bind(&["tree:t"]),
@@ -570,6 +588,7 @@ pub(crate) fn parse_binding(s: &str) -> Result<KeyBinding, String> {
 
     let mut ctrl = false;
     let mut alt = false;
+    let mut shift = false;
     let mut super_key = false;
     for m in mods {
         match m.to_ascii_lowercase().as_str() {
@@ -577,12 +596,13 @@ pub(crate) fn parse_binding(s: &str) -> Result<KeyBinding, String> {
             "alt" | "option" => alt = true,
             "meta" => alt = true,
             "cmd" | "super" | "command" => super_key = true,
-            "shift" => {}
+            "shift" => shift = true,
             other => return Err(format!("unknown modifier '{other}' in '{s}'")),
         }
     }
 
     let mut code = parse_keycode(key[0], s)?;
+    let shift = shift && !matches!(code, KeyCode::Char(_));
     // Modifier+letter bindings are case-insensitive (Ctrl+Shift combos are
     // unsupported); normalize to lowercase so `ctrl+P`, `ctrl+shift+p`, and
     // `ctrl+p` in a config all serialize and match identically.
@@ -596,6 +616,7 @@ pub(crate) fn parse_binding(s: &str) -> Result<KeyBinding, String> {
         code,
         ctrl,
         alt,
+        shift,
         super_key,
         scope,
     })
@@ -627,6 +648,7 @@ fn parse_keycode(s: &str, full: &str) -> Result<KeyCode, String> {
         "pagedown" => KeyCode::PageDown,
         "home" => KeyCode::Home,
         "end" => KeyCode::End,
+        "menu" => KeyCode::Menu,
         "space" => KeyCode::Char(' '),
         _ => return Err(format!("unknown key '{s}' in '{full}'")),
     };

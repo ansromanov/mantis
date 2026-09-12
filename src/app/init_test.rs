@@ -20,6 +20,12 @@ fn new_app_starts_with_search_bar_closed() {
     assert!(app.statusbar_segments.is_empty());
 }
 
+#[test]
+fn new_app_starts_with_empty_statusbar_geometry() {
+    let app = App::new(std::path::PathBuf::from("."), Config::default(), None, None).unwrap();
+    assert_eq!(app.statusbar_area, ratatui::layout::Rect::default());
+}
+
 fn temp_dir() -> PathBuf {
     static COUNTER: AtomicUsize = AtomicUsize::new(0);
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
