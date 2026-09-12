@@ -107,7 +107,10 @@ Open more than one project at once: pass multiple paths on the command line
 (`mantis dir1 dir2`), or use the command palette's `Open project as new tab`
 (type a directory path, `Enter` to open it, `Esc` to cancel). A tab strip
 appears above the tree/content panes whenever more than one tab is open —
-click a tab to switch to it, or its `×` to close it.
+click a tab to switch to it, or its `×` to close it. When many tabs are open,
+tab labels shrink toward a minimum length and the strip scrolls horizontally to
+keep the active tab visible; click the `‹`/`›` edge affordances or use the mouse
+wheel on the tab strip to scroll through hidden tabs.
 
 | Key              | Action                        |
 | ---------------- | ------------------------------ |

@@ -66,6 +66,14 @@ fn every_palette_action_has_one_menu_group_and_menu_bar_has_a_keymap_action() {
         );
     }
     assert!(ACTIONS.iter().any(|action| action.id == "menu_bar"));
+    assert_eq!(
+        ACTIONS
+            .iter()
+            .find(|action| action.id == "select_tab")
+            .map(|action| action.menu),
+        Some(None),
+        "select_tab is key-only and has no menu entry"
+    );
 }
 
 /// Every `Keymap` field that represents a real bound action, by its canonical
@@ -146,7 +154,7 @@ const KEYMAP_FIELD_ACTION_IDS: &[&str] = &[
 /// Keymap-only actions that intentionally have no palette entry. Their help
 /// coverage, when present, is captured by the `.help` field in `ACTIONS`.
 /// Listed here so parity checks can distinguish them from missing actions.
-const NAV_ONLY_ALLOWLIST: &[&str] = &[
+const KEYMAP_ONLY_ALLOWLIST: &[&str] = &[
     "nav_up",
     "nav_down",
     "tree_expand",
@@ -176,24 +184,23 @@ fn every_keymap_field_has_an_actions_entry() {
 }
 
 #[test]
-fn nav_only_allowlist_ids_are_real_keymap_fields() {
+fn keymap_only_allowlist_ids_are_real_keymap_fields() {
     // Guards the allowlist itself against typos / stale entries.
-    for &id in NAV_ONLY_ALLOWLIST {
+    for &id in KEYMAP_ONLY_ALLOWLIST {
         assert!(
             KEYMAP_FIELD_ACTION_IDS.contains(&id),
-            "'{id}' in NAV_ONLY_ALLOWLIST is not a known keymap field id",
+            "'{id}' in KEYMAP_ONLY_ALLOWLIST is not a known keymap field id",
         );
     }
 }
 
 #[test]
-fn nav_only_allowlist_entries_have_no_palette_entry() {
-    // Pure-navigation actions should not clutter the command palette.
-    for &id in NAV_ONLY_ALLOWLIST {
+fn keymap_only_allowlist_entries_have_no_palette_entry() {
+    for &id in KEYMAP_ONLY_ALLOWLIST {
         if let Some(action) = ACTIONS.iter().find(|a| a.id == id) {
             assert!(
                 action.palette.is_none(),
-                "'{id}' is in NAV_ONLY_ALLOWLIST but has a palette entry \
+                "'{id}' is in KEYMAP_ONLY_ALLOWLIST but has a palette entry \
                  ({:?}) - remove it from the allowlist or drop its palette name",
                 action.palette,
             );
@@ -202,12 +209,12 @@ fn nav_only_allowlist_entries_have_no_palette_entry() {
 }
 
 #[test]
-fn every_bound_non_nav_action_has_a_palette_entry() {
-    // Every keymap field not covered by the pure-navigation allowlist must be
+fn every_bound_non_allowlisted_action_has_a_palette_entry() {
+    // Every keymap field not covered by the keymap-only allowlist must be
     // reachable from the command palette (this is the actual bug the issue
     // reported: keys bound but not discoverable via Ctrl-P).
     for &id in KEYMAP_FIELD_ACTION_IDS {
-        if NAV_ONLY_ALLOWLIST.contains(&id) {
+        if KEYMAP_ONLY_ALLOWLIST.contains(&id) {
             continue;
         }
         let action = ACTIONS

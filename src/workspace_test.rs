@@ -2,7 +2,7 @@ use super::*;
 use std::fs;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use crossterm::event::KeyModifiers;
+use crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 
 use crate::config::Config;
 
@@ -353,4 +353,72 @@ fn clicking_outside_tab_picker_closes_it() {
     }));
     assert!(tabs.tab_picker.is_none());
     fs::remove_dir_all(root).ok();
+}
+
+#[test]
+fn active_tab_stays_visible_while_switching_and_opening_tabs() {
+    let dirs: Vec<_> = (0..10).map(|i| temp_dir(&format!("visible_{i}"))).collect();
+    let apps: Vec<_> = dirs.iter().map(|dir| app_for(dir)).collect();
+    let mut tabs = Tabs::new(apps, 0);
+    tabs.strip_area = Rect::new(0, 0, 40, 1);
+
+    for _ in 0..tabs.apps.len() * 2 {
+        tabs.next_tab();
+        assert!(crate::ui::tabstrip::is_tab_visible(
+            &tabs,
+            tabs.first_visible,
+            tabs.active,
+            tabs.strip_area.width
+        ));
+    }
+
+    let new_dir = temp_dir("visible_new");
+    tabs.open_tab(new_dir.clone()).unwrap();
+    assert!(crate::ui::tabstrip::is_tab_visible(
+        &tabs,
+        tabs.first_visible,
+        tabs.active,
+        tabs.strip_area.width
+    ));
+    fs::remove_dir_all(&new_dir).ok();
+    for dir in &dirs {
+        fs::remove_dir_all(dir).ok();
+    }
+}
+
+#[test]
+fn tab_strip_clicks_and_wheel_scroll_horizontally() {
+    let dirs: Vec<_> = (0..6).map(|i| temp_dir(&format!("scroll_{i}"))).collect();
+    let apps: Vec<_> = dirs.iter().map(|dir| app_for(dir)).collect();
+    let mut tabs = Tabs::new(apps, 2);
+    tabs.strip_area = Rect::new(0, 0, 30, 1);
+    tabs.first_visible = 2;
+
+    tabs.dispatch_event(Event::Mouse(MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: 0,
+        row: 0,
+        modifiers: KeyModifiers::empty(),
+    }));
+    assert_eq!(tabs.first_visible, 1);
+
+    tabs.dispatch_event(Event::Mouse(MouseEvent {
+        kind: MouseEventKind::ScrollDown,
+        column: 10,
+        row: 0,
+        modifiers: KeyModifiers::empty(),
+    }));
+    assert_eq!(tabs.first_visible, 2);
+
+    tabs.dispatch_event(Event::Mouse(MouseEvent {
+        kind: MouseEventKind::ScrollUp,
+        column: 10,
+        row: 0,
+        modifiers: KeyModifiers::empty(),
+    }));
+    assert_eq!(tabs.first_visible, 1);
+
+    for dir in &dirs {
+        fs::remove_dir_all(dir).ok();
+    }
 }
