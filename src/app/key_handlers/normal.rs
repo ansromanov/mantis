@@ -1,8 +1,9 @@
 //! Key handling when no overlay is open.
 //!
 //! `handle_normal_key` dispatches the main editing surface: global actions
-//! (quit, help, toggle hidden files, reload, open the search/history/theme/
-//! recent-files/command overlays, theme cycling, git-mode toggles) plus
+//! (quit, help, open the menu bar, toggle hidden files, reload, open the
+//! search/history/theme/recent-files/command overlays, theme cycling,
+//! git-mode toggles) plus
 //! focus-specific movement that it forwards to the tree or content handlers
 //! based on `App::focus`. It also handles the entry into visual-line mode and
 //! clearing an active text selection. This is the busiest handler in the app;
@@ -86,7 +87,12 @@ impl App {
             Focus::Content => BindingScope::Content,
         };
         let k = &self.keys;
-        if pressed_in(&k.quit, &key, scope) {
+        if pressed_in(&k.menu_bar, &key, scope)
+            || (key.code == crossterm::event::KeyCode::Null
+                && key.modifiers == crossterm::event::KeyModifiers::ALT)
+        {
+            self.open_menu_bar();
+        } else if pressed_in(&k.quit, &key, scope) {
             self.should_quit = true;
         } else if pressed_in(&k.help, &key, scope) {
             self.show_help = !self.show_help;

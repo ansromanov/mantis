@@ -14,7 +14,9 @@ mantis --help             # print help (or -h)
 mantis --version          # print version (or -V)
 ```
 
-Press `?` or `F1` for in-app help, and `q` to quit.
+Press `?` or `F1` for in-app help, `F10` for the action menu, and `q` to quit.
+The menu groups palette actions by area and shows each action's current keybinding.
+Set `[ui] menu_bar = true` in `mantis.toml` to keep its row visible for mouse use.
 
 ## Pager mode
 
@@ -142,6 +144,7 @@ These work no matter which panel is focused.
 | ---------------------- | ----------------------- |
 | `Ctrl+c`, `q` (tree)   | Quit                    |
 | `F1`, `?`              | Toggle help             |
+| `F10`                  | Open the action menu    |
 | `Ctrl+P`               | Command palette (fuzzy-find any action) |
 | `Tab`                  | Switch panel            |
 | `/`                    | Tree filter (tree) / in-file search (content) |
@@ -434,6 +437,10 @@ When viewing log files (detected via `.log` extension or level/timestamp sniffin
 - Press `&` to open the filter bar. Typing a query will filter the visible log lines to only those containing the query.
 
 ## Mouse
+
+When `[ui] menu_bar = true`, hover over a menu name to open its dropdown and
+click an action to run it. Unavailable actions appear dimmed. F10 opens the
+same menu even when the persistent row is disabled.
 
 - **Click** a tree row to select it — opens a file, or folds/unfolds a
   directory.

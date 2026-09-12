@@ -42,7 +42,7 @@ launch.
 
 Options are grouped into tables by area. A few general keys sit at the top
 level (they must appear before the first `[table]` header); everything else
-lives under `[tree]`, `[content]`, `[search]`, or `[git]`.
+lives under `[tree]`, `[content]`, `[search]`, `[git]`, or `[ui]`.
 
 > **Migrated from flat keys?** Older configs used flat top-level keys
 > (`show_hidden`, `tree_width`, `git_status`, …). Those still load — they are
@@ -96,6 +96,9 @@ ignore_gitignore = false     # respect .gitignore when listing files
 [git.diff]
 mode = "all"                 # default diff source: "all" (vs HEAD) | "staged" | "unstaged"
 side_by_side = false         # start the diff view in side-by-side layout
+
+[ui]
+menu_bar = false             # keep the action menu row visible; F10 opens it either way
 
 [telemetry]
 enabled = false              # anonymous, local-only usage log — see Telemetry & Bug Reports

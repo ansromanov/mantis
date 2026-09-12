@@ -73,6 +73,17 @@ fn esc_closes_theme_picker_even_if_a_stale_context_menu_exists() {
 }
 
 #[test]
+fn menu_bar_consumes_escape_before_normal_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_menu_bar();
+    app.handle_key(key(KeyCode::Esc));
+    assert!(app.menu_bar_state.is_none());
+    assert!(!app.should_quit);
+    fs::remove_dir_all(root).ok();
+}
+
+#[test]
 fn q_closes_about() {
     let root = temp_tree();
     let mut app = app_for(&root);

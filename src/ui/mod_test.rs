@@ -50,6 +50,7 @@ fn render(app: &mut App) -> Vec<String> {
 fn draw_no_overlay() {
     let mut app = make_app();
     let rows = render(&mut app);
+    assert_eq!(app.menu_bar_area, ratatui::layout::Rect::default());
     let joined = rows.join("\n");
     assert!(joined.contains("mantis"));
     // The version badge (P_VER, highest priority) fills the 80-char status bar;
@@ -58,6 +59,24 @@ fn draw_no_overlay() {
         rows[29].contains(&format!("v{}", env!("CARGO_PKG_VERSION"))),
         "status bar should show version string"
     );
+}
+
+#[test]
+fn menu_bar_uses_an_extra_row_and_seven_row_minimum() {
+    let mut app = make_app();
+    app.config.ui.menu_bar = true;
+    let backend = TestBackend::new(80, 7);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|f| super::draw(f, &mut app)).unwrap();
+    assert_eq!(app.menu_bar_area.y, 0);
+    assert_eq!(app.menu_bar_area.height, 1);
+    assert!(buffer_rows(&terminal)[0].contains("General"));
+
+    let backend = TestBackend::new(80, 6);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|f| super::draw(f, &mut app)).unwrap();
+    let text = buffer_rows(&terminal).join("\n");
+    assert!(text.contains("at least 7 rows"));
 }
 
 #[test]

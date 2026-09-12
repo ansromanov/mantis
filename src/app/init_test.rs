@@ -881,6 +881,9 @@ fn app_new_starts_with_no_context_menu() {
         ratatui::layout::Rect::default(),
         "App::new must start with a default context-menu hit area"
     );
+    assert!(app.menu_bar_state.is_none());
+    assert_eq!(app.menu_bar_area, ratatui::layout::Rect::default());
+    assert_eq!(app.menu_dropdown_area, ratatui::layout::Rect::default());
     fs::remove_dir_all(&root).ok();
 }
 

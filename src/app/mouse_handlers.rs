@@ -6,9 +6,10 @@
 //! content panel by hit-testing the `Rect`s recorded during the last render. It
 //! handles left-click selection, drag-selection of text, splitter dragging to
 //! resize the tree pane, scrollbar dragging, wheel scrolling, double-click to
-//! open a picker result, and right-click to open the context menu. While the
-//! context menu is open, all pointer events route to its own handler so item
-//! clicks and click-away dismissal work without falling through to the panels.
+//! open a picker result, and right-click to open the context menu. The optional
+//! action-menu row handles hover and click before panel routing. While either
+//! menu is open, pointer events route to its own handler so item clicks and
+//! dismissal work without falling through to the panels.
 //! All coordinate math must account for the panels' scroll offsets, which are
 //! also captured at render time.
 
@@ -149,6 +150,14 @@ impl App {
         }
         if self.context_menu.is_some() {
             self.handle_context_menu_mouse(ev);
+            return;
+        }
+        if self.menu_bar_state.is_some()
+            || (self.config.ui.menu_bar
+                && (rect_contains(self.menu_bar_area, ev.column, ev.row)
+                    || matches!(ev.kind, MouseEventKind::Moved)))
+        {
+            self.handle_menu_bar_mouse(ev);
             return;
         }
         if self.filter_bar.is_some() {

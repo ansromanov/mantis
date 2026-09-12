@@ -1848,3 +1848,12 @@ fn toggle_table_view_key_toggles_show_csv_table() {
 
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn f10_opens_the_action_menu_from_normal_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(key(KeyCode::F(10)));
+    assert!(app.menu_bar_state.is_some());
+    fs::remove_dir_all(&root).ok();
+}

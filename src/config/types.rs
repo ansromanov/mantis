@@ -1,10 +1,11 @@
 //! Config struct definitions, serde defaults, and the one-time legacy-field migration.
 //!
-//! Every user-tunable option is represented here with `#[serde(default)]` so partial
-//! configs and older files still load cleanly. The embedded `mantis.toml` is the
-//! fully-commented source of truth; this module only provides the Rust data model.
-//! New fields must match their default in `Config::default()` so the sparse-save
-//! round-trip is lossless.
+//! Every user-tunable option is represented here with `#[serde(default)]` so
+//! partial configs and older files still load cleanly. The embedded
+//! `mantis.toml` is the fully-commented source of truth; this module provides
+//! the Rust data model for grouped settings such as tree, content, tabs, and UI.
+//! New fields must match their default in `Config::default()` so sparse saves
+//! round-trip without emitting unchanged defaults.
 
 use std::collections::HashMap;
 
@@ -133,6 +134,14 @@ impl Default for SearchConfig {
             keep_query: false,
         }
     }
+}
+
+/// Menu-bar configuration, grouped under `[ui]` in the TOML.
+#[derive(Default, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(default)]
+pub struct UiConfig {
+    /// Keep the action menu row visible even when its dropdown is closed.
+    pub menu_bar: bool,
 }
 
 /// Git-related configuration, grouped under `[git]` in the TOML.
@@ -291,6 +300,8 @@ pub struct Config {
     pub telemetry: TelemetryConfig,
     /// Grouped tabs/workspace settings.
     pub tabs: TabsConfig,
+    /// User-interface chrome settings.
+    pub ui: UiConfig,
 
     // --- deprecated flat keys (read for backward-compat; never written) ---
     #[serde(default, skip_serializing, rename = "git_status")]
@@ -355,6 +366,7 @@ impl Default for Config {
             updates: UpdatesConfig::default(),
             telemetry: TelemetryConfig::default(),
             tabs: TabsConfig::default(),
+            ui: UiConfig::default(),
 
             legacy_git_status: None,
             legacy_git_show_deleted: None,

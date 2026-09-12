@@ -2,8 +2,8 @@
 //!
 //! `handle_key` is the single funnel for every key event. It first filters out
 //! key-release events (Windows reports both press and release) so each action
-//! fires once, then routes by precedence: modal overlays (about, help, theme
-//! picker, history, recent files, command palette, search) consume input first,
+//! fires once, then routes by precedence: modal overlays (about, help, menu,
+//! theme picker, history, recent files, command palette, search) consume input first,
 //! and only when none is active does control fall through to the normal
 //! tree/content handler. The actual handling lives in the sibling submodules
 //! wired up here: `normal` (no overlay), `overlay` (search/picker editing),
@@ -151,6 +151,8 @@ impl App {
         }
         if self.context_menu.is_some() {
             self.handle_context_menu_key(key);
+        } else if self.menu_bar_state.is_some() {
+            self.handle_menu_bar_key(key);
         } else if self.plugin_picker.is_some() {
             self.handle_plugin_key(key);
         } else if self.command_palette.is_some() {

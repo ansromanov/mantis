@@ -36,6 +36,29 @@ fn tab_actions_are_registered_with_palette_entries() {
     }
 }
 
+#[test]
+fn every_palette_action_has_one_menu_group_and_menu_bar_has_a_keymap_action() {
+    let menu_groups = [
+        "General", "View", "Git", "Copy", "Navigate", "Tree", "Tabs", "Safety",
+    ];
+    for action in ACTIONS.iter().filter(|action| action.palette.is_some()) {
+        let (menu, _) = action
+            .menu
+            .unwrap_or_else(|| panic!("{} has no menu placement", action.id));
+        assert!(menu_groups.contains(&menu), "unknown menu group {menu}");
+        assert_eq!(
+            ACTIONS
+                .iter()
+                .filter(|candidate| { candidate.id == action.id && candidate.menu.is_some() })
+                .count(),
+            1,
+            "{} should have one menu placement",
+            action.id
+        );
+    }
+    assert!(ACTIONS.iter().any(|action| action.id == "menu_bar"));
+}
+
 /// Every `Keymap` field that represents a real bound action, by its canonical
 /// action id (matching the field name, or the id `Keymap::bindings_for_action`
 /// maps to that field - see `config::keymap`). Kept in sync by hand since Rust
@@ -45,6 +68,7 @@ fn tab_actions_are_registered_with_palette_entries() {
 const KEYMAP_FIELD_ACTION_IDS: &[&str] = &[
     "quit",
     "help",
+    "menu_bar",
     "toggle_hidden",
     "search_files",
     "find_files",

@@ -1,9 +1,9 @@
 //! ratatui rendering orchestration: the top-level `draw` entry point.
 //!
 //! `draw` is called once per frame and lays out the whole screen: it paints the
-//! themed background, splits the area into the tree pane, content pane, and
-//! status bar, and renders each by delegating to the `tree`, `content`, and
-//! `statusbar` submodules. Modal overlays (help, search, history, theme picker,
+//! themed background, splits the area into the optional menu row, tree pane,
+//! content pane, and status bar, and renders each by delegating to `tree`,
+//! `content`, and `statusbar` submodules. Modal overlays (help, search, history, theme picker,
 //! command palette, about, blame) are drawn last, on top, following the same
 //! precedence chain the input handlers use. Rendering is also where panel
 //! geometry (`Rect`s and scroll offsets) is recorded back onto `App` for mouse
@@ -19,6 +19,7 @@ use ratatui::{
 use crate::app::App;
 
 mod content;
+pub(crate) mod menu_bar;
 pub(crate) mod popups;
 mod statusbar;
 pub(crate) mod tabstrip;
@@ -58,27 +59,46 @@ fn draw_area(f: &mut Frame, app: &mut App, area: Rect) {
         area,
     );
 
-    let vert = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Min(0), Constraint::Length(1)])
-        .split(area);
+    let menu_visible = app.config.ui.menu_bar || app.menu_bar_state.is_some();
+    let min_height = MIN_LAYOUT_HEIGHT + u16::from(menu_visible);
+    let vert = if menu_visible {
+        Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Min(0),
+                Constraint::Length(1),
+            ])
+            .split(area)
+    } else {
+        Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Min(0), Constraint::Length(1)])
+            .split(area)
+    };
+    let menu_area = if menu_visible {
+        vert[0]
+    } else {
+        app.menu_bar_area = Rect::default();
+        app.menu_dropdown_area = Rect::default();
+        Rect::default()
+    };
+    let body_area = if menu_visible { vert[1] } else { vert[0] };
+    let status_area = if menu_visible { vert[2] } else { vert[1] };
 
-    if area.width < MIN_LAYOUT_WIDTH || area.height < MIN_LAYOUT_HEIGHT {
+    if area.width < MIN_LAYOUT_WIDTH || area.height < min_height {
         app.tree_area = Rect::default();
         app.content_area = Rect::default();
         app.splitter_area = Rect::default();
-        let resize_message = match (
-            area.width < MIN_LAYOUT_WIDTH,
-            area.height < MIN_LAYOUT_HEIGHT,
-        ) {
+        let resize_message = match (area.width < MIN_LAYOUT_WIDTH, area.height < min_height) {
             (true, true) => format!(
-                "Terminal too small: {MIN_LAYOUT_WIDTH} columns x {MIN_LAYOUT_HEIGHT} rows minimum."
+                "Terminal too small: {MIN_LAYOUT_WIDTH} columns x {min_height} rows minimum."
             ),
             (true, false) => {
                 format!("Terminal too narrow. Resize to at least {MIN_LAYOUT_WIDTH} columns.")
             }
             (false, true) => {
-                format!("Terminal too short. Resize to at least {MIN_LAYOUT_HEIGHT} rows.")
+                format!("Terminal too short. Resize to at least {min_height} rows.")
             }
             (false, false) => unreachable!(),
         };
@@ -86,9 +106,12 @@ fn draw_area(f: &mut Frame, app: &mut App, area: Rect) {
             Paragraph::new(resize_message)
                 .alignment(Alignment::Center)
                 .style(Style::default().fg(app.theme.text)),
-            vert[0],
+            body_area,
         );
-        statusbar::draw_statusbar(f, app, vert[1]);
+        statusbar::draw_statusbar(f, app, status_area);
+        if menu_visible {
+            menu_bar::draw_menu_bar(f, app, menu_area);
+        }
         return;
     }
 
@@ -99,19 +122,19 @@ fn draw_area(f: &mut Frame, app: &mut App, area: Rect) {
             Constraint::Percentage(tree_width),
             Constraint::Percentage(100 - tree_width),
         ])
-        .split(vert[0]);
+        .split(body_area);
 
     // Record the 2-column splitter boundary for mouse hit-testing.
     app.splitter_area = Rect {
         x: horiz[0].right().saturating_sub(1),
-        y: vert[0].y,
+        y: body_area.y,
         width: 2,
-        height: vert[0].height,
+        height: body_area.height,
     };
 
     tree::draw_tree(f, app, horiz[0]);
     content::draw_content(f, app, horiz[1]);
-    statusbar::draw_statusbar(f, app, vert[1]);
+    statusbar::draw_statusbar(f, app, status_area);
 
     if app.in_file_search_open || app.json_query.is_some() {
         popups::draw_in_file_search(f, app, horiz[1]);
@@ -191,6 +214,10 @@ fn draw_area(f: &mut Frame, app: &mut App, area: Rect) {
 
     if app.show_welcome {
         popups::draw_welcome(f, app, area);
+    }
+
+    if menu_visible {
+        menu_bar::draw_menu_bar(f, app, menu_area);
     }
 }
 

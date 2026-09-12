@@ -2,7 +2,7 @@
 //!
 //! `App` holds the file tree, content/diff buffers, every overlay's state
 //! (search, history, theme picker, plugin picker, command palette, recent files,
-//! help, about, blame, goto line), the
+//! action menu, help, about, blame, goto line), the
 //! resolved theme and keymap, and the geometry captured during the last render
 //! so mouse handlers can hit-test clicks. Construction (`App::new`) walks the
 //! root, loads git status, and opens the first file; `reload`/`tick` keep the
@@ -62,6 +62,7 @@ mod fold;
 mod init;
 mod key_handlers;
 mod loader;
+pub(crate) mod menu_bar;
 mod mouse_handlers;
 mod navigation;
 mod pager;
@@ -219,6 +220,12 @@ pub struct App {
     /// Hit area of the context menu recorded during the last render, used to
     /// hit-test item clicks and click-away dismissal.
     pub context_menu_area: ratatui::layout::Rect,
+    /// Keyboard or pointer-opened action menu dropdown state.
+    pub(crate) menu_bar_state: Option<menu_bar::MenuBarState>,
+    /// Hit area of the optional menu row.
+    pub(crate) menu_bar_area: Rect,
+    /// Hit area of the currently open menu dropdown.
+    pub(crate) menu_dropdown_area: Rect,
     pub show_hidden: bool,
     pub ignore_gitignore: bool,
     /// Monotonically increasing counter bumped every time the tree is rebuilt.

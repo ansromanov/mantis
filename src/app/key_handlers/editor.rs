@@ -1,9 +1,10 @@
 //! Command-palette dispatch and external-editor integration for `App`.
 //!
 //! `dispatch_command` maps a selected command-palette entry's `action_id` to the
-//! matching `App` method, so the palette and direct keybindings share one set of
-//! canonical ids from `crate::actions::ACTIONS` - no more `open_x`/`x_picker`
-//! aliasing between this match and `Keymap::bindings_for_action`. This module
+//! shared `dispatch_action_id` path, which also serves the menu bar. The palette
+//! and menu therefore share one set of canonical ids from
+//! `crate::actions::ACTIONS`, avoiding `open_x`/`x_picker` aliasing between this
+//! match and `Keymap::bindings_for_action`. This module
 //! also owns suspending the TUI to launch the user's `$EDITOR` on the current
 //! file: it tears down raw mode and the alternate screen, runs the editor,
 //! then restores the terminal and flags `needs_clear` so the next frame
@@ -39,33 +40,49 @@ impl App {
             .command_palette
             .as_ref()
             .and_then(|p| p.selected_command().map(|c| c.action_id.clone()));
-        if let Some(id) = action_id.as_deref() {
-            if let Err(reason) = self.check_applicability(id) {
-                let name = crate::command_palette::COMMANDS
-                    .iter()
-                    .find(|c| c.action_id == id)
-                    .map(|c| c.name.as_str())
-                    .unwrap_or(id);
-                self.set_status(format!("{}: {}", name, reason));
+        match action_id {
+            Some(id) => self.dispatch_action_id(&id, crate::telemetry::ActionSource::Palette),
+            None => {
                 self.command_palette = None;
-                return true;
-            }
-            // Usage stats and telemetry record canonical action ids only;
-            // plugin-contributed command ids are not in ACTIONS and are
-            // skipped so they can't consume the palette's pinned-frequent
-            // slots (ranked_base_order only knows built-in commands).
-            if let Some(spec) = crate::actions::ACTIONS.iter().find(|a| a.id == id) {
-                self.command_usage.record(spec.id);
-                self.command_usage.save();
-                self.telemetry
-                    .record(crate::telemetry::TelemetryEvent::ActionInvoked {
-                        action: spec.id,
-                        source: crate::telemetry::ActionSource::Palette,
-                    });
+                false
             }
         }
+    }
+
+    /// Dispatches a canonical registry action from a non-palette surface.
+    /// Applicability, usage recording, and telemetry stay shared with the
+    /// command palette so menu items have identical behavior.
+    pub(crate) fn dispatch_action_id(
+        &mut self,
+        id: &str,
+        source: crate::telemetry::ActionSource,
+    ) -> bool {
+        if let Err(reason) = self.check_applicability(id) {
+            let name = crate::actions::ACTIONS
+                .iter()
+                .find(|action| action.id == id)
+                .and_then(|action| action.palette)
+                .unwrap_or(id);
+            self.set_status(format!("{}: {}", name, reason));
+            self.command_palette = None;
+            return true;
+        }
+        // Usage stats and telemetry record canonical action ids only;
+        // plugin-contributed command ids are not in ACTIONS.
+        if let Some(spec) = crate::actions::ACTIONS
+            .iter()
+            .find(|action| action.id == id)
+        {
+            self.command_usage.record(spec.id);
+            self.command_usage.save();
+            self.telemetry
+                .record(crate::telemetry::TelemetryEvent::ActionInvoked {
+                    action: spec.id,
+                    source,
+                });
+        }
         self.command_palette = None;
-        match action_id.as_deref() {
+        match Some(id) {
             Some("help") => {
                 self.show_help = !self.show_help;
                 true

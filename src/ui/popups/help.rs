@@ -306,6 +306,7 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
             rows.push(gap.clone());
             rows.push(section("Essential Keys"));
             rows.push(row_key("help"));
+            rows.push(row_key("menu_bar"));
             rows.push(row_key("command_palette"));
             rows.push(row_key("switch_panel"));
             rows.push(row_key("quit"));

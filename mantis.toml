@@ -10,7 +10,7 @@
 # overrides the global config.
 #
 # Sections below: [general] keys first (must precede any table), then
-# [tree] [content] [search] [git] [statusbar] [keys] [theme] [plugins].
+# [tree] [content] [search] [git] [statusbar] [ui] [keys] [theme] [plugins].
 # ============================================================================
 
 
@@ -86,6 +86,13 @@ side_by_side = false         # start the diff view in side-by-side layout
 # right = ["lnum", "type", "git", "version", "update"]
 
 
+# --- user interface --------------------------------------------------------
+# Optional interface chrome. The keyboard shortcut can open the menu while
+# this is false; enabling it keeps the row visible for mouse users.
+[ui]
+menu_bar = false              # keep the action menu row visible
+
+
 # --- updates ----------------------------------------------------------------
 # Optional background update check.
 [updates]
@@ -117,6 +124,7 @@ restore_on_launch = true     # reopen last session's tabs when launched with no 
 # global
 quit = ["q", "ctrl+c"]
 help = ["?"]
+menu_bar = ["F10"]
 command_palette = ["ctrl+p"]
 reload = ["r"]
 switch_panel = ["Tab"]

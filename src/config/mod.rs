@@ -10,8 +10,8 @@
 //! which emits a *sparse* override file (changed-from-default keys only).
 //!
 //! Sub-modules:
-//! - `types` — `Config` and grouped sub-configs (`TreeConfig`, `ContentConfig`, …)
-//!   with serde defaults and one-time legacy-field migration.
+//! - `types` — `Config` and grouped sub-configs (`TreeConfig`, `ContentConfig`,
+//!   `UiConfig`, …) with serde defaults and one-time legacy-field migration.
 //! - `keymap` — `KeyBinding`, `Keymap`, parsing (`parse_binding`, `bind`),
 //!   and the `pressed` matcher.
 //! - `validate` — schema validation for unknown-key detection.
@@ -30,6 +30,8 @@ pub(crate) mod validate;
 #[cfg_attr(not(test), allow(unused_imports))]
 pub(crate) use keymap::bind;
 pub use keymap::{pressed, pressed_in, BindingScope, Keymap};
+#[allow(unused_imports)]
+pub use types::UiConfig;
 pub use types::{Config, GeneralConfig, StatusBarConfig};
 // Only referenced in test struct literals.
 #[cfg_attr(not(test), allow(unused_imports))]

@@ -221,3 +221,9 @@ fn events_contain_only_whitelisted_keys() {
         }
     }
 }
+
+#[test]
+fn menu_action_source_serializes_as_menu() {
+    let source = serde_json::to_value(super::ActionSource::Menu).unwrap();
+    assert_eq!(source, serde_json::Value::String("menu".to_string()));
+}
