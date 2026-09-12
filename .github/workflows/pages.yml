@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - docs/**
+      - media/**
       - .github/workflows/pages.yml
 
   workflow_dispatch:
@@ -31,6 +32,13 @@ jobs:
           mkdir -p "$HOME/.local/bin"
           tar xz -C "$HOME/.local/bin" -f /tmp/mdbook.tgz
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Stage images for mdBook
+        # mdBook only copies files under docs/src, so repository images have to
+        # be staged there before the build. Mirrors `just docs`.
+        run: |
+          rm -rf docs/src/media
+          cp -R media docs/src/media
 
       - name: Build docs
         run: mdbook build docs

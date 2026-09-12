@@ -5,6 +5,9 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
+        # Multi-document YAML (`---` separators) is normal for Kubernetes
+        # manifests, including the screenshot fixtures under docs/tapes.
+        args: [--allow-multiple-documents]
       - id: check-added-large-files
       - id: check-merge-conflict
       - id: detect-private-key

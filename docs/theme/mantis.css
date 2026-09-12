@@ -1,0 +1,356 @@
+/* mantis docs — typography and readability refinements.
+ *
+ * Loaded via `additional-css` in book.toml, on top of mdBook 0.5.x's own
+ * stylesheets. It only overrides presentation: no template or structural
+ * changes, so an mdBook upgrade cannot break the layout — at worst a rule
+ * stops applying.
+ *
+ * mdBook sets the root font-size to 62.5%, so 1rem = 10px throughout.
+ */
+
+/* ---------------------------------------------------------------- tokens */
+
+:root {
+    /* A wider measure than mdBook's default, still within the 60–75
+       character comfortable-reading band at the body size set below. */
+    --content-max-width: 78rem;
+
+    --mantis-sans: system-ui, -apple-system, "Segoe UI", "Open Sans",
+        Helvetica, Arial, sans-serif;
+    --mantis-mono: ui-monospace, "SF Mono", SFMono-Regular, "JetBrains Mono",
+        "Cascadia Mono", Menlo, Consolas, monospace;
+
+    --mantis-body-size: 1.72rem;
+    --mantis-body-leading: 1.7;
+
+    /* Vertical rhythm: headings take more space above than below, so a
+       section reads as attached to the text under it. */
+    --mantis-space-above: 3.6rem;
+    --mantis-space-below: 1.2rem;
+}
+
+/* ------------------------------------------------------------------ body */
+
+html {
+    font-family: var(--mantis-sans);
+    /* Kerning and ligatures are worth having; contextual alternates are not
+       worth the surprises in a technical document. */
+    font-kerning: normal;
+    font-variant-ligatures: common-ligatures;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+.content {
+    font-size: var(--mantis-body-size);
+    line-height: var(--mantis-body-leading);
+    /* Hyphenation off: hyphenated identifiers and flags read badly broken. */
+    hyphens: none;
+}
+
+.content p,
+.content li {
+    /* Slightly looser than mdBook's 1.45 — long technical sentences need
+       the extra room to stay scannable. */
+    line-height: var(--mantis-body-leading);
+}
+
+.content p {
+    margin: 0 0 1.6rem;
+}
+
+/* Opening paragraph of a page carries a touch more weight. */
+.content > main > p:first-of-type {
+    font-size: 1.85rem;
+    line-height: 1.65;
+    color: var(--fg);
+    opacity: 0.92;
+}
+
+/* -------------------------------------------------------------- headings */
+
+.content h1,
+.content h2,
+.content h3,
+.content h4,
+.content h5,
+.content h6 {
+    font-family: var(--mantis-sans);
+    font-weight: 650;
+    letter-spacing: -0.012em;
+    line-height: 1.25;
+    margin: var(--mantis-space-above) 0 var(--mantis-space-below);
+    scroll-margin-top: calc(var(--menu-bar-height) + 1.5rem);
+}
+
+.content h1 {
+    font-size: 3.4rem;
+    letter-spacing: -0.02em;
+    margin-top: 1.2rem;
+    margin-bottom: 2.4rem;
+}
+
+.content h2 {
+    font-size: 2.5rem;
+    padding-bottom: 0.7rem;
+    border-bottom: 1px solid var(--table-border-color);
+}
+
+.content h3 {
+    font-size: 2rem;
+}
+
+.content h4 {
+    font-size: 1.75rem;
+    font-weight: 600;
+}
+
+.content h5,
+.content h6 {
+    font-size: 1.6rem;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+/* First heading on a page shouldn't push a big gap under the page chrome. */
+.content > main > :is(h1, h2, h3):first-child {
+    margin-top: 0;
+}
+
+/* mdBook's anchor links: keep them out of the way until hover. */
+.content :is(h1, h2, h3, h4, h5, h6) .header-anchor,
+.content :is(h1, h2, h3, h4, h5, h6) a.header {
+    color: inherit;
+    text-decoration: none;
+}
+
+/* ----------------------------------------------------------------- links */
+
+.content main a,
+.content main a:visited {
+    color: var(--links);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.18em;
+    /* Descenders shouldn't collide with the rule. */
+    text-decoration-skip-ink: auto;
+}
+
+.content main a:hover {
+    text-decoration-thickness: 2px;
+}
+
+/* Heading anchors and in-code links stay unadorned. */
+.content main :is(h1, h2, h3, h4, h5, h6) a,
+.content main pre a {
+    text-decoration: none;
+}
+
+/* ------------------------------------------------------------------ code */
+
+:root {
+    --code-font-size: 0.92em;
+}
+
+.content code {
+    font-family: var(--mantis-mono);
+    font-variant-ligatures: none;
+    font-feature-settings: "calt" 0;
+}
+
+/* Inline code: a quiet chip, legible against prose without shouting. */
+.content :not(pre) > code {
+    font-size: 0.9em;
+    padding: 0.15em 0.38em;
+    border-radius: 4px;
+    background: var(--quote-bg);
+    border: 1px solid var(--table-border-color);
+    /* Keep long paths and flags from overflowing on narrow screens. */
+    overflow-wrap: break-word;
+}
+
+.content pre {
+    border-radius: 8px;
+    border: 1px solid var(--table-border-color);
+    padding: 1.4rem 1.6rem;
+    margin: 2rem 0;
+    line-height: 1.55;
+    overflow-x: auto;
+}
+
+.content pre code {
+    font-size: 1.45rem;
+    line-height: 1.55;
+}
+
+/* ---------------------------------------------------------------- tables */
+
+.content table {
+    width: 100%;
+    margin: 2.2rem 0;
+    border-collapse: collapse;
+    font-size: 1.6rem;
+    line-height: 1.5;
+    /* Wide keybinding tables scroll inside themselves rather than pushing
+       the page sideways. */
+    display: block;
+    overflow-x: auto;
+}
+
+.content table thead th {
+    background: var(--table-header-bg);
+    font-weight: 650;
+    letter-spacing: 0.01em;
+    text-align: left;
+    vertical-align: bottom;
+    padding: 0.9rem 1.2rem;
+    border-bottom: 2px solid var(--table-border-color);
+}
+
+.content table td {
+    padding: 0.85rem 1.2rem;
+    border-bottom: 1px solid var(--table-border-color);
+    vertical-align: top;
+}
+
+.content table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Keybinding cells: never wrap a chord across lines. */
+.content table td:first-child code {
+    white-space: nowrap;
+}
+
+/* ------------------------------------------------------------ quotes/notes */
+
+.content blockquote {
+    margin: 2.2rem 0;
+    padding: 1.2rem 1.8rem;
+    border-left: 3px solid var(--quote-border);
+    border-radius: 0 6px 6px 0;
+    background: var(--quote-bg);
+    font-size: 1.65rem;
+}
+
+.content blockquote > :first-child {
+    margin-top: 0;
+}
+
+.content blockquote > :last-child {
+    margin-bottom: 0;
+}
+
+/* ----------------------------------------------------------------- lists */
+
+.content ul,
+.content ol {
+    padding-left: 2.4rem;
+    margin: 1.4rem 0 1.8rem;
+}
+
+.content li {
+    margin-bottom: 0.6rem;
+}
+
+.content li > ul,
+.content li > ol {
+    margin: 0.6rem 0 0.8rem;
+}
+
+/* A list item whose first run is bold reads as a term — give the group air. */
+.content li > strong:first-child {
+    letter-spacing: -0.005em;
+}
+
+/* --------------------------------------------------------------- figures */
+
+.content figure {
+    margin: 2.8rem 0;
+}
+
+.content img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    border: 1px solid var(--table-border-color);
+    /* Terminal screenshots are dark; a hairline keeps them from bleeding
+       into a light page background. */
+    display: block;
+}
+
+.content figcaption {
+    margin-top: 1rem;
+    font-size: 1.45rem;
+    line-height: 1.5;
+    color: var(--fg);
+    opacity: 0.72;
+}
+
+/* --------------------------------------------------------------- sidebar */
+
+.sidebar {
+    font-size: 1.5rem;
+}
+
+.chapter li.chapter-item {
+    line-height: 1.5;
+    margin: 0.4rem 0;
+}
+
+.sidebar .sidebar-scrollbox > .chapter > li.part-title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.65;
+    margin-top: 2.4rem;
+}
+
+/* ------------------------------------------------------------ separators */
+
+.content hr {
+    border: none;
+    border-top: 1px solid var(--table-border-color);
+    margin: 3.2rem 0;
+}
+
+/* ----------------------------------------------------------------- print */
+
+@media print {
+    .content {
+        font-size: 11pt;
+        line-height: 1.5;
+    }
+
+    .content :is(h1, h2, h3, h4) {
+        break-after: avoid;
+    }
+
+    .content :is(pre, table, figure) {
+        break-inside: avoid;
+    }
+}
+
+/* ------------------------------------------------------ narrow viewports */
+
+@media (max-width: 700px) {
+    :root {
+        --mantis-body-size: 1.65rem;
+        --mantis-space-above: 2.8rem;
+    }
+
+    .content h1 {
+        font-size: 2.8rem;
+    }
+
+    .content h2 {
+        font-size: 2.2rem;
+    }
+
+    .content h3 {
+        font-size: 1.85rem;
+    }
+}

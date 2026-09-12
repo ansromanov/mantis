@@ -164,6 +164,43 @@ generate-completions: build
     target/debug/mantis --print-man-page > man/mantis.1 2>/dev/null
     echo "generated man/mantis.1"
 
+# build the documentation site into docs/book
+# mdBook only copies files under docs/src, so repository images are staged
+# into docs/src/media first (gitignored; the Pages workflow does the same).
+docs:
+    rm -rf docs/src/media
+    cp -R media docs/src/media
+    mdbook build docs
+
+# serve the documentation site locally with live reload
+docs-serve: docs
+    mdbook serve docs --open
+
+# re-render the documentation screenshots from docs/tapes/*.tape
+# needs vhs (brew install vhs) and a release build of mantis
+docs-screenshots: release
+    #!/usr/bin/env bash
+    set -euo pipefail
+    command -v vhs >/dev/null || { echo "vhs not found: brew install vhs"; exit 1; }
+    mkdir -p media/docs
+    # vhs does not create its output directory.
+    mkdir -p .vhs-out
+    for tape in docs/tapes/*.tape; do
+        name="$(basename "$tape" .tape)"
+        echo "rendering ${name}"
+        # Clear stale frames first: vhs writes into the directory without
+        # emptying it, so a shorter run would otherwise leave the previous
+        # run's higher-numbered frames behind for the copy below to pick up.
+        rm -rf .vhs-out/"${name}".png
+        PATH="$PWD/target/release:$PATH" vhs "$tape"
+        # vhs writes one PNG per frame into a directory; the last text frame is
+        # the settled screen the tape was driving toward.
+        last="$(ls .vhs-out/"${name}".png/frame-text-*.png | tail -1)"
+        cp "$last" "media/docs/${name}.png"
+    done
+    rm -rf .vhs-out
+    echo "wrote media/docs/*.png"
+
 # remove build artifacts
 clean:
     cargo clean

@@ -1,0 +1,13 @@
+region,service,requests,error_rate,p95_ms,cost_usd
+us-east-1,api-gateway,18432119,0.21,142,4821.55
+us-east-1,auth,9120044,0.08,88,1233.10
+us-east-1,search,4410932,1.42,317,2044.87
+eu-west-1,api-gateway,11204773,0.19,155,3110.42
+eu-west-1,auth,5512008,0.11,94,806.33
+eu-west-1,search,2884519,1.67,342,1502.19
+ap-south-1,api-gateway,6120884,0.33,201,1788.04
+ap-south-1,auth,2044120,0.14,109,441.28
+ap-south-1,search,1338207,2.08,455,915.66
+sa-east-1,api-gateway,1884200,0.41,238,622.71
+sa-east-1,auth,712043,0.17,118,180.55
+sa-east-1,search,404118,2.44,512,318.90

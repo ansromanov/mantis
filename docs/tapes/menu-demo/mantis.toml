@@ -1,0 +1,23 @@
+# Config for docs/tapes/menu-bar.tape only — the shared demo config plus the
+# two settings that tape needs.
+#
+# vhs cannot send function keys, so `menu_bar` gains a chord it can type
+# alongside the documented F10 default. Nothing here changes what the menu
+# looks like, which is what the screenshot is for.
+
+[theme]
+name = "default"
+auto_detect = false
+
+[ui]
+menu_bar = true
+
+[updates]
+check = false
+
+[telemetry]
+enabled = false
+notice_shown = true
+
+[keys]
+menu_bar = ["F10", "ctrl+y"]
