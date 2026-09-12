@@ -475,6 +475,9 @@ fn statusbar_config_defaults_to_none() {
     let cfg = StatusBarConfig::default();
     assert!(cfg.left.is_none());
     assert!(cfg.right.is_none());
+    assert_eq!(cfg.separator, " ");
+    assert!(cfg.colors.is_empty());
+    assert_eq!(cfg.height, 1);
 }
 
 #[test]
@@ -482,6 +485,23 @@ fn statusbar_config_schema_has_some_fields() {
     let schema = StatusBarConfig::schema();
     assert!(schema.left.is_some());
     assert!(schema.right.is_some());
+    for id in StatusBarConfig::VALID_SEGMENTS {
+        assert!(
+            schema.colors.contains_key(*id),
+            "schema should seed statusbar.colors.{id}"
+        );
+    }
+}
+
+#[test]
+fn statusbar_config_separator_round_trips() {
+    let cfg = StatusBarConfig {
+        separator: " \u{2502} ".into(),
+        ..Default::default()
+    };
+    let toml_str = toml::to_string_pretty(&cfg).unwrap();
+    let parsed: StatusBarConfig = toml::from_str(&toml_str).unwrap();
+    assert_eq!(parsed.separator, " \u{2502} ");
 }
 
 #[test]
@@ -490,6 +510,11 @@ fn statusbar_config_round_trips_explicit_mode() {
         statusbar: StatusBarConfig {
             left: Some(vec!["hint".into()]),
             right: Some(vec!["version".into()]),
+            height: 2,
+            colors: [("git".to_string(), "accent".to_string())]
+                .into_iter()
+                .collect(),
+            ..Default::default()
         },
         ..Config::default()
     };
@@ -497,6 +522,11 @@ fn statusbar_config_round_trips_explicit_mode() {
     let parsed: Config = toml::from_str(&toml_str).unwrap();
     assert_eq!(parsed.statusbar.left, Some(vec!["hint".into()]));
     assert_eq!(parsed.statusbar.right, Some(vec!["version".into()]));
+    assert_eq!(parsed.statusbar.height, 2);
+    assert_eq!(
+        parsed.statusbar.colors.get("git"),
+        Some(&"accent".to_string())
+    );
 }
 
 #[test]

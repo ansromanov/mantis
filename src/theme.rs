@@ -19,6 +19,35 @@ use std::sync::{OnceLock, RwLock};
 use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
 
+/// The valid semantic color-role names accepted by feature metadata that
+/// references theme roles by name (e.g. the `[statusbar.colors]` overrides).
+/// Every entry maps to a `Theme` color field; `syntax` is deliberately absent
+/// because it names a syntect theme rather than a color.
+pub const THEME_COLOR_ROLES: &[&str] = &[
+    "background",
+    "accent",
+    "accent_alt",
+    "dim",
+    "text",
+    "dir",
+    "file",
+    "selection_bg",
+    "selection_fg",
+    "heading1",
+    "heading2",
+    "heading3",
+    "code",
+    "diff_add",
+    "diff_del",
+    "git_clean",
+    "git_dirty",
+    "git_conflict",
+    "git_progress",
+    "breadcrumb_fg",
+    "breadcrumb_bg",
+    "active_line_bg",
+];
+
 /// The active color palette. Field names are semantic roles, not literal
 /// colors, so a theme can remap the whole UI. `Default` reproduces the
 /// original hardcoded look.
@@ -198,6 +227,38 @@ impl Theme {
             && self.background == Color::Reset
             && self.accent == Color::Reset
             && self.text == Color::Reset
+    }
+
+    /// Resolves a semantic color-role name (e.g. `"accent"` or `"git_dirty"`)
+    /// to its themed color. Used by status-bar per-segment overrides. Returns
+    /// `None` for unknown role names.
+    pub fn role_color(&self, role: &str) -> Option<Color> {
+        let c = match role {
+            "background" => self.background,
+            "accent" => self.accent,
+            "accent_alt" => self.accent_alt,
+            "dim" => self.dim,
+            "text" => self.text,
+            "dir" => self.dir,
+            "file" => self.file,
+            "selection_bg" => self.selection_bg,
+            "selection_fg" => self.selection_fg,
+            "heading1" => self.heading1,
+            "heading2" => self.heading2,
+            "heading3" => self.heading3,
+            "code" => self.code,
+            "diff_add" => self.diff_add,
+            "diff_del" => self.diff_del,
+            "git_clean" => self.git_clean,
+            "git_dirty" => self.git_dirty,
+            "git_conflict" => self.git_conflict,
+            "git_progress" => self.git_progress,
+            "breadcrumb_fg" => self.breadcrumb_fg,
+            "breadcrumb_bg" => self.breadcrumb_bg,
+            "active_line_bg" => self.active_line_bg,
+            _ => return None,
+        };
+        Some(c)
     }
 
     /// Returns the selection style for the theme.

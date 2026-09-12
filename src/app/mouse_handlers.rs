@@ -307,7 +307,12 @@ impl App {
                 }
                 MouseEventKind::Down(MouseButton::Right) => {
                     let segment =
-                        crate::ui::statusbar::segment_at(self, self.statusbar_area, ev.column)
+                        crate::ui::statusbar::segment_at(
+                            self,
+                            self.statusbar_area,
+                            ev.column,
+                            ev.row,
+                        )
                             .unwrap_or_default();
                     self.open_statusbar_context_menu(segment, (ev.column, ev.row));
                 }

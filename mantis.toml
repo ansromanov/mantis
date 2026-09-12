@@ -80,10 +80,16 @@ side_by_side = false         # start the diff view in side-by-side layout
 # everything else left. Either set: explicit allowlist — only listed ids
 # render on their configured side, in listed order; unlisted ids are hidden.
 # Set both to empty lists for an empty bar.
-# Valid ids: hint badges scroll lnum type fileinfo git errors folds message version update
+# Valid ids: badges scroll lnum type jsonpath fileinfo git errors folds
+# pluginfacts message pluginerror version update
 [statusbar]
 # left = ["hint", "badges", "scroll", "lnum", "type", "fileinfo", "git", "errors", "folds", "message"]
 # right = ["lnum", "type", "git", "version", "update"]
+separator = " "               # string drawn before every segment (default: " ")
+height = 1                    # 1 = single row, 2 = spread left/right groups over two rows
+# Per-segment foreground overrides: any theme color role (see themes page).
+# [statusbar.colors]
+# git = "accent"
 
 
 # --- user interface --------------------------------------------------------

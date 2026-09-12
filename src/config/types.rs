@@ -185,7 +185,7 @@ pub struct GitDiffConfig {
     pub side_by_side: bool,
 }
 
-/// Status-bar segment alignment, grouped under `[statusbar]` in the TOML.
+/// Status-bar config, grouped under `[statusbar]` in the TOML.
 ///
 /// ## Semantics
 /// - **Both `None`** — default mode: all segments visible, using the historical
@@ -193,27 +193,84 @@ pub struct GitDiffConfig {
 /// - **Either `Some`** — explicit allowlist mode: only segments whose id appears
 ///   in `left` or `right` are rendered, in the order specified by the list.
 ///   Unlisted segments are hidden. Both lists empty → empty bar.
-#[derive(Default, Serialize, Deserialize, Clone, PartialEq)]
+///
+/// `separator` is the divider drawn between segments (and before the first
+/// segment of each row); its default, a single space, reproduces the historical
+/// rendering byte-for-byte. `colors` maps a segment id to a theme color-role
+/// name (see `crate::theme::THEME_COLOR_ROLES`) to override that segment's
+/// foreground. `height` selects a one-row (default) or two-row bar; in two-row
+/// mode the left-aligned segments fill the top row and right-aligned segments
+/// the bottom row, with elision applied per row.
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 #[serde(default)]
 pub struct StatusBarConfig {
     /// Segments to show on the left, in order. `None` = default behaviour.
-    /// Valid ids: badges worktrees scroll lnum type jsonpath fileinfo git errors folds pluginfacts
-    /// message pluginerror version update
+    /// Valid ids: see [`StatusBarConfig::VALID_SEGMENTS`].
     pub left: Option<Vec<String>>,
     /// Segments to show on the right, in order. `None` = default behaviour.
-    /// Valid ids: badges worktrees scroll lnum type jsonpath fileinfo git errors folds pluginfacts
-    /// message pluginerror version update
+    /// Valid ids: see [`StatusBarConfig::VALID_SEGMENTS`].
     pub right: Option<Vec<String>>,
+    /// Divider drawn between segments. Default `" "` reproduces the historical
+    /// single-space separation.
+    pub separator: String,
+    /// Per-segment theme color-role overrides, keyed by segment id. The value
+    /// is a semantic role name (e.g. `"accent"`, `"git_dirty"`), not a literal
+    /// color, so overrides follow the active theme.
+    pub colors: HashMap<String, String>,
+    /// Status-bar height in rows: `1` (default) or `2`. Two rows spreads the
+    /// segments instead of eliding them on narrow terminals.
+    pub height: u8,
+}
+
+impl Default for StatusBarConfig {
+    fn default() -> Self {
+        StatusBarConfig {
+            left: None,
+            right: None,
+            separator: " ".to_string(),
+            colors: HashMap::new(),
+            height: 1,
+        }
+    }
 }
 
 impl StatusBarConfig {
+    /// Every valid status-bar segment id, in canonical (build) order. This is
+    /// the source of truth for schema building and value validation; the
+    /// `StatusSegment::id_str` mapping in `src/ui/statusbar.rs` must agree.
+    pub(crate) const VALID_SEGMENTS: &[&str] = &[
+        "badges",
+        "worktrees",
+        "scroll",
+        "lnum",
+        "type",
+        "jsonpath",
+        "fileinfo",
+        "git",
+        "errors",
+        "folds",
+        "pluginfacts",
+        "message",
+        "pluginerror",
+        "version",
+        "update",
+    ];
+
     /// A fully-populated instance for config-validation schema building.
-    /// Every field is `Some` so that TOML serialization emits them (unlike
-    /// `Default` where everything is `None` and would be omitted).
+    /// Every field is `Some`/populated so that TOML serialization emits them
+    /// (unlike `Default` where they are `None`/empty and would be omitted).
+    /// `colors` is seeded with every valid segment id so the schema also
+    /// flags unknown segment ids under `[statusbar.colors]`.
     pub(crate) fn schema() -> Self {
         StatusBarConfig {
             left: Some(vec!["hint".into()]),
             right: Some(vec!["version".into()]),
+            separator: " ".to_string(),
+            colors: Self::VALID_SEGMENTS
+                .iter()
+                .map(|id| (id.to_string(), "accent".to_string()))
+                .collect(),
+            height: 1,
         }
     }
 }

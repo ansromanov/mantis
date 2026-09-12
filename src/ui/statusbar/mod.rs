@@ -1,23 +1,26 @@
-//! Status-bar rendering: the bottom line of the UI.
+//! Status-bar rendering: the bottom row (or two) of the UI.
 //!
-//! `draw_statusbar` renders the single row at the bottom of the screen. Its
-//! contents are context-sensitive: when an overlay is active it shows that
-//! overlay's key hints, and otherwise it summarizes the current state - focused
-//! panel, file path, git branch/HEAD info (`GitRepoInfo`/`GitHead`), position
-//! and scroll percentage, and active mode flags. Colors come from the active
-//! theme. It returns the surviving segment geometry for mouse hit-testing and
-//! is drawn last so it always reflects the final per-frame state.
-//! It is a read-only projection of `App`; it never mutates state.
-//! `segment_at` maps a mouse column back to the visible span text for context
-//! menu hit-testing.
+//! `draw_statusbar` renders the bottom row or rows of the screen. When an
+//! overlay is active it shows that overlay's key hints; otherwise it summarizes
+//! the focused panel, file path, git state, position, and active modes. Colors
+//! come from the active theme, with per-segment overrides from
+//! `[statusbar.colors]`. It is a read-only projection of `App` and is drawn
+//! last so it reflects the final per-frame state. `hit_test` maps clicks to
+//! actionable segments, while `segment_at` returns visible text for the
+//! status-bar context menu.
 //!
 //! On narrow terminals the bar elides low-priority segments so it never
 //! overflows `area.width`. Plugin and status messages (`P_META`) are dropped
 //! first, then fold stats, badges, and file info (`P_INFO`), then git info;
 //! error indicators — including a `plugin_error` action (protocol 3+, styled
 //! distinctly from routine `show_message` text) — and the version string are
-//! always shown. Keybinding hints are no longer rendered — the `?` help
-//! overlay and the command palette are the discovery surfaces for bindings.
+//! always shown. When `[statusbar] height = 2`, the left-aligned segments fill
+//! the top row and right-aligned segments the bottom row instead of sharing a
+//! single row, so narrow terminals spread segments rather than dropping them;
+//! elision still applies per row. Segments are joined by the configured
+//! `separator` (default: a single space, reproducing the historical bytes
+//! exactly). Keybinding hints are no longer rendered — the `?` help overlay
+//! and the command palette are the discovery surfaces for bindings.
 
 use ratatui::{
     layout::Rect,
@@ -28,8 +31,10 @@ use ratatui::{
 };
 
 use crate::app::{App, Focus};
-use crate::config::StatusBarConfig;
 use crate::git::{GitHead, GitRepoInfo};
+
+pub(super) mod fit;
+use self::fit::{fit_two_row, fit_two_sided, P_ERR, P_GIT, P_INFO, P_META, P_VER};
 
 /// Named segment identifiers for status-bar alignment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -105,15 +110,6 @@ enum StatusSide {
     Right,
 }
 
-/// Priority levels for status-bar segments (higher = kept when eliding).
-const P_META: u8 = 1; // plugin/status messages
-const P_INFO: u8 = 2; // fold stats, badges, scroll %, file encoding
-const P_GIT: u8 = 3; // git branch info
-const P_ERR: u8 = 4; // error indicators
-const P_VER: u8 = 5; // version string
-
-type TaggedStatusSpan = (Span<'static>, StatusSegment);
-
 pub(super) fn draw_statusbar(
     f: &mut Frame,
     app: &App,
@@ -126,47 +122,35 @@ pub(super) fn draw_statusbar(
         Style::default().bg(theme.selection_bg).fg(theme.text)
     };
 
-    let (line, segments) = if app.goto_line.is_some() {
-        (
-            overlay_line(
-                " type line number  Enter jump  Esc cancel  +N forward  -N back",
-                base,
-                area.width,
-            ),
-            Vec::new(),
-        )
+    let (lines, segments) = if app.goto_line.is_some() {
+        (vec![overlay_line(
+            " type line number  Enter jump  Esc cancel  +N forward  -N back",
+            base,
+            area.width,
+        )], Vec::new())
     } else if app.theme_picker.is_some() {
-        (
-            overlay_line(
-                " \u{2191}\u{2193} navigate  type to filter  Enter apply theme  Esc cancel",
-                base,
-                area.width,
-            ),
-            Vec::new(),
-        )
+        (vec![overlay_line(
+            " \u{2191}\u{2193} navigate  type to filter  Enter apply theme  Esc cancel",
+            base,
+            area.width,
+        )], Vec::new())
     } else if app.history.is_some() {
-        (
-            overlay_line(
-                " \u{2191}\u{2193} navigate  type to filter  Enter show diff  Esc cancel",
-                base,
-                area.width,
-            ),
-            Vec::new(),
-        )
+        (vec![overlay_line(
+            " \u{2191}\u{2193} navigate  type to filter  Enter show diff  Esc cancel",
+            base,
+            area.width,
+        )], Vec::new())
     } else if app.search.is_some() {
-        (
-            overlay_line(
-                " \u{2191}\u{2193} navigate  Enter select  Tab toggle mode  Esc cancel",
-                base,
-                area.width,
-            ),
-            Vec::new(),
-        )
+        (vec![overlay_line(
+            " \u{2191}\u{2193} navigate  Enter select  Tab toggle mode  Esc cancel",
+            base,
+            area.width,
+        )], Vec::new())
     } else {
-        build_normal_line(app, base, area.width)
+        (build_normal_lines(app, base, area.width), Vec::new())
     };
 
-    f.render_widget(Paragraph::new(line).style(base), area);
+    f.render_widget(Paragraph::new(lines).style(base), area);
     segments
         .into_iter()
         .filter(|(segment, _, _)| segment.action_id().is_some())
@@ -182,9 +166,8 @@ pub(super) fn draw_statusbar(
 
 /// Returns the segment under a click using geometry generated with the line.
 pub(crate) fn hit_test(app: &App, column: u16, row: u16) -> Option<StatusSegment> {
-    if row != app.statusbar_area.y
-        || column < app.statusbar_area.x
-        || column >= app.statusbar_area.right()
+    if row < app.statusbar_area.y || row >= app.statusbar_area.bottom()
+        || column < app.statusbar_area.x || column >= app.statusbar_area.right()
     {
         return None;
     }
@@ -194,17 +177,18 @@ pub(crate) fn hit_test(app: &App, column: u16, row: u16) -> Option<StatusSegment
         .map(|(segment, _, _)| *segment)
 }
 
-/// Returns the visible status-bar span text under `column`, excluding the
-/// spacer between left and right groups and empty overlay hints.
-pub(crate) fn segment_at(app: &App, area: Rect, column: u16) -> Option<String> {
-    if column < area.x || column >= area.x.saturating_add(area.width) {
+/// Returns visible status-bar text under a right-click, excluding the spacer
+/// between left and right groups and empty overlay hints.
+pub(crate) fn segment_at(app: &App, area: Rect, column: u16, row: u16) -> Option<String> {
+    if column < area.x || column >= area.right() || row < area.y || row >= area.bottom() {
         return None;
     }
-    let (line, _) = build_normal_line(app, Style::default(), area.width);
+    let lines = build_normal_lines(app, Style::default(), area.width);
+    let row_index = usize::from(row.saturating_sub(area.y));
+    let line = lines.get(row_index)?;
     let mut x = area.x;
-    for span in line.spans {
-        let width = span.width() as u16;
-        let end = x.saturating_add(width);
+    for span in &line.spans {
+        let end = x.saturating_add(span.width() as u16);
         if column >= x && column < end {
             let text = span.content.to_string();
             return (!text.trim().is_empty()).then_some(text);
@@ -233,12 +217,10 @@ fn overlay_line(text: &str, style: Style, max_width: u16) -> Line<'static> {
 }
 
 /// Normal (non-overlay) status bar with priority-based elision and configurable
-/// left/right alignment per segment.
-fn build_normal_line(
-    app: &App,
-    base: Style,
-    max_width: u16,
-) -> (Line<'static>, Vec<(StatusSegment, u16, u16)>) {
+/// left/right alignment per segment. Returns one row in default `height = 1`
+/// mode and two rows (left group on top, right group on the bottom) when the
+/// config sets `height = 2`.
+fn build_normal_lines(app: &App, base: Style, max_width: u16) -> Vec<Line<'static>> {
     let badge = base.fg(app.theme.accent).add_modifier(Modifier::BOLD);
     let err_style = base.fg(app.theme.diff_del).add_modifier(Modifier::BOLD);
     let dim = base.fg(app.theme.dim);
@@ -522,209 +504,18 @@ fn build_normal_line(
         P_VER,
     ));
 
-    fit_two_sided_with_ranges(segs, max_width as usize, &app.config.statusbar)
-}
-
-/// From a list of `(Span, StatusSegment, priority)` pairs, return a `Line`
-/// with segments split into left-aligned and right-aligned groups per config.
-/// Higher-priority items are kept first; within the same priority level,
-/// rightmost items are dropped first — across both groups.  The right group
-/// is right-anchored as a block, with padding spaces in between.
-///
-/// In explicit allowlist mode (either `left` or `right` is `Some`), segments
-/// not listed in either list are filtered out before any width/elision math.
-#[cfg(test)]
-fn fit_two_sided(
-    segs: Vec<(Span<'static>, StatusSegment, u8)>,
-    max_width: usize,
-    config: &StatusBarConfig,
-) -> Line<'static> {
-    fit_two_sided_with_ranges(segs, max_width, config).0
-}
-
-/// Fits and composes status spans, returning the exact displayed columns for
-/// each segment alongside the rendered line.
-fn fit_two_sided_with_ranges(
-    segs: Vec<(Span<'static>, StatusSegment, u8)>,
-    max_width: usize,
-    config: &StatusBarConfig,
-) -> (Line<'static>, Vec<(StatusSegment, u16, u16)>) {
-    if segs.is_empty() || max_width == 0 {
-        return (Line::from(Vec::<Span>::new()), Vec::new());
-    }
-
-    // Explicit allowlist mode: drop unlisted segments before width calc.
-    let segs = if config.left.is_some() || config.right.is_some() {
-        let left_ids = config.left.as_deref().unwrap_or(&[]);
-        let right_ids = config.right.as_deref().unwrap_or(&[]);
-        segs.into_iter()
-            .filter(|(_, id, _)| {
-                let name = id.id_str();
-                left_ids.iter().any(|s| s == name) || right_ids.iter().any(|s| s == name)
-            })
-            .collect()
+    let statusbar = &app.config.statusbar;
+    if statusbar.height >= 2 {
+        let (top, bottom) = fit_two_row(segs, max_width as usize, statusbar, &app.theme);
+        vec![top, bottom]
     } else {
-        segs
-    };
-
-    // After filtering, might be empty.
-    if segs.is_empty() {
-        return (Line::from(Vec::<Span>::new()), Vec::new());
+        vec![fit_two_sided(
+            segs,
+            max_width as usize,
+            statusbar,
+            &app.theme,
+        )]
     }
-
-    // Fast path: everything fits.
-    let total: usize = segs.iter().map(|(s, _, _)| s.width()).sum();
-    if total <= max_width {
-        let (left, right) = split_sides_tagged(segs, config);
-        return compose_left_right_tagged(left, right, max_width);
-    }
-
-    let n = segs.len();
-    let mut keep = vec![true; n];
-
-    // Indices sorted by priority (ascending) then position (descending),
-    // so we remove lowest-priority, rightmost items first.
-    let mut order: Vec<usize> = (0..n).collect();
-    order.sort_by(|&a, &b| segs[a].2.cmp(&segs[b].2).then(b.cmp(&a)));
-
-    let mut current_width = total;
-
-    for idx in order {
-        if current_width <= max_width {
-            break;
-        }
-        if keep[idx] {
-            current_width -= segs[idx].0.width();
-            keep[idx] = false;
-        }
-    }
-
-    let kept: Vec<_> = segs
-        .into_iter()
-        .enumerate()
-        .filter(|(i, _)| keep[*i])
-        .map(|(_, t)| t)
-        .collect();
-
-    let (left, right) = split_sides_tagged(kept, config);
-    compose_left_right_tagged(left, right, max_width)
-}
-
-/// Split kept segments into left and right groups by config.
-///
-/// In explicit allowlist mode (either `left` or `right` is `Some`), the
-/// groups are built by iterating each list in config order, preserving the
-/// user-specified sequence. In default mode (both `None`), the order is the
-/// build order, partitioned by `StatusSegment::side()`.
-#[cfg(test)]
-fn split_sides(
-    segs: Vec<(Span<'static>, StatusSegment, u8)>,
-    config: &StatusBarConfig,
-) -> (Vec<Span<'static>>, Vec<Span<'static>>) {
-    let (left, right) = split_sides_tagged(segs, config);
-    (
-        left.into_iter().map(|(span, _)| span).collect(),
-        right.into_iter().map(|(span, _)| span).collect(),
-    )
-}
-
-fn split_sides_tagged(
-    segs: Vec<(Span<'static>, StatusSegment, u8)>,
-    config: &StatusBarConfig,
-) -> (Vec<TaggedStatusSpan>, Vec<TaggedStatusSpan>) {
-    let explicit = config.left.is_some() || config.right.is_some();
-    if explicit {
-        let left_ids = config.left.as_deref().unwrap_or(&[]);
-        let right_ids = config.right.as_deref().unwrap_or(&[]);
-
-        let mut left = Vec::new();
-        let mut right = Vec::new();
-
-        // Left side: iterate config order, pull matching built segment.
-        for id in left_ids {
-            if let Some((span, sid, _)) =
-                segs.iter().find(|(_, sid, _)| sid.id_str() == id.as_str())
-            {
-                left.push((span.clone(), *sid));
-            }
-        }
-        // Right side: iterate config order, pull matching built segment.
-        for id in right_ids {
-            if let Some((span, sid, _)) =
-                segs.iter().find(|(_, sid, _)| sid.id_str() == id.as_str())
-            {
-                right.push((span.clone(), *sid));
-            }
-        }
-        (left, right)
-    } else {
-        let mut left = Vec::new();
-        let mut right = Vec::new();
-        for (span, id, _) in segs {
-            if id.side() == StatusSide::Right {
-                right.push((span, id));
-            } else {
-                left.push((span, id));
-            }
-        }
-        (left, right)
-    }
-}
-
-/// Compose left and right span groups into a single Line, with a padding
-/// gap between them.  Right group is right-anchored flush to max_width.
-#[cfg(test)]
-fn compose_left_right(
-    left: Vec<Span<'static>>,
-    right: Vec<Span<'static>>,
-    max_width: usize,
-) -> Line<'static> {
-    compose_left_right_tagged(
-        left.into_iter()
-            .map(|span| (span, StatusSegment::Badges))
-            .collect(),
-        right
-            .into_iter()
-            .map(|span| (span, StatusSegment::Badges))
-            .collect(),
-        max_width,
-    )
-    .0
-}
-
-fn compose_left_right_tagged(
-    left: Vec<(Span<'static>, StatusSegment)>,
-    right: Vec<(Span<'static>, StatusSegment)>,
-    max_width: usize,
-) -> (Line<'static>, Vec<(StatusSegment, u16, u16)>) {
-    let left_w: usize = left.iter().map(|(span, _)| span.width()).sum();
-    let right_w: usize = right.iter().map(|(span, _)| span.width()).sum();
-    let gap = max_width.saturating_sub(left_w + right_w);
-
-    let mut all: Vec<Span<'static>> = Vec::with_capacity(left.len() + 1 + right.len());
-    let mut ranges = Vec::new();
-    let mut col = 0usize;
-    for (span, segment) in left {
-        let width = span.width();
-        if width > 0 {
-            ranges.push((segment, col as u16, (col + width) as u16));
-        }
-        col += width;
-        all.push(span);
-    }
-    if gap > 0 {
-        all.push(Span::raw(" ".repeat(gap)));
-    }
-    col = max_width.saturating_sub(right_w);
-    for (span, segment) in right {
-        let width = span.width();
-        if width > 0 {
-            ranges.push((segment, col as u16, (col + width) as u16));
-        }
-        col += width;
-        all.push(span);
-    }
-    (Line::from(all), ranges)
 }
 
 fn git_info_str(info: &GitRepoInfo) -> String {

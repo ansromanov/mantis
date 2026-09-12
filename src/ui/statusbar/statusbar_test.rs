@@ -1,11 +1,10 @@
 use super::*;
 use crate::app::{App, Focus, StatusMessage};
-use crate::config::Config;
+use crate::config::{Config, StatusBarConfig};
 use crate::git::{GitHead, GitRepoInfo};
 use crate::search::{GotoLineState, HistoryState, SearchState, ThemePicker};
 use ratatui::backend::TestBackend;
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::Span;
+use ratatui::style::{Color, Modifier};
 use ratatui::Terminal;
 use std::path::{Path, PathBuf};
 
@@ -34,6 +33,8 @@ fn make_app() -> App {
     App::new(PathBuf::from("."), cfg, None, None).unwrap()
 }
 
+/// A deterministic theme for pure-function tests (separator/color/elision
+/// math): every role resolves, and `accent` is pinned to red.
 #[test]
 fn statusbar_displays_worktree_count() {
     let mut app = make_app();
@@ -809,25 +810,6 @@ fn overlay_theme_picker_truncated_at_narrow_width() {
 }
 
 #[test]
-fn fit_segments_empty_input() {
-    let cfg = StatusBarConfig::default();
-    let line = fit_two_sided(vec![], 80, &cfg);
-    assert_eq!(line.width(), 0);
-}
-
-#[test]
-fn fit_segments_zero_max_width() {
-    let cfg = StatusBarConfig::default();
-    let segs = vec![(
-        Span::styled("hello", Style::default()),
-        StatusSegment::Badges,
-        P_INFO,
-    )];
-    let line = fit_two_sided(segs, 0, &cfg);
-    assert_eq!(line.width(), 0);
-}
-
-#[test]
 fn fold_stats_without_anchors() {
     let mut app = make_app();
     app.focus = Focus::Content;
@@ -917,38 +899,6 @@ fn bar_never_overflows_various_widths() {
 // ── Explicit-allowlist / empty-bar tests ──────────────────────────────────
 
 #[test]
-fn both_none_default_split() {
-    // Regression: both None should behave like the old default.
-    let cfg = StatusBarConfig {
-        left: None,
-        right: None,
-    };
-    let segs = vec![
-        (
-            Span::styled("badges", Style::default()),
-            StatusSegment::Badges,
-            P_INFO,
-        ),
-        (
-            Span::styled("ver", Style::default()),
-            StatusSegment::Version,
-            P_VER,
-        ),
-        (
-            Span::styled("git", Style::default()),
-            StatusSegment::Git,
-            P_GIT,
-        ),
-    ];
-    let (left, right) = split_sides(segs, &cfg);
-    assert_eq!(left.len(), 1);
-    assert_eq!(left[0].content.as_ref(), "badges");
-    assert_eq!(right.len(), 2);
-    assert_eq!(right[0].content.as_ref(), "ver");
-    assert_eq!(right[1].content.as_ref(), "git");
-}
-
-#[test]
 fn both_some_empty_yields_empty_bar() {
     let cfg = Config {
         git: crate::config::GitConfig {
@@ -958,6 +908,7 @@ fn both_some_empty_yields_empty_bar() {
         statusbar: StatusBarConfig {
             left: Some(vec![]),
             right: Some(vec![]),
+            ..Default::default()
         },
         ..Config::default()
     };
@@ -980,6 +931,7 @@ fn explicit_left_right_only_listed_segments_render() {
         statusbar: StatusBarConfig {
             left: Some(vec!["badges".into()]),
             right: Some(vec!["version".into()]),
+            ..Default::default()
         },
         ..Config::default()
     };
@@ -1015,6 +967,7 @@ fn explicit_elision_still_drops_lowest_priority() {
             statusbar: StatusBarConfig {
                 left: Some(vec!["badges".into()]),
                 right: Some(vec!["version".into()]),
+                ..Default::default()
             },
             ..Config::default()
         };
@@ -1115,6 +1068,7 @@ fn custom_right_only_version() {
         statusbar: StatusBarConfig {
             right: Some(vec!["version".into()]),
             left: Some(vec!["badges".into()]),
+            ..Default::default()
         },
         ..Config::default()
     };
@@ -1148,6 +1102,7 @@ fn empty_right_all_left() {
         statusbar: StatusBarConfig {
             left: None,
             right: None,
+            ..Default::default()
         },
         ..Config::default()
     };
@@ -1170,6 +1125,7 @@ fn nonexistent_id_ignored() {
         statusbar: StatusBarConfig {
             left: Some(vec!["badges".into()]),
             right: Some(vec!["nonexistent".into()]),
+            ..Default::default()
         },
         ..Config::default()
     };
@@ -1179,111 +1135,6 @@ fn nonexistent_id_ignored() {
     // "nonexistent" doesn't match any built segment; only badges (left) appear.
     assert!(text.starts_with(" [hidden]"));
     assert!(!text.contains(&format!("v{}", env!("CARGO_PKG_VERSION"))));
-}
-
-#[test]
-fn split_sides_default_mode_natural_order() {
-    // Default mode: both None.
-    let cfg = StatusBarConfig {
-        left: None,
-        right: None,
-    };
-    // Manually exercise split_sides.
-    let segs = vec![
-        (
-            Span::styled("badges", Style::default()),
-            StatusSegment::Badges,
-            P_INFO,
-        ),
-        (
-            Span::styled("ver", Style::default()),
-            StatusSegment::Version,
-            P_VER,
-        ),
-        (
-            Span::styled("git", Style::default()),
-            StatusSegment::Git,
-            P_GIT,
-        ),
-    ];
-    let (left, right) = split_sides(segs, &cfg);
-    assert_eq!(left.len(), 1);
-    assert_eq!(left[0].content.as_ref(), "badges");
-    assert_eq!(right.len(), 2);
-    assert_eq!(right[0].content.as_ref(), "ver");
-    assert_eq!(right[1].content.as_ref(), "git");
-}
-
-#[test]
-fn split_sides_explicit_mode_order_follows_config() {
-    let cfg = StatusBarConfig {
-        left: Some(vec!["git".into(), "badges".into()]),
-        right: Some(vec!["version".into()]),
-    };
-    let segs = vec![
-        (
-            Span::styled("badges", Style::default()),
-            StatusSegment::Badges,
-            P_INFO,
-        ),
-        (
-            Span::styled("ver", Style::default()),
-            StatusSegment::Version,
-            P_VER,
-        ),
-        (
-            Span::styled("git", Style::default()),
-            StatusSegment::Git,
-            P_GIT,
-        ),
-    ];
-    let (left, right) = split_sides(segs, &cfg);
-    // Left order follows config: git before badges.
-    assert_eq!(left.len(), 2);
-    assert_eq!(left[0].content.as_ref(), "git");
-    assert_eq!(left[1].content.as_ref(), "badges");
-    // Right: version.
-    assert_eq!(right.len(), 1);
-    assert_eq!(right[0].content.as_ref(), "ver");
-}
-
-#[test]
-fn compose_left_right_padding() {
-    let left = vec![Span::styled("left", Style::default())];
-    let right = vec![Span::styled("right", Style::default())];
-    // left=4, right=5, max=20 -> gap=11
-    let line = compose_left_right(left, right, 20);
-    assert_eq!(line.width(), 20);
-    let content: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
-    assert_eq!(content, "left           right");
-}
-
-#[test]
-fn compose_left_right_no_padding_needed() {
-    let left = vec![Span::styled("abc", Style::default())];
-    let right = vec![Span::styled("de", Style::default())];
-    let line = compose_left_right(left, right, 7);
-    assert_eq!(line.width(), 7);
-    let content: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
-    assert_eq!(content, "abc  de");
-}
-
-#[test]
-fn compose_left_right_exact_fit() {
-    let left = vec![Span::styled("abc", Style::default())];
-    let right = vec![Span::styled("de", Style::default())];
-    let line = compose_left_right(left, right, 5);
-    assert_eq!(line.width(), 5);
-    let content: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
-    assert_eq!(content, "abcde");
-}
-
-#[test]
-fn compose_left_right_empty_groups() {
-    let line = compose_left_right(vec![], vec![], 10);
-    assert_eq!(line.width(), 10);
-    let content: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
-    assert_eq!(content, "          ");
 }
 
 #[test]
@@ -1439,4 +1290,160 @@ fn statusbar_shows_active_json_path() {
     app.current_file = Some("config.json".into());
     app.json_path_map = vec![Some(".server.port".into())];
     assert!(render_bar(&app).contains(".server.port"));
+}
+
+fn render_two_row_bar(app: &App, width: u16) -> Vec<String> {
+    let backend = TestBackend::new(width, 2);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|f| draw_statusbar(f, app, f.area())).unwrap();
+    let buf = terminal.backend().buffer();
+    (0..2)
+        .map(|y| {
+            (0..width)
+                .map(|x| buf[(x, y)].symbol().to_string())
+                .collect()
+        })
+        .collect()
+}
+
+#[test]
+fn two_row_mode_spreads_left_and_right_groups_on_separate_rows() {
+    // Default bar: badges on the left, version+git on the right. In height=2
+    // mode the left group must render on the top row and the right group on
+    // the bottom row instead of sharing one elided line.
+    let mut app = make_app();
+    app.config.statusbar.height = 2;
+    app.show_hidden = true;
+    app.git_info = Some(GitRepoInfo {
+        head: GitHead::Branch("main".into()),
+        ahead: 0,
+        behind: 0,
+        total_changed: 0,
+        staged: 0,
+        untracked: 0,
+    });
+    let rows = render_two_row_bar(&app, 60);
+    assert!(
+        rows[0].contains("[hidden]"),
+        "top row should have left group, got {rows:?}"
+    );
+    assert!(
+        !rows[0].contains(&format!("v{}", env!("CARGO_PKG_VERSION"))),
+        "top row should not have the version segment"
+    );
+    let version = format!("v{}", env!("CARGO_PKG_VERSION"));
+    assert!(
+        rows[1].contains("[main]"),
+        "bottom row should have git segment"
+    );
+    let trimmed = rows[1].trim_end_matches(' ');
+    assert!(
+        trimmed.ends_with(&version),
+        "bottom row should end (right-anchored) with version, got {rows:?}"
+    );
+}
+
+#[test]
+fn two_row_mode_keeps_right_group_anchored_flush() {
+    let mut app = make_app();
+    app.config.statusbar.height = 2;
+    app.git_info = Some(GitRepoInfo {
+        head: GitHead::Branch("main".into()),
+        ahead: 0,
+        behind: 0,
+        total_changed: 0,
+        staged: 0,
+        untracked: 0,
+    });
+    let rows = render_two_row_bar(&app, 40);
+    let bottom = rows[1].as_str();
+    let trimmed = bottom.trim_end_matches(' ');
+    assert!(
+        trimmed.ends_with(&format!("v{}", env!("CARGO_PKG_VERSION"))),
+        "bottom row right-anchored to edge, got {bottom:?}"
+    );
+    assert!(
+        !bottom.contains("[hidden]"),
+        "left group must not leak into the bottom row"
+    );
+    assert!(
+        !rows[0].contains("[main]"),
+        "right group must not leak into the top row"
+    );
+}
+
+#[test]
+fn single_row_default_unchanged_with_height_2_in_narrow_width() {
+    // A 2-row bar whose right group already fits elides the left group to its
+    // own row: at width 12 the version must still win elision, rendered on the
+    // bottom row.
+    let mut app = make_app();
+    app.config.statusbar.height = 2;
+    let rows = render_two_row_bar(&app, 12);
+    let version = format!("v{}", env!("CARGO_PKG_VERSION"));
+    assert!(
+        rows[1].contains(&version),
+        "version should survive per-row elision on the bottom row, got {rows:?}"
+    );
+}
+
+#[test]
+fn custom_separator_replaces_space_between_segments() {
+    let mut app = make_app();
+    app.show_hidden = true;
+    app.git_info = Some(GitRepoInfo {
+        head: GitHead::Branch("main".into()),
+        ahead: 0,
+        behind: 0,
+        total_changed: 0,
+        staged: 0,
+        untracked: 0,
+    });
+    app.config.statusbar.separator = " \u{2502} ".into();
+    let text = render_bar_width(&app, 200);
+    assert!(text.contains(" \u{2502} "), "separator should appear");
+    // Badges segment must no longer be preceded by a plain single space when a
+    // custom separator follows the leading space rule.
+    for seg in [
+        "[hidden]",
+        "[main]",
+        &format!("v{}", env!("CARGO_PKG_VERSION")),
+    ] {
+        let idx = text.find(seg).unwrap();
+        let before = &text[..idx];
+        assert!(
+            before.ends_with("\u{2502} "),
+            "segment {seg} should be preceded by the separator, got: {before:?}"
+        );
+    }
+}
+
+#[test]
+fn segment_ids_match_config_valid_segments() {
+    // Every StatusSegment must have an id the config schema/validation knows.
+    let ids: Vec<&str> = [
+        StatusSegment::Badges,
+        StatusSegment::Scroll,
+        StatusSegment::Lnum,
+        StatusSegment::Type,
+        StatusSegment::JsonPath,
+        StatusSegment::FileInfo,
+        StatusSegment::Git,
+        StatusSegment::Errors,
+        StatusSegment::Folds,
+        StatusSegment::PluginFacts,
+        StatusSegment::Message,
+        StatusSegment::PluginError,
+        StatusSegment::Version,
+        StatusSegment::Update,
+    ]
+    .into_iter()
+    .map(|s| s.id_str())
+    .collect();
+    let mut sorted_ids = ids.clone();
+    sorted_ids.sort_unstable();
+    let mut valid = StatusBarConfig::VALID_SEGMENTS.to_vec();
+    valid.sort_unstable();
+    assert_eq!(sorted_ids, valid);
+    assert_eq!(sorted_ids.len(), valid.len());
 }
