@@ -515,6 +515,29 @@ fn bench_tree_redraw(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_tabstrip_redraw(c: &mut Criterion) {
+    let temp = tempfile::tempdir().unwrap();
+    let mut apps = Vec::new();
+    for name in [
+        "api", "web", "worker", "docs", "tools", "cli", "infra", "ops",
+    ] {
+        let root = temp.path().join(name).join("repo");
+        fs::create_dir_all(&root).unwrap();
+        apps.push(App::new(root, Config::default(), None, None).unwrap());
+    }
+    let mut tabs = mantis::workspace::Tabs::new(apps, 0);
+    let backend = TestBackend::new(160, 40);
+    let mut terminal = Terminal::new(backend).unwrap();
+    c.bench_function("tabstrip_redraw/eight_colliding_roots", |b| {
+        b.iter(|| {
+            terminal
+                .draw(|frame| mantis::ui::draw_workspace(frame, &mut tabs))
+                .unwrap();
+            black_box(())
+        })
+    });
+}
+
 // ---------------------------------------------------------------------------
 // 7. Tree-filter keystroke: full-tree match + auto-expand sync
 // ---------------------------------------------------------------------------
@@ -736,6 +759,7 @@ criterion_group!(
     bench_highlight,
     bench_scroll_redraw,
     bench_tree_redraw,
+    bench_tabstrip_redraw,
     bench_tree_filter_sync,
     bench_brace_fold,
     bench_indent_fold,

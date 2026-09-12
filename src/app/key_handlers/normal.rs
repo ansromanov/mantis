@@ -229,6 +229,14 @@ impl App {
             self.tab_action_request = Some(TabAction::Next);
         } else if pressed_in(&k.prev_tab, &key, scope) {
             self.tab_action_request = Some(TabAction::Prev);
+        } else if pressed_in(&k.move_tab_prev, &key, scope) {
+            self.tab_action_request = Some(TabAction::MovePrev);
+        } else if pressed_in(&k.move_tab_next, &key, scope) {
+            self.tab_action_request = Some(TabAction::MoveNext);
+        } else if pressed_in(&k.tab_picker, &key, scope) {
+            self.tab_action_request = Some(TabAction::Picker);
+        } else if pressed_in(&k.reopen_tab, &key, scope) {
+            self.tab_action_request = Some(TabAction::Reopen);
         } else {
             match self.focus {
                 Focus::Tree => self.handle_tree_key(key),

@@ -27,6 +27,16 @@ pub enum TabAction {
     Close,
     Next,
     Prev,
+    /// Select a zero-based tab index.
+    Select(usize),
+    /// Move the active tab one position toward the first tab.
+    MovePrev,
+    /// Move the active tab one position toward the last tab.
+    MoveNext,
+    /// Open the fuzzy tab picker.
+    Picker,
+    /// Reopen the most recently closed tab.
+    Reopen,
 }
 
 /// Which git diff view is active in the content pane.

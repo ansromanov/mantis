@@ -46,6 +46,8 @@ struct Segment {
     start: u16,
     end: u16,
     hit: TabHit,
+    label: String,
+    badge: String,
 }
 
 /// Builds the column ranges for each tab's switch region and close glyph,
@@ -55,9 +57,17 @@ fn build_segments(tabs: &Tabs, area: Rect) -> Vec<Segment> {
     let mut x = area.x;
     let right = area.x.saturating_add(area.width);
     for (i, app) in tabs.apps.iter().enumerate() {
-        let label = tab_label(app);
+        let label = unique_tab_label(tabs, i);
+        let badge = tab_badge(app);
+        let badge = if label.chars().count() + badge.chars().count() + 4
+            <= right.saturating_sub(x) as usize
+        {
+            badge
+        } else {
+            String::new()
+        };
         // " label × " — one leading space, the label, " × " for the close glyph.
-        let width = label.chars().count() as u16 + 4;
+        let width = label.chars().count() as u16 + badge.chars().count() as u16 + 4;
         if x.saturating_add(width) > right {
             break;
         }
@@ -66,11 +76,15 @@ fn build_segments(tabs: &Tabs, area: Rect) -> Vec<Segment> {
             start: x,
             end: close_start,
             hit: TabHit::Switch(i),
+            label: label.clone(),
+            badge: badge.clone(),
         });
         segments.push(Segment {
             start: close_start,
             end: x + width,
             hit: TabHit::Close(i),
+            label,
+            badge,
         });
         x += width;
     }
@@ -98,24 +112,99 @@ pub(crate) fn draw_tabstrip(f: &mut Frame, tabs: &mut Tabs, area: Rect) {
 
     let segments = build_segments(tabs, area);
     let mut spans = Vec::new();
-    for (i, app) in tabs.apps.iter().enumerate() {
+    for i in 0..tabs.apps.len() {
         // Each tab contributes exactly two `build_segments` entries (switch,
         // close); stop rendering once we run past what fit.
         if segments.len() < i * 2 + 2 {
             break;
         }
-        let label = tab_label(app);
+        let Some(segment) = segments.get(i * 2) else {
+            break;
+        };
         let active = i == tabs.active;
         let style = if active {
             theme.selection_style().add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(theme.dim)
         };
-        spans.push(Span::styled(format!(" {label} "), style));
+        spans.push(Span::styled(format!(" {}", segment.label), style));
+        if !segment.badge.is_empty() {
+            spans.push(Span::styled(
+                segment.badge.as_str(),
+                Style::default().fg(theme.accent_alt),
+            ));
+        }
+        spans.push(Span::styled(" ", style));
         spans.push(Span::styled("×", Style::default().fg(theme.dim)));
         spans.push(Span::raw(" "));
     }
     f.render_widget(Paragraph::new(Line::from(spans)).style(base), area);
+}
+
+/// Produces the shortest trailing path suffix that uniquely identifies a tab.
+fn unique_tab_label(tabs: &Tabs, index: usize) -> String {
+    let Some(app) = tabs.apps.get(index) else {
+        return String::new();
+    };
+    let parts = app
+        .root
+        .components()
+        .map(|part| part.as_os_str().to_string_lossy().to_string())
+        .collect::<Vec<_>>();
+    if let Some(name) = parts.last() {
+        let collision = tabs.apps.iter().enumerate().any(|(other_index, other)| {
+            other_index != index
+                && other
+                    .root
+                    .file_name()
+                    .is_some_and(|other_name| other_name.to_string_lossy() == *name)
+        });
+        if !collision {
+            return tab_label(app);
+        }
+    }
+    let mut count = 1;
+    while count < parts.len() {
+        let candidate = parts[parts.len() - count..].join("/");
+        let unique = tabs.apps.iter().enumerate().all(|(other_index, other)| {
+            other_index == index
+                || other
+                    .root
+                    .components()
+                    .map(|part| part.as_os_str().to_string_lossy().to_string())
+                    .collect::<Vec<_>>()
+                    .iter()
+                    .rev()
+                    .take(count)
+                    .rev()
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join("/")
+                    != candidate
+        });
+        if unique {
+            break;
+        }
+        count += 1;
+    }
+    let label = parts[parts.len().saturating_sub(count)..].join("/");
+    if label.chars().count() > MAX_LABEL_LEN {
+        let truncated: String = label.chars().take(MAX_LABEL_LEN - 1).collect();
+        format!("{truncated}…")
+    } else {
+        label
+    }
+}
+
+fn tab_badge(app: &crate::app::App) -> String {
+    let Some(info) = &app.git_info else {
+        return String::new();
+    };
+    let mut badge = format!("·{}", info.head.display());
+    if info.total_changed > 0 {
+        badge.push_str(&format!(" ●{}", info.total_changed));
+    }
+    badge
 }
 
 /// Maps a mouse click at `(col, row)` to the tab it landed on, or `None`

@@ -173,6 +173,11 @@ new_tab = ["ctrl+n"]
 close_tab = ["ctrl+w"]
 next_tab = ["ctrl+PageDown"]
 prev_tab = ["ctrl+PageUp"]
+select_tab = ["ctrl+1", "ctrl+2", "ctrl+3", "ctrl+4", "ctrl+5", "ctrl+6", "ctrl+7", "ctrl+8", "ctrl+9", "ctrl+0"]
+move_tab_prev = ["ctrl+["]
+move_tab_next = ["ctrl+]"]
+tab_picker = ["ctrl+Tab"]
+reopen_tab = ["ctrl+Backspace"]
 
 # search
 search_files = ["/"]          # contextual: tree filter / in-file search

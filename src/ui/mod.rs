@@ -43,6 +43,9 @@ pub fn draw_workspace(f: &mut Frame, tabs: &mut crate::workspace::Tabs) {
     } else {
         draw(f, tabs.active_app_mut());
     }
+    if tabs.tab_picker.is_some() {
+        popups::draw_tab_picker(f, tabs);
+    }
 }
 
 pub fn draw(f: &mut Frame, app: &mut App) {

@@ -251,7 +251,11 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
     let gap = Line::from("");
 
     let row_key = |action_id: &str| {
-        let label = app.keys().labels_for_action(action_id);
+        let label = if action_id == "select_tab" {
+            "Ctrl+1-9/0".to_string()
+        } else {
+            app.keys().labels_for_action(action_id)
+        };
         let display = truncate_label(&label, key_w);
         let padded = format!("  {display:width$}  ", width = key_w);
         let entry_desc = action_desc(action_id);
@@ -319,6 +323,11 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
             rows.push(row_key("close_tab"));
             rows.push(row_key("next_tab"));
             rows.push(row_key("prev_tab"));
+            rows.push(row_key("select_tab"));
+            rows.push(row_key("move_tab_prev"));
+            rows.push(row_key("move_tab_next"));
+            rows.push(row_key("tab_picker"));
+            rows.push(row_key("reopen_tab"));
             rows.push(gap.clone());
         }
         1 => {

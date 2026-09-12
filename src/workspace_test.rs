@@ -127,6 +127,60 @@ fn next_and_prev_tab_are_no_ops_with_a_single_tab() {
 }
 
 #[test]
+fn select_clamps_and_move_keeps_the_moved_tab_active() {
+    let a = temp_dir("select_a");
+    let b = temp_dir("select_b");
+    let c = temp_dir("select_c");
+    let _state = IsolatedState::new(&a);
+    let mut tabs = Tabs::new(vec![app_for(&a), app_for(&b), app_for(&c)], 0);
+    tabs.select_tab(99);
+    assert_eq!(tabs.active, 2);
+    tabs.move_tab(2, 0);
+    assert_eq!(tabs.active, 0);
+    assert_eq!(tabs.active_app().root, c);
+    tabs.move_active_tab(1);
+    assert_eq!(tabs.active, 1);
+    assert_eq!(tabs.active_app().root, c);
+    fs::remove_dir_all(&a).ok();
+    fs::remove_dir_all(&b).ok();
+    fs::remove_dir_all(&c).ok();
+}
+
+#[test]
+fn reordered_tabs_are_written_in_manifest_order() {
+    let a = temp_dir("move_persist_a");
+    let b = temp_dir("move_persist_b");
+    let _state = IsolatedState::new(&a);
+    let mut tabs = Tabs::new(vec![app_for(&a), app_for(&b)], 0);
+    tabs.move_active_tab(1);
+    tabs.save_all_and_persist_workspace();
+    let loaded = crate::session::load_workspace().unwrap();
+    assert_eq!(loaded.roots, vec![b.clone(), a.clone()]);
+    assert_eq!(loaded.active, 1);
+    fs::remove_dir_all(&a).ok();
+    fs::remove_dir_all(&b).ok();
+}
+
+#[test]
+fn close_and_reopen_restores_the_last_root() {
+    let a = temp_dir("reopen_a");
+    let b = temp_dir("reopen_b");
+    let _state = IsolatedState::new(&a);
+    let remembered = b.join("remembered.txt");
+    fs::write(&remembered, "remember this file").unwrap();
+    let mut tabs = Tabs::new(vec![app_for(&a), app_for(&b)], 1);
+    tabs.active_app_mut().open_file(&remembered);
+    tabs.close_active_tab();
+    assert_eq!(tabs.active_app().root, a);
+    tabs.reopen_closed_tab();
+    assert_eq!(tabs.active_app().root, b);
+    assert_eq!(tabs.active_app().current_file.as_ref(), Some(&remembered));
+    assert!(tabs.closed_tabs.is_empty());
+    fs::remove_dir_all(&a).ok();
+    fs::remove_dir_all(&b).ok();
+}
+
+#[test]
 fn save_all_and_persist_workspace_writes_the_manifest() {
     let a = temp_dir("persist_a");
     let b = temp_dir("persist_b");
@@ -231,4 +285,72 @@ fn ctrl_pagedown_and_pageup_switch_tabs() {
     assert_eq!(tabs.active, 0);
     fs::remove_dir_all(&a).ok();
     fs::remove_dir_all(&b).ok();
+}
+
+#[test]
+fn ctrl_number_selects_tab_and_zero_selects_last() {
+    let roots = (0..3)
+        .map(|index| temp_dir(&format!("direct_{index}")))
+        .collect::<Vec<_>>();
+    let mut tabs = Tabs::new(roots.iter().map(|root| app_for(root)).collect(), 0);
+    tabs.dispatch_event(Event::Key(KeyEvent::new(
+        KeyCode::Char('3'),
+        KeyModifiers::CONTROL,
+    )));
+    assert_eq!(tabs.active, 2);
+    tabs.dispatch_event(Event::Key(KeyEvent::new(
+        KeyCode::Char('0'),
+        KeyModifiers::CONTROL,
+    )));
+    assert_eq!(tabs.active, 2);
+    for root in roots {
+        fs::remove_dir_all(root).ok();
+    }
+}
+
+#[test]
+fn dragging_a_tab_reorders_it_on_release() {
+    use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
+    let a = temp_dir("drag_alpha");
+    let b = temp_dir("drag_beta");
+    let _state = IsolatedState::new(&a);
+    let mut tabs = Tabs::new(vec![app_for(&a), app_for(&b)], 0);
+    tabs.strip_area = ratatui::layout::Rect::new(0, 0, 80, 1);
+    let first_width = a.file_name().unwrap().to_string_lossy().len() as u16 + 4;
+    let mouse = |kind, column| {
+        Event::Mouse(MouseEvent {
+            kind,
+            column,
+            row: 0,
+            modifiers: KeyModifiers::empty(),
+        })
+    };
+    tabs.dispatch_event(mouse(MouseEventKind::Down(MouseButton::Left), 1));
+    tabs.dispatch_event(mouse(
+        MouseEventKind::Up(MouseButton::Left),
+        first_width + 1,
+    ));
+    assert_eq!(tabs.apps[0].root, b);
+    assert_eq!(tabs.active_app().root, a);
+    assert!(tabs.drag_tab.is_none());
+    fs::remove_dir_all(&a).ok();
+    fs::remove_dir_all(&b).ok();
+}
+
+#[test]
+fn clicking_outside_tab_picker_closes_it() {
+    use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
+    let root = temp_dir("picker_outside");
+    let app = app_for(&root);
+    let mut tabs = Tabs::new(vec![app], 0);
+    tabs.tab_picker = Some(crate::search::TabPicker::new(&tabs.apps));
+    tabs.tab_picker_area = ratatui::layout::Rect::new(10, 5, 40, 10);
+    tabs.dispatch_event(Event::Mouse(MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: 1,
+        row: 1,
+        modifiers: KeyModifiers::empty(),
+    }));
+    assert!(tabs.tab_picker.is_none());
+    fs::remove_dir_all(root).ok();
 }

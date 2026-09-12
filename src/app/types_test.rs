@@ -8,6 +8,7 @@ fn tab_action_is_copy_and_comparable() {
     let b = a; // Copy, not move
     assert_eq!(a, b);
     assert_ne!(TabAction::New, TabAction::Close);
+    assert_eq!(TabAction::Select(3), TabAction::Select(3));
 }
 
 // -- DiffMode -----------------------------------------------------------------

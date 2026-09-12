@@ -2,10 +2,32 @@ use crate::app::App;
 use crate::command_palette::CommandPalette;
 use crate::config::Config;
 use crate::git::Commit;
+use crate::search::TabPicker;
 use crate::search::{HistoryState, SearchState, ThemePicker};
+use crate::workspace::Tabs;
 use ratatui::backend::TestBackend;
 use ratatui::Terminal;
 use std::path::{Path, PathBuf};
+
+#[test]
+fn tab_picker_overlay_draws_with_the_workspace() {
+    let app = make_app();
+    let mut tabs = Tabs::new(vec![app], 0);
+    tabs.tab_picker = Some(TabPicker::new(&tabs.apps));
+    let backend = TestBackend::new(80, 24);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| super::draw_workspace(frame, &mut tabs))
+        .unwrap();
+    let text = terminal
+        .backend()
+        .buffer()
+        .content()
+        .iter()
+        .map(|cell| cell.symbol())
+        .collect::<String>();
+    assert!(text.contains("Open tabs"));
+}
 
 fn make_app() -> App {
     let cfg = Config {

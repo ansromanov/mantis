@@ -107,3 +107,38 @@ fn tab_label_truncates_long_directory_names() {
     assert!(label.chars().count() <= MAX_LABEL_LEN);
     assert!(label.ends_with('…'));
 }
+
+#[test]
+fn duplicate_root_names_use_the_shortest_unique_suffix() {
+    let parent =
+        std::env::temp_dir().join(format!("mantis_tabstrip_collision_{}", std::process::id()));
+    let api = parent.join("api").join("repo");
+    let web = parent.join("web").join("repo");
+    fs::create_dir_all(&api).unwrap();
+    fs::create_dir_all(&web).unwrap();
+    let tabs = Tabs::new(vec![app_for(&api), app_for(&web)], 0);
+    assert_eq!(unique_tab_label(&tabs, 0), "api/repo");
+    assert_eq!(unique_tab_label(&tabs, 1), "web/repo");
+    fs::remove_dir_all(&parent).ok();
+}
+
+#[test]
+fn git_branch_and_changed_count_are_shown_when_the_strip_has_room() {
+    let root = temp_dir("git_badge");
+    let second_root = temp_dir("git_badge_second");
+    let mut app = app_for(&root);
+    app.git_info = Some(crate::git::GitRepoInfo {
+        head: crate::git::GitHead::Branch("main".into()),
+        ahead: 0,
+        behind: 0,
+        total_changed: 3,
+        staged: 0,
+        untracked: 0,
+    });
+    let mut tabs = Tabs::new(vec![app, app_for(&second_root)], 0);
+    let text = render(&mut tabs, Rect::new(0, 0, 100, 1));
+    assert!(text.contains("main"));
+    assert!(text.contains("●3"));
+    fs::remove_dir_all(&root).ok();
+    fs::remove_dir_all(&second_root).ok();
+}

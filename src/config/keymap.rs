@@ -284,6 +284,11 @@ impl Keymap {
             "close_tab" => &self.close_tab,
             "next_tab" => &self.next_tab,
             "prev_tab" => &self.prev_tab,
+            "select_tab" => &self.select_tab,
+            "move_tab_prev" => &self.move_tab_prev,
+            "move_tab_next" => &self.move_tab_next,
+            "tab_picker" => &self.tab_picker,
+            "reopen_tab" => &self.reopen_tab,
             _ => &[],
         }
     }
@@ -409,6 +414,12 @@ pub struct Keymap {
     pub close_tab: Vec<KeyBinding>,
     pub next_tab: Vec<KeyBinding>,
     pub prev_tab: Vec<KeyBinding>,
+    /// Numeric tab selection: Ctrl+1 through Ctrl+9 and Ctrl+0 for the last.
+    pub select_tab: Vec<KeyBinding>,
+    pub move_tab_prev: Vec<KeyBinding>,
+    pub move_tab_next: Vec<KeyBinding>,
+    pub tab_picker: Vec<KeyBinding>,
+    pub reopen_tab: Vec<KeyBinding>,
 
     // --- deprecated/renamed action keys (read for backward-compat; never written) ---
     /// Old name for `fold_toggle` (#553).
@@ -499,6 +510,14 @@ impl Default for Keymap {
             close_tab: bind(&["ctrl+w"]),
             next_tab: bind(&["ctrl+PageDown"]),
             prev_tab: bind(&["ctrl+PageUp"]),
+            select_tab: bind(&[
+                "ctrl+1", "ctrl+2", "ctrl+3", "ctrl+4", "ctrl+5", "ctrl+6", "ctrl+7", "ctrl+8",
+                "ctrl+9", "ctrl+0",
+            ]),
+            move_tab_prev: bind(&["ctrl+["]),
+            move_tab_next: bind(&["ctrl+]"]),
+            tab_picker: bind(&["ctrl+Tab"]),
+            reopen_tab: bind(&["ctrl+Backspace"]),
             legacy_yaml_fold_toggle: None,
             legacy_visual_line_blame: None,
         };
