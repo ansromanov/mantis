@@ -2,6 +2,10 @@
 /.agent/worktrees
 /.claude/worktrees
 /docs/book
+# staged copy of /media for mdBook (see `just docs`)
+/docs/src/media
+# vhs frame output (see docs/tapes/README.md)
+/.vhs-out
 /bench-results/
 __pycache__/
 *.pyc

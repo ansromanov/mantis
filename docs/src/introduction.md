@@ -5,7 +5,7 @@ your terminal** — instantly. Point it at a folder and start moving through you
 files with the arrow keys (or your mouse), with syntax highlighting, rendered
 markdown, fuzzy search, and git diff/blame/history always one keystroke away.
 
-![mantis screenshot](../media/intro.png)
+![mantis screenshot](media/intro.png)
 
 > 💡 **New here?** You only need two things to get started: the
 > [Installation](installation.md) page, then the [Quick Start](quickstart.md).

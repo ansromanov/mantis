@@ -1,0 +1,20 @@
+# Shared config for the documentation screenshots (docs/tapes/*.tape).
+#
+# Tapes run with HOME pointed at a throwaway directory, so this is the only
+# config in play: the screenshots never inherit the repository's annotated
+# mantis.toml or whatever the author happens to have configured locally.
+# Pinning the theme is what keeps the images looking like one set.
+
+[theme]
+name = "default"
+auto_detect = false
+
+[ui]
+menu_bar = false
+
+[updates]
+check = false
+
+[telemetry]
+enabled = false
+notice_shown = true

@@ -1,0 +1,43 @@
+{
+  "run": {
+    "id": "2026-09-11T18:34:55Z",
+    "trigger": "push",
+    "branch": "main",
+    "commit": "2956e6f",
+    "duration_ms": 184203
+  },
+  "environment": {
+    "region": "us-east-1",
+    "cluster": "prod-blue",
+    "kubernetes": "1.31.4"
+  },
+  "services": [
+    {
+      "name": "api-gateway",
+      "image": "ghcr.io/example/api-gateway:v2.4.1",
+      "replicas": { "desired": 6, "ready": 6 },
+      "health": "healthy",
+      "rollout_ms": 41022
+    },
+    {
+      "name": "auth",
+      "image": "ghcr.io/example/auth:v1.19.0",
+      "replicas": { "desired": 3, "ready": 3 },
+      "health": "healthy",
+      "rollout_ms": 28114
+    },
+    {
+      "name": "search",
+      "image": "ghcr.io/example/search:v0.42.2",
+      "replicas": { "desired": 4, "ready": 3 },
+      "health": "degraded",
+      "rollout_ms": 91288,
+      "notes": ["one replica restarted twice", "p95 latency above target"]
+    }
+  ],
+  "checks": {
+    "smoke": "passed",
+    "migrations": "applied",
+    "canary": { "traffic_pct": 10, "error_rate": 0.4, "verdict": "hold" }
+  }
+}

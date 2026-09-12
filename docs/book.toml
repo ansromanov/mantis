@@ -5,3 +5,13 @@ description = "A fast terminal file tree viewer with syntax highlighting, fuzzy 
 
 [output.html]
 site-url = "/mantis/"
+additional-css = ["theme/mantis.css"]
+default-theme = "light"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/ansromanov/mantis"
+edit-url-template = "https://github.com/ansromanov/mantis/edit/main/docs/{path}"
+no-section-label = true
+
+[output.html.fold]
+enable = true
+level = 1
