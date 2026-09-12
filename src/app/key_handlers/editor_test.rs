@@ -462,6 +462,13 @@ fn open_content_search_command_scoped_in_git_mode() {
 #[test]
 fn toggle_git_mode_command_flips_git_mode_flag() {
     let root = temp_tree();
+    let status = std::process::Command::new("git")
+        .arg("-C")
+        .arg(&root)
+        .args(["init", "--quiet"])
+        .status()
+        .unwrap();
+    assert!(status.success(), "test fixture must initialize a git repo");
     let mut app = app_for(&root);
     assert!(!app.git_mode);
     app.command_palette = Some(palette_with_query("Toggle git mode"));
@@ -1393,6 +1400,21 @@ fn dispatch_worktree_picker_opens_overlay() {
     app.command_palette = Some(p);
     app.dispatch_command();
     assert!(app.worktree_picker.is_some());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn dispatch_open_worktree_new_tab_opens_picker_in_tab_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.command_palette = Some(palette_with_query("Open worktree in new tab"));
+
+    assert!(app.dispatch_command());
+
+    assert!(app
+        .worktree_picker
+        .as_ref()
+        .is_some_and(|picker| picker.open_in_new_tab));
     fs::remove_dir_all(&root).ok();
 }
 

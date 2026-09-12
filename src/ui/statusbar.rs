@@ -135,6 +135,13 @@ pub(super) fn draw_statusbar(
             ),
             Vec::new(),
         )
+    } else if let Some(picker) = &app.worktree_picker {
+        let hint = if picker.open_in_new_tab {
+            " Enter open tab  Esc cancel"
+        } else {
+            " Enter switch root  Ctrl+Enter open tab  Esc cancel"
+        };
+        (overlay_line(hint, base, area.width), Vec::new())
     } else if app.theme_picker.is_some() {
         (
             overlay_line(

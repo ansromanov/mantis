@@ -1068,6 +1068,13 @@ fn worktree_picker_filters_by_branch() {
 }
 
 #[test]
+fn worktree_picker_new_tab_constructor_selects_tab_activation() {
+    let dir = tempfile::tempdir().unwrap();
+    let picker = WorktreePicker::new_tab(dir.path());
+    assert!(picker.open_in_new_tab);
+}
+
+#[test]
 fn worktree_picker_drops_disconnected_changed_count_worker() {
     let (tx, rx) = std::sync::mpsc::channel();
     drop(tx);

@@ -814,17 +814,32 @@ impl App {
         }
     }
 
-    /// Handles keyboard input for the worktree picker and switches roots on Enter.
+    /// Handles picker keys: Enter switches roots (or opens a tab when launched
+    /// from that palette command), while Ctrl+Enter requests a separate tab.
     pub(super) fn handle_worktree_key(&mut self, key: KeyEvent) {
+        use crossterm::event::KeyModifiers;
+
         let Some(ref mut picker) = self.worktree_picker else {
             return;
         };
+        if key.code == KeyCode::Enter && key.modifiers.contains(KeyModifiers::CONTROL) {
+            let path = picker.selected_path();
+            self.worktree_picker = None;
+            if let Some(path) = path {
+                self.tab_action_request = Some(super::super::TabAction::OpenRoot(path));
+            }
+            return;
+        }
         match handle_list_picker_key(picker, &key) {
             OverlayKey::Activate => {
-                let path = picker.selected_path();
+                let (path, open_in_new_tab) = (picker.selected_path(), picker.open_in_new_tab);
                 self.worktree_picker = None;
                 if let Some(path) = path {
-                    self.set_root(&path);
+                    if open_in_new_tab {
+                        self.tab_action_request = Some(super::super::TabAction::OpenRoot(path));
+                    } else {
+                        self.set_root(&path);
+                    }
                 }
             }
             OverlayKey::Close => self.worktree_picker = None,
