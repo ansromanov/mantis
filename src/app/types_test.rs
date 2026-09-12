@@ -3,12 +3,16 @@ use super::*;
 // -- TabAction --------------------------------------------------------------
 
 #[test]
-fn tab_action_is_cloneable_and_comparable() {
+fn tab_action_is_comparable_and_carries_open_root() {
     let a = TabAction::Next;
     let b = a.clone();
     assert_eq!(a, b);
     assert_ne!(TabAction::New, TabAction::Close);
     assert_eq!(TabAction::Select(3), TabAction::Select(3));
+    assert_eq!(
+        TabAction::OpenRoot(PathBuf::from("/repo")),
+        TabAction::OpenRoot(PathBuf::from("/repo"))
+    );
 }
 
 #[test]

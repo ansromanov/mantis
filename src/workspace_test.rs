@@ -29,6 +29,23 @@ fn ctrl_key(c: char) -> Event {
     Event::Key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::CONTROL))
 }
 
+fn ctrl_enter() -> Event {
+    Event::Key(KeyEvent::new(KeyCode::Enter, KeyModifiers::CONTROL))
+}
+
+fn worktree_item(path: &std::path::Path) -> crate::git::WorktreeItem {
+    crate::git::WorktreeItem {
+        worktree: crate::git::Worktree {
+            path: path.to_path_buf(),
+            head: "abc".into(),
+            branch: Some("agent".into()),
+            locked: false,
+            prunable: false,
+        },
+        changed: 0,
+    }
+}
+
 /// Points `MANTIS_STATE_DIR` at an isolated dir for the duration of the test.
 struct IsolatedState {
     _lock: std::sync::MutexGuard<'static, ()>,
@@ -69,6 +86,86 @@ fn open_tab_pushes_and_activates_the_new_tab() {
     assert_eq!(tabs.apps.len(), 2);
     assert_eq!(tabs.active, 1);
     assert_eq!(tabs.active_app().root, b);
+    fs::remove_dir_all(&a).ok();
+    fs::remove_dir_all(&b).ok();
+}
+
+#[test]
+fn open_tab_activates_an_existing_canonical_root_without_duplicating_it() {
+    let a = temp_dir("dedupe_a");
+    let b = temp_dir("dedupe_b");
+    let mut tabs = Tabs::new(vec![app_for(&a), app_for(&b)], 0);
+    let aliased_b = b.join(".");
+
+    tabs.open_tab(aliased_b).unwrap();
+
+    assert_eq!(tabs.apps.len(), 2);
+    assert_eq!(tabs.active, 1);
+    assert_eq!(tabs.active_app().root, b);
+    fs::remove_dir_all(&a).ok();
+    fs::remove_dir_all(&b).ok();
+}
+
+#[test]
+fn ctrl_enter_opens_or_activates_the_selected_worktree_tab() {
+    let a = temp_dir("action_a");
+    let b = temp_dir("action_b");
+    let c = temp_dir("action_c");
+    let mut tabs = Tabs::new(vec![app_for(&a), app_for(&b), app_for(&c)], 2);
+    tabs.active_app_mut().worktree_picker = Some(crate::search::WorktreePicker::for_test(vec![
+        worktree_item(&b),
+    ]));
+
+    tabs.dispatch_event(ctrl_enter());
+
+    assert_eq!(
+        tabs.apps.len(),
+        3,
+        "an open worktree must not be duplicated"
+    );
+    assert_eq!(
+        tabs.active, 1,
+        "the existing worktree tab must be activated"
+    );
+    assert_eq!(tabs.active_app().root, b);
+    fs::remove_dir_all(&a).ok();
+    fs::remove_dir_all(&b).ok();
+    fs::remove_dir_all(&c).ok();
+}
+
+#[test]
+fn opening_a_root_uses_its_session_without_changing_the_active_tab() {
+    let a = temp_dir("session_a");
+    let b = temp_dir("session_b");
+    fs::write(a.join("current.txt"), "alpha\nbeta\n").unwrap();
+    fs::write(b.join("current.txt"), "one\ntwo\nthree\n").unwrap();
+    let _state = IsolatedState::new(&a);
+    let b_file = b.join("current.txt");
+    crate::session::save(
+        &b,
+        &crate::session::SessionState {
+            current_file: Some(b_file.clone()),
+            content_scroll: 1,
+            active_line: 2,
+            ..Default::default()
+        },
+    );
+    let mut current = app_for(&a);
+    current.active_line = 1;
+    current.content_scroll = 0;
+    let mut tabs = Tabs::new(vec![current], 0);
+
+    tabs.open_tab(b.clone()).unwrap();
+
+    assert_eq!(tabs.apps.len(), 2);
+    assert_eq!(tabs.active_app().root, b);
+    assert_eq!(
+        tabs.active_app().current_file.as_deref(),
+        Some(b_file.as_path())
+    );
+    assert_eq!(tabs.active_app().active_line, 2);
+    assert_eq!(tabs.apps[0].active_line, 1);
+    assert_eq!(tabs.apps[0].content_scroll, 0);
     fs::remove_dir_all(&a).ok();
     fs::remove_dir_all(&b).ok();
 }
