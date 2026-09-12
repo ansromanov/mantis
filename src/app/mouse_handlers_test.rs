@@ -87,6 +87,76 @@ fn right_down_at(column: u16, row: u16) -> MouseEvent {
 }
 
 #[test]
+fn statusbar_segment_click_opens_revision_picker_and_blank_space_is_noop() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.statusbar_area = Rect::new(0, 0, 30, 1);
+    app.statusbar_segments = vec![(crate::ui::statusbar::StatusSegment::Git, 4, 14)];
+
+    app.handle_mouse(left_down_at(7, 0));
+    assert!(app.revision_picker.is_some());
+
+    app.revision_picker = None;
+    app.handle_mouse(left_down_at(20, 0));
+    assert!(app.revision_picker.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn statusbar_overlay_hint_line_has_no_click_targets() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.goto_line = Some(crate::search::GotoLineState::new());
+    app.statusbar_area = Rect::new(0, 0, 30, 1);
+    app.statusbar_segments.clear();
+
+    app.handle_mouse(left_down_at(5, 0));
+    assert!(app.goto_line.is_some());
+    assert!(app.revision_picker.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn statusbar_clicks_open_each_mapped_picker_and_toggle_folds() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.statusbar_area = Rect::new(0, 0, 30, 1);
+
+    let click = |app: &mut App, segment| {
+        app.statusbar_segments = vec![(segment, 2, 8)];
+        app.handle_mouse(left_down_at(4, 0));
+    };
+
+    click(&mut app, crate::ui::statusbar::StatusSegment::Worktrees);
+    assert!(app.worktree_picker.is_some());
+    app.worktree_picker = None;
+
+    click(&mut app, crate::ui::statusbar::StatusSegment::Lnum);
+    assert!(app.goto_line.is_some());
+    assert_eq!(app.focus, Focus::Content);
+    app.goto_line = None;
+
+    click(&mut app, crate::ui::statusbar::StatusSegment::Type);
+    assert!(app.theme_picker.is_some());
+    app.theme_picker = None;
+
+    app.fold_regions = vec![crate::fold::FoldRegion { start: 0, end: 5 }];
+    click(&mut app, crate::ui::statusbar::StatusSegment::Folds);
+    assert_eq!(app.folded.len(), 1);
+    click(&mut app, crate::ui::statusbar::StatusSegment::Folds);
+    assert!(app.folded.is_empty());
+
+    click(&mut app, crate::ui::statusbar::StatusSegment::Errors);
+    assert!(app.plugin_picker.is_some());
+    app.plugin_picker = None;
+
+    click(&mut app, crate::ui::statusbar::StatusSegment::Update);
+    assert!(app.show_about);
+
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn scrolling_content_marks_session_dirty() {
     let root = temp_tree();
     let mut app = app_for(&root);

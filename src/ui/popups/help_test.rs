@@ -66,6 +66,19 @@ fn help_shows_search_option_toggles() {
 }
 
 #[test]
+fn help_documents_clickable_statusbar_segments() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    app.help_tab = 8; // Mouse tab
+    let backend = TestBackend::new(100, 75);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
+    let joined = buffer_rows(&terminal).join("\n");
+    assert!(joined.contains("Mouse (status bar)"));
+    assert!(joined.contains("Click a segment to open its picker or run its action"));
+}
+
+#[test]
 fn help_shows_dot_for_toggle_hidden() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());

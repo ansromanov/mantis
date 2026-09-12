@@ -500,6 +500,18 @@ fn statusbar_config_round_trips_explicit_mode() {
 }
 
 #[test]
+fn statusbar_config_accepts_worktree_segment_id() {
+    let cfg: Config = toml::from_str(
+        r#"
+[statusbar]
+left = ["worktrees"]
+"#,
+    )
+    .unwrap();
+    assert_eq!(cfg.statusbar.left, Some(vec!["worktrees".into()]));
+}
+
+#[test]
 fn updates_check_defaults_to_true() {
     let cfg = Config::default();
     assert!(cfg.updates.check);

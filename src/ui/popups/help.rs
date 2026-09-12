@@ -621,6 +621,10 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
                 "Right-Click",
                 "Open the context menu (file/folder/copy/toggle actions)",
             ));
+            rows.push(row_static_key(
+                "Mouse (status bar)",
+                "Click a segment to open its picker or run its action",
+            ));
             rows.push(gap.clone());
             rows.push(section("Breadcrumb Actions"));
             rows.push(row_static_key(

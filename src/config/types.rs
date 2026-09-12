@@ -197,10 +197,12 @@ pub struct GitDiffConfig {
 #[serde(default)]
 pub struct StatusBarConfig {
     /// Segments to show on the left, in order. `None` = default behaviour.
-    /// Valid ids: hint badges scroll lnum type fileinfo git errors folds message version
+    /// Valid ids: badges worktrees scroll lnum type jsonpath fileinfo git errors folds pluginfacts
+    /// message pluginerror version update
     pub left: Option<Vec<String>>,
     /// Segments to show on the right, in order. `None` = default behaviour.
-    /// Valid ids: hint badges scroll lnum type fileinfo git errors folds message version
+    /// Valid ids: badges worktrees scroll lnum type jsonpath fileinfo git errors folds pluginfacts
+    /// message pluginerror version update
     pub right: Option<Vec<String>>,
 }
 
