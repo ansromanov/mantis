@@ -1397,6 +1397,21 @@ fn dispatch_worktree_picker_opens_overlay() {
 }
 
 #[test]
+fn dispatch_open_worktree_new_tab_opens_picker_in_tab_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.command_palette = Some(palette_with_query("Open worktree in new tab"));
+
+    assert!(app.dispatch_command());
+
+    assert!(app
+        .worktree_picker
+        .as_ref()
+        .is_some_and(|picker| picker.open_in_new_tab));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn dispatch_toggle_table_view_toggles_show_csv_table() {
     let root = temp_tree();
     let mut app = app_for(&root);

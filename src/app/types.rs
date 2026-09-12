@@ -3,7 +3,7 @@
 //!
 //! Extracted from `mod.rs` to stay under the 700-line project limit. Re-exported
 //! from `super::mod.rs` so callers continue to use `crate::app::Focus`,
-//! `crate::app::DiffMode`, etc.
+//! `crate::app::DiffMode`, and tab-action requests including worktree roots.
 
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
@@ -43,6 +43,9 @@ pub enum TabAction {
     Picker,
     /// Reopen the most recently closed tab.
     Reopen,
+    /// Open the given project root in its own tab, or activate its tab if
+    /// that root is already open.
+    OpenRoot(PathBuf),
 }
 
 /// Which git diff view is active in the content pane.
