@@ -42,6 +42,16 @@ fn dispatch_json_query_opens_query_bar() {
 }
 
 #[test]
+fn context_menu_is_available_from_the_command_palette() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.command_palette = Some(palette_with_query("Open context menu"));
+    assert!(app.dispatch_command());
+    assert!(app.context_menu.is_some());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn dispatch_new_tab_records_a_tab_action_request() {
     let root = temp_tree();
     let mut app = app_for(&root);

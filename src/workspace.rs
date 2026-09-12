@@ -156,6 +156,47 @@ impl Tabs {
         self.ensure_active_visible();
     }
 
+    fn close_tab_at(&mut self, index: usize) {
+        if self.apps.len() <= 1 || index >= self.apps.len() {
+            return;
+        }
+        let mut app = self.apps.remove(index);
+        app.save_session();
+        app.plugin_manager.on_quit();
+        app.plugin_manager.deactivate_all();
+        if self.active > index {
+            self.active -= 1;
+        }
+        self.active = self.active.min(self.apps.len().saturating_sub(1));
+    }
+
+    fn close_tabs_to_right(&mut self, index: usize) {
+        while self.apps.len() > index.saturating_add(1) {
+            self.close_tab_at(self.apps.len() - 1);
+        }
+        self.active = index.min(self.apps.len().saturating_sub(1));
+    }
+
+    fn close_other_tabs(&mut self, index: usize) {
+        if index >= self.apps.len() {
+            return;
+        }
+        let mut kept = None;
+        for (i, mut app) in self.apps.drain(..).enumerate() {
+            if i == index {
+                kept = Some(app);
+            } else {
+                app.save_session();
+                app.plugin_manager.on_quit();
+                app.plugin_manager.deactivate_all();
+            }
+        }
+        if let Some(app) = kept {
+            self.apps.push(app);
+            self.active = 0;
+        }
+    }
+
     /// Switches to the next tab, wrapping around. No-op with one tab.
     pub fn next_tab(&mut self) {
         if self.apps.len() > 1 {
@@ -408,6 +449,20 @@ impl Tabs {
                     }
                 }
             }
+            crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Right) => {
+                let Some(i) = (match hit {
+                    crate::ui::tabstrip::TabHit::Switch(i)
+                    | crate::ui::tabstrip::TabHit::Close(i) => Some(i),
+                    crate::ui::tabstrip::TabHit::ScrollLeft
+                    | crate::ui::tabstrip::TabHit::ScrollRight => None,
+                }) else {
+                    return true;
+                };
+                self.active = i;
+                if let Some(app) = self.apps.get_mut(i) {
+                    app.open_tab_context_menu(app.root.clone(), i, (m.column, m.row));
+                }
+            }
             _ => {}
         }
         true
@@ -427,6 +482,14 @@ impl Tabs {
     fn apply_tab_action(&mut self, action: TabAction) {
         match action {
             TabAction::New => self.new_tab_prompt = Some(String::new()),
+            TabAction::Open(path) => {
+                if let Err(error) = self.open_tab(path) {
+                    self.active_app_mut()
+                        .set_status(format!("cannot open tab: {error}"));
+                }
+            }
+            TabAction::CloseOthers(index) => self.close_other_tabs(index),
+            TabAction::CloseToRight(index) => self.close_tabs_to_right(index),
             TabAction::Close => self.close_active_tab(),
             TabAction::Next => self.next_tab(),
             TabAction::Prev => self.prev_tab(),

@@ -6,10 +6,10 @@
 //! content panel by hit-testing the `Rect`s recorded during the last render. It
 //! handles left-click selection, drag-selection of text, splitter dragging to
 //! resize the tree pane, scrollbar dragging, wheel scrolling, double-click to
-//! open a picker result, and right-click to open the context menu. The optional
-//! action-menu row handles hover and click before panel routing. While either
-//! menu is open, pointer events route to its own handler so item clicks and
-//! dismissal work without falling through to the panels.
+//! open a picker result, and right-click to open menus on tree, content,
+//! breadcrumb, blame, hunk, and status-bar targets. While the
+//! context menu or action-menu row is open, pointer events route to its own
+//! handler so item clicks and dismissal work without falling through to panels.
 //! All coordinate math must account for the panels' scroll offsets, which are
 //! also captured at render time.
 
@@ -298,10 +298,20 @@ impl App {
             return;
         }
         if rect_contains(self.statusbar_area, ev.column, ev.row) {
-            if let MouseEventKind::Down(MouseButton::Left) = ev.kind {
-                if let Some(segment) = crate::ui::statusbar::hit_test(self, ev.column, ev.row) {
-                    self.activate_statusbar_segment(segment);
+            match ev.kind {
+                MouseEventKind::Down(MouseButton::Left) => {
+                    if let Some(segment) = crate::ui::statusbar::hit_test(self, ev.column, ev.row) {
+                        self.activate_statusbar_segment(segment);
+                    }
+                    return;
                 }
+                MouseEventKind::Down(MouseButton::Right) => {
+                    let segment =
+                        crate::ui::statusbar::segment_at(self, self.statusbar_area, ev.column)
+                            .unwrap_or_default();
+                    self.open_statusbar_context_menu(segment, (ev.column, ev.row));
+                }
+                _ => {}
             }
             return;
         }
@@ -437,7 +447,22 @@ impl App {
             }
             MouseEventKind::Down(MouseButton::Right) => {
                 let anchor = (ev.column, ev.row);
-                if rect_contains(self.tree_area, ev.column, ev.row) {
+                let breadcrumb = self
+                    .breadcrumb_areas
+                    .iter()
+                    .find(|(_, area)| rect_contains(*area, ev.column, ev.row))
+                    .map(|(path, _)| path.clone());
+                if let Some(path) = breadcrumb {
+                    self.open_breadcrumb_context_menu(path, anchor);
+                } else if self.show_blame && rect_contains(self.blame_area, ev.column, ev.row) {
+                    let display_line = self
+                        .content_scroll
+                        .saturating_add(ev.row.saturating_sub(self.blame_area.y) as usize);
+                    if display_line < self.display_line_count() {
+                        let physical = self.display_to_physical(display_line);
+                        self.open_blame_context_menu(physical, anchor);
+                    }
+                } else if rect_contains(self.tree_area, ev.column, ev.row) {
                     let row = (ev.row - self.tree_area.y) as usize;
                     let index = self.tree_offset + row;
                     if self.tree_filter.is_some() {
@@ -451,7 +476,22 @@ impl App {
                         self.open_tree_context_menu(index, anchor);
                     }
                 } else if rect_contains(self.content_area, ev.column, ev.row) {
-                    self.open_content_context_menu(anchor);
+                    if !self.is_diff && self.has_text_cursor() {
+                        let pos = self.content_pos(ev.column, ev.row);
+                        self.set_active_line_from_physical(pos.0);
+                    }
+                    let row = self
+                        .content_scroll
+                        .saturating_add(ev.row.saturating_sub(self.content_area.y) as usize);
+                    let header_row = self
+                        .is_diff
+                        .then(|| self.diff_hunk_header_for_row(row))
+                        .flatten();
+                    if let Some(header_row) = header_row {
+                        self.open_hunk_context_menu(header_row, anchor);
+                    } else {
+                        self.open_content_context_menu(anchor);
+                    }
                 }
             }
             MouseEventKind::Drag(MouseButton::Left) => {

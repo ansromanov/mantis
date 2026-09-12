@@ -55,6 +55,7 @@ fn global_char_binding(c: char) -> Vec<crate::config::KeyBinding> {
         code: KeyCode::Char(c),
         ctrl: false,
         alt: false,
+        shift: false,
         super_key: false,
         scope: crate::config::BindingScope::Global,
     }]

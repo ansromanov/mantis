@@ -11,6 +11,15 @@ fn worktree_picker_is_registered() {
 }
 
 #[test]
+fn context_menu_action_is_palette_invokable() {
+    let action = ACTIONS
+        .iter()
+        .find(|action| action.id == "context_menu")
+        .unwrap();
+    assert_eq!(action.palette, Some("Open context menu"));
+}
+
+#[test]
 fn secret_reveal_action_is_registered() {
     assert!(ACTIONS
         .iter()
@@ -92,6 +101,8 @@ const KEYMAP_FIELD_ACTION_IDS: &[&str] = &[
     "search_content",
     "reload",
     "switch_panel",
+    "menu_bar",
+    "context_menu",
     "file_history",
     "repo_commit_log",
     "theme_picker",

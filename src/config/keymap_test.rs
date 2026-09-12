@@ -837,3 +837,21 @@ fn toggle_table_view_bindings_for_action() {
     keymap.toggle_table_view = bind(&["ctrl+t"]);
     assert_eq!(keymap.bindings_for_action("toggle_table_view").len(), 1);
 }
+
+#[test]
+fn context_menu_defaults_to_menu_and_shift_f10() {
+    let keymap = Keymap::default();
+    assert_eq!(keymap.context_menu.len(), 2);
+    assert_eq!(keymap.context_menu[0].code, KeyCode::Menu);
+    assert_eq!(keymap.context_menu[1].code, KeyCode::F(10));
+    assert!(keymap.context_menu[1].shift);
+    assert_eq!(keymap.context_menu[1].display(), "Shift+F10");
+    assert!(pressed(
+        &keymap.context_menu[1..2],
+        &ev(KeyCode::F(10), KeyModifiers::SHIFT)
+    ));
+    assert!(!pressed(
+        &keymap.context_menu[1..2],
+        &ev(KeyCode::F(10), KeyModifiers::empty())
+    ));
+}

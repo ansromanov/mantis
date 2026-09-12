@@ -34,6 +34,7 @@ keys.content_page_up
 keys.content_reset_col
 keys.content_right
 keys.content_top
+keys.context_menu
 keys.copy_file
 keys.copy_line
 keys.copy_path
@@ -50,6 +51,8 @@ keys.git_mode_toggle
 keys.goto_line
 keys.help
 keys.menu_bar
+keys.move_tab_next
+keys.move_tab_prev
 keys.nav_down
 keys.nav_up
 keys.new_tab
@@ -61,10 +64,13 @@ keys.prev_tab
 keys.quit
 keys.recent_files
 keys.reload
+keys.reopen_tab
 keys.repo_commit_log
 keys.search_content
 keys.search_files
+keys.select_tab
 keys.switch_panel
+keys.tab_picker
 keys.theme_picker
 keys.toggle_blame
 keys.toggle_bookmark

@@ -128,6 +128,19 @@ fn statusbar_ranges_follow_elision_at_narrow_widths() {
     }
 }
 
+#[test]
+fn statusbar_hit_test_returns_the_visible_segment_text() {
+    let mut app = make_app();
+    app.worktree_count = 3;
+    let area = ratatui::layout::Rect::new(0, 5, 80, 1);
+    let segment = segment_at(&app, area, 2).expect("worktree count span is visible");
+    assert!(segment.contains("worktrees: 3"));
+    assert_eq!(
+        segment_at(&app, area, 79),
+        Some(format!(" v{}", env!("CARGO_PKG_VERSION")))
+    );
+}
+
 fn render_bar_width(app: &App, width: u16) -> String {
     let backend = TestBackend::new(width, 1);
     let mut terminal = Terminal::new(backend).unwrap();

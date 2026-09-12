@@ -1,4 +1,4 @@
-use super::*;
+use super::entries::entry_action_id;
 
 use std::fs;
 use std::path::PathBuf;
@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::Rect;
 
-use crate::app::{App, ContextActionId, ContextMenuEntry, ContextMenuTarget};
+use crate::app::{App, ContextActionId, ContextMenuEntry, ContextMenuTarget, Focus};
 use crate::config::Config;
 use crate::selection::TextSelection;
 
@@ -45,6 +45,7 @@ fn action_labels(menu: &crate::app::ContextMenuState) -> Vec<String> {
         .filter_map(|e| match e {
             ContextMenuEntry::Action { label, .. } => Some(label.clone()),
             ContextMenuEntry::Separator => None,
+            ContextMenuEntry::Submenu { label, .. } => Some(label.clone()),
         })
         .collect()
 }
@@ -52,7 +53,7 @@ fn action_labels(menu: &crate::app::ContextMenuState) -> Vec<String> {
 fn entry_id(menu: &crate::app::ContextMenuState, index: usize) -> Option<ContextActionId> {
     match menu.entries.get(index)? {
         ContextMenuEntry::Action { id, .. } => Some(*id),
-        ContextMenuEntry::Separator => None,
+        ContextMenuEntry::Separator | ContextMenuEntry::Submenu { .. } => None,
     }
 }
 
@@ -158,6 +159,7 @@ fn open_content_context_menu_without_file_omits_file_actions() {
         !labels.iter().any(|l| l == "Reveal in tree"),
         "content menu without an open file must omit file actions"
     );
+    assert!(!labels.iter().any(|l| l == "Copy as markdown block"));
     fs::remove_dir_all(&root).ok();
 }
 
@@ -316,11 +318,23 @@ fn context_enter_on_expand_entry_expands_directory() {
     let sub = root.join("sub");
 
     app.open_tree_context_menu(dir_idx, (10, 10));
-    // Directory menu: 0 Open, sep, 2 CopyPath, 3 CopyRelative, sep, 5 Reveal,
-    // 6 Expand. Four downs skip the separators to land on Expand.
-    for _ in 0..4 {
-        app.handle_context_menu_key(key(KeyCode::Down));
-    }
+    let expand = app
+        .context_menu
+        .as_ref()
+        .unwrap()
+        .entries
+        .iter()
+        .position(|entry| {
+            matches!(
+                entry,
+                ContextMenuEntry::Action {
+                    id: ContextActionId::ExpandDir,
+                    ..
+                }
+            )
+        })
+        .unwrap();
+    app.context_menu.as_mut().unwrap().selected = expand;
     assert_eq!(
         entry_id(
             app.context_menu.as_ref().unwrap(),
@@ -350,9 +364,23 @@ fn context_enter_on_collapse_entry_collapses_directory() {
     app.expanded.insert(sub.clone());
 
     app.open_tree_context_menu(dir_idx, (10, 10));
-    for _ in 0..4 {
-        app.handle_context_menu_key(key(KeyCode::Down));
-    }
+    let collapse = app
+        .context_menu
+        .as_ref()
+        .unwrap()
+        .entries
+        .iter()
+        .position(|entry| {
+            matches!(
+                entry,
+                ContextMenuEntry::Action {
+                    id: ContextActionId::CollapseDir,
+                    ..
+                }
+            )
+        })
+        .unwrap();
+    app.context_menu.as_mut().unwrap().selected = collapse;
     assert_eq!(
         entry_id(
             app.context_menu.as_ref().unwrap(),
@@ -670,5 +698,206 @@ fn context_expand_dir_action_uses_target_path_after_rebuild() {
         app.expanded.contains(&sub),
         "ExpandDir must expand the right-clicked path even if selection moved"
     );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_menu_includes_new_actions_and_groups_git_items_in_submenu() {
+    let root = temp_tree();
+    assert!(std::process::Command::new("git")
+        .args(["-C", root.to_str().unwrap(), "init", "-q"])
+        .status()
+        .unwrap()
+        .success());
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt"));
+    let file_idx = app
+        .nodes
+        .iter()
+        .position(|n| n.path == root.join("a.txt"))
+        .unwrap();
+    app.open_tree_context_menu(file_idx, (10, 10));
+    let menu = app.context_menu.as_ref().unwrap();
+    let labels = action_labels(menu);
+    for label in [
+        "Toggle bookmark",
+        "Copy file name",
+        "Copy as markdown block",
+    ] {
+        assert!(labels.iter().any(|value| value == label), "missing {label}");
+    }
+    assert!(menu.entries.iter().any(|entry| matches!(entry,
+        ContextMenuEntry::Submenu { label, entries } if label == "Git" && !entries.is_empty())));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn tree_git_submenu_is_hidden_outside_a_git_repository() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let file_idx = app
+        .nodes
+        .iter()
+        .position(|n| n.path == root.join("a.txt"))
+        .unwrap();
+    app.open_tree_context_menu(file_idx, (10, 10));
+    assert!(!app
+        .context_menu
+        .as_ref()
+        .unwrap()
+        .entries
+        .iter()
+        .any(|entry| matches!(entry, ContextMenuEntry::Submenu { label, .. } if label == "Git")));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn keyboard_context_menu_uses_focused_tree_row() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let file_idx = app
+        .nodes
+        .iter()
+        .position(|n| n.path == root.join("a.txt"))
+        .unwrap();
+    app.tree_selected = file_idx;
+    app.tree_area = Rect::new(0, 2, 30, 10);
+    app.tree_offset = 0;
+    app.focus = Focus::Tree;
+    app.handle_key(KeyEvent::new(
+        KeyCode::F(10),
+        crossterm::event::KeyModifiers::SHIFT,
+    ));
+    let menu = app
+        .context_menu
+        .as_ref()
+        .expect("Shift+F10 opens context menu");
+    assert!(
+        matches!(&menu.target, ContextMenuTarget::Tree { path, .. } if path == &root.join("a.txt"))
+    );
+    assert_eq!(menu.anchor.1, 2 + file_idx as u16);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn submenu_enter_opens_level_and_escape_returns_to_parent() {
+    let root = temp_tree();
+    assert!(std::process::Command::new("git")
+        .args(["-C", root.to_str().unwrap(), "init", "-q"])
+        .status()
+        .unwrap()
+        .success());
+    let mut app = app_for(&root);
+    let file_idx = app
+        .nodes
+        .iter()
+        .position(|n| n.path == root.join("a.txt"))
+        .unwrap();
+    app.open_tree_context_menu(file_idx, (10, 10));
+    let submenu = app
+        .context_menu
+        .as_ref()
+        .unwrap()
+        .entries
+        .iter()
+        .position(|entry| matches!(entry, ContextMenuEntry::Submenu { .. }))
+        .unwrap();
+    app.context_menu.as_mut().unwrap().selected = submenu;
+    app.handle_context_menu_key(key(KeyCode::Enter));
+    assert_eq!(app.context_menu.as_ref().unwrap().submenu_stack.len(), 1);
+    assert!(!app
+        .context_menu
+        .as_ref()
+        .unwrap()
+        .visible_entries()
+        .is_empty());
+    app.handle_context_menu_key(key(KeyCode::Esc));
+    assert!(app.context_menu.as_ref().unwrap().submenu_stack.is_empty());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn markdown_copy_includes_relative_path_and_fenced_content() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let file_idx = app
+        .nodes
+        .iter()
+        .position(|n| n.path == root.join("a.txt"))
+        .unwrap();
+    app.open_tree_context_menu(file_idx, (10, 10));
+    app.execute_context_action(ContextActionId::CopyMarkdownBlock);
+    let copied = app.clipboard_capture.last().unwrap();
+    assert!(copied.starts_with("a.txt:1\n\n```txt\nline1\nline2"));
+    assert!(copied.ends_with("\n```"));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn breadcrumb_and_tab_targets_offer_their_specific_actions() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_breadcrumb_context_menu(root.clone(), (5, 1));
+    assert!(
+        action_labels(app.context_menu.as_ref().unwrap()).contains(&"Set as tree root".to_string())
+    );
+    app.open_tab_context_menu(root.clone(), 0, (5, 0));
+    let labels = action_labels(app.context_menu.as_ref().unwrap());
+    assert!(labels.contains(&"Duplicate tab".to_string()));
+    assert!(labels.contains(&"Close tabs to the right".to_string()));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn content_menu_includes_line_blame_folding_and_revision_actions() {
+    let root = temp_tree();
+    assert!(std::process::Command::new("git")
+        .args(["-C", root.to_str().unwrap(), "init", "-q"])
+        .status()
+        .unwrap()
+        .success());
+    let mut app = app_for(&root);
+    app.open_file(&root.join("a.txt"));
+    app.fold_regions = vec![crate::fold::FoldRegion { start: 0, end: 1 }];
+    app.open_content_context_menu((20, 5));
+    let labels = action_labels(app.context_menu.as_ref().unwrap());
+    for label in [
+        "Blame this line",
+        "Go to line",
+        "Fold all",
+        "Unfold all",
+        "Open at revision",
+    ] {
+        if label == "Open at revision" {
+            assert!(
+                !labels.iter().any(|value| value == label),
+                "revision action requires a diff"
+            );
+        } else {
+            assert!(labels.iter().any(|value| value == label), "missing {label}");
+        }
+    }
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn statusbar_menu_selects_picker_group_by_clicked_side() {
+    let root = temp_tree();
+    assert!(std::process::Command::new("git")
+        .args(["-C", root.to_str().unwrap(), "init", "-q"])
+        .status()
+        .unwrap()
+        .success());
+    let mut app = app_for(&root);
+    app.open_statusbar_context_menu("[M]".to_string(), (2, 23));
+    let labels = action_labels(app.context_menu.as_ref().unwrap());
+    assert!(labels.contains(&"Open recent files".to_string()));
+    assert!(labels.contains(&"Open bookmarks".to_string()));
+    app.git_info = Some(crate::git::repo_info(&root).unwrap());
+    let head = app.git_info.as_ref().unwrap().head.display();
+    app.open_statusbar_context_menu(format!(" [{head}]"), (70, 23));
+    let labels = action_labels(app.context_menu.as_ref().unwrap());
+    assert!(labels.contains(&"Open repository history".to_string()));
+    assert!(labels.contains(&"Open worktree picker".to_string()));
     fs::remove_dir_all(&root).ok();
 }

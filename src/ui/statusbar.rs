@@ -7,6 +7,9 @@
 //! and scroll percentage, and active mode flags. Colors come from the active
 //! theme. It returns the surviving segment geometry for mouse hit-testing and
 //! is drawn last so it always reflects the final per-frame state.
+//! It is a read-only projection of `App`; it never mutates state.
+//! `segment_at` maps a mouse column back to the visible span text for context
+//! menu hit-testing.
 //!
 //! On narrow terminals the bar elides low-priority segments so it never
 //! overflows `area.width`. Plugin and status messages (`P_META`) are dropped
@@ -189,6 +192,26 @@ pub(crate) fn hit_test(app: &App, column: u16, row: u16) -> Option<StatusSegment
         .iter()
         .find(|(_, start, end)| column >= *start && column < *end)
         .map(|(segment, _, _)| *segment)
+}
+
+/// Returns the visible status-bar span text under `column`, excluding the
+/// spacer between left and right groups and empty overlay hints.
+pub(crate) fn segment_at(app: &App, area: Rect, column: u16) -> Option<String> {
+    if column < area.x || column >= area.x.saturating_add(area.width) {
+        return None;
+    }
+    let (line, _) = build_normal_line(app, Style::default(), area.width);
+    let mut x = area.x;
+    for span in line.spans {
+        let width = span.width() as u16;
+        let end = x.saturating_add(width);
+        if column >= x && column < end {
+            let text = span.content.to_string();
+            return (!text.trim().is_empty()).then_some(text);
+        }
+        x = end;
+    }
+    None
 }
 
 /// Overlay hint text, truncated with ellipsis if it exceeds `max_width`.

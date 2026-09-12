@@ -846,6 +846,7 @@ fn right_click_on_directory_row_opens_tree_menu() {
         .filter_map(|e| match e {
             crate::app::ContextMenuEntry::Action { label, .. } => Some(label.as_str()),
             crate::app::ContextMenuEntry::Separator => None,
+            crate::app::ContextMenuEntry::Submenu { label, .. } => Some(label.as_str()),
         })
         .collect();
     assert!(
@@ -1747,6 +1748,141 @@ fn mouse_input_pauses_follow_mode() {
     app.handle_mouse(scroll_down_at(0, 0));
     assert!(!app.follow_pinned);
     assert!(app.follow_paused_until.is_some());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn right_clicking_a_breadcrumb_opens_its_context_menu() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let area = Rect::new(0, 1, 12, 1);
+    app.breadcrumb_areas.push((root.clone(), area));
+    app.handle_mouse(MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Right),
+        column: 2,
+        row: 1,
+        modifiers: crossterm::event::KeyModifiers::NONE,
+    });
+    assert!(matches!(app.context_menu.as_ref().map(|m| &m.target),
+        Some(crate::app::ContextMenuTarget::Breadcrumb { path }) if path == &root));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn right_clicking_the_statusbar_opens_status_actions() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.statusbar_area = Rect::new(0, 23, 80, 1);
+    assert!(crate::ui::statusbar::segment_at(&app, app.statusbar_area, 75).is_some());
+    app.handle_mouse(MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Right),
+        column: 75,
+        row: 23,
+        modifiers: crossterm::event::KeyModifiers::NONE,
+    });
+    assert!(matches!(
+        app.context_menu.as_ref().map(|m| &m.target),
+        Some(crate::app::ContextMenuTarget::Statusbar)
+    ));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn right_clicking_a_diff_header_opens_hunk_actions() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.git_mode = true;
+    app.is_diff = true;
+    app.content = vec![
+        "@@ -1 +1 @@".to_string(),
+        "-old".to_string(),
+        "+new".to_string(),
+    ];
+    app.content_area = Rect::new(40, 2, 40, 20);
+    app.handle_mouse(MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Right),
+        column: 45,
+        row: 2,
+        modifiers: crossterm::event::KeyModifiers::NONE,
+    });
+    assert!(matches!(
+        app.context_menu.as_ref().map(|m| &m.target),
+        Some(crate::app::ContextMenuTarget::DiffHunk { header_row: 0 })
+    ));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn right_clicking_a_side_by_side_diff_row_targets_its_unified_hunk() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.is_diff = true;
+    app.diff_side_by_side = true;
+    app.content = vec![
+        "diff --git a/file b/file".to_string(),
+        "@@ -1 +1 @@".to_string(),
+        "-old".to_string(),
+        "+new".to_string(),
+    ];
+    app.diff_rows = crate::diff::parse_side_by_side(&app.content);
+    app.content_area = Rect::new(40, 2, 40, 20);
+    app.handle_mouse(MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Right),
+        column: 45,
+        row: 2,
+        modifiers: crossterm::event::KeyModifiers::NONE,
+    });
+    assert!(matches!(
+        app.context_menu.as_ref().map(|m| &m.target),
+        Some(crate::app::ContextMenuTarget::DiffHunk { header_row: 1 })
+    ));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn right_clicking_a_blame_row_opens_blame_actions() {
+    let root = temp_tree();
+    let path = root.join("long.txt");
+    assert!(std::process::Command::new("git")
+        .args(["-C", root.to_str().unwrap(), "init", "-q"])
+        .status()
+        .unwrap()
+        .success());
+    assert!(std::process::Command::new("git")
+        .args(["-C", root.to_str().unwrap(), "add", "long.txt"])
+        .status()
+        .unwrap()
+        .success());
+    assert!(std::process::Command::new("git")
+        .args([
+            "-C",
+            root.to_str().unwrap(),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "initial",
+            "-q"
+        ])
+        .status()
+        .unwrap()
+        .success());
+    let mut app = app_for(&root);
+    app.open_file(&path);
+    app.show_blame = true;
+    app.blame_area = Rect::new(40, 2, 25, 10);
+    app.handle_mouse(MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Right),
+        column: 42,
+        row: 2,
+        modifiers: crossterm::event::KeyModifiers::NONE,
+    });
+    assert!(matches!(
+        app.context_menu.as_ref().map(|m| &m.target),
+        Some(crate::app::ContextMenuTarget::Blame { line: 0, .. })
+    ));
     fs::remove_dir_all(&root).ok();
 }
 // touched for log follow mode

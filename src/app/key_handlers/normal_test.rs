@@ -39,6 +39,19 @@ fn opening_in_file_search_marks_the_bar_active() {
     let _ = std::fs::remove_dir_all(root);
 }
 
+#[test]
+fn menu_key_opens_context_menu_for_focused_tree_row() {
+    let root = temp_tree();
+    let mut app = App::new(root.clone(), Config::default(), None, None).unwrap();
+    app.focus = Focus::Tree;
+    app.handle_key(KeyEvent::new(KeyCode::Menu, KeyModifiers::NONE));
+    assert!(matches!(
+        app.context_menu.as_ref().map(|m| &m.target),
+        Some(crate::app::ContextMenuTarget::Tree { .. })
+    ));
+    fs::remove_dir_all(&root).ok();
+}
+
 #[cfg(unix)]
 use crate::event_source::{AltKeys, CURRENT_ALT_KEYS};
 

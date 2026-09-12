@@ -83,6 +83,10 @@ impl App {
         }
         self.command_palette = None;
         match Some(id) {
+            Some("context_menu") => {
+                self.open_focused_context_menu();
+                true
+            }
             Some("help") => {
                 self.show_help = !self.show_help;
                 true

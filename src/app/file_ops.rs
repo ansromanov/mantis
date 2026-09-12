@@ -637,6 +637,11 @@ impl App {
             self.set_status("bookmark: no file is open");
             return;
         };
+        self.toggle_bookmark_path(path);
+    }
+
+    /// Toggles a bookmark for `path` and persists the change.
+    pub(super) fn toggle_bookmark_path(&mut self, path: PathBuf) {
         if let Some(index) = self.bookmark_paths.iter().position(|p| p == &path) {
             self.bookmark_paths.remove(index);
             self.set_status("bookmark removed");

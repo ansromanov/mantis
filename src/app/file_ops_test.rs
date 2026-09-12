@@ -40,6 +40,19 @@ fn user_input_pauses_follow_mode_and_toggle_clears_pause() {
     fs::remove_dir_all(&root).ok();
 }
 
+#[test]
+fn bookmark_can_be_toggled_for_a_path_without_opening_it() {
+    let root = temp_dir();
+    let path = root.join("saved.txt");
+    fs::write(&path, "saved\n").unwrap();
+    let mut app = app_for(&root);
+    app.toggle_bookmark_path(path.clone());
+    assert_eq!(app.bookmark_paths, vec![path.clone()]);
+    app.toggle_bookmark_path(path.clone());
+    assert!(app.bookmark_paths.is_empty());
+    fs::remove_dir_all(&root).ok();
+}
+
 // -- push_recent ------------------------------------------------------------
 
 #[test]

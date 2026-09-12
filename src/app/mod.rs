@@ -226,6 +226,8 @@ pub struct App {
     pub(crate) menu_bar_area: Rect,
     /// Hit area of the currently open menu dropdown.
     pub(crate) menu_dropdown_area: Rect,
+    /// Status-bar hit area recorded during the last render.
+    pub statusbar_area: ratatui::layout::Rect,
     pub show_hidden: bool,
     pub ignore_gitignore: bool,
     /// Monotonically increasing counter bumped every time the tree is rebuilt.
@@ -346,8 +348,6 @@ pub struct App {
     pub revision_picker_offset: usize,
     /// Hit area of the splitter bar between tree and content panes.
     pub splitter_area: Rect,
-    /// Hit area of the status bar recorded during the last render.
-    pub(crate) statusbar_area: Rect,
     /// Clickable status-bar column ranges recorded during the last render.
     pub(crate) statusbar_segments: Vec<(crate::ui::statusbar::StatusSegment, u16, u16)>,
     // Time and result index of the last search-result click, for double-click.

@@ -2,8 +2,8 @@
 //!
 //! `draw_context_menu` renders the menu built by `App::open_tree_context_menu`
 //! / `open_content_context_menu` anchored below-right of the click position,
-//! clamped so it stays on screen. Action rows show their label with the
-//! highlighted one using the theme selection style; separator rows render as
+//! clamped so it stays on screen. Action and submenu rows show their label with
+//! the highlighted one using the theme selection style; separator rows render as
 //! dim rules. The full popup `Rect` is recorded back on `App` so mouse handlers
 //! can hit-test item clicks and click-away dismissal. `menu_rect` is a pure
 //! geometry helper, kept separate from the painter so the popup layout is
@@ -35,7 +35,7 @@ pub(crate) fn draw_context_menu(f: &mut Frame, app: &mut App, area: Rect) {
     f.render_widget(block, popup);
 
     let items: Vec<ListItem> = menu
-        .entries
+        .visible_entries()
         .iter()
         .map(|entry| match entry {
             ContextMenuEntry::Action { label, .. } => {
@@ -45,6 +45,9 @@ pub(crate) fn draw_context_menu(f: &mut Frame, app: &mut App, area: Rect) {
                 "─".repeat(inner.width.saturating_sub(2) as usize),
                 Style::default().fg(theme.dim),
             ))),
+            ContextMenuEntry::Submenu { label, .. } => {
+                ListItem::new(Line::from(Span::raw(format!("{label}  >"))))
+            }
         })
         .collect();
 
@@ -52,7 +55,7 @@ pub(crate) fn draw_context_menu(f: &mut Frame, app: &mut App, area: Rect) {
         List::new(items).highlight_style(theme.selection_style().add_modifier(Modifier::BOLD));
 
     let mut state = ListState::default();
-    state.select(Some(menu.selected));
+    state.select(Some(menu.visible_selected()));
     f.render_stateful_widget(list, inner, &mut state);
 
     app.context_menu_area = popup;
@@ -65,7 +68,9 @@ pub(crate) fn draw_context_menu(f: &mut Frame, app: &mut App, area: Rect) {
 fn menu_rect(menu: &ContextMenuState, area: Rect) -> Rect {
     let max_label = menu.max_label_len().max(8);
     let width = ((max_label + 4) as u16).clamp(8, area.width.saturating_sub(2).max(8));
-    let height = (menu.entries.len() as u16 + 2).min(area.height).max(3);
+    let height = (menu.visible_entries().len() as u16 + 2)
+        .min(area.height)
+        .max(3);
     let max_x = area.x + area.width.saturating_sub(width);
     let max_y = area.y + area.height.saturating_sub(height);
     let x = (menu.anchor.0.saturating_add(1)).min(max_x).max(area.x);

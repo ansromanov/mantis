@@ -84,6 +84,14 @@ pub static ACTIONS: &[ActionSpec] = &[
         description: None,
     },
     ActionSpec {
+        id: "context_menu",
+        palette: Some("Open context menu"),
+        help: Some(("Global", "open context menu")),
+        category: Some("General"),
+        menu: Some(("General", 7)),
+        description: Some("Open the context menu for the focused item"),
+    },
+    ActionSpec {
         id: "quit",
         palette: Some("Quit"),
         help: Some(("Global", "quit")),
@@ -739,6 +747,7 @@ impl ActionSpec {
             "blame_line" | "toggle_blame" => Applicability::GitRepoAndNoDiff,
             "file_history" => Applicability::GitRepoAndFile,
             "repo_commit_log" => Applicability::GitRepo,
+            "git_mode_toggle" => Applicability::GitRepo,
             "compare_against" => Applicability::GitRepo,
             "toggle_diff_staged" => Applicability::GitRepoAndDiffView,
             "toggle_diff_side_by_side" | "diff_hunk_next" | "diff_hunk_prev" => {
