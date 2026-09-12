@@ -115,6 +115,7 @@ statusbar.colors.scroll
 statusbar.colors.type
 statusbar.colors.update
 statusbar.colors.version
+statusbar.colors.worktrees
 statusbar.height
 statusbar.left
 statusbar.right
