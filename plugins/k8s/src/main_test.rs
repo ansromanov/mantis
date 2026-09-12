@@ -89,6 +89,38 @@ metadata:
 }
 
 #[test]
+fn cursor_line_selects_the_resource_in_its_document() {
+    let src = "\
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+";
+    assert_eq!(
+        format_status_facts_at_line(src, 8),
+        "Service/backend \u{b7} 1 Deployment \u{b7} 1 Service"
+    );
+}
+
+#[test]
+fn cursor_line_in_non_manifest_document_clears_facts() {
+    let src = "\
+apiVersion: v1
+kind: Pod
+metadata:
+  name: web
+---
+just: config
+";
+    assert_eq!(format_status_facts_at_line(src, 7), "");
+}
+
+#[test]
 fn non_manifest_documents_in_a_multi_doc_file_are_skipped() {
     let src = "\
 apiVersion: v1

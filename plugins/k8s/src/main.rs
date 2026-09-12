@@ -7,21 +7,16 @@
 //! (`status_facts`), so the two providers coexist on the same extensions —
 //! this is the routing the design gap in #606 was waiting on.
 //!
-//! On `on_file_open`, heuristically scans the file (no full YAML parse — see
-//! the epic's "regex/indentation heuristics, not tree-sitter" constraint) for
-//! `---`-separated documents that carry both `apiVersion` and `kind` at
-//! column 0. For each match it records `kind`, `metadata.name`, and
-//! `metadata.namespace`, then reports:
+//! On `on_file_open` and `on_content_cursor_change`, heuristically scans the
+//! file (no full YAML parse — see the epic's "regex/indentation heuristics,
+//! not tree-sitter" constraint) for `---`-separated documents that carry both
+//! `apiVersion` and `kind` at column 0. For each match it records `kind`,
+//! `metadata.name`, and `metadata.namespace`, then reports:
 //!
 //! - a single resource: its identity, `Kind/name (namespace)`.
-//! - multiple resources: the first resource's identity, plus per-kind counts
+//! - multiple resources: the resource under the cursor, plus per-kind counts
 //!   (`3 Deployments · 2 Services · 1 ConfigMap`), parallel to the per-language
 //!   statusbar facts the epic describes for Rust/Python.
-//!
-//! Per-cursor "which resource is the viewport currently in" (the full
-//! breadcrumb vision in #606) needs the host to send cursor/line position on
-//! selection change, which the protocol does not carry yet — tracked
-//! separately; this plugin reports the first resource in the file instead.
 
 use std::io::{self, BufRead, Write};
 use std::path::Path;
@@ -51,6 +46,11 @@ fn main() {
             "on_file_open" => {
                 if let Some(path) = msg["path"].as_str() {
                     handle_open(path, &mut stdout.lock());
+                }
+            }
+            "on_content_cursor_change" => {
+                if let (Some(path), Some(line)) = (msg["path"].as_str(), msg["line"].as_u64()) {
+                    handle_cursor(path, line as usize, &mut stdout.lock());
                 }
             }
             "on_quit" | "shutdown" => break,
@@ -83,6 +83,29 @@ fn handle_open(path_str: &str, out: &mut impl Write) {
         Err(_) => return,
     };
     let text = format_status_facts(&src);
+    let msg = serde_json::json!({
+        "event": "action",
+        "action": "set_status_facts",
+        "params": {
+            "path": path_str,
+            "text": text
+        }
+    });
+    let _ = writeln!(out, "{}", serde_json::to_string(&msg).unwrap());
+    let _ = out.flush();
+}
+
+fn handle_cursor(path_str: &str, line: usize, out: &mut impl Write) {
+    let path = Path::new(path_str);
+    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+    if ext != "yaml" && ext != "yml" {
+        return;
+    }
+    let src = match std::fs::read_to_string(path) {
+        Ok(s) => s,
+        Err(_) => return,
+    };
+    let text = format_status_facts_at_line(&src, line);
     let msg = serde_json::json!({
         "event": "action",
         "action": "set_status_facts",
@@ -247,11 +270,25 @@ fn resource_identity(r: &K8sResource) -> String {
 /// looks like a Kubernetes manifest — the host treats an empty `text` as "no
 /// fact", clearing any stale summary left from a previous open of this path.
 fn format_status_facts(src: &str) -> String {
+    format_status_facts_for_resource(src, None)
+}
+
+/// Builds status facts using the Kubernetes resource containing a one-based
+/// cursor line. Returns empty text when that YAML document is not a resource.
+fn format_status_facts_at_line(src: &str, line: usize) -> String {
+    format_status_facts_for_resource(src, Some(line))
+}
+
+fn format_status_facts_for_resource(src: &str, cursor_line: Option<usize>) -> String {
     let resources = parse_k8s_resources(src);
-    let Some(first) = resources.first() else {
+    let selected = match cursor_line {
+        Some(line) => parse_k8s_resource_at_line(src, line),
+        None => resources.first().cloned(),
+    };
+    let Some(selected) = selected else {
         return String::new();
     };
-    let identity = resource_identity(first);
+    let identity = resource_identity(&selected);
     if resources.len() == 1 {
         return identity;
     }
@@ -276,6 +313,30 @@ fn format_status_facts(src: &str) -> String {
         .collect::<Vec<_>>()
         .join(" \u{b7} ");
     format!("{identity} \u{b7} {counts_str}")
+}
+
+/// Finds the Kubernetes resource in the YAML document containing a one-based
+/// source line. A cursor on a `---` separator belongs to no document.
+fn parse_k8s_resource_at_line(src: &str, line: usize) -> Option<K8sResource> {
+    let target = line.checked_sub(1)?;
+    let mut start = 0;
+    let mut doc = Vec::new();
+    for (index, source_line) in src.lines().enumerate() {
+        if source_line.trim_end() == "---" {
+            if (start..index).contains(&target) {
+                return parse_one_doc(&doc);
+            }
+            start = index + 1;
+            doc.clear();
+        } else {
+            doc.push(source_line);
+        }
+    }
+    if (start..start + doc.len()).contains(&target) {
+        parse_one_doc(&doc)
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]

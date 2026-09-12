@@ -153,6 +153,12 @@ fn content_cursor_scroll_helper_accepts_physical_line_notifications() {
     app.scroll_active_line_into_view();
 
     assert_eq!(app.display_to_physical(app.active_line), 7);
+    assert_eq!(
+        app.pending_content_cursor,
+        Some((root.join("long.txt"), 8, 1)),
+        "plugin cursor coordinates are one-based, with the line cursor at column 1"
+    );
+    assert!(app.content_cursor_dirty_at.is_some());
     fs::remove_dir_all(&root).ok();
 }
 

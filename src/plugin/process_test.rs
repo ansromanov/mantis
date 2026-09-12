@@ -47,6 +47,7 @@ fn send_is_noop_when_no_writer() {
         event: "test".into(),
         path: None,
         line: None,
+        column: None,
         key: None,
         theme: None,
         colors: None,

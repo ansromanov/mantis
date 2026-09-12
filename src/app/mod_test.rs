@@ -41,6 +41,15 @@ fn new_app_has_no_pending_tab_action() {
     fs::remove_dir_all(root).ok();
 }
 
+#[test]
+fn new_app_has_no_pending_plugin_content_cursor() {
+    let root = temp_tree();
+    let app = app_for(&root);
+    assert!(app.pending_content_cursor.is_none());
+    assert!(app.content_cursor_dirty_at.is_none());
+    fs::remove_dir_all(root).ok();
+}
+
 fn app_for(root: &std::path::Path) -> App {
     App::new(root.to_path_buf(), Config::default(), None, None).unwrap()
 }
