@@ -106,6 +106,13 @@ pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
             base,
             area.width,
         )
+    } else if let Some(picker) = &app.worktree_picker {
+        let hint = if picker.open_in_new_tab {
+            " Enter open tab  Esc cancel"
+        } else {
+            " Enter switch root  Ctrl+Enter open tab  Esc cancel"
+        };
+        overlay_line(hint, base, area.width)
     } else if app.theme_picker.is_some() {
         overlay_line(
             " \u{2191}\u{2193} navigate  type to filter  Enter apply theme  Esc cancel",

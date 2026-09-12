@@ -1,5 +1,6 @@
 //! Multiple project tabs, each an independent [`App`], plus the top-level
-//! event routing needed to add/close/switch between them.
+//! event routing needed to add/close/switch between them, including opening a
+//! selected worktree root as a tab without replacing the current project.
 //!
 //! `mantis` is single-root at its core: `App` owns exactly one project's tree
 //! and content pane. Rather than exploding `App`'s already-large field set
@@ -7,9 +8,9 @@
 //! is a thin wrapper around `Vec<App>` — every tab is built, driven, and torn
 //! down exactly the way a single-root `mantis` launch already works. `App`
 //! itself is untouched aside from one field, `tab_action_request`, that the
-//! tab keybindings/command-palette entries set (since a single-root `App` has
-//! no way to act on "next tab" itself) and that [`Tabs::dispatch_event`] here
-//! checks and clears after every event.
+//! tab keybindings, worktree picker, and command-palette entries set (since a
+//! single-root `App` has no way to act on another tab) and that
+//! [`Tabs::dispatch_event`] here checks and clears after every event.
 
 use std::path::PathBuf;
 
@@ -52,9 +53,19 @@ impl Tabs {
         &mut self.apps[self.active]
     }
 
-    /// Builds a new `App` for `root` (loading its own `mantis.toml`, exactly
-    /// as a top-level launch would) and makes it the active tab.
+    /// Opens `root` as the active tab, reusing an already-open tab for the
+    /// same canonical root. New tabs load their own config and root-keyed
+    /// session, exactly as a top-level launch would.
     pub fn open_tab(&mut self, root: PathBuf) -> anyhow::Result<()> {
+        let root = root.canonicalize()?;
+        if let Some(index) = self
+            .apps
+            .iter()
+            .position(|app| app.root.canonicalize().unwrap_or_else(|_| app.root.clone()) == root)
+        {
+            self.active = index;
+            return Ok(());
+        }
         let (cfg, cfg_path, cfg_error) = crate::config::load(&root);
         let mut app = App::new(root, cfg, cfg_path, cfg_error)?;
         app.watch_root();
@@ -144,8 +155,8 @@ impl Tabs {
     /// handled here first (switch/close tab); otherwise routes to the
     /// new-tab prompt when it's open, or to the active `App`, then checks
     /// whether that `App` requested a tab-lifecycle action (`new_tab`/
-    /// `close_tab`/`next_tab`/`prev_tab`, set via keybinding or the command
-    /// palette) and acts on it.
+    /// `close_tab`/`next_tab`/`prev_tab`/`open_root`, set via keybinding, overlay,
+    /// or the command palette) and acts on it.
     pub fn dispatch_event(&mut self, event: Event) {
         if let Event::Mouse(m) = &event {
             if self.dispatch_strip_mouse(m) {
@@ -202,6 +213,14 @@ impl Tabs {
             TabAction::Close => self.close_active_tab(),
             TabAction::Next => self.next_tab(),
             TabAction::Prev => self.prev_tab(),
+            TabAction::OpenRoot(root) => {
+                if let Err(err) = self.open_tab(root.clone()) {
+                    self.active_app_mut().set_status(format!(
+                        "couldn't open '{}' as a tab: {err}",
+                        root.display()
+                    ));
+                }
+            }
         }
     }
 }

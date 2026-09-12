@@ -1,7 +1,8 @@
 //! All remaining fuzzy-picker overlay types extracted from the monolithic
 //! `search.rs`. Hosts `ThemePicker`, `RecentFilesState`, `PluginPicker`,
 //! `GotoLineState`, `TreeFilter`, and `InFileSearch`/`InFileMatch`, plus
-//! their `ListPicker` implementations.
+//! their `ListPicker` implementations, plus the git-worktree picker and its
+//! optional open-in-new-tab activation mode.
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -32,6 +33,8 @@ pub struct WorktreePicker {
     pub query: String,
     pub filtered: Vec<usize>,
     pub selected: usize,
+    /// Makes Enter open the selection in a tab. Ctrl+Enter always does so.
+    pub open_in_new_tab: bool,
     matcher: SkimMatcherV2,
     changed_rx: Option<Receiver<Vec<(PathBuf, usize)>>>,
     cache_key: PathBuf,
@@ -45,6 +48,7 @@ impl WorktreePicker {
             query: String::new(),
             filtered: Vec::new(),
             selected: 0,
+            open_in_new_tab: false,
             matcher: SkimMatcherV2::default(),
             changed_rx: None,
             cache_key: PathBuf::new(),
@@ -100,11 +104,19 @@ impl WorktreePicker {
             query: String::new(),
             filtered: Vec::new(),
             selected: 0,
+            open_in_new_tab: false,
             matcher: SkimMatcherV2::default(),
             changed_rx,
             cache_key,
         };
         picker.refresh();
+        picker
+    }
+
+    /// Builds the picker with Enter set to open the selection in a tab.
+    pub fn new_tab(root: &std::path::Path) -> Self {
+        let mut picker = Self::new(root);
+        picker.open_in_new_tab = true;
         picker
     }
 

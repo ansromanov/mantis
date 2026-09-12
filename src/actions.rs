@@ -218,6 +218,13 @@ pub static ACTIONS: &[ActionSpec] = &[
         description: Some("Browse branches and changed-file counts across worktrees"),
     },
     ActionSpec {
+        id: "open_worktree_new_tab",
+        palette: Some("Open worktree in new tab"),
+        help: None,
+        category: Some("Tabs"),
+        description: Some("Choose a worktree to open or activate in its own tab"),
+    },
+    ActionSpec {
         id: "git_mode_flat_toggle",
         palette: Some("Toggle git flat mode"),
         help: Some(("Global", "toggle git flat/tree view (in git mode)")),

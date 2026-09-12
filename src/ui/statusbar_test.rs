@@ -72,6 +72,24 @@ fn hint_history() {
 }
 
 #[test]
+fn hint_worktree_picker_shows_new_tab_binding() {
+    let mut app = make_app();
+    app.worktree_picker = Some(crate::search::WorktreePicker::for_test(vec![]));
+    let text = render_bar(&app);
+    assert!(text.contains("Ctrl+Enter open tab"));
+}
+
+#[test]
+fn hint_worktree_new_tab_mode_shows_enter_activation() {
+    let mut app = make_app();
+    let mut picker = crate::search::WorktreePicker::for_test(vec![]);
+    picker.open_in_new_tab = true;
+    app.worktree_picker = Some(picker);
+    let text = render_bar(&app);
+    assert!(text.contains("Enter open tab"));
+}
+
+#[test]
 fn hint_search() {
     let mut app = make_app();
     app.search = Some(SearchState::new(Path::new("."), false, true, 0, None));

@@ -8,6 +8,9 @@ fn json_query_action_is_registered() {
 #[test]
 fn worktree_picker_is_registered() {
     assert!(ACTIONS.iter().any(|action| action.id == "worktree_picker"));
+    assert!(ACTIONS.iter().any(|action| {
+        action.id == "open_worktree_new_tab" && action.palette == Some("Open worktree in new tab")
+    }));
 }
 
 #[test]

@@ -395,6 +395,10 @@ impl App {
                 self.worktree_picker = Some(crate::search::WorktreePicker::new(&self.root));
                 true
             }
+            Some("open_worktree_new_tab") => {
+                self.worktree_picker = Some(crate::search::WorktreePicker::new_tab(&self.root));
+                true
+            }
             Some("toggle_watch") => {
                 self.auto_watch = !self.auto_watch;
                 self.config.content.watch = self.auto_watch;

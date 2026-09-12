@@ -1461,6 +1461,91 @@ fn worktree_picker_escape_closes() {
     assert!(app.worktree_picker.is_none());
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn worktree_picker_ctrl_enter_requests_open_root_tab() {
+    let root = temp_tree();
+    let target = temp_tree();
+    let mut app = app_for(&root);
+    app.worktree_picker = Some(crate::search::WorktreePicker::for_test(vec![
+        crate::git::WorktreeItem {
+            worktree: crate::git::Worktree {
+                path: target.clone(),
+                head: "abc".into(),
+                branch: Some("agent".into()),
+                locked: false,
+                prunable: false,
+            },
+            changed: 0,
+        },
+    ]));
+
+    app.handle_worktree_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::CONTROL));
+
+    assert!(app.worktree_picker.is_none());
+    assert_eq!(
+        app.tab_action_request,
+        Some(crate::app::TabAction::OpenRoot(target.clone()))
+    );
+    assert_eq!(app.root, root);
+    fs::remove_dir_all(root).ok();
+    fs::remove_dir_all(target).ok();
+}
+
+#[test]
+fn worktree_picker_enter_keeps_switching_the_current_root() {
+    let root = temp_tree();
+    let target = temp_tree();
+    let mut app = app_for(&root);
+    app.worktree_picker = Some(crate::search::WorktreePicker::for_test(vec![
+        crate::git::WorktreeItem {
+            worktree: crate::git::Worktree {
+                path: target.clone(),
+                head: "abc".into(),
+                branch: Some("agent".into()),
+                locked: false,
+                prunable: false,
+            },
+            changed: 0,
+        },
+    ]));
+
+    app.handle_worktree_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+
+    assert_eq!(app.root, target);
+    assert!(app.tab_action_request.is_none());
+    fs::remove_dir_all(root).ok();
+    fs::remove_dir_all(target).ok();
+}
+
+#[test]
+fn worktree_picker_new_tab_mode_uses_enter_to_request_open_root_tab() {
+    let root = temp_tree();
+    let target = temp_tree();
+    let mut app = app_for(&root);
+    let mut picker = crate::search::WorktreePicker::for_test(vec![crate::git::WorktreeItem {
+        worktree: crate::git::Worktree {
+            path: target.clone(),
+            head: "abc".into(),
+            branch: Some("agent".into()),
+            locked: false,
+            prunable: false,
+        },
+        changed: 0,
+    }]);
+    picker.open_in_new_tab = true;
+    app.worktree_picker = Some(picker);
+
+    app.handle_worktree_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+
+    assert_eq!(
+        app.tab_action_request,
+        Some(crate::app::TabAction::OpenRoot(target.clone()))
+    );
+    assert_eq!(app.root, root);
+    fs::remove_dir_all(root).ok();
+    fs::remove_dir_all(target).ok();
+}
 #[test]
 fn tree_filter_key_handler_owns_navigation_while_open() {
     let root = temp_tree();

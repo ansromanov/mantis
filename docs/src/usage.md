@@ -459,3 +459,8 @@ changed-file count; type to filter, then press Enter to switch the tree to that
 worktree. The picker opens immediately; changed-file counts are filled in as
 the background scan completes. The status bar shows the total worktree count
 when more than one is available.
+
+Press Ctrl+Enter on a worktree to open it in a new tab. If that worktree
+already has a tab, Mantis activates it instead of creating a duplicate. The
+command palette also offers `Open worktree in new tab`, where Enter opens the
+selected worktree in its own tab. Each tab keeps its own session state.
