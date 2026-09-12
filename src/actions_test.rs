@@ -179,7 +179,6 @@ const KEYMAP_ONLY_ALLOWLIST: &[&str] = &[
     "content_reset_col",
     "switch_panel",
     "menu_bar",
-    "context_menu",
     "command_palette",
     "select_tab",
 ];

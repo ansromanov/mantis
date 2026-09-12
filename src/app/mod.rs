@@ -348,8 +348,6 @@ pub struct App {
     pub revision_picker_offset: usize,
     /// Hit area of the splitter bar between tree and content panes.
     pub splitter_area: Rect,
-    /// Hit area of the status bar recorded during the last render.
-    pub(crate) statusbar_area: Rect,
     /// Clickable status-bar column ranges recorded during the last render.
     pub(crate) statusbar_segments: Vec<(crate::ui::statusbar::StatusSegment, u16, u16)>,
     // Time and result index of the last search-result click, for double-click.

@@ -243,7 +243,6 @@ impl App {
             revision_picker_area: ratatui::layout::Rect::default(),
             revision_picker_offset: 0,
             splitter_area: ratatui::layout::Rect::default(),
-            statusbar_area: ratatui::layout::Rect::default(),
             statusbar_segments: Vec::new(),
             last_click: None,
             last_breadcrumb_click: None,

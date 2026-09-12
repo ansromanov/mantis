@@ -1773,6 +1773,7 @@ fn right_clicking_the_statusbar_opens_status_actions() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.statusbar_area = Rect::new(0, 23, 80, 1);
+    assert!(crate::ui::statusbar::segment_at(&app, app.statusbar_area, 75).is_some());
     app.handle_mouse(MouseEvent {
         kind: MouseEventKind::Down(MouseButton::Right),
         column: 75,

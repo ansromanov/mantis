@@ -450,9 +450,13 @@ impl Tabs {
                 }
             }
             crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Right) => {
-                let i = match hit {
+                let Some(i) = (match hit {
                     crate::ui::tabstrip::TabHit::Switch(i)
-                    | crate::ui::tabstrip::TabHit::Close(i) => i,
+                    | crate::ui::tabstrip::TabHit::Close(i) => Some(i),
+                    crate::ui::tabstrip::TabHit::ScrollLeft
+                    | crate::ui::tabstrip::TabHit::ScrollRight => None,
+                }) else {
+                    return true;
                 };
                 self.active = i;
                 if let Some(app) = self.apps.get_mut(i) {

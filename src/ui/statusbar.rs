@@ -200,7 +200,7 @@ pub(crate) fn segment_at(app: &App, area: Rect, column: u16) -> Option<String> {
     if column < area.x || column >= area.x.saturating_add(area.width) {
         return None;
     }
-    let line = build_normal_line(app, Style::default(), area.width);
+    let (line, _) = build_normal_line(app, Style::default(), area.width);
     let mut x = area.x;
     for span in line.spans {
         let width = span.width() as u16;

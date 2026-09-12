@@ -298,10 +298,20 @@ impl App {
             return;
         }
         if rect_contains(self.statusbar_area, ev.column, ev.row) {
-            if let MouseEventKind::Down(MouseButton::Left) = ev.kind {
-                if let Some(segment) = crate::ui::statusbar::hit_test(self, ev.column, ev.row) {
-                    self.activate_statusbar_segment(segment);
+            match ev.kind {
+                MouseEventKind::Down(MouseButton::Left) => {
+                    if let Some(segment) = crate::ui::statusbar::hit_test(self, ev.column, ev.row) {
+                        self.activate_statusbar_segment(segment);
+                    }
+                    return;
                 }
+                MouseEventKind::Down(MouseButton::Right) => {
+                    let segment =
+                        crate::ui::statusbar::segment_at(self, self.statusbar_area, ev.column)
+                            .unwrap_or_default();
+                    self.open_statusbar_context_menu(segment, (ev.column, ev.row));
+                }
+                _ => {}
             }
             return;
         }
@@ -481,12 +491,6 @@ impl App {
                         self.open_hunk_context_menu(header_row, anchor);
                     } else {
                         self.open_content_context_menu(anchor);
-                    }
-                } else if rect_contains(self.statusbar_area, ev.column, ev.row) {
-                    if let Some(segment) =
-                        crate::ui::statusbar::segment_at(self, self.statusbar_area, ev.column)
-                    {
-                        self.open_statusbar_context_menu(segment, anchor);
                     }
                 }
             }

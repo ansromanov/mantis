@@ -437,6 +437,16 @@ fn tab_strip_clicks_and_wheel_scroll_horizontally() {
         modifiers: KeyModifiers::empty(),
     }));
     assert_eq!(tabs.first_visible, 1);
+    let active = tabs.active;
+    tabs.dispatch_event(Event::Mouse(MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Right),
+        column: 0,
+        row: 0,
+        modifiers: KeyModifiers::empty(),
+    }));
+    assert_eq!(tabs.first_visible, 1);
+    assert_eq!(tabs.active, active);
+    assert!(tabs.active_app().context_menu.is_none());
 
     for dir in &dirs {
         fs::remove_dir_all(dir).ok();
@@ -471,5 +481,4 @@ fn close_other_tabs_preserves_only_the_target_tab() {
     fs::remove_dir_all(&a).ok();
     fs::remove_dir_all(&b).ok();
     fs::remove_dir_all(&c).ok();
-}
 }
