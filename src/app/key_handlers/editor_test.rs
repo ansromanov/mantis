@@ -462,6 +462,13 @@ fn open_content_search_command_scoped_in_git_mode() {
 #[test]
 fn toggle_git_mode_command_flips_git_mode_flag() {
     let root = temp_tree();
+    let status = std::process::Command::new("git")
+        .arg("-C")
+        .arg(&root)
+        .args(["init", "--quiet"])
+        .status()
+        .unwrap();
+    assert!(status.success(), "test fixture must initialize a git repo");
     let mut app = app_for(&root);
     assert!(!app.git_mode);
     app.command_palette = Some(palette_with_query("Toggle git mode"));
