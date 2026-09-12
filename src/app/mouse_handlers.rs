@@ -605,7 +605,7 @@ impl App {
                 let entries = self.plugin_manager.plugin_entries();
                 self.plugin_picker = Some(crate::search::PluginPicker::new(entries));
             }
-            "show_about" => self.show_about = true,
+            "show_about" => self.show_about = !self.show_about,
             "copy_path" => {
                 self.focus = Focus::Content;
                 self.copy_path_to_clipboard(false);
