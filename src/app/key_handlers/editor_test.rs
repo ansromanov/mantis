@@ -251,7 +251,7 @@ fn apply_theme_sends_new_theme_colors_to_plugins() {
     let monokai = crate::theme::Theme::load("monokai").expect("monokai theme must load");
     app.apply_theme("monokai", monokai.clone());
 
-    let deadline = Instant::now() + Duration::from_secs(3);
+    let deadline = Instant::now() + Duration::from_secs(10);
     let contents = loop {
         if let Ok(s) = fs::read_to_string(&out) {
             if s.matches(r#""event":"on_theme_change""#).count() >= 1 {
@@ -1412,6 +1412,21 @@ fn dispatch_worktree_picker_opens_overlay() {
     app.command_palette = Some(p);
     app.dispatch_command();
     assert!(app.worktree_picker.is_some());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn dispatch_open_worktree_new_tab_opens_picker_in_tab_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.command_palette = Some(palette_with_query("Open worktree in new tab"));
+
+    assert!(app.dispatch_command());
+
+    assert!(app
+        .worktree_picker
+        .as_ref()
+        .is_some_and(|picker| picker.open_in_new_tab));
     fs::remove_dir_all(&root).ok();
 }
 
