@@ -303,10 +303,15 @@ fn set_active_line_from_physical_is_identity_without_folds() {
     let mut app = app_for(&root);
     app.virtual_file = None;
     app.content = (0..20).map(|i| format!("line {i}")).collect();
+    app.current_file = Some(root.join("cursor.txt"));
     app.session_dirty = false;
     app.set_active_line_from_physical(7);
     assert_eq!(app.active_line, 7);
     assert!(app.session_dirty);
+    assert_eq!(
+        app.pending_content_cursor,
+        Some((root.join("cursor.txt"), 8, 1))
+    );
     fs::remove_dir_all(&root).ok();
 }
 
@@ -490,6 +495,7 @@ fn scroll_content_by_keeps_cursor_in_view() {
     let mut app = app_for(&root);
     app.content = (0..50).map(|i| format!("line {i}")).collect();
     app.virtual_file = None;
+    app.current_file = Some(root.join("cursor.txt"));
     app.content_area = Rect {
         x: 0,
         y: 0,
@@ -501,6 +507,10 @@ fn scroll_content_by_keeps_cursor_in_view() {
 
     assert_eq!(app.content_scroll, 3);
     assert_eq!(app.active_line, 3);
+    assert_eq!(
+        app.pending_content_cursor,
+        Some((root.join("cursor.txt"), 4, 1))
+    );
 
     app.scroll_content_by(-3);
 

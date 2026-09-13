@@ -53,7 +53,7 @@ dynamically.
 |---|---|---|
 | `"1"` | 0.7.x | Initial protocol. Events: init, on_file_open, on_keypress, on_selection_change, on_theme_change, on_quit, shutdown. Actions: show_message, open_file, set_content, set_icon_map. Git features (set_file_statuses, set_blame_data, set_status_bar_git_info) were removed in 0.11.22 — git is now built in only. |
 | `"2"` | 0.8.x | Language providers (register_language_provider, set_fold_regions), event subscription (`events` field in manifest), protocol hardening (bounded queues, line caps), `protocol_version` field on init event. `init`/`on_theme_change` additionally carry an optional `colors` object (0.13.x, additive — does not bump this version) with the active theme's actual role colors as `#rrggbb` hex. |
-| `"3"` | 0.14.x | Request/response correlation (`request`/`response` events) so the host can ask a plugin for something and match the reply; a `plugin_error` action for reporting failures outside the request/response flow; key-consumption semantics for `on_keypress` (`key_handled` action, host waits up to one tick); `priority` field on `register_language_provider` plus a status-bar warning on conflicting registrations; manifest field renamed `tv_protocol` → `mantis_protocol` (alias kept, see above). As with every prior protocol bump, discovery requires an exact version match: a manifest still declaring `"2"` is silently skipped, not loaded in a reduced-compatibility mode — plugins must declare `"3"` (via `mantis_protocol`, or its `tv_protocol` alias) to be discovered on this host. `highlight` capability remains formally reserved and unimplemented: real syntax highlighting continues to flow through syntax plugins (`.sublime-syntax` + syntect), not language providers. A `status_facts` capability plus `set_status_facts` action (0.18.x, additive — does not bump this version) let a provider push a free-text status-bar summary for a file, gated the same way as `fold`/`set_fold_regions`; the bundled `k8s` plugin uses it to report Kubernetes resource identity and per-kind counts for `.yaml`/`.yml` files without conflicting with the `yaml` plugin's `fold` registration on the same extensions. |
+| `"3"` | 0.14.x | Request/response correlation (`request`/`response` events) so the host can ask a plugin for something and match the reply; a `plugin_error` action for reporting failures outside the request/response flow; key-consumption semantics for `on_keypress` (`key_handled` action, host waits up to one tick); `priority` field on `register_language_provider` plus a status-bar warning on conflicting registrations; manifest field renamed `tv_protocol` → `mantis_protocol` (alias kept, see above). As with every prior protocol bump, discovery requires an exact version match: a manifest still declaring `"2"` is silently skipped, not loaded in a reduced-compatibility mode — plugins must declare `"3"` (via `mantis_protocol`, or its `tv_protocol` alias) to be discovered on this host. `highlight` capability remains formally reserved and unimplemented: real syntax highlighting continues to flow through syntax plugins (`.sublime-syntax` + syntect), not language providers. A `status_facts` capability plus `set_status_facts` action (0.18.x, additive — does not bump this version) let a provider push a free-text status-bar summary for a file, gated the same way as `fold`/`set_fold_regions`; the bundled `k8s` plugin uses it to report Kubernetes resource identity and per-kind counts for `.yaml`/`.yml` files without conflicting with the `yaml` plugin's `fold` registration on the same extensions. The `on_content_cursor_change` event (0.21.x, additive — does not bump this version) sends debounced, one-based line and column coordinates to subscribers. |
 
 ### Discovery
 
@@ -169,6 +169,19 @@ physical source line; tree-only selections omit it.
 
 ```json
 {"event":"on_selection_change","path":"/absolute/path/to/entry","line":12}
+```
+
+### `on_content_cursor_change`
+
+Sent to subscribers after the content cursor has stayed still for 100 ms. A
+burst of cursor moves is coalesced into one event for the latest position.
+`line` and `column` are one-based. Mantis' content cursor selects a source
+line, so `column` is currently always `1` (the start of that line). This event
+is separate from `on_selection_change`, whose existing tree and selection
+semantics and zero-based `line` field remain unchanged.
+
+```json
+{"event":"on_content_cursor_change","path":"/absolute/path/to/file.yaml","line":13,"column":1}
 ```
 
 ### `on_theme_change`
@@ -589,8 +602,9 @@ fn main() {
    internal buffer; `App::tick()` drains them via `drain_plugin_actions()` in
    `src/app/refresh.rs`.
 - Hook dispatch (`on_file_open`, `on_keypress`, `on_selection_change`) happens
-   in `src/app/file_ops.rs`, `src/app/key_handlers/`, and `src/app/navigation.rs`
-   respectively.
+  in `src/app/file_ops.rs`, `src/app/key_handlers/`, and `src/app/navigation.rs`.
+  `on_content_cursor_change` is queued from cursor movement and emitted after
+  its debounce in `src/app/refresh.rs`.
 - Plugin config deserialization lives in `src/config/mod.rs` under the
    `plugins` key.
 - Bundled plugins are declared in `BUNDLED_PLUGINS`

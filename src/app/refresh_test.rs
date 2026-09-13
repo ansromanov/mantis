@@ -44,6 +44,23 @@ fn tick_debounce_clears_dirty_after_quiet_period() {
     );
 }
 
+#[test]
+fn content_cursor_debounce_keeps_only_latest_position_until_quiet() {
+    let mut app = create_base_app();
+    app.pending_content_cursor = Some(("/tmp/manifest.yaml".into(), 2, 1));
+    app.content_cursor_dirty_at = Some(Instant::now());
+    app.tick();
+    assert!(app.pending_content_cursor.is_some());
+
+    // Several moves during the quiet window overwrite one pending slot. Once
+    // the burst settles, tick consumes exactly the latest position.
+    app.pending_content_cursor = Some(("/tmp/manifest.yaml".into(), 12, 1));
+    app.content_cursor_dirty_at = Some(Instant::now() - Duration::from_millis(101));
+    app.tick();
+    assert!(app.pending_content_cursor.is_none());
+    assert!(app.content_cursor_dirty_at.is_none());
+}
+
 // -- set_icon_map action tests ------------------------------------------------
 
 #[test]
@@ -458,6 +475,8 @@ fn create_base_app() -> App {
         config_watch_rx: None,
         config_dirty: false,
         config_dirty_at: None,
+        pending_content_cursor: None,
+        content_cursor_dirty_at: None,
         tree_dirty: false,
         tree_dirty_at: None,
         selection: None,

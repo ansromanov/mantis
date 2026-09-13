@@ -114,8 +114,6 @@ version history in [Plugin Development](plugin-development.md) only.
    not a structured breadcrumb — the bundled `k8s` plugin uses it for both
    candidate features from #606 (resource identity and multi-doc per-kind
    counts) combined into one string, rather than adding a second `breadcrumb`
-   capability. **Not yet solved:** per-cursor "which resource is the viewport
-   in right now" needs the host to send line/cursor position on
-   `on_selection_change`, which the protocol still doesn't carry — the `k8s`
-   plugin reports the first resource in the file instead of the one under the
-   cursor. That's a separate, still-open protocol gap.
+   capability. The additive `on_content_cursor_change` event closes the
+   per-cursor gap: it sends debounced, one-based line and column coordinates,
+   and the bundled `k8s` plugin now reports the resource containing the cursor.

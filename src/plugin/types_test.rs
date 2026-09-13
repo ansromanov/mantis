@@ -98,6 +98,7 @@ fn to_plugin_init_serializes_protocol_version() {
         event: "init".into(),
         path: None,
         line: None,
+        column: None,
         key: None,
         theme: Some("default".into()),
         colors: None,
@@ -120,6 +121,7 @@ fn to_plugin_serializes_colors_when_present() {
         event: "on_theme_change".into(),
         path: None,
         line: None,
+        column: None,
         key: None,
         theme: Some("default".into()),
         colors: Some(ThemeColorsMsg::from(&Theme::default())),
@@ -140,6 +142,7 @@ fn to_plugin_omits_colors_when_none() {
         event: "on_keypress".into(),
         path: None,
         line: None,
+        column: None,
         key: Some("q".into()),
         theme: None,
         colors: None,
@@ -166,6 +169,7 @@ fn to_plugin_omits_protocol_version_when_none() {
         event: "on_file_open".into(),
         path: Some("/a/b.rs".into()),
         line: None,
+        column: None,
         key: None,
         theme: None,
         colors: None,
@@ -187,6 +191,7 @@ fn to_plugin_selection_change_serializes_zero_based_line() {
         event: "on_selection_change".into(),
         path: Some("/a/b.yaml".into()),
         line: Some(12),
+        column: None,
         key: None,
         theme: None,
         colors: None,
@@ -197,6 +202,27 @@ fn to_plugin_selection_change_serializes_zero_based_line() {
     };
     let json = serde_json::to_string(&msg).unwrap();
     assert!(json.contains(r#""line":12"#));
+}
+
+#[test]
+fn to_plugin_content_cursor_change_serializes_one_based_position() {
+    let msg = ToPlugin {
+        event: "on_content_cursor_change".into(),
+        path: Some("/a/b.yaml".into()),
+        line: Some(13),
+        column: Some(1),
+        key: None,
+        theme: None,
+        colors: None,
+        protocol_version: None,
+        id: None,
+        method: None,
+        params: None,
+    };
+    let json = serde_json::to_string(&msg).unwrap();
+    assert!(json.contains(r#""event":"on_content_cursor_change""#));
+    assert!(json.contains(r#""line":13"#));
+    assert!(json.contains(r#""column":1"#));
 }
 
 #[test]
@@ -217,6 +243,7 @@ fn to_plugin_request_serializes_id_method_params() {
         event: "request".into(),
         path: None,
         line: None,
+        column: None,
         key: None,
         theme: None,
         colors: None,
@@ -238,6 +265,7 @@ fn to_plugin_omits_request_fields_when_none() {
         event: "on_file_open".into(),
         path: Some("/a/b.rs".into()),
         line: None,
+        column: None,
         key: None,
         theme: None,
         colors: None,
