@@ -483,3 +483,24 @@ fn theme_color_roles_constant_covers_role_color_branches() {
         );
     }
 }
+
+#[test]
+fn diagnostic_severities_map_to_semantic_theme_roles() {
+    let theme = Theme::load("default").expect("default theme must load");
+    assert_eq!(
+        theme.diagnostic_color(crate::plugin::types::DiagnosticSeverity::Error),
+        theme.git_conflict
+    );
+    assert_eq!(
+        theme.diagnostic_color(crate::plugin::types::DiagnosticSeverity::Warning),
+        theme.git_progress
+    );
+    assert_eq!(
+        theme.diagnostic_color(crate::plugin::types::DiagnosticSeverity::Info),
+        theme.accent
+    );
+    assert_eq!(
+        theme.diagnostic_color(crate::plugin::types::DiagnosticSeverity::Hint),
+        theme.dim
+    );
+}

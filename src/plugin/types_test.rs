@@ -1,6 +1,9 @@
 use super::*;
-use crate::plugin::types::{enclosing_symbol, FromPlugin, Symbol, ThemeColorsMsg, ToPlugin};
+use crate::plugin::types::{
+    enclosing_symbol, Diagnostic, DiagnosticSeverity, FromPlugin, Symbol, ThemeColorsMsg, ToPlugin,
+};
 use crate::theme::{color_to_hex, Theme};
+use std::path::PathBuf;
 
 fn symbol(name: &str, line: usize, end_line: usize, parent: Option<&str>) -> Symbol {
     Symbol {
@@ -466,4 +469,35 @@ fn plugin_contributions_tracks_context_and_status_ids() {
     contrib.status_segment_ids.insert("my_status".to_string());
     assert!(contrib.context_item_ids.contains("my_action"));
     assert!(contrib.status_segment_ids.contains("my_status"));
+}
+
+#[test]
+fn diagnostic_deserializes_optional_ranges_and_lowercase_severity() {
+    let diagnostic: Diagnostic = serde_json::from_value(serde_json::json!({
+        "line":4,
+        "column":2,
+        "severity":"warning",
+        "message":"unused value",
+        "source":"ruff:F841"
+    }))
+    .unwrap();
+    assert_eq!(diagnostic.line, 4);
+    assert_eq!(diagnostic.end_line, None);
+    assert_eq!(diagnostic.severity, DiagnosticSeverity::Warning);
+    assert!(serde_json::from_value::<Diagnostic>(serde_json::json!({
+        "line":4,
+        "column":2,
+        "severity":"critical",
+        "message":"bad severity",
+        "source":"test"
+    }))
+    .is_err());
+}
+
+#[test]
+fn plugin_contributions_tracks_diagnostic_paths() {
+    let mut contributions = PluginContributions::default();
+    let path = PathBuf::from("src/main.rs");
+    contributions.diagnostic_paths.insert(path.clone());
+    assert!(contributions.diagnostic_paths.contains(&path));
 }

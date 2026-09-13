@@ -10,8 +10,8 @@
 //! the layout of the other list-style pickers (search, history, and theme).
 //!
 //! **Prefix routing**: when the first query character is a prefix (`/`, `#`,
-//! `:`, `@`), the palette switches to file search, content search, go-to-line,
-//! or the current file's symbol list mode respectively. The title, query bar,
+//! `:`, `@`, `!`), the palette switches to file search, content search,
+//! go-to-line, symbols, or the current file's diagnostics respectively. The title, query bar,
 //! and result list adapt to the
 //! active route. Categories are shown as a dimmed prefix (`General:`, `View:`,
 //! ...) for the commands route. Descriptions (when present) follow the name
@@ -126,6 +126,9 @@ pub(crate) fn draw_command_palette(f: &mut Frame, app: &mut App, area: Rect) {
         }
         crate::command_palette::PaletteRoute::Symbols => {
             draw_symbol_results(f, app, list_area, &theme);
+        }
+        crate::command_palette::PaletteRoute::Diagnostics => {
+            draw_diagnostic_results(f, app, list_area, &theme);
         }
     }
 }
@@ -390,6 +393,62 @@ fn draw_symbol_results(f: &mut Frame, app: &mut App, list_area: Rect, theme: &cr
                 symbol.name,
                 symbol.line + 1
             ))
+        })
+        .collect();
+    let mut state = ListState::default();
+    state.select(Some(picker.selected));
+    f.render_stateful_widget(
+        List::new(items).highlight_style(theme.selection_style().add_modifier(Modifier::BOLD)),
+        list_area,
+        &mut state,
+    );
+    app.command_palette_area = list_area;
+    app.command_palette_offset = state.offset();
+}
+
+/// Renders diagnostics for the `!` command-palette route.
+fn draw_diagnostic_results(
+    f: &mut Frame,
+    app: &mut App,
+    list_area: Rect,
+    theme: &crate::theme::Theme,
+) {
+    let Some(picker) = app
+        .command_palette
+        .as_ref()
+        .and_then(|palette| palette.route_diagnostics.as_ref())
+    else {
+        f.render_widget(Paragraph::new("No diagnostics in this file"), list_area);
+        return;
+    };
+    if picker.filtered.is_empty() {
+        f.render_widget(Paragraph::new("No matching diagnostics"), list_area);
+        app.command_palette_area = list_area;
+        app.command_palette_offset = 0;
+        return;
+    }
+    let items: Vec<ListItem> = picker
+        .filtered
+        .iter()
+        .filter_map(|index| picker.diagnostics.get(*index))
+        .map(|diagnostic| {
+            let severity = diagnostic.severity;
+            let label = format!(
+                "{} {}:{}",
+                severity.label(),
+                diagnostic.line + 1,
+                diagnostic.column + 1
+            );
+            ListItem::new(Line::from(vec![
+                Span::styled(
+                    format!("{label:<18}"),
+                    Style::default().fg(theme.diagnostic_color(severity)),
+                ),
+                Span::styled(
+                    format!("{}: {}", diagnostic.source, diagnostic.message),
+                    Style::default().fg(theme.text),
+                ),
+            ]))
         })
         .collect();
     let mut state = ListState::default();

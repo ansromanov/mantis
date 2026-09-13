@@ -2,7 +2,7 @@
 name = "python"
 version = "0.1.0"
 edition = "2021"
-description = "Bundled Python language provider plugin for mantis. Provides fold capability via indent_fold."
+description = "Bundled Python language provider plugin for mantis. Provides folding and optional Ruff diagnostics."
 license = "GPL-3.0-or-later"
 repository = "https://github.com/ansromanov/mantis"
 

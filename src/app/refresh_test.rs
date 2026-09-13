@@ -489,6 +489,11 @@ fn create_base_app() -> App {
         plugin_fold_regions: HashMap::new(),
         plugin_status_facts: HashMap::new(),
         plugin_symbols: HashMap::new(),
+        plugin_diagnostics: HashMap::new(),
+        plugin_diagnostic_lines: HashMap::new(),
+        diagnostic_owners: HashMap::new(),
+        pending_diagnostic_requests: HashMap::new(),
+        latest_diagnostic_requests: HashMap::new(),
         fold_display_map: Vec::new(),
         fold_gutter_rows: Vec::new(),
         yaml_error: None,
@@ -1250,6 +1255,116 @@ fn set_fold_regions_stamps_contribution() {
 }
 
 // -- teardown_plugin_contributions tests ---------------------------------------
+
+#[test]
+fn diagnostic_response_skips_malformed_items_and_indexes_strongest_severity() {
+    let mut app = create_base_app();
+    let path = std::path::PathBuf::from("/tmp/main.rs");
+    app.current_file = Some(path.clone());
+    let mut palette = crate::command_palette::CommandPalette::default();
+    palette.route = crate::command_palette::PaletteRoute::Diagnostics;
+    palette.route_diagnostics = Some(crate::search::DiagnosticPicker::new(Vec::new()));
+    app.command_palette = Some(palette);
+    app.drain_plugin_actions_for_test(
+        "ruff",
+        "register_language_provider",
+        serde_json::json!({"extensions":["rs"],"capabilities":["diagnostics"]}),
+    );
+    app.pending_diagnostic_requests
+        .insert(7, (path.clone(), "ruff".into()));
+    app.latest_diagnostic_requests.insert(path.clone(), 7);
+    app.handle_diagnostic_response(
+        7,
+        Ok(serde_json::json!({
+            "diagnostics":[
+                {"line":3,"column":2,"severity":"warning",
+                 "message":"unused\nvalue","source":"ruff:F841"},
+                {"line":3,"column":4,"severity":"error",
+                 "message":"undefined name","source":"ruff:F821"},
+                {"line":"bad","column":0,"severity":"error",
+                 "message":"invalid line","source":"ruff"},
+                {"line":4,"column":0,"severity":"unknown",
+                 "message":"invalid severity","source":"ruff"}
+            ]
+        })),
+    );
+
+    assert_eq!(app.plugin_diagnostics[&path].len(), 2);
+    assert_eq!(app.plugin_diagnostics[&path][0].message, "unused value");
+    assert_eq!(
+        app.plugin_diagnostic_lines[&path].get(&3),
+        Some(&crate::plugin::types::DiagnosticSeverity::Error)
+    );
+    assert!(app.plugin_contributions["ruff"]
+        .diagnostic_paths
+        .contains(&path));
+    assert_eq!(
+        app.command_palette
+            .as_ref()
+            .and_then(|palette| palette.route_diagnostics.as_ref())
+            .map(|picker| picker.filtered.len()),
+        Some(2)
+    );
+}
+
+#[test]
+fn stale_diagnostic_response_is_ignored_after_a_newer_request() {
+    let mut app = create_base_app();
+    let path = std::path::PathBuf::from("/tmp/main.rs");
+    app.drain_plugin_actions_for_test(
+        "ruff",
+        "register_language_provider",
+        serde_json::json!({"extensions":["rs"],"capabilities":["diagnostics"]}),
+    );
+    app.pending_diagnostic_requests
+        .insert(1, (path.clone(), "ruff".into()));
+    app.latest_diagnostic_requests.insert(path.clone(), 2);
+    app.handle_diagnostic_response(
+        1,
+        Ok(serde_json::json!({
+            "diagnostics":[{"line":0,"column":0,"severity":"error",
+                "message":"stale","source":"ruff"}]
+        })),
+    );
+    assert!(!app.plugin_diagnostics.contains_key(&path));
+}
+
+#[test]
+fn diagnostics_teardown_clears_results_and_line_markers() {
+    let mut app = create_base_app();
+    let path = std::path::PathBuf::from("/tmp/main.rs");
+    app.current_file = Some(path.clone());
+    let mut palette = crate::command_palette::CommandPalette::default();
+    palette.route = crate::command_palette::PaletteRoute::Diagnostics;
+    palette.route_diagnostics = Some(crate::search::DiagnosticPicker::new(Vec::new()));
+    app.command_palette = Some(palette);
+    app.drain_plugin_actions_for_test(
+        "ruff",
+        "register_language_provider",
+        serde_json::json!({"extensions":["rs"],"capabilities":["diagnostics"]}),
+    );
+    app.pending_diagnostic_requests
+        .insert(3, (path.clone(), "ruff".into()));
+    app.latest_diagnostic_requests.insert(path.clone(), 3);
+    app.handle_diagnostic_response(
+        3,
+        Ok(serde_json::json!({
+            "diagnostics":[{"line":0,"column":0,"severity":"warning",
+                "message":"check","source":"ruff"}]
+        })),
+    );
+    app.teardown_plugin_contributions("ruff");
+    assert!(!app.plugin_diagnostics.contains_key(&path));
+    assert!(!app.plugin_diagnostic_lines.contains_key(&path));
+    assert!(!app.diagnostic_owners.contains_key(&path));
+    assert_eq!(
+        app.command_palette
+            .as_ref()
+            .and_then(|palette| palette.route_diagnostics.as_ref())
+            .map(|picker| picker.filtered.len()),
+        Some(0)
+    );
+}
 
 #[test]
 fn teardown_clears_content_state() {

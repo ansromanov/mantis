@@ -2,8 +2,8 @@
 //!
 //! `draw_statusbar` renders the bottom row or rows of the screen. When an
 //! overlay is active it shows that overlay's key hints; otherwise it summarizes
-//! the focused panel, file path, git state, position, symbol scope, and active
-//! modes. Colors come from the active theme, with per-segment overrides from
+//! the focused panel, file path, git state, position, symbol scope, diagnostics,
+//! and active modes. Colors come from the active theme, with per-segment overrides from
 //! `[statusbar.colors]`. It is a read-only projection of `App` and is drawn
 //! last so it reflects the final per-frame state. `hit_test` maps clicks to
 //! actionable segments, while `segment_at` returns visible text for the
@@ -53,6 +53,8 @@ pub(crate) enum StatusSegment {
     Git,
     Errors,
     Folds,
+    Diagnostics,
+    DiagnosticMessage,
     PluginFacts,
     PluginContent,
     Message,
@@ -79,6 +81,7 @@ impl StatusSegment {
             StatusSegment::Git => "git",
             StatusSegment::Errors => "errors",
             StatusSegment::Folds => "folds",
+            StatusSegment::Diagnostics | StatusSegment::DiagnosticMessage => "diagnostics",
             StatusSegment::PluginFacts => "pluginfacts",
             StatusSegment::PluginContent => "plugincontent",
             StatusSegment::Message => "message",
@@ -116,6 +119,9 @@ impl StatusSegment {
             StatusSegment::Worktrees => Some("worktree_picker"),
             StatusSegment::Lnum => Some("goto_line"),
             StatusSegment::Scope => Some("symbol_outline"),
+            StatusSegment::Diagnostics | StatusSegment::DiagnosticMessage => {
+                Some("diagnostics_picker")
+            }
             StatusSegment::Type => Some("theme_picker"),
             StatusSegment::Folds => Some("fold_all"),
             StatusSegment::Errors | StatusSegment::PluginError => Some("plugin_picker"),
@@ -466,6 +472,87 @@ fn build_normal_lines(
             StatusSegment::Git,
             P_GIT,
         ));
+    }
+
+    // -- Diagnostic count and active-line message --
+    let diagnostics = app
+        .current_file
+        .as_deref()
+        .and_then(|path| app.plugin_diagnostics.get(path))
+        .map(Vec::as_slice)
+        .unwrap_or_default();
+    let errors = diagnostics
+        .iter()
+        .filter(|diagnostic| diagnostic.severity == crate::plugin::types::DiagnosticSeverity::Error)
+        .count();
+    let warnings = diagnostics
+        .iter()
+        .filter(|diagnostic| {
+            diagnostic.severity == crate::plugin::types::DiagnosticSeverity::Warning
+        })
+        .count();
+    let informational = diagnostics.len().saturating_sub(errors + warnings);
+    if warnings > 0 {
+        segs.push((
+            Span::styled(
+                format!(" ⚠{warnings}"),
+                base.fg(app
+                    .theme
+                    .diagnostic_color(crate::plugin::types::DiagnosticSeverity::Warning)),
+            ),
+            StatusSegment::Diagnostics,
+            P_ERR,
+        ));
+    }
+    if errors > 0 {
+        segs.push((
+            Span::styled(
+                format!(" ✖{errors}"),
+                base.fg(app
+                    .theme
+                    .diagnostic_color(crate::plugin::types::DiagnosticSeverity::Error)),
+            ),
+            StatusSegment::Diagnostics,
+            P_ERR,
+        ));
+    }
+    if warnings == 0 && errors == 0 && informational > 0 {
+        segs.push((
+            Span::styled(
+                format!(" ℹ{informational}"),
+                base.fg(app
+                    .theme
+                    .diagnostic_color(crate::plugin::types::DiagnosticSeverity::Info)),
+            ),
+            StatusSegment::Diagnostics,
+            P_INFO,
+        ));
+    }
+    if app.has_text_cursor() && !diagnostics.is_empty() {
+        let line = app.display_to_physical(app.active_line);
+        if let Some(diagnostic) = diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.line == line)
+            .max_by_key(|diagnostic| diagnostic.severity.rank())
+        {
+            let source = if diagnostic.source.is_empty() {
+                diagnostic.severity.label()
+            } else {
+                diagnostic.source.as_str()
+            };
+            let text = crate::ansi::sanitize_terminal_text(&format!(
+                " [{source}: {}]",
+                diagnostic.message
+            ));
+            segs.push((
+                Span::styled(
+                    text,
+                    base.fg(app.theme.diagnostic_color(diagnostic.severity)),
+                ),
+                StatusSegment::DiagnosticMessage,
+                P_META,
+            ));
+        }
     }
 
     // -- Priority 4: error indicators --

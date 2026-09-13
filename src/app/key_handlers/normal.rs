@@ -181,6 +181,8 @@ impl App {
             ));
         } else if pressed_in(&k.symbol_outline, &key, scope) {
             self.open_symbol_outline();
+        } else if pressed_in(&k.diagnostics_picker, &key, scope) {
+            self.open_diagnostics_picker();
         } else if pressed_in(&k.switch_panel, &key, scope) {
             self.focus = match self.focus {
                 Focus::Tree => Focus::Content,

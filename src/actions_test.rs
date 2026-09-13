@@ -15,6 +15,15 @@ fn symbol_outline_requires_provider_symbols() {
 }
 
 #[test]
+fn diagnostics_picker_requires_provider_diagnostics() {
+    let action = ACTIONS
+        .iter()
+        .find(|action| action.id == "diagnostics_picker")
+        .unwrap();
+    assert_eq!(action.applicability(), Applicability::Diagnostics);
+}
+
+#[test]
 fn worktree_picker_is_registered() {
     assert!(ACTIONS.iter().any(|action| action.id == "worktree_picker"));
     assert!(ACTIONS.iter().any(|action| {

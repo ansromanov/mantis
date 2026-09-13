@@ -810,6 +810,9 @@ impl App {
                 crate::command_palette::PaletteRoute::Content => self.dispatch_palette_content(),
                 crate::command_palette::PaletteRoute::GotoLine => {}
                 crate::command_palette::PaletteRoute::Symbols => self.dispatch_palette_symbol(),
+                crate::command_palette::PaletteRoute::Diagnostics => {
+                    self.dispatch_palette_diagnostic()
+                }
             }
         }
     }

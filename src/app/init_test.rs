@@ -26,6 +26,14 @@ fn new_app_starts_with_empty_statusbar_geometry() {
     assert_eq!(app.statusbar_area, ratatui::layout::Rect::default());
 }
 
+#[test]
+fn new_app_starts_with_no_provider_diagnostics() {
+    let app = App::new(std::path::PathBuf::from("."), Config::default(), None, None).unwrap();
+    assert!(app.plugin_diagnostics.is_empty());
+    assert!(app.plugin_diagnostic_lines.is_empty());
+    assert!(app.pending_diagnostic_requests.is_empty());
+}
+
 fn temp_dir() -> PathBuf {
     static COUNTER: AtomicUsize = AtomicUsize::new(0);
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);

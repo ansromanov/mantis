@@ -716,6 +716,17 @@ fn default_keymap_includes_open_external() {
 }
 
 #[test]
+fn diagnostics_picker_is_bound_to_content_exclamation() {
+    let keymap = Keymap::default();
+    let binding = keymap
+        .diagnostics_picker
+        .first()
+        .expect("diagnostics picker should have a default binding");
+    assert_eq!(binding.code, KeyCode::Char('!'));
+    assert_eq!(binding.display(), "! (content)");
+}
+
+#[test]
 fn action_for_key_resolves_correctly() {
     let keymap = Keymap::default();
     let key = ev(KeyCode::Char('o'), KeyModifiers::NONE);

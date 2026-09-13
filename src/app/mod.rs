@@ -414,6 +414,17 @@ pub struct App {
     pub plugin_status_facts: HashMap<PathBuf, String>,
     /// Per-path symbol outlines supplied by language providers via `set_symbols`.
     pub plugin_symbols: HashMap<PathBuf, Vec<crate::plugin::types::Symbol>>,
+    /// Per-path diagnostics returned by the selected language provider.
+    pub plugin_diagnostics: HashMap<PathBuf, Vec<crate::plugin::types::Diagnostic>>,
+    /// Highest-severity diagnostic per physical line, precomputed for visible-row rendering.
+    pub plugin_diagnostic_lines:
+        HashMap<PathBuf, HashMap<usize, crate::plugin::types::DiagnosticSeverity>>,
+    /// Provider owning each path's current diagnostic set.
+    pub(crate) diagnostic_owners: HashMap<PathBuf, String>,
+    /// Diagnostic request ids mapped to their file and expected provider.
+    pub(crate) pending_diagnostic_requests: HashMap<u64, (PathBuf, String)>,
+    /// Latest outstanding diagnostic request for each path; older replies are ignored.
+    pub(crate) latest_diagnostic_requests: HashMap<PathBuf, u64>,
     /// display_line → physical_line mapping; empty when no folds are active.
     pub fold_display_map: Vec<usize>,
     /// (screen_y, region_idx) pairs recorded during the last render, used for
@@ -586,7 +597,20 @@ impl App {
     /// plugin had rendered content for it — so the display falls back to core
     /// rendering (markdown, JSON, or plain text).
     pub(crate) fn teardown_plugin_contributions(&mut self, name: &str) {
+        let pending_diagnostic_ids: Vec<u64> = self
+            .pending_diagnostic_requests
+            .iter()
+            .filter_map(|(id, (_, provider))| (provider == name).then_some(*id))
+            .collect();
+        for id in pending_diagnostic_ids {
+            if let Some((path, _)) = self.pending_diagnostic_requests.remove(&id) {
+                if self.latest_diagnostic_requests.get(&path) == Some(&id) {
+                    self.latest_diagnostic_requests.remove(&path);
+                }
+            }
+        }
         let Some(contrib) = self.plugin_contributions.remove(name) else {
+            self.plugin_manager.remove_provider_registrations(name);
             return;
         };
 
@@ -626,12 +650,39 @@ impl App {
         for path in &contrib.symbol_paths {
             self.plugin_symbols.remove(path);
         }
+        for path in &contrib.diagnostic_paths {
+            if self
+                .diagnostic_owners
+                .get(path)
+                .is_some_and(|owner| owner == name)
+            {
+                self.plugin_diagnostics.remove(path);
+                self.plugin_diagnostic_lines.remove(path);
+                self.diagnostic_owners.remove(path);
+            }
+        }
         if !contrib.symbol_paths.is_empty()
             && self.command_palette.as_ref().is_some_and(|palette| {
                 palette.route == crate::command_palette::PaletteRoute::Symbols
             })
         {
             self.command_palette = None;
+        }
+        if self
+            .current_file
+            .as_ref()
+            .is_some_and(|path| contrib.diagnostic_paths.contains(path))
+        {
+            if let Some(picker) = self
+                .command_palette
+                .as_mut()
+                .filter(|palette| {
+                    palette.route == crate::command_palette::PaletteRoute::Diagnostics
+                })
+                .and_then(|palette| palette.route_diagnostics.as_mut())
+            {
+                picker.set_diagnostics(Vec::new());
+            }
         }
 
         // Icon map (Nerd Font glyphs).
@@ -832,6 +883,20 @@ impl App {
                     .is_none_or(Vec::is_empty)
                 {
                     return Err("no symbols in file");
+                }
+                Ok(())
+            }
+            crate::actions::Applicability::Diagnostics => {
+                if self.current_file.is_none() {
+                    return Err("no file is open");
+                }
+                if self
+                    .current_file
+                    .as_deref()
+                    .and_then(|path| self.plugin_diagnostics.get(path))
+                    .is_none_or(Vec::is_empty)
+                {
+                    return Err("no diagnostics in file");
                 }
                 Ok(())
             }

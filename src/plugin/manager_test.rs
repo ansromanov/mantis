@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use super::*;
+use crate::plugin::manager::PendingRequest;
 use crate::theme::{color_to_hex, Theme};
 
 fn make_reg(name: &str, exts: &[&str], caps: &[Capability]) -> LanguageProviderRegistration {
@@ -991,6 +992,25 @@ fn send_request_times_out_without_response() {
 
     mgr.deactivate_all();
     std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn diagnostics_request_timeout_does_not_surface_as_plugin_error() {
+    use std::time::{Duration, Instant};
+
+    let mut manager = PluginManager::new(vec![]);
+    manager.pending_requests.insert(
+        99,
+        PendingRequest {
+            plugin_name: "slow-linter".into(),
+            method: "diagnostics".into(),
+            deadline: Instant::now() - Duration::from_millis(1),
+        },
+    );
+    let results = manager.poll_requests();
+    assert_eq!(results.len(), 1);
+    assert!(results[0].1.is_err());
+    assert!(manager.plugin_error_for("slow-linter").is_none());
 }
 
 #[test]

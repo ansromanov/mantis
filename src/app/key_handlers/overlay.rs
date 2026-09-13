@@ -692,6 +692,9 @@ impl App {
                     crate::command_palette::PaletteRoute::Symbols => {
                         self.dispatch_palette_symbol();
                     }
+                    crate::command_palette::PaletteRoute::Diagnostics => {
+                        self.dispatch_palette_diagnostic();
+                    }
                 }
             }
             Some(OverlayKey::Close) => {
@@ -702,6 +705,7 @@ impl App {
                         p.route_search = None;
                         p.route_goto_line = None;
                         p.route_symbols = None;
+                        p.route_diagnostics = None;
                         p.selected = 0;
                         p.filtered = p.base_order.clone();
                         p.match_positions = vec![Vec::new(); p.filtered.len()];
@@ -783,6 +787,18 @@ impl App {
                 );
                 if let Some(ref mut palette) = self.command_palette {
                     palette.route_symbols = Some(picker);
+                }
+            }
+            crate::command_palette::PaletteRoute::Diagnostics => {
+                let diagnostics = self
+                    .current_file
+                    .as_deref()
+                    .and_then(|path| self.plugin_diagnostics.get(path))
+                    .cloned()
+                    .unwrap_or_default();
+                let picker = crate::search::DiagnosticPicker::new(diagnostics);
+                if let Some(ref mut palette) = self.command_palette {
+                    palette.route_diagnostics = Some(picker);
                 }
             }
             crate::command_palette::PaletteRoute::Commands => {}
