@@ -4,6 +4,14 @@ fn hl() -> Highlighter {
     Highlighter::with_extra_syntaxes("base16-ocean.dark", &[])
 }
 
+fn load_yaml(input: &str) -> YamlLoad {
+    let file = tempfile::NamedTempFile::with_suffix(".yaml").unwrap();
+    std::fs::write(file.path(), input).unwrap();
+    compute_file_load(file.path(), &hl(), usize::MAX)
+        .yaml
+        .expect("yaml state")
+}
+
 #[test]
 fn plain_file_uses_virtual_file() {
     let mut f = tempfile::NamedTempFile::with_suffix(".rs").unwrap();
@@ -128,6 +136,35 @@ fn yaml_detects_folds_and_anchors() {
     assert_eq!(yaml.anchor_count, 1);
     assert_eq!(yaml.alias_count, 1);
     assert!(!yaml.fold_regions.is_empty());
+}
+
+#[test]
+fn valid_single_document_yaml_has_no_error() {
+    let yaml = load_yaml("apiVersion: v1\nkind: Pod\n");
+    assert_eq!(yaml.error, None);
+}
+
+#[test]
+fn valid_multi_document_yaml_has_no_error_and_keeps_folds_and_counts() {
+    let yaml = load_yaml(
+        "root: &first\n  key: value\nref: *first\n---\nother: &second\n  key: value\nref: *second\n",
+    );
+    assert_eq!(yaml.error, None);
+    assert_eq!(yaml.anchor_count, 2);
+    assert_eq!(yaml.alias_count, 2);
+    assert!(!yaml.fold_regions.is_empty());
+}
+
+#[test]
+fn invalid_single_document_yaml_reports_error() {
+    let yaml = load_yaml("key: [unterminated\n");
+    assert!(yaml.error.is_some());
+}
+
+#[test]
+fn malformed_second_yaml_document_reports_error() {
+    let yaml = load_yaml("kind: Pod\n---\nkey: [unterminated\n");
+    assert!(yaml.error.is_some());
 }
 
 #[test]

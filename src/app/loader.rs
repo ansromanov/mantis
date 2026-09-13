@@ -279,9 +279,7 @@ pub(super) fn compute_file_load(
 
     if is_yaml {
         let fold_regions = yaml_fold::detect_fold_regions(&load.content);
-        let error = serde_yaml::from_str::<serde_yaml::Value>(&s)
-            .err()
-            .map(|e| e.to_string());
+        let error = yaml_parse_error(&s);
         let (anchor_count, alias_count) = yaml_fold::count_anchors_aliases(&load.content);
         load.yaml = Some(YamlLoad {
             fold_regions,
@@ -314,6 +312,15 @@ pub(super) fn compute_file_load(
         }
     }
     load
+}
+
+/// Returns the first YAML parse error across all documents in a YAML stream.
+fn yaml_parse_error(input: &str) -> Option<String> {
+    serde_yaml::Deserializer::from_str(input).find_map(|document| {
+        <serde_yaml::Value as serde::Deserialize>::deserialize(document)
+            .err()
+            .map(|error| error.to_string())
+    })
 }
 
 /// Parses JSON without imposing serde_json's default nesting limit. Valid
