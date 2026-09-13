@@ -138,7 +138,7 @@ pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) -> Vec<Status
         } else {
             " Enter switch root  Ctrl+Enter open tab  Esc cancel"
         };
-        (overlay_line(hint, base, area.width), Vec::new())
+        (vec![overlay_line(hint, base, area.width)], Vec::new())
     } else if app.theme_picker.is_some() {
         (
             vec![overlay_line(
