@@ -303,8 +303,8 @@ pub static ACTIONS: &[ActionSpec] = &[
         id: "open_worktree_new_tab",
         palette: Some("Open worktree in new tab"),
         help: None,
-        category: Some("Tabs"),
-        menu: Some(("Tabs", 8)),
+        category: "Tabs",
+        menu: Some(8),
         description: Some("Choose a worktree to open or activate in its own tab"),
     },
     ActionSpec {

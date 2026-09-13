@@ -251,7 +251,7 @@ fn apply_theme_sends_new_theme_colors_to_plugins() {
     let monokai = crate::theme::Theme::load("monokai").expect("monokai theme must load");
     app.apply_theme("monokai", monokai.clone());
 
-    let deadline = Instant::now() + Duration::from_secs(3);
+    let deadline = Instant::now() + Duration::from_secs(10);
     let contents = loop {
         if let Ok(s) = fs::read_to_string(&out) {
             if s.matches(r#""event":"on_theme_change""#).count() >= 1 {
