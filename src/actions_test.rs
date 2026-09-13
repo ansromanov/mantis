@@ -26,8 +26,8 @@ fn menu_bar_action_is_palette_invokable_and_menu_registered() {
         .find(|action| action.id == "menu_bar")
         .expect("menu_bar action is registered");
     assert_eq!(action.palette, Some("Toggle the action menu"));
-    assert_eq!(action.category, Some("General"));
-    assert_eq!(action.menu, Some(("General", 9)));
+    assert_eq!(action.category, "General");
+    assert_eq!(action.menu, Some(9));
 }
 
 #[test]
@@ -60,21 +60,28 @@ fn tab_actions_are_registered_with_palette_entries() {
             .find(|a| a.id == id)
             .unwrap_or_else(|| panic!("'{id}' missing from ACTIONS"));
         assert!(action.palette.is_some(), "'{id}' must be palette-invokable");
-        assert_eq!(action.category, Some("Tabs"), "'{id}' category");
+        assert_eq!(action.category, "Tabs", "'{id}' category");
         assert!(action.description.is_some(), "'{id}' needs a description");
     }
 }
 
 #[test]
 fn every_palette_action_has_one_menu_group_and_menu_bar_has_a_keymap_action() {
-    let menu_groups = [
-        "General", "View", "Git", "Copy", "Navigate", "Tree", "Tabs", "Safety",
-    ];
+    let menu_groups = ACTION_CATEGORIES;
     for action in ACTIONS.iter().filter(|action| action.palette.is_some()) {
-        let (menu, _) = action
+        let order = action
             .menu
             .unwrap_or_else(|| panic!("{} has no menu placement", action.id));
-        assert!(menu_groups.contains(&menu), "unknown menu group {menu}");
+        assert!(
+            menu_groups.contains(&action.category),
+            "unknown category {}",
+            action.category
+        );
+        assert!(
+            order <= 15,
+            "unexpected menu order {order} for {}",
+            action.id
+        );
         assert_eq!(
             ACTIONS
                 .iter()
@@ -173,8 +180,8 @@ const KEYMAP_FIELD_ACTION_IDS: &[&str] = &[
     "reopen_tab",
 ];
 
-/// Keymap-only actions that intentionally have no palette entry. Their help
-/// coverage, when present, is captured by the `.help` field in `ACTIONS`.
+/// Keymap-only actions that intentionally have no palette entry. Their group
+/// is still recorded in `.category`, while help coverage uses `.help`.
 /// Listed here so parity checks can distinguish them from missing actions.
 const KEYMAP_ONLY_ALLOWLIST: &[&str] = &[
     "nav_up",
@@ -391,12 +398,13 @@ fn compare_against_action_is_palette_only() {
 // -- category & description tests -------------------------------------------
 
 #[test]
-fn every_palette_entry_has_category() {
-    for action in ACTIONS.iter().filter(|a| a.palette.is_some()) {
+fn every_action_has_a_canonical_category() {
+    for action in ACTIONS {
         assert!(
-            action.category.is_some(),
-            "action '{}' has palette entry but no category",
+            ACTION_CATEGORIES.contains(&action.category),
+            "action '{}' has unknown category '{}'",
             action.id,
+            action.category,
         );
     }
 }
@@ -413,18 +421,40 @@ fn every_palette_entry_has_description() {
 }
 
 #[test]
-fn navigation_actions_have_no_category_or_description() {
+fn non_palette_actions_have_descriptions_omitted() {
     for action in ACTIONS.iter().filter(|a| a.palette.is_none()) {
         assert!(
-            action.category.is_none(),
-            "action '{}' has no palette entry but has a category",
+            ACTION_CATEGORIES.contains(&action.category),
+            "action '{}' has unknown category '{}'",
             action.id,
+            action.category,
         );
         assert!(
             action.description.is_none(),
             "action '{}' has no palette entry but has a description",
             action.id,
         );
+    }
+}
+
+#[test]
+fn help_actions_use_the_same_category_as_palette_and_menu() {
+    for action in ACTIONS.iter().filter(|action| action.help.is_some()) {
+        assert!(
+            ACTION_CATEGORIES.contains(&action.category),
+            "{} has a help row but no canonical category",
+            action.id
+        );
+        if action.palette.is_some() {
+            let command = crate::command_palette::COMMANDS
+                .iter()
+                .find(|command| command.action_id == action.id)
+                .unwrap_or_else(|| panic!("{} is missing from the command palette", action.id));
+            assert_eq!(command.category.as_deref(), Some(action.category));
+        }
+        if action.menu.is_some() {
+            assert!(ACTION_CATEGORIES.contains(&action.category));
+        }
     }
 }
 
@@ -504,6 +534,6 @@ fn repo_commit_log_action_requires_git_repo() {
         .find(|a| a.id == "repo_commit_log")
         .expect("repo_commit_log must be registered in ACTIONS");
     assert_eq!(spec.palette, Some("Browse repository commits"));
-    assert_eq!(spec.category, Some("Git"));
+    assert_eq!(spec.category, "Git");
 }
 // touched for log follow mode

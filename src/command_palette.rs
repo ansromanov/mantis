@@ -114,7 +114,7 @@ pub static COMMANDS: LazyLock<Vec<CommandEntry>> = LazyLock::new(|| {
             a.palette.map(|name| CommandEntry {
                 name: name.to_string(),
                 action_id: a.id.to_string(),
-                category: a.category.map(str::to_string),
+                category: Some(a.category.to_string()),
                 description: a.description.map(str::to_string),
             })
         })

@@ -29,7 +29,7 @@ fn each_palette_action_has_exactly_one_menu_placement() {
     for action in actions.iter().filter(|action| action.palette.is_some()) {
         let placements = MENUS
             .iter()
-            .filter(|menu| action.menu.is_some_and(|(name, _)| name == **menu))
+            .filter(|menu| action.menu.is_some_and(|_| action.category == **menu))
             .count();
         assert_eq!(placements, 1, "{} must occur in one menu", action.id);
     }

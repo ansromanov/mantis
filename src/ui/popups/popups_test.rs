@@ -391,37 +391,33 @@ fn draw_theme_with_filter() {
 fn draw_help_all_sections() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());
-    let backend = TestBackend::new(80, 100);
+    let backend = TestBackend::new(120, 100);
     let mut terminal = Terminal::new(backend).unwrap();
 
-    // Tab 0: Getting started
-    app.help_tab = 0;
-    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
-    let rows = buffer_rows(&terminal);
-    let joined = rows.join("\n");
-    assert!(joined.contains("Help"));
-    assert!(joined.contains("toggle this help"));
+    let mut draw_category = |category: &str| {
+        app.help_tab = crate::ui::popups::help_tabs()
+            .iter()
+            .position(|tab| *tab == category)
+            .unwrap();
+        terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
+        buffer_rows(&terminal).join("\n")
+    };
 
-    // Tab 1: Navigation
-    app.help_tab = 1;
-    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
-    let rows = buffer_rows(&terminal);
-    let joined = rows.join("\n");
-    assert!(joined.contains("Tree Panel Navigation"));
+    let getting_started = draw_category("Getting started");
+    assert!(getting_started.contains("Help"));
+    assert!(getting_started.contains("Welcome to mantis"));
 
-    // Tab 2: Content
-    app.help_tab = 2;
-    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
-    let rows = buffer_rows(&terminal);
-    let joined = rows.join("\n");
-    assert!(joined.contains("toggle word wrap"));
+    let general = draw_category("General");
+    assert!(general.contains("toggle this help"));
 
-    // Tab 3: Search
-    app.help_tab = 3;
-    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
-    let rows = buffer_rows(&terminal);
-    let joined = rows.join("\n");
-    assert!(joined.contains("global fuzzy file-name picker"));
+    let navigate = draw_category("Navigate");
+    assert!(navigate.contains("go to top"));
+
+    let view = draw_category("View");
+    assert!(view.contains("toggle word wrap"));
+
+    let tree = draw_category("Tree");
+    assert!(tree.contains("global fuzzy file-name picker"));
 }
 
 // ── draw_in_file_search_none ─────────────────────────────────────────────

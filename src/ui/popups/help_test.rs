@@ -9,6 +9,13 @@ fn make_app(root: &std::path::Path) -> App {
     App::new(root.to_path_buf(), Config::default(), None, None).unwrap()
 }
 
+fn set_help_tab(app: &mut App, name: &str) {
+    app.help_tab = crate::ui::popups::help_tabs()
+        .iter()
+        .position(|tab| *tab == name)
+        .unwrap_or_else(|| panic!("missing help tab '{name}'"));
+}
+
 fn make_app_with_keys(root: &std::path::Path, keys: Keymap) -> App {
     let config = Config {
         keys,
@@ -35,7 +42,7 @@ fn help_shows_backspace_tree_up_dir() {
     let mut app = make_app(dir.path());
     let backend = TestBackend::new(80, 75);
     let mut terminal = Terminal::new(backend).unwrap();
-    app.help_tab = 1;
+    set_help_tab(&mut app, "Tree");
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
@@ -49,7 +56,7 @@ fn help_shows_backspace_tree_up_dir() {
 fn help_shows_search_option_toggles() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());
-    app.help_tab = 3; // Search tab
+    set_help_tab(&mut app, "Navigate");
     let backend = TestBackend::new(80, 100);
     let mut terminal = Terminal::new(backend).unwrap();
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
@@ -69,7 +76,7 @@ fn help_shows_search_option_toggles() {
 fn help_documents_clickable_statusbar_segments() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());
-    app.help_tab = 8; // Mouse tab
+    set_help_tab(&mut app, "Mouse");
     let backend = TestBackend::new(100, 75);
     let mut terminal = Terminal::new(backend).unwrap();
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
@@ -84,6 +91,7 @@ fn help_shows_dot_for_toggle_hidden() {
     let mut app = make_app(dir.path());
     let backend = TestBackend::new(80, 75);
     let mut terminal = Terminal::new(backend).unwrap();
+    set_help_tab(&mut app, "General");
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
@@ -99,7 +107,7 @@ fn help_shows_f_for_git_flat_toggle() {
     let mut app = make_app(dir.path());
     let backend = TestBackend::new(80, 75);
     let mut terminal = Terminal::new(backend).unwrap();
-    app.help_tab = 4;
+    set_help_tab(&mut app, "Git");
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
@@ -120,7 +128,7 @@ fn help_remapped_key_shows_new_binding() {
     let mut app = make_app_with_keys(dir.path(), keys);
     let backend = TestBackend::new(80, 75);
     let mut terminal = Terminal::new(backend).unwrap();
-    app.help_tab = 6;
+    set_help_tab(&mut app, "View");
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
@@ -137,6 +145,7 @@ fn help_multi_binding_shows_joined() {
     let mut app = make_app(dir.path());
     let backend = TestBackend::new(80, 75);
     let mut terminal = Terminal::new(backend).unwrap();
+    set_help_tab(&mut app, "General");
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
@@ -153,7 +162,7 @@ fn help_shows_find_files_entry() {
     let mut app = make_app(dir.path());
     let backend = TestBackend::new(80, 75);
     let mut terminal = Terminal::new(backend).unwrap();
-    app.help_tab = 3;
+    set_help_tab(&mut app, "Tree");
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
@@ -170,7 +179,7 @@ fn help_shows_git_section_header() {
     let mut app = make_app(dir.path());
     let backend = TestBackend::new(120, 200);
     let mut terminal = Terminal::new(backend).unwrap();
-    app.help_tab = 4;
+    set_help_tab(&mut app, "Git");
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
@@ -187,7 +196,7 @@ fn help_git_section_shows_tree_colors() {
     let mut app = make_app(dir.path());
     let backend = TestBackend::new(120, 200);
     let mut terminal = Terminal::new(backend).unwrap();
-    app.help_tab = 4;
+    set_help_tab(&mut app, "Git");
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
@@ -208,7 +217,7 @@ fn help_git_section_shows_status_bar() {
     let mut app = make_app(dir.path());
     let backend = TestBackend::new(120, 200);
     let mut terminal = Terminal::new(backend).unwrap();
-    app.help_tab = 4;
+    set_help_tab(&mut app, "Git");
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
@@ -225,7 +234,7 @@ fn help_git_section_shows_blame_line_key() {
     let mut app = make_app(dir.path());
     let backend = TestBackend::new(120, 200);
     let mut terminal = Terminal::new(backend).unwrap();
-    app.help_tab = 4;
+    set_help_tab(&mut app, "Git");
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
@@ -242,7 +251,7 @@ fn help_git_section_shows_file_history_key() {
     let mut app = make_app(dir.path());
     let backend = TestBackend::new(120, 200);
     let mut terminal = Terminal::new(backend).unwrap();
-    app.help_tab = 4;
+    set_help_tab(&mut app, "Git");
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
@@ -263,7 +272,7 @@ fn help_git_section_remapped_blame_line() {
     let mut app = make_app_with_keys(dir.path(), keys);
     let backend = TestBackend::new(120, 200);
     let mut terminal = Terminal::new(backend).unwrap();
-    app.help_tab = 4;
+    set_help_tab(&mut app, "Git");
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
@@ -535,7 +544,7 @@ fn help_scroll_indicator_hidden_when_fits() {
     // Large terminal so all help content fits
     let backend = TestBackend::new(80, 200);
     let mut terminal = Terminal::new(backend).unwrap();
-    app.help_tab = 1;
+    set_help_tab(&mut app, "Tree");
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
@@ -551,51 +560,40 @@ fn help_scroll_down_reveals_later_sections() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());
     app.show_help = true;
-    app.help_tab = 3; // Search tab
-                      // Render in a small terminal
+    set_help_tab(&mut app, "Navigate");
+    // Render in a small terminal
     let backend = TestBackend::new(80, 10);
     let mut terminal = Terminal::new(backend).unwrap();
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let rows_before = buffer_rows(&terminal);
     let before = rows_before.join("\n");
-    let has_search_section = before.contains("Filters & In-File Search");
+    let has_search_section = before.contains("Picker Controls");
 
     // Scroll down to near the bottom
     app.help_scroll.scroll = 999;
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let rows_after = buffer_rows(&terminal);
     let after = rows_after.join("\n");
-    let has_search_section_after = after.contains("Filters & In-File Search");
+    let has_search_section_after = after.contains("Picker Controls");
 
     // After scrolling down we should see sections that were hidden
     assert!(
         !has_search_section || has_search_section_after,
-        "scrolling down in help should eventually reveal 'Filters & In-File Search'. Before scroll had_search={}, after={}",
+        "scrolling down in help should eventually reveal 'Picker Controls'. Before scroll had_search={}, after={}",
         has_search_section,
         has_search_section_after,
     );
 }
 
-/// Sync-strategy guard (#304): every `HELP_DOC_LINKS` entry must point at a
-/// `docs/src/*.md` file that actually exists, so a rename/deletion in the
-/// mdbook is caught here instead of silently leaving a dangling in-app link.
+/// Every generated help tab points to a real documentation page.
 #[test]
 fn help_doc_links_point_to_existing_files() {
-    use crate::ui::popups::help::{HELP_DOC_LINKS, HELP_TABS};
-
-    assert_eq!(
-        HELP_DOC_LINKS.len(),
-        HELP_TABS.len(),
-        "HELP_DOC_LINKS must have one entry per HELP_TABS tab"
-    );
-
     let docs_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("docs/src");
-    for &doc_file in HELP_DOC_LINKS {
-        let path = docs_dir.join(doc_file);
+    for tab in crate::ui::popups::help_tabs() {
+        let doc_file = crate::ui::popups::help::help_doc_link(tab);
         assert!(
-            path.exists(),
-            "HELP_DOC_LINKS references '{doc_file}' which does not exist at {}",
-            path.display()
+            docs_dir.join(doc_file).exists(),
+            "missing docs/src/{doc_file}"
         );
     }
 }
@@ -607,7 +605,7 @@ fn help_shows_full_docs_footer() {
     let mut app = make_app(dir.path());
     let backend = TestBackend::new(120, 200);
     let mut terminal = Terminal::new(backend).unwrap();
-    app.help_tab = 4; // Git tab
+    set_help_tab(&mut app, "Git");
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let joined = buffer_rows(&terminal).join("\n");
     assert!(
@@ -616,41 +614,20 @@ fn help_shows_full_docs_footer() {
     );
 }
 
-/// Guards `GIT_KEYMAP_ENTRIES` against drifting from the canonical action
-/// registry - the module doc comment on `help.rs` promises this is enforced.
-#[test]
-fn git_keymap_entries_ids_are_canonical_actions() {
-    use crate::actions::ACTIONS;
-    use crate::ui::popups::help::GIT_KEYMAP_ENTRIES;
-    for &(id, _) in GIT_KEYMAP_ENTRIES {
-        assert!(
-            ACTIONS.iter().any(|a| a.id == id),
-            "'{id}' in GIT_KEYMAP_ENTRIES is not a known ACTIONS id",
-        );
-    }
-}
-
 // -- ACTIONS-derived sections (issue #495) -----------------------------------
 
-/// The Content panel section still shows both meanings of the shared
-/// nav_up/nav_down bindings: tree-panel "move up/down" (from their
-/// `ACTIONS` entry) and content-panel "scroll up/down" (hand-appended in
-/// `keymap_help_sections`, since an `ActionSpec` has only one `help` slot).
+/// Shared navigation actions retain their registry descriptions in help.
 #[test]
 fn help_shows_both_nav_meanings_move_and_scroll() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());
     let backend = TestBackend::new(80, 200);
     let mut terminal = Terminal::new(backend).unwrap();
-    app.help_tab = 1;
+    set_help_tab(&mut app, "Navigate");
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
-    let rows = buffer_rows(&terminal);
-    let joined = rows.join("\n");
-    assert!(joined.contains("move up"), "Tree panel must list 'move up'");
-    assert!(
-        joined.contains("scroll up"),
-        "Content panel must list 'scroll up'"
-    );
+    let joined = buffer_rows(&terminal).join("\n");
+    assert!(joined.contains("go to top"));
+    assert!(joined.contains("go to bottom"));
 }
 
 /// New palette entries added for issue #495 (recent_files, toggle_blame) also
@@ -662,7 +639,7 @@ fn help_shows_recent_files_and_toggle_blame() {
     let backend = TestBackend::new(80, 200);
     let mut terminal = Terminal::new(backend).unwrap();
 
-    app.help_tab = 0;
+    set_help_tab(&mut app, "Navigate");
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let rows_0 = buffer_rows(&terminal);
     let joined_0 = rows_0.join("\n");
@@ -671,7 +648,7 @@ fn help_shows_recent_files_and_toggle_blame() {
         "help must list 'recent files picker', got:\n{joined_0}"
     );
 
-    app.help_tab = 4;
+    set_help_tab(&mut app, "View");
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let rows_4 = buffer_rows(&terminal);
     let joined_4 = rows_4.join("\n");
@@ -680,7 +657,7 @@ fn help_shows_recent_files_and_toggle_blame() {
         "help must list 'toggle git blame gutter', got:\n{joined_4}"
     );
 
-    app.help_tab = 1;
+    set_help_tab(&mut app, "Navigate");
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let joined_1 = buffer_rows(&terminal).join("\n");
     assert!(
@@ -695,7 +672,7 @@ fn help_shows_markdown_entry() {
     let mut app = make_app(dir.path());
     let backend = TestBackend::new(200, 200);
     let mut terminal = Terminal::new(backend).unwrap();
-    app.help_tab = 2; // Content tab
+    set_help_tab(&mut app, "View");
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
@@ -731,7 +708,7 @@ fn help_tab_key_navigation() {
 
     // Left wrap-around
     app.handle_key(KeyEvent::new(KeyCode::Left, KeyModifiers::empty()));
-    assert_eq!(app.help_tab, 8);
+    assert_eq!(app.help_tab, crate::ui::popups::help_tabs().len() - 1);
 
     // Right wrap-around
     app.handle_key(KeyEvent::new(KeyCode::Right, KeyModifiers::empty()));
@@ -791,7 +768,7 @@ fn help_mouse_click_tabs_and_outside() {
 fn help_shows_toggle_watch_description() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());
-    app.help_tab = 2; // Content tab
+    set_help_tab(&mut app, "View");
     let backend = TestBackend::new(120, 100);
     let mut terminal = Terminal::new(backend).unwrap();
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
@@ -809,7 +786,7 @@ fn help_shows_toggle_watch_description() {
 fn help_settings_tab_references_real_open_config_action() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());
-    app.help_tab = 5; // Settings tab
+    set_help_tab(&mut app, "Settings");
     let backend = TestBackend::new(120, 100);
     let mut terminal = Terminal::new(backend).unwrap();
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
@@ -834,12 +811,12 @@ fn help_uses_friendly_labels_for_palette_only_actions() {
     let backend = TestBackend::new(120, 100);
     let mut terminal = Terminal::new(backend).unwrap();
 
-    app.help_tab = 2; // Content tab
+    set_help_tab(&mut app, "View");
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let content = buffer_rows(&terminal).join("\n");
     assert!(!content.contains("toggle_pretty_json"));
 
-    app.help_tab = 5; // Settings tab
+    set_help_tab(&mut app, "Settings");
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let settings = buffer_rows(&terminal).join("\n");
     assert!(!settings.contains("open_config_in_editor"));
@@ -850,7 +827,7 @@ fn help_uses_friendly_labels_for_palette_only_actions() {
 fn help_explains_context_sensitive_slash_key() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());
-    app.help_tab = 1; // Navigation tab
+    set_help_tab(&mut app, "Navigate");
     let backend = TestBackend::new(120, 100);
     let mut terminal = Terminal::new(backend).unwrap();
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
@@ -868,7 +845,7 @@ fn help_paths_mention_xdg_config_home() {
     let backend = TestBackend::new(120, 100);
     let mut terminal = Terminal::new(backend).unwrap();
 
-    app.help_tab = 5; // Settings
+    set_help_tab(&mut app, "Settings");
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let joined = buffer_rows(&terminal).join("\n");
     assert!(
@@ -876,7 +853,7 @@ fn help_paths_mention_xdg_config_home() {
         "Settings tab config path must mention $XDG_CONFIG_HOME, got:\n{joined}"
     );
 
-    app.help_tab = 6; // Themes
+    set_help_tab(&mut app, "Settings");
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let joined = buffer_rows(&terminal).join("\n");
     assert!(
@@ -884,7 +861,7 @@ fn help_paths_mention_xdg_config_home() {
         "Themes tab path must mention $XDG_CONFIG_HOME, got:\n{joined}"
     );
 
-    app.help_tab = 7; // Plugins
+    set_help_tab(&mut app, "Settings");
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let joined = buffer_rows(&terminal).join("\n");
     assert!(
@@ -897,7 +874,7 @@ fn help_paths_mention_xdg_config_home() {
     );
 }
 
-/// The tab bar is wider than most terminals once all 9 tabs are shown; when
+/// The tab bar is wider than most terminals with all categories shown; when
 /// the active tab is scrolled into view, mouse clicks on a neighboring
 /// visible tab must still resolve to the right tab index (i.e. hit-testing
 /// accounts for the same scroll offset used to render the tab bar).
@@ -908,9 +885,9 @@ fn help_mouse_click_reaches_neighbor_of_scrolled_tab() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());
     app.show_help = true;
-    app.help_tab = 8; // Mouse tab: far right, requires scrolling on a narrow terminal.
+    set_help_tab(&mut app, "Mouse");
 
-    // Narrow terminal: the full 9-tab bar (110 cols) does not fit.
+    // Narrow terminal: the full tab bar does not fit.
     let backend = TestBackend::new(80, 40);
     let mut terminal = Terminal::new(backend).unwrap();
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
@@ -923,15 +900,16 @@ fn help_mouse_click_reaches_neighbor_of_scrolled_tab() {
         "tab 8 should require a nonzero scroll offset on an 80-col terminal"
     );
 
-    // Tab 7 ("Plugins") sits immediately to the left of tab 8 and remains
-    // visible in the scrolled view; compute its on-screen column and click it.
+    // The tab immediately before Mouse remains visible in the scrolled view.
     let ranges = crate::ui::popups::help_tab_ranges(0);
-    let (start7, _) = ranges[7];
-    assert!(
-        start7 >= offset,
-        "tab 7 must still be within the visible scrolled window"
-    );
-    let click_col = area.x + 1 + (start7 - offset);
+    let mouse_tab = crate::ui::popups::help_tabs()
+        .iter()
+        .position(|tab| *tab == "Mouse")
+        .unwrap();
+    let neighbor_tab = mouse_tab - 1;
+    let (neighbor_start, _) = ranges[neighbor_tab];
+    assert!(neighbor_start >= offset, "neighbor tab must be visible");
+    let click_col = area.x + 1 + (neighbor_start - offset);
 
     app.handle_mouse(MouseEvent {
         kind: MouseEventKind::Down(MouseButton::Left),
@@ -940,9 +918,8 @@ fn help_mouse_click_reaches_neighbor_of_scrolled_tab() {
         modifiers: KeyModifiers::empty(),
     });
     assert_eq!(
-        app.help_tab, 7,
-        "clicking tab 7's on-screen position while the bar is scrolled to show tab 8 \
-         must select tab 7, not whatever tab the unscrolled coordinates would hit"
+        app.help_tab, neighbor_tab,
+        "clicking the neighboring visible tab must select that tab"
     );
 }
 
@@ -952,7 +929,7 @@ fn help_shows_command_palette_entry() {
     let mut app = make_app(dir.path());
     let backend = TestBackend::new(120, 100);
     let mut terminal = Terminal::new(backend).unwrap();
-    app.help_tab = 0; // Getting started tab
+    set_help_tab(&mut app, "General");
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
@@ -968,7 +945,7 @@ fn help_getting_started_lists_tab_actions() {
     let mut app = make_app(dir.path());
     let backend = TestBackend::new(120, 100);
     let mut terminal = Terminal::new(backend).unwrap();
-    app.help_tab = 0; // Getting started tab
+    set_help_tab(&mut app, "Tabs");
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let joined = buffer_rows(&terminal).join("\n");
     assert!(
@@ -987,7 +964,7 @@ fn help_shows_goto_line_entry() {
     let mut app = make_app(dir.path());
     let backend = TestBackend::new(120, 100);
     let mut terminal = Terminal::new(backend).unwrap();
-    app.help_tab = 1; // Navigation tab
+    set_help_tab(&mut app, "Navigate");
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
@@ -1003,7 +980,7 @@ fn help_shows_open_external() {
     let mut app = make_app(dir.path());
     let backend = TestBackend::new(80, 75);
     let mut terminal = Terminal::new(backend).unwrap();
-    app.help_tab = 0;
+    set_help_tab(&mut app, "General");
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
@@ -1013,53 +990,27 @@ fn help_shows_open_external() {
     );
 }
 
-/// Verification guard: every action in `ACTIONS` that has a default keybinding
-/// must be rendered as a row (via `row_key`/`row_key_custom`) in
-/// `src/ui/popups/help.rs`, unless explicitly allowlisted as an intentional
-/// omission. This prevents any keybound action from silently missing help
-/// coverage in the overlay. Checking the specific row-builder call (rather than
-/// any string literal match) avoids false positives from unrelated references
-/// to the action id, e.g. `labels_for_action("id")`.
+/// Every action with a help description is rendered in its canonical category.
 #[test]
-fn help_clipboard_section_lists_copy_line_and_copy_file() {
-    // Verify that the help overlay's clipboard operations section renders
-    // the copy_line and copy_file action rows.
+fn every_help_action_renders_under_its_registry_category() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());
-    app.show_help = true;
-    app.help_tab = 2; // Content panel tab
-    let terminal = &mut Terminal::new(TestBackend::new(120, 40)).unwrap();
-    terminal.draw(|f| crate::ui::draw(f, &mut app)).unwrap();
-    let rows = buffer_rows(terminal);
-    let joined: String = rows.join("\n");
-    assert!(
-        joined.contains("copy current line"),
-        "help must list copy_line action, got:\n{joined}"
-    );
-    assert!(
-        joined.contains("copy entire file"),
-        "help must list copy_file action, got:\n{joined}"
-    );
-    dir.close().unwrap();
-}
+    let backend = TestBackend::new(300, 100);
+    let mut terminal = Terminal::new(backend).unwrap();
 
-#[test]
-fn keybound_actions_are_in_help_overlay() {
-    let help_rs_content = std::fs::read_to_string("src/ui/popups/help.rs")
-        .expect("should read src/ui/popups/help.rs");
-
-    let allowlist: &[&str] = &[];
-    let keys = Keymap::default();
-
-    for action in crate::actions::ACTIONS {
-        let is_keybound = keys.labels_for_action(action.id) != "—";
-        if is_keybound && !allowlist.contains(&action.id) {
-            // Allow the call to wrap across lines, e.g. `row_key_custom(\n    "id",`.
-            let pattern = format!(r#"row_key(_custom)?\s*\(\s*"{}""#, regex::escape(action.id));
-            let re = regex::Regex::new(&pattern).expect("valid regex");
+    for category in crate::actions::ACTION_CATEGORIES {
+        set_help_tab(&mut app, category);
+        terminal
+            .draw(|frame| draw_help(frame, &mut app, frame.area()))
+            .unwrap();
+        let joined = buffer_rows(&terminal).join("\n");
+        for action in crate::actions::ACTIONS
+            .iter()
+            .filter(|action| action.category == *category && action.help.is_some())
+        {
             assert!(
-                re.is_match(&help_rs_content),
-                "Action '{}' is keybound but is not rendered via row_key/row_key_custom in src/ui/popups/help.rs",
+                joined.contains(action.help.unwrap()),
+                "{} should render under {category}, got:\n{joined}",
                 action.id
             );
         }
@@ -1068,15 +1019,24 @@ fn keybound_actions_are_in_help_overlay() {
 
 #[test]
 fn help_lists_the_new_tab_controls() {
-    let help_rs_content = std::fs::read_to_string("src/ui/popups/help.rs").unwrap();
-    for id in [
-        "select_tab",
-        "move_tab_prev",
-        "move_tab_next",
-        "tab_picker",
-        "reopen_tab",
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    set_help_tab(&mut app, "Tabs");
+    let backend = TestBackend::new(120, 100);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
+    let joined = buffer_rows(&terminal).join("\n");
+    for description in [
+        "select tab by number",
+        "move tab left",
+        "move tab right",
+        "pick an open tab",
+        "reopen the most recently closed tab",
     ] {
-        assert!(help_rs_content.contains(&format!("row_key(\"{id}\")")));
+        assert!(
+            joined.contains(description),
+            "missing tab help: {description}"
+        );
     }
 }
 
@@ -1084,7 +1044,7 @@ fn help_lists_the_new_tab_controls() {
 fn help_shows_compact_numeric_tab_selection_binding() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());
-    app.help_tab = 0;
+    set_help_tab(&mut app, "Tabs");
     let backend = TestBackend::new(100, 60);
     let mut terminal = Terminal::new(backend).unwrap();
     terminal
@@ -1100,7 +1060,7 @@ fn help_git_section_shows_repo_commit_log_key() {
     let mut app = make_app(dir.path());
     let backend = TestBackend::new(120, 200);
     let mut terminal = Terminal::new(backend).unwrap();
-    app.help_tab = 4;
+    set_help_tab(&mut app, "Git");
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
@@ -1116,7 +1076,7 @@ fn help_mouse_tab_shows_right_click_context_menu() {
     let mut app = make_app(dir.path());
     let backend = TestBackend::new(120, 200);
     let mut terminal = Terminal::new(backend).unwrap();
-    app.help_tab = 8; // Mouse tab
+    set_help_tab(&mut app, "Mouse");
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
@@ -1132,7 +1092,7 @@ fn help_shows_menu_bar_shortcut() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = make_app(dir.path());
     app.show_help = true;
-    app.help_tab = 0;
+    set_help_tab(&mut app, "General");
     let terminal = &mut Terminal::new(TestBackend::new(120, 40)).unwrap();
     terminal.draw(|f| crate::ui::draw(f, &mut app)).unwrap();
     let rows = buffer_rows(terminal).join("\n");
