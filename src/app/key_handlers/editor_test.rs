@@ -250,7 +250,6 @@ fn apply_theme_sends_new_theme_colors_to_plugins() {
 
     let monokai = crate::theme::Theme::load("monokai").expect("monokai theme must load");
     app.apply_theme("monokai", monokai.clone());
-    app.plugin_manager.deactivate_all();
 
     let deadline = Instant::now() + Duration::from_secs(3);
     let contents = loop {
@@ -265,6 +264,7 @@ fn apply_theme_sends_new_theme_colors_to_plugins() {
         );
         std::thread::sleep(Duration::from_millis(25));
     };
+    app.plugin_manager.deactivate_all();
     let line = contents
         .lines()
         .find(|l| l.contains(r#""event":"on_theme_change""#))
@@ -472,6 +472,15 @@ fn open_content_search_command_scoped_in_git_mode() {
 #[test]
 fn toggle_git_mode_command_flips_git_mode_flag() {
     let root = temp_tree();
+    let git_init = std::process::Command::new("git")
+        .arg("init")
+        .current_dir(&root)
+        .status()
+        .unwrap();
+    assert!(
+        git_init.success(),
+        "temporary test tree should be a Git repository"
+    );
     let mut app = app_for(&root);
     assert!(!app.git_mode);
     app.command_palette = Some(palette_with_query("Toggle git mode"));

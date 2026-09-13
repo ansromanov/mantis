@@ -566,3 +566,19 @@ fn list_picker_query_is_empty_delegates_to_route() {
     ListPicker::query_push(&mut p, '/');
     assert!(ListPicker::query_is_empty(&p));
 }
+
+#[test]
+fn palette_groups_match_the_action_registry() {
+    for command in COMMANDS.iter() {
+        let action = crate::actions::ACTIONS
+            .iter()
+            .find(|action| action.id == command.action_id)
+            .unwrap_or_else(|| panic!("{} is missing from ACTIONS", command.action_id));
+        assert_eq!(
+            command.category.as_deref(),
+            Some(action.category),
+            "palette group for {} must come from its canonical action category",
+            command.action_id
+        );
+    }
+}

@@ -129,12 +129,12 @@ impl App {
                         self.help_scroll.scroll = usize::MAX;
                     }
                     KeyCode::Right | KeyCode::Char('l') | KeyCode::Tab => {
-                        self.help_tab = (self.help_tab + 1) % crate::ui::popups::HELP_TABS.len();
+                        self.help_tab = (self.help_tab + 1) % crate::ui::popups::help_tabs().len();
                         self.help_scroll.scroll = 0;
                     }
                     KeyCode::Left | KeyCode::Char('h') | KeyCode::BackTab => {
                         self.help_tab = if self.help_tab == 0 {
-                            crate::ui::popups::HELP_TABS.len() - 1
+                            crate::ui::popups::help_tabs().len() - 1
                         } else {
                             self.help_tab - 1
                         };

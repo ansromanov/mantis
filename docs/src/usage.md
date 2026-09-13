@@ -141,6 +141,9 @@ in `mantis.toml` (see [Configuration](configuration.md)).
 > to open the command palette and search for an action by name — it shows you
 > the shortcut too. New to `mantis`? Start with the [Quick Start](quickstart.md).
 
+The help overlay groups actions using the same categories shown in the command
+palette and action menu.
+
 Bindings are editor-style (VS Code / Sublime conventions) and fully remappable
 — see [Keybindings](configuration.md#keybindings) for the complete list, the
 macOS (`Cmd`) variants, and the `tree:`/`content:` scoping syntax. The tables

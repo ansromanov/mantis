@@ -284,7 +284,6 @@ fn on_theme_change_sends_updated_theme_colors() {
 
     let monokai = Theme::load("monokai").expect("monokai theme must load");
     mgr.on_theme_change("monokai", &monokai);
-    mgr.deactivate_all();
 
     let deadline = Instant::now() + Duration::from_secs(3);
     let contents = loop {
@@ -299,6 +298,7 @@ fn on_theme_change_sends_updated_theme_colors() {
         );
         std::thread::sleep(Duration::from_millis(25));
     };
+    mgr.deactivate_all();
     let line = contents
         .lines()
         .find(|l| l.contains(r#""event":"on_theme_change""#))

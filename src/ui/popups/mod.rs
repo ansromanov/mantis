@@ -36,7 +36,7 @@ pub(super) use command::draw_command_palette;
 pub(super) use context_menu::draw_context_menu;
 pub(super) use goto_line::draw_goto_line;
 pub(super) use help::draw_help;
-pub(crate) use help::{help_tab_ranges, help_tab_scroll_offset, HELP_TABS};
+pub(crate) use help::{help_tab_ranges, help_tab_scroll_offset, help_tabs};
 pub(super) use history::draw_history;
 pub(super) use in_file::{draw_filter_bar, draw_in_file_search};
 pub(super) use plugin::draw_plugin_picker;

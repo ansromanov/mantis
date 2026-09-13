@@ -1,6 +1,7 @@
 //! Registry-driven menu-bar state and action lookup.
 //!
-//! The optional menu row groups palette actions through `ActionSpec::menu`.
+//! The optional menu row groups actions through the canonical
+//! `ActionSpec::category`; `ActionSpec::menu` supplies order within each group.
 //! This module owns the active dropdown, keyboard navigation, and the small
 //! action-row projection used by the menu renderer and mouse handler. The
 //! registry remains the source of labels and action ids, while key labels and
@@ -15,9 +16,7 @@ use crate::telemetry::ActionSource;
 use super::{rect_contains, App};
 
 /// Menu groups in their stable left-to-right order.
-pub(crate) const MENUS: &[&str] = &[
-    "General", "View", "Git", "Copy", "Navigate", "Tree", "Tabs", "Safety",
-];
+pub(crate) use crate::actions::ACTION_CATEGORIES as MENUS;
 
 /// One action row projected from the registry for rendering and dispatch.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -40,8 +39,8 @@ pub(crate) fn menu_actions(app: &App, menu: &str) -> Vec<MenuAction> {
     let mut actions: Vec<_> = crate::actions::ACTIONS
         .iter()
         .filter_map(|action| {
-            let (action_menu, order) = action.menu?;
-            if action_menu != menu {
+            let order = action.menu?;
+            if action.category != menu {
                 return None;
             }
             let label = action.palette?;
