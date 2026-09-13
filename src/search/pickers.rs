@@ -2,7 +2,10 @@
 //! `search.rs`. Hosts `ThemePicker`, `RecentFilesState`, `PluginPicker`,
 //! `GotoLineState`, `TreeFilter`, and `InFileSearch`/`InFileMatch`, plus
 //! their `ListPicker` implementations, plus the git-worktree picker and its
-//! optional open-in-new-tab activation mode.
+//! optional open-in-new-tab activation mode. `RevisionPicker` groups commits,
+//! tags, and branches into tabs for selecting a read-only comparison revision.
+//! Its caller can choose the initial tab, which lets status-bar branch browsing
+//! open directly to branch names while preserving the default commit picker.
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -558,6 +561,11 @@ impl RevisionPicker {
     /// or the directory is not a repo, items is empty (the picker still allows
     /// free-form entry).
     pub fn new(repo_dir: &std::path::Path) -> Self {
+        Self::new_for_tab(repo_dir, RevisionTab::Commits)
+    }
+
+    /// Builds the revision picker with `tab` selected initially.
+    pub fn new_for_tab(repo_dir: &std::path::Path, tab: RevisionTab) -> Self {
         let mut shortcuts = vec![
             RevisionItem {
                 rev: "HEAD".into(),
@@ -604,7 +612,7 @@ impl RevisionPicker {
             filtered: Vec::new(),
             selected: 0,
             matcher: SkimMatcherV2::default(),
-            tab: RevisionTab::Commits,
+            tab,
             shortcuts,
             commits,
             tags,

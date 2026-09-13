@@ -418,6 +418,13 @@ fn revision_picker_new_with_nonexistent_repo_has_no_shortcuts() {
 }
 
 #[test]
+fn revision_picker_can_start_on_branches_tab() {
+    let p =
+        RevisionPicker::new_for_tab(std::path::Path::new("/nonexistent"), RevisionTab::Branches);
+    assert_eq!(p.tab, RevisionTab::Branches);
+}
+
+#[test]
 fn revision_picker_push_appends() {
     let mut p = RevisionPicker::for_test(vec![RevisionItem {
         rev: "HEAD".into(),
