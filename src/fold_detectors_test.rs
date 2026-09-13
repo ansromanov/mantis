@@ -1,5 +1,12 @@
 use super::*;
 
+#[test]
+fn rust_symbol_detector_is_available_from_shared_detectors() {
+    let symbols = rust_symbols("fn main() {}\n");
+    assert_eq!(symbols.len(), 1);
+    assert_eq!(symbols[0].name, "main");
+}
+
 // ---------------------------------------------------------------------------
 // brace_fold tests
 // ---------------------------------------------------------------------------

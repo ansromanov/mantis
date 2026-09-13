@@ -101,6 +101,7 @@ Plugins receive lifecycle and hook events from `mantis` and can respond with
 | `register_language_provider` | Declares file extensions and capabilities |
 | `set_fold_regions` | Provides fold regions for a file |
 | `set_status_facts` | Provides a short status-bar summary for a file |
+| `set_symbols` | Provides a file's outline symbols for navigation |
 | `register_commands` | Adds commands to the Ctrl-P command palette |
 
 Each action has specific parameters; see [Plugin Development](plugin-development.md)
@@ -170,7 +171,7 @@ compiled alongside `mantis` and installed on first run.
 | iconize | `iconize` | On `init`, sends a `set_icon_map` action with Nerd Font glyphs for ~80 file extensions. Requires `icons = true` in `mantis.toml` and a Nerd Font terminal. |
 | markdown | `markdown` | Renders `.md` files using pulldown-cmark, sending the output as ANSI-escaped lines via `set_content`. Responds to theme changes and `M` keypress for raw/rendered toggle. |
 | python | `python` | Registers as a language provider for `.py` files with the `fold` capability. On file open, computes and registers collapsible indentation-based fold regions. |
-| rust | `rust` | Registers as a language provider for `.rs` files with the `fold` capability. On file open, computes and registers collapsible curly-brace fold regions. |
+| rust | `rust` | Registers as a language provider for `.rs` files with `fold` and `symbols` capabilities. On file open, provides curly-brace folds and a symbol outline for functions, types, modules, and methods. |
 | go | `go` | Registers as a language provider for `.go` files with the `fold` capability. On file open, computes and registers collapsible curly-brace fold regions. |
 | json | `json` | Registers as a language provider for `.json` files with the `fold` capability. On file open, computes fold regions for multi-line objects and arrays in the displayed JSON. |
 | sh | `sh` | Registers as a language provider for `.sh`, `.bash`, and `.zsh` files with the `fold` capability. On file open, computes fold regions for function bodies and compound blocks, aware of `#` comments, quoted strings, and heredocs. |

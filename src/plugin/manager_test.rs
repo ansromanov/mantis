@@ -573,6 +573,23 @@ fn provider_for_prefers_higher_priority_regardless_of_registration_order() {
 }
 
 #[test]
+fn symbols_provider_priority_uses_the_same_capability_routing() {
+    let mut mgr = PluginManager::new(vec![]);
+    mgr.register_provider(make_reg_priority("low", &["rs"], &[Capability::Symbols], 1));
+    mgr.register_provider(make_reg_priority(
+        "high",
+        &["rs"],
+        &[Capability::Symbols],
+        10,
+    ));
+    assert_eq!(
+        mgr.provider_for("rs", &Capability::Symbols)
+            .map(|provider| provider.plugin_name.as_str()),
+        Some("high")
+    );
+}
+
+#[test]
 fn provider_for_high_priority_registered_first_still_wins() {
     let mut mgr = PluginManager::new(vec![]);
     mgr.register_provider(make_reg_priority("high", &["rs"], &[Capability::Fold], 10));

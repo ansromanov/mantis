@@ -494,6 +494,11 @@ fn statusbar_config_schema_has_some_fields() {
 }
 
 #[test]
+fn scope_is_a_valid_statusbar_segment() {
+    assert!(StatusBarConfig::VALID_SEGMENTS.contains(&"scope"));
+}
+
+#[test]
 fn statusbar_config_separator_round_trips() {
     let cfg = StatusBarConfig {
         separator: " \u{2502} ".into(),

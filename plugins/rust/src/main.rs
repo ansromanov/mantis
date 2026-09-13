@@ -1,8 +1,8 @@
 //! Bundled Rust language provider plugin for mantis.
 //!
 //! Implements the mantis plugin protocol to provide language services for `.rs`
-//! files. Today, it registers the `fold` capability and responds to `on_file_open`
-//! events by running the shared `brace_fold` detector and returning the fold regions.
+//! files. It registers the `fold` and `symbols` capabilities, then runs the shared
+//! Rust detectors on each open file and returns fold regions and outline entries.
 
 use std::io::{self, BufRead, Write};
 
@@ -46,7 +46,7 @@ fn register_language_provider(out: &mut impl Write) {
         "action": "register_language_provider",
         "params": {
             "extensions": ["rs"],
-            "capabilities": ["fold"],
+            "capabilities": ["fold", "symbols"],
             "priority": 0
         }
     });
@@ -61,6 +61,8 @@ fn handle_file_open(path: &str, out: &mut impl Write) {
     };
     let regions = mantis::fold_detectors::brace_fold(&content);
     send_set_fold_regions(&regions, path, out);
+    let symbols = mantis::fold_detectors::rust_symbols(&content);
+    send_set_symbols(&symbols, path, out);
 }
 
 fn send_set_fold_regions(regions: &[mantis::fold::FoldRegion], path: &str, out: &mut impl Write) {
@@ -74,6 +76,19 @@ fn send_set_fold_regions(regions: &[mantis::fold::FoldRegion], path: &str, out: 
         "params": {
             "path": path,
             "regions": json_regions
+        }
+    });
+    let _ = writeln!(out, "{}", serde_json::to_string(&msg).unwrap());
+    let _ = out.flush();
+}
+
+fn send_set_symbols(symbols: &[mantis::plugin::types::Symbol], path: &str, out: &mut impl Write) {
+    let msg = serde_json::json!({
+        "event": "action",
+        "action": "set_symbols",
+        "params": {
+            "path": path,
+            "symbols": symbols
         }
     });
     let _ = writeln!(out, "{}", serde_json::to_string(&msg).unwrap());

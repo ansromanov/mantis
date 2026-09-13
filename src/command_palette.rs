@@ -1,6 +1,6 @@
 //! The Ctrl-P command palette: a fuzzy-filterable picker over the
 //! palette-invokable subset of the canonical action registry, with prefix
-//! routing to file search, content search, and go-to-line.
+//! routing to file search, content search, go-to-line, and file symbols.
 //!
 //! `COMMANDS` is derived from `crate::actions::ACTIONS`, keeping only entries
 //! with `palette: Some(_)`, so this module no longer hand-maintains its own
@@ -23,8 +23,7 @@
 //! | `/`    | Files      | `SearchState`    |
 //! | `#`    | Content    | `SearchState`    |
 //! | `:`    | Go to Line | `GotoLineState`  |
-//!
-//! `@` is reserved for symbols (epic #482) and is not yet routed.
+//! | `@`    | Symbols    | `SymbolPicker`   |
 //!
 //! `inapplicability_reasons` carries, per `COMMANDS` index, why a command
 //! can't run right now (from `App::check_applicability`, driven by
@@ -42,7 +41,7 @@ use crate::config::Keymap;
 use crate::list_picker::ListPicker;
 use crate::plugin::PluginCommand;
 use crate::search::fuzzy_refilter;
-use crate::search::{GotoLineState, SearchState};
+use crate::search::{GotoLineState, SearchState, SymbolPicker};
 
 /// Routes the command palette query to different picker modes via a
 /// single-character prefix typed as the first character in the query bar.
@@ -54,14 +53,15 @@ use crate::search::{GotoLineState, SearchState};
 /// | `/`    | File search      | `SearchState`      |
 /// | `#`    | Content search   | `SearchState`      |
 /// | `:`    | Go to line       | `GotoLineState`    |
+/// | `@`    | Symbols          | `SymbolPicker`     |
 ///
-/// `@` is reserved for symbols (epic #482) and is not yet routed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PaletteRoute {
     Commands,
     Files,
     Content,
     GotoLine,
+    Symbols,
 }
 
 impl PaletteRoute {
@@ -73,6 +73,7 @@ impl PaletteRoute {
             '/' => Some(Self::Files),
             '#' => Some(Self::Content),
             ':' => Some(Self::GotoLine),
+            '@' => Some(Self::Symbols),
             _ => None,
         }
     }
@@ -84,6 +85,7 @@ impl PaletteRoute {
             Self::Files => "Files",
             Self::Content => "Content",
             Self::GotoLine => "Go to Line",
+            Self::Symbols => "Symbols",
         }
     }
 
@@ -94,6 +96,7 @@ impl PaletteRoute {
             Self::Files => '/',
             Self::Content => '#',
             Self::GotoLine => ':',
+            Self::Symbols => '@',
         }
     }
 }
@@ -147,6 +150,8 @@ pub struct CommandPalette {
     pub route_search: Option<SearchState>,
     /// Sub-picker for the go-to-line route. `None` outside that route.
     pub route_goto_line: Option<GotoLineState>,
+    /// Sub-picker for symbols from the current file's language provider.
+    pub route_symbols: Option<SymbolPicker>,
     /// Combined list of built-in + plugin commands. Indices in `filtered`
     /// and `base_order` reference this list.
     pub all_commands: Vec<CommandEntry>,
@@ -262,6 +267,7 @@ impl CommandPalette {
             route: PaletteRoute::Commands,
             route_search: None,
             route_goto_line: None,
+            route_symbols: None,
             all_commands,
         }
     }
@@ -287,6 +293,11 @@ impl CommandPalette {
             PaletteRoute::GotoLine => {
                 if let Some(ref mut g) = self.route_goto_line {
                     g.push(c);
+                }
+            }
+            PaletteRoute::Symbols => {
+                if let Some(ref mut symbols) = self.route_symbols {
+                    symbols.push(c);
                 }
             }
         }
@@ -323,6 +334,11 @@ impl CommandPalette {
                     self.match_positions = vec![Vec::new(); self.filtered.len()];
                 }
             },
+            PaletteRoute::Symbols => {
+                if let Some(ref mut symbols) = self.route_symbols {
+                    symbols.pop();
+                }
+            }
         }
     }
 
@@ -333,6 +349,7 @@ impl CommandPalette {
                 self.route_search.as_ref().map_or(0, |s| s.results_len())
             }
             PaletteRoute::GotoLine => self.route_goto_line.as_ref().map_or(0, |g| g.results_len()),
+            PaletteRoute::Symbols => self.route_symbols.as_ref().map_or(0, |s| s.results_len()),
         }
     }
 
@@ -348,6 +365,10 @@ impl CommandPalette {
                 .route_goto_line
                 .as_ref()
                 .is_none_or(|g| g.query.is_empty()),
+            PaletteRoute::Symbols => self
+                .route_symbols
+                .as_ref()
+                .is_none_or(|symbols| symbols.query.is_empty()),
         }
     }
 
@@ -367,6 +388,13 @@ impl CommandPalette {
                 self.route_goto_line
                     .as_ref()
                     .map(|g| g.query.as_str())
+                    .unwrap_or(EMPTY)
+            }
+            PaletteRoute::Symbols => {
+                static EMPTY: &str = "";
+                self.route_symbols
+                    .as_ref()
+                    .map(|symbols| symbols.query.as_str())
                     .unwrap_or(EMPTY)
             }
         }
@@ -478,6 +506,7 @@ impl ListPicker for CommandPalette {
                 self.route_search.as_ref().map_or(0, |s| s.selected)
             }
             PaletteRoute::GotoLine => 0,
+            PaletteRoute::Symbols => self.route_symbols.as_ref().map_or(0, |s| s.selected),
         }
     }
     fn set_selected(&mut self, i: usize) {
@@ -491,6 +520,11 @@ impl ListPicker for CommandPalette {
             PaletteRoute::GotoLine => {
                 // GotoLine has no selectable list; ignore.
                 let _ = i;
+            }
+            PaletteRoute::Symbols => {
+                if let Some(ref mut symbols) = self.route_symbols {
+                    symbols.set_selected(i);
+                }
             }
         }
     }

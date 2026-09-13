@@ -376,8 +376,8 @@ an empty `commands` array clears it.
 A process plugin can declare itself as a **language provider** by responding to
 the `init` event with a `register_language_provider` action. This tells `mantis`
 which file extensions the plugin handles and what capabilities it provides.
-`fold` is implemented via push (`set_fold_regions`); `highlight` is formally
-reserved (see below). The reserved capabilities (`hover`, `diagnostics`,
+`fold` and `symbols` are implemented via push (`set_fold_regions` and
+`set_symbols`); `highlight` is formally reserved (see below). The reserved capabilities (`hover`, `diagnostics`,
 `definition`) are expected to slot in as `request`/`response` methods (see
 [Requests: mantis ⇄ plugin](#requests-mantis--plugin-protocol-3)) once
 implemented, without a protocol break.
@@ -405,7 +405,7 @@ lifecycle:
    without conflicting as long as they declare *different* capabilities —
    e.g. the bundled `yaml` plugin owns `fold` for `.yaml`/`.yml` while the
    bundled `k8s` plugin owns `status_facts` for the same extensions. `fold`
-   and `status_facts` drive backend state (fold regions, status-bar text,
+   `status_facts`, and `symbols` drive backend state (fold regions, status-bar text, and symbol outlines,
    respectively); `highlight` is reserved for future use (see below).
 
 3. **Response.** For each declared capability, the plugin should respond to
@@ -414,6 +414,8 @@ lifecycle:
       (see below).
    - `status_facts` → respond with `set_status_facts` when a matching file is
       opened (see below).
+   - `symbols` → respond with `set_symbols` when a matching file is opened
+      (see below).
    - `highlight` → reserved for future use.
 
 4. **Lifetime.** Provider registrations persist for the entire plugin session.
@@ -444,7 +446,7 @@ file.
 
 Fields:
 - `extensions` — lowercase file extensions (no leading dot) this provider handles.
-- `capabilities` — one or more of `"highlight"`, `"fold"`, or `"status_facts"`.
+- `capabilities` — one or more of `"highlight"`, `"fold"`, `"status_facts"`, or `"symbols"`.
   Reserved for future use: `"hover"`, `"diagnostics"`, `"definition"`.
 - `priority` — optional signed integer, default `0` (protocol 3+). Used only
   to break ties when two providers register the same extension+capability
@@ -509,6 +511,24 @@ file that stopped looking like a Kubernetes manifest after an edit).
 }}
 ```
 
+### `set_symbols`
+
+Provides a flat symbol list for a file. Symbols power the Ctrl+P `@` route,
+the `O` outline picker, and the scope breadcrumb beside the cursor line.
+Line numbers are zero-based; `end_line` is inclusive when supplied. The host
+accepts this action only from a provider that declared the `symbols` capability
+for the file extension.
+
+```json
+{"event":"action","action":"set_symbols","params":{
+  "path":"/absolute/path/to/file.rs",
+  "symbols":[
+    {"name":"Service","kind":"struct","line":0,"end_line":3},
+    {"name":"run","kind":"method","line":5,"end_line":8,"parent":"Service"}
+  ]
+}}
+```
+
 ## Rules
 
 - **One JSON object per line.** No pretty-printing, no multi-line objects.
@@ -538,6 +558,7 @@ special cases needed.
 | `set_icon_map` | `icon_map`, `icons_enabled`, `icon_dir_open/closed`, `icon_fallback` |
 | `set_fold_regions` | `plugin_fold_regions` entries for contributed paths; active fold state reset |
 | `set_status_facts` | `plugin_status_facts` entries for contributed paths |
+| `set_symbols` | `plugin_symbols` entries for contributed paths |
 | `register_language_provider` | Provider registration removed |
 | `register_commands` | Palette command registrations removed; an open palette listing them is closed |
 

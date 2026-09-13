@@ -10,6 +10,7 @@ fn test_register_language_provider() {
     assert_eq!(parsed["action"], "register_language_provider");
     assert_eq!(parsed["params"]["extensions"][0], "rs");
     assert_eq!(parsed["params"]["capabilities"][0], "fold");
+    assert_eq!(parsed["params"]["capabilities"][1], "symbols");
 }
 
 #[test]
@@ -36,12 +37,21 @@ fn test_handle_file_open() {
     let mut buf = Vec::new();
     handle_file_open(&path_str, &mut buf);
     let output = String::from_utf8(buf).unwrap();
-    let parsed: serde_json::Value = serde_json::from_str(output.trim()).unwrap();
-    assert_eq!(parsed["event"], "action");
-    assert_eq!(parsed["action"], "set_fold_regions");
-    assert_eq!(parsed["params"]["path"], path_str);
-    assert_eq!(parsed["params"]["regions"][0][0], 0);
-    assert_eq!(parsed["params"]["regions"][0][1], 2);
+    let messages: Vec<serde_json::Value> = output
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    assert_eq!(messages.len(), 2);
+    let folds = &messages[0];
+    assert_eq!(folds["event"], "action");
+    assert_eq!(folds["action"], "set_fold_regions");
+    assert_eq!(folds["params"]["path"], path_str);
+    assert_eq!(folds["params"]["regions"][0][0], 0);
+    assert_eq!(folds["params"]["regions"][0][1], 2);
+    let symbols = &messages[1];
+    assert_eq!(symbols["action"], "set_symbols");
+    assert_eq!(symbols["params"]["symbols"][0]["name"], "foo");
+    assert_eq!(symbols["params"]["symbols"][0]["kind"], "function");
 
     std::fs::remove_file(&tmp).ok();
 }

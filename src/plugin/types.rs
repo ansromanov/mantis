@@ -13,7 +13,10 @@
 //! register the same extension/capability pair. None of these are `set_*`
 //! state contributions, so they are intentionally absent from
 //! [`PluginContributions`] (see the state teardown contract in
-//! `docs/src/plugin-development.md`).
+//! `docs/src/plugin-development.md`). The `symbols` capability and
+//! `PluginContributions::symbol_paths` extend the push-based language-provider
+//! lifecycle with per-file symbol lists that disappear when their provider
+//! exits.
 
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -104,6 +107,42 @@ pub enum Capability {
     /// summary string (e.g. resource identity, per-kind counts) without the
     /// host special-casing a language.
     StatusFacts,
+    /// Flat symbol outlines for declared file extensions, delivered via
+    /// `set_symbols`.
+    Symbols,
+}
+
+/// One named symbol discovered in a source file.
+///
+/// Language providers send flat records with zero-based physical source lines.
+/// The host uses their ranges for outline navigation and cursor-scope display.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+pub struct Symbol {
+    /// The name shown in pickers and breadcrumbs.
+    pub name: String,
+    /// A short kind label such as `function`, `struct`, or `method`.
+    pub kind: String,
+    /// Zero-based physical source line where the symbol starts.
+    pub line: usize,
+    /// Zero-based physical source line where the symbol ends, when known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end_line: Option<usize>,
+    /// Name of the containing symbol, when known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent: Option<String>,
+}
+
+/// Finds the narrowest symbol range containing `line`.
+pub fn enclosing_symbol(symbols: &[Symbol], line: usize) -> Option<&Symbol> {
+    symbols
+        .iter()
+        .filter(|symbol| symbol.line <= line && symbol.end_line.unwrap_or(symbol.line) >= line)
+        .min_by_key(|symbol| {
+            symbol
+                .end_line
+                .unwrap_or(symbol.line)
+                .saturating_sub(symbol.line)
+        })
 }
 
 /// A language provider registration received from a plugin via the
@@ -264,6 +303,8 @@ pub(crate) struct PluginContributions {
     pub(crate) fold_region_paths: HashSet<PathBuf>,
     /// Paths in `plugin_status_facts` registered by this plugin.
     pub(crate) status_fact_paths: HashSet<PathBuf>,
+    /// Paths in `plugin_symbols` registered by this plugin.
+    pub(crate) symbol_paths: HashSet<PathBuf>,
     /// Whether this plugin set the icon map / icon fields via `set_icon_map`.
     pub(crate) has_icon_map: bool,
     /// Command IDs registered by this plugin via `register_commands`.

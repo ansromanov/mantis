@@ -1,6 +1,7 @@
 use crate::app::{App, Focus};
 use crate::command_palette::{CommandPalette, COMMANDS};
 use crate::config::Config;
+use crate::list_picker::ListPicker;
 use crate::search::{
     BugReportState, FilterBarState, GotoLineState, InFileSearch, RecentFilesState, RevisionItem,
     RevisionPicker, SearchState, ThemePicker, TreeFilter,
@@ -1555,4 +1556,30 @@ fn tree_filter_key_handler_owns_navigation_while_open() {
     app.handle_tree_filter_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
     assert!(app.tree_filter.is_some());
     fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn command_palette_at_prefix_opens_symbol_picker() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let path = root.join("a.txt");
+    app.current_file = Some(path.clone());
+    app.plugin_symbols.insert(
+        path,
+        vec![crate::plugin::types::Symbol {
+            name: "main".into(),
+            kind: "function".into(),
+            line: 0,
+            end_line: Some(0),
+            parent: None,
+        }],
+    );
+    app.command_palette = Some(CommandPalette::default());
+
+    app.handle_command_key(KeyEvent::new(KeyCode::Char('@'), KeyModifiers::empty()));
+
+    let palette = app.command_palette.as_ref().unwrap();
+    assert_eq!(palette.route, crate::command_palette::PaletteRoute::Symbols);
+    assert_eq!(palette.route_symbols.as_ref().unwrap().results_len(), 1);
+    fs::remove_dir_all(root).ok();
 }

@@ -284,7 +284,7 @@ separator = " "  # drawn before every segment (default: " ")
 height = 1       # 1 = single row, 2 = spread the two groups over two rows
 ```
 
-Valid ids: `badges` `worktrees` `scroll` `lnum` `type` `jsonpath` `fileinfo` `git` `errors`
+Valid ids: `badges` `worktrees` `scroll` `lnum` `type` `jsonpath` `scope` `fileinfo` `git` `errors`
 `folds` `pluginfacts` `message` `pluginerror` `version` `update`. There is no
 keybinding-hint segment — the `?`/`F1` help overlay and the command palette are
 the discovery surfaces for bindings.

@@ -1,5 +1,38 @@
 use super::*;
 
+#[test]
+fn symbol_picker_fuzzy_filters_and_keeps_nested_cursor_symbol_selected() {
+    let symbols = vec![
+        crate::plugin::types::Symbol {
+            name: "Service".into(),
+            kind: "struct".into(),
+            line: 0,
+            end_line: Some(10),
+            parent: None,
+        },
+        crate::plugin::types::Symbol {
+            name: "run".into(),
+            kind: "method".into(),
+            line: 3,
+            end_line: Some(5),
+            parent: Some("Service".into()),
+        },
+    ];
+    let mut picker = SymbolPicker::new(symbols, Some(4));
+    assert_eq!(
+        picker.selected_symbol().map(|symbol| symbol.name.as_str()),
+        Some("run")
+    );
+    picker.push('r');
+    picker.push('u');
+    picker.push('n');
+    assert_eq!(picker.results_len(), 1);
+    assert_eq!(
+        picker.selected_symbol().map(|symbol| symbol.name.as_str()),
+        Some("run")
+    );
+}
+
 use std::path::PathBuf;
 
 // -- FilterBarState ----------------------------------------------------------

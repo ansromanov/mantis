@@ -813,5 +813,6 @@ fn capability_label(cap: &Capability) -> &'static str {
         Capability::Diagnostics => "diagnostics",
         Capability::Definition => "definition",
         Capability::StatusFacts => "status_facts",
+        Capability::Symbols => "symbols",
     }
 }

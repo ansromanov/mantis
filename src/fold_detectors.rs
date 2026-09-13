@@ -33,6 +33,8 @@
 //!   semicolon-terminated statements and common procedural blocks.
 //! * `template_fold` — delimiter-aware template block detector for Go templates,
 //!   Helm, and Jinja2.
+//! * `rust_symbols` — lightweight Rust declaration detector shared with the
+//!   bundled Rust language provider.
 //!
 //! None of these functions know about `App`, plugins, or IPC — they are pure
 //! transformations to `Vec<FoldRegion>`.
@@ -1061,6 +1063,9 @@ fn is_toml_header(line: &str) -> bool {
 pub fn yaml_fold(lines: &[impl AsRef<str>]) -> Vec<FoldRegion> {
     crate::yaml_fold::detect_fold_regions(lines)
 }
+
+mod symbols;
+pub use symbols::rust_symbols;
 
 #[cfg(test)]
 #[path = "fold_detectors_test.rs"]

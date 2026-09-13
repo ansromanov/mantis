@@ -2,7 +2,7 @@
 //!
 //! `handle_normal_key` dispatches the main editing surface: global actions
 //! (quit, help, open the menu bar, toggle hidden files, reload, open the
-//! search/history/theme/recent-files/command overlays, theme cycling,
+//! search/history/theme/recent-files/command/symbol-outline overlays, theme cycling,
 //! git-mode toggles) plus
 //! focus-specific movement that it forwards to the tree or content handlers
 //! based on `App::focus`. It also handles the entry into visual-line mode and
@@ -179,6 +179,8 @@ impl App {
                 inapplicability_reasons,
                 plugin_commands,
             ));
+        } else if pressed_in(&k.symbol_outline, &key, scope) {
+            self.open_symbol_outline();
         } else if pressed_in(&k.switch_panel, &key, scope) {
             self.focus = match self.focus {
                 Focus::Tree => Focus::Content,

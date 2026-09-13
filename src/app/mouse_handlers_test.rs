@@ -50,6 +50,40 @@ fn clicking_outside_bookmarks_closes_picker() {
     fs::remove_dir_all(&root).ok();
 }
 
+#[test]
+fn double_clicking_symbol_result_jumps_to_declaration() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let path = root.join("long.txt");
+    app.open_file(&path);
+    app.focus = Focus::Content;
+    app.plugin_symbols.insert(
+        path.clone(),
+        vec![crate::plugin::types::Symbol {
+            name: "target".into(),
+            kind: "function".into(),
+            line: 8,
+            end_line: Some(10),
+            parent: None,
+        }],
+    );
+    let mut palette = crate::command_palette::CommandPalette::default();
+    palette.route = crate::command_palette::PaletteRoute::Symbols;
+    palette.route_symbols = Some(crate::search::SymbolPicker::new(
+        app.plugin_symbols.get(&path).unwrap().clone(),
+        None,
+    ));
+    app.command_palette = Some(palette);
+    app.command_palette_area = Rect::new(10, 5, 40, 8);
+
+    app.handle_mouse(left_down_at(11, 5));
+    app.handle_mouse(left_down_at(11, 5));
+
+    assert!(app.command_palette.is_none());
+    assert_eq!(app.active_line, 8);
+    fs::remove_dir_all(root).ok();
+}
+
 fn left_down_at(column: u16, row: u16) -> MouseEvent {
     MouseEvent {
         kind: MouseEventKind::Down(MouseButton::Left),

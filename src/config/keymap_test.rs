@@ -75,6 +75,15 @@ fn tab_actions_have_non_alt_default_bindings() {
 }
 
 #[test]
+fn symbol_outline_has_uppercase_o_content_binding() {
+    let map = Keymap::default();
+    let bindings = map.bindings_for_action("symbol_outline");
+    assert_eq!(bindings.len(), 1);
+    assert_eq!(bindings[0].code, KeyCode::Char('O'));
+    assert_eq!(bindings[0].scope, BindingScope::Content);
+}
+
+#[test]
 fn modifier_aliases_accepted() {
     assert!(parse_binding("control+a").unwrap().ctrl);
     assert!(parse_binding("meta+a").unwrap().alt);
@@ -435,16 +444,16 @@ fn pressed_in_honours_scope() {
 }
 
 /// The content pane must stay free of bare letters (for future editing)
-/// except the vim motion set, plus `M` and `o` — the bundled markdown plugin
+/// except the vim motion set, plus `M`, `o`, and `O` — the bundled markdown plugin
 /// only recognizes the literal key `M`, and `o` is used to open files
-/// externally — plus `y`/`Y` for copy-line/copy-file clipboard operations
+/// externally, while `O` opens the symbol outline — plus `y`/`Y` for copy-line/copy-file clipboard operations
 /// and `B` for blame-line (the Shift pair of the `ctrl+b` blame toggle).
 /// Tree-structural actions are exempt: their bindings only dispatch from the
 /// tree handler.
 #[test]
 fn default_content_reachable_letters_are_motions_only() {
     let motions = [
-        'j', 'k', 'h', 'l', 'g', 'G', '0', 'n', 'N', 'M', 'o', 'y', 'Y', 'B', 'F', ' ',
+        'j', 'k', 'h', 'l', 'g', 'G', '0', 'n', 'N', 'M', 'o', 'O', 'y', 'Y', 'B', 'F', ' ',
     ];
     let tree_structural = [
         "tree_expand",

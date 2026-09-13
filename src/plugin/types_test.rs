@@ -1,6 +1,49 @@
 use super::*;
-use crate::plugin::types::{FromPlugin, ThemeColorsMsg, ToPlugin};
+use crate::plugin::types::{enclosing_symbol, FromPlugin, Symbol, ThemeColorsMsg, ToPlugin};
 use crate::theme::{color_to_hex, Theme};
+
+fn symbol(name: &str, line: usize, end_line: usize, parent: Option<&str>) -> Symbol {
+    Symbol {
+        name: name.to_string(),
+        kind: "function".to_string(),
+        line,
+        end_line: Some(end_line),
+        parent: parent.map(str::to_string),
+    }
+}
+
+#[test]
+fn enclosing_symbol_selects_the_narrowest_range_and_includes_boundaries() {
+    let symbols = [
+        symbol("outer", 2, 20, None),
+        symbol("inner", 5, 8, Some("outer")),
+    ];
+    assert_eq!(
+        enclosing_symbol(&symbols, 5).map(|item| item.name.as_str()),
+        Some("inner")
+    );
+    assert_eq!(
+        enclosing_symbol(&symbols, 8).map(|item| item.name.as_str()),
+        Some("inner")
+    );
+    assert_eq!(
+        enclosing_symbol(&symbols, 9).map(|item| item.name.as_str()),
+        Some("outer")
+    );
+}
+
+#[test]
+fn symbol_without_end_line_matches_only_its_declaration() {
+    let symbol = Symbol {
+        name: "field".into(),
+        kind: "key".into(),
+        line: 3,
+        end_line: None,
+        parent: None,
+    };
+    assert!(enclosing_symbol(std::slice::from_ref(&symbol), 3).is_some());
+    assert!(enclosing_symbol(&[symbol], 4).is_none());
+}
 
 #[test]
 fn plugin_entry_default_is_enabled_process() {
@@ -43,7 +86,18 @@ fn capability_variants_are_distinct() {
     set.insert(Capability::Diagnostics);
     set.insert(Capability::Definition);
     set.insert(Capability::StatusFacts);
-    assert_eq!(set.len(), 6);
+    set.insert(Capability::Symbols);
+    assert_eq!(set.len(), 7);
+}
+
+#[test]
+fn capability_symbols_serializes_as_snake_case() {
+    let json = serde_json::to_string(&Capability::Symbols).unwrap();
+    assert_eq!(json, r#""symbols""#);
+    assert_eq!(
+        serde_json::from_str::<Capability>(&json).unwrap(),
+        Capability::Symbols
+    );
 }
 
 #[test]
@@ -77,6 +131,7 @@ fn plugin_contributions_default_is_empty() {
     assert!(c.content_paths.is_empty());
     assert!(c.fold_region_paths.is_empty());
     assert!(c.status_fact_paths.is_empty());
+    assert!(c.symbol_paths.is_empty());
     assert!(!c.has_icon_map);
 }
 
@@ -86,9 +141,11 @@ fn plugin_contributions_tracks_inserted_paths() {
     let p = std::path::PathBuf::from("/tmp/file.rs");
     c.content_paths.insert(p.clone());
     c.status_fact_paths.insert(p.clone());
+    c.symbol_paths.insert(p.clone());
     c.has_icon_map = true;
     assert!(c.content_paths.contains(&p));
     assert!(c.status_fact_paths.contains(&p));
+    assert!(c.symbol_paths.contains(&p));
     assert!(c.has_icon_map);
 }
 
