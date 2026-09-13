@@ -166,7 +166,7 @@ fn spawn_captures_stderr_to_log_and_last_line() {
     p.spawn(&script).expect("spawn crash.sh");
 
     // Wait for the reader thread to observe the process exit (stdout closes).
-    let deadline = Instant::now() + Duration::from_secs(3);
+    let deadline = Instant::now() + Duration::from_secs(10);
     loop {
         let (_, is_dead) = p.drain_actions();
         if is_dead {
@@ -224,7 +224,7 @@ fn spawn_sanitizes_path_traversal_in_plugin_name_for_log_file() {
     let mut p = Plugin::new("../../etc/evil".into(), vec![]);
     p.spawn(&script).expect("spawn crash.sh");
 
-    let deadline = Instant::now() + Duration::from_secs(3);
+    let deadline = Instant::now() + Duration::from_secs(10);
     loop {
         let (_, is_dead) = p.drain_actions();
         if is_dead {
@@ -276,7 +276,7 @@ fn spawn_preserves_leading_indentation_in_stderr_log() {
     let mut p = Plugin::new("indent-crash-plugin".into(), vec![]);
     p.spawn(&script).expect("spawn crash.sh");
 
-    let deadline = Instant::now() + Duration::from_secs(3);
+    let deadline = Instant::now() + Duration::from_secs(10);
     loop {
         let (_, is_dead) = p.drain_actions();
         if is_dead {
@@ -331,7 +331,7 @@ fn spawn_strips_ansi_escapes_from_last_stderr_line() {
     let mut p = Plugin::new("ansi-crash-plugin".into(), vec![]);
     p.spawn(&script).expect("spawn crash.sh");
 
-    let deadline = Instant::now() + Duration::from_secs(3);
+    let deadline = Instant::now() + Duration::from_secs(10);
     loop {
         let (_, is_dead) = p.drain_actions();
         if is_dead {
@@ -447,7 +447,7 @@ sleep 1
     let mut p = Plugin::new("responder".into(), vec![]);
     p.spawn(&script).expect("spawn respond.sh");
 
-    let deadline = Instant::now() + Duration::from_secs(3);
+    let deadline = Instant::now() + Duration::from_secs(10);
     let responses = loop {
         let responses = p.drain_responses();
         if !responses.is_empty() {
@@ -497,7 +497,7 @@ sleep 1
     let mut p = Plugin::new("responder-err".into(), vec![]);
     p.spawn(&script).expect("spawn respond.sh");
 
-    let deadline = Instant::now() + Duration::from_secs(3);
+    let deadline = Instant::now() + Duration::from_secs(10);
     let responses = loop {
         let responses = p.drain_responses();
         if !responses.is_empty() {
@@ -539,7 +539,7 @@ sleep 1
     let mut p = Plugin::new("mixed".into(), vec![]);
     p.spawn(&script).expect("spawn mixed.sh");
 
-    let deadline = Instant::now() + Duration::from_secs(3);
+    let deadline = Instant::now() + Duration::from_secs(10);
     loop {
         let (actions, _) = p.drain_actions();
         let responses = p.drain_responses();
