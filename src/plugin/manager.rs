@@ -31,8 +31,8 @@ use std::time::{Duration, Instant};
 use crate::plugin::install::default_plugin_dir;
 use crate::plugin::process::Plugin;
 use crate::plugin::types::{
-    Capability, LanguageProviderRegistration, PluginCommand, PluginEntry, PluginKind,
-    ThemeColorsMsg, ToPlugin,
+    Capability, LanguageProviderRegistration, PluginCommand, PluginContextItem, PluginEntry,
+    PluginKind, PluginStatusSegment, ThemeColorsMsg, ToPlugin,
 };
 use crate::theme::Theme;
 
@@ -99,6 +99,10 @@ pub(crate) struct PluginManager {
     /// Plugin-contributed palette commands, keyed by plugin name. A
     /// `BTreeMap` so palette ordering across plugins is deterministic.
     command_registrations: BTreeMap<String, Vec<PluginCommand>>,
+    /// Plugin-contributed context-menu items, keyed by plugin name.
+    context_item_registrations: BTreeMap<String, Vec<PluginContextItem>>,
+    /// Plugin-contributed status segments, keyed by plugin name.
+    status_segment_registrations: BTreeMap<String, Vec<PluginStatusSegment>>,
 }
 
 impl PluginManager {
@@ -120,6 +124,8 @@ impl PluginManager {
             pending_requests: HashMap::new(),
             request_spans: HashMap::new(),
             command_registrations: BTreeMap::new(),
+            context_item_registrations: BTreeMap::new(),
+            status_segment_registrations: BTreeMap::new(),
         }
     }
 
@@ -694,6 +700,89 @@ impl PluginManager {
                 id: None,
                 method: None,
                 params: Some(serde_json::json!({"id": command_id})),
+            });
+        }
+    }
+
+    /// Registers context-menu items contributed by `plugin_name`.
+    pub(crate) fn register_context_items(
+        &mut self,
+        plugin_name: &str,
+        items: Vec<PluginContextItem>,
+    ) {
+        if items.is_empty() {
+            self.context_item_registrations.remove(plugin_name);
+        } else {
+            self.context_item_registrations
+                .insert(plugin_name.to_string(), items);
+        }
+    }
+
+    /// Removes context-menu items registered by `plugin_name`.
+    pub(crate) fn remove_context_items(&mut self, plugin_name: &str) {
+        self.context_item_registrations.remove(plugin_name);
+    }
+
+    /// All registered plugin context items as `(plugin_name, item)`.
+    pub(crate) fn all_context_items(&self) -> Vec<(&str, &PluginContextItem)> {
+        self.context_item_registrations
+            .iter()
+            .flat_map(|(name, items)| items.iter().map(move |item| (name.as_str(), item)))
+            .collect()
+    }
+
+    /// Registers status segments contributed by `plugin_name`.
+    pub(crate) fn register_status_segments(
+        &mut self,
+        plugin_name: &str,
+        segments: Vec<PluginStatusSegment>,
+    ) {
+        if segments.is_empty() {
+            self.status_segment_registrations.remove(plugin_name);
+        } else {
+            self.status_segment_registrations
+                .insert(plugin_name.to_string(), segments);
+        }
+    }
+
+    /// Removes status segments registered by `plugin_name`.
+    pub(crate) fn remove_status_segments(&mut self, plugin_name: &str) {
+        self.status_segment_registrations.remove(plugin_name);
+    }
+
+    /// All registered plugin status segments as `(plugin_name, segment)`.
+    pub(crate) fn all_status_segments(&self) -> Vec<(&str, &PluginStatusSegment)> {
+        self.status_segment_registrations
+            .iter()
+            .flat_map(|(name, segs)| segs.iter().map(move |seg| (name.as_str(), seg)))
+            .collect()
+    }
+
+    /// Send a context menu `command` event to the plugin that owns the item.
+    pub(crate) fn send_context_menu_event(
+        &mut self,
+        plugin_name: &str,
+        item_id: &str,
+        target_kind: &str,
+        path: Option<String>,
+        line: Option<usize>,
+    ) {
+        if let Some(plugin) = self.plugins.iter_mut().find(|p| p.name == plugin_name) {
+            plugin.send(&ToPlugin {
+                event: "command".into(),
+                path,
+                line,
+                column: None,
+                key: None,
+                theme: None,
+                colors: None,
+                protocol_version: None,
+                id: None,
+                method: None,
+                params: Some(serde_json::json!({
+                    "id": item_id,
+                    "target": target_kind,
+                })),
             });
         }
     }

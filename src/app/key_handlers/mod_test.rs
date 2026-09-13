@@ -123,7 +123,7 @@ fn spawn_keypress_responder(app: &mut App, dir: &std::path::Path, reply: bool) {
     if reply {
         write!(
             f,
-            "#!/bin/sh\nwhile read -r line; do\n  case \"$line\" in\n    *'\"event\":\"on_keypress\"'*)\n      echo '{{\"event\":\"action\",\"action\":\"key_handled\",\"params\":{{\"handled\":true}}}}'\n      ;;\n  esac\ndone\n"
+            "#!/bin/sh\nwhile read -r line; do\n  case \"$line\" in\n    *'\"event\":\"on_keypress\"'*)\n      printf '%s\\n' '{{\"event\":\"action\",\"action\":\"key_handled\",\"params\":{{\"handled\":true}}}}'\n      ;;\n  esac\ndone\n"
         )
         .unwrap();
     } else {

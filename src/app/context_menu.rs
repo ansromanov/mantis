@@ -43,7 +43,7 @@ impl App {
     ) {
         self.last_click = None;
         self.context_menu = Some(ContextMenuState {
-            entries: tab_entries(),
+            entries: tab_entries(self, Some(&root)),
             selected: 0,
             anchor,
             target: ContextMenuTarget::Tab { root, index },
@@ -74,7 +74,7 @@ impl App {
             return;
         };
         self.context_menu = Some(ContextMenuState {
-            entries: blame_entries(),
+            entries: blame_entries(self, Some(path)),
             selected: 0,
             anchor,
             target: ContextMenuTarget::Blame {

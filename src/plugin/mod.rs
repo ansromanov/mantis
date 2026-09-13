@@ -88,8 +88,9 @@ pub(crate) use manager::PluginManager;
 pub(crate) use process::Plugin;
 pub(crate) use syntax::load_extra_syntaxes;
 pub(crate) use types::{
-    Capability, ExtraSyntax, LanguageProviderRegistration, PluginCommand, PluginContributions,
-    PluginEntry, PluginKind,
+    Capability, ContextItemTargetKind, ExtraSyntax, LanguageProviderRegistration, PluginCommand,
+    PluginContextItem, PluginContributions, PluginEntry, PluginKind, PluginStatusSegment,
+    StatusSidePreference,
 };
 
 /// Converts a crossterm `KeyEvent` into a human-readable string like `"q"`,

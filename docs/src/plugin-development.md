@@ -203,13 +203,19 @@ and `colors` carries its resolved colors (same shape as on `init`; see above).
 
 ### `command` (protocol 3+)
 
-Sent when the user selects one of the plugin's palette commands (see the
-`register_commands` action below). `params.id` is the command's stable `id`
-exactly as the plugin registered it.
+Sent when the user selects one of the plugin's palette commands, menu bar
+entries (see the `register_commands` action below), or context-menu items
+(see `register_context_items` below). `params.id` is the command's stable `id`
+exactly as the plugin registered it. When activated from a context menu,
+`params.target` is also provided:
 
 ```json
-{"event":"command","params":{"id":"my-plugin.do-thing"}}
+{"event":"command","params":{"id":"my-plugin.format","target":{"kind":"content","path":"/path/to/file.rs","line":42}}}
 ```
+
+`target.kind` is `"tree_file"`, `"tree_dir"`, `"content"`, `"tab"`, or `"blame"`.
+`target.path` is the target path (or current file path) if available.
+`target.line` is the 1-based physical line number when applicable (`content` or `blame`), or null.
 
 ### `on_quit`
 
@@ -391,7 +397,66 @@ Fields per command:
 - `description` — optional one-line description shown dim after the name.
 
 Re-registration replaces the plugin's previous command list entirely; sending
-an empty `commands` array clears it.
+an empty `commands` array clears it. Commands registered here also appear under
+the **Plugins** dropdown in the menu bar.
+
+### `register_context_items` (protocol 3+)
+
+Contributes items to context menus across the application. Context menu items
+are scoped by target kind and optional file extensions, rendered in a dedicated
+plugin group below built-in items, and never interleaved with host actions.
+
+```json
+{"event":"action","action":"register_context_items","params":{"items":[
+  {
+    "id": "my-plugin.format",
+    "label": "Format document",
+    "target": "content",
+    "category": "Format",
+    "extensions": ["rs", "toml"],
+    "weight": 10
+  }
+]}}
+```
+
+Fields per item:
+- `id` — stable identifier, dispatched back to the plugin in a `command` event when activated.
+- `label` — display label shown in the context menu (truncated to 40 characters).
+- `target` — context scope kind: `"tree_file"`, `"tree_dir"`, `"content"`, `"tab"`, or `"blame"`.
+- `category` — optional submenu category (items sharing a category are nested into a submenu).
+- `extensions` — optional list of file extensions (case-insensitive) the item applies to.
+- `weight` — optional sort weight (lower numbers sort first; ties are broken alphabetically by label).
+
+Limits and invariants:
+- A plugin may contribute at most 16 context items. Registrations exceeding this limit or containing malformed parameters report a `plugin_error`.
+- Re-registration replaces the plugin's previous items; an empty `items` array clears them.
+- Selecting an item dispatches a `command` event containing `id` and `target` information (`kind`, `path`, `line`) back to the plugin.
+
+### `register_status_segments` (protocol 3+)
+
+Contributes persistent segments to the status bar. Segments participate in the status bar
+layout, elision ladder, and user color customization via `[statusbar]` in `mantis.toml`.
+
+```json
+{"event":"action","action":"register_status_segments","params":{"segments":[
+  {
+    "id": "git-stats",
+    "text": "±3",
+    "priority": 3,
+    "side": "right"
+  }
+]}}
+```
+
+Fields per segment:
+- `id` — unique identifier for the segment. Can be referenced in `[statusbar]` `left`/`right` lists and styled in `[statusbar.colors.<id> = "<role>"]`.
+- `text` — text content to display (truncated to 40 characters).
+- `priority` — optional priority for the elision ladder (integer from 1 to 5, default: 2; 5 is highest priority / last to be dropped on narrow screens).
+- `side` — optional alignment preference: `"left"` or `"right"` (default: `"right"`).
+
+Limits and invariants:
+- A plugin may contribute at most 8 status segments. Registrations exceeding this limit or containing malformed parameters report a `plugin_error`.
+- Re-registration replaces the plugin's previous segments; an empty `segments` array clears them.
 
 ## Language providers
 
@@ -598,6 +663,8 @@ special cases needed.
 | `set_symbols` | `plugin_symbols` entries for contributed paths |
 | `register_language_provider` | Provider registration removed |
 | `register_commands` | Palette command registrations removed; an open palette listing them is closed |
+| `register_context_items` | Context menu item registrations removed; an open context menu is closed |
+| `register_status_segments` | Status segment registrations removed |
 
 After clearing, if the disabled plugin had rendered content for the current
 file, the file is reloaded from disk and falls back to core rendering

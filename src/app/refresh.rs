@@ -593,6 +593,12 @@ impl App {
             "set_status_facts" => self.handle_plugin_set_status_facts(name, params),
             "set_symbols" => self.handle_plugin_set_symbols(name, params),
             "register_commands" => self.handle_plugin_register_commands(name, params),
+            "register_context_items" => {
+                self.handle_plugin_register_context_items(name, params);
+            }
+            "register_status_segments" => {
+                self.handle_plugin_register_status_segments(name, params);
+            }
             "key_handled" => self.handle_plugin_key_handled(params),
             "plugin_error" => self.handle_plugin_error(name, params),
             _ => {}
@@ -909,6 +915,185 @@ impl App {
             .or_default();
         contrib.command_ids = commands.iter().map(|c| c.id.clone()).collect();
         self.plugin_manager.register_commands(name, commands);
+    }
+
+    /// Handles a `register_context_items` action: validates and registers
+    /// context-menu items contributed by a plugin. Capped at 16 items per plugin;
+    /// labels and category names are truncated to 40 chars max. Oversized or
+    /// malformed registrations are rejected with a `plugin_error`.
+    fn handle_plugin_register_context_items(&mut self, name: &str, params: &serde_json::Value) {
+        let Some(items_val) = params.get("items") else {
+            self.plugin_manager.remove_context_items(name);
+            if let Some(contrib) = self.plugin_contributions.get_mut(name) {
+                contrib.context_item_ids.clear();
+            }
+            return;
+        };
+
+        let Some(arr) = items_val.as_array() else {
+            self.handle_plugin_error(
+                name,
+                &serde_json::json!({
+                    "message": "register_context_items: 'items' must be an array",
+                    "context": "register_context_items",
+                }),
+            );
+            return;
+        };
+
+        if arr.len() > 16 {
+            self.handle_plugin_error(
+                name,
+                &serde_json::json!({
+                    "message": format!("register_context_items: exceeded maximum item count ({}/16)", arr.len()),
+                    "context": "register_context_items",
+                }),
+            );
+            return;
+        }
+
+        let mut parsed_items = Vec::new();
+        for item_val in arr {
+            let item: Result<crate::plugin::PluginContextItem, _> =
+                serde_json::from_value(item_val.clone());
+            match item {
+                Ok(mut item) => {
+                    if item.id.trim().is_empty() {
+                        self.handle_plugin_error(
+                            name,
+                            &serde_json::json!({
+                                "message": "register_context_items: item id cannot be empty",
+                                "context": "register_context_items",
+                            }),
+                        );
+                        return;
+                    }
+                    if item.label.trim().is_empty() {
+                        self.handle_plugin_error(
+                            name,
+                            &serde_json::json!({
+                                "message": "register_context_items: item label cannot be empty",
+                                "context": "register_context_items",
+                            }),
+                        );
+                        return;
+                    }
+                    if item.label.chars().count() > 40 {
+                        item.label = item.label.chars().take(40).collect();
+                    }
+                    if let Some(ref cat) = item.category {
+                        if cat.chars().count() > 40 {
+                            item.category = Some(cat.chars().take(40).collect());
+                        }
+                    }
+                    if let Some(ref mut exts) = item.extensions {
+                        for ext in exts.iter_mut() {
+                            *ext = ext.trim_start_matches('.').to_ascii_lowercase();
+                        }
+                    }
+                    parsed_items.push(item);
+                }
+                Err(err) => {
+                    self.handle_plugin_error(
+                        name,
+                        &serde_json::json!({
+                            "message": format!("register_context_items: invalid item: {err}"),
+                            "context": "register_context_items",
+                        }),
+                    );
+                    return;
+                }
+            }
+        }
+
+        let contrib = self
+            .plugin_contributions
+            .entry(name.to_string())
+            .or_default();
+        contrib.context_item_ids = parsed_items.iter().map(|it| it.id.clone()).collect();
+        self.plugin_manager
+            .register_context_items(name, parsed_items);
+    }
+
+    /// Handles a `register_status_segments` action: validates and registers
+    /// status-bar segments contributed by a plugin. Capped at 8 segments per plugin;
+    /// segment texts are truncated to 40 chars max. Oversized or malformed
+    /// registrations are rejected with a `plugin_error`.
+    fn handle_plugin_register_status_segments(&mut self, name: &str, params: &serde_json::Value) {
+        let Some(segs_val) = params.get("segments") else {
+            self.plugin_manager.remove_status_segments(name);
+            if let Some(contrib) = self.plugin_contributions.get_mut(name) {
+                contrib.status_segment_ids.clear();
+            }
+            return;
+        };
+
+        let Some(arr) = segs_val.as_array() else {
+            self.handle_plugin_error(
+                name,
+                &serde_json::json!({
+                    "message": "register_status_segments: 'segments' must be an array",
+                    "context": "register_status_segments",
+                }),
+            );
+            return;
+        };
+
+        if arr.len() > 8 {
+            self.handle_plugin_error(
+                name,
+                &serde_json::json!({
+                    "message": format!("register_status_segments: exceeded maximum segment count ({}/8)", arr.len()),
+                    "context": "register_status_segments",
+                }),
+            );
+            return;
+        }
+
+        let mut parsed_segs = Vec::new();
+        for seg_val in arr {
+            let seg: Result<crate::plugin::PluginStatusSegment, _> =
+                serde_json::from_value(seg_val.clone());
+            match seg {
+                Ok(mut seg) => {
+                    if seg.id.trim().is_empty() {
+                        self.handle_plugin_error(
+                            name,
+                            &serde_json::json!({
+                                "message": "register_status_segments: segment id cannot be empty",
+                                "context": "register_status_segments",
+                            }),
+                        );
+                        return;
+                    }
+                    if seg.text.chars().count() > 40 {
+                        seg.text = seg.text.chars().take(40).collect();
+                    }
+                    if let Some(ref mut prio) = seg.priority {
+                        *prio = (*prio).clamp(1, 5);
+                    }
+                    parsed_segs.push(seg);
+                }
+                Err(err) => {
+                    self.handle_plugin_error(
+                        name,
+                        &serde_json::json!({
+                            "message": format!("register_status_segments: invalid segment: {err}"),
+                            "context": "register_status_segments",
+                        }),
+                    );
+                    return;
+                }
+            }
+        }
+
+        let contrib = self
+            .plugin_contributions
+            .entry(name.to_string())
+            .or_default();
+        contrib.status_segment_ids = parsed_segs.iter().map(|s| s.id.clone()).collect();
+        self.plugin_manager
+            .register_status_segments(name, parsed_segs);
     }
 
     pub(crate) fn check_overlay_transitions(&mut self) {

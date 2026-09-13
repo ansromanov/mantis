@@ -548,4 +548,14 @@ fn repo_commit_log_action_requires_git_repo() {
     assert_eq!(spec.palette, Some("Browse repository commits"));
     assert_eq!(spec.category, "Git");
 }
-// touched for log follow mode
+
+#[test]
+fn plugins_category_and_plugin_picker_action() {
+    assert!(ACTION_CATEGORIES.contains(&"Plugins"));
+    let action = ACTIONS
+        .iter()
+        .find(|a| a.id == "plugin_picker")
+        .expect("plugin_picker action exists");
+    assert_eq!(action.category, "Plugins");
+    assert_eq!(action.menu, Some(0));
+}

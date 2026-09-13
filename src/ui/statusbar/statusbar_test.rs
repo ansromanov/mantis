@@ -1520,7 +1520,7 @@ fn custom_separator_replaces_space_between_segments() {
 #[test]
 fn segment_ids_match_config_valid_segments() {
     // Every StatusSegment must have an id the config schema/validation knows.
-    let ids: Vec<&str> = [
+    let segments = [
         StatusSegment::Badges,
         StatusSegment::Worktrees,
         StatusSegment::Scroll,
@@ -1537,14 +1537,96 @@ fn segment_ids_match_config_valid_segments() {
         StatusSegment::PluginError,
         StatusSegment::Version,
         StatusSegment::Update,
-    ]
-    .into_iter()
-    .map(|s| s.id_str())
-    .collect();
+    ];
+    let ids: Vec<&str> = segments.iter().map(|s| s.id_str()).collect();
     let mut sorted_ids = ids.clone();
     sorted_ids.sort_unstable();
     let mut valid = StatusBarConfig::VALID_SEGMENTS.to_vec();
     valid.sort_unstable();
     assert_eq!(sorted_ids, valid);
     assert_eq!(sorted_ids.len(), valid.len());
+}
+
+#[test]
+fn statusbar_plugin_segment_properties() {
+    let seg = StatusSegment::Plugin {
+        id: "git-stats".to_string(),
+        side: StatusSide::Right,
+    };
+    assert_eq!(seg.id_str(), "git-stats");
+    assert_eq!(seg.side(), StatusSide::Right);
+    assert_eq!(seg.action_id(), None);
+}
+
+#[test]
+fn statusbar_plugin_segments_render_with_side_and_color() {
+    let mut app = make_app();
+    app.plugin_manager.register_status_segments(
+        "linter",
+        vec![
+            crate::plugin::PluginStatusSegment {
+                id: "linter-status".to_string(),
+                text: "Lint: OK".to_string(),
+                priority: Some(1),
+                side: Some(crate::plugin::StatusSidePreference::Left),
+            },
+            crate::plugin::PluginStatusSegment {
+                id: "extra-info".to_string(),
+                text: "Extra: 123".to_string(),
+                priority: Some(5),
+                side: Some(crate::plugin::StatusSidePreference::Right),
+            },
+        ],
+    );
+
+    let text = render_bar_width(&app, 200);
+    assert!(text.contains("Lint: OK"));
+    assert!(text.contains("Extra: 123"));
+
+    // Check color override from config
+    app.config
+        .statusbar
+        .colors
+        .insert("linter-status".to_string(), "diff_del".to_string());
+    let (line, _) = build_normal_line(&app, Style::default(), 200);
+    let lint_span = line
+        .spans
+        .iter()
+        .find(|s| s.content.contains("Lint: OK"))
+        .unwrap();
+    assert_eq!(lint_span.style.fg, Some(app.theme.diff_del));
+}
+
+#[test]
+fn statusbar_plugin_segments_participate_in_elision_and_allowlist() {
+    let mut app = make_app();
+    app.plugin_manager.register_status_segments(
+        "metrics",
+        vec![
+            crate::plugin::PluginStatusSegment {
+                id: "low-prio".to_string(),
+                text: "LowPriorityTextThatCanBeDropped".to_string(),
+                priority: Some(1),
+                side: Some(crate::plugin::StatusSidePreference::Left),
+            },
+            crate::plugin::PluginStatusSegment {
+                id: "high-prio".to_string(),
+                text: "HighPrio".to_string(),
+                priority: Some(5),
+                side: Some(crate::plugin::StatusSidePreference::Left),
+            },
+        ],
+    );
+
+    // Explicit allowlist filtering: only include high-prio
+    app.config.statusbar.left = Some(vec!["high-prio".to_string()]);
+    app.config.statusbar.right = Some(Vec::new());
+    let (line, _) = build_normal_line(&app, Style::default(), 200);
+    let text = line
+        .spans
+        .iter()
+        .map(|s| s.content.as_ref())
+        .collect::<String>();
+    assert!(text.contains("HighPrio"));
+    assert!(!text.contains("LowPriorityTextThatCanBeDropped"));
 }

@@ -135,3 +135,37 @@ fn clicking_a_menu_row_then_an_action_dispatches_it() {
     drop(app);
     fs::remove_dir_all(root).ok();
 }
+
+#[test]
+fn menu_bar_includes_plugin_commands_under_plugins_menu() {
+    let (mut app, root) = app();
+    app.plugin_manager.register_commands(
+        "my-plugin",
+        vec![crate::plugin::PluginCommand {
+            id: "do_something".to_string(),
+            name: "Do Something".to_string(),
+            category: None,
+            description: Some("Description".to_string()),
+        }],
+    );
+    let plugins = menu_actions(&app, "Plugins");
+    assert!(plugins
+        .iter()
+        .any(|item| item.id == "do_something" && item.label == "Do Something"));
+    assert!(plugins.iter().any(|item| item.id == "plugin_picker"));
+
+    // Activate it from menu bar
+    let index = plugins
+        .iter()
+        .position(|item| item.id == "do_something")
+        .unwrap();
+    app.menu_bar_state = Some(MenuBarState {
+        menu_index: MENUS.iter().position(|name| *name == "Plugins").unwrap(),
+        selected: index,
+    });
+    app.handle_menu_bar_key(key(KeyCode::Enter));
+    assert!(app.menu_bar_state.is_none());
+
+    drop(app);
+    fs::remove_dir_all(root).ok();
+}

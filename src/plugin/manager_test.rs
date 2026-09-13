@@ -899,7 +899,7 @@ fn send_request_and_poll_requests_matches_response_by_id() {
     let mut f = std::fs::File::create(&script).unwrap();
     write!(
         f,
-        "#!/bin/sh\nwhile read -r line; do\n  case \"$line\" in\n    *'\"event\":\"request\"'*)\n      rest=${{line#*\\\"id\\\":}}\n      id=${{rest%%,*}}\n      echo \"{{\\\"event\\\":\\\"response\\\",\\\"id\\\":$id,\\\"result\\\":{{\\\"ok\\\":true}}}}\"\n      ;;\n  esac\ndone\n"
+        "#!/bin/sh\nwhile read -r line; do\n  case \"$line\" in\n    *'\"event\":\"request\"'*)\n      rest=${{line#*\\\"id\\\":}}\n      id=${{rest%%,*}}\n      printf '%s\\n' \"{{\\\"event\\\":\\\"response\\\",\\\"id\\\":$id,\\\"result\\\":{{\\\"ok\\\":true}}}}\"\n      ;;\n  esac\ndone\n"
     )
     .unwrap();
     drop(f);
@@ -1111,4 +1111,73 @@ fn activate_all_ensures_bundled_plugins_installed() {
         }
     }
     std::fs::remove_dir_all(&tmp).ok();
+}
+
+#[test]
+fn register_and_remove_context_items() {
+    let mut mgr = PluginManager::new(vec![]);
+    let item1 = PluginContextItem {
+        id: "demo.action1".into(),
+        label: "Action 1".into(),
+        target: ContextItemTargetKind::TreeFile,
+        extensions: Some(vec!["rs".into()]),
+        category: Some("Tools".into()),
+        weight: Some(10),
+    };
+    let item2 = PluginContextItem {
+        id: "demo.action2".into(),
+        label: "Action 2".into(),
+        target: ContextItemTargetKind::Content,
+        extensions: None,
+        category: None,
+        weight: None,
+    };
+    mgr.register_context_items("demo", vec![item1.clone(), item2.clone()]);
+    let all = mgr.all_context_items();
+    assert_eq!(all.len(), 2);
+    assert_eq!(all[0].0, "demo");
+    assert_eq!(all[0].1.id, "demo.action1");
+
+    mgr.remove_context_items("demo");
+    assert!(mgr.all_context_items().is_empty());
+}
+
+#[test]
+fn register_and_remove_status_segments() {
+    let mut mgr = PluginManager::new(vec![]);
+    let seg1 = PluginStatusSegment {
+        id: "demo.seg1".into(),
+        text: "Segment 1".into(),
+        priority: Some(3),
+        side: Some(StatusSidePreference::Left),
+    };
+    let seg2 = PluginStatusSegment {
+        id: "other.seg2".into(),
+        text: "Segment 2".into(),
+        priority: Some(4),
+        side: Some(StatusSidePreference::Right),
+    };
+    mgr.register_status_segments("demo", vec![seg1]);
+    mgr.register_status_segments("other", vec![seg2]);
+    let all = mgr.all_status_segments();
+    assert_eq!(all.len(), 2);
+
+    mgr.remove_status_segments("demo");
+    let remaining = mgr.all_status_segments();
+    assert_eq!(remaining.len(), 1);
+    assert_eq!(remaining[0].0, "other");
+    assert_eq!(remaining[0].1.id, "other.seg2");
+}
+
+#[test]
+fn send_context_menu_event_without_running_plugin_is_noop() {
+    let mut mgr = PluginManager::new(vec![]);
+    // Plugin not running — should gracefully do nothing without panicking
+    mgr.send_context_menu_event(
+        "demo",
+        "demo.action",
+        "content",
+        Some("/tmp/test.rs".into()),
+        Some(10),
+    );
 }

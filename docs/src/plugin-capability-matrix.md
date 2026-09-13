@@ -42,8 +42,11 @@ Every action the host accepts, dispatched in `App::handle_plugin_action`
 | `register_language_provider` | yes | provider registration in `PluginManager` | yes — `remove_provider_registrations` | yes — rust, python, json, yaml, k8s |
 | `set_fold_regions` | yes | `fold_region_paths` | yes — regions removed, fold state reset | yes — rust, python, json, yaml |
 | `set_status_facts` | yes | `status_fact_paths` | yes — facts removed for contributed paths | yes — k8s |
+| `register_commands` | yes | `command_ids` | yes — commands removed, open palette closed | no |
+| `register_context_items` | yes | `context_item_ids` | yes — context items removed, open context menu closed | no |
+| `register_status_segments` | yes | `status_segment_ids` | yes — status segments removed | no |
 
-Teardown status: **every stateful `set_*` action stamps `PluginContributions`
+Teardown status: **every stateful registration and `set_*` action stamps `PluginContributions`
 and is cleared by `App::teardown_plugin_contributions`** (`src/app/mod.rs`).
 No teardown gaps were found in this audit.
 

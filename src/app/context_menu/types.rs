@@ -114,6 +114,12 @@ pub enum ContextMenuEntry {
     /// A runnable action and the label drawn for it. Toggle labels embed the
     /// current state (e.g. "Word wrap: on") at build time.
     Action { id: ContextActionId, label: String },
+    /// A runnable action contributed by a plugin.
+    PluginAction {
+        plugin: String,
+        id: String,
+        label: String,
+    },
     /// A non-selectable divider row between action groups.
     Separator,
     /// A selectable row that opens a nested list of entries.
@@ -204,7 +210,8 @@ impl ContextMenuState {
         self.entries
             .iter()
             .filter_map(|e| match e {
-                ContextMenuEntry::Action { label, .. } => Some(label.chars().count()),
+                ContextMenuEntry::Action { label, .. }
+                | ContextMenuEntry::PluginAction { label, .. } => Some(label.chars().count()),
                 ContextMenuEntry::Separator => None,
                 ContextMenuEntry::Submenu { label, .. } => Some(label.chars().count() + 3),
             })

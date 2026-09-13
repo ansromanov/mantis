@@ -39,7 +39,8 @@ use self::fit::{
 };
 
 /// Named segment identifiers for status-bar alignment.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Named segment identifiers for status-bar alignment.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum StatusSegment {
     Badges,
     Worktrees,
@@ -58,13 +59,14 @@ pub(crate) enum StatusSegment {
     PluginError,
     Version,
     Update,
+    Plugin { id: String, side: StatusSide },
 }
 
 /// Rendered horizontal bounds and screen row for an actionable status segment.
 pub(crate) type StatusbarHit = (StatusSegment, u16, u16, u16);
 
 impl StatusSegment {
-    fn id_str(self) -> &'static str {
+    pub(crate) fn id_str(&self) -> &str {
         match self {
             StatusSegment::Badges => "badges",
             StatusSegment::Worktrees => "worktrees",
@@ -83,26 +85,32 @@ impl StatusSegment {
             StatusSegment::PluginError => "pluginerror",
             StatusSegment::Version => "version",
             StatusSegment::Update => "update",
+            StatusSegment::Plugin { id, .. } => id.as_str(),
         }
     }
 
     /// Returns which side this segment belongs to in **default** mode
     /// (both `left` and `right` are `None`). Explicit mode uses `split_sides`
     /// directly and never calls this.
-    fn side(self) -> StatusSide {
-        if [
-            "lnum", "type", "jsonpath", "scope", "git", "version", "update",
-        ]
-        .contains(&self.id_str())
-        {
-            StatusSide::Right
-        } else {
-            StatusSide::Left
+    fn side(&self) -> StatusSide {
+        match self {
+            StatusSegment::Plugin { side, .. } => *side,
+            _ => {
+                if [
+                    "lnum", "type", "jsonpath", "scope", "git", "version", "update",
+                ]
+                .contains(&self.id_str())
+                {
+                    StatusSide::Right
+                } else {
+                    StatusSide::Left
+                }
+            }
         }
     }
 
     /// Existing palette action id activated by clicking this segment.
-    pub(crate) fn action_id(self) -> Option<&'static str> {
+    pub(crate) fn action_id(&self) -> Option<&'static str> {
         match self {
             StatusSegment::Git => Some("compare_against"),
             StatusSegment::Worktrees => Some("worktree_picker"),
@@ -113,13 +121,14 @@ impl StatusSegment {
             StatusSegment::Errors | StatusSegment::PluginError => Some("plugin_picker"),
             StatusSegment::Update => Some("show_about"),
             StatusSegment::FileInfo => Some("copy_path"),
+            StatusSegment::Plugin { .. } => None,
             _ => None,
         }
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum StatusSide {
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum StatusSide {
     Left,
     Right,
 }
@@ -206,7 +215,7 @@ pub(crate) fn hit_test(app: &App, column: u16, row: u16) -> Option<StatusSegment
     app.statusbar_segments
         .iter()
         .find(|(_, start, end, target_row)| row == *target_row && column >= *start && column < *end)
-        .map(|(segment, _, _, _)| *segment)
+        .map(|(segment, _, _, _)| segment.clone())
 }
 
 /// Returns visible status-bar text under a right-click, excluding the spacer
@@ -583,6 +592,28 @@ fn build_normal_lines(
         StatusSegment::Version,
         P_VER,
     ));
+
+    // -- Plugin-contributed status segments (`register_status_segments`) --
+    for (_, seg) in app.plugin_manager.all_status_segments() {
+        let side = match seg.side.unwrap_or_default() {
+            crate::plugin::StatusSidePreference::Left => StatusSide::Left,
+            crate::plugin::StatusSidePreference::Right => StatusSide::Right,
+        };
+        let priority = seg.priority.unwrap_or(P_INFO).clamp(1, 5);
+        let span_text = if seg.text.starts_with(' ') {
+            seg.text.clone()
+        } else {
+            format!(" {}", seg.text)
+        };
+        segs.push((
+            Span::styled(span_text, base.fg(app.theme.accent)),
+            StatusSegment::Plugin {
+                id: seg.id.clone(),
+                side,
+            },
+            priority,
+        ));
+    }
 
     let statusbar = &app.config.statusbar;
     if statusbar.height >= 2 {

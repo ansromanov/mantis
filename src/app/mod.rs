@@ -654,6 +654,16 @@ impl App {
             self.command_palette = None;
         }
 
+        // Plugin-contributed context-menu items. Close an open context menu if
+        // it may list this plugin's items.
+        self.plugin_manager.remove_context_items(name);
+        if !contrib.context_item_ids.is_empty() && self.context_menu.is_some() {
+            self.context_menu = None;
+        }
+
+        // Plugin-contributed status segments.
+        self.plugin_manager.remove_status_segments(name);
+
         // Re-render the current file without plugin content.
         if had_current_content {
             self.plugin_content_active = false;
