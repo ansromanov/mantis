@@ -32,6 +32,18 @@ pub(crate) const MAX_LABEL_LEN: usize = 20;
 pub(crate) const MIN_LABEL_LEN: usize = 7;
 pub(crate) const AFFORDANCE_WIDTH: u16 = 2;
 
+fn strip_style(theme: &crate::theme::Theme) -> Style {
+    Style::default().bg(theme.dim)
+}
+
+fn inactive_tab_style(theme: &crate::theme::Theme) -> Style {
+    Style::default().fg(theme.text).add_modifier(Modifier::DIM)
+}
+
+fn close_tab_style(theme: &crate::theme::Theme) -> Style {
+    Style::default().fg(theme.text)
+}
+
 /// The display label for a tab: its root directory's file name, truncated.
 fn tab_label_with_max(app: &crate::app::App, max_len: usize) -> String {
     let name = app
@@ -173,7 +185,7 @@ pub(crate) fn draw_tabstrip(f: &mut Frame, tabs: &mut Tabs, area: Rect) {
     tabs.strip_area = area;
     tabs.first_visible = tabs.first_visible.min(tabs.apps.len().saturating_sub(1));
     let theme = &tabs.active_app().theme;
-    let base = Style::default().bg(theme.dim);
+    let base = strip_style(theme);
     f.render_widget(Paragraph::new(Line::from("")).style(base), area);
 
     if let Some(query) = &tabs.new_tab_prompt {
@@ -210,7 +222,7 @@ pub(crate) fn draw_tabstrip(f: &mut Frame, tabs: &mut Tabs, area: Rect) {
         let style = if active {
             theme.selection_style().add_modifier(Modifier::BOLD)
         } else {
-            Style::default().fg(theme.dim)
+            inactive_tab_style(theme)
         };
         spans.push(Span::styled(format!(" {}", segment.label), style));
         if !segment.badge.is_empty() {
@@ -220,7 +232,7 @@ pub(crate) fn draw_tabstrip(f: &mut Frame, tabs: &mut Tabs, area: Rect) {
             ));
         }
         spans.push(Span::styled(" ", style));
-        spans.push(Span::styled("×", Style::default().fg(theme.dim)));
+        spans.push(Span::styled("×", close_tab_style(theme)));
         spans.push(Span::raw(" "));
     }
     if segments
