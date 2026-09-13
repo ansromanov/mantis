@@ -97,6 +97,7 @@ Plugins receive lifecycle and hook events from `mantis` and can respond with
 | `show_message` | Displays a message in the status bar |
 | `open_file` | Opens a file in the content panel |
 | `set_content` | Replaces content panel with ANSI-escaped lines |
+| `set_content_chunk` / `set_content_end` | Streams a large rendered document into the content panel |
 | `set_icon_map` | Sets file-type icon glyphs (requires Nerd Font) |
 | `register_language_provider` | Declares file extensions and capabilities |
 | `set_fold_regions` | Provides fold regions for a file |
@@ -116,11 +117,11 @@ matches the host protocol version — plugins with a mismatched version are
 silently skipped. The `init` event sent to each plugin includes the host
 protocol version so the plugin can verify compatibility dynamically.
 
-Current protocol version: **`"2"`** (bumped from `"1"` for the 0.8 release).
+Current protocol version: **`"3"`**. Chunked content actions are an additive
+protocol-3 feature and do not require another version bump.
 
-> **Upgrading from 0.7:** Plugins written for protocol `"1"` must update
-> `tv_protocol = "2"` in their `plugin.toml` and handle the new
-> `protocol_version` field on the `init` event to remain compatible with 0.8+.
+Plugins must declare `mantis_protocol = "3"` (or the legacy `tv_protocol`
+alias) to be discovered by the current host.
 
 ## Lifecycle
 
@@ -169,7 +170,7 @@ compiled alongside `mantis` and installed on first run.
 | Plugin | Binary | What it does |
 |---|---|---|
 | iconize | `iconize` | On `init`, sends a `set_icon_map` action with Nerd Font glyphs for ~80 file extensions. Requires `icons = true` in `mantis.toml` and a Nerd Font terminal. |
-| markdown | `markdown` | Renders `.md` files using pulldown-cmark, sending the output as ANSI-escaped lines via `set_content`. Responds to theme changes and `M` keypress for raw/rendered toggle. |
+| markdown | `markdown` | Renders `.md` files using pulldown-cmark, streaming ANSI-escaped lines into the content panel. Responds to theme changes and `M` keypress for raw/rendered toggle. |
 | python | `python` | Registers as a language provider for `.py` files with the `fold` capability. On file open, computes and registers collapsible indentation-based fold regions. |
 | rust | `rust` | Registers as a language provider for `.rs` files with `fold` and `symbols` capabilities. On file open, provides curly-brace folds and a symbol outline for functions, types, modules, and methods. |
 | go | `go` | Registers as a language provider for `.go` files with the `fold` capability. On file open, computes and registers collapsible curly-brace fold regions. |

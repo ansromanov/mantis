@@ -148,10 +148,10 @@ fn spawn_keypress_responder(app: &mut App, dir: &std::path::Path, reply: bool) {
 /// generous deadline), mirroring the ~16ms poll loop in `main.rs` without a
 /// real 16ms sleep per iteration.
 fn drain_until_keypress_resolved(app: &mut App) {
-    // Deadline comfortably exceeds KEY_CONSUME_TIMEOUT (2s under cfg(test))
+    // Deadline comfortably exceeds KEY_CONSUME_TIMEOUT (5s under cfg(test))
     // so a slow subprocess round trip under parallel test-suite load doesn't
     // race the timeout path.
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
     while app.pending_keypress.is_some() {
         app.tick();
         assert!(

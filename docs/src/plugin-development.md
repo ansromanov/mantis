@@ -53,7 +53,7 @@ dynamically.
 |---|---|---|
 | `"1"` | 0.7.x | Initial protocol. Events: init, on_file_open, on_keypress, on_selection_change, on_theme_change, on_quit, shutdown. Actions: show_message, open_file, set_content, set_icon_map. Git features (set_file_statuses, set_blame_data, set_status_bar_git_info) were removed in 0.11.22 — git is now built in only. |
 | `"2"` | 0.8.x | Language providers (register_language_provider, set_fold_regions), event subscription (`events` field in manifest), protocol hardening (bounded queues, line caps), `protocol_version` field on init event. `init`/`on_theme_change` additionally carry an optional `colors` object (0.13.x, additive — does not bump this version) with the active theme's actual role colors as `#rrggbb` hex. |
-| `"3"` | 0.14.x | Request/response correlation (`request`/`response` events) so the host can ask a plugin for something and match the reply; a `plugin_error` action for reporting failures outside the request/response flow; key-consumption semantics for `on_keypress` (`key_handled` action, host waits up to one tick); `priority` field on `register_language_provider` plus a status-bar warning on conflicting registrations; manifest field renamed `tv_protocol` → `mantis_protocol` (alias kept, see above). As with every prior protocol bump, discovery requires an exact version match: a manifest still declaring `"2"` is silently skipped, not loaded in a reduced-compatibility mode — plugins must declare `"3"` (via `mantis_protocol`, or its `tv_protocol` alias) to be discovered on this host. `highlight` capability remains formally reserved and unimplemented: real syntax highlighting continues to flow through syntax plugins (`.sublime-syntax` + syntect), not language providers. A `status_facts` capability plus `set_status_facts` action (0.18.x, additive — does not bump this version) let a provider push a free-text status-bar summary for a file, gated the same way as `fold`/`set_fold_regions`; the bundled `k8s` plugin uses it to report Kubernetes resource identity and per-kind counts for `.yaml`/`.yml` files without conflicting with the `yaml` plugin's `fold` registration on the same extensions. Optional `filenames` and `shebangs` selectors for `register_language_provider` (0.21.x, additive — see #836) also do not change the protocol version. The `on_content_cursor_change` event (0.21.x, additive — does not bump this version) sends debounced, one-based line and column coordinates to subscribers. |
+| `"3"` | 0.14.x | Request/response correlation (`request`/`response` events) so the host can ask a plugin for something and match the reply; a `plugin_error` action for reporting failures outside the request/response flow; key-consumption semantics for `on_keypress` (`key_handled` action, host waits up to one tick); `priority` field on `register_language_provider` plus a status-bar warning on conflicting registrations; manifest field renamed `tv_protocol` → `mantis_protocol` (alias kept, see above). As with every prior protocol bump, discovery requires an exact version match: a manifest still declaring `"2"` is silently skipped, not loaded in a reduced-compatibility mode — plugins must declare `"3"` (via `mantis_protocol`, or its `tv_protocol` alias) to be discovered on this host. `highlight` capability remains formally reserved and unimplemented: real syntax highlighting continues to flow through syntax plugins (`.sublime-syntax` + syntect), not language providers. A `status_facts` capability plus `set_status_facts` action (0.18.x, additive — does not bump this version) let a provider push a free-text status-bar summary for a file, gated the same way as `fold`/`set_fold_regions`; the bundled `k8s` plugin uses it to report Kubernetes resource identity and per-kind counts for `.yaml`/`.yml` files without conflicting with the `yaml` plugin's `fold` registration on the same extensions. Optional `filenames` and `shebangs` selectors for `register_language_provider` (0.21.x, additive — see #836) also do not change the protocol version. The `on_content_cursor_change` event (0.21.x, additive — does not bump this version) sends debounced, one-based line and column coordinates to subscribers. Chunked rendered content (`set_content_chunk` + `set_content_end`, 0.21.x) is also additive and keeps the protocol at version 3. |
 
 ### Discovery
 
@@ -329,6 +329,28 @@ that generate rich output (e.g. markdown renderers, linters).
 {"event":"action","action":"set_content","params":{"lines":["\u001b[32mgreen line\u001b[0m","plain line"]}}
 ```
 
+For large rendered documents, use `set_content_chunk` followed by
+`set_content_end`. Each chunk is a bounded action, so the host can display
+early lines while later chunks are still arriving. `content_id` identifies one
+render pass and must be unique for each new render of a path. `index` is a
+zero-based chunk number; chunks may arrive out of order, and duplicate indexes
+are ignored. `set_content_end` is the explicit terminator and reports the total
+number of chunks. The host appends contiguous chunks as they become available
+and waits for any gaps before marking the stream complete.
+
+```json
+{"event":"action","action":"set_content_chunk","params":{"path":"/tmp/report.md","content_id":"render-17","index":0,"lines":["first line","second line"]}}
+{"event":"action","action":"set_content_chunk","params":{"path":"/tmp/report.md","content_id":"render-17","index":1,"lines":["third line"]}}
+{"event":"action","action":"set_content_end","params":{"path":"/tmp/report.md","content_id":"render-17","total_chunks":2}}
+```
+
+The host accepts chunks up to 1 MiB and caps a streamed document at 64 MiB,
+1,000,000 lines, and 65,536 chunks. These limits complement the existing
+4 MiB stdout-line limit and bounded plugin action queue. A stream that exceeds
+a limit, has an invalid terminator, or is idle for ten seconds keeps its
+already-delivered lines and is marked **incomplete** in the status bar. A later
+render should use a new `content_id`.
+
 ### `set_icon_map`
 
 Sets the file-type icon glyphs used in the tree. Requires `icons = true` in `mantis.toml` and a Nerd Font terminal. Keys in `icons` are file extensions (lowercase) or full filenames for extensionless files (e.g. `"dockerfile"`).
@@ -569,6 +591,7 @@ special cases needed.
 | Action | State cleared |
 |---|---|
 | `set_content` | `plugin_content` / `plugin_content_text` entries for contributed paths |
+| `set_content_chunk` / `set_content_end` | Stream assembly state and partial `plugin_content` entries for contributed paths |
 | `set_icon_map` | `icon_map`, `icons_enabled`, `icon_dir_open/closed`, `icon_fallback` |
 | `set_fold_regions` | `plugin_fold_regions` entries for contributed paths; active fold state reset |
 | `set_status_facts` | `plugin_status_facts` entries for contributed paths |

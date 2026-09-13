@@ -1,4 +1,6 @@
-use crate::plugin::process::{drain_rest_of_line, read_capped_line, Plugin, MAX_LINE_LEN};
+use crate::plugin::process::{
+    drain_rest_of_line, read_capped_line, Plugin, MAX_ACTIONS_PER_TICK, MAX_LINE_LEN,
+};
 use crate::plugin::types::ToPlugin;
 
 /// Small stand-in for `MAX_LINE_LEN` so cap-boundary tests don't allocate
@@ -38,6 +40,26 @@ fn drain_actions_returns_empty_when_no_reader() {
     let (actions, is_dead) = p.drain_actions();
     assert!(actions.is_empty());
     assert!(is_dead, "no reader channel means the plugin is dead");
+}
+
+#[test]
+fn action_drain_leaves_later_chunks_for_the_next_frame() {
+    let (tx, rx) = std::sync::mpsc::sync_channel(128);
+    let mut plugin = Plugin::new("streaming".into(), vec![]);
+    plugin.set_action_receiver_for_test(rx);
+    for index in 0..100 {
+        tx.send((
+            "set_content_chunk".into(),
+            serde_json::json!({"index": index}),
+        ))
+        .unwrap();
+    }
+
+    let (first, is_dead) = plugin.drain_actions();
+    assert_eq!(first.len(), MAX_ACTIONS_PER_TICK);
+    assert!(!is_dead);
+    let (second, _) = plugin.drain_actions();
+    assert_eq!(second.len(), 100 - MAX_ACTIONS_PER_TICK);
 }
 
 #[test]

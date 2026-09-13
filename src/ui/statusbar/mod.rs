@@ -53,6 +53,7 @@ pub(crate) enum StatusSegment {
     Errors,
     Folds,
     PluginFacts,
+    PluginContent,
     Message,
     PluginError,
     Version,
@@ -77,6 +78,7 @@ impl StatusSegment {
             StatusSegment::Errors => "errors",
             StatusSegment::Folds => "folds",
             StatusSegment::PluginFacts => "pluginfacts",
+            StatusSegment::PluginContent => "plugincontent",
             StatusSegment::Message => "message",
             StatusSegment::PluginError => "pluginerror",
             StatusSegment::Version => "version",
@@ -511,6 +513,28 @@ fn build_normal_lines(
             StatusSegment::PluginFacts,
             P_INFO,
         ));
+    }
+
+    // -- Streamed plugin content progress / partial result state --
+    if let Some((plugin, stream)) = app
+        .current_file
+        .as_deref()
+        .and_then(|path| app.plugin_content_streams.get(path))
+    {
+        let state = if stream.is_active() {
+            "rendering"
+        } else if stream.is_incomplete() {
+            "incomplete"
+        } else {
+            ""
+        };
+        if !state.is_empty() {
+            segs.push((
+                Span::styled(format!(" [{plugin}: {state}]"), base.fg(app.theme.accent)),
+                StatusSegment::PluginContent,
+                P_META,
+            ));
+        }
     }
 
     // -- Priority 1: plugin / status messages --

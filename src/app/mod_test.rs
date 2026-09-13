@@ -5312,6 +5312,35 @@ fn teardown_plugin_contributions_removes_palette_commands_and_closes_palette() {
 }
 
 #[test]
+fn teardown_plugin_contributions_removes_partial_streamed_content() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let path = root.join("a.txt");
+    app.plugin_content.insert(path.clone(), Vec::new());
+    app.plugin_content_text
+        .insert(path.clone(), vec!["partial".to_string()]);
+    app.plugin_content_streams.insert(
+        path.clone(),
+        (
+            "demo".to_string(),
+            crate::plugin::ContentStream::new("render-1".into(), std::time::Instant::now()),
+        ),
+    );
+    app.plugin_contributions
+        .entry("demo".to_string())
+        .or_default()
+        .content_paths
+        .insert(path.clone());
+
+    app.teardown_plugin_contributions("demo");
+
+    assert!(!app.plugin_content.contains_key(&path));
+    assert!(!app.plugin_content_text.contains_key(&path));
+    assert!(!app.plugin_content_streams.contains_key(&path));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn teardown_plugin_contributions_keeps_palette_when_plugin_had_no_commands() {
     let root = temp_tree();
     let mut app = app_for(&root);

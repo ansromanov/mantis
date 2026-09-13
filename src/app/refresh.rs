@@ -17,9 +17,10 @@
 //! consumption): once a `key_handled` reply arrives or the deadline passes,
 //! `process_pending_keypress` either swallows the key or falls through to
 //! normal-mode handling, following the same deferred/debounced pattern as the
-//! search debounce below. `handle_plugin_action` grew two protocol 3 cases:
-//! `key_handled` (feeds that resolution) and `plugin_error` (recorded via
-//! `PluginManager` and logged, distinct from routine `show_message` text).
+//! `key_handled` (feeds that resolution), `plugin_error` (recorded via
+//! `PluginManager` and logged, distinct from routine `show_message` text), and
+//! `set_content_chunk` / `set_content_end` (bounded incremental rich-content
+//! delivery with partial-result timeout handling).
 //! Language providers can also push per-file symbol outlines with `set_symbols`;
 //! the action is capability- and priority-gated, and its paths are recorded for
 //! deterministic teardown when the provider exits or is disabled.
@@ -53,6 +54,7 @@ impl App {
             self.update_rx = None;
         }
         self.drain_plugin_actions();
+        self.expire_plugin_content_streams(self.now());
         self.process_pending_keypress();
         self.flush_pending_content_cursor();
         if self.drain_config_watch() {
@@ -582,6 +584,8 @@ impl App {
             "open_file" => self.handle_plugin_open_file(name, params),
             "set_icon_map" => self.handle_plugin_set_icon_map(name, params),
             "set_content" => self.handle_plugin_set_content(name, params),
+            "set_content_chunk" => self.handle_plugin_content_chunk(name, params),
+            "set_content_end" => self.handle_plugin_content_end(name, params),
             "register_language_provider" => {
                 self.handle_plugin_register_language_provider(name, params);
             }
@@ -679,54 +683,6 @@ impl App {
                 .entry(name.to_string())
                 .or_default()
                 .has_icon_map = true;
-        }
-    }
-
-    fn handle_plugin_set_content(&mut self, name: &str, params: &serde_json::Value) {
-        let lines: Vec<String> = match params.get("lines").and_then(|v| v.as_array()) {
-            Some(arr) => arr
-                .iter()
-                .filter_map(|v| v.as_str().map(String::from))
-                .collect(),
-            None => return,
-        };
-        let path = match params.get("path").and_then(|v| v.as_str()) {
-            Some(p) => std::path::PathBuf::from(p),
-            None => return,
-        };
-        let rendered: Vec<Vec<(ratatui::style::Style, String)>> = lines
-            .iter()
-            .map(|l| crate::ansi::parse_ansi_line(l))
-            .collect();
-        let text: Vec<String> = rendered
-            .iter()
-            .map(|spans| spans.iter().map(|(_, t)| t.as_str()).collect::<String>())
-            .collect();
-        // Only reset scroll / mark active when the render targets the
-        // file currently on screen; a plugin rendering a background path
-        // must not yank the viewport of the file the user is reading.
-        let is_current = self.current_file.as_deref() == Some(path.as_path());
-        self.plugin_content_text.insert(path.clone(), text);
-        self.plugin_content.insert(path.clone(), rendered);
-        self.plugin_contributions
-            .entry(name.to_string())
-            .or_default()
-            .content_paths
-            .insert(path);
-        if is_current {
-            // First render of this file by a plugin resets the viewport;
-            // subsequent re-renders preserve scroll (clamped) so that
-            // periodic plugin updates don't yank the user's position.
-            let first_render =
-                self.plugin_content_active_path.as_deref() != self.current_file.as_deref();
-            self.plugin_content_active_path = self.current_file.clone();
-            if first_render {
-                self.set_content_scroll(0);
-                self.content_hscroll = 0;
-            } else {
-                self.clamp_content_scroll();
-            }
-            self.plugin_content_active = true;
         }
     }
 

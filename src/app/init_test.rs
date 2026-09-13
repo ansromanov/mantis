@@ -106,6 +106,10 @@ fn app_new_starts_with_empty_plugin_content() {
         "plugin_content_text must start empty"
     );
     assert!(
+        app.plugin_content_streams.is_empty(),
+        "plugin_content_streams must start empty"
+    );
+    assert!(
         app.plugin_status_facts.is_empty(),
         "plugin_status_facts must start empty"
     );

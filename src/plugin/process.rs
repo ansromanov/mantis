@@ -4,6 +4,10 @@
 //! handle plus background reader (stdout → action/response channels) and
 //! writer (send queue → stdin) threads.
 //!
+//! The stdout action channel has a fixed capacity and yields at most 64 actions
+//! per frame, letting the UI paint streamed content while a plugin is still
+//! sending it. Oversized individual JSON lines are discarded by the reader.
+//!
 //! Protocol 3 adds a `response` message shape (`{"event":"response","id":..}`)
 //! alongside the existing `action` shape on the same stdout stream. The
 //! reader thread dispatches on `event` and routes the two onto **separate**
@@ -25,10 +29,13 @@ use std::time::{Duration, Instant};
 use crate::plugin::types::{FromPlugin, ToPlugin};
 
 /// Maximum line length from a plugin's stdout (4 MiB). Lines exceeding this
-/// are discarded and the reader continues. Sized to hold a fully rendered
-/// document in one `set_content` message (a large markdown file with wide
-/// tables serializes to ~70 KB); the cap only guards against a runaway plugin.
+/// are discarded and the reader continues. Streamed content uses smaller
+/// chunks, while the cap remains a guard against a runaway plugin action.
 pub(crate) const MAX_LINE_LEN: usize = 4 * 1024 * 1024;
+/// Maximum plugin actions handed to the event loop per plugin and frame.
+/// Remaining actions stay in the bounded reader channel for the next tick so
+/// streamed output can be drawn while a plugin is still sending it.
+pub(crate) const MAX_ACTIONS_PER_TICK: usize = 64;
 
 /// Maximum size of a plugin's on-disk stderr log before older lines are
 /// dropped to make room for new ones. Keeps a crashing plugin from filling
@@ -93,6 +100,14 @@ impl Plugin {
     /// Empty subscription list means all events are accepted (backward compat).
     pub(crate) fn subscribes_to(&self, event: &str) -> bool {
         self.subscribed_events.is_empty() || self.subscribed_events.iter().any(|e| e == event)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_action_receiver_for_test(
+        &mut self,
+        receiver: std::sync::mpsc::Receiver<(String, serde_json::Value)>,
+    ) {
+        self.action_rx = Some(receiver);
     }
 
     /// Returns `true` only if this plugin *explicitly* listed `on_keypress`
@@ -234,7 +249,7 @@ impl Plugin {
         let Some(ref rx) = self.action_rx else {
             return (actions, true);
         };
-        loop {
+        while actions.len() < MAX_ACTIONS_PER_TICK {
             match rx.try_recv() {
                 Ok((action, params)) => actions.push((action, params)),
                 Err(std::sync::mpsc::TryRecvError::Empty) => break,
