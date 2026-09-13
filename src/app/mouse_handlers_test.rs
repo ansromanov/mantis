@@ -94,7 +94,10 @@ fn statusbar_segment_click_opens_revision_picker_and_blank_space_is_noop() {
     app.statusbar_segments = vec![(crate::ui::statusbar::StatusSegment::Git, 4, 14, 0)];
 
     app.handle_mouse(left_down_at(7, 0));
-    assert!(app.revision_picker.is_some());
+    assert_eq!(
+        app.revision_picker.as_ref().map(|picker| picker.tab),
+        Some(crate::search::RevisionTab::Branches)
+    );
 
     app.revision_picker = None;
     app.handle_mouse(left_down_at(20, 0));

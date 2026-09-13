@@ -10,8 +10,9 @@
 //! breadcrumb, blame, hunk, and status-bar targets. While the
 //! context menu or action-menu row is open, pointer events route to its own
 //! handler so item clicks and dismissal work without falling through to panels.
-//! All coordinate math must account for the panels' scroll offsets, which are
-//! also captured at render time.
+//! The status-bar Git segment opens the revision picker on its Branches tab for
+//! read-only branch browsing. All coordinate math must account for the panels'
+//! scroll offsets, which are also captured at render time.
 
 use std::time::{Duration, Instant};
 
@@ -620,7 +621,10 @@ impl App {
 
         match action {
             "compare_against" => {
-                self.revision_picker = Some(crate::search::RevisionPicker::new(&self.root));
+                self.revision_picker = Some(crate::search::RevisionPicker::new_for_tab(
+                    &self.root,
+                    crate::search::RevisionTab::Branches,
+                ));
             }
             "worktree_picker" => {
                 self.worktree_picker = Some(crate::search::WorktreePicker::new(&self.root));

@@ -99,10 +99,16 @@ complete, regardless of this setting.
 
 ## Compare mode
 
-To review changes against something other than the working tree's usual
-baseline, open the command palette and run **Compare against a revision**.
-A picker overlay opens with three tabs — **Commits** (default), **Tags**,
-and **Branches** — switchable with the Left/Right arrow keys. Each tab
+Click the branch name in the status bar to open the revision picker on its
+**Branches** tab. Choose a branch to compare it with the working tree. This is
+read-only: mantis browses another branch without checking it out or changing
+the working tree. To inspect a file at that revision, use **Toggle file at
+revision** while viewing its diff.
+
+You can also open the command palette and run **Compare against a revision**
+to compare against a commit, tag, or branch. The picker has three tabs —
+**Commits** (default), **Tags**, and **Branches** — switchable with the
+Left/Right arrow keys. Each tab
 shows only items of that category, plus HEAD shortcuts (`HEAD`, `HEAD~1`,
 `HEAD~2`) that appear in all tabs. Start typing to fuzzy-filter the list,
 or enter any revision (a commit hash, tag, branch name, or something
