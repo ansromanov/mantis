@@ -647,6 +647,14 @@ pub static ACTIONS: &[ActionSpec] = &[
         description: Some("Jump to a specific line number"),
     },
     ActionSpec {
+        id: "symbol_outline",
+        palette: Some("Show symbol outline"),
+        help: Some("show the current file's symbol outline"),
+        category: "Navigate",
+        menu: Some(0),
+        description: Some("Filter and jump to symbols in the current file"),
+    },
+    ActionSpec {
         id: "compare_against",
         palette: Some("Compare against a revision"),
         help: None,
@@ -732,6 +740,8 @@ pub enum Applicability {
     PluginContentActive,
     /// Requires being in git mode.
     GitMode,
+    /// Requires a current file with symbols from its language provider.
+    Symbols,
 }
 
 impl ActionSpec {
@@ -755,6 +765,7 @@ impl ActionSpec {
             "toggle_raw_markdown" => Applicability::PluginContentActive,
             "open_in_editor" | "open_external" | "copy_path" | "copy_relative_path"
             | "copy_line" | "copy_file" | "goto_line" => Applicability::OpenFile,
+            "symbol_outline" => Applicability::Symbols,
             "git_mode_flat_toggle" => Applicability::GitMode,
             _ => Applicability::Always,
         }

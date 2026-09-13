@@ -488,6 +488,7 @@ fn create_base_app() -> App {
         folded: HashSet::new(),
         plugin_fold_regions: HashMap::new(),
         plugin_status_facts: HashMap::new(),
+        plugin_symbols: HashMap::new(),
         fold_display_map: Vec::new(),
         fold_gutter_rows: Vec::new(),
         yaml_error: None,
@@ -1216,6 +1217,76 @@ fn set_status_facts_stamps_contribution() {
     );
 }
 
+#[test]
+fn set_symbols_is_capability_gated_and_stamps_contribution() {
+    let mut app = create_base_app();
+    let path = std::path::PathBuf::from("/tmp/main.rs");
+    let symbols = serde_json::json!([
+        {"name":"main","kind":"function","line":0,"end_line":2}
+    ]);
+    app.drain_plugin_actions_for_test(
+        "rust-plugin",
+        "set_symbols",
+        serde_json::json!({"path":path,"symbols":symbols}),
+    );
+    assert!(!app.plugin_symbols.contains_key(&path));
+
+    app.drain_plugin_actions_for_test(
+        "rust-plugin",
+        "register_language_provider",
+        serde_json::json!({"extensions":["rs"],"capabilities":["symbols"]}),
+    );
+    app.drain_plugin_actions_for_test(
+        "rust-plugin",
+        "set_symbols",
+        serde_json::json!({
+            "path":"/tmp/main.rs",
+            "symbols":[{"name":"main","kind":"function","line":0,"end_line":2}]
+        }),
+    );
+    assert_eq!(app.plugin_symbols.get(&path).map(Vec::len), Some(1));
+    assert!(app.plugin_contributions["rust-plugin"]
+        .symbol_paths
+        .contains(&path));
+}
+
+#[test]
+fn set_symbols_rejects_a_lower_priority_provider() {
+    let mut app = create_base_app();
+    for (name, priority) in [("low", 1), ("high", 10)] {
+        app.drain_plugin_actions_for_test(
+            name,
+            "register_language_provider",
+            serde_json::json!({
+                "extensions":["rs"],"capabilities":["symbols"],"priority":priority
+            }),
+        );
+    }
+    app.drain_plugin_actions_for_test(
+        "low",
+        "set_symbols",
+        serde_json::json!({
+            "path":"/tmp/main.rs",
+            "symbols":[{"name":"low","kind":"function","line":0}]
+        }),
+    );
+    assert!(!app
+        .plugin_symbols
+        .contains_key(&std::path::PathBuf::from("/tmp/main.rs")));
+    app.drain_plugin_actions_for_test(
+        "high",
+        "set_symbols",
+        serde_json::json!({
+            "path":"/tmp/main.rs",
+            "symbols":[{"name":"high","kind":"function","line":1}]
+        }),
+    );
+    assert_eq!(
+        app.plugin_symbols[std::path::Path::new("/tmp/main.rs")][0].name,
+        "high"
+    );
+}
+
 // -- plugin contribution tracking tests ---------------------------------------
 
 #[test]
@@ -1396,6 +1467,35 @@ fn teardown_clears_status_facts() {
         !app.plugin_status_facts.contains_key(&path),
         "status facts must be removed"
     );
+}
+
+#[test]
+fn teardown_clears_symbol_contributions() {
+    let mut app = create_base_app();
+    let path = std::path::PathBuf::from("/tmp/main.rs");
+    let mut palette = crate::command_palette::CommandPalette::default();
+    palette.route = crate::command_palette::PaletteRoute::Symbols;
+    app.command_palette = Some(palette);
+    app.plugin_symbols.insert(
+        path.clone(),
+        vec![crate::plugin::types::Symbol {
+            name: "main".into(),
+            kind: "function".into(),
+            line: 0,
+            end_line: Some(2),
+            parent: None,
+        }],
+    );
+    app.plugin_contributions.insert(
+        "rust-plugin".to_string(),
+        crate::plugin::PluginContributions {
+            symbol_paths: [path.clone()].into(),
+            ..Default::default()
+        },
+    );
+    app.teardown_plugin_contributions("rust-plugin");
+    assert!(!app.plugin_symbols.contains_key(&path));
+    assert!(app.command_palette.is_none());
 }
 
 #[test]

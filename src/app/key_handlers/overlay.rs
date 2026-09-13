@@ -689,6 +689,9 @@ impl App {
                     crate::command_palette::PaletteRoute::GotoLine => {
                         self.dispatch_palette_goto_line();
                     }
+                    crate::command_palette::PaletteRoute::Symbols => {
+                        self.dispatch_palette_symbol();
+                    }
                 }
             }
             Some(OverlayKey::Close) => {
@@ -698,6 +701,7 @@ impl App {
                         p.route = crate::command_palette::PaletteRoute::Commands;
                         p.route_search = None;
                         p.route_goto_line = None;
+                        p.route_symbols = None;
                         p.selected = 0;
                         p.filtered = p.base_order.clone();
                         p.match_positions = vec![Vec::new(); p.filtered.len()];
@@ -764,6 +768,21 @@ impl App {
             crate::command_palette::PaletteRoute::GotoLine => {
                 if let Some(ref mut p) = self.command_palette {
                     p.route_goto_line = Some(crate::search::GotoLineState::new());
+                }
+            }
+            crate::command_palette::PaletteRoute::Symbols => {
+                let symbols = self
+                    .current_file
+                    .as_deref()
+                    .and_then(|path| self.plugin_symbols.get(path))
+                    .cloned()
+                    .unwrap_or_default();
+                let picker = crate::search::SymbolPicker::new(
+                    symbols,
+                    Some(self.display_to_physical(self.active_line)),
+                );
+                if let Some(ref mut palette) = self.command_palette {
+                    palette.route_symbols = Some(picker);
                 }
             }
             crate::command_palette::PaletteRoute::Commands => {}

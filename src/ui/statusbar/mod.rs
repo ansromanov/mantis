@@ -2,8 +2,8 @@
 //!
 //! `draw_statusbar` renders the bottom row or rows of the screen. When an
 //! overlay is active it shows that overlay's key hints; otherwise it summarizes
-//! the focused panel, file path, git state, position, and active modes. Colors
-//! come from the active theme, with per-segment overrides from
+//! the focused panel, file path, git state, position, symbol scope, and active
+//! modes. Colors come from the active theme, with per-segment overrides from
 //! `[statusbar.colors]`. It is a read-only projection of `App` and is drawn
 //! last so it reflects the final per-frame state. `hit_test` maps clicks to
 //! actionable segments, while `segment_at` returns visible text for the
@@ -47,6 +47,7 @@ pub(crate) enum StatusSegment {
     Lnum,
     Type,
     JsonPath,
+    Scope,
     FileInfo,
     Git,
     Errors,
@@ -70,6 +71,7 @@ impl StatusSegment {
             StatusSegment::Lnum => "lnum",
             StatusSegment::Type => "type",
             StatusSegment::JsonPath => "jsonpath",
+            StatusSegment::Scope => "scope",
             StatusSegment::FileInfo => "fileinfo",
             StatusSegment::Git => "git",
             StatusSegment::Errors => "errors",
@@ -86,7 +88,11 @@ impl StatusSegment {
     /// (both `left` and `right` are `None`). Explicit mode uses `split_sides`
     /// directly and never calls this.
     fn side(self) -> StatusSide {
-        if ["lnum", "type", "jsonpath", "git", "version", "update"].contains(&self.id_str()) {
+        if [
+            "lnum", "type", "jsonpath", "scope", "git", "version", "update",
+        ]
+        .contains(&self.id_str())
+        {
             StatusSide::Right
         } else {
             StatusSide::Left
@@ -99,6 +105,7 @@ impl StatusSegment {
             StatusSegment::Git => Some("compare_against"),
             StatusSegment::Worktrees => Some("worktree_picker"),
             StatusSegment::Lnum => Some("goto_line"),
+            StatusSegment::Scope => Some("symbol_outline"),
             StatusSegment::Type => Some("theme_picker"),
             StatusSegment::Folds => Some("fold_all"),
             StatusSegment::Errors | StatusSegment::PluginError => Some("plugin_picker"),
@@ -380,6 +387,28 @@ fn build_normal_lines(
             StatusSegment::Lnum,
             P_INFO,
         ));
+        if let Some(symbol) = app
+            .current_file
+            .as_deref()
+            .and_then(|path| app.plugin_symbols.get(path))
+            .and_then(|symbols| {
+                crate::plugin::types::enclosing_symbol(
+                    symbols,
+                    app.display_to_physical(app.active_line),
+                )
+            })
+        {
+            let scope = symbol
+                .parent
+                .as_deref()
+                .map(|parent| format!(" {parent}::{}", symbol.name))
+                .unwrap_or_else(|| format!(" {}", symbol.name));
+            segs.push((
+                Span::styled(format!(" Scope{scope}"), base.fg(app.theme.accent)),
+                StatusSegment::Scope,
+                P_INFO,
+            ));
+        }
         if let Some(ref syn) = app.current_syntax {
             segs.push((
                 Span::styled(format!(" [{syn}]"), dim),

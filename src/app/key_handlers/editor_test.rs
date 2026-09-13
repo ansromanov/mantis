@@ -1277,6 +1277,78 @@ fn goto_line_from_query_absolute_relative_and_clamped() {
 }
 
 #[test]
+fn outline_opens_with_cursor_symbol_selected_and_enter_jumps_to_declaration() {
+    let root = temp_tree();
+    let path = root.join("a.rs");
+    fs::write(
+        &path,
+        "struct Service {\n  fn run() {\n    work();\n  }\n}\nfn other() {}\n",
+    )
+    .unwrap();
+    let mut app = app_for(&root);
+    app.current_file = Some(path.clone());
+    app.content = fs::read_to_string(&path)
+        .unwrap()
+        .lines()
+        .map(str::to_owned)
+        .collect();
+    app.active_line = 2;
+    app.plugin_symbols.insert(
+        path,
+        vec![
+            crate::plugin::types::Symbol {
+                name: "Service".into(),
+                kind: "struct".into(),
+                line: 0,
+                end_line: Some(4),
+                parent: None,
+            },
+            crate::plugin::types::Symbol {
+                name: "run".into(),
+                kind: "method".into(),
+                line: 1,
+                end_line: Some(3),
+                parent: Some("Service".into()),
+            },
+            crate::plugin::types::Symbol {
+                name: "other".into(),
+                kind: "function".into(),
+                line: 5,
+                end_line: Some(5),
+                parent: None,
+            },
+        ],
+    );
+
+    app.open_symbol_outline();
+    let selected = app
+        .command_palette
+        .as_ref()
+        .and_then(|palette| palette.route_symbols.as_ref())
+        .and_then(crate::search::SymbolPicker::selected_symbol)
+        .map(|symbol| symbol.name.as_str());
+    assert_eq!(selected, Some("run"));
+    app.dispatch_palette_symbol();
+    assert!(app.command_palette.is_none());
+    assert_eq!(app.active_line, 1);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn outline_is_not_opened_when_the_provider_has_no_symbols() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.current_file = Some(root.join("a.rs"));
+    app.open_symbol_outline();
+    assert!(app.command_palette.is_none());
+    assert!(app
+        .status_message
+        .as_ref()
+        .is_some_and(|message| message.text.contains("no symbols")));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn dispatch_palette_goto_line_jumps_and_closes_palette() {
     let root = temp_tree();
     let long: String = (1..=50).map(|i| format!("line {i}\n")).collect();

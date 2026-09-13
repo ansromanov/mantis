@@ -115,6 +115,15 @@ fn app_new_starts_with_empty_plugin_content() {
 }
 
 #[test]
+fn app_new_starts_with_empty_plugin_symbols() {
+    let root = temp_dir();
+    let mut app = new_app(&root, Config::default());
+    assert!(app.plugin_symbols.is_empty());
+    app.plugin_manager.deactivate_all();
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn app_new_hides_dotfiles_by_default() {
     let root = temp_dir();
     fs::write(root.join("visible.txt"), "x\n").unwrap();

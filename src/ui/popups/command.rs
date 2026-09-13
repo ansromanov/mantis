@@ -10,8 +10,9 @@
 //! the layout of the other list-style pickers (search, history, and theme).
 //!
 //! **Prefix routing**: when the first query character is a prefix (`/`, `#`,
-//! `:`), the palette switches to file search, content search, or go-to-line
-//! mode respectively. The title, query bar, and result list adapt to the
+//! `:`, `@`), the palette switches to file search, content search, go-to-line,
+//! or the current file's symbol list mode respectively. The title, query bar,
+//! and result list adapt to the
 //! active route. Categories are shown as a dimmed prefix (`General:`, `View:`,
 //! ...) for the commands route. Descriptions (when present) follow the name
 //! in dim text. Keybinding labels are right-aligned to form a scannable
@@ -122,6 +123,9 @@ pub(crate) fn draw_command_palette(f: &mut Frame, app: &mut App, area: Rect) {
         }
         crate::command_palette::PaletteRoute::GotoLine => {
             draw_goto_line_hint(f, list_area, &theme);
+        }
+        crate::command_palette::PaletteRoute::Symbols => {
+            draw_symbol_results(f, app, list_area, &theme);
         }
     }
 }
@@ -352,4 +356,49 @@ fn draw_goto_line_hint(f: &mut Frame, list_area: Rect, theme: &crate::theme::The
         Span::styled(" (e.g. 42, +5, -3)", Style::default().fg(theme.dim)),
     ]);
     f.render_widget(Paragraph::new(hint), list_area);
+}
+
+/// Renders symbol results for both the `@` route and the outline action.
+fn draw_symbol_results(f: &mut Frame, app: &mut App, list_area: Rect, theme: &crate::theme::Theme) {
+    let Some(picker) = app
+        .command_palette
+        .as_ref()
+        .and_then(|palette| palette.route_symbols.as_ref())
+    else {
+        f.render_widget(Paragraph::new("No symbols in this file"), list_area);
+        return;
+    };
+    if picker.filtered.is_empty() {
+        f.render_widget(Paragraph::new("No matching symbols"), list_area);
+        app.command_palette_area = list_area;
+        app.command_palette_offset = 0;
+        return;
+    }
+    let items: Vec<ListItem> = picker
+        .filtered
+        .iter()
+        .filter_map(|index| picker.symbols.get(*index))
+        .map(|symbol| {
+            let parent = symbol
+                .parent
+                .as_deref()
+                .map(|name| format!("{name}::"))
+                .unwrap_or_default();
+            ListItem::new(format!(
+                "{} {parent}{}  :{}",
+                symbol.kind,
+                symbol.name,
+                symbol.line + 1
+            ))
+        })
+        .collect();
+    let mut state = ListState::default();
+    state.select(Some(picker.selected));
+    f.render_stateful_widget(
+        List::new(items).highlight_style(theme.selection_style().add_modifier(Modifier::BOLD)),
+        list_area,
+        &mut state,
+    );
+    app.command_palette_area = list_area;
+    app.command_palette_offset = state.offset();
 }

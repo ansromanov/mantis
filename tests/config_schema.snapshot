@@ -70,6 +70,7 @@ keys.search_content
 keys.search_files
 keys.select_tab
 keys.switch_panel
+keys.symbol_outline
 keys.tab_picker
 keys.theme_picker
 keys.toggle_blame
@@ -111,6 +112,7 @@ statusbar.colors.lnum
 statusbar.colors.message
 statusbar.colors.pluginerror
 statusbar.colors.pluginfacts
+statusbar.colors.scope
 statusbar.colors.scroll
 statusbar.colors.type
 statusbar.colors.update

@@ -5,9 +5,9 @@
 //! architecture: `app` owns the central state machine and input handling, `ui`
 //! owns ratatui rendering, and `config` parses `mantis.toml`. The remaining leaf
 //! modules (`tree`, `git`, `highlight`, `search`, `diff`,
-//! `selection`, `session`, `telemetry`, `theme`, `virtual_file`, `fold`,
-//! `yaml_fold`, `file`, `command_palette`, `release_info`, `ansi`, `actions`,
-//! `pager`, `update`) each provide
+//! `selection`, `session`, `telemetry`, `theme`,
+//! `virtual_file`, `fold`, `yaml_fold`, `file`, `command_palette`,
+//! `release_info`, `ansi`, `actions`, `pager`, and `update` each provide
 //! one focused capability consumed by `app`/`ui`. Keep this list in sync with
 //! the directory structure documented in AGENTS.md. `actions` is the
 //! canonical action registry that `command_palette`, `config::keymap`, and

@@ -436,6 +436,7 @@ fn palette_route_from_char_prefixes() {
     assert_eq!(PaletteRoute::from_char('/'), Some(PaletteRoute::Files));
     assert_eq!(PaletteRoute::from_char('#'), Some(PaletteRoute::Content));
     assert_eq!(PaletteRoute::from_char(':'), Some(PaletteRoute::GotoLine));
+    assert_eq!(PaletteRoute::from_char('@'), Some(PaletteRoute::Symbols));
 }
 
 #[test]
@@ -443,7 +444,6 @@ fn palette_route_from_char_non_prefix_returns_none() {
     assert_eq!(PaletteRoute::from_char('a'), None);
     assert_eq!(PaletteRoute::from_char('z'), None);
     assert_eq!(PaletteRoute::from_char(' '), None);
-    assert_eq!(PaletteRoute::from_char('@'), None); // reserved for symbols
 }
 
 #[test]
@@ -452,6 +452,7 @@ fn palette_route_label() {
     assert_eq!(PaletteRoute::Files.label(), "Files");
     assert_eq!(PaletteRoute::Content.label(), "Content");
     assert_eq!(PaletteRoute::GotoLine.label(), "Go to Line");
+    assert_eq!(PaletteRoute::Symbols.label(), "Symbols");
 }
 
 #[test]
@@ -460,6 +461,7 @@ fn palette_route_prefix_char() {
     assert_eq!(PaletteRoute::Files.prefix_char(), '/');
     assert_eq!(PaletteRoute::Content.prefix_char(), '#');
     assert_eq!(PaletteRoute::GotoLine.prefix_char(), ':');
+    assert_eq!(PaletteRoute::Symbols.prefix_char(), '@');
 }
 
 #[test]
@@ -468,6 +470,45 @@ fn starts_in_commands_route() {
     assert_eq!(p.route, PaletteRoute::Commands);
     assert!(p.route_search.is_none());
     assert!(p.route_goto_line.is_none());
+    assert!(p.route_symbols.is_none());
+}
+
+#[test]
+fn at_route_fuzzy_filters_symbols_and_selects_the_match() {
+    let mut palette = CommandPalette::default();
+    palette.push('@');
+    assert_eq!(palette.route, PaletteRoute::Symbols);
+    palette.route_symbols = Some(crate::search::SymbolPicker::new(
+        vec![
+            crate::plugin::types::Symbol {
+                name: "render_tree".into(),
+                kind: "function".into(),
+                line: 2,
+                end_line: Some(8),
+                parent: None,
+            },
+            crate::plugin::types::Symbol {
+                name: "load_file".into(),
+                kind: "function".into(),
+                line: 12,
+                end_line: Some(16),
+                parent: None,
+            },
+        ],
+        None,
+    ));
+    for ch in "render".chars() {
+        palette.push(ch);
+    }
+    assert_eq!(palette.results_len(), 1);
+    assert_eq!(
+        palette
+            .route_symbols
+            .as_ref()
+            .and_then(crate::search::SymbolPicker::selected_symbol)
+            .map(|symbol| symbol.name.as_str()),
+        Some("render_tree")
+    );
 }
 
 #[test]

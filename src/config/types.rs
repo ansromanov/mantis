@@ -245,6 +245,7 @@ impl StatusBarConfig {
         "lnum",
         "type",
         "jsonpath",
+        "scope",
         "fileinfo",
         "git",
         "errors",

@@ -21,6 +21,33 @@ fn ctrl_brackets_request_tab_reordering() {
     );
     fs::remove_dir_all(root).ok();
 }
+
+#[test]
+fn uppercase_o_opens_symbol_outline_when_provider_symbols_exist() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let path = root.join("long.txt");
+    app.current_file = Some(path.clone());
+    app.focus = crate::app::Focus::Content;
+    app.plugin_symbols.insert(
+        path,
+        vec![crate::plugin::types::Symbol {
+            name: "main".into(),
+            kind: "function".into(),
+            line: 0,
+            end_line: Some(2),
+            parent: None,
+        }],
+    );
+
+    app.handle_key(key(KeyCode::Char('O')));
+
+    assert_eq!(
+        app.command_palette.as_ref().map(|p| p.route),
+        Some(crate::command_palette::PaletteRoute::Symbols)
+    );
+    fs::remove_dir_all(&root).ok();
+}
 use ratatui::layout::Rect;
 
 use crate::app::{App, Focus};

@@ -156,11 +156,15 @@ fn draw_help_overlay() {
     assert!(joined.contains("Welcome to mantis!"));
 
     // Tab 1: Navigation
-    app.help_tab = 1;
+    app.help_tab = crate::ui::popups::help_tabs()
+        .iter()
+        .position(|&tab| tab == "Navigate")
+        .unwrap();
+    app.help_scroll.scroll = usize::MAX;
     terminal.draw(|f| super::draw(f, &mut app)).unwrap();
     let rows = buffer_rows(&terminal);
     let joined = rows.join("\n");
-    assert!(joined.contains("Tree Panel Navigation"));
+    assert!(joined.contains("Context-sensitive Keys"));
 }
 
 #[test]

@@ -227,3 +227,33 @@ fn goto_line_route_renders_hint() {
         "hint line renders for the goto route"
     );
 }
+
+#[test]
+fn symbols_route_renders_symbol_name_and_source_line() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    let mut palette = CommandPalette::default();
+    palette.push('@');
+    palette.route_symbols = Some(crate::search::SymbolPicker::new(
+        vec![crate::plugin::types::Symbol {
+            name: "render_tree".into(),
+            kind: "function".into(),
+            line: 4,
+            end_line: Some(8),
+            parent: Some("App".into()),
+        }],
+        None,
+    ));
+    app.command_palette = Some(palette);
+
+    let backend = TestBackend::new(80, 30);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| draw_command_palette(frame, &mut app, frame.area()))
+        .unwrap();
+    let joined = buffer_rows(&terminal).join("\n");
+    assert!(joined.contains(" Symbols - "));
+    assert!(joined.contains("@> "));
+    assert!(joined.contains("App::render_tree"));
+    assert!(joined.contains(":5"));
+}

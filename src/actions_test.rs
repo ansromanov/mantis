@@ -6,6 +6,15 @@ fn json_query_action_is_registered() {
 }
 
 #[test]
+fn symbol_outline_requires_provider_symbols() {
+    let action = ACTIONS
+        .iter()
+        .find(|action| action.id == "symbol_outline")
+        .unwrap();
+    assert_eq!(action.applicability(), Applicability::Symbols);
+}
+
+#[test]
 fn worktree_picker_is_registered() {
     assert!(ACTIONS.iter().any(|action| action.id == "worktree_picker"));
     assert!(ACTIONS.iter().any(|action| {

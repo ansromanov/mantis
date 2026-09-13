@@ -66,6 +66,7 @@ fn statusbar_segments_map_to_their_existing_actions() {
         (StatusSegment::Git, Some("compare_against")),
         (StatusSegment::Worktrees, Some("worktree_picker")),
         (StatusSegment::Lnum, Some("goto_line")),
+        (StatusSegment::Scope, Some("symbol_outline")),
         (StatusSegment::Type, Some("theme_picker")),
         (StatusSegment::Folds, Some("fold_all")),
         (StatusSegment::Errors, Some("plugin_picker")),
@@ -86,6 +87,39 @@ fn statusbar_segments_map_to_their_existing_actions() {
             "unexpected action for {segment:?}"
         );
     }
+}
+
+#[test]
+fn statusbar_shows_the_enclosing_symbol_scope() {
+    let mut app = make_app();
+    app.current_file = Some(PathBuf::from("src/lib.rs"));
+    app.content = vec![
+        "mod app {".into(),
+        "    fn open() {".into(),
+        "    }".into(),
+        "}".into(),
+    ];
+    app.active_line = 2;
+    app.plugin_symbols.insert(
+        PathBuf::from("src/lib.rs"),
+        vec![
+            crate::plugin::types::Symbol {
+                name: "app".into(),
+                kind: "module".into(),
+                line: 0,
+                end_line: Some(3),
+                parent: None,
+            },
+            crate::plugin::types::Symbol {
+                name: "open".into(),
+                kind: "function".into(),
+                line: 1,
+                end_line: Some(2),
+                parent: Some("app".into()),
+            },
+        ],
+    );
+    assert!(render_bar(&app).contains("Scope app::open"));
 }
 
 #[test]
@@ -1474,6 +1508,7 @@ fn segment_ids_match_config_valid_segments() {
         StatusSegment::Errors,
         StatusSegment::Folds,
         StatusSegment::PluginFacts,
+        StatusSegment::Scope,
         StatusSegment::Message,
         StatusSegment::PluginError,
         StatusSegment::Version,

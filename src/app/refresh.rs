@@ -20,6 +20,9 @@
 //! search debounce below. `handle_plugin_action` grew two protocol 3 cases:
 //! `key_handled` (feeds that resolution) and `plugin_error` (recorded via
 //! `PluginManager` and logged, distinct from routine `show_message` text).
+//! Language providers can also push per-file symbol outlines with `set_symbols`;
+//! the action is capability- and priority-gated, and its paths are recorded for
+//! deterministic teardown when the provider exits or is disabled.
 
 use std::time::Duration;
 
@@ -582,6 +585,7 @@ impl App {
             }
             "set_fold_regions" => self.handle_plugin_set_fold_regions(name, params),
             "set_status_facts" => self.handle_plugin_set_status_facts(name, params),
+            "set_symbols" => self.handle_plugin_set_symbols(name, params),
             "register_commands" => self.handle_plugin_register_commands(name, params),
             "key_handled" => self.handle_plugin_key_handled(params),
             "plugin_error" => self.handle_plugin_error(name, params),
@@ -835,6 +839,61 @@ impl App {
             .or_default()
             .status_fact_paths
             .insert(path);
+    }
+
+    fn handle_plugin_set_symbols(&mut self, name: &str, params: &serde_json::Value) {
+        let Some(path) = params.get("path").and_then(|value| value.as_str()) else {
+            return;
+        };
+        let path = std::path::PathBuf::from(path);
+        let extension = path
+            .extension()
+            .and_then(|value| value.to_str())
+            .unwrap_or_default();
+        let Some(provider) = self
+            .plugin_manager
+            .provider_for(extension, &crate::plugin::Capability::Symbols)
+        else {
+            return;
+        };
+        if provider.plugin_name != name {
+            return;
+        }
+        let symbols = params
+            .get("symbols")
+            .and_then(|value| value.as_array())
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(|item| {
+                        serde_json::from_value::<crate::plugin::types::Symbol>(item.clone()).ok()
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        self.plugin_symbols.insert(path.clone(), symbols.clone());
+        self.plugin_contributions
+            .entry(name.to_string())
+            .or_default()
+            .symbol_paths
+            .insert(path.clone());
+        let cursor_line = self.display_to_physical(self.active_line);
+        if self.current_file.as_deref() == Some(path.as_path()) {
+            if let Some(palette) = &mut self.command_palette {
+                if palette.route == crate::command_palette::PaletteRoute::Symbols {
+                    let query = palette
+                        .route_symbols
+                        .as_ref()
+                        .map(|picker| picker.query.clone())
+                        .unwrap_or_default();
+                    let mut picker = crate::search::SymbolPicker::new(symbols, Some(cursor_line));
+                    for character in query.chars() {
+                        picker.push(character);
+                    }
+                    palette.route_symbols = Some(picker);
+                }
+            }
+        }
     }
 
     /// Handles a `register_commands` action: parses the command list, stores

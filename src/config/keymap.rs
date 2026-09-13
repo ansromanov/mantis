@@ -24,6 +24,8 @@
 //! bindings are matched case-insensitively (and `parse_binding` normalizes
 //! them to lowercase), so CapsLock, a held Shift, or a config written as
 //! `ctrl+P`/`ctrl+shift+p` all resolve to the same `ctrl+p` action.
+//! The content-scoped uppercase `O` binding opens the current file's symbol
+//! outline when a provider has supplied symbol ranges.
 //! The `matches` method also handles the kitty keyboard protocol's
 //! alternate-key reporting for layout-independent matching.
 //!
@@ -291,6 +293,7 @@ impl Keymap {
             "copy_file" => &self.copy_file,
             "plugin_picker" => &self.plugin_picker,
             "goto_line" => &self.goto_line,
+            "symbol_outline" => &self.symbol_outline,
             "toggle_raw_markdown" => &self.toggle_raw_markdown,
             "follow_tail" => &self.follow_tail,
             "filter_lines" => &self.filter_lines,
@@ -425,6 +428,8 @@ pub struct Keymap {
     pub copy_file: Vec<KeyBinding>,
     pub plugin_picker: Vec<KeyBinding>,
     pub goto_line: Vec<KeyBinding>,
+    /// Opens the current file's language-provider symbol outline.
+    pub symbol_outline: Vec<KeyBinding>,
     pub toggle_raw_markdown: Vec<KeyBinding>,
     pub follow_tail: Vec<KeyBinding>,
     pub filter_lines: Vec<KeyBinding>,
@@ -524,6 +529,7 @@ impl Default for Keymap {
             copy_file: bind(&["content:Y"]),
             plugin_picker: bind(&["tree:p"]),
             goto_line: bind(&["ctrl+g"]),
+            symbol_outline: bind(&["content:O"]),
             toggle_raw_markdown: bind(&["M"]),
             follow_tail: bind(&["content:F"]),
             filter_lines: bind(&["content:&"]),

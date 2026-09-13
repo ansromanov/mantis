@@ -6,10 +6,11 @@
 //! `SkimMatcherV2`, debouncing the expensive content scans. `ContentMatch`
 //! carries a hit's path, line number, and surrounding context. The same
 //! query/filtered-list/selected-index shape backs `HistoryState`, `ThemePicker`,
-//! `CommandPalette`, `RecentFilesState`, `PluginPicker`, the in-file search (`InFileSearch`),
-//! and the go-to-line dialog (`GotoLineState`), all defined here. The shared
-//! `fuzzy_refilter` helper scores and sorts any typed item list by descending fuzzy
-//! score; binary files are skipped via `is_binary_bytes`.
+//! `CommandPalette`, `RecentFilesState`, `PluginPicker`, the in-file search
+//! (`InFileSearch`), the go-to-line dialog (`GotoLineState`), and symbol outline
+//! (`SymbolPicker`), all defined here. The shared `fuzzy_refilter` helper scores
+//! and sorts typed item lists by descending fuzzy score; binary files are
+//! skipped via `is_binary_bytes`.
 
 mod history;
 mod pickers;
@@ -23,8 +24,8 @@ pub use repo_log::RepoLogState;
 #[allow(unused_imports)]
 pub use pickers::{
     BugReportFocus, BugReportState, FilterBarState, GotoLineState, InFileMatch, InFileSearch,
-    PluginPicker, RecentFilesState, RevisionItem, RevisionPicker, RevisionTab, TabPicker,
-    TabPickerItem, ThemePicker, TreeFilter, WorktreePicker,
+    PluginPicker, RecentFilesState, RevisionItem, RevisionPicker, RevisionTab, SymbolPicker,
+    TabPicker, TabPickerItem, ThemePicker, TreeFilter, WorktreePicker,
 };
 
 use std::collections::{HashMap, HashSet};

@@ -1,8 +1,9 @@
 //! Central application state: the `App` struct that ties the whole TUI together.
 //!
 //! `App` holds the file tree, content/diff buffers, every overlay's state
-//! (search, history, theme picker, plugin picker, command palette, recent files,
-//! action menu, help, about, blame, goto line), the
+//! (search, history, theme picker, plugin picker, symbol outline, command
+//! palette, recent files, action menu, help, about, blame, goto line), provider
+//! symbols and the
 //! resolved theme and keymap, and the geometry captured during the last render
 //! so mouse handlers can hit-test clicks. Construction (`App::new`) walks the
 //! root, loads git status, and opens the first file; `reload`/`tick` keep the
@@ -410,6 +411,8 @@ pub struct App {
     /// the fold-count segment, parallel to YAML's built-in anchor/alias counts
     /// but generic to any provider.
     pub plugin_status_facts: HashMap<PathBuf, String>,
+    /// Per-path symbol outlines supplied by language providers via `set_symbols`.
+    pub plugin_symbols: HashMap<PathBuf, Vec<crate::plugin::types::Symbol>>,
     /// display_line → physical_line mapping; empty when no folds are active.
     pub fold_display_map: Vec<usize>,
     /// (screen_y, region_idx) pairs recorded during the last render, used for
@@ -608,6 +611,16 @@ impl App {
         for path in &contrib.status_fact_paths {
             self.plugin_status_facts.remove(path);
         }
+        for path in &contrib.symbol_paths {
+            self.plugin_symbols.remove(path);
+        }
+        if !contrib.symbol_paths.is_empty()
+            && self.command_palette.as_ref().is_some_and(|palette| {
+                palette.route == crate::command_palette::PaletteRoute::Symbols
+            })
+        {
+            self.command_palette = None;
+        }
 
         // Icon map (Nerd Font glyphs).
         if contrib.has_icon_map {
@@ -783,6 +796,20 @@ impl App {
                 }
                 if !self.plugin_content_active {
                     return Err("not available (current file not plugin-rendered)");
+                }
+                Ok(())
+            }
+            crate::actions::Applicability::Symbols => {
+                if self.current_file.is_none() {
+                    return Err("no file is open");
+                }
+                if self
+                    .current_file
+                    .as_deref()
+                    .and_then(|path| self.plugin_symbols.get(path))
+                    .is_none_or(Vec::is_empty)
+                {
+                    return Err("no symbols in file");
                 }
                 Ok(())
             }
