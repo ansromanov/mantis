@@ -12,6 +12,10 @@ fn test_register_language_provider() {
     assert!(extensions.contains(&serde_json::json!("sh")));
     assert!(extensions.contains(&serde_json::json!("bash")));
     assert!(extensions.contains(&serde_json::json!("zsh")));
+    let shebangs = parsed["params"]["shebangs"].as_array().unwrap();
+    assert!(shebangs.contains(&serde_json::json!("bash")));
+    assert!(shebangs.contains(&serde_json::json!("sh")));
+    assert!(shebangs.contains(&serde_json::json!("zsh")));
     assert_eq!(parsed["params"]["capabilities"][0], "fold");
 }
 

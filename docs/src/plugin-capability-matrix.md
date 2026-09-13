@@ -99,9 +99,9 @@ version history in [Plugin Development](plugin-development.md) only.
    `handle_plugin_set_fold_regions`). Retiring the built-in dispatch is a
    separate follow-up (issue #603 phase 2), deferred until bundled plugins
    have a default-enabled mechanism.
-   **Known limitation:** provider routing is extension-based; extensionless
-   scripts with a `#!/bin/bash` shebang won't route to the plugin. Shebang
-   routing is a host/protocol gap (see #605).
+   Provider routing supports exact filenames, filename globs, extensions, and
+   shebang interpreters. The host reads and caches the shebang during file load;
+   filename specificity wins over extension and shebang matches (see #836).
 3. **`Capability::Highlight` is declared but routes to nothing.** Either
    implement provider-driven highlighting in v3 or re-document it as reserved
    alongside `hover`/`diagnostics`/`definition`. Not yet tracked in a

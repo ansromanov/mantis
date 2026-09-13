@@ -53,7 +53,7 @@ dynamically.
 |---|---|---|
 | `"1"` | 0.7.x | Initial protocol. Events: init, on_file_open, on_keypress, on_selection_change, on_theme_change, on_quit, shutdown. Actions: show_message, open_file, set_content, set_icon_map. Git features (set_file_statuses, set_blame_data, set_status_bar_git_info) were removed in 0.11.22 — git is now built in only. |
 | `"2"` | 0.8.x | Language providers (register_language_provider, set_fold_regions), event subscription (`events` field in manifest), protocol hardening (bounded queues, line caps), `protocol_version` field on init event. `init`/`on_theme_change` additionally carry an optional `colors` object (0.13.x, additive — does not bump this version) with the active theme's actual role colors as `#rrggbb` hex. |
-| `"3"` | 0.14.x | Request/response correlation (`request`/`response` events) so the host can ask a plugin for something and match the reply; a `plugin_error` action for reporting failures outside the request/response flow; key-consumption semantics for `on_keypress` (`key_handled` action, host waits up to one tick); `priority` field on `register_language_provider` plus a status-bar warning on conflicting registrations; manifest field renamed `tv_protocol` → `mantis_protocol` (alias kept, see above). As with every prior protocol bump, discovery requires an exact version match: a manifest still declaring `"2"` is silently skipped, not loaded in a reduced-compatibility mode — plugins must declare `"3"` (via `mantis_protocol`, or its `tv_protocol` alias) to be discovered on this host. `highlight` capability remains formally reserved and unimplemented: real syntax highlighting continues to flow through syntax plugins (`.sublime-syntax` + syntect), not language providers. A `status_facts` capability plus `set_status_facts` action (0.18.x, additive — does not bump this version) let a provider push a free-text status-bar summary for a file, gated the same way as `fold`/`set_fold_regions`; the bundled `k8s` plugin uses it to report Kubernetes resource identity and per-kind counts for `.yaml`/`.yml` files without conflicting with the `yaml` plugin's `fold` registration on the same extensions. The `on_content_cursor_change` event (0.21.x, additive — does not bump this version) sends debounced, one-based line and column coordinates to subscribers. |
+| `"3"` | 0.14.x | Request/response correlation (`request`/`response` events) so the host can ask a plugin for something and match the reply; a `plugin_error` action for reporting failures outside the request/response flow; key-consumption semantics for `on_keypress` (`key_handled` action, host waits up to one tick); `priority` field on `register_language_provider` plus a status-bar warning on conflicting registrations; manifest field renamed `tv_protocol` → `mantis_protocol` (alias kept, see above). As with every prior protocol bump, discovery requires an exact version match: a manifest still declaring `"2"` is silently skipped, not loaded in a reduced-compatibility mode — plugins must declare `"3"` (via `mantis_protocol`, or its `tv_protocol` alias) to be discovered on this host. `highlight` capability remains formally reserved and unimplemented: real syntax highlighting continues to flow through syntax plugins (`.sublime-syntax` + syntect), not language providers. A `status_facts` capability plus `set_status_facts` action (0.18.x, additive — does not bump this version) let a provider push a free-text status-bar summary for a file, gated the same way as `fold`/`set_fold_regions`; the bundled `k8s` plugin uses it to report Kubernetes resource identity and per-kind counts for `.yaml`/`.yml` files without conflicting with the `yaml` plugin's `fold` registration on the same extensions. Optional `filenames` and `shebangs` selectors for `register_language_provider` (0.21.x, additive — see #836) also do not change the protocol version. The `on_content_cursor_change` event (0.21.x, additive — does not bump this version) sends debounced, one-based line and column coordinates to subscribers. |
 
 ### Discovery
 
@@ -432,13 +432,15 @@ lifecycle:
 ### `register_language_provider`
 
 Sent by the plugin immediately after receiving `init`. Declares the file
-extensions and capabilities the plugin provides. `mantis` stores the registration
-and uses it to route the correct events and display-state updates for each open
-file.
+extensions, filenames, shebang interpreters, and capabilities the plugin
+provides. `mantis` stores the registration and uses it to route display-state
+updates for each open file.
 
 ```json
 {"event":"action","action":"register_language_provider","params":{
   "extensions": ["py", "pyi"],
+  "filenames": ["Makefile", "Dockerfile*"],
+  "shebangs": ["python3"],
   "capabilities": ["fold"],
   "priority": 10
 }}
@@ -446,12 +448,24 @@ file.
 
 Fields:
 - `extensions` — lowercase file extensions (no leading dot) this provider handles.
+- `filenames` — optional exact filenames or filename globs this provider handles.
+  Globs support `*` (any sequence) and `?` (one character); matching is
+  case-sensitive.
+- `shebangs` — optional interpreter executable names, case-insensitive, such as
+  `bash`, `sh`, or `python3`. For `env` shebangs the host skips common env flags
+  and assignments before reading the interpreter name.
 - `capabilities` — one or more of `"highlight"`, `"fold"`, `"status_facts"`, or `"symbols"`.
   Reserved for future use: `"hover"`, `"diagnostics"`, `"definition"`.
 - `priority` — optional signed integer, default `0` (protocol 3+). Used only
-  to break ties when two providers register the same extension+capability
-  pair; higher wins. Absent on protocol 2 plugins, which are treated as
-  priority `0`.
+  to break ties between providers with the same match specificity and
+  capability; higher wins. Match precedence is exact filename, filename glob,
+  extension, then shebang. Equal priority keeps the first registered provider.
+  Absent on protocol 2 plugins, which are treated as priority `0`.
+
+Shebang detection uses the first line already read by the background file loader
+and is cached with the loaded path; the UI thread does not reopen files to route
+providers. Binary files do not match shebang registrations. Conflicts on the
+same selector and capability produce a one-time status-bar warning.
 
 **On `highlight`:** it remains declared but formally reserved as of protocol
 3 — `mantis` accepts the registration and never dispatches anything for it.
@@ -464,9 +478,9 @@ styled spans over IPC per file/edit, which the syntect path already does
 locally and faster. Revisit only if a concrete plugin use case needs
 highlighting decisions syntect's grammar model can't express.
 
-After registering, `mantis` sends `on_file_open` whenever a matching file is
-opened. The plugin should respond with the appropriate action for each declared
-capability (e.g. `set_fold_regions` for `"fold"`).
+After registering, `mantis` sends `on_file_open` when a file is opened. The host
+accepts capability output only from the provider selected by the precedence and
+priority rules above (e.g. `set_fold_regions` for `"fold"`).
 
 ### `set_fold_regions`
 
@@ -477,10 +491,10 @@ inclusive). When the named file is currently open the regions are applied
 immediately; when it is not yet open they are cached and applied the next
 time the file is opened.
 
-Fold regions from a plugin are only accepted when `mantis` has a registered
-language provider with the `fold` capability for the file's extension.
-Regions from unregistered plugins or for unmatched extensions are silently
-discarded.
+Fold regions from a plugin are only accepted when that plugin wins routing for
+the file with the `fold` capability, by exact filename, filename glob,
+extension, or shebang. Regions from unregistered or non-winning plugins are
+silently discarded.
 
 ```json
 {"event":"action","action":"set_fold_regions","params":{
@@ -498,9 +512,9 @@ identity (`Deployment/nginx (default)`). Unlike `set_fold_regions`, this
 carries free text rather than a structured value, so the host does not
 interpret it beyond displaying it.
 
-Status facts from a plugin are only accepted when `mantis` has a registered
-language provider with the `status_facts` capability for the file's
-extension. An empty `text` clears any previously set fact for that path
+Status facts from a plugin are only accepted when that plugin wins routing for
+the file with the `status_facts` capability. An empty `text` clears any
+previously set fact for that path
 (useful when a provider detects the file no longer qualifies, e.g. a YAML
 file that stopped looking like a Kubernetes manifest after an edit).
 

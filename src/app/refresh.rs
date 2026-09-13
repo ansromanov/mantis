@@ -23,6 +23,8 @@
 //! Language providers can also push per-file symbol outlines with `set_symbols`;
 //! the action is capability- and priority-gated, and its paths are recorded for
 //! deterministic teardown when the provider exits or is disabled.
+//! Language-provider outputs pass through the same exact filename, glob,
+//! extension, and cached-shebang resolver used to select the winning plugin.
 
 use std::time::Duration;
 
@@ -738,6 +740,24 @@ impl App {
                     .collect()
             })
             .unwrap_or_default();
+        let filenames: Vec<String> = params
+            .get("filenames")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(str::to_string))
+                    .collect()
+            })
+            .unwrap_or_default();
+        let shebangs: Vec<String> = params
+            .get("shebangs")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(str::to_ascii_lowercase))
+                    .collect()
+            })
+            .unwrap_or_default();
         let capabilities: std::collections::HashSet<crate::plugin::Capability> = params
             .get("capabilities")
             .and_then(|v| v.as_array())
@@ -751,6 +771,8 @@ impl App {
         let reg = crate::plugin::LanguageProviderRegistration {
             plugin_name: name.to_string(),
             extensions,
+            filenames,
+            shebangs,
             capabilities,
             priority,
         };
@@ -764,16 +786,12 @@ impl App {
             Some(p) => std::path::PathBuf::from(p),
             None => return,
         };
-        // Only accept fold regions from a provider that registered the
-        // file's extension with the Fold capability.
-        let ext = path
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or_default();
+        // Only accept regions from the winning provider for this file and
+        // capability, respecting filename, extension, and shebang precedence.
         if self
             .plugin_manager
-            .provider_for(ext, &crate::plugin::Capability::Fold)
-            .is_none()
+            .provider_for_file(&path, &crate::plugin::Capability::Fold)
+            .is_none_or(|provider| provider.plugin_name != name)
         {
             return;
         }
@@ -805,22 +823,18 @@ impl App {
     /// Handles a `set_status_facts` action (protocol 3+): stores a short
     /// plugin-supplied summary string for `path`, shown in the status bar
     /// alongside the fold-count segment when `path` is the current file.
-    /// Only accepted from a provider that registered the file's extension
-    /// with the `StatusFacts` capability, mirroring `set_fold_regions`'s
+    /// Only accepted from the provider that won routing for the file and
+    /// `StatusFacts` capability, mirroring `set_fold_regions`'s
     /// capability gate.
     fn handle_plugin_set_status_facts(&mut self, name: &str, params: &serde_json::Value) {
         let path = match params.get("path").and_then(|v| v.as_str()) {
             Some(p) => std::path::PathBuf::from(p),
             None => return,
         };
-        let ext = path
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or_default();
         if self
             .plugin_manager
-            .provider_for(ext, &crate::plugin::Capability::StatusFacts)
-            .is_none()
+            .provider_for_file(&path, &crate::plugin::Capability::StatusFacts)
+            .is_none_or(|provider| provider.plugin_name != name)
         {
             return;
         }
@@ -846,13 +860,9 @@ impl App {
             return;
         };
         let path = std::path::PathBuf::from(path);
-        let extension = path
-            .extension()
-            .and_then(|value| value.to_str())
-            .unwrap_or_default();
         let Some(provider) = self
             .plugin_manager
-            .provider_for(extension, &crate::plugin::Capability::Symbols)
+            .provider_for_file(&path, &crate::plugin::Capability::Symbols)
         else {
             return;
         };

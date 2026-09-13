@@ -5,20 +5,21 @@
 //! that `App` calls on file-open, keypress, theme-change, selection-change,
 //! debounced content-cursor, and shutdown events.
 //!
-//! Protocol 3 additions: [`PluginManager::send_request`]/[`poll_requests`]
+//! Provider routing checks exact filename, filename glob, extension, and
+//! cached shebang matches in that order, using registration priority only for
+//! matches of the same specificity. [`PluginManager::send_request`]/[`poll_requests`]
 //! implement the host side of the `request`/`response` correlation (see
 //! `crate::plugin::process`), tracking outstanding requests in
 //! `pending_requests` and timing them out after [`REQUEST_TIMEOUT`] without
-//! killing the plugin. [`provider_for`] now picks the highest-`priority`
-//! registration when several providers claim the same extension +
-//! capability, and [`register_provider`] raises a one-time conflict warning
-//! the first time that happens for a given pair. A `plugin_error` action
+//! killing the plugin. [`provider_for_file`] resolves the winning capability
+//! provider, and [`register_provider`] raises a one-time warning when two
+//! plugins claim the same rule and capability. A `plugin_error` action
 //! (reported via [`record_plugin_error`]) is tracked in `last_plugin_error`,
 //! a struct parallel to the existing crash-diagnostics `last_crash` map, so
 //! it can surface in the plugin picker's badge without marking the plugin
 //! dead.
 //!
-//! [`provider_for`]: PluginManager::provider_for
+//! [`provider_for_file`]: PluginManager::provider_for_file
 //! [`register_provider`]: PluginManager::register_provider
 //! [`record_plugin_error`]: PluginManager::record_plugin_error
 //! [`poll_requests`]: PluginManager::poll_requests
@@ -84,9 +85,10 @@ pub(crate) struct PluginManager {
     active_theme: Option<String>,
     active_theme_colors: Option<ThemeColorsMsg>,
     provider_registrations: Vec<LanguageProviderRegistration>,
-    /// (extension, capability) pairs that have already produced a conflict
-    /// warning, so the status bar is only told about each conflict once.
+    /// (match rule, capability) pairs that already produced a conflict warning.
     provider_conflicts_warned: HashSet<(String, Capability)>,
+    /// Shebang interpreter cached by file load, keyed by absolute path.
+    file_shebangs: HashMap<PathBuf, String>,
     /// Counter for allocating `request` ids, incremented per outstanding
     /// request across all plugins. Never reused while a request with that id
     /// is outstanding.
@@ -113,6 +115,7 @@ impl PluginManager {
             active_theme_colors: None,
             provider_registrations: Vec::new(),
             provider_conflicts_warned: HashSet::new(),
+            file_shebangs: HashMap::new(),
             next_request_id: 0,
             pending_requests: HashMap::new(),
             request_spans: HashMap::new(),
@@ -121,8 +124,8 @@ impl PluginManager {
     }
 
     /// Registers a language provider declaration. Returns a one-time
-    /// status-bar warning string the first time this (extension, capability)
-    /// pair conflicts with another plugin's registration — `None` otherwise
+    /// status-bar warning string the first time a matching rule and capability
+    /// conflict with another plugin's registration — `None` otherwise
     /// (including on every later registration of an already-warned pair).
     pub(crate) fn register_provider(
         &mut self,
@@ -132,25 +135,24 @@ impl PluginManager {
             .retain(|r| r.plugin_name != reg.plugin_name);
 
         let mut warning = None;
-        'outer: for ext in &reg.extensions {
+        'outer: for (rule, label) in provider_rules(&reg) {
             for cap in &reg.capabilities {
-                let already_warned = self
-                    .provider_conflicts_warned
-                    .contains(&(ext.clone(), cap.clone()));
-                if already_warned {
+                let warning_key = (rule.clone(), cap.clone());
+                if self.provider_conflicts_warned.contains(&warning_key) {
                     continue;
                 }
-                let Some(existing) = self.provider_registrations.iter().find(|r| {
-                    r.plugin_name != reg.plugin_name
-                        && r.extensions.iter().any(|e| e == ext)
-                        && r.capabilities.contains(cap)
+                let Some(existing) = self.provider_registrations.iter().find(|existing| {
+                    existing.plugin_name != reg.plugin_name
+                        && existing.capabilities.contains(cap)
+                        && provider_rules(existing)
+                            .iter()
+                            .any(|(existing_rule, _)| existing_rule == &rule)
                 }) else {
                     continue;
                 };
-                self.provider_conflicts_warned
-                    .insert((ext.clone(), cap.clone()));
+                self.provider_conflicts_warned.insert(warning_key);
                 warning = Some(format!(
-                    "Plugins '{}' and '{}' both register '{}' for .{ext}; higher priority wins",
+                    "Plugins '{}' and '{}' both register '{}' for {label}; higher priority wins",
                     existing.plugin_name,
                     reg.plugin_name,
                     capability_label(cap),
@@ -167,6 +169,7 @@ impl PluginManager {
     /// (case-insensitive) and whose capabilities include `cap`, breaking ties
     /// between multiple matches by highest `priority`; equal priority keeps
     /// whichever was registered first (earliest in registration order).
+    #[cfg(test)]
     pub(crate) fn provider_for(
         &self,
         ext: &str,
@@ -182,6 +185,74 @@ impl PluginManager {
             }
         }
         best
+    }
+
+    /// Caches or clears the loader-detected interpreter for a file path.
+    pub(crate) fn cache_file_shebang(&mut self, path: &Path, shebang: Option<String>) {
+        if let Some(interpreter) = shebang {
+            self.file_shebangs
+                .insert(path.to_path_buf(), interpreter.to_ascii_lowercase());
+        } else {
+            self.file_shebangs.remove(path);
+        }
+    }
+
+    /// Returns the most specific provider for `path` and `cap`. Match
+    /// specificity precedes priority: exact filename, glob, extension, then
+    /// shebang. Registration order breaks equal-priority ties.
+    pub(crate) fn provider_for_file(
+        &self,
+        path: &Path,
+        cap: &Capability,
+    ) -> Option<&LanguageProviderRegistration> {
+        let file_name = path.file_name()?.to_str().unwrap_or_default();
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or_default();
+        let shebang = self.file_shebangs.get(path).map(String::as_str);
+        let mut best: Option<(&LanguageProviderRegistration, u8)> = None;
+        for reg in self.provider_registrations.iter().filter(|reg| {
+            reg.capabilities.contains(cap)
+                && (reg.filenames.iter().any(|name| name == file_name)
+                    || reg
+                        .filenames
+                        .iter()
+                        .any(|pattern| glob_matches(pattern, file_name))
+                    || reg
+                        .extensions
+                        .iter()
+                        .any(|candidate| !ext.is_empty() && candidate.eq_ignore_ascii_case(ext))
+                    || shebang.is_some_and(|interpreter| {
+                        reg.shebangs
+                            .iter()
+                            .any(|candidate| candidate.eq_ignore_ascii_case(interpreter))
+                    }))
+        }) {
+            let specificity = if reg.filenames.iter().any(|name| name == file_name) {
+                4
+            } else if reg
+                .filenames
+                .iter()
+                .any(|pattern| glob_matches(pattern, file_name))
+            {
+                3
+            } else if reg
+                .extensions
+                .iter()
+                .any(|candidate| !ext.is_empty() && candidate.eq_ignore_ascii_case(ext))
+            {
+                2
+            } else {
+                1
+            };
+            if best.is_none_or(|(current, rank)| {
+                specificity > rank || (specificity == rank && reg.priority > current.priority)
+            }) {
+                best = Some((reg, specificity));
+            }
+        }
+        best.map(|(reg, _)| reg)
     }
 
     /// Sends a `request` to the named running plugin, allocating a fresh id
@@ -801,6 +872,65 @@ fn plugin_error_summary(info: &PluginErrorInfo) -> String {
         Some(context) => format!("{} ({context})", info.message),
         None => info.message.clone(),
     }
+}
+
+/// Returns stable identities and display labels for a provider's conflict
+/// rules. Prefixes keep identical text in different match kinds distinct.
+fn provider_rules(reg: &LanguageProviderRegistration) -> Vec<(String, String)> {
+    let mut rules = Vec::new();
+    for filename in &reg.filenames {
+        let kind = if filename.contains('*') || filename.contains('?') {
+            "glob"
+        } else {
+            "filename"
+        };
+        rules.push((
+            format!("{kind}:{filename}"),
+            format!("filename pattern '{filename}'"),
+        ));
+    }
+    rules.extend(reg.extensions.iter().map(|ext| {
+        let ext = ext.to_ascii_lowercase();
+        (format!("extension:{ext}"), format!(".{ext}"))
+    }));
+    rules.extend(reg.shebangs.iter().map(|interpreter| {
+        let interpreter = interpreter.to_ascii_lowercase();
+        (
+            format!("shebang:{interpreter}"),
+            format!("shebang '{interpreter}'"),
+        )
+    }));
+    rules
+}
+
+/// Matches a filename against the `*` and `?` wildcards accepted in provider
+/// filename patterns. Matching is case-sensitive, like exact filename rules.
+fn glob_matches(pattern: &str, value: &str) -> bool {
+    let pattern: Vec<char> = pattern.chars().collect();
+    let value: Vec<char> = value.chars().collect();
+    let mut rows = vec![vec![false; value.len() + 1]; pattern.len() + 1];
+    rows[0][0] = true;
+    for (i, token) in pattern.iter().enumerate() {
+        match token {
+            '*' => {
+                rows[i + 1][0] = rows[i][0];
+                for j in 1..=value.len() {
+                    rows[i + 1][j] = rows[i][j] || rows[i + 1][j - 1];
+                }
+            }
+            '?' => {
+                for j in 1..=value.len() {
+                    rows[i + 1][j] = rows[i][j - 1];
+                }
+            }
+            literal => {
+                for j in 1..=value.len() {
+                    rows[i + 1][j] = rows[i][j - 1] && *literal == value[j - 1];
+                }
+            }
+        }
+    }
+    rows[pattern.len()][value.len()]
 }
 
 /// Human-readable label for a capability, used in the provider-conflict

@@ -14,6 +14,10 @@
 //!
 //! `compute_diff_load` accepts a [`crate::app::DiffMode`] parameter to choose
 //! between all-changes, staged, and unstaged diff variants.
+//!
+//! `compute_file_load` also parses a bounded first-line shebang from the bytes
+//! already read on this worker. The cached interpreter name lets provider
+//! routing support extensionless scripts without disk reads in the UI thread.
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -72,6 +76,9 @@ pub(super) struct FileLoad {
     /// `None` for plain text or when syntect has no match. Populated by the
     /// worker thread so the main thread never calls `find_syntax_for_file`.
     pub syntax_name: Option<String>,
+    /// Interpreter name parsed from the first line's shebang, when present.
+    /// Detected from the bytes already read by this worker-thread load.
+    pub shebang: Option<String>,
     pub secret_original: Vec<String>,
     pub secret_masked: bool,
     /// Decoded image for inline rendering, when the file is an image and the
@@ -124,6 +131,7 @@ impl FileLoad {
             encoding: None,
             line_ending: None,
             syntax_name: None,
+            shebang: None,
             secret_original: Vec::new(),
             secret_masked: false,
             image: None,
@@ -194,6 +202,7 @@ pub(super) fn compute_file_load(
                 load.encoding = Some(detect_encoding_prefix(raw).unwrap_or("UTF-8").to_string());
                 load.line_ending = detect_line_ending(raw).map(|s| s.to_string());
                 load.syntax_name = hl.syntax_name(path);
+                load.shebang = parse_shebang(raw);
                 load.virtual_file = Some(vf);
                 load.prettify_size_limit_exceeded = too_large;
                 return load;
@@ -218,6 +227,7 @@ pub(super) fn compute_file_load(
         load.image = decode_inline_image(path, &bytes);
         return load;
     }
+    load.shebang = parse_shebang(&bytes);
     // Detect line endings and BOM/ASCII classification before consuming bytes.
     // Full UTF-8 validity is confirmed by String::from_utf8 below, avoiding a
     // double validation pass.
@@ -312,6 +322,61 @@ pub(super) fn compute_file_load(
         }
     }
     load
+}
+
+/// Extracts the interpreter executable name from a UTF-8 shebang line.
+/// `env` options and assignments are skipped so both `#!/bin/bash` and
+/// `#!/usr/bin/env -S python3 -u` route as expected.
+pub(super) fn parse_shebang(bytes: &[u8]) -> Option<String> {
+    let first_line_end = bytes
+        .iter()
+        .position(|byte| *byte == b'\n')
+        .unwrap_or(bytes.len());
+    if first_line_end > 4096 {
+        return None;
+    }
+    let first_line = bytes.get(..first_line_end)?;
+    if first_line.contains(&0) {
+        return None;
+    }
+    let mut line = std::str::from_utf8(first_line).ok()?.trim_end_matches('\r');
+    line = line.strip_prefix("#!")?.trim_start();
+    let mut tokens = line.split_whitespace();
+    let executable = tokens.next()?;
+    let mut interpreter = Path::new(executable).file_name()?.to_str()?;
+    if interpreter.eq_ignore_ascii_case("env") {
+        let mut remaining = tokens.peekable();
+        let mut found_interpreter = None;
+        while let Some(token) = remaining.next() {
+            if token == "-S" || token == "--split-string" {
+                found_interpreter = remaining.next();
+                break;
+            }
+            if token == "--" {
+                found_interpreter = remaining.next();
+                break;
+            }
+            if token == "-i" || token == "--ignore-environment" {
+                continue;
+            }
+            if token == "-u" || token == "--unset" || token == "-C" || token == "--chdir" {
+                remaining.next()?;
+                continue;
+            }
+            if token.starts_with('-') || token.contains('=') {
+                continue;
+            }
+            found_interpreter = Some(token);
+            break;
+        }
+        interpreter = found_interpreter?.trim_matches(|ch| ch == '\'' || ch == '"');
+    }
+    let interpreter = Path::new(interpreter).file_name()?.to_str()?;
+    if interpreter.is_empty() {
+        None
+    } else {
+        Some(interpreter.to_ascii_lowercase())
+    }
 }
 
 /// Returns the first YAML parse error across all documents in a YAML stream.
