@@ -43,7 +43,7 @@ pub struct ActionSpec {
 /// Canonical action groups shared by help, the command palette, and the menu bar.
 /// Add a new group here before using it in an action.
 pub const ACTION_CATEGORIES: &[&str] = &[
-    "General", "View", "Git", "Copy", "Navigate", "Tree", "Tabs", "Safety",
+    "General", "View", "Git", "Copy", "Navigate", "Tree", "Tabs", "Safety", "Plugins",
 ];
 
 /// The canonical action registry. Add a new bound action here first, then
@@ -207,8 +207,8 @@ pub static ACTIONS: &[ActionSpec] = &[
         id: "plugin_picker",
         palette: Some("Open plugin manager"),
         help: Some("plugin manager"),
-        category: "View",
-        menu: Some(1),
+        category: "Plugins",
+        menu: Some(0),
         description: Some("Manage installed plugins"),
     },
     ActionSpec {

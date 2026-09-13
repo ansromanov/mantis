@@ -393,3 +393,77 @@ fn plugin_contributions_tracks_command_ids() {
     contrib.command_ids.insert("demo.hello".to_string());
     assert!(contrib.command_ids.contains("demo.hello"));
 }
+
+#[test]
+fn context_item_target_kind_as_str_and_serde() {
+    for (kind, expected) in [
+        (ContextItemTargetKind::TreeFile, "tree_file"),
+        (ContextItemTargetKind::TreeDir, "tree_dir"),
+        (ContextItemTargetKind::Content, "content"),
+        (ContextItemTargetKind::Tab, "tab"),
+        (ContextItemTargetKind::Blame, "blame"),
+    ] {
+        assert_eq!(kind.as_str(), expected);
+        let json = serde_json::to_string(&kind).unwrap();
+        assert_eq!(json, format!("\"{expected}\""));
+        let de: ContextItemTargetKind = serde_json::from_str(&json).unwrap();
+        assert_eq!(de, kind);
+    }
+}
+
+#[test]
+fn plugin_context_item_deserializes_with_defaults() {
+    let json = r#"{"id":"test.action","label":"Test Action","target":"content"}"#;
+    let item: PluginContextItem = serde_json::from_str(json).unwrap();
+    assert_eq!(item.id, "test.action");
+    assert_eq!(item.label, "Test Action");
+    assert_eq!(item.target, ContextItemTargetKind::Content);
+    assert!(item.extensions.is_none());
+    assert!(item.category.is_none());
+    assert!(item.weight.is_none());
+
+    let full_json = r#"{
+        "id":"test.git",
+        "label":"Git Action",
+        "target":"tree_file",
+        "extensions":["rs","toml"],
+        "category":"Tools",
+        "weight":5
+    }"#;
+    let full_item: PluginContextItem = serde_json::from_str(full_json).unwrap();
+    assert_eq!(full_item.target, ContextItemTargetKind::TreeFile);
+    assert_eq!(full_item.extensions, Some(vec!["rs".into(), "toml".into()]));
+    assert_eq!(full_item.category.as_deref(), Some("Tools"));
+    assert_eq!(full_item.weight, Some(5));
+}
+
+#[test]
+fn plugin_status_segment_deserializes_with_defaults() {
+    let json = r#"{"id":"test.stat","text":"Status Info"}"#;
+    let seg: PluginStatusSegment = serde_json::from_str(json).unwrap();
+    assert_eq!(seg.id, "test.stat");
+    assert_eq!(seg.text, "Status Info");
+    assert!(seg.priority.is_none());
+    assert!(seg.side.is_none());
+
+    let full_json = r#"{
+        "id":"test.right",
+        "text":"R Info",
+        "priority":4,
+        "side":"right"
+    }"#;
+    let full_seg: PluginStatusSegment = serde_json::from_str(full_json).unwrap();
+    assert_eq!(full_seg.priority, Some(4));
+    assert_eq!(full_seg.side, Some(StatusSidePreference::Right));
+}
+
+#[test]
+fn plugin_contributions_tracks_context_and_status_ids() {
+    let mut contrib = PluginContributions::default();
+    assert!(contrib.context_item_ids.is_empty());
+    assert!(contrib.status_segment_ids.is_empty());
+    contrib.context_item_ids.insert("my_action".to_string());
+    contrib.status_segment_ids.insert("my_status".to_string());
+    assert!(contrib.context_item_ids.contains("my_action"));
+    assert!(contrib.status_segment_ids.contains("my_status"));
+}

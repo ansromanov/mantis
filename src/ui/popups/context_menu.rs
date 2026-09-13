@@ -38,7 +38,8 @@ pub(crate) fn draw_context_menu(f: &mut Frame, app: &mut App, area: Rect) {
         .visible_entries()
         .iter()
         .map(|entry| match entry {
-            ContextMenuEntry::Action { label, .. } => {
+            ContextMenuEntry::Action { label, .. }
+            | ContextMenuEntry::PluginAction { label, .. } => {
                 ListItem::new(Line::from(Span::raw(label.clone())))
             }
             ContextMenuEntry::Separator => ListItem::new(Line::from(Span::styled(

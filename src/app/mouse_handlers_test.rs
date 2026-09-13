@@ -881,7 +881,8 @@ fn right_click_on_directory_row_opens_tree_menu() {
         .entries
         .iter()
         .filter_map(|e| match e {
-            crate::app::ContextMenuEntry::Action { label, .. } => Some(label.as_str()),
+            crate::app::ContextMenuEntry::Action { label, .. }
+            | crate::app::ContextMenuEntry::PluginAction { label, .. } => Some(label.as_str()),
             crate::app::ContextMenuEntry::Separator => None,
             crate::app::ContextMenuEntry::Submenu { label, .. } => Some(label.as_str()),
         })

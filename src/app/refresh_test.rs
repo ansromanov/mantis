@@ -2441,3 +2441,156 @@ fn log_auto_follow_scrolls_to_bottom_on_grow() {
     assert_eq!(app.line_count(), 3);
     assert_eq!(app.active_line, 2);
 }
+
+#[test]
+fn register_context_items_success_and_capping() {
+    let mut app = create_base_app();
+    let valid_items = serde_json::json!({
+        "items": [
+            {
+                "id": "item1",
+                "label": "Item 1",
+                "target": "content"
+            },
+            {
+                "id": "item2",
+                "label": "A very very very long label that definitely exceeds forty characters limit",
+                "target": "tree_file",
+                "extensions": [".RS", "TOML"],
+                "category": "This is also a very very long category name that exceeds forty characters",
+                "weight": 5
+            }
+        ]
+    });
+    app.drain_plugin_actions_for_test("demo", "register_context_items", valid_items);
+    let items = app.plugin_manager.all_context_items();
+    assert_eq!(items.len(), 2);
+    assert_eq!(items[0].1.id, "item1");
+    assert_eq!(items[1].1.id, "item2");
+    assert_eq!(items[1].1.label.chars().count(), 40);
+    assert_eq!(items[1].1.category.as_ref().unwrap().chars().count(), 40);
+    assert_eq!(
+        items[1].1.extensions,
+        Some(vec!["rs".into(), "toml".into()])
+    );
+
+    // Capping at 16: sending 17 items must fail with plugin_error
+    let mut too_many = Vec::new();
+    for i in 0..17 {
+        too_many.push(serde_json::json!({
+            "id": format!("id_{i}"),
+            "label": format!("Label {i}"),
+            "target": "content"
+        }));
+    }
+    app.drain_plugin_actions_for_test(
+        "demo",
+        "register_context_items",
+        serde_json::json!({ "items": too_many }),
+    );
+    assert!(app.plugin_error.is_some());
+    assert!(app
+        .plugin_error
+        .as_ref()
+        .unwrap()
+        .contains("exceeded maximum item count"));
+
+    // Empty items clears registrations
+    app.drain_plugin_actions_for_test(
+        "demo",
+        "register_context_items",
+        serde_json::json!({ "items": [] }),
+    );
+    assert!(app.plugin_manager.all_context_items().is_empty());
+}
+
+#[test]
+fn register_status_segments_success_and_capping() {
+    let mut app = create_base_app();
+    let valid_segs = serde_json::json!({
+        "segments": [
+            {
+                "id": "status1",
+                "text": "Status 1",
+                "priority": 2,
+                "side": "left"
+            },
+            {
+                "id": "status2",
+                "text": "Extremely long status text that goes way beyond forty characters",
+                "priority": 99,
+                "side": "right"
+            }
+        ]
+    });
+    app.drain_plugin_actions_for_test("demo", "register_status_segments", valid_segs);
+    let segs = app.plugin_manager.all_status_segments();
+    assert_eq!(segs.len(), 2);
+    assert_eq!(segs[0].1.id, "status1");
+    assert_eq!(segs[1].1.text.chars().count(), 40);
+    assert_eq!(segs[1].1.priority, Some(5)); // clamped to 1..=5
+
+    // Capping at 8: sending 9 segments must fail with plugin_error
+    let mut too_many = Vec::new();
+    for i in 0..9 {
+        too_many.push(serde_json::json!({
+            "id": format!("seg_{i}"),
+            "text": format!("Text {i}")
+        }));
+    }
+    app.drain_plugin_actions_for_test(
+        "demo",
+        "register_status_segments",
+        serde_json::json!({ "segments": too_many }),
+    );
+    assert!(app.plugin_error.is_some());
+    assert!(app
+        .plugin_error
+        .as_ref()
+        .unwrap()
+        .contains("exceeded maximum segment count"));
+}
+
+#[test]
+fn teardown_clears_context_items_and_status_segments() {
+    let mut app = create_base_app();
+    app.drain_plugin_actions_for_test(
+        "demo",
+        "register_context_items",
+        serde_json::json!({
+            "items": [
+                {
+                    "id": "item1",
+                    "label": "Item",
+                    "target": "content"
+                }
+            ]
+        }),
+    );
+    app.drain_plugin_actions_for_test(
+        "demo",
+        "register_status_segments",
+        serde_json::json!({
+            "segments": [
+                {
+                    "id": "seg1",
+                    "text": "Segment"
+                }
+            ]
+        }),
+    );
+    assert_eq!(app.plugin_manager.all_context_items().len(), 1);
+    assert_eq!(app.plugin_manager.all_status_segments().len(), 1);
+
+    // Open context menu to verify it closes on teardown
+    app.open_content_context_menu((10, 10));
+    assert!(app.context_menu.is_some());
+
+    app.teardown_plugin_contributions("demo");
+    assert!(app.plugin_manager.all_context_items().is_empty());
+    assert!(app.plugin_manager.all_status_segments().is_empty());
+    assert!(
+        app.context_menu.is_none(),
+        "context menu should close on teardown"
+    );
+}

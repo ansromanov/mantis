@@ -102,10 +102,13 @@ Plugins receive lifecycle and hook events from `mantis` and can respond with
 | `set_fold_regions` | Provides fold regions for a file |
 | `set_status_facts` | Provides a short status-bar summary for a file |
 | `set_symbols` | Provides a file's outline symbols for navigation |
-| `register_commands` | Adds commands to the Ctrl-P command palette |
+| `register_commands` | Adds commands to the Ctrl-P command palette and Plugins menu |
+| `register_context_items` | Contributes items to context menus (tree, content, tabs, blame) |
+| `register_status_segments` | Contributes persistent segments to the status bar |
 
 Each action has specific parameters; see [Plugin Development](plugin-development.md)
-for the full protocol reference.
+for the full protocol reference. Plugin commands also appear under the **Plugins**
+dropdown in the menu bar.
 
 ## Protocol version
 

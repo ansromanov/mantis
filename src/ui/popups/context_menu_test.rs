@@ -124,3 +124,22 @@ fn draw_context_menu_records_hit_area() {
     assert_ne!(area.width, 0, "render must record the popup hit area");
     assert_eq!(area.height, 3 + 2, "hit area must match the popup height");
 }
+
+#[test]
+fn draw_context_menu_renders_plugin_action() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    app.context_menu = Some(menu(vec![ContextMenuEntry::PluginAction {
+        plugin: "formatter".to_string(),
+        id: "format".to_string(),
+        label: "Format file".to_string(),
+    }]));
+    let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+    terminal
+        .draw(|f| draw_context_menu(f, &mut app, Rect::new(0, 0, 80, 24)))
+        .unwrap();
+
+    let area = app.context_menu_area;
+    assert_ne!(area.width, 0);
+    assert_eq!(area.height, 1 + 2);
+}

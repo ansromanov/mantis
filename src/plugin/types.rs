@@ -287,6 +287,79 @@ pub struct PluginCommand {
     pub description: Option<String>,
 }
 
+/// Target kinds for plugin-contributed context-menu items.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum ContextItemTargetKind {
+    /// A file row in the file tree.
+    TreeFile,
+    /// A directory row in the file tree.
+    TreeDir,
+    /// The active content editor / viewer pane.
+    Content,
+    /// A workspace tab in the tab bar.
+    Tab,
+    /// A git blame annotation row.
+    Blame,
+}
+
+impl ContextItemTargetKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::TreeFile => "tree_file",
+            Self::TreeDir => "tree_dir",
+            Self::Content => "content",
+            Self::Tab => "tab",
+            Self::Blame => "blame",
+        }
+    }
+}
+
+/// A context-menu item contributed by a plugin.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct PluginContextItem {
+    /// Stable identifier dispatched back to the plugin on selection.
+    pub id: String,
+    /// Display label shown in the context menu.
+    pub label: String,
+    /// Target kind where this menu item should appear.
+    pub target: ContextItemTargetKind,
+    /// Optional file extensions (e.g. `["rs", "toml"]`) this item matches.
+    #[serde(default)]
+    pub extensions: Option<Vec<String>>,
+    /// Optional submenu category label for grouping.
+    #[serde(default)]
+    pub category: Option<String>,
+    /// Optional ordering weight (lower appears earlier).
+    #[serde(default)]
+    pub weight: Option<i32>,
+}
+
+/// Which side of the status bar a plugin segment prefers.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum StatusSidePreference {
+    #[default]
+    Left,
+    Right,
+}
+
+/// A status-bar segment contributed by a plugin.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct PluginStatusSegment {
+    /// Stable identifier used for allowlist and `[statusbar.colors]`.
+    pub id: String,
+    /// Display text shown in the status bar.
+    pub text: String,
+    /// Elision ladder priority: 1 (dropped first) to 5 (always kept).
+    /// Defaults to 2 (`P_INFO`).
+    #[serde(default)]
+    pub priority: Option<u8>,
+    /// Side preference (`left` or `right`). Defaults to `left`.
+    #[serde(default)]
+    pub side: Option<StatusSidePreference>,
+}
+
 /// Tracks what application state a plugin has contributed so that disabling
 /// or crashing the plugin tears down exactly its output without affecting
 /// other plugins' state. One entry per running plugin.
@@ -310,4 +383,8 @@ pub(crate) struct PluginContributions {
     pub(crate) has_icon_map: bool,
     /// Command IDs registered by this plugin via `register_commands`.
     pub(crate) command_ids: HashSet<String>,
+    /// Context item IDs registered by this plugin via `register_context_items`.
+    pub(crate) context_item_ids: HashSet<String>,
+    /// Status segment IDs registered by this plugin via `register_status_segments`.
+    pub(crate) status_segment_ids: HashSet<String>,
 }

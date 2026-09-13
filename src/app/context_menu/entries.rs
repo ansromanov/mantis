@@ -12,12 +12,16 @@
 use std::path::Path;
 
 use crate::app::{App, ContextActionId, ContextMenuEntry};
+use crate::plugin::{ContextItemTargetKind, PluginContextItem};
 
 /// Returns the action id of an entry when it is a selectable action row.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn entry_action_id(entry: &ContextMenuEntry) -> Option<ContextActionId> {
     match entry {
         ContextMenuEntry::Action { id, .. } => Some(*id),
-        ContextMenuEntry::Separator | ContextMenuEntry::Submenu { .. } => None,
+        ContextMenuEntry::PluginAction { .. }
+        | ContextMenuEntry::Separator
+        | ContextMenuEntry::Submenu { .. } => None,
     }
 }
 
@@ -142,6 +146,12 @@ pub(super) fn tree_entries(
         id: ContextActionId::CollapseAll,
         label: "Collapse all".to_string(),
     });
+    let target_kind = if is_dir {
+        ContextItemTargetKind::TreeDir
+    } else {
+        ContextItemTargetKind::TreeFile
+    };
+    append_plugin_entries(app, &mut entries, target_kind, Some(path));
     entries
 }
 
@@ -248,16 +258,24 @@ pub(super) fn content_entries(app: &App) -> Vec<ContextMenuEntry> {
             label: "Reveal in file manager".to_string(),
         });
     }
+    append_plugin_entries(
+        app,
+        &mut entries,
+        ContextItemTargetKind::Content,
+        app.current_file.as_deref(),
+    );
     entries
 }
 
-pub(super) fn tab_entries() -> Vec<ContextMenuEntry> {
-    vec![
+pub(super) fn tab_entries(app: &App, root: Option<&Path>) -> Vec<ContextMenuEntry> {
+    let mut entries = vec![
         action(ContextActionId::CloseOtherTabs, "Close other tabs"),
         action(ContextActionId::CloseTabsToRight, "Close tabs to the right"),
         action(ContextActionId::DuplicateTab, "Duplicate tab"),
         action(ContextActionId::RevealRoot, "Reveal root in file manager"),
-    ]
+    ];
+    append_plugin_entries(app, &mut entries, ContextItemTargetKind::Tab, root);
+    entries
 }
 
 pub(super) fn breadcrumb_entries() -> Vec<ContextMenuEntry> {
@@ -272,12 +290,91 @@ pub(super) fn breadcrumb_entries() -> Vec<ContextMenuEntry> {
     ]
 }
 
-pub(super) fn blame_entries() -> Vec<ContextMenuEntry> {
-    vec![
+pub(super) fn blame_entries(app: &App, path: Option<&Path>) -> Vec<ContextMenuEntry> {
+    let mut entries = vec![
         action(ContextActionId::OpenBlameCommit, "Open commit"),
         action(ContextActionId::CopyBlameHash, "Copy commit hash"),
         action(ContextActionId::CopyBlameAuthor, "Copy author"),
-    ]
+    ];
+    append_plugin_entries(app, &mut entries, ContextItemTargetKind::Blame, path);
+    entries
+}
+
+fn append_plugin_entries(
+    app: &App,
+    entries: &mut Vec<ContextMenuEntry>,
+    target_kind: ContextItemTargetKind,
+    target_path: Option<&Path>,
+) {
+    let mut matching: Vec<(&str, &PluginContextItem)> = app
+        .plugin_manager
+        .all_context_items()
+        .into_iter()
+        .filter(|(_, item)| item.target == target_kind)
+        .filter(|(_, item)| {
+            if let Some(exts) = &item.extensions {
+                if exts.is_empty() {
+                    return true;
+                }
+                let Some(path) = target_path else {
+                    return false;
+                };
+                let Some(ext) = path.extension().and_then(|e| e.to_str()) else {
+                    return false;
+                };
+                let ext_clean = ext.to_ascii_lowercase();
+                exts.iter().any(|target_ext| {
+                    let target_clean = target_ext.trim_start_matches('.').to_ascii_lowercase();
+                    target_clean == ext_clean
+                })
+            } else {
+                true
+            }
+        })
+        .collect();
+
+    if matching.is_empty() {
+        return;
+    }
+
+    matching.sort_by(|(_, a), (_, b)| {
+        a.weight
+            .unwrap_or(0)
+            .cmp(&b.weight.unwrap_or(0))
+            .then_with(|| a.label.cmp(&b.label))
+    });
+
+    if !entries.is_empty() {
+        entries.push(ContextMenuEntry::Separator);
+    }
+
+    let mut uncategorized = Vec::new();
+    let mut category_groups: Vec<(String, Vec<ContextMenuEntry>)> = Vec::new();
+
+    for (plugin_name, item) in matching {
+        let entry = ContextMenuEntry::PluginAction {
+            plugin: plugin_name.to_string(),
+            id: item.id.clone(),
+            label: item.label.clone(),
+        };
+        if let Some(cat) = &item.category {
+            if let Some((_, group)) = category_groups.iter_mut().find(|(c, _)| c == cat) {
+                group.push(entry);
+            } else {
+                category_groups.push((cat.clone(), vec![entry]));
+            }
+        } else {
+            uncategorized.push(entry);
+        }
+    }
+
+    for (cat, group) in category_groups {
+        entries.push(ContextMenuEntry::Submenu {
+            label: cat,
+            entries: group,
+        });
+    }
+    entries.extend(uncategorized);
 }
 
 pub(super) fn hunk_entries() -> Vec<ContextMenuEntry> {

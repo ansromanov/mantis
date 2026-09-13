@@ -43,7 +43,8 @@ fn action_labels(menu: &crate::app::ContextMenuState) -> Vec<String> {
     menu.entries
         .iter()
         .filter_map(|e| match e {
-            ContextMenuEntry::Action { label, .. } => Some(label.clone()),
+            ContextMenuEntry::Action { label, .. }
+            | ContextMenuEntry::PluginAction { label, .. } => Some(label.clone()),
             ContextMenuEntry::Separator => None,
             ContextMenuEntry::Submenu { label, .. } => Some(label.clone()),
         })
@@ -53,7 +54,9 @@ fn action_labels(menu: &crate::app::ContextMenuState) -> Vec<String> {
 fn entry_id(menu: &crate::app::ContextMenuState, index: usize) -> Option<ContextActionId> {
     match menu.entries.get(index)? {
         ContextMenuEntry::Action { id, .. } => Some(*id),
-        ContextMenuEntry::Separator | ContextMenuEntry::Submenu { .. } => None,
+        ContextMenuEntry::PluginAction { .. }
+        | ContextMenuEntry::Separator
+        | ContextMenuEntry::Submenu { .. } => None,
     }
 }
 
@@ -899,5 +902,32 @@ fn statusbar_menu_selects_picker_group_by_clicked_side() {
     let labels = action_labels(app.context_menu.as_ref().unwrap());
     assert!(labels.contains(&"Open repository history".to_string()));
     assert!(labels.contains(&"Open worktree picker".to_string()));
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn context_menu_includes_plugin_contributed_items() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let file_idx = app
+        .nodes
+        .iter()
+        .position(|n| n.path == root.join("a.txt"))
+        .expect("a.txt must be in the tree");
+    app.plugin_manager.register_context_items(
+        "my-plugin",
+        vec![crate::plugin::PluginContextItem {
+            id: "run-linter".to_string(),
+            label: "Run Linter".to_string(),
+            target: crate::plugin::ContextItemTargetKind::TreeFile,
+            category: None,
+            extensions: Some(vec!["txt".to_string()]),
+            weight: Some(10),
+        }],
+    );
+    app.open_tree_context_menu(file_idx, (10, 10));
+    let menu = app.context_menu.expect("menu must open");
+    let labels = action_labels(&menu);
+    assert!(labels.contains(&"Run Linter".to_string()));
     fs::remove_dir_all(&root).ok();
 }

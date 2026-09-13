@@ -18,7 +18,7 @@ use crate::app::{
 };
 use crate::config::static_keys;
 
-use super::entries::{entry_action_id, markdown_code_fence};
+use super::entries::markdown_code_fence;
 
 impl App {
     /// The path the open menu's target refers to, if any.
@@ -58,14 +58,14 @@ impl App {
                     .unwrap_or(*index);
                 let i = i.min(self.nodes.len().saturating_sub(1));
                 self.tree_selected = i;
+                self.focus = Focus::Tree;
                 true
             }
         }
     }
 
-    /// Moves the highlighted action by `delta` rows, skipping separators and
-    /// clamping at both ends of the menu.
-    fn move_context_selection(&mut self, delta: isize) {
+    /// Moves the context-menu selection by `delta` rows, skipping separators.
+    pub(super) fn move_context_selection(&mut self, delta: isize) {
         let Some(menu) = self.context_menu.as_mut() else {
             return;
         };
@@ -87,7 +87,11 @@ impl App {
         if next < n
             && matches!(
                 menu.visible_entries().get(next),
-                Some(ContextMenuEntry::Action { .. } | ContextMenuEntry::Submenu { .. })
+                Some(
+                    ContextMenuEntry::Action { .. }
+                        | ContextMenuEntry::PluginAction { .. }
+                        | ContextMenuEntry::Submenu { .. }
+                )
             )
         {
             menu.set_visible_selected(next);
@@ -133,7 +137,7 @@ impl App {
     }
 
     /// Handles mouse input while the context menu is open: a left click on an
-    /// action row runs it, a left click anywhere else dismisses the menu, and
+    /// action runs it, a left click anywhere else dismisses the menu, and
     /// the scroll wheel navigates.
     pub(crate) fn handle_context_menu_mouse(&mut self, ev: MouseEvent) {
         match ev.kind {
@@ -166,8 +170,18 @@ impl App {
                     }
                     return;
                 }
-                if let Some(id) = menu.visible_entries().get(rel).and_then(entry_action_id) {
-                    self.execute_context_action(id);
+                if let Some(entry) = menu.visible_entries().get(rel) {
+                    match entry {
+                        ContextMenuEntry::Action { id, .. } => {
+                            self.execute_context_action(*id);
+                        }
+                        ContextMenuEntry::PluginAction { plugin, id, .. } => {
+                            let plugin = plugin.clone();
+                            let id = id.clone();
+                            self.execute_plugin_context_action(&plugin, &id);
+                        }
+                        ContextMenuEntry::Submenu { .. } | ContextMenuEntry::Separator => {}
+                    }
                 }
             }
             MouseEventKind::Down(MouseButton::Right) => {
@@ -188,6 +202,9 @@ impl App {
             .and_then(|menu| menu.visible_entries().get(menu.visible_selected()).cloned());
         match selected_entry {
             Some(ContextMenuEntry::Action { id, .. }) => self.execute_context_action(id),
+            Some(ContextMenuEntry::PluginAction { plugin, id, .. }) => {
+                self.execute_plugin_context_action(&plugin, &id);
+            }
             Some(ContextMenuEntry::Submenu { entries, .. }) => {
                 if let Some(menu) = self.context_menu.as_mut() {
                     menu.push_submenu(entries);
@@ -209,6 +226,42 @@ impl App {
                 menu.push_submenu(entries);
             }
         }
+    }
+
+    /// Runs a plugin context-menu action against the menu's target and closes
+    /// the menu. Dispatches a `command` event carrying `id` and target information
+    /// to the plugin.
+    pub(crate) fn execute_plugin_context_action(&mut self, plugin: &str, id: &str) {
+        self.telemetry
+            .record(crate::telemetry::TelemetryEvent::ActionInvoked {
+                action: "context_menu_action",
+                source: crate::telemetry::ActionSource::Mouse,
+            });
+        let target_kind = match &self.context_menu.as_ref().map(|m| &m.target) {
+            Some(ContextMenuTarget::Tree { path, .. }) => {
+                if path.is_dir() {
+                    crate::plugin::ContextItemTargetKind::TreeDir
+                } else {
+                    crate::plugin::ContextItemTargetKind::TreeFile
+                }
+            }
+            Some(ContextMenuTarget::Content) => crate::plugin::ContextItemTargetKind::Content,
+            Some(ContextMenuTarget::Tab { .. }) => crate::plugin::ContextItemTargetKind::Tab,
+            Some(ContextMenuTarget::Blame { .. }) => crate::plugin::ContextItemTargetKind::Blame,
+            _ => crate::plugin::ContextItemTargetKind::Content,
+        };
+        let path = self
+            .context_target_path()
+            .map(|p| p.to_string_lossy().to_string());
+        let line = match &self.context_menu.as_ref().map(|m| &m.target) {
+            Some(ContextMenuTarget::Content) => Some(self.display_to_physical(self.active_line)),
+            Some(ContextMenuTarget::Blame { line, .. }) => Some(*line),
+            _ => None,
+        };
+        self.select_context_tree_target();
+        self.plugin_manager
+            .send_context_menu_event(plugin, id, target_kind.as_str(), path, line);
+        self.close_context_menu();
     }
 
     /// Runs a chosen context-menu action against the menu's target and closes

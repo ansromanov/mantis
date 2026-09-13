@@ -15,14 +15,16 @@ use crate::telemetry::ActionSource;
 
 use super::{rect_contains, App};
 
+use std::borrow::Cow;
+
 /// Menu groups in their stable left-to-right order.
 pub(crate) use crate::actions::ACTION_CATEGORIES as MENUS;
 
 /// One action row projected from the registry for rendering and dispatch.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct MenuAction {
-    pub id: &'static str,
-    pub label: &'static str,
+    pub id: Cow<'static, str>,
+    pub label: Cow<'static, str>,
     pub binding: String,
     pub applicable: bool,
 }
@@ -48,8 +50,8 @@ pub(crate) fn menu_actions(app: &App, menu: &str) -> Vec<MenuAction> {
             Some((
                 order,
                 MenuAction {
-                    id: action.id,
-                    label,
+                    id: Cow::Borrowed(action.id),
+                    label: Cow::Borrowed(label),
                     binding: if binding.is_empty() {
                         "-".to_string()
                     } else {
@@ -61,7 +63,18 @@ pub(crate) fn menu_actions(app: &App, menu: &str) -> Vec<MenuAction> {
         })
         .collect();
     actions.sort_by_key(|(order, _)| *order);
-    actions.into_iter().map(|(_, action)| action).collect()
+    let mut result: Vec<MenuAction> = actions.into_iter().map(|(_, action)| action).collect();
+    if menu == "Plugins" {
+        for cmd in app.plugin_manager.all_plugin_commands() {
+            result.push(MenuAction {
+                id: Cow::Owned(cmd.id.clone()),
+                label: Cow::Owned(cmd.name.clone()),
+                binding: "-".to_string(),
+                applicable: true,
+            });
+        }
+    }
+    result
 }
 
 /// Top row index needed to keep a selected action visible in a short dropdown.
@@ -110,9 +123,9 @@ impl App {
             KeyCode::Enter => {
                 if let Some(item) = menu_actions(self, MENUS[state.menu_index]).get(state.selected)
                 {
-                    let id = item.id;
+                    let id = item.id.clone();
                     self.menu_bar_state = None;
-                    self.dispatch_action_id(id, ActionSource::Menu);
+                    self.dispatch_action_id(&id, ActionSource::Menu);
                     return;
                 }
             }
@@ -197,9 +210,9 @@ impl App {
                 let row = dropdown_scroll_offset(state.selected, visible_rows)
                     + event.row.saturating_sub(self.menu_dropdown_area.y + 1) as usize;
                 if let Some(item) = menu_actions(self, MENUS[state.menu_index]).get(row) {
-                    let id = item.id;
+                    let id = item.id.clone();
                     self.menu_bar_state = None;
-                    self.dispatch_action_id(id, ActionSource::Mouse);
+                    self.dispatch_action_id(&id, ActionSource::Mouse);
                 }
                 return;
             }
