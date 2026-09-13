@@ -67,6 +67,7 @@ pub(crate) mod menu_bar;
 mod mouse_handlers;
 mod navigation;
 mod pager;
+mod plugin_content;
 mod plugin_ops;
 mod refresh;
 mod types;
@@ -492,6 +493,10 @@ pub struct App {
     /// Stored separately because `plugin_content` holds styled spans whose text
     /// would require joining on every access.
     pub plugin_content_text: HashMap<PathBuf, Vec<String>>,
+    /// Active or recently completed streamed plugin content, keyed by file path.
+    /// The owner is retained for contribution teardown; the stream keeps its
+    /// content id and reports whether delivery is active or incomplete.
+    pub(crate) plugin_content_streams: HashMap<PathBuf, (String, crate::plugin::ContentStream)>,
     /// Remembered cursor position per file (active_line, content_scroll), so
     /// returning to a previously-viewed file restores where you left off. Session-
     /// scoped (in memory); restart restore of the last file is handled by session.
@@ -589,6 +594,13 @@ impl App {
         for path in &contrib.content_paths {
             self.plugin_content.remove(path);
             self.plugin_content_text.remove(path);
+            if self
+                .plugin_content_streams
+                .get(path)
+                .is_some_and(|(owner, _)| owner == name)
+            {
+                self.plugin_content_streams.remove(path);
+            }
         }
         let had_current_content = contrib
             .content_paths
@@ -1061,6 +1073,7 @@ impl App {
         self.plugin_content_active = false;
         self.plugin_content.clear();
         self.plugin_content_text.clear();
+        self.plugin_content_streams.clear();
     }
 }
 

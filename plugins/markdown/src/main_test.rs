@@ -212,17 +212,44 @@ fn hex_to_truecolor_rejects_malformed_hex() {
 }
 
 #[test]
-fn set_content_message_produces_valid_json() {
+fn content_stream_messages_are_valid_json_and_have_a_terminator() {
     let lines = vec!["line1".to_string(), "line2".to_string()];
     let mut buf: Vec<u8> = Vec::new();
-    send_set_content(&lines, "/path/to/file.md", &mut buf);
+    send_content_stream(&lines, "/path/to/file.md", "render-1", &mut buf);
     let output = String::from_utf8(buf).unwrap();
-    let parsed: serde_json::Value = serde_json::from_str(output.trim()).unwrap();
-    assert_eq!(parsed["event"], "action");
-    assert_eq!(parsed["action"], "set_content");
-    assert_eq!(parsed["params"]["path"], "/path/to/file.md");
-    assert_eq!(parsed["params"]["lines"][0], "line1");
-    assert_eq!(parsed["params"]["lines"][1], "line2");
+    let messages: Vec<serde_json::Value> = output
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    assert_eq!(messages.len(), 2);
+    assert_eq!(messages[0]["event"], "action");
+    assert_eq!(messages[0]["action"], "set_content_chunk");
+    assert_eq!(messages[0]["params"]["path"], "/path/to/file.md");
+    assert_eq!(messages[0]["params"]["content_id"], "render-1");
+    assert_eq!(messages[0]["params"]["index"], 0);
+    assert_eq!(messages[0]["params"]["lines"][0], "line1");
+    assert_eq!(messages[0]["params"]["lines"][1], "line2");
+    assert_eq!(messages[1]["action"], "set_content_end");
+    assert_eq!(messages[1]["params"]["total_chunks"], 1);
+}
+
+#[test]
+fn large_markdown_output_is_split_into_incremental_chunks() {
+    let lines = vec!["x".repeat(800 * 1024); 4];
+    let mut buf = Vec::new();
+    send_content_stream(&lines, "/path/to/file.md", "large-render", &mut buf);
+    let messages: Vec<serde_json::Value> = String::from_utf8(buf)
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    assert_eq!(messages.len(), 5);
+    assert_eq!(messages[0]["params"]["index"], 0);
+    assert_eq!(messages[1]["params"]["index"], 1);
+    assert_eq!(messages[2]["params"]["index"], 2);
+    assert_eq!(messages[3]["params"]["index"], 3);
+    assert_eq!(messages[4]["action"], "set_content_end");
+    assert_eq!(messages[4]["params"]["total_chunks"], 4);
 }
 
 #[test]
@@ -325,7 +352,7 @@ fn keypress_toggle_rerenders_open_file() {
         state.handle_open(&path, &mut buf2);
     }
     assert!(
-        buf2.len() > 0,
+        !buf2.is_empty(),
         "when toggle_raw is false, handle_open should render"
     );
 

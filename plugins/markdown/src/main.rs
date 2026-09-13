@@ -1,9 +1,10 @@
 //! Bundled markdown renderer plugin for mantis.
 //!
 //! Implements the mantis plugin protocol to render `.md` files to ANSI escape
-//! codes. On `on_file_open`, reads the file and sends `set_content` with
-//! rendered lines. Responds to `on_theme_change` to re-render with matching
-//! colours, and `on_keypress` for `M` (raw/rendered toggle).
+//! codes. On `on_file_open`, reads the file and sends rendered lines as bounded
+//! `set_content_chunk` actions followed by an explicit end marker. Responds to
+//! `on_theme_change` to re-render with matching colours, and `on_keypress` for
+//! `M` (raw/rendered toggle).
 //!
 //! ## Theme colours
 //!
@@ -73,6 +74,7 @@ struct PluginState {
     current_file: Option<String>,
     theme: ThemeColors,
     toggle_raw: bool,
+    render_seq: u64,
 }
 
 struct ThemeColors {
@@ -136,6 +138,7 @@ impl PluginState {
             current_file: None,
             theme: ThemeColors::default_theme(),
             toggle_raw: false,
+            render_seq: 0,
         }
     }
 
@@ -165,9 +168,13 @@ impl PluginState {
             Ok(s) => s,
             Err(_) => return,
         };
-        let rendered = render_to_ansi(&src, &self.theme);
-        let ansi_lines: Vec<String> = rendered;
-        send_set_content(&ansi_lines, path_str, out);
+        self.render_seq = self.render_seq.wrapping_add(1);
+        let content_id = format!("markdown-{}", self.render_seq);
+        let mut next_chunk = 0;
+        render_to_ansi_batches(&src, &self.theme, |batch| {
+            next_chunk = send_content_chunk_batch(&batch, path_str, &content_id, next_chunk, out);
+        });
+        send_content_end(path_str, &content_id, next_chunk, out);
     }
 }
 
@@ -198,7 +205,14 @@ fn ansi(code: &str, text: &str) -> String {
     }
 }
 
+#[cfg(test)]
 fn render_to_ansi(src: &str, theme: &ThemeColors) -> Vec<String> {
+    let mut lines = Vec::new();
+    render_to_ansi_batches(src, theme, |batch| lines.extend(batch));
+    lines
+}
+
+fn render_to_ansi_batches(src: &str, theme: &ThemeColors, mut emit: impl FnMut(Vec<String>)) {
     let mut lines: Vec<String> = Vec::new();
     let mut current = String::new();
     let mut style_stack: Vec<String> = Vec::new();
@@ -404,9 +418,14 @@ fn render_to_ansi(src: &str, theme: &ThemeColors) -> Vec<String> {
             }
             _ => {}
         }
+        if lines.len() >= 128 {
+            emit(std::mem::take(&mut lines));
+        }
     }
     flush_line(&mut lines, &mut current, bq_depth, theme);
-    lines
+    if !lines.is_empty() {
+        emit(lines);
+    }
 }
 
 fn apply_style(style: &str, text: &str) -> String {
@@ -446,20 +465,70 @@ fn heading_ansi(level: HeadingLevel, theme: &ThemeColors) -> String {
     }
 }
 
-fn send_set_content(lines: &[String], path: &str, out: &mut impl Write) {
-    let json_lines: Vec<serde_json::Value> = lines
-        .iter()
-        .map(|l| serde_json::Value::String(l.clone()))
-        .collect();
+#[cfg(test)]
+fn send_content_stream(lines: &[String], path: &str, content_id: &str, out: &mut impl Write) {
+    let next_chunk = send_content_chunk_batch(lines, path, content_id, 0, out);
+    send_content_end(path, content_id, next_chunk, out);
+}
+
+fn send_content_chunk_batch(
+    lines: &[String],
+    path: &str,
+    content_id: &str,
+    mut next_chunk: usize,
+    out: &mut impl Write,
+) -> usize {
+    const TARGET_CHUNK_BYTES: usize = 768 * 1024;
+    let mut start = 0;
+    let mut bytes = 0usize;
+    for (index, line) in lines.iter().enumerate() {
+        if index > start && bytes.saturating_add(line.len()) > TARGET_CHUNK_BYTES {
+            write_content_chunk(&lines[start..index], path, content_id, next_chunk, out);
+            next_chunk += 1;
+            start = index;
+            bytes = 0;
+        }
+        bytes = bytes.saturating_add(line.len());
+    }
+    if start < lines.len() {
+        write_content_chunk(&lines[start..], path, content_id, next_chunk, out);
+        next_chunk += 1;
+    }
+    next_chunk
+}
+
+fn write_content_chunk(
+    lines: &[String],
+    path: &str,
+    content_id: &str,
+    index: usize,
+    out: &mut impl Write,
+) {
     let msg = serde_json::json!({
         "event": "action",
-        "action": "set_content",
+        "action": "set_content_chunk",
         "params": {
-            "lines": json_lines,
-            "path": path
+            "path": path,
+            "content_id": content_id,
+            "index": index,
+            "lines": lines,
         }
     });
     let _ = writeln!(out, "{}", serde_json::to_string(&msg).unwrap());
+    let _ = out.flush();
+}
+
+fn send_content_end(path: &str, content_id: &str, total_chunks: usize, out: &mut impl Write) {
+    let end = serde_json::json!({
+        "event": "action",
+        "action": "set_content_end",
+        "params": {
+            "path": path,
+            "content_id": content_id,
+            "total_chunks": total_chunks,
+        }
+    });
+    let _ = writeln!(out, "{}", serde_json::to_string(&end).unwrap());
     let _ = out.flush();
 }
 

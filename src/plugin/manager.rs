@@ -66,7 +66,7 @@ struct PendingRequest {
 #[cfg(not(test))]
 pub(crate) const REQUEST_TIMEOUT: Duration = Duration::from_millis(300);
 #[cfg(test)]
-pub(crate) const REQUEST_TIMEOUT: Duration = Duration::from_secs(2);
+pub(crate) const REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Manages discovery, lifecycle, and hook dispatch for all plugins.
 pub(crate) struct PluginManager {

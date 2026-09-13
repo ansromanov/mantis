@@ -94,6 +94,11 @@ fn named_keys() {
 }
 
 #[test]
+fn content_streaming_keeps_protocol_three_compatible() {
+    assert_eq!(PROTOCOL_VERSION, "3");
+}
+
+#[test]
 fn space_char() {
     assert_eq!(
         key_event_to_string(&key(KeyCode::Char(' '), KeyModifiers::NONE)),

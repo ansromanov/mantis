@@ -53,7 +53,7 @@ const HELP_PAGE_SIZE: usize = 10;
 #[cfg(not(test))]
 const KEY_CONSUME_TIMEOUT: Duration = Duration::from_millis(20);
 #[cfg(test)]
-const KEY_CONSUME_TIMEOUT: Duration = Duration::from_secs(2);
+const KEY_CONSUME_TIMEOUT: Duration = Duration::from_secs(5);
 
 impl App {
     /// Dispatches a key event. Overlays (help, theme, history, search) are

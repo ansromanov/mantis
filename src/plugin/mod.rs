@@ -30,6 +30,8 @@
 //!    {"event":"action","action":"open_file","params":{"path":"/tmp/x"}}
 //!    {"event":"action","action":"key_handled","params":{"handled":true}}
 //!    {"event":"action","action":"plugin_error","params":{"message":"failed"}}
+//!    {"event":"action","action":"set_content_chunk","params":{"path":"/file","content_id":"render-1","index":0,"lines":["first line"]}}
+//!    {"event":"action","action":"set_content_end","params":{"path":"/file","content_id":"render-1","total_chunks":1}}
 //!    {"event":"response","id":1,"result":{"regions":[[0,5]]}}
 //!    ```
 //!
@@ -59,7 +61,9 @@
 /// - `"3"` — request/response correlation (`request`/`response` events),
 ///   `plugin_error` action, `on_keypress` key consumption (`key_handled`),
 ///   `priority` on `register_language_provider`, manifest field renamed
-///   `tv_protocol` -> `mantis_protocol` (alias kept) (0.14.x)
+///   `tv_protocol` -> `mantis_protocol` (alias kept) (0.14.x); chunked
+///   rendered content (`set_content_chunk` / `set_content_end`) is additive
+///   (0.21.x) and keeps the protocol at version 3.
 pub(crate) const PROTOCOL_VERSION: &str = "3";
 
 pub mod install;
@@ -67,10 +71,14 @@ pub mod manifest;
 pub mod registry;
 pub mod types;
 
+mod content_stream;
 mod manager;
 mod process;
 mod syntax;
 
+pub(crate) use content_stream::ContentStream;
+#[cfg(test)]
+pub(crate) use content_stream::STREAM_IDLE_TIMEOUT;
 pub(crate) use install::bundled_plugin_entries;
 pub(crate) use install::default_plugin_dir;
 pub(crate) use install::install_bundled_plugins;

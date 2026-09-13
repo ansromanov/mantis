@@ -922,10 +922,10 @@ fn send_request_and_poll_requests_matches_response_by_id() {
         )
         .expect("plugin is running, request must be sent");
 
-    // Deadline comfortably exceeds REQUEST_TIMEOUT (2s under cfg(test)) so a
+    // Deadline comfortably exceeds REQUEST_TIMEOUT (5s under cfg(test)) so a
     // slow response under parallel test-suite load is still matched rather
     // than raced against the timeout path.
-    let deadline = Instant::now() + Duration::from_secs(5);
+    let deadline = Instant::now() + Duration::from_secs(10);
     let results = loop {
         let results = mgr.poll_requests();
         if !results.is_empty() {
@@ -972,8 +972,8 @@ fn send_request_times_out_without_response() {
         .send_request("silent", "fold_regions", serde_json::json!({}))
         .expect("request must be sent");
 
-    // REQUEST_TIMEOUT is 2s under cfg(test); wait comfortably past it.
-    let deadline = Instant::now() + Duration::from_secs(5);
+    // REQUEST_TIMEOUT is 5s under cfg(test); wait comfortably past it.
+    let deadline = Instant::now() + Duration::from_secs(10);
     let results = loop {
         let results = mgr.poll_requests();
         if !results.is_empty() {

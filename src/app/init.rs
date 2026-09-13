@@ -291,6 +291,7 @@ impl App {
             plugin_contributions: HashMap::new(),
             plugin_content: HashMap::new(),
             plugin_content_text: HashMap::new(),
+            plugin_content_streams: HashMap::new(),
             cursor_positions: HashMap::new(),
             plugin_content_active: false,
             show_raw_markdown: false,

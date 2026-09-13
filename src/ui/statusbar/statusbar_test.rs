@@ -2,6 +2,7 @@ use super::*;
 use crate::app::{App, Focus, StatusMessage};
 use crate::config::{Config, StatusBarConfig};
 use crate::git::{GitHead, GitRepoInfo};
+use crate::plugin::ContentStream;
 use crate::search::{GotoLineState, HistoryState, SearchState, ThemePicker};
 use ratatui::backend::TestBackend;
 use ratatui::style::{Color, Modifier};
@@ -43,6 +44,28 @@ fn statusbar_displays_worktree_count() {
 }
 
 #[test]
+fn statusbar_shows_streaming_and_incomplete_plugin_content_state() {
+    let mut app = make_app();
+    let path = PathBuf::from("/tmp/streamed.md");
+    app.current_file = Some(path.clone());
+    app.plugin_content_streams.insert(
+        path.clone(),
+        (
+            "markdown".into(),
+            ContentStream::new("r1".into(), std::time::Instant::now()),
+        ),
+    );
+    assert!(render_bar(&app).contains("[markdown: rendering]"));
+
+    app.plugin_content_streams
+        .get_mut(&path)
+        .unwrap()
+        .1
+        .expire(std::time::Instant::now() + crate::plugin::STREAM_IDLE_TIMEOUT);
+    assert!(render_bar(&app).contains("[markdown: incomplete]"));
+}
+
+#[test]
 fn worktree_status_segment_can_be_selected_in_explicit_config() {
     let mut app = make_app();
     app.worktree_count = 3;
@@ -77,6 +100,7 @@ fn statusbar_segments_map_to_their_existing_actions() {
         (StatusSegment::Scroll, None),
         (StatusSegment::JsonPath, None),
         (StatusSegment::PluginFacts, None),
+        (StatusSegment::PluginContent, None),
         (StatusSegment::Message, None),
         (StatusSegment::Version, None),
     ];
