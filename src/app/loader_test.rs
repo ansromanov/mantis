@@ -25,6 +25,45 @@ fn plain_file_uses_virtual_file() {
 }
 
 #[test]
+fn parse_shebang_handles_direct_and_env_interpreters() {
+    assert_eq!(
+        parse_shebang(b"#!/bin/sh\necho hi\n").as_deref(),
+        Some("sh")
+    );
+    assert_eq!(
+        parse_shebang(b"#!/usr/bin/env -S python3 -u\r\nprint('hi')\r\n").as_deref(),
+        Some("python3")
+    );
+    assert_eq!(
+        parse_shebang(b"#!/usr/bin/env -S 'python3 -u'\n").as_deref(),
+        Some("python3")
+    );
+    assert_eq!(
+        parse_shebang(b"#!/usr/bin/env bash\n").as_deref(),
+        Some("bash")
+    );
+}
+
+#[test]
+fn parse_shebang_rejects_missing_binary_and_overlong_headers() {
+    assert_eq!(parse_shebang(b"echo hi\n"), None);
+    assert_eq!(parse_shebang(b"#!/bin/sh\0ignored\n"), None);
+    let mut overlong = b"#!".to_vec();
+    overlong.resize(4097, b'a');
+    assert_eq!(parse_shebang(&overlong), None);
+}
+
+#[test]
+fn compute_file_load_caches_shebang_from_loaded_bytes() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("script");
+    std::fs::write(&path, b"#!/bin/bash\necho hi\n").unwrap();
+
+    let load = compute_file_load(&path, &hl(), usize::MAX);
+    assert_eq!(load.shebang.as_deref(), Some("bash"));
+}
+
+#[test]
 fn terminal_controls_force_sanitized_inline_content() {
     let file = tempfile::NamedTempFile::with_suffix(".rs").unwrap();
     std::fs::write(
@@ -223,6 +262,7 @@ fn binary_file_sets_binary_encoding() {
     f.write_all(b"data\x00binary").unwrap();
     let load = compute_file_load(f.path(), &hl(), usize::MAX);
     assert_eq!(load.encoding.as_deref(), Some("BINARY"));
+    assert_eq!(load.shebang, None);
     assert_eq!(
         load.content,
         vec![

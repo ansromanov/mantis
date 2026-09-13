@@ -16,7 +16,32 @@ fn make_reg_priority(
     LanguageProviderRegistration {
         plugin_name: name.to_string(),
         extensions: exts.iter().map(|e| e.to_string()).collect(),
+        filenames: Vec::new(),
+        shebangs: Vec::new(),
         capabilities: caps.iter().cloned().collect(),
+        priority,
+    }
+}
+
+fn make_filename_reg(
+    name: &str,
+    filenames: &[&str],
+    exts: &[&str],
+    shebangs: &[&str],
+    priority: i64,
+) -> LanguageProviderRegistration {
+    LanguageProviderRegistration {
+        plugin_name: name.to_string(),
+        extensions: exts
+            .iter()
+            .map(|value| value.to_ascii_lowercase())
+            .collect(),
+        filenames: filenames.iter().map(|value| value.to_string()).collect(),
+        shebangs: shebangs
+            .iter()
+            .map(|value| value.to_ascii_lowercase())
+            .collect(),
+        capabilities: [Capability::Fold].into(),
         priority,
     }
 }
@@ -354,6 +379,52 @@ fn provider_for_unregistered_ext_returns_none() {
 }
 
 #[test]
+fn provider_for_file_precedence_is_filename_glob_extension_then_shebang() {
+    let mut manager = PluginManager::new(vec![]);
+    manager.register_provider(make_filename_reg("shebang", &[], &[], &["bash"], 100));
+    manager.register_provider(make_filename_reg(
+        "extension",
+        &[],
+        &["sh", "prod"],
+        &[],
+        100,
+    ));
+    manager.register_provider(make_filename_reg("glob", &["Dockerfile*"], &[], &[], 0));
+    manager.register_provider(make_filename_reg(
+        "exact-low-priority",
+        &["Dockerfile.prod"],
+        &[],
+        &[],
+        0,
+    ));
+    manager.register_provider(make_filename_reg(
+        "exact",
+        &["Dockerfile.prod"],
+        &[],
+        &[],
+        5,
+    ));
+
+    let cases = [
+        ("Dockerfile.prod", "exact"),
+        ("Dockerfile.dev", "glob"),
+        ("script.sh", "extension"),
+        ("script", "shebang"),
+    ];
+    for (filename, expected) in cases {
+        let path = PathBuf::from("/repo").join(filename);
+        manager.cache_file_shebang(&path, Some("bash".to_string()));
+        assert_eq!(
+            manager
+                .provider_for_file(&path, &Capability::Fold)
+                .map(|provider| provider.plugin_name.as_str()),
+            Some(expected),
+            "unexpected route for {filename}"
+        );
+    }
+}
+
+#[test]
 fn event_dispatch_with_no_active_plugins_is_noop() {
     // The per-event `subscribes_to` gate runs inside a loop over active
     // plugins; with none spawned every dispatch must be a harmless noop.
@@ -654,6 +725,18 @@ fn register_provider_warns_once_on_conflict() {
         warning3.is_none(),
         "conflict warning must only fire once per (ext, capability) pair"
     );
+}
+
+#[test]
+fn register_provider_warns_once_for_filename_conflicts() {
+    let mut manager = PluginManager::new(vec![]);
+    manager.register_provider(make_filename_reg("first", &["Makefile"], &[], &[], 0));
+    assert!(manager
+        .register_provider(make_filename_reg("second", &["Makefile"], &[], &[], 0))
+        .is_some());
+    assert!(manager
+        .register_provider(make_filename_reg("third", &["Makefile"], &[], &[], 0))
+        .is_none());
 }
 
 #[test]

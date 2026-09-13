@@ -8,6 +8,8 @@
 //! background `loader` via `compute_file_load`/`compute_diff_load`, with
 //! synchronous variants used at startup and for reloads. It also installs the
 //! per-file watcher so an open file auto-reloads when it changes on disk.
+//! Applying a successful load caches its optional shebang with the plugin
+//! manager before `on_file_open` can produce language-provider actions.
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -398,6 +400,8 @@ impl App {
     /// selection, then installs the rendered content/highlighting/JSON/YAML
     /// state. Shared by the synchronous and worker-thread code paths.
     pub(super) fn apply_file_load(&mut self, path: &Path, load: FileLoad) {
+        self.plugin_manager
+            .cache_file_shebang(path, if load.ok { load.shebang.clone() } else { None });
         if load.ok {
             let size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
             let size_bucket = crate::telemetry::FileSizeBucket::from_size(size);

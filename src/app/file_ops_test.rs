@@ -41,6 +41,48 @@ fn user_input_pauses_follow_mode_and_toggle_clears_pause() {
 }
 
 #[test]
+fn apply_file_load_caches_and_refreshes_provider_shebang() {
+    let root = temp_dir();
+    let path = root.join("run-script");
+    fs::write(&path, "#!/usr/bin/env -S bash -e\necho hi\n").unwrap();
+    let mut app = app_for(&root);
+    app.plugin_manager
+        .register_provider(crate::plugin::LanguageProviderRegistration {
+            plugin_name: "shell".to_string(),
+            extensions: Vec::new(),
+            filenames: Vec::new(),
+            shebangs: vec!["bash".to_string()],
+            capabilities: [crate::plugin::Capability::Fold].into(),
+            priority: 0,
+        });
+
+    let loaded = crate::app::loader::compute_file_load(
+        &path,
+        &crate::highlight::Highlighter::with_extra_syntaxes("base16-ocean.dark", &[]),
+        usize::MAX,
+    );
+    app.apply_file_load(&path, loaded);
+    assert!(app
+        .plugin_manager
+        .provider_for_file(&path, &crate::plugin::Capability::Fold)
+        .is_some());
+
+    fs::write(&path, "echo no shebang\n").unwrap();
+    let loaded = crate::app::loader::compute_file_load(
+        &path,
+        &crate::highlight::Highlighter::with_extra_syntaxes("base16-ocean.dark", &[]),
+        usize::MAX,
+    );
+    app.apply_file_load(&path, loaded);
+    assert!(app
+        .plugin_manager
+        .provider_for_file(&path, &crate::plugin::Capability::Fold)
+        .is_none());
+
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn bookmark_can_be_toggled_for_a_path_without_opening_it() {
     let root = temp_dir();
     let path = root.join("saved.txt");

@@ -758,6 +758,37 @@ fn register_language_provider_stores_registration() {
 }
 
 #[test]
+fn register_language_provider_parses_filename_and_shebang_selectors() {
+    let mut app = create_base_app();
+    app.drain_plugin_actions_for_test(
+        "named-provider",
+        "register_language_provider",
+        serde_json::json!({
+            "filenames": ["Makefile", "Dockerfile*"],
+            "shebangs": ["BASH"],
+            "capabilities": ["fold"]
+        }),
+    );
+    let cap = crate::plugin::Capability::Fold;
+    let makefile = std::path::PathBuf::from("/repo/Makefile");
+    assert_eq!(
+        app.plugin_manager
+            .provider_for_file(&makefile, &cap)
+            .map(|provider| provider.plugin_name.as_str()),
+        Some("named-provider")
+    );
+    let script = std::path::PathBuf::from("/repo/run-script");
+    app.plugin_manager
+        .cache_file_shebang(&script, Some("bash".to_string()));
+    assert_eq!(
+        app.plugin_manager
+            .provider_for_file(&script, &cap)
+            .map(|provider| provider.plugin_name.as_str()),
+        Some("named-provider")
+    );
+}
+
+#[test]
 fn register_language_provider_overwrites_prior() {
     let mut app = create_base_app();
     app.drain_plugin_actions_for_test(
@@ -1127,6 +1158,36 @@ fn set_fold_regions_ignored_without_registered_provider() {
 }
 
 #[test]
+fn set_fold_regions_requires_the_winning_provider() {
+    let mut app = create_base_app();
+    app.drain_plugin_actions_for_test(
+        "low-priority",
+        "register_language_provider",
+        serde_json::json!({"extensions": ["py"], "capabilities": ["fold"]}),
+    );
+    app.drain_plugin_actions_for_test(
+        "high-priority",
+        "register_language_provider",
+        serde_json::json!({
+            "extensions": ["py"],
+            "capabilities": ["fold"],
+            "priority": 10
+        }),
+    );
+    app.drain_plugin_actions_for_test(
+        "low-priority",
+        "set_fold_regions",
+        serde_json::json!({"path": "/some/file.py", "regions": [[0, 2]]}),
+    );
+
+    assert!(
+        !app.plugin_fold_regions
+            .contains_key(&std::path::PathBuf::from("/some/file.py")),
+        "a lower-priority provider must not contribute when another provider wins"
+    );
+}
+
+#[test]
 fn set_status_facts_applies_to_current_file() {
     let mut app = create_base_app();
     let path = std::path::PathBuf::from("/some/manifest.yaml");
@@ -1284,6 +1345,54 @@ fn set_symbols_rejects_a_lower_priority_provider() {
     assert_eq!(
         app.plugin_symbols[std::path::Path::new("/tmp/main.rs")][0].name,
         "high"
+    );
+}
+
+#[test]
+fn set_symbols_uses_filename_precedence_over_provider_priority() {
+    let mut app = create_base_app();
+    app.drain_plugin_actions_for_test(
+        "glob-provider",
+        "register_language_provider",
+        serde_json::json!({
+            "filenames":["Dockerfile*"],
+            "capabilities":["symbols"],
+            "priority":100
+        }),
+    );
+    app.drain_plugin_actions_for_test(
+        "exact-provider",
+        "register_language_provider",
+        serde_json::json!({
+            "filenames":["Dockerfile.prod"],
+            "capabilities":["symbols"],
+            "priority":0
+        }),
+    );
+
+    app.drain_plugin_actions_for_test(
+        "glob-provider",
+        "set_symbols",
+        serde_json::json!({
+            "path":"/tmp/Dockerfile.prod",
+            "symbols":[{"name":"wrong","kind":"function","line":0}]
+        }),
+    );
+    assert!(!app
+        .plugin_symbols
+        .contains_key(&std::path::PathBuf::from("/tmp/Dockerfile.prod")));
+
+    app.drain_plugin_actions_for_test(
+        "exact-provider",
+        "set_symbols",
+        serde_json::json!({
+            "path":"/tmp/Dockerfile.prod",
+            "symbols":[{"name":"right","kind":"function","line":1}]
+        }),
+    );
+    assert_eq!(
+        app.plugin_symbols[std::path::Path::new("/tmp/Dockerfile.prod")][0].name,
+        "right"
     );
 }
 

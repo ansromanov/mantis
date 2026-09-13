@@ -115,11 +115,15 @@ fn language_provider_registration_holds_fields() {
     let reg = LanguageProviderRegistration {
         plugin_name: "test-p".into(),
         extensions: vec!["rs".into(), "py".into()],
+        filenames: vec!["Makefile".into()],
+        shebangs: vec!["bash".into()],
         capabilities: caps,
         priority: 0,
     };
     assert_eq!(reg.plugin_name, "test-p");
     assert_eq!(reg.extensions.len(), 2);
+    assert_eq!(reg.filenames, vec!["Makefile"]);
+    assert_eq!(reg.shebangs, vec!["bash"]);
     assert!(reg.capabilities.contains(&Capability::Highlight));
     assert!(reg.capabilities.contains(&Capability::Fold));
     assert_eq!(reg.priority, 0);

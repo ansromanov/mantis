@@ -1,8 +1,9 @@
 //! Bundled Shell language provider plugin for mantis.
 //!
 //! Implements the mantis plugin protocol to provide language services for
-//! `.sh`, `.bash`, and `.zsh` files. Today, it registers the `fold` capability
-//! and responds to `on_file_open` events by running the shared
+//! `.sh`, `.bash`, and `.zsh` files, as well as extensionless scripts with
+//! bash, sh, or zsh shebangs. It registers the `fold` capability and responds
+//! to `on_file_open` events by running the shared
 //! `shell_brace_fold` detector and returning the fold regions.
 //!
 //! Highlighting for shell is already handled by syntect defaults — this
@@ -50,6 +51,7 @@ fn register_language_provider(out: &mut impl Write) {
         "action": "register_language_provider",
         "params": {
             "extensions": ["sh", "bash", "zsh"],
+            "shebangs": ["bash", "sh", "zsh"],
             "capabilities": ["fold"],
             "priority": 0
         }

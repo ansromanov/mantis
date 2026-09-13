@@ -291,6 +291,20 @@ fn syntax_name_resolves_dockerfile_by_filename() {
 }
 
 #[test]
+fn syntax_name_resolves_dockerfile_variant_by_filename_glob() {
+    let extra = extra_syntax("dockerfile");
+    let highlighter = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[extra]);
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("Dockerfile.prod");
+    std::fs::write(&path, "# build image\nFROM alpine\n").unwrap();
+
+    assert_eq!(
+        highlighter.syntax_name(&path).as_deref(),
+        Some("Dockerfile")
+    );
+}
+
+#[test]
 fn syntax_name_resolves_containerfile_by_filename() {
     let extra = extra_syntax("dockerfile");
     let h = Highlighter::with_extra_syntaxes("base16-ocean.dark", &[extra]);

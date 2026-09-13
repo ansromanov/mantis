@@ -185,15 +185,20 @@ fn resolve_syntax_for_file(ss: &SyntaxSet, path: &Path) -> Option<String> {
 /// Looks up a syntax for a well-known filename by matching it against syntax
 /// names (e.g. `Dockerfile`), with aliases for filenames that share a grammar
 /// under a different name (`Containerfile` → `Dockerfile`), differ in case
-/// (`justfile` → `Justfile`), or bundle a file extension into the config
-/// filename (`nginx.conf` → `Nginx`).
+/// (`justfile` → `Justfile`), use a filename glob (`Dockerfile.prod` →
+/// `Dockerfile`), or bundle a file extension into the config filename
+/// (`nginx.conf` → `Nginx`).
 fn find_syntax_by_file_name<'a>(ss: &'a SyntaxSet, path: &Path) -> Option<&'a SyntaxReference> {
     let name = path.file_name()?.to_str()?;
-    let name = match name {
-        "Containerfile" => "Dockerfile",
-        "justfile" | "Justfile" | "JUSTFILE" | ".justfile" => "Justfile",
-        "nginx.conf" => "Nginx",
-        other => other,
+    let name = if name == "Dockerfile" || name.starts_with("Dockerfile.") {
+        "Dockerfile"
+    } else {
+        match name {
+            "Containerfile" => "Dockerfile",
+            "justfile" | "Justfile" | "JUSTFILE" | ".justfile" => "Justfile",
+            "nginx.conf" => "Nginx",
+            other => other,
+        }
     };
     ss.find_syntax_by_name(name)
 }

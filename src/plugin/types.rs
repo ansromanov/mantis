@@ -8,15 +8,12 @@
 //! fields so it can also carry a `request` event (host → plugin, answered by a
 //! correlated `response` on stdout — see `crate::plugin::process`), and
 //! [`FromPlugin`] gained `id`/`result`/`error` so the reader thread can parse
-//! those `response` lines. [`LanguageProviderRegistration`] gained `priority`
-//! so `PluginManager::provider_for` can break ties between two providers that
-//! register the same extension/capability pair. None of these are `set_*`
-//! state contributions, so they are intentionally absent from
-//! [`PluginContributions`] (see the state teardown contract in
-//! `docs/src/plugin-development.md`). The `symbols` capability and
-//! `PluginContributions::symbol_paths` extend the push-based language-provider
-//! lifecycle with per-file symbol lists that disappear when their provider
-//! exits.
+//! those `response` lines. [`LanguageProviderRegistration`] selects providers
+//! by exact filename, filename glob, extension, or cached shebang, then uses
+//! priority to break ties between registrations of equal specificity. The
+//! `symbols` capability and [`PluginContributions::symbol_paths`] extend the
+//! push-based language-provider lifecycle with per-file symbol lists that are
+//! removed when their provider exits.
 
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -156,9 +153,13 @@ pub struct LanguageProviderRegistration {
     pub plugin_name: String,
     /// Lowercase file extensions handled by this provider (no leading dot).
     pub extensions: Vec<String>,
+    /// Exact filenames or filename globs handled by this provider.
+    pub filenames: Vec<String>,
+    /// Shebang interpreter names handled by this provider (for example `bash`).
+    pub shebangs: Vec<String>,
     /// Capabilities declared by this provider.
     pub capabilities: std::collections::HashSet<Capability>,
-    /// Tie-breaker when two providers register the same extension +
+    /// Tie-breaker when two providers register the same file match +
     /// capability pair (protocol 3+). Higher wins; equal priority keeps
     /// whichever provider was registered first. Defaults to `0`, matching
     /// what a plugin that never sends this field is treated as — such a
