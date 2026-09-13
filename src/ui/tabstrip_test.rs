@@ -6,6 +6,7 @@ use ratatui::backend::TestBackend;
 
 use crate::app::App;
 use crate::config::Config;
+use crate::theme::Theme;
 use crate::workspace::Tabs;
 
 /// Creates a temp directory whose *basename* is short (`name`, deduped with a
@@ -49,6 +50,24 @@ fn draws_a_label_and_close_glyph_for_each_tab() {
     assert!(text.contains('×'));
     fs::remove_dir_all(&a).ok();
     fs::remove_dir_all(&b).ok();
+}
+
+#[test]
+fn inactive_labels_and_close_glyphs_contrast_with_the_strip_in_every_theme() {
+    for (name, theme) in Theme::discover_all() {
+        let background = strip_style(&theme).bg;
+        let inactive_foreground = inactive_tab_style(&theme).fg;
+        let close_foreground = close_tab_style(&theme).fg;
+
+        assert_ne!(
+            inactive_foreground, background,
+            "inactive tab labels are invisible in theme {name}"
+        );
+        assert_ne!(
+            close_foreground, background,
+            "tab close glyphs are invisible in theme {name}"
+        );
+    }
 }
 
 #[test]
