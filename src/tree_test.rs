@@ -375,3 +375,79 @@ fn build_visible_runs_without_panicking() {
     assert!(nodes.is_empty());
     fs::remove_dir_all(&root).ok();
 }
+
+fn node_at(path: PathBuf, is_dir: bool) -> TreeNode {
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+    TreeNode {
+        path,
+        name,
+        depth: 0,
+        is_dir,
+        deleted: false,
+    }
+}
+
+#[test]
+fn affordance_labels_cover_every_variant() {
+    assert_eq!(TreeAffordance::None.label(), "");
+    assert_eq!(TreeAffordance::Deleted.label(), "[deleted]");
+    assert_eq!(TreeAffordance::Link.label(), "[link]");
+    assert_eq!(TreeAffordance::Empty.label(), "[empty]");
+    assert_eq!(TreeAffordance::Unreadable.label(), "[unreadable]");
+    assert_eq!(TreeAffordance::default(), TreeAffordance::None);
+}
+
+#[test]
+fn affordance_resolves_deleted_before_touching_the_filesystem() {
+    // A ghost node's path does not exist, so this also proves `resolve`
+    // reports Deleted without depending on a successful stat.
+    let mut node = node_at(PathBuf::from("/nonexistent/ghost.txt"), false);
+    node.deleted = true;
+    assert_eq!(TreeAffordance::resolve(&node), TreeAffordance::Deleted);
+}
+
+#[test]
+fn affordance_resolves_plain_files_and_directories() {
+    let root = temp_dir("affordance_basic");
+    fs::write(root.join("file.txt"), "x").unwrap();
+    fs::create_dir_all(root.join("empty_dir")).unwrap();
+    fs::create_dir_all(root.join("full_dir")).unwrap();
+    fs::write(root.join("full_dir").join("inner.txt"), "x").unwrap();
+
+    assert_eq!(
+        TreeAffordance::resolve(&node_at(root.join("file.txt"), false)),
+        TreeAffordance::None
+    );
+    assert_eq!(
+        TreeAffordance::resolve(&node_at(root.join("empty_dir"), true)),
+        TreeAffordance::Empty
+    );
+    assert_eq!(
+        TreeAffordance::resolve(&node_at(root.join("full_dir"), true)),
+        TreeAffordance::None
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[cfg(unix)]
+#[test]
+fn affordance_resolves_symlinks_as_links() {
+    let root = temp_dir("affordance_link");
+    fs::write(root.join("target.txt"), "x").unwrap();
+    std::os::unix::fs::symlink(root.join("target.txt"), root.join("link.txt")).unwrap();
+
+    assert_eq!(
+        TreeAffordance::resolve(&node_at(root.join("link.txt"), false)),
+        TreeAffordance::Link
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn affordance_resolves_a_missing_directory_as_unreadable() {
+    let node = node_at(PathBuf::from("/nonexistent/missing_dir"), true);
+    assert_eq!(TreeAffordance::resolve(&node), TreeAffordance::Unreadable);
+}
