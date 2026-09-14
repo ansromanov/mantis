@@ -321,6 +321,11 @@ pub struct App {
     /// Per-node indent-guide masks, keyed by `tree_revision` so they're
     /// recomputed only when the tree is rebuilt rather than on every render.
     pub(crate) tree_guide_cache: Option<(u64, Vec<Vec<bool>>)>,
+    /// Per-node affordance badges, keyed by `tree_revision`. Resolving one
+    /// stats the path (and reads the directory, for directories), so entries
+    /// are filled in lazily for the rows actually rendered and reused until
+    /// the tree is rebuilt.
+    pub(crate) tree_affordance_cache: Option<(u64, Vec<Option<crate::tree::TreeAffordance>>)>,
     pub content_area: Rect,
     /// Raw bytes + dimensions of the image in `current_file`, when it is an
     /// image and the terminal supports inline rendering. `None` otherwise. Set

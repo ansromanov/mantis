@@ -226,6 +226,7 @@ impl App {
             tree_offset: 0,
             tree_visible_indices: None,
             tree_guide_cache: None,
+            tree_affordance_cache: None,
             content_area: ratatui::layout::Rect::default(),
             content_image: None,
             image_area: ratatui::layout::Rect::default(),

@@ -26,6 +26,61 @@ pub struct TreeNode {
     pub deleted: bool,
 }
 
+/// The badge shown after a node's icon in the tree pane.
+///
+/// Resolving one costs filesystem syscalls, so the renderer never calls
+/// [`TreeAffordance::resolve`] directly: it caches results per tree revision
+/// for the rows actually on screen. See `ui::tree::draw_tree`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum TreeAffordance {
+    #[default]
+    None,
+    Deleted,
+    Link,
+    Empty,
+    Unreadable,
+}
+
+impl TreeAffordance {
+    /// Reads the filesystem to classify `node`. Callers are responsible for
+    /// caching — this is far too expensive to run per frame.
+    pub fn resolve(node: &TreeNode) -> Self {
+        if node.deleted {
+            return Self::Deleted;
+        }
+        if std::fs::symlink_metadata(&node.path)
+            .map(|m| m.file_type().is_symlink())
+            .unwrap_or(false)
+        {
+            return Self::Link;
+        }
+        if !node.is_dir {
+            return Self::None;
+        }
+        match std::fs::read_dir(&node.path) {
+            Ok(mut entries) => {
+                if entries.next().is_none() {
+                    Self::Empty
+                } else {
+                    Self::None
+                }
+            }
+            Err(_) => Self::Unreadable,
+        }
+    }
+
+    /// The badge text, or `""` when the node needs no badge.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::None => "",
+            Self::Deleted => "[deleted]",
+            Self::Link => "[link]",
+            Self::Empty => "[empty]",
+            Self::Unreadable => "[unreadable]",
+        }
+    }
+}
+
 /// Recursively walks `root` using `ignore::WalkBuilder`, returning a flat
 /// `Vec<TreeNode>` of files and directories. Only directories in `expanded`
 /// are descended into. `deleted_files` are appended as ghost nodes.
