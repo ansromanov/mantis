@@ -57,6 +57,28 @@ fn render_virtual_file_shows_line_numbers_and_text() {
 }
 
 #[test]
+fn render_virtual_file_marks_diagnostic_lines() {
+    let (mut app, dir) = render_app();
+    let path = dir.path().join("f.txt");
+    app.open_file(&path);
+
+    let screen = render(&mut app, |app| {
+        app.plugin_diagnostic_lines.insert(
+            path.clone(),
+            std::collections::HashMap::from([(
+                1,
+                crate::plugin::types::DiagnosticSeverity::Warning,
+            )]),
+        );
+    });
+
+    assert!(
+        screen.contains("! 2"),
+        "diagnostic gutter marker missing: {screen:?}"
+    );
+}
+
+#[test]
 fn render_inline_fallback_renders_loaded_content() {
     let (mut app, _dir) = render_app();
     let screen = render(&mut app, |app| {

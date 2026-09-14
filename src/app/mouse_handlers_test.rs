@@ -1694,6 +1694,36 @@ fn double_click_palette_file_route_opens_file_not_command() {
     fs::remove_dir_all(&root).ok();
 }
 
+#[test]
+fn double_click_palette_diagnostic_jumps_to_its_line() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.current_file = Some(root.join("long.txt"));
+    app.content = (0..20).map(|line| format!("line {line}")).collect();
+    let mut palette = crate::command_palette::CommandPalette::default();
+    palette.route = crate::command_palette::PaletteRoute::Diagnostics;
+    palette.route_diagnostics = Some(crate::search::DiagnosticPicker::new(vec![
+        crate::plugin::types::Diagnostic {
+            line: 8,
+            column: 0,
+            end_line: None,
+            end_column: None,
+            severity: crate::plugin::types::DiagnosticSeverity::Error,
+            message: "broken".into(),
+            source: "test".into(),
+        },
+    ]));
+    app.command_palette = Some(palette);
+    app.command_palette_area = Rect::new(0, 0, 40, 10);
+
+    app.handle_mouse(left_down_at(5, 0));
+    app.handle_mouse(left_down_at(5, 0));
+
+    assert!(app.command_palette.is_none());
+    assert_eq!(app.active_line, 8);
+    fs::remove_dir_all(&root).ok();
+}
+
 // -- repo log overlay ---------------------------------------------------------
 
 fn repo_log_with_commits(root: PathBuf, n: usize) -> crate::search::RepoLogState {

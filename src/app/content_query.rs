@@ -10,6 +10,9 @@
 //! lines?" or "what is line N?" without knowing which source is active. They
 //! never mutate state; callers that need scrolling or navigation build on top of
 //! these read accessors.
+//!
+//! A precomputed severity index also lets the renderer annotate visible
+//! physical lines without scanning the file's full diagnostics list per frame.
 
 use super::App;
 use unicode_width::UnicodeWidthStr;
@@ -147,6 +150,18 @@ impl App {
                 .copied()
                 .unwrap_or(display)
         }
+    }
+
+    /// Returns the strongest diagnostic severity on a physical source line.
+    pub(crate) fn diagnostic_severity_at(
+        &self,
+        physical_line: usize,
+    ) -> Option<crate::plugin::types::DiagnosticSeverity> {
+        let path = self.current_file.as_ref()?;
+        self.plugin_diagnostic_lines
+            .get(path)?
+            .get(&physical_line)
+            .copied()
     }
 
     /// Converts a physical line index to a display line index.

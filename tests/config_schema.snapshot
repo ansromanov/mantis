@@ -39,6 +39,7 @@ keys.copy_file
 keys.copy_line
 keys.copy_path
 keys.copy_relative_path
+keys.diagnostics_picker
 keys.diff_hunk_next
 keys.diff_hunk_prev
 keys.file_history

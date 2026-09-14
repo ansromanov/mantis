@@ -147,6 +147,45 @@ fn statusbar_shows_the_enclosing_symbol_scope() {
 }
 
 #[test]
+fn statusbar_shows_diagnostic_counts_and_active_line_message() {
+    let mut app = make_app();
+    let path = PathBuf::from("src/lib.rs");
+    app.current_file = Some(path.clone());
+    app.active_line = 1;
+    app.plugin_diagnostics.insert(
+        path,
+        vec![
+            crate::plugin::types::Diagnostic {
+                line: 1,
+                column: 0,
+                end_line: None,
+                end_column: None,
+                severity: crate::plugin::types::DiagnosticSeverity::Warning,
+                message: "unused variable".into(),
+                source: "clippy".into(),
+            },
+            crate::plugin::types::Diagnostic {
+                line: 2,
+                column: 0,
+                end_line: None,
+                end_column: None,
+                severity: crate::plugin::types::DiagnosticSeverity::Error,
+                message: "type mismatch".into(),
+                source: "rustc".into(),
+            },
+        ],
+    );
+
+    let text = render_bar(&app);
+    assert!(text.contains("⚠1"), "warning count missing: {text:?}");
+    assert!(text.contains("✖1"), "error count missing: {text:?}");
+    assert!(
+        text.contains("[clippy: unused variable]"),
+        "active diagnostic missing: {text:?}"
+    );
+}
+
+#[test]
 fn statusbar_ranges_follow_elision_at_narrow_widths() {
     let mut app = make_app();
     app.worktree_count = 3;

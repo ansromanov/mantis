@@ -11,8 +11,9 @@
 //! implement the host side of the `request`/`response` correlation (see
 //! `crate::plugin::process`), tracking outstanding requests in
 //! `pending_requests` and timing them out after [`REQUEST_TIMEOUT`] without
-//! killing the plugin. [`provider_for_file`] resolves the winning capability
-//! provider, and [`register_provider`] raises a one-time warning when two
+//! killing the plugin; diagnostics timeouts stay quiet because they are an
+//! optional, read-only refresh. [`provider_for_file`] resolves the winning
+//! capability provider, and [`register_provider`] raises a one-time warning when two
 //! plugins claim the same rule and capability. A `plugin_error` action
 //! (reported via [`record_plugin_error`]) is tracked in `last_plugin_error`,
 //! a struct parallel to the existing crash-diagnostics `last_crash` map, so
@@ -53,9 +54,10 @@ pub(crate) struct PluginErrorInfo {
 }
 
 /// A `request` awaiting its correlated `response` (protocol 3+).
-struct PendingRequest {
-    plugin_name: String,
-    deadline: Instant,
+pub(super) struct PendingRequest {
+    pub(super) plugin_name: String,
+    pub(super) method: String,
+    pub(super) deadline: Instant,
 }
 
 /// How long the host waits for a plugin's `response` before treating the
@@ -94,7 +96,7 @@ pub(crate) struct PluginManager {
     /// is outstanding.
     next_request_id: u64,
     /// Requests sent via `send_request` awaiting a `response`, keyed by id.
-    pending_requests: HashMap<u64, PendingRequest>,
+    pub(super) pending_requests: HashMap<u64, PendingRequest>,
     request_spans: HashMap<u64, tracing::Span>,
     /// Plugin-contributed palette commands, keyed by plugin name. A
     /// `BTreeMap` so palette ordering across plugins is deterministic.
@@ -265,7 +267,6 @@ impl PluginManager {
     /// and recording it as pending with a [`REQUEST_TIMEOUT`] deadline.
     /// Returns the allocated id, or `None` if no plugin with that name is
     /// currently running.
-    #[allow(dead_code)]
     pub(crate) fn send_request(
         &mut self,
         plugin_name: &str,
@@ -294,6 +295,7 @@ impl PluginManager {
             id,
             PendingRequest {
                 plugin_name: plugin_name.to_string(),
+                method: method.to_string(),
                 deadline: Instant::now() + REQUEST_TIMEOUT,
             },
         );
@@ -306,7 +308,6 @@ impl PluginManager {
     /// error, recording it exactly like a `plugin_error` (see
     /// `record_plugin_error`) without killing the plugin. Companion to
     /// `drain_actions`/`take_actions`.
-    #[allow(dead_code)]
     pub(crate) fn poll_requests(&mut self) -> Vec<(u64, Result<serde_json::Value, String>)> {
         let mut results = Vec::new();
         for plugin in &mut self.plugins {
@@ -331,11 +332,13 @@ impl PluginManager {
             };
             self.request_spans.remove(&id);
             let message = format!("request {id} to plugin '{}' timed out", pending.plugin_name);
-            self.record_plugin_error(
-                &pending.plugin_name,
-                message.clone(),
-                Some("request".into()),
-            );
+            if pending.method != "diagnostics" {
+                self.record_plugin_error(
+                    &pending.plugin_name,
+                    message.clone(),
+                    Some("request".into()),
+                );
+            }
             results.push((id, Err(message)));
         }
         results

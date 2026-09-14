@@ -437,6 +437,10 @@ fn palette_route_from_char_prefixes() {
     assert_eq!(PaletteRoute::from_char('#'), Some(PaletteRoute::Content));
     assert_eq!(PaletteRoute::from_char(':'), Some(PaletteRoute::GotoLine));
     assert_eq!(PaletteRoute::from_char('@'), Some(PaletteRoute::Symbols));
+    assert_eq!(
+        PaletteRoute::from_char('!'),
+        Some(PaletteRoute::Diagnostics)
+    );
 }
 
 #[test]
@@ -453,6 +457,7 @@ fn palette_route_label() {
     assert_eq!(PaletteRoute::Content.label(), "Content");
     assert_eq!(PaletteRoute::GotoLine.label(), "Go to Line");
     assert_eq!(PaletteRoute::Symbols.label(), "Symbols");
+    assert_eq!(PaletteRoute::Diagnostics.label(), "Diagnostics");
 }
 
 #[test]
@@ -462,6 +467,7 @@ fn palette_route_prefix_char() {
     assert_eq!(PaletteRoute::Content.prefix_char(), '#');
     assert_eq!(PaletteRoute::GotoLine.prefix_char(), ':');
     assert_eq!(PaletteRoute::Symbols.prefix_char(), '@');
+    assert_eq!(PaletteRoute::Diagnostics.prefix_char(), '!');
 }
 
 #[test]

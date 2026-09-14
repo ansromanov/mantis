@@ -256,10 +256,14 @@ impl App {
         // Capture whether this is a genuine file switch before we overwrite
         // current_file with the new path.
         let is_new_file = self.current_file.as_deref() != Some(path);
+        if is_new_file {
+            self.close_diagnostics_picker();
+        }
 
         self.viewing_revision = None;
         self.virtual_file = None;
         self.current_file = Some(path.to_path_buf());
+        self.clear_diagnostics_for_path(path);
         self.current_syntax = None;
         self.mark_session_dirty();
         self.plugin_content_active = false;
@@ -315,8 +319,10 @@ impl App {
     /// working tree but is tracked by git.
     pub(super) fn show_deleted(&mut self, path: &Path) {
         self.invalidate_pending_load();
+        self.close_diagnostics_picker();
         self.viewing_revision = None;
         self.in_file_search = None;
+        self.clear_diagnostics_for_path(path);
         self.current_file = Some(path.to_path_buf());
         self.current_syntax = None;
         self.mark_session_dirty();
@@ -455,6 +461,7 @@ impl App {
         let is_new_file = self.current_file.as_deref() != Some(path);
         let had_filter = self.filter_query.is_some();
         if is_new_file {
+            self.close_diagnostics_picker();
             self.file_at_revision = None;
             self.viewing_revision_hash = None;
             // Remember outgoing cursor, restore incoming cursor
@@ -573,6 +580,7 @@ impl App {
                 if !(is_markdown && self.show_raw_markdown) {
                     self.plugin_manager.on_file_open(path);
                 }
+                self.request_file_diagnostics(path);
             }
             if is_new_file {
                 self.push_recent(path.to_path_buf());

@@ -19,6 +19,8 @@ use std::sync::{OnceLock, RwLock};
 use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
 
+use crate::plugin::types::DiagnosticSeverity;
+
 /// The valid semantic color-role names accepted by feature metadata that
 /// references theme roles by name (e.g. the `[statusbar.colors]` overrides).
 /// Every entry maps to a `Theme` color field; `syntax` is deliberately absent
@@ -128,6 +130,16 @@ struct ThemeToml {
 }
 
 impl Theme {
+    /// Color role used for diagnostics at the given severity.
+    pub fn diagnostic_color(&self, severity: DiagnosticSeverity) -> Color {
+        match severity {
+            DiagnosticSeverity::Error => self.git_conflict,
+            DiagnosticSeverity::Warning => self.git_progress,
+            DiagnosticSeverity::Info => self.accent,
+            DiagnosticSeverity::Hint => self.dim,
+        }
+    }
+
     /// Build a `Theme` from a TOML string. Returns `None` if any field is
     /// invalid.
     fn from_toml(toml_str: &str) -> Option<Theme> {

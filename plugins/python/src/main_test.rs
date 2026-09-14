@@ -11,6 +11,44 @@ fn register_language_provider_produces_valid_json() {
     assert_eq!(parsed["params"]["extensions"][0], "py");
     assert_eq!(parsed["params"]["extensions"][1], "pyi");
     assert_eq!(parsed["params"]["capabilities"][0], "fold");
+    assert_eq!(parsed["params"]["capabilities"][1], "diagnostics");
+}
+
+#[test]
+fn ruff_json_maps_locations_severity_and_source() {
+    let output = br#"[
+        {
+            "code":"F821",
+            "message":"Undefined name `missing`",
+            "location":{"row":3,"column":5},
+            "end_location":{"row":3,"column":12}
+        },
+        {
+            "code":"I001",
+            "message":"Import block is un-sorted",
+            "location":{"row":1,"column":1}
+        },
+        {"code":"E999","message":"invalid location"}
+    ]"#;
+    let diagnostics = ruff_json_to_diagnostics(output).unwrap();
+    assert_eq!(diagnostics.len(), 2);
+    assert_eq!(diagnostics[0]["line"], 2);
+    assert_eq!(diagnostics[0]["column"], 4);
+    assert_eq!(diagnostics[0]["severity"], "error");
+    assert_eq!(diagnostics[0]["source"], "ruff:F821");
+    assert_eq!(diagnostics[0]["end_column"], 11);
+    assert_eq!(diagnostics[1]["severity"], "info");
+}
+
+#[test]
+fn diagnostics_response_echoes_request_id_and_result_shape() {
+    let mut output = Vec::new();
+    respond_diagnostics(42, vec![], &mut output);
+    let response: serde_json::Value =
+        serde_json::from_slice(&output).expect("response is valid JSON");
+    assert_eq!(response["event"], "response");
+    assert_eq!(response["id"], 42);
+    assert_eq!(response["result"]["diagnostics"], serde_json::json!([]));
 }
 
 #[test]

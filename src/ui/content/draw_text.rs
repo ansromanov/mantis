@@ -1,7 +1,7 @@
 //! Virtual-file and inline-fallback content rendering.
 //!
 //! These two branches of `draw_content` share the same structure (display_phys
-//! mapping, fold markers, blame/line-number gutters) and are the longest arms
+//! mapping, diagnostic/fold markers, blame/line-number gutters) and are the longest arms
 //! of the main content-render match. Extracting them here keeps `draw.rs`
 //! under 700 lines.
 
@@ -105,18 +105,26 @@ pub(crate) fn render_virtual_file<'a>(
                     let screen_y = inner.y + offset as u16;
                     new_fold_gutter_rows.push((screen_y, ri));
                     if app.folded.contains(&ri) {
-                        "▶ "
+                        "▶"
                     } else {
-                        "▼ "
+                        "▼"
                     }
                 } else {
-                    "  "
+                    " "
                 }
             } else {
                 ""
             };
             let mut spans = Vec::new();
             if fold_gw > 0 {
+                if let Some(severity) = app.diagnostic_severity_at(phys) {
+                    spans.push(Span::styled(
+                        severity.marker(),
+                        Style::default().fg(app.theme.diagnostic_color(severity)),
+                    ));
+                } else {
+                    spans.push(Span::raw(" "));
+                }
                 spans.push(Span::styled(fold_marker.to_string(), fold_marker_style));
             }
             if show_ln {
@@ -241,18 +249,26 @@ pub(crate) fn render_inline_fallback<'a>(
                     let screen_y = inner.y + offset as u16;
                     inline_fold_gutter_rows.push((screen_y, ri));
                     if app.folded.contains(&ri) {
-                        "▶ "
+                        "▶"
                     } else {
-                        "▼ "
+                        "▼"
                     }
                 } else {
-                    "  "
+                    " "
                 }
             } else {
                 ""
             };
             let mut spans = Vec::new();
             if fold_gw > 0 {
+                if let Some(severity) = app.diagnostic_severity_at(phys) {
+                    spans.push(Span::styled(
+                        severity.marker(),
+                        Style::default().fg(app.theme.diagnostic_color(severity)),
+                    ));
+                } else {
+                    spans.push(Span::raw(" "));
+                }
                 spans.push(Span::styled(fold_marker.to_string(), ln_style));
             }
             if show_ln {

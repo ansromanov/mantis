@@ -25,6 +25,24 @@ fn app_for(root: &std::path::Path) -> App {
     App::new(root.to_path_buf(), Config::default(), None, None).unwrap()
 }
 
+#[test]
+fn diagnostic_severity_query_reads_the_current_file_index() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    let path = root.join("doc.md");
+    app.current_file = Some(path.clone());
+    app.plugin_diagnostic_lines.insert(
+        path,
+        std::collections::HashMap::from([(3, crate::plugin::types::DiagnosticSeverity::Error)]),
+    );
+    assert_eq!(
+        app.diagnostic_severity_at(3),
+        Some(crate::plugin::types::DiagnosticSeverity::Error)
+    );
+    assert_eq!(app.diagnostic_severity_at(4), None);
+    fs::remove_dir_all(root).ok();
+}
+
 fn seed_plugin(app: &mut App, path: PathBuf, lines: &[&str]) {
     let rendered: Vec<Vec<(Style, String)>> = lines
         .iter()

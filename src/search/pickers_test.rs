@@ -33,6 +33,51 @@ fn symbol_picker_fuzzy_filters_and_keeps_nested_cursor_symbol_selected() {
     );
 }
 
+#[test]
+fn diagnostic_picker_filters_source_and_message_and_clamps_selection() {
+    let diagnostics = vec![
+        crate::plugin::types::Diagnostic {
+            line: 4,
+            column: 2,
+            end_line: None,
+            end_column: None,
+            severity: crate::plugin::types::DiagnosticSeverity::Warning,
+            message: "unused variable name".into(),
+            source: "ruff:F841".into(),
+        },
+        crate::plugin::types::Diagnostic {
+            line: 8,
+            column: 0,
+            end_line: Some(8),
+            end_column: Some(12),
+            severity: crate::plugin::types::DiagnosticSeverity::Error,
+            message: "undefined name".into(),
+            source: "ruff:F821".into(),
+        },
+    ];
+    let mut picker = DiagnosticPicker::new(diagnostics);
+    picker.set_selected(1);
+    picker.push('u');
+    picker.push('n');
+    assert_eq!(picker.results_len(), 2);
+    picker.push('d');
+    picker.push('e');
+    picker.push('f');
+    assert_eq!(picker.results_len(), 1);
+    assert_eq!(
+        picker
+            .selected_diagnostic()
+            .map(|diagnostic| diagnostic.line),
+        Some(8)
+    );
+    picker.pop();
+    picker.pop();
+    picker.pop();
+    picker.pop();
+    picker.pop();
+    assert_eq!(picker.selected, 0);
+}
+
 use std::path::PathBuf;
 
 // -- FilterBarState ----------------------------------------------------------

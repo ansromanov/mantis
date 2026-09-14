@@ -13,7 +13,9 @@
 //! priority to break ties between registrations of equal specificity. The
 //! `symbols` capability and [`PluginContributions::symbol_paths`] extend the
 //! push-based language-provider lifecycle with per-file symbol lists that are
-//! removed when their provider exits.
+//! removed when their provider exits. [`Diagnostic`] and
+//! [`PluginContributions::diagnostic_paths`] track correlated diagnostics
+//! results and are removed with their provider as well.
 
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -94,7 +96,7 @@ pub enum Capability {
     Fold,
     /// Hover documentation (reserved; not implemented in 0.8).
     Hover,
-    /// Inline diagnostics (reserved; not implemented in 0.8).
+    /// Read-only diagnostics returned through protocol 3 request/response.
     Diagnostics,
     /// Go-to-definition navigation (reserved; not implemented in 0.8).
     Definition,
@@ -107,6 +109,77 @@ pub enum Capability {
     /// Flat symbol outlines for declared file extensions, delivered via
     /// `set_symbols`.
     Symbols,
+}
+
+/// Severity assigned by a language provider to one diagnostic.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[serde(rename_all = "lowercase")]
+pub enum DiagnosticSeverity {
+    /// A correctness issue that should be fixed.
+    Error,
+    /// A likely problem that may be context-dependent.
+    Warning,
+    /// Additional information about the source.
+    Info,
+    /// A low-priority suggestion.
+    Hint,
+}
+
+impl DiagnosticSeverity {
+    /// Lowercase label used in pickers and diagnostics messages.
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Error => "error",
+            Self::Warning => "warning",
+            Self::Info => "info",
+            Self::Hint => "hint",
+        }
+    }
+
+    /// Single-cell marker used in the content gutter.
+    pub const fn marker(self) -> &'static str {
+        match self {
+            Self::Error => "x",
+            Self::Warning => "!",
+            Self::Info => "i",
+            Self::Hint => ".",
+        }
+    }
+
+    /// Relative importance used when several diagnostics share a line.
+    pub const fn rank(self) -> u8 {
+        match self {
+            Self::Error => 4,
+            Self::Warning => 3,
+            Self::Info => 2,
+            Self::Hint => 1,
+        }
+    }
+}
+
+/// One read-only diagnostic returned by a language provider.
+///
+/// Lines and columns are zero-based physical source coordinates. The UI
+/// currently marks only `line`; optional end coordinates are retained for
+/// consumers such as future range highlighting.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct Diagnostic {
+    /// Zero-based physical line containing the diagnostic.
+    pub line: usize,
+    /// Zero-based column within `line`.
+    pub column: usize,
+    /// Optional zero-based end line.
+    #[serde(default)]
+    pub end_line: Option<usize>,
+    /// Optional zero-based end column.
+    #[serde(default)]
+    pub end_column: Option<usize>,
+    /// Severity used for gutter markers and the status-bar badge.
+    pub severity: DiagnosticSeverity,
+    /// Human-readable diagnostic text.
+    pub message: String,
+    /// Short tool or rule identifier.
+    pub source: String,
 }
 
 /// One named symbol discovered in a source file.
@@ -379,6 +452,8 @@ pub(crate) struct PluginContributions {
     pub(crate) status_fact_paths: HashSet<PathBuf>,
     /// Paths in `plugin_symbols` registered by this plugin.
     pub(crate) symbol_paths: HashSet<PathBuf>,
+    /// Paths in `plugin_diagnostics` registered by this plugin.
+    pub(crate) diagnostic_paths: HashSet<PathBuf>,
     /// Whether this plugin set the icon map / icon fields via `set_icon_map`.
     pub(crate) has_icon_map: bool,
     /// Command IDs registered by this plugin via `register_commands`.

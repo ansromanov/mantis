@@ -257,3 +257,34 @@ fn symbols_route_renders_symbol_name_and_source_line() {
     assert!(joined.contains("App::render_tree"));
     assert!(joined.contains(":5"));
 }
+
+#[test]
+fn diagnostics_route_renders_message_and_source_line() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = make_app(dir.path());
+    let mut palette = CommandPalette::default();
+    palette.push('!');
+    palette.route_diagnostics = Some(crate::search::DiagnosticPicker::new(vec![
+        crate::plugin::types::Diagnostic {
+            line: 4,
+            column: 1,
+            end_line: None,
+            end_column: None,
+            severity: crate::plugin::types::DiagnosticSeverity::Error,
+            message: "bad token".into(),
+            source: "ruff:E999".into(),
+        },
+    ]));
+    app.command_palette = Some(palette);
+
+    let backend = TestBackend::new(80, 30);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| draw_command_palette(frame, &mut app, frame.area()))
+        .unwrap();
+    let joined = buffer_rows(&terminal).join("\n");
+    assert!(joined.contains(" Diagnostics - "));
+    assert!(joined.contains("ruff:E999"));
+    assert!(joined.contains("bad token"));
+    assert!(joined.contains("error 5:2"));
+}

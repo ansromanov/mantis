@@ -53,7 +53,7 @@ dynamically.
 |---|---|---|
 | `"1"` | 0.7.x | Initial protocol. Events: init, on_file_open, on_keypress, on_selection_change, on_theme_change, on_quit, shutdown. Actions: show_message, open_file, set_content, set_icon_map. Git features (set_file_statuses, set_blame_data, set_status_bar_git_info) were removed in 0.11.22 — git is now built in only. |
 | `"2"` | 0.8.x | Language providers (register_language_provider, set_fold_regions), event subscription (`events` field in manifest), protocol hardening (bounded queues, line caps), `protocol_version` field on init event. `init`/`on_theme_change` additionally carry an optional `colors` object (0.13.x, additive — does not bump this version) with the active theme's actual role colors as `#rrggbb` hex. |
-| `"3"` | 0.14.x | Request/response correlation (`request`/`response` events) so the host can ask a plugin for something and match the reply; a `plugin_error` action for reporting failures outside the request/response flow; key-consumption semantics for `on_keypress` (`key_handled` action, host waits up to one tick); `priority` field on `register_language_provider` plus a status-bar warning on conflicting registrations; manifest field renamed `tv_protocol` → `mantis_protocol` (alias kept, see above). As with every prior protocol bump, discovery requires an exact version match: a manifest still declaring `"2"` is silently skipped, not loaded in a reduced-compatibility mode — plugins must declare `"3"` (via `mantis_protocol`, or its `tv_protocol` alias) to be discovered on this host. `highlight` capability remains formally reserved and unimplemented: real syntax highlighting continues to flow through syntax plugins (`.sublime-syntax` + syntect), not language providers. A `status_facts` capability plus `set_status_facts` action (0.18.x, additive — does not bump this version) let a provider push a free-text status-bar summary for a file, gated the same way as `fold`/`set_fold_regions`; the bundled `k8s` plugin uses it to report Kubernetes resource identity and per-kind counts for `.yaml`/`.yml` files without conflicting with the `yaml` plugin's `fold` registration on the same extensions. Optional `filenames` and `shebangs` selectors for `register_language_provider` (0.21.x, additive — see #836) also do not change the protocol version. The `on_content_cursor_change` event (0.21.x, additive — does not bump this version) sends debounced, one-based line and column coordinates to subscribers. Chunked rendered content (`set_content_chunk` + `set_content_end`, 0.21.x) is also additive and keeps the protocol at version 3. |
+| `"3"` | 0.14.x | Request/response correlation (`request`/`response` events) so the host can ask a plugin for something and match the reply; a `plugin_error` action for reporting failures outside the request/response flow; key-consumption semantics for `on_keypress` (`key_handled` action, host waits up to one tick); `priority` field on `register_language_provider` plus a status-bar warning on conflicting registrations; manifest field renamed `tv_protocol` → `mantis_protocol` (alias kept, see above). As with every prior protocol bump, discovery requires an exact version match: a manifest still declaring `"2"` is silently skipped, not loaded in a reduced-compatibility mode — plugins must declare `"3"` (via `mantis_protocol`, or its `tv_protocol` alias) to be discovered on this host. `highlight` capability remains formally reserved and unimplemented: real syntax highlighting continues to flow through syntax plugins (`.sublime-syntax` + syntect), not language providers. A `status_facts` capability plus `set_status_facts` action (0.18.x, additive — does not bump this version) let a provider push a free-text status-bar summary for a file, gated the same way as `fold`/`set_fold_regions`; the bundled `k8s` plugin uses it to report Kubernetes resource identity and per-kind counts for `.yaml`/`.yml` files without conflicting with the `yaml` plugin's `fold` registration on the same extensions. Optional `filenames` and `shebangs` selectors for `register_language_provider` (0.21.x, additive — see #836) also do not change the protocol version. The `on_content_cursor_change` event (0.21.x, additive — does not bump this version) sends debounced, one-based line and column coordinates to subscribers. Chunked rendered content (`set_content_chunk` + `set_content_end`, 0.21.x) is also additive. The `diagnostics` capability (0.21.x, additive — see #834) uses request/response without changing the protocol version. |
 
 ### Discovery
 
@@ -269,20 +269,40 @@ Rules:
   unchanged in the response. IDs are not reused while a request is
   outstanding.
 - Exactly one of `result` / `error` must be present.
-- The host applies a per-plugin timeout to each request (a bounded number of
-  ticks). If no response arrives in time, the host treats it as an error,
-  logs it the same way as a `plugin_error` (see below), and does not kill the
-  plugin — a slow or missed response degrades gracefully rather than being
-  fatal.
+- The host applies a 300 ms timeout to each request (5 seconds in test builds).
+  If no response arrives in time, the host treats it as an error and
+  does not kill the plugin. Non-diagnostics requests are logged like a
+  `plugin_error`; a missed diagnostics response is silent and leaves the file
+  without diagnostic UI.
 - `request`/`response` is additive to the existing event/action stream, not a
   replacement: `set_fold_regions` pushed unprompted still works exactly as in
   protocol 2 for plugins that don't implement requests. The host only sends
   `request` events to plugins that declared protocol 3 in their manifest.
 
-This is the surface the reserved `hover`, `diagnostics`, and `definition`
-capabilities are expected to use once implemented — each as a `method` name
-on the same `request`/`response` pair, gated by the corresponding capability
-in `register_language_provider`.
+This is the surface the `hover` and `definition` capabilities can use in the
+future. Diagnostics uses the same pair today, gated by the `diagnostics`
+capability in `register_language_provider`.
+
+For diagnostics, the host sends a `diagnostics` request with the current file
+path whenever that file is opened or reloaded:
+
+```json
+{"event":"request","id":43,"method":"diagnostics","params":{"path":"/repo/main.py"}}
+```
+
+The plugin responds with a result object containing a `diagnostics` array:
+
+```json
+{"event":"response","id":43,"result":{"diagnostics":[
+  {"line":4,"column":8,"end_line":4,"end_column":13,
+   "severity":"error","message":"Undefined name `value`","source":"ruff:F821"}
+]}}
+```
+
+Coordinates are zero-based physical source positions; end coordinates are
+optional. `severity` is `error`, `warning`, `info`, or `hint`; `message` and
+`source` are strings. The host ignores malformed entries, caps accepted
+results at 10,000 items, and ignores late replies after a newer reload.
 
 ## Actions: plugin → tv (stdout)
 
@@ -464,10 +484,9 @@ A process plugin can declare itself as a **language provider** by responding to
 the `init` event with a `register_language_provider` action. This tells `mantis`
 which file extensions the plugin handles and what capabilities it provides.
 `fold` and `symbols` are implemented via push (`set_fold_regions` and
-`set_symbols`); `highlight` is formally reserved (see below). The reserved capabilities (`hover`, `diagnostics`,
-`definition`) are expected to slot in as `request`/`response` methods (see
-[Requests: mantis ⇄ plugin](#requests-mantis--plugin-protocol-3)) once
-implemented, without a protocol break.
+`set_symbols`); `diagnostics` uses a request/response; `highlight` is formally
+reserved (see below). `hover` and `definition` can use the same request
+transport later without a protocol break.
 
 ### Provider contract
 
@@ -492,8 +511,9 @@ lifecycle:
    without conflicting as long as they declare *different* capabilities —
    e.g. the bundled `yaml` plugin owns `fold` for `.yaml`/`.yml` while the
    bundled `k8s` plugin owns `status_facts` for the same extensions. `fold`
-   `status_facts`, and `symbols` drive backend state (fold regions, status-bar text, and symbol outlines,
-   respectively); `highlight` is reserved for future use (see below).
+  `status_facts`, `symbols`, and `diagnostics` drive backend state (fold
+  regions, status-bar text, symbol outlines, and diagnostics, respectively);
+  `highlight` is reserved for future use (see below).
 
 3. **Response.** For each declared capability, the plugin should respond to
    file-related events with the corresponding action:
@@ -503,6 +523,8 @@ lifecycle:
       opened (see below).
    - `symbols` → respond with `set_symbols` when a matching file is opened
       (see below).
+   - `diagnostics` → respond to the host's `diagnostics` request with a
+      `diagnostics` result array (see above).
    - `highlight` → reserved for future use.
 
 4. **Lifetime.** Provider registrations persist for the entire plugin session.
@@ -541,8 +563,9 @@ Fields:
 - `shebangs` — optional interpreter executable names, case-insensitive, such as
   `bash`, `sh`, or `python3`. For `env` shebangs the host skips common env flags
   and assignments before reading the interpreter name.
-- `capabilities` — one or more of `"highlight"`, `"fold"`, `"status_facts"`, or `"symbols"`.
-  Reserved for future use: `"hover"`, `"diagnostics"`, `"definition"`.
+- `capabilities` — one or more of `"highlight"`, `"fold"`, `"status_facts"`,
+  `"symbols"`, or `"diagnostics"`. Reserved for future use: `"hover"` and
+  `"definition"`.
 - `priority` — optional signed integer, default `0` (protocol 3+). Used only
   to break ties between providers with the same match specificity and
   capability; higher wins. Match precedence is exact filename, filename glob,
@@ -661,6 +684,7 @@ special cases needed.
 | `set_fold_regions` | `plugin_fold_regions` entries for contributed paths; active fold state reset |
 | `set_status_facts` | `plugin_status_facts` entries for contributed paths |
 | `set_symbols` | `plugin_symbols` entries for contributed paths |
+| `response` (`diagnostics`) | Diagnostic entries, line index, status-bar segments, and picker data for contributed paths |
 | `register_language_provider` | Provider registration removed |
 | `register_commands` | Palette command registrations removed; an open palette listing them is closed |
 | `register_context_items` | Context menu item registrations removed; an open context menu is closed |

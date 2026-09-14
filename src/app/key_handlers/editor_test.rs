@@ -21,6 +21,32 @@ fn app_for(root: &std::path::Path) -> App {
     App::new(root.to_path_buf(), Config::default(), None, None).unwrap()
 }
 
+#[test]
+fn diagnostics_picker_opens_the_diagnostics_palette_route() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let path = root.join("a.txt");
+    app.current_file = Some(path.clone());
+    app.plugin_diagnostics.insert(
+        path,
+        vec![crate::plugin::types::Diagnostic {
+            line: 1,
+            column: 0,
+            end_line: None,
+            end_column: None,
+            severity: crate::plugin::types::DiagnosticSeverity::Warning,
+            message: "unused value".into(),
+            source: "lint".into(),
+        }],
+    );
+    app.open_diagnostics_picker();
+    assert_eq!(
+        app.command_palette.as_ref().map(|palette| palette.route),
+        Some(crate::command_palette::PaletteRoute::Diagnostics)
+    );
+    fs::remove_dir_all(root).ok();
+}
+
 fn palette_with_query(query: &str) -> CommandPalette {
     let mut p = CommandPalette::default();
     for c in query.chars() {

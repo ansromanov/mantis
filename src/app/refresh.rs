@@ -54,6 +54,7 @@ impl App {
             self.update_rx = None;
         }
         self.drain_plugin_actions();
+        self.drain_plugin_responses();
         self.expire_plugin_content_streams(self.now());
         self.process_pending_keypress();
         self.flush_pending_content_cursor();
@@ -866,6 +867,168 @@ impl App {
                 }
             }
         }
+    }
+
+    /// Starts a diagnostics request for the winning provider of `path`.
+    /// Existing results are cleared immediately so watcher reloads cannot
+    /// leave stale markers visible while a provider is working.
+    pub(crate) fn request_file_diagnostics(&mut self, path: &std::path::Path) {
+        self.clear_diagnostics_for_path(path);
+        let Some(provider) = self
+            .plugin_manager
+            .provider_for_file(path, &crate::plugin::Capability::Diagnostics)
+        else {
+            return;
+        };
+        let provider_name = provider.plugin_name.clone();
+        let params = serde_json::json!({"path": path.to_string_lossy()});
+        let Some(id) = self
+            .plugin_manager
+            .send_request(&provider_name, "diagnostics", params)
+        else {
+            return;
+        };
+        self.pending_diagnostic_requests
+            .insert(id, (path.to_path_buf(), provider_name));
+        self.latest_diagnostic_requests
+            .insert(path.to_path_buf(), id);
+    }
+
+    /// Removes one file's diagnostic data and its path ownership record.
+    pub(crate) fn clear_diagnostics_for_path(&mut self, path: &std::path::Path) {
+        self.plugin_diagnostics.remove(path);
+        self.plugin_diagnostic_lines.remove(path);
+        if let Some(owner) = self.diagnostic_owners.remove(path) {
+            if let Some(contributions) = self.plugin_contributions.get_mut(&owner) {
+                contributions.diagnostic_paths.remove(path);
+            }
+        }
+        self.latest_diagnostic_requests.remove(path);
+        if self.current_file.as_deref() == Some(path) {
+            if let Some(picker) = self
+                .command_palette
+                .as_mut()
+                .filter(|palette| {
+                    palette.route == crate::command_palette::PaletteRoute::Diagnostics
+                })
+                .and_then(|palette| palette.route_diagnostics.as_mut())
+            {
+                picker.set_diagnostics(Vec::new());
+            }
+        }
+    }
+
+    /// Closes diagnostics tied to the previous file after genuine navigation.
+    pub(crate) fn close_diagnostics_picker(&mut self) {
+        if self.command_palette.as_ref().is_some_and(|palette| {
+            palette.route == crate::command_palette::PaletteRoute::Diagnostics
+        }) {
+            self.command_palette = None;
+        }
+    }
+
+    /// Applies completed protocol request/response pairs on the UI thread.
+    fn drain_plugin_responses(&mut self) {
+        let responses = self.plugin_manager.poll_requests();
+        for (id, result) in responses {
+            self.handle_diagnostic_response(id, result);
+        }
+    }
+
+    fn handle_diagnostic_response(&mut self, id: u64, result: Result<serde_json::Value, String>) {
+        let Some((path, provider_name)) = self.pending_diagnostic_requests.remove(&id) else {
+            return;
+        };
+        if self.latest_diagnostic_requests.get(&path) != Some(&id) {
+            return;
+        }
+        self.latest_diagnostic_requests.remove(&path);
+        let Some(provider) = self
+            .plugin_manager
+            .provider_for_file(&path, &crate::plugin::Capability::Diagnostics)
+        else {
+            return;
+        };
+        if provider.plugin_name != provider_name {
+            return;
+        }
+        let Ok(result) = result else {
+            return;
+        };
+        let Some(items) = result
+            .get("diagnostics")
+            .and_then(serde_json::Value::as_array)
+        else {
+            return;
+        };
+        let diagnostics: Vec<crate::plugin::types::Diagnostic> = items
+            .iter()
+            .take(10_000)
+            .filter_map(|item| {
+                let mut diagnostic =
+                    serde_json::from_value::<crate::plugin::types::Diagnostic>(item.clone())
+                        .ok()?;
+                if diagnostic.message.is_empty()
+                    || diagnostic.end_line.is_some_and(|end| end < diagnostic.line)
+                    || (diagnostic.end_line == Some(diagnostic.line)
+                        && diagnostic
+                            .end_column
+                            .is_some_and(|end| end < diagnostic.column))
+                {
+                    return None;
+                }
+                diagnostic.message = crate::ansi::sanitize_terminal_text(&diagnostic.message)
+                    .split_whitespace()
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                diagnostic.source = crate::ansi::sanitize_terminal_text(&diagnostic.source)
+                    .split_whitespace()
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                Some(diagnostic)
+            })
+            .collect();
+        if diagnostics.is_empty() {
+            return;
+        }
+        let mut line_severity = std::collections::HashMap::new();
+        for diagnostic in &diagnostics {
+            line_severity
+                .entry(diagnostic.line)
+                .and_modify(|severity: &mut crate::plugin::types::DiagnosticSeverity| {
+                    if diagnostic.severity.rank() > severity.rank() {
+                        *severity = diagnostic.severity;
+                    }
+                })
+                .or_insert(diagnostic.severity);
+        }
+        self.plugin_diagnostics.insert(path.clone(), diagnostics);
+        self.plugin_diagnostic_lines
+            .insert(path.clone(), line_severity);
+        if self.current_file.as_deref() == Some(path.as_path()) {
+            let refreshed = self
+                .plugin_diagnostics
+                .get(&path)
+                .cloned()
+                .unwrap_or_default();
+            if let Some(picker) = self
+                .command_palette
+                .as_mut()
+                .filter(|palette| {
+                    palette.route == crate::command_palette::PaletteRoute::Diagnostics
+                })
+                .and_then(|palette| palette.route_diagnostics.as_mut())
+            {
+                picker.set_diagnostics(refreshed);
+            }
+        }
+        self.diagnostic_owners
+            .insert(path.clone(), provider_name.clone());
+        self.plugin_contributions
+            .entry(provider_name)
+            .or_default()
+            .diagnostic_paths
+            .insert(path);
     }
 
     /// Handles a `register_commands` action: parses the command list, stores

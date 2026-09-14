@@ -41,6 +41,45 @@ fn user_input_pauses_follow_mode_and_toggle_clears_pause() {
 }
 
 #[test]
+fn clearing_file_diagnostics_removes_results_and_line_markers() {
+    let root = temp_dir();
+    let path = root.join("a.txt");
+    fs::write(&path, "a\n").unwrap();
+    let mut app = app_for(&root);
+    app.current_file = Some(path.clone());
+    app.plugin_diagnostics.insert(path.clone(), Vec::new());
+    app.plugin_diagnostic_lines.insert(
+        path.clone(),
+        std::collections::HashMap::from([(0, crate::plugin::types::DiagnosticSeverity::Warning)]),
+    );
+    let mut picker = crate::search::DiagnosticPicker::new(vec![crate::plugin::types::Diagnostic {
+        line: 0,
+        column: 0,
+        end_line: None,
+        end_column: None,
+        severity: crate::plugin::types::DiagnosticSeverity::Warning,
+        message: "old result".into(),
+        source: "test".into(),
+    }]);
+    picker.push('o');
+    let mut palette = crate::command_palette::CommandPalette::default();
+    palette.route = crate::command_palette::PaletteRoute::Diagnostics;
+    palette.route_diagnostics = Some(picker);
+    app.command_palette = Some(palette);
+    app.clear_diagnostics_for_path(&path);
+    assert!(!app.plugin_diagnostics.contains_key(&path));
+    assert!(!app.plugin_diagnostic_lines.contains_key(&path));
+    let picker = app
+        .command_palette
+        .as_ref()
+        .and_then(|palette| palette.route_diagnostics.as_ref())
+        .expect("same-file reload keeps the diagnostics picker open");
+    assert_eq!(picker.query, "o");
+    assert!(picker.filtered.is_empty());
+    fs::remove_dir_all(root).ok();
+}
+
+#[test]
 fn apply_file_load_caches_and_refreshes_provider_shebang() {
     let root = temp_dir();
     let path = root.join("run-script");

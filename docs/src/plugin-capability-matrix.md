@@ -1,6 +1,6 @@
 # Plugin Capability Matrix
 
-Audit of the plugin protocol (v2) as of 0.12.x: what the protocol declares,
+Audit of the plugin protocol (v3) as of 0.21.x: what the protocol declares,
 what the host actually implements, and what the bundled plugins use. This is
 the "take stock" pass after the 0.8 plugin work (issue #296). For the protocol
 itself — message formats, examples, contribution/teardown rules — see
@@ -18,7 +18,7 @@ routes them via `PluginManager::provider_for` (`src/plugin/manager.rs`).
 | `status_facts` | yes (0.18.x) | yes — gates `set_status_facts` in `handle_plugin_set_status_facts` (`src/app/refresh.rs`) | **yes** — used by the bundled `k8s` plugin, coexisting with `yaml`'s `fold` registration on the same `.yaml`/`.yml` extensions |
 | `highlight` | yes | **no** — accepted at registration, never checked anywhere | no |
 | `hover` | yes (reserved) | no — unimplementable in v2 (no request/response correlation) | no |
-| `diagnostics` | yes (reserved) | no — same as `hover` | no |
+| `diagnostics` | yes | yes — sends a correlated `diagnostics` request to the winning provider, validates results, and clears contributed state on teardown | **yes** — bundled `python` plugin uses Ruff when installed |
 | `definition` | yes (reserved) | no — same as `hover` | no |
 
 Note on `highlight`: real syntax highlighting flows through **syntax plugins**
@@ -42,6 +42,7 @@ Every action the host accepts, dispatched in `App::handle_plugin_action`
 | `register_language_provider` | yes | provider registration in `PluginManager` | yes — `remove_provider_registrations` | yes — rust, python, json, yaml, k8s |
 | `set_fold_regions` | yes | `fold_region_paths` | yes — regions removed, fold state reset | yes — rust, python, json, yaml |
 | `set_status_facts` | yes | `status_fact_paths` | yes — facts removed for contributed paths | yes — k8s |
+| `response` (`diagnostics`) | yes (protocol 3) | `diagnostic_paths` | yes — markers, line index, badge, and picker data removed | yes — python / Ruff |
 | `register_commands` | yes | `command_ids` | yes — commands removed, open palette closed | no |
 | `register_context_items` | yes | `context_item_ids` | yes — context items removed, open context menu closed | no |
 | `register_status_segments` | yes | `status_segment_ids` | yes — status segments removed | no |
@@ -61,7 +62,7 @@ version history in [Plugin Development](plugin-development.md) only.
 |---|---|---|---|
 | `iconize` | process | `set_icon_map` | none |
 | `markdown` | process | `set_content` | none |
-| `python` | process | `register_language_provider`, `set_fold_regions` | `fold` |
+| `python` | process | `register_language_provider`, `set_fold_regions`, `response` | `fold`, `diagnostics` |
 | `rust` | process | `register_language_provider`, `set_fold_regions` | `fold` |
 | `go` | process | `register_language_provider`, `set_fold_regions` | `fold` |
 | `json` | process | `register_language_provider`, `set_fold_regions` | `fold` |
@@ -74,10 +75,10 @@ version history in [Plugin Development](plugin-development.md) only.
 
 ## Gaps and follow-ups
 
-1. **Reserved capabilities (`hover`, `diagnostics`, `definition`) are
-   unimplementable in protocol v2** — they need id-correlated
-   request/response. Tracked in the protocol v3 proposal (issue #481), which
-   names this audit as its precursor.
+1. **Reserved capabilities (`hover`, `definition`)** still need concrete UI and
+   contribution models. `diagnostics` uses the protocol 3 request/response
+   transport and is implemented by the host; the bundled Python provider uses
+   Ruff when available.
 2. **The language-provider fold pipeline has bundled consumers** —
    `register_language_provider` + `Capability::Fold` + `set_fold_regions` are
    used by the bundled `rust` (issue #599), `go` (issue #600), `python`
@@ -107,7 +108,7 @@ version history in [Plugin Development](plugin-development.md) only.
    filename specificity wins over extension and shebang matches (see #836).
 3. **`Capability::Highlight` is declared but routes to nothing.** Either
    implement provider-driven highlighting in v3 or re-document it as reserved
-   alongside `hover`/`diagnostics`/`definition`. Not yet tracked in a
+   alongside `hover`/`definition`. Not yet tracked in a
    dedicated issue; candidate checklist item for #481.
 4. **`status_facts`/`set_status_facts` (0.18.x) resolves the protocol gap
    that blocked issue #606** (k8s manifest awareness): the epic's "per-language

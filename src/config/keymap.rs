@@ -294,6 +294,7 @@ impl Keymap {
             "plugin_picker" => &self.plugin_picker,
             "goto_line" => &self.goto_line,
             "symbol_outline" => &self.symbol_outline,
+            "diagnostics_picker" => &self.diagnostics_picker,
             "toggle_raw_markdown" => &self.toggle_raw_markdown,
             "follow_tail" => &self.follow_tail,
             "filter_lines" => &self.filter_lines,
@@ -430,6 +431,8 @@ pub struct Keymap {
     pub goto_line: Vec<KeyBinding>,
     /// Opens the current file's language-provider symbol outline.
     pub symbol_outline: Vec<KeyBinding>,
+    /// Opens the current file's language-provider diagnostics picker.
+    pub diagnostics_picker: Vec<KeyBinding>,
     pub toggle_raw_markdown: Vec<KeyBinding>,
     pub follow_tail: Vec<KeyBinding>,
     pub filter_lines: Vec<KeyBinding>,
@@ -530,6 +533,7 @@ impl Default for Keymap {
             plugin_picker: bind(&["tree:p"]),
             goto_line: bind(&["ctrl+g"]),
             symbol_outline: bind(&["content:O"]),
+            diagnostics_picker: bind(&["content:!"]),
             toggle_raw_markdown: bind(&["M"]),
             follow_tail: bind(&["content:F"]),
             filter_lines: bind(&["content:&"]),

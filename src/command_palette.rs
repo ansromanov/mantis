@@ -1,6 +1,7 @@
 //! The Ctrl-P command palette: a fuzzy-filterable picker over the
 //! palette-invokable subset of the canonical action registry, with prefix
-//! routing to file search, content search, go-to-line, and file symbols.
+//! routing to file search, content search, go-to-line, file symbols, and
+//! diagnostics.
 //!
 //! `COMMANDS` is derived from `crate::actions::ACTIONS`, keeping only entries
 //! with `palette: Some(_)`, so this module no longer hand-maintains its own
@@ -41,7 +42,7 @@ use crate::config::Keymap;
 use crate::list_picker::ListPicker;
 use crate::plugin::PluginCommand;
 use crate::search::fuzzy_refilter;
-use crate::search::{GotoLineState, SearchState, SymbolPicker};
+use crate::search::{DiagnosticPicker, GotoLineState, SearchState, SymbolPicker};
 
 /// Routes the command palette query to different picker modes via a
 /// single-character prefix typed as the first character in the query bar.
@@ -62,6 +63,7 @@ pub enum PaletteRoute {
     Content,
     GotoLine,
     Symbols,
+    Diagnostics,
 }
 
 impl PaletteRoute {
@@ -74,6 +76,7 @@ impl PaletteRoute {
             '#' => Some(Self::Content),
             ':' => Some(Self::GotoLine),
             '@' => Some(Self::Symbols),
+            '!' => Some(Self::Diagnostics),
             _ => None,
         }
     }
@@ -86,6 +89,7 @@ impl PaletteRoute {
             Self::Content => "Content",
             Self::GotoLine => "Go to Line",
             Self::Symbols => "Symbols",
+            Self::Diagnostics => "Diagnostics",
         }
     }
 
@@ -97,6 +101,7 @@ impl PaletteRoute {
             Self::Content => '#',
             Self::GotoLine => ':',
             Self::Symbols => '@',
+            Self::Diagnostics => '!',
         }
     }
 }
@@ -152,6 +157,8 @@ pub struct CommandPalette {
     pub route_goto_line: Option<GotoLineState>,
     /// Sub-picker for symbols from the current file's language provider.
     pub route_symbols: Option<SymbolPicker>,
+    /// Sub-picker for diagnostics returned for the current file.
+    pub route_diagnostics: Option<DiagnosticPicker>,
     /// Combined list of built-in + plugin commands. Indices in `filtered`
     /// and `base_order` reference this list.
     pub all_commands: Vec<CommandEntry>,
@@ -268,6 +275,7 @@ impl CommandPalette {
             route_search: None,
             route_goto_line: None,
             route_symbols: None,
+            route_diagnostics: None,
             all_commands,
         }
     }
@@ -298,6 +306,11 @@ impl CommandPalette {
             PaletteRoute::Symbols => {
                 if let Some(ref mut symbols) = self.route_symbols {
                     symbols.push(c);
+                }
+            }
+            PaletteRoute::Diagnostics => {
+                if let Some(ref mut diagnostics) = self.route_diagnostics {
+                    diagnostics.push(c);
                 }
             }
         }
@@ -339,6 +352,11 @@ impl CommandPalette {
                     symbols.pop();
                 }
             }
+            PaletteRoute::Diagnostics => {
+                if let Some(ref mut diagnostics) = self.route_diagnostics {
+                    diagnostics.pop();
+                }
+            }
         }
     }
 
@@ -350,6 +368,10 @@ impl CommandPalette {
             }
             PaletteRoute::GotoLine => self.route_goto_line.as_ref().map_or(0, |g| g.results_len()),
             PaletteRoute::Symbols => self.route_symbols.as_ref().map_or(0, |s| s.results_len()),
+            PaletteRoute::Diagnostics => self
+                .route_diagnostics
+                .as_ref()
+                .map_or(0, |diagnostics| diagnostics.results_len()),
         }
     }
 
@@ -369,6 +391,10 @@ impl CommandPalette {
                 .route_symbols
                 .as_ref()
                 .is_none_or(|symbols| symbols.query.is_empty()),
+            PaletteRoute::Diagnostics => self
+                .route_diagnostics
+                .as_ref()
+                .is_none_or(|diagnostics| diagnostics.query.is_empty()),
         }
     }
 
@@ -395,6 +421,13 @@ impl CommandPalette {
                 self.route_symbols
                     .as_ref()
                     .map(|symbols| symbols.query.as_str())
+                    .unwrap_or(EMPTY)
+            }
+            PaletteRoute::Diagnostics => {
+                static EMPTY: &str = "";
+                self.route_diagnostics
+                    .as_ref()
+                    .map(|diagnostics| diagnostics.query.as_str())
                     .unwrap_or(EMPTY)
             }
         }
@@ -507,6 +540,10 @@ impl ListPicker for CommandPalette {
             }
             PaletteRoute::GotoLine => 0,
             PaletteRoute::Symbols => self.route_symbols.as_ref().map_or(0, |s| s.selected),
+            PaletteRoute::Diagnostics => self
+                .route_diagnostics
+                .as_ref()
+                .map_or(0, |diagnostics| diagnostics.selected),
         }
     }
     fn set_selected(&mut self, i: usize) {
@@ -524,6 +561,11 @@ impl ListPicker for CommandPalette {
             PaletteRoute::Symbols => {
                 if let Some(ref mut symbols) = self.route_symbols {
                     symbols.set_selected(i);
+                }
+            }
+            PaletteRoute::Diagnostics => {
+                if let Some(ref mut diagnostics) = self.route_diagnostics {
+                    diagnostics.set_selected(i);
                 }
             }
         }

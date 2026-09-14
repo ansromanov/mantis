@@ -180,6 +180,7 @@ These work no matter which panel is focused.
 | `p` (tree)             | Plugin palette (enable/disable plugins) |
 | `Ctrl+g`               | Go to line              |
 | `O` (content)          | Open the symbol outline (when a provider supplies symbols) |
+| `!` (content)          | Open diagnostics for the current file (when available) |
 | `Ctrl+b`               | Toggle full-file blame (dedicated pane replacing the tree) |
 | `B` (content)          | Toggle single-line blame bar for the active line |
 | `t` (tree)             | Theme picker            |
@@ -332,6 +333,7 @@ the **first** character of the query to switch what it searches:
 | `#`    | Content search (grep across files)          |
 | `:`    | Go to line (`42`, `+5`, `-3`)               |
 | `@`    | Symbols in the open file                    |
+| `!`    | Diagnostics in the open file                |
 
 In the file/content modes, `Tab` toggles between the two (just like the
 standalone search overlay), and `Enter` opens the selected result. Backspace
@@ -343,6 +345,11 @@ the palette to fuzzy-search the current file's functions, types, and other
 symbols. Press `Enter` to jump to the declaration. Press `O` in the content
 pane to open the same outline with the symbol containing the cursor selected.
 The status bar shows the enclosing symbol as a scope breadcrumb.
+
+With a language provider that supports diagnostics enabled, type `!` to search
+the current file's diagnostics. Press `Enter` to jump to the selected location.
+The content gutter marks diagnostic lines, while the status bar shows diagnostic
+counts and the active line's message.
 
 ## Reporting a bug
 

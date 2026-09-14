@@ -456,6 +456,10 @@ impl App {
                 self.open_symbol_outline();
                 true
             }
+            Some("diagnostics_picker") => {
+                self.open_diagnostics_picker();
+                true
+            }
             Some("compare_against") => {
                 self.revision_picker = Some(crate::search::RevisionPicker::new(&self.root));
                 true
@@ -596,6 +600,67 @@ impl App {
             .and_then(|palette| palette.route_symbols.as_ref())
             .and_then(crate::search::SymbolPicker::selected_symbol)
             .map(|symbol| symbol.line);
+        self.command_palette = None;
+        if let Some(line) = line {
+            let display_line = self.physical_to_display(line);
+            let max = self.display_line_count().saturating_sub(1);
+            self.active_line = display_line.min(max);
+            self.scroll_active_line_into_view();
+            self.mark_content_scrolled();
+            self.mark_session_dirty();
+        }
+    }
+
+    /// Opens the diagnostic picker for the current file.
+    pub(crate) fn open_diagnostics_picker(&mut self) {
+        let Some(path) = self.current_file.as_ref() else {
+            self.set_status("diagnostics: no file is open");
+            return;
+        };
+        let Some(diagnostics) = self
+            .plugin_diagnostics
+            .get(path)
+            .cloned()
+            .filter(|diagnostics| !diagnostics.is_empty())
+        else {
+            self.set_status("diagnostics: no diagnostics in file");
+            return;
+        };
+        let (base_order, base_pinned) = crate::command_palette::ranked_base_order(
+            &self.command_usage,
+            self.config.palette_pin_recent,
+            self.config.palette_frequent_count,
+        );
+        let reasons = crate::command_palette::COMMANDS
+            .iter()
+            .map(|command| self.check_applicability(&command.action_id).err())
+            .collect();
+        let commands = self
+            .plugin_manager
+            .all_plugin_commands()
+            .into_iter()
+            .cloned()
+            .collect();
+        let mut palette = crate::command_palette::CommandPalette::new(
+            &self.keys,
+            base_order,
+            base_pinned,
+            reasons,
+            commands,
+        );
+        palette.route = crate::command_palette::PaletteRoute::Diagnostics;
+        palette.route_diagnostics = Some(crate::search::DiagnosticPicker::new(diagnostics));
+        self.command_palette = Some(palette);
+    }
+
+    /// Jumps to the selected diagnostic's source line and closes the picker.
+    pub(crate) fn dispatch_palette_diagnostic(&mut self) {
+        let line = self
+            .command_palette
+            .as_ref()
+            .and_then(|palette| palette.route_diagnostics.as_ref())
+            .and_then(crate::search::DiagnosticPicker::selected_diagnostic)
+            .map(|diagnostic| diagnostic.line);
         self.command_palette = None;
         if let Some(line) = line {
             let display_line = self.physical_to_display(line);

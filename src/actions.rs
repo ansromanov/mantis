@@ -655,6 +655,14 @@ pub static ACTIONS: &[ActionSpec] = &[
         description: Some("Filter and jump to symbols in the current file"),
     },
     ActionSpec {
+        id: "diagnostics_picker",
+        palette: Some("Show diagnostics"),
+        help: Some("show diagnostics for the current file"),
+        category: "Navigate",
+        menu: Some(0),
+        description: Some("Filter diagnostics and jump to a reported line"),
+    },
+    ActionSpec {
         id: "compare_against",
         palette: Some("Compare against a revision"),
         help: None,
@@ -742,6 +750,8 @@ pub enum Applicability {
     GitMode,
     /// Requires a current file with symbols from its language provider.
     Symbols,
+    /// Requires a current file with diagnostics from its language provider.
+    Diagnostics,
 }
 
 impl ActionSpec {
@@ -766,6 +776,7 @@ impl ActionSpec {
             "open_in_editor" | "open_external" | "copy_path" | "copy_relative_path"
             | "copy_line" | "copy_file" | "goto_line" => Applicability::OpenFile,
             "symbol_outline" => Applicability::Symbols,
+            "diagnostics_picker" => Applicability::Diagnostics,
             "git_mode_flat_toggle" => Applicability::GitMode,
             _ => Applicability::Always,
         }
