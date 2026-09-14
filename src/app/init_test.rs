@@ -27,6 +27,14 @@ fn new_app_starts_with_empty_statusbar_geometry() {
 }
 
 #[test]
+fn new_app_starts_with_no_cached_affordances() {
+    // The cache is keyed by `tree_revision`, so starting empty is what makes
+    // the first render resolve badges instead of trusting a stale vector.
+    let app = App::new(std::path::PathBuf::from("."), Config::default(), None, None).unwrap();
+    assert!(app.tree_affordance_cache.is_none());
+}
+
+#[test]
 fn new_app_starts_with_no_provider_diagnostics() {
     let app = App::new(std::path::PathBuf::from("."), Config::default(), None, None).unwrap();
     assert!(app.plugin_diagnostics.is_empty());
