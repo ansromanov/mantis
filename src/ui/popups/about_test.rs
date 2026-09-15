@@ -78,11 +78,11 @@ fn about_shows_telemetry_status() {
     // Telemetry is disabled by default
     let text = buffer_text(&app);
     assert!(
-        text.contains("disabled"),
+        text.contains("Telemetry: disabled"),
         "must show disabled by default: {text}"
     );
     assert!(
-        !text.contains("active"),
+        !text.contains("Telemetry: active"),
         "must not show active when disabled: {text}"
     );
 
@@ -90,11 +90,11 @@ fn about_shows_telemetry_status() {
     app.telemetry = crate::telemetry::Telemetry::new(true);
     let text = buffer_text(&app);
     assert!(
-        text.contains("active"),
+        text.contains("Telemetry: active"),
         "must show active when enabled: {text}"
     );
     assert!(
-        !text.contains("disabled"),
+        !text.contains("Telemetry: disabled"),
         "must not show disabled when active: {text}"
     );
 }
@@ -157,6 +157,7 @@ fn about_shows_update_notice_when_newer_version_available() {
     let mut app = make_app(dir.path());
     app.new_version_available = Some("v99.0.0".to_string());
     let text = buffer_text(&app);
+    assert!(text.contains("Update:"), "must show update row: {text}");
     assert!(text.contains("v99.0.0"), "must show latest version: {text}");
     assert!(
         text.contains("is available"),
@@ -170,5 +171,5 @@ fn about_omits_update_notice_when_no_newer_version() {
     let app = make_app(dir.path());
     assert!(app.new_version_available.is_none());
     let text = buffer_text(&app);
-    assert!(!text.contains("is available"), "no update, no hint: {text}");
+    assert!(!text.contains("Update:"), "no update, no hint: {text}");
 }
