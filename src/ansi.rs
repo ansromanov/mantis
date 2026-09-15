@@ -102,6 +102,29 @@ pub fn contains_terminal_controls(text: &str) -> bool {
 /// Removes terminal control sequences and unsafe directional controls from
 /// text that will be emitted through ratatui. Tabs become spaces so they cannot
 /// alter the terminal grid; CSI and OSC sequences are consumed as a whole.
+/// True when [`sanitize_terminal_text`] would alter `text`.
+fn needs_sanitizing(text: &str) -> bool {
+    text.chars().any(|c| {
+        c == '\x1b'
+            || ('\u{80}'..='\u{9f}').contains(&c)
+            || c == '\t'
+            || (c.is_control() && c != '\n' && c != '\r')
+            || is_directional_control(c)
+    })
+}
+
+/// [`sanitize_terminal_text`] that borrows when there is nothing to strip.
+///
+/// Filenames almost never contain terminal control sequences, so the hot
+/// render paths use this to avoid allocating a `String` per row per frame.
+pub fn sanitize_terminal_text_cow(text: &str) -> std::borrow::Cow<'_, str> {
+    if needs_sanitizing(text) {
+        std::borrow::Cow::Owned(sanitize_terminal_text(text))
+    } else {
+        std::borrow::Cow::Borrowed(text)
+    }
+}
+
 pub fn sanitize_terminal_text(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut chars = text.chars().peekable();

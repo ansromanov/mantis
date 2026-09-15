@@ -228,3 +228,34 @@ fn ansi_at_start_only() {
     assert_eq!(result[0].1, "green all the way");
     assert_eq!(result[0].0.fg, Some(Color::Green));
 }
+
+#[test]
+fn sanitize_cow_borrows_text_that_needs_no_changes() {
+    for clean in ["plain_name.rs", "", "naïve-ünicode.txt", "line\nbreak\r"] {
+        let out = sanitize_terminal_text_cow(clean);
+        assert!(
+            matches!(out, std::borrow::Cow::Borrowed(_)),
+            "expected a borrow for {clean:?}"
+        );
+        assert_eq!(out, clean);
+    }
+}
+
+#[test]
+fn sanitize_cow_owns_and_matches_the_allocating_version() {
+    for dirty in [
+        "\x1b[31mred",
+        "tab\there",
+        "bell\x07",
+        "c1\u{9b}seq",
+        "rtl\u{202e}override",
+    ] {
+        let out = sanitize_terminal_text_cow(dirty);
+        assert!(
+            matches!(out, std::borrow::Cow::Owned(_)),
+            "expected an allocation for {dirty:?}"
+        );
+        // The fast path must never disagree with the original implementation.
+        assert_eq!(out, sanitize_terminal_text(dirty));
+    }
+}

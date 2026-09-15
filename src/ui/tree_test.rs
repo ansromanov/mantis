@@ -181,6 +181,58 @@ fn draw_tree_sanitizes_terminal_controls_in_file_names() {
 }
 
 #[test]
+fn draw_tree_still_badges_deleted_nodes() {
+    let mut app = make_app(false, HashMap::new());
+    app.nodes = vec![make_node("gone.txt", false, true)];
+    let text = all_text(&render_tree(&mut app, 60, 5));
+    assert!(
+        text.contains("[deleted]"),
+        "ghost nodes must keep their badge: {text}"
+    );
+}
+
+#[test]
+fn draw_tree_resolves_each_affordance_once_per_revision() {
+    let mut app = make_app(false, HashMap::new());
+    app.nodes = vec![make_node("gone.txt", false, true)];
+
+    render_tree(&mut app, 60, 5);
+    let (rev, cached) = app
+        .tree_affordance_cache
+        .clone()
+        .expect("first render populates the cache");
+    assert_eq!(rev, app.tree_revision);
+    assert_eq!(cached[0], Some(crate::tree::TreeAffordance::Deleted));
+
+    // A second render at the same revision reuses the entry rather than
+    // hitting the filesystem again.
+    render_tree(&mut app, 60, 5);
+    let (rev_again, cached_again) = app.tree_affordance_cache.clone().unwrap();
+    assert_eq!(rev_again, rev);
+    assert_eq!(cached_again[0], Some(crate::tree::TreeAffordance::Deleted));
+}
+
+#[test]
+fn draw_tree_discards_affordances_when_the_tree_is_rebuilt() {
+    let mut app = make_app(false, HashMap::new());
+    app.nodes = vec![make_node("gone.txt", false, true)];
+    render_tree(&mut app, 60, 5);
+    assert_eq!(
+        app.tree_affordance_cache.as_ref().unwrap().0,
+        app.tree_revision
+    );
+
+    // Rebuilding the tree bumps the revision; stale badges must not survive it.
+    app.tree_revision += 1;
+    app.nodes = vec![make_node("fresh.txt", false, false)];
+    render_tree(&mut app, 60, 5);
+
+    let (rev, cached) = app.tree_affordance_cache.clone().unwrap();
+    assert_eq!(rev, app.tree_revision);
+    assert_eq!(cached[0], Some(crate::tree::TreeAffordance::None));
+}
+
+#[test]
 fn draw_tree_git_mode_shows_git_label() {
     let mut app = make_app(false, HashMap::new());
     app.root = PathBuf::from("repo");

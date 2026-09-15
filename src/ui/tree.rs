@@ -6,6 +6,7 @@
 //! See that module for per-line blame annotations and the single-line
 //! blame info bar.
 
+use std::borrow::Cow;
 use std::collections::HashSet;
 use std::path::PathBuf;
 
@@ -213,6 +214,30 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
         }
     }
 
+    // Affordance badges need a stat (and a directory read, for directories),
+    // which is far too expensive to redo for every row on every frame. Resolve
+    // them once per tree rebuild, and only for the rows actually on screen.
+    let affordances_stale = app
+        .tree_affordance_cache
+        .as_ref()
+        .map(|(rev, _)| *rev != app.tree_revision)
+        .unwrap_or(true);
+    if affordances_stale {
+        app.tree_affordance_cache = Some((app.tree_revision, vec![None; total_nodes]));
+    }
+    for &global_i in &visible_indices[offset..end] {
+        let unresolved = app
+            .tree_affordance_cache
+            .as_ref()
+            .is_some_and(|(_, cache)| matches!(cache.get(global_i), Some(None)));
+        if unresolved {
+            let resolved = crate::tree::TreeAffordance::resolve(&app.nodes[global_i]);
+            if let Some((_, cache)) = app.tree_affordance_cache.as_mut() {
+                cache[global_i] = Some(resolved);
+            }
+        }
+    }
+
     let items: Vec<ListItem> = visible_indices[offset..end]
         .iter()
         .map(|&global_i| {
@@ -292,32 +317,34 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
                 }
             }
 
-            let affordance = tree_affordance(node);
+            let affordance = app
+                .tree_affordance_cache
+                .as_ref()
+                .and_then(|(_, cache)| cache.get(global_i).copied().flatten())
+                .unwrap_or_default()
+                .label();
             if !affordance.is_empty() {
                 spans.push(Span::styled(format!("{affordance} "), badge_style));
             }
 
-            // Inline tree-filter match highlighting
-            let display_name = truncate_tree_name(&node.name, list_area.width as usize);
+            // Inline tree-filter match highlighting. Both steps below borrow
+            // from `node.name` unless they actually have to change it, so an
+            // ordinary row allocates nothing here.
+            let display_name: Cow<str> =
+                match truncate_tree_name(&node.name, list_area.width as usize) {
+                    Cow::Borrowed(s) => crate::ansi::sanitize_terminal_text_cow(s),
+                    Cow::Owned(s) => {
+                        Cow::Owned(crate::ansi::sanitize_terminal_text_cow(&s).into_owned())
+                    }
+                };
             let name_spans = if let Some(ref filter) = app.tree_filter {
                 if filter.is_empty() {
-                    vec![Span::styled(
-                        crate::ansi::sanitize_terminal_text(&display_name),
-                        name_style,
-                    )]
+                    vec![Span::styled(display_name, name_style)]
                 } else {
-                    highlight_matches(
-                        &crate::ansi::sanitize_terminal_text(&display_name),
-                        &filter.query,
-                        name_style,
-                        theme,
-                    )
+                    highlight_matches(&display_name, &filter.query, name_style, theme)
                 }
             } else {
-                vec![Span::styled(
-                    crate::ansi::sanitize_terminal_text(&display_name),
-                    name_style,
-                )]
+                vec![Span::styled(display_name, name_style)]
             };
             spans.extend(name_spans);
 
@@ -359,40 +386,18 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
     };
 }
 
-fn tree_affordance(node: &crate::tree::TreeNode) -> &'static str {
-    if node.deleted {
-        return "[deleted]";
-    }
-    if std::fs::symlink_metadata(&node.path)
-        .map(|m| m.file_type().is_symlink())
-        .unwrap_or(false)
-    {
-        return "[link]";
-    }
-    if node.is_dir {
-        match std::fs::read_dir(&node.path) {
-            Ok(mut entries) => {
-                if entries.next().is_none() {
-                    "[empty]"
-                } else {
-                    ""
-                }
-            }
-            Err(_) => "[unreadable]",
-        }
-    } else {
-        ""
-    }
-}
-
-fn truncate_tree_name(name: &str, width: usize) -> String {
+/// Shortens `name` to fit `width`, borrowing when it already fits — which is
+/// the overwhelmingly common case, and this runs for every rendered row.
+fn truncate_tree_name(name: &str, width: usize) -> Cow<'_, str> {
     let max_chars = width.saturating_sub(8).max(12);
-    let chars: Vec<char> = name.chars().collect();
-    if chars.len() <= max_chars {
-        return name.to_string();
+    // Counting is enough to decide; only collect when actually truncating.
+    if name.chars().count() <= max_chars {
+        return Cow::Borrowed(name);
     }
     let keep = max_chars.saturating_sub(3);
-    format!("{}...", chars[..keep].iter().collect::<String>())
+    let mut out: String = name.chars().take(keep).collect();
+    out.push_str("...");
+    Cow::Owned(out)
 }
 
 /// Splits `name` into spans, highlighting substrings that match `query`
