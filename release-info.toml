@@ -1,9 +1,24 @@
-version = "0.21.19"
+version = "0.22.0"
 date = "2026-09-15"
-whats_new = """- test: use shallow-checkout-safe compare revision (#823)
-- feat: improve overlay and tree UX (#822)
-- fix: close theme picker with one escape (#821)
-- fix: resolve bug batch 804-816 (#820)
-- fix: restore compare exit and search navigation keys (#803)
-- chore: bump Homebrew formula to v0.20.2 [skip ci]"""
-release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.21.0"
+whats_new = """- fix(test): scope telemetry and update assertions in about popup test (#862)
+- fix: stop re-statting the filesystem on every tree redraw (#861)
+- feat(plugin): implement diagnostics capability (#860)
+- feat(plugin): let plugins contribute context-menu items, status segments, and menu entries (#859)
+- feat(plugin): stream large rendered content (#858)
+- feat: route language providers by filename and shebang (#856)
+- feat: add provider-backed symbol outlines (#838) (#857)
+- fix: accept multi-document YAML streams (#849) (#853)
+- fix(ui): restore inactive tab label contrast (#848) (#854)
+- feat: browse branches from status bar (#831) (#855)
+- feat(plugin): report debounced content cursor (#847)
+- feat: open worktrees in new tabs (#846)
+- refactor: unify action categories across UI (#852)
+- feat: statusbar styling config — separators, per-segment color roles, two-row mode (#845)
+- docs: release digests since v0.17, reproducible screenshots, typography pass (#851)
+- feat: expand context menu targets and actions (#844)
+- fix: support tab strip horizontal scrolling and overflow affordances (#840)
+- feat: make status-bar segments clickable (#841)
+- feat: improve tab ergonomics (#843)
+- feat: add opt-in action menu bar (#842)
+- chore: bump Homebrew formula to v0.21.0 [skip ci]"""
+release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.22.0"
