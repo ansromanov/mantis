@@ -55,6 +55,22 @@ fn new_app(root: &std::path::Path, cfg: Config) -> App {
 }
 
 #[test]
+fn app_new_snapshots_the_loaded_config_as_save_baseline() {
+    let root = temp_dir();
+    let mut cfg = Config::default();
+    cfg.tree.width = 42;
+
+    let app = new_app(&root, cfg);
+
+    assert_eq!(app.config_baseline.tree.width, app.config.tree.width);
+    assert_eq!(
+        app.config_baseline.content.word_wrap,
+        app.config.content.word_wrap
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
 fn app_new_builds_visible_root_tree() {
     let root = temp_dir();
     fs::create_dir(root.join("sub")).unwrap();

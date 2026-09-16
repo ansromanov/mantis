@@ -309,6 +309,10 @@ pub struct App {
     pub icon_fallback: String,
     keys: Keymap,
     pub config: Config,
+    /// The config as last loaded from or written to `config_path`. Saves write
+    /// only the differences from this snapshot, so settings the user never
+    /// changed at runtime (and the file's comments) are left untouched.
+    config_baseline: Config,
     config_path: Option<std::path::PathBuf>,
     // Geometry captured during the last render, used to map mouse events.
     pub tree_area: Rect,
@@ -559,7 +563,11 @@ impl App {
     /// reverted on next launch.
     fn save_config(&mut self) {
         if let Some(path) = &self.config_path {
-            if let Err(e) = config::save(&self.config, path) {
+            let result = config::save_changes(&self.config_baseline, &self.config, path);
+            if result.is_ok() {
+                self.config_baseline = self.config.clone();
+            }
+            if let Err(e) = result {
                 self.telemetry
                     .record(crate::telemetry::TelemetryEvent::ErrorOccurred {
                         module: "config",

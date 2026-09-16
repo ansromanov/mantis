@@ -141,7 +141,7 @@ fn config_paths_are_local_first_then_global() {
 #[test]
 fn local_config_overrides_global_without_hiding_unspecified_values() {
     let mut merged = toml::Value::Table(toml::map::Map::new());
-    merge_tables(
+    merge_config_tables(
         &mut merged,
         toml::toml! {
             ui = { menu_bar = true }
@@ -149,7 +149,7 @@ fn local_config_overrides_global_without_hiding_unspecified_values() {
         }
         .into(),
     );
-    merge_tables(
+    merge_config_tables(
         &mut merged,
         toml::toml! {
             theme = { accent = "cyan" }
@@ -367,8 +367,14 @@ fn save_returns_err_on_unwritable_dir() {
     let dir = scratch_dir("save_err");
     // Don't create the subdir — save to a non-existent path.
     let bad = dir.join("nonexistent").join("mantis.toml");
-    let cfg = Config::default();
-    let result = save(&cfg, &bad);
+    let cfg = Config {
+        tree: TreeConfig {
+            width: 42,
+            ..Default::default()
+        },
+        ..Config::default()
+    };
+    let result = save_changes(&Config::default(), &cfg, &bad);
     assert!(result.is_err(), "save to unwritable dir should fail");
     fs::remove_dir_all(&dir).ok();
 }
@@ -386,7 +392,7 @@ fn save_returns_ok_on_success_and_round_trips() {
         ..Config::default()
     };
 
-    let result = save(&cfg, &path);
+    let result = save_changes(&Config::default(), &cfg, &path);
     assert!(result.is_ok(), "save should succeed: {:?}", result);
 
     // Round-trip: re-load and verify overrides survive, defaults remain.
@@ -652,4 +658,142 @@ fn sparse_toml_keeps_overridden_or_custom_plugins() {
 fn ui_config_is_exported_for_callers() {
     let ui = super::UiConfig::default();
     assert!(!ui.menu_bar);
+}
+
+fn save_dir(name: &str) -> PathBuf {
+    let dir =
+        std::env::temp_dir().join(format!("mantis_save_changes_{}_{name}", std::process::id()));
+    fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+fn load_from(text: &str) -> Config {
+    toml::from_str(text).unwrap()
+}
+
+#[test]
+fn save_changes_edits_only_the_changed_key_and_keeps_comments() {
+    let dir = save_dir("comments");
+    let path = dir.join("mantis.toml");
+    let original = "# Project config -- keep this header\n\n[tree]\n# Width of the tree pane.\nwidth = 30 # percent\nshow_hidden = false\n\n[keys]\ncontext_menu = [\"shift+F10\"] # reserved\n";
+    fs::write(&path, original).unwrap();
+    let previous = load_from(original);
+    let mut current = previous.clone();
+    current.tree.width = 45;
+
+    assert!(save_changes(&previous, &current, &path).unwrap());
+    let saved = fs::read_to_string(&path).unwrap();
+    assert_eq!(saved, original.replace("width = 30", "width = 45"));
+    assert_eq!(load_from(&saved).tree.width, 45);
+    fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn save_changes_without_changes_does_not_touch_the_file() {
+    let dir = save_dir("noop");
+    let path = dir.join("mantis.toml");
+    let original = "# only a comment\n[tree]\nwidth = 30\n";
+    fs::write(&path, original).unwrap();
+    let config = load_from(original);
+    assert!(!save_changes(&config, &config.clone(), &path).unwrap());
+    assert_eq!(fs::read_to_string(&path).unwrap(), original);
+    fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn save_changes_adds_new_non_default_keys_sparsely() {
+    let dir = save_dir("add");
+    let path = dir.join("mantis.toml");
+    let original = "# header\n[tree]\nwidth = 30\n";
+    fs::write(&path, original).unwrap();
+    let previous = load_from(original);
+    let mut current = previous.clone();
+    current.tree.show_hidden = true;
+    current.content.word_wrap = !Config::default().content.word_wrap;
+
+    save_changes(&previous, &current, &path).unwrap();
+    let saved = fs::read_to_string(&path).unwrap();
+    assert!(
+        saved.starts_with("# header\n[tree]\nwidth = 30\n"),
+        "{saved}"
+    );
+    assert!(saved.contains("show_hidden = true"), "{saved}");
+    assert!(saved.contains("[content]"), "{saved}");
+    assert!(
+        !saved.contains("line_numbers"),
+        "defaults must not be dumped: {saved}"
+    );
+    let reloaded = load_from(&saved);
+    assert!(reloaded.tree.show_hidden);
+    assert_eq!(reloaded.content.word_wrap, current.content.word_wrap);
+    fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn save_changes_writes_a_toggled_plugin_as_a_whole_entry() {
+    let dir = save_dir("plugin");
+    let path = dir.join("mantis.toml");
+    let original = "# no plugins section yet\n[tree]\nwidth = 30\n";
+    fs::write(&path, original).unwrap();
+    let mut previous = load_from(original);
+    for (name, entry) in crate::plugin::bundled_plugin_entries() {
+        previous.plugins.insert(name, entry);
+    }
+    let name = previous.plugins.keys().next().unwrap().clone();
+    let mut current = previous.clone();
+    current.plugins.get_mut(&name).unwrap().enabled = false;
+
+    save_changes(&previous, &current, &path).unwrap();
+    let saved = fs::read_to_string(&path).unwrap();
+    assert!(saved.starts_with(original), "{saved}");
+    assert_eq!(
+        saved.matches("[plugins.").count(),
+        1,
+        "only the changed plugin: {saved}"
+    );
+    let reloaded = load_from(&saved);
+    assert_eq!(reloaded.plugins.get(&name), current.plugins.get(&name));
+    fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn save_changes_creates_a_missing_file_and_refuses_to_clobber_invalid_toml() {
+    let dir = save_dir("missing");
+    let path = dir.join("mantis.toml");
+    let previous = Config::default();
+    let mut current = previous.clone();
+    current.tree.width = 50;
+    assert!(save_changes(&previous, &current, &path).unwrap());
+    assert_eq!(
+        load_from(&fs::read_to_string(&path).unwrap()).tree.width,
+        50
+    );
+
+    fs::write(&path, "[tree\nwidth = ").unwrap();
+    assert!(save_changes(&previous, &current, &path).is_err());
+    assert_eq!(fs::read_to_string(&path).unwrap(), "[tree\nwidth = ");
+    fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn save_changes_preserves_the_checked_in_project_config() {
+    let original = include_str!("../../mantis.toml");
+    let dir = save_dir("project");
+    let path = dir.join("mantis.toml");
+    fs::write(&path, original).unwrap();
+    let previous = load_from(original);
+    let mut current = previous.clone();
+    current.git.status = !previous.git.status;
+
+    save_changes(&previous, &current, &path).unwrap();
+    let saved = fs::read_to_string(&path).unwrap();
+    let changed: Vec<_> = original
+        .lines()
+        .zip(saved.lines())
+        .filter(|(a, b)| a != b)
+        .collect();
+    assert_eq!(saved.lines().count(), original.lines().count(), "{saved}");
+    assert_eq!(changed.len(), 1, "exactly one line may change: {changed:?}");
+    assert!(changed[0].1.contains("status"), "{changed:?}");
+    fs::remove_dir_all(&dir).ok();
 }

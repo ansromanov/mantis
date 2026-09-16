@@ -6,8 +6,11 @@
 //! a read-only `mantis.default.toml` reference is (re)written next to the user config
 //! whenever it is missing or stale, so an upgrade always refreshes the documented
 //! option catalogue without ever touching the user's own file. The user `mantis.toml`
-//! is created once as a minimal stub and from then on is only written by `save`,
-//! which emits a *sparse* override file (changed-from-default keys only).
+//! is created once as a minimal stub and from then on is only written by
+//! `save_changes`, which edits the existing file in place (via `toml_edit`) so
+//! comments, ordering, and untouched keys survive -- only the settings changed
+//! at runtime are rewritten. `sparse_toml` (changed-from-default keys only) is
+//! used when there is no file to edit yet.
 //!
 //! Sub-modules:
 //! - `types` — `Config` and grouped sub-configs (`TreeConfig`, `ContentConfig`,
@@ -17,8 +20,8 @@
 //! - `validate` — schema validation for unknown-key detection.
 //!
 //! `load` merges the global config with project-local overrides, returning any
-//! validation warning rather than failing the launch; `save` writes the current
-//! settings back.
+//! validation warning rather than failing the launch; `save_changes` writes
+//! runtime changes back without destroying the source document.
 //! Keep new fields in `types` in sync with the defaults so round-tripping
 //! a saved config is lossless.
 
@@ -73,14 +76,12 @@ pub fn load(root: &Path) -> (Config, Option<PathBuf>, Option<String>) {
     let mut loaded_any = false;
 
     // Apply the least-specific file first so nearer project/ancestor files
-    // override only the values they declare. A complete project reference
-    // file must not accidentally hide unrelated global settings.
+    // override only the values they declare.
     for path in paths.iter().rev() {
         let Ok(s) = fs::read_to_string(path) else {
             continue; // missing or unreadable: try the next candidate
         };
         if let Err(e) = toml::from_str::<Config>(&s) {
-            // Keep falling back when one layer is malformed, as before.
             if error.is_none() {
                 error = Some(format!("{}: {e}", path.display()));
             }
@@ -95,7 +96,7 @@ pub fn load(root: &Path) -> (Config, Option<PathBuf>, Option<String>) {
                 error = Some(format!("{}: {}", path.display(), unknown.join("; ")));
             }
         }
-        merge_tables(&mut merged, value);
+        merge_config_tables(&mut merged, value);
         loaded_any = true;
         loaded_path = Some(path.clone());
     }
@@ -109,9 +110,6 @@ pub fn load(root: &Path) -> (Config, Option<PathBuf>, Option<String>) {
     config.migrate_legacy_git_fields();
     config.migrate_legacy_plugin_paths();
     config.keys.migrate_legacy_keys();
-    // Remove any [plugins] entries referencing retired bundled plugin
-    // filenames (e.g. old shell scripts). This is done in memory only; the
-    // user's mantis.toml is not rewritten unless save_config is called.
     let retired = crate::plugin::retired_bundled_plugins();
     config.plugins.retain(|_name, entry| {
         let Some(fname) = entry.path.file_name().and_then(|s| s.to_str()) else {
@@ -123,14 +121,14 @@ pub fn load(root: &Path) -> (Config, Option<PathBuf>, Option<String>) {
 }
 
 /// Recursively merges a higher-precedence TOML table into `base`.
-fn merge_tables(base: &mut toml::Value, overlay: toml::Value) {
+fn merge_config_tables(base: &mut toml::Value, overlay: toml::Value) {
     let (toml::Value::Table(base), toml::Value::Table(overlay)) = (base, overlay) else {
         return;
     };
     for (key, value) in overlay {
         if let Some(existing) = base.get_mut(&key) {
             if existing.is_table() && value.is_table() {
-                merge_tables(existing, value);
+                merge_config_tables(existing, value);
                 continue;
             }
         }
@@ -138,12 +136,146 @@ fn merge_tables(base: &mut toml::Value, overlay: toml::Value) {
     }
 }
 
-/// Writes `config` back to the user's `path` as a *sparse* override file: only
-/// the keys whose value differs from the built-in defaults are written, so the
-/// user config stays small and readable instead of growing into a full dump of
-/// every setting.
-pub fn save(config: &Config, path: &Path) -> std::io::Result<()> {
-    fs::write(path, sparse_toml(config))
+/// Persists the settings that changed between `previous` (the config as last
+/// loaded or saved) and `current` into the file at `path`, editing it in place.
+///
+/// The file may be a hand-written, checked-in project `mantis.toml`, so it is
+/// never regenerated: comments, key order, legacy spellings, and every key the
+/// user did not change at runtime are preserved. Changed keys already present
+/// in the file are replaced (keeping their trailing comments); new keys are
+/// added only when they differ from the built-in defaults; removed keys are
+/// deleted. Returns `Ok(false)` without touching the disk when nothing changed.
+/// A missing file is created with [`sparse_toml`]; an unparseable one is left
+/// alone and reported as an error rather than overwritten.
+pub fn save_changes(previous: &Config, current: &Config, path: &Path) -> std::io::Result<bool> {
+    let invalid = |e: String| std::io::Error::new(std::io::ErrorKind::InvalidData, e);
+    let prev = toml::Value::try_from(previous).map_err(|e| invalid(e.to_string()))?;
+    let cur = toml::Value::try_from(current).map_err(|e| invalid(e.to_string()))?;
+    if prev == cur {
+        return Ok(false);
+    }
+    let text = match fs::read_to_string(path) {
+        Ok(text) => text,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            fs::write(path, sparse_toml(current))?;
+            return Ok(true);
+        }
+        Err(e) => return Err(e),
+    };
+    let mut doc: toml_edit::DocumentMut = text.parse().map_err(|e| {
+        invalid(format!(
+            "{} is not valid TOML, not overwriting it: {e}",
+            path.display()
+        ))
+    })?;
+    let default = toml::Value::try_from(Config::default()).ok();
+    if let (toml::Value::Table(prev), toml::Value::Table(cur)) = (&prev, &cur) {
+        let default = match &default {
+            Some(toml::Value::Table(t)) => Some(t),
+            _ => None,
+        };
+        apply_table_changes(doc.as_table_mut(), prev, cur, default);
+    }
+    fs::write(path, doc.to_string())?;
+    Ok(true)
+}
+
+/// Applies the key-level differences between `prev` and `cur` to `table`,
+/// recursing into sub-tables that exist on both sides and in the document.
+fn apply_table_changes(
+    table: &mut dyn toml_edit::TableLike,
+    prev: &toml::map::Map<String, toml::Value>,
+    cur: &toml::map::Map<String, toml::Value>,
+    default: Option<&toml::map::Map<String, toml::Value>>,
+) {
+    let keys: std::collections::BTreeSet<&String> = prev.keys().chain(cur.keys()).collect();
+    for key in keys {
+        let before = prev.get(key);
+        let Some(after) = cur.get(key) else {
+            table.remove(key);
+            continue;
+        };
+        if before == Some(after) {
+            continue;
+        }
+        let key_default = default.and_then(|d| d.get(key));
+        if let (Some(toml::Value::Table(before)), toml::Value::Table(after)) = (before, after) {
+            let child_default = match key_default {
+                Some(toml::Value::Table(t)) => Some(t),
+                _ => None,
+            };
+            // A config section (one with defaults, e.g. `[ui]` or `[plugins]`)
+            // missing from the file is created as an implicit table so only
+            // its changed keys are written. Map entries without defaults
+            // (a single `[plugins.<name>]`) fall through and are written whole.
+            let created = !table.contains_key(key) && child_default.is_some() && !table.is_dotted();
+            if created {
+                let mut section = toml_edit::Table::new();
+                section.set_implicit(true);
+                table.insert(key, toml_edit::Item::Table(section));
+            }
+            if let Some(child) = table.get_mut(key).and_then(|i| i.as_table_like_mut()) {
+                apply_table_changes(child, before, after, child_default);
+                if created && child.is_empty() {
+                    table.remove(key);
+                }
+                continue;
+            }
+        }
+        let value = if table.contains_key(key) {
+            after.clone()
+        } else {
+            match without_defaults(after, key_default) {
+                Some(value) => value,
+                None => continue,
+            }
+        };
+        let Some(mut item) = toml_item(key, &value) else {
+            continue;
+        };
+        // Replace an existing scalar/inline value in place: the comment lines
+        // above a key belong to the key, so re-inserting would drop them.
+        if let Some(existing) = table.get_mut(key).and_then(|i| i.as_value_mut()) {
+            let decor = existing.decor().clone();
+            if let Ok(mut new) = item.into_value() {
+                *new.decor_mut() = decor;
+                *existing = new;
+            }
+            continue;
+        }
+        if table.is_dotted() {
+            item = match item.into_value() {
+                Ok(value) => toml_edit::Item::Value(value),
+                Err(item) => item,
+            };
+        }
+        table.insert(key, item);
+    }
+}
+
+/// `value` minus any parts equal to `default`, or `None` when nothing differs.
+fn without_defaults(value: &toml::Value, default: Option<&toml::Value>) -> Option<toml::Value> {
+    match (value, default) {
+        (_, Some(default)) if default == value => None,
+        (toml::Value::Table(value), Some(toml::Value::Table(default))) => {
+            let kept: toml::map::Map<String, toml::Value> = value
+                .iter()
+                .filter_map(|(k, v)| Some((k.clone(), without_defaults(v, default.get(k))?)))
+                .collect();
+            (!kept.is_empty()).then_some(toml::Value::Table(kept))
+        }
+        _ => Some(value.clone()),
+    }
+}
+
+/// Converts `value` into a `toml_edit` item formatted the way `toml` would
+/// write it under `key` (tables as `[section]`s, scalars as plain values).
+fn toml_item(key: &str, value: &toml::Value) -> Option<toml_edit::Item> {
+    let mut wrapper = toml::map::Map::new();
+    wrapper.insert(key.to_string(), value.clone());
+    let text = toml::to_string(&toml::Value::Table(wrapper)).ok()?;
+    let mut doc: toml_edit::DocumentMut = text.parse().ok()?;
+    doc.as_table_mut().remove(key)
 }
 
 /// Serialises `config` keeping only the top-level keys whose value differs from

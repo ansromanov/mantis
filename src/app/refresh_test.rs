@@ -439,6 +439,7 @@ fn create_base_app() -> App {
         icon_fallback: String::new(),
         keys: crate::config::Keymap::default(),
         config: Config::default(),
+        config_baseline: Config::default(),
         config_path: None,
         tree_area: ratatui::layout::Rect::default(),
         tree_offset: 0,
