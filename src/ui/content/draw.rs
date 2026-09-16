@@ -392,15 +392,20 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         app.content_hscroll as u16
     };
 
+    // The gutter can be wider than a very narrow pane (e.g. a 6-digit line
+    // number with the tree at 95%); clamp it so no widget is handed a Rect
+    // that extends past the frame edge.
+    let gutter_width = (ln_width as u16).min(inner.width);
+
     // Fixed gutter: line numbers are pre-clipped to the visible range,
     // rendered with scroll=(0,0) because they are already at the right offset.
-    if ln_width > 0 {
+    if gutter_width > 0 {
         f.render_widget(
             Paragraph::new(ln_lines).scroll((0, 0)),
             Rect {
                 x: inner.x,
                 y: inner.y,
-                width: ln_width as u16,
+                width: gutter_width,
                 height: inner.height,
             },
         );
@@ -408,8 +413,8 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
 
     // Content area: only the visible window of lines is materialised, so
     // vertical scroll is 0. Horizontal scroll is still applied.
-    let cx = inner.x + ln_width as u16;
-    let cw = inner.width.saturating_sub(ln_width as u16);
+    let cx = inner.x + gutter_width;
+    let cw = inner.width - gutter_width;
     // When there is no gutter (ln_width == 0) but word-wrap is on, fall back to
     // ratatui's built-in Wrap — there is no drift risk without a parallel gutter
     // paragraph, so the pre-expansion path is skipped and ratatui handles it.
