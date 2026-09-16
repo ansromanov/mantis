@@ -25,106 +25,119 @@ fn app_for(root: &std::path::Path) -> App {
     App::new(root.to_path_buf(), Config::default(), None, None).unwrap()
 }
 
-fn render(tabs: &mut Tabs, area: Rect) -> String {
-    let backend = TestBackend::new(area.width, area.height.max(1));
+fn render(tabs: &mut Tabs, area: Rect) -> Vec<String> {
+    let backend = TestBackend::new(area.right(), area.bottom());
     let mut terminal = ratatui::Terminal::new(backend).unwrap();
-    terminal.draw(|f| draw_tabstrip(f, tabs, area)).unwrap();
+    let list = WorkspaceList::from_tabs(tabs);
+    let theme = tabs.active_app().theme.clone();
     terminal
-        .backend()
-        .buffer()
-        .content()
-        .iter()
-        .map(|c| c.symbol())
+        .draw(|f| {
+            draw_workspace_list(f, &theme, &list, area);
+        })
+        .unwrap();
+    let buffer = terminal.backend().buffer().clone();
+    (0..buffer.area.height)
+        .map(|y| {
+            (0..buffer.area.width)
+                .map(|x| buffer[(x, y)].symbol().to_string())
+                .collect()
+        })
         .collect()
 }
 
-#[test]
-fn draws_a_label_and_close_glyph_for_each_tab() {
-    let a = temp_dir("alpha");
-    let b = temp_dir("beta");
-    let mut tabs = Tabs::new(vec![app_for(&a), app_for(&b)], 0);
-    let area = Rect::new(0, 0, 60, 1);
-    let text = render(&mut tabs, area);
-    assert!(text.contains(a.file_name().unwrap().to_str().unwrap()));
-    assert!(text.contains(b.file_name().unwrap().to_str().unwrap()));
-    assert!(text.contains('×'));
-    fs::remove_dir_all(&a).ok();
-    fs::remove_dir_all(&b).ok();
+fn remove(dirs: &[std::path::PathBuf]) {
+    for dir in dirs {
+        fs::remove_dir_all(dir).ok();
+    }
 }
 
 #[test]
-fn inactive_labels_and_close_glyphs_contrast_with_the_strip_in_every_theme() {
-    for (name, theme) in Theme::discover_all() {
-        let background = strip_style(&theme).bg;
-        let inactive_foreground = inactive_tab_style(&theme).fg;
-        let close_foreground = close_tab_style(&theme).fg;
+fn draws_one_row_with_label_and_close_glyph_per_workspace() {
+    let a = temp_dir("alpha");
+    let b = temp_dir("beta");
+    let mut tabs = Tabs::new(vec![app_for(&a), app_for(&b)], 0);
+    let lines = render(&mut tabs, Rect::new(0, 0, 30, 4));
+    assert!(lines[0].contains("Workspaces"));
+    assert!(lines[1].contains("▸ alpha"), "active row: {:?}", lines[1]);
+    assert!(lines[1].trim_end().ends_with("× │"));
+    assert!(lines[2].contains("  beta"));
+    assert!(lines[2].contains('×'));
+    remove(&[a, b]);
+}
 
+#[test]
+fn inactive_labels_and_close_glyphs_contrast_with_the_background_in_every_theme() {
+    for (name, theme) in Theme::discover_all() {
+        let background = Some(theme.background);
         assert_ne!(
-            inactive_foreground, background,
-            "inactive tab labels are invisible in theme {name}"
+            inactive_tab_style(&theme).fg,
+            background,
+            "inactive workspace labels are invisible in theme {name}"
         );
         assert_ne!(
-            close_foreground, background,
-            "tab close glyphs are invisible in theme {name}"
+            close_tab_style(&theme).fg,
+            background,
+            "workspace close glyphs are invisible in theme {name}"
         );
     }
 }
 
 #[test]
-fn draws_the_new_tab_prompt_instead_of_labels_when_open() {
+fn draws_the_new_tab_prompt_as_the_last_row() {
     let a = temp_dir("prompt");
     let mut tabs = Tabs::new(vec![app_for(&a)], 0);
     tabs.new_tab_prompt = Some("/some/path".to_string());
-    let area = Rect::new(0, 0, 60, 1);
-    let text = render(&mut tabs, area);
-    assert!(text.contains("open project"));
-    assert!(text.contains("/some/path"));
-    fs::remove_dir_all(&a).ok();
+    let list = WorkspaceList::from_tabs(&tabs);
+    let height = list.height_for(30);
+    let lines = render(&mut tabs, Rect::new(0, 0, 40, height));
+    assert_eq!(height, 4);
+    assert!(lines[1].contains("prompt"));
+    assert!(lines[2].contains("open: /some/path"));
+    remove(&[a]);
 }
 
 #[test]
-fn hit_test_maps_clicks_to_switch_and_close() {
+fn hit_test_maps_rows_to_switch_and_close() {
     let a = temp_dir("hit_a");
     let b = temp_dir("hit_b");
-    let mut tabs = Tabs::new(vec![app_for(&a), app_for(&b)], 0);
-    let area = Rect::new(0, 0, 60, 1);
-    // Force a render so build_segments' width math matches what's on screen
-    // (labels are directory-name-derived, deterministic either way).
-    render(&mut tabs, area);
-
-    // Layout per tab is " {label} × " → total width = label chars + 4, with
-    // the close glyph occupying the last two columns of that span.
-    let label_len = tab_label(tabs.active_app()).chars().count() as u16;
-    let width = label_len + 4;
-    // A column inside the label region resolves to Switch for that tab.
-    assert_eq!(hit_test(&tabs, area, 1, 0), Some(TabHit::Switch(0)));
-    // A column in the last two of the span resolves to Close.
-    assert_eq!(hit_test(&tabs, area, width - 1, 0), Some(TabHit::Close(0)));
-    // The second tab's label region resolves to Switch(1).
-    assert_eq!(hit_test(&tabs, area, width + 1, 0), Some(TabHit::Switch(1)));
-
-    fs::remove_dir_all(&a).ok();
-    fs::remove_dir_all(&b).ok();
+    let tabs = Tabs::new(vec![app_for(&a), app_for(&b)], 0);
+    let area = Rect::new(0, 3, 30, 4);
+    assert_eq!(hit_test(&tabs, area, 2, 4), Some(TabHit::Switch(0)));
+    assert_eq!(hit_test(&tabs, area, 26, 4), Some(TabHit::Close(0)));
+    assert_eq!(hit_test(&tabs, area, 5, 5), Some(TabHit::Switch(1)));
+    assert_eq!(hit_test(&tabs, area, 27, 5), Some(TabHit::Close(1)));
+    remove(&[a, b]);
 }
 
 #[test]
-fn hit_test_returns_none_outside_the_strip_row() {
-    let a = temp_dir("outside");
-    let tabs = Tabs::new(vec![app_for(&a)], 0);
-    let area = Rect::new(0, 0, 60, 1);
-    assert_eq!(hit_test(&tabs, area, 1, 5), None);
-    fs::remove_dir_all(&a).ok();
+fn hit_test_ignores_borders_empty_rows_and_outside_clicks() {
+    let a = temp_dir("outside_a");
+    let b = temp_dir("outside_b");
+    let tabs = Tabs::new(vec![app_for(&a), app_for(&b)], 0);
+    let area = Rect::new(0, 0, 30, 6);
+    assert_eq!(hit_test(&tabs, area, 5, 0), None);
+    assert_eq!(hit_test(&tabs, area, 0, 1), None);
+    assert_eq!(hit_test(&tabs, area, 5, 3), None);
+    assert_eq!(hit_test(&tabs, area, 5, 5), None);
+    assert_eq!(hit_test(&tabs, area, 5, 9), None);
+    assert_eq!(hit_test(&tabs, area, 40, 1), None);
+    remove(&[a, b]);
 }
 
 #[test]
-fn tab_label_truncates_long_directory_names() {
+fn long_labels_are_truncated_to_the_row_width() {
     let long_name = "a".repeat(40);
-    let dir = temp_dir("base").join(&long_name);
+    let base = temp_dir("base");
+    let dir = base.join(&long_name);
     fs::create_dir_all(&dir).unwrap();
-    let app = app_for(&dir);
-    let label = tab_label(&app);
-    assert!(label.chars().count() <= MAX_LABEL_LEN);
-    assert!(label.ends_with('…'));
+    let other = temp_dir("other");
+    assert!(tab_label_with_max(&app_for(&dir), 10).ends_with('…'));
+    let mut tabs = Tabs::new(vec![app_for(&dir), app_for(&other)], 0);
+    let lines = render(&mut tabs, Rect::new(0, 0, 20, 4));
+    assert!(lines[1].contains('…'), "{:?}", lines[1]);
+    assert!(lines[1].contains('×'));
+    assert_eq!(lines[1].chars().count(), 20);
+    remove(&[base, other]);
 }
 
 #[test]
@@ -142,7 +155,7 @@ fn duplicate_root_names_use_the_shortest_unique_suffix() {
 }
 
 #[test]
-fn git_branch_and_changed_count_are_shown_when_the_strip_has_room() {
+fn git_branch_and_changed_count_are_shown_when_the_row_has_room() {
     let root = temp_dir("git_badge");
     let second_root = temp_dir("git_badge_second");
     let mut app = app_for(&root);
@@ -155,92 +168,58 @@ fn git_branch_and_changed_count_are_shown_when_the_strip_has_room() {
         untracked: 0,
     });
     let mut tabs = Tabs::new(vec![app, app_for(&second_root)], 0);
-    let text = render(&mut tabs, Rect::new(0, 0, 100, 1));
-    assert!(text.contains("main"));
-    assert!(text.contains("●3"));
-    fs::remove_dir_all(&root).ok();
-    fs::remove_dir_all(&second_root).ok();
+    let wide = render(&mut tabs, Rect::new(0, 0, 40, 4));
+    assert!(wide[1].contains("git_badge ·main ●3"), "{:?}", wide[1]);
+    let narrow = render(&mut tabs, Rect::new(0, 0, 18, 4));
+    assert!(!narrow[1].contains("main"), "{:?}", narrow[1]);
+    remove(&[root, second_root]);
 }
 
 #[test]
-fn segments_show_scroll_affordances_around_hidden_tabs() {
+fn overflowing_lists_show_scroll_affordances_on_the_borders() {
     let dirs: Vec<_> = (0..6).map(|i| temp_dir(&format!("scroll_{i}"))).collect();
     let apps: Vec<_> = dirs.iter().map(|dir| app_for(dir)).collect();
-    let tabs = Tabs::new(apps, 2);
-    let area = Rect::new(0, 0, 30, 1);
-
-    let left_edge = build_segments_with(&tabs, 0, area);
-    assert!(!left_edge
-        .iter()
-        .any(|segment| segment.hit == TabHit::ScrollLeft));
-    assert!(left_edge
-        .iter()
-        .any(|segment| segment.hit == TabHit::ScrollRight));
-    assert!(left_edge
-        .iter()
-        .any(|segment| segment.hit == TabHit::Switch(0)));
-
-    let middle = build_segments_with(&tabs, 2, area);
-    assert!(middle
-        .iter()
-        .any(|segment| segment.hit == TabHit::ScrollLeft));
-    assert!(middle
-        .iter()
-        .any(|segment| segment.hit == TabHit::ScrollRight));
-    assert!(middle
-        .iter()
-        .any(|segment| segment.hit == TabHit::Switch(2)));
-
-    for dir in &dirs {
-        fs::remove_dir_all(dir).ok();
-    }
-}
-
-#[test]
-fn every_rendered_segment_round_trips_through_hit_testing() {
-    let dirs: Vec<_> = (0..6)
-        .map(|i| temp_dir(&format!("roundtrip_{i}")))
-        .collect();
-    let apps: Vec<_> = dirs.iter().map(|dir| app_for(dir)).collect();
     let mut tabs = Tabs::new(apps, 2);
+    let area = Rect::new(0, 0, 30, 5);
+
+    tabs.first_visible = 0;
+    let top = render(&mut tabs, area);
+    assert!(!top[0].contains('▴'));
+    assert!(top[4].contains('▾'));
+    assert_eq!(hit_test(&tabs, area, 5, 0), None);
+    assert_eq!(hit_test(&tabs, area, 5, 4), Some(TabHit::ScrollDown));
+
     tabs.first_visible = 2;
-    let area = Rect::new(5, 0, 35, 1);
+    let middle = render(&mut tabs, area);
+    assert!(middle[0].contains('▴'));
+    assert!(middle[1].contains("scroll_2"));
+    assert!(middle[4].contains('▾'));
+    assert_eq!(hit_test(&tabs, area, 5, 0), Some(TabHit::ScrollUp));
+    assert_eq!(hit_test(&tabs, area, 5, 1), Some(TabHit::Switch(2)));
 
-    for segment in build_segments(&tabs, area) {
-        for column in segment.start..segment.end {
-            assert_eq!(hit_test(&tabs, area, column, area.y), Some(segment.hit));
-        }
-    }
-
-    for dir in &dirs {
-        fs::remove_dir_all(dir).ok();
-    }
+    remove(&dirs);
 }
 
 #[test]
-fn active_tab_can_be_rendered_after_horizontal_navigation() {
-    let dirs: Vec<_> = (0..12)
-        .map(|i| temp_dir(&format!("active_{i:02}")))
-        .collect();
+fn list_height_is_capped_to_a_third_of_the_column() {
+    let dirs: Vec<_> = (0..12).map(|i| temp_dir(&format!("cap_{i}"))).collect();
     let apps: Vec<_> = dirs.iter().map(|dir| app_for(dir)).collect();
-    let mut tabs = Tabs::new(apps, 0);
-    let area = Rect::new(0, 0, 80, 1);
+    let tabs = Tabs::new(apps, 0);
+    let list = WorkspaceList::from_tabs(&tabs);
+    assert_eq!(list.height_for(60), 14);
+    assert_eq!(list.height_for(30), 10);
+    assert_eq!(list.height_for(6), 3);
+    remove(&dirs);
+}
 
-    for index in 0..tabs.apps.len() {
-        tabs.set_active(index);
-        let segments = build_segments(&tabs, area);
-        assert!(segments
-            .iter()
-            .any(|segment| segment.hit == TabHit::Switch(index)));
-        assert!(is_tab_visible(
-            &tabs,
-            tabs.first_visible,
-            tabs.active,
-            area.width
-        ));
-    }
-
-    for dir in &dirs {
-        fs::remove_dir_all(dir).ok();
+#[test]
+fn scroll_offset_keeps_the_active_row_in_view_without_blank_rows() {
+    assert_eq!(scroll_offset(0, 7, 10, 3), 5);
+    assert_eq!(scroll_offset(5, 1, 10, 3), 1);
+    assert_eq!(scroll_offset(9, 9, 10, 3), 7);
+    assert_eq!(scroll_offset(4, 0, 2, 5), 0);
+    for active in 0..10 {
+        let first = scroll_offset(0, active, 10, 4);
+        assert!(is_tab_visible(first, active, 4));
     }
 }

@@ -514,12 +514,12 @@ fn dispatch_event_switches_tab_on_strip_click() {
     let a = temp_dir();
     let b = temp_dir();
     let mut tabs = Tabs::new(vec![app_for(&a), app_for(&b)], 0);
-    tabs.strip_area = ratatui::layout::Rect::new(0, 0, 60, 1);
-    // Column 1 lands inside the first tab's label (" {label} ").
+    tabs.strip_area = ratatui::layout::Rect::new(0, 0, 30, 4);
+    // Row 1 is the first workspace row inside the list's top border.
     let mouse = Event::Mouse(MouseEvent {
         kind: MouseEventKind::Down(MouseButton::Left),
-        column: 1,
-        row: 0,
+        column: 3,
+        row: 1,
         modifiers: KeyModifiers::empty(),
     });
     // Force-select tab 1 first so the click actually changes something.
@@ -661,14 +661,23 @@ fn render_frame_clears_when_requested() {
 }
 
 #[test]
-fn render_frame_draws_tab_strip_with_multiple_tabs() {
+fn render_frame_draws_workspace_list_above_the_tree_with_multiple_tabs() {
     let a = temp_dir();
     let b = temp_dir();
     let mut tabs = Tabs::new(vec![app_for(&a), app_for(&b)], 0);
     let backend = TestBackend::new(80, 30);
     let mut terminal = ratatui::Terminal::new(backend).unwrap();
     render_frame(&mut terminal, &mut tabs).unwrap();
-    assert_eq!(tabs.strip_area.height, 1, "the strip must reserve one row");
+    let list = tabs.strip_area;
+    assert_eq!(list.height, 4, "two workspace rows plus borders");
+    assert_eq!((list.x, list.y), (0, 0));
+    let tree = tabs.active_app().tree_area;
+    assert!(
+        tree.x >= list.x && tree.right() <= list.right(),
+        "tree shares the list's column"
+    );
+    assert!(tree.y >= list.bottom(), "the tree must sit below the list");
+    assert!(tabs.active_app().content_area.y < list.bottom());
     fs::remove_dir_all(&a).ok();
     fs::remove_dir_all(&b).ok();
 }

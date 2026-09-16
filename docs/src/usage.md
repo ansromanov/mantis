@@ -105,12 +105,14 @@ and delete its file from the `sessions/` subdirectory in the state directory.
 
 Open more than one project at once: pass multiple paths on the command line
 (`mantis dir1 dir2`), or use the command palette's `Open project as new tab`
-(type a directory path, `Enter` to open it, `Esc` to cancel). A tab strip
-appears above the tree/content panes whenever more than one tab is open —
-click a tab to switch to it, or its `×` to close it. When many tabs are open,
-tab labels shrink toward a minimum length and the strip scrolls horizontally to
-keep the active tab visible; click the `‹`/`›` edge affordances or use the mouse
-wheel on the tab strip to scroll through hidden tabs.
+(type a directory path, `Enter` to open it, `Esc` to cancel). A `Workspaces`
+list appears at the top of the left panel, above the file tree, whenever more
+than one tab is open. Each row shows the project name with its git branch and
+changed-file count, and the active workspace is highlighted. Click a row to
+switch to it, or its `×` to close it; drag a row onto another to reorder. The
+list takes at most a third of the panel height and scrolls vertically to keep
+the active workspace visible; click the `▴`/`▾` border affordances or use the
+mouse wheel on the list to scroll through hidden workspaces.
 
 | Key              | Action                        |
 | ---------------- | ------------------------------ |

@@ -411,21 +411,17 @@ fn dragging_a_tab_reorders_it_on_release() {
     let b = temp_dir("drag_beta");
     let _state = IsolatedState::new(&a);
     let mut tabs = Tabs::new(vec![app_for(&a), app_for(&b)], 0);
-    tabs.strip_area = ratatui::layout::Rect::new(0, 0, 80, 1);
-    let first_width = a.file_name().unwrap().to_string_lossy().len() as u16 + 4;
-    let mouse = |kind, column| {
+    tabs.strip_area = ratatui::layout::Rect::new(0, 0, 30, 4);
+    let mouse = |kind, row| {
         Event::Mouse(MouseEvent {
             kind,
-            column,
-            row: 0,
+            column: 3,
+            row,
             modifiers: KeyModifiers::empty(),
         })
     };
     tabs.dispatch_event(mouse(MouseEventKind::Down(MouseButton::Left), 1));
-    tabs.dispatch_event(mouse(
-        MouseEventKind::Up(MouseButton::Left),
-        first_width + 1,
-    ));
+    tabs.dispatch_event(mouse(MouseEventKind::Up(MouseButton::Left), 2));
     assert_eq!(tabs.apps[0].root, b);
     assert_eq!(tabs.active_app().root, a);
     assert!(tabs.drag_tab.is_none());
@@ -438,11 +434,11 @@ fn right_clicking_a_tab_opens_tab_context_menu() {
     let a = temp_dir("tab_menu_a");
     let b = temp_dir("tab_menu_b");
     let mut tabs = Tabs::new(vec![app_for(&a), app_for(&b)], 0);
-    tabs.strip_area = Rect::new(0, 0, 80, 1);
+    tabs.strip_area = Rect::new(0, 0, 30, 4);
     tabs.dispatch_event(Event::Mouse(MouseEvent {
         kind: MouseEventKind::Down(MouseButton::Right),
         column: 2,
-        row: 0,
+        row: 1,
         modifiers: KeyModifiers::empty(),
     }));
     assert_eq!(tabs.active, 0);
@@ -477,25 +473,24 @@ fn active_tab_stays_visible_while_switching_and_opening_tabs() {
     let dirs: Vec<_> = (0..10).map(|i| temp_dir(&format!("visible_{i}"))).collect();
     let apps: Vec<_> = dirs.iter().map(|dir| app_for(dir)).collect();
     let mut tabs = Tabs::new(apps, 0);
-    tabs.strip_area = Rect::new(0, 0, 40, 1);
+    tabs.strip_area = Rect::new(0, 0, 30, 5);
+    let rows = crate::ui::tabstrip::visible_rows(false, tabs.strip_area);
 
     for _ in 0..tabs.apps.len() * 2 {
         tabs.next_tab();
         assert!(crate::ui::tabstrip::is_tab_visible(
-            &tabs,
             tabs.first_visible,
             tabs.active,
-            tabs.strip_area.width
+            rows
         ));
     }
 
     let new_dir = temp_dir("visible_new");
     tabs.open_tab(new_dir.clone()).unwrap();
     assert!(crate::ui::tabstrip::is_tab_visible(
-        &tabs,
         tabs.first_visible,
         tabs.active,
-        tabs.strip_area.width
+        rows
     ));
     fs::remove_dir_all(&new_dir).ok();
     for dir in &dirs {
@@ -504,44 +499,39 @@ fn active_tab_stays_visible_while_switching_and_opening_tabs() {
 }
 
 #[test]
-fn tab_strip_clicks_and_wheel_scroll_horizontally() {
+fn workspace_list_clicks_and_wheel_scroll_vertically() {
     let dirs: Vec<_> = (0..6).map(|i| temp_dir(&format!("scroll_{i}"))).collect();
     let apps: Vec<_> = dirs.iter().map(|dir| app_for(dir)).collect();
     let mut tabs = Tabs::new(apps, 2);
-    tabs.strip_area = Rect::new(0, 0, 30, 1);
+    tabs.strip_area = Rect::new(0, 0, 30, 5);
     tabs.first_visible = 2;
+    let mouse = |kind, row| {
+        Event::Mouse(MouseEvent {
+            kind,
+            column: 10,
+            row,
+            modifiers: KeyModifiers::empty(),
+        })
+    };
 
-    tabs.dispatch_event(Event::Mouse(MouseEvent {
-        kind: MouseEventKind::Down(MouseButton::Left),
-        column: 0,
-        row: 0,
-        modifiers: KeyModifiers::empty(),
-    }));
+    tabs.dispatch_event(mouse(MouseEventKind::Down(MouseButton::Left), 0));
     assert_eq!(tabs.first_visible, 1);
 
-    tabs.dispatch_event(Event::Mouse(MouseEvent {
-        kind: MouseEventKind::ScrollDown,
-        column: 10,
-        row: 0,
-        modifiers: KeyModifiers::empty(),
-    }));
+    tabs.dispatch_event(mouse(MouseEventKind::ScrollDown, 2));
     assert_eq!(tabs.first_visible, 2);
+    tabs.dispatch_event(mouse(MouseEventKind::ScrollDown, 2));
+    assert_eq!(tabs.first_visible, 3);
+    tabs.dispatch_event(mouse(MouseEventKind::ScrollDown, 2));
+    assert_eq!(
+        tabs.first_visible, 3,
+        "must stop once the last row is shown"
+    );
 
-    tabs.dispatch_event(Event::Mouse(MouseEvent {
-        kind: MouseEventKind::ScrollUp,
-        column: 10,
-        row: 0,
-        modifiers: KeyModifiers::empty(),
-    }));
-    assert_eq!(tabs.first_visible, 1);
+    tabs.dispatch_event(mouse(MouseEventKind::ScrollUp, 2));
+    assert_eq!(tabs.first_visible, 2);
     let active = tabs.active;
-    tabs.dispatch_event(Event::Mouse(MouseEvent {
-        kind: MouseEventKind::Down(MouseButton::Right),
-        column: 0,
-        row: 0,
-        modifiers: KeyModifiers::empty(),
-    }));
-    assert_eq!(tabs.first_visible, 1);
+    tabs.dispatch_event(mouse(MouseEventKind::Down(MouseButton::Right), 0));
+    assert_eq!(tabs.first_visible, 2);
     assert_eq!(tabs.active, active);
     assert!(tabs.active_app().context_menu.is_none());
 

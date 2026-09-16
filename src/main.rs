@@ -636,7 +636,7 @@ fn render_frame(terminal: &mut Terminal<impl Backend>, tabs: &mut Tabs) -> anyho
     Ok(())
 }
 
-/// Dispatches a single terminal event to the active tab, handling tab-strip
+/// Dispatches a single terminal event to the active tab, handling workspace-list
 /// clicks and tab-lifecycle actions along the way (see `Tabs::dispatch_event`).
 fn dispatch_event(tabs: &mut Tabs, event: Event) {
     tabs.dispatch_event(event);

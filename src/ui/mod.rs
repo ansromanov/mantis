@@ -1,8 +1,9 @@
 //! ratatui rendering orchestration: the top-level `draw` entry point.
 //!
 //! `draw` is called once per frame and lays out the whole screen: it paints the
-//! themed background, splits the area into the optional menu row, tree pane,
-//! content pane, and status bar, and renders each by delegating to `tree`,
+//! themed background, splits the area into the optional menu row, left column
+//! (the workspace list when several tabs are open, then the tree), content
+//! pane, and status bar, and renders each by delegating to `tree`,
 //! `content`, and `statusbar` submodules. Modal overlays (help, search, history, theme picker,
 //! command palette, about, blame) are drawn last, on top, following the same
 //! precedence chain the input handlers use. Rendering is also where panel
@@ -28,20 +29,19 @@ pub mod tree;
 const MIN_LAYOUT_WIDTH: u16 = 80;
 const MIN_LAYOUT_HEIGHT: u16 = 6;
 
-/// Draws the whole workspace: the tab strip (only when more than one tab is
-/// open, or the "open project as new tab" prompt is active) above the
-/// regular single-root frame for the active tab. With exactly one tab and no
-/// prompt open, this renders identically to calling [`draw`] directly.
+/// Draws the whole workspace: the regular single-root frame for the active
+/// tab, with a ` Workspaces ` list stacked above its file tree when more than
+/// one tab is open or the "open project as new tab" prompt is active. With
+/// exactly one tab and no prompt open, this renders identically to calling
+/// [`draw`] directly.
 pub fn draw_workspace(f: &mut Frame, tabs: &mut crate::workspace::Tabs) {
-    let full = f.area();
     if tabs.apps.len() > 1 || tabs.new_tab_prompt.is_some() {
-        let vert = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Length(1), Constraint::Min(0)])
-            .split(full);
-        tabstrip::draw_tabstrip(f, tabs, vert[0]);
-        draw_area(f, tabs.active_app_mut(), vert[1]);
+        let list = tabstrip::WorkspaceList::from_tabs(tabs);
+        let area = f.area();
+        tabs.strip_area = draw_area(f, tabs.active_app_mut(), area, Some(&list));
+        tabs.ensure_active_visible();
     } else {
+        tabs.strip_area = Rect::default();
         draw(f, tabs.active_app_mut());
     }
     if tabs.tab_picker.is_some() {
@@ -51,10 +51,18 @@ pub fn draw_workspace(f: &mut Frame, tabs: &mut crate::workspace::Tabs) {
 
 pub fn draw(f: &mut Frame, app: &mut App) {
     let area = f.area();
-    draw_area(f, app, area);
+    draw_area(f, app, area, None);
 }
 
-fn draw_area(f: &mut Frame, app: &mut App, area: Rect) {
+/// Draws one tab's frame into `area`. When `workspaces` is given, the list is
+/// drawn at the top of the left column and its `Rect` is returned (otherwise
+/// `Rect::default()`), so overlays drawn afterwards still sit on top of it.
+fn draw_area(
+    f: &mut Frame,
+    app: &mut App,
+    area: Rect,
+    workspaces: Option<&tabstrip::WorkspaceList>,
+) -> Rect {
     // Paint the themed background; widgets that don't set their own bg inherit
     // it. With the default theme this is Color::Reset (the terminal default).
     f.render_widget(
@@ -119,7 +127,7 @@ fn draw_area(f: &mut Frame, app: &mut App, area: Rect) {
         if menu_visible {
             menu_bar::draw_menu_bar(f, app, menu_area);
         }
-        return;
+        return Rect::default();
     }
 
     let tree_width = app.tree_width.clamp(5, 95);
@@ -139,7 +147,22 @@ fn draw_area(f: &mut Frame, app: &mut App, area: Rect) {
         height: body_area.height,
     };
 
-    tree::draw_tree(f, app, horiz[0]);
+    let mut workspace_area = Rect::default();
+    let tree_area = match workspaces {
+        Some(list) => {
+            let column = horiz[0];
+            let height = list.height_for(column.height).min(column.height);
+            let split = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Length(height), Constraint::Min(0)])
+                .split(column);
+            workspace_area = tabstrip::draw_workspace_list(f, &app.theme, list, split[0]);
+            split[1]
+        }
+        None => horiz[0],
+    };
+
+    tree::draw_tree(f, app, tree_area);
     content::draw_content(f, app, horiz[1]);
     app.statusbar_area = status_area;
     app.statusbar_segments = statusbar::draw_statusbar(f, app, status_area);
@@ -153,7 +176,7 @@ fn draw_area(f: &mut Frame, app: &mut App, area: Rect) {
     }
 
     if app.tree_filter.is_some() {
-        popups::draw_tree_filter(f, app, horiz[0]);
+        popups::draw_tree_filter(f, app, tree_area);
     }
 
     if app.revision_picker.is_some() {
@@ -227,6 +250,7 @@ fn draw_area(f: &mut Frame, app: &mut App, area: Rect) {
     if menu_visible {
         menu_bar::draw_menu_bar(f, app, menu_area);
     }
+    workspace_area
 }
 
 #[cfg(test)]
