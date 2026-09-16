@@ -8,7 +8,7 @@
 //! is a thin wrapper around `Vec<App>` — every tab is built, driven, and torn
 //! down exactly the way a single-root `mantis` launch already works. `Tabs`
 //! tracks the first visible tab so the active tab remains in view and routes
-//! mouse input for the tab-strip scroll affordances. `App`
+//! mouse input for the workspace list's row clicks and scroll affordances. `App`
 //! itself is untouched aside from one field, `tab_action_request`, that the
 //! tab keybindings, worktree picker, and command-palette entries set (since a
 //! single-root `App` has no way to act on another tab) and that
@@ -26,13 +26,13 @@ use crate::app::{App, TabAction};
 pub struct Tabs {
     pub apps: Vec<App>,
     pub active: usize,
-    /// Index of the first visible tab in the tab strip (horizontal scroll offset).
+    /// Index of the first visible row in the workspace list (vertical scroll offset).
     pub first_visible: usize,
     /// Path being typed for "open project as new tab"; `Some` while that
     /// inline prompt is open.
     pub new_tab_prompt: Option<String>,
-    /// The tab strip's on-screen `Rect` as of the last frame, recorded by
-    /// `ui::tabstrip::draw_tabstrip` for mouse hit-testing — the same
+    /// The workspace list's on-screen `Rect` (borders included) as of the last
+    /// frame, recorded by `ui::draw_workspace` for mouse hit-testing — the same
     /// record-geometry-at-draw-time pattern `App` uses for `tree_area` etc.
     pub strip_area: Rect,
     /// Recently closed roots, newest last, for the reopen-tab action.
@@ -41,7 +41,7 @@ pub struct Tabs {
     pub tab_picker: Option<crate::search::TabPicker>,
     /// The popup rectangle from the last workspace-picker render.
     pub tab_picker_area: Rect,
-    /// Tab pressed on the strip, used to finish a drag reorder on release.
+    /// Tab pressed in the workspace list, used to finish a drag reorder on release.
     pub drag_tab: Option<usize>,
 }
 
@@ -73,43 +73,44 @@ impl Tabs {
         &mut self.apps[self.active]
     }
 
-    /// Ensures that the active tab is visible, using the last drawn strip width.
+    /// Ensures that the active tab is visible, using the last drawn list height.
     pub fn ensure_active_visible(&mut self) {
-        let width = if self.strip_area.width > 0 {
-            self.strip_area.width
+        let rows = if self.strip_area.height > 0 {
+            crate::ui::tabstrip::visible_rows(self.new_tab_prompt.is_some(), self.strip_area)
         } else {
-            80
+            crate::ui::tabstrip::DEFAULT_VISIBLE_ROWS
         };
-        self.ensure_active_visible_for_width(width);
+        self.ensure_active_visible_for_rows(rows);
     }
 
-    /// Ensures that the active tab is visible for a specific strip width.
-    pub fn ensure_active_visible_for_width(&mut self, width: u16) {
+    /// Ensures that the active tab is visible for a list with `rows` content rows.
+    pub fn ensure_active_visible_for_rows(&mut self, rows: u16) {
         if self.apps.is_empty() {
             self.active = 0;
             self.first_visible = 0;
             return;
         }
         self.active = self.active.min(self.apps.len() - 1);
-        self.first_visible = self.first_visible.min(self.apps.len() - 1);
-        if self.active < self.first_visible {
-            self.first_visible = self.active;
-        }
-        while self.first_visible < self.active
-            && !crate::ui::tabstrip::is_tab_visible(self, self.first_visible, self.active, width)
-        {
-            self.first_visible += 1;
-        }
+        self.first_visible = crate::ui::tabstrip::scroll_offset(
+            self.first_visible,
+            self.active,
+            self.apps.len(),
+            rows,
+        );
     }
 
-    /// Scrolls the tab strip one tab to the left, if possible.
-    pub fn scroll_strip_left(&mut self) {
+    /// Scrolls the workspace list up one row, if possible.
+    pub fn scroll_list_up(&mut self) {
         self.first_visible = self.first_visible.saturating_sub(1);
     }
 
-    /// Scrolls the tab strip one tab to the right, if possible.
-    pub fn scroll_strip_right(&mut self) {
-        if self.first_visible + 1 < self.apps.len() {
+    /// Scrolls the workspace list down one row, stopping once the last row is shown.
+    pub fn scroll_list_down(&mut self) {
+        let rows = usize::from(
+            crate::ui::tabstrip::visible_rows(self.new_tab_prompt.is_some(), self.strip_area)
+                .max(1),
+        );
+        if self.first_visible + rows < self.apps.len() {
             self.first_visible += 1;
         }
     }
@@ -400,7 +401,7 @@ impl Tabs {
         }
     }
 
-    /// Handles a click that landed on the tab strip. Returns `true` when the
+    /// Handles a mouse event that landed on the workspace list. Returns `true` when the
     /// event was consumed there (so it must not also reach the active app).
     fn dispatch_strip_mouse(&mut self, m: &MouseEvent) -> bool {
         let strip_area = self.strip_area;
@@ -414,11 +415,11 @@ impl Tabs {
         {
             match m.kind {
                 MouseEventKind::ScrollUp => {
-                    self.scroll_strip_left();
+                    self.scroll_list_up();
                     return true;
                 }
                 MouseEventKind::ScrollDown => {
-                    self.scroll_strip_right();
+                    self.scroll_list_down();
                     return true;
                 }
                 _ => {}
@@ -444,16 +445,16 @@ impl Tabs {
                     self.set_active(i);
                     self.close_active_tab();
                 }
-                crate::ui::tabstrip::TabHit::ScrollLeft => self.scroll_strip_left(),
-                crate::ui::tabstrip::TabHit::ScrollRight => self.scroll_strip_right(),
+                crate::ui::tabstrip::TabHit::ScrollUp => self.scroll_list_up(),
+                crate::ui::tabstrip::TabHit::ScrollDown => self.scroll_list_down(),
             },
             MouseEventKind::Up(crossterm::event::MouseButton::Left) => {
                 if let Some(from) = self.drag_tab.take() {
                     let to = match hit {
                         crate::ui::tabstrip::TabHit::Switch(i)
                         | crate::ui::tabstrip::TabHit::Close(i) => Some(i),
-                        crate::ui::tabstrip::TabHit::ScrollLeft
-                        | crate::ui::tabstrip::TabHit::ScrollRight => None,
+                        crate::ui::tabstrip::TabHit::ScrollUp
+                        | crate::ui::tabstrip::TabHit::ScrollDown => None,
                     };
                     if let Some(to) = to {
                         self.move_tab(from, to);
@@ -464,8 +465,8 @@ impl Tabs {
                 let Some(i) = (match hit {
                     crate::ui::tabstrip::TabHit::Switch(i)
                     | crate::ui::tabstrip::TabHit::Close(i) => Some(i),
-                    crate::ui::tabstrip::TabHit::ScrollLeft
-                    | crate::ui::tabstrip::TabHit::ScrollRight => None,
+                    crate::ui::tabstrip::TabHit::ScrollUp
+                    | crate::ui::tabstrip::TabHit::ScrollDown => None,
                 }) else {
                     return true;
                 };
