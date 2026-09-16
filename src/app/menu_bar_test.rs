@@ -137,6 +137,38 @@ fn clicking_a_menu_row_then_an_action_dispatches_it() {
 }
 
 #[test]
+fn clicking_menu_label_toggles_dropdown_and_hover_switches_only_while_open() {
+    let (mut app, root) = app();
+    app.menu_bar_area = Rect::new(0, 0, 80, 1);
+    let ranges = crate::ui::menu_bar::menu_ranges(app.menu_bar_area);
+    let at = |kind, column, row| MouseEvent {
+        kind,
+        column,
+        row,
+        modifiers: KeyModifiers::empty(),
+    };
+
+    // Moving over a menu label when closed does not open it
+    app.handle_menu_bar_mouse(at(MouseEventKind::Moved, ranges[0].0, 0));
+    assert!(app.menu_bar_state.is_none());
+
+    // Clicking opens the dropdown
+    app.handle_menu_bar_mouse(at(MouseEventKind::Down(MouseButton::Left), ranges[0].0, 0));
+    assert_eq!(app.menu_bar_state.unwrap().menu_index, 0);
+
+    // Hovering another label while open switches the active menu
+    app.handle_menu_bar_mouse(at(MouseEventKind::Moved, ranges[1].0, 0));
+    assert_eq!(app.menu_bar_state.unwrap().menu_index, 1);
+
+    // Clicking the same label again closes the dropdown
+    app.handle_menu_bar_mouse(at(MouseEventKind::Down(MouseButton::Left), ranges[1].0, 0));
+    assert!(app.menu_bar_state.is_none());
+
+    drop(app);
+    fs::remove_dir_all(root).ok();
+}
+
+#[test]
 fn menu_bar_includes_plugin_commands_under_plugins_menu() {
     let (mut app, root) = app();
     app.plugin_manager.register_commands(
