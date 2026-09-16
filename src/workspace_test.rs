@@ -78,6 +78,24 @@ fn new_clamps_active_index_to_valid_range() {
 }
 
 #[test]
+fn shell_layout_is_captured_from_the_first_tab() {
+    let a = temp_dir("shell_a");
+    let b = temp_dir("shell_b");
+    let mut first = app_for(&a);
+    first.config.ui.menu_bar = true;
+    first.config.tree.width = 22;
+    let mut second = app_for(&b);
+    second.config.ui.menu_bar = false;
+    second.config.tree.width = 40;
+
+    let tabs = Tabs::new(vec![first, second], 0);
+    assert!(tabs.shell.menu_bar);
+    assert_eq!(tabs.shell.tree_width, 22);
+    fs::remove_dir_all(a).ok();
+    fs::remove_dir_all(b).ok();
+}
+
+#[test]
 fn open_tab_pushes_and_activates_the_new_tab() {
     let a = temp_dir("open_a");
     let b = temp_dir("open_b");

@@ -194,13 +194,11 @@ pub(crate) fn draw_workspace_list(
         };
         let marker = if active { "▸ " } else { "  " };
         let text_width = width.saturating_sub(ROW_PREFIX_WIDTH + usize::from(CLOSE_WIDTH));
-        let label = truncate(&row.label, text_width);
-        let badge_room = text_width.saturating_sub(label.width());
-        let badge = if row.badge.width() <= badge_room {
-            row.badge.as_str()
-        } else {
-            ""
-        };
+        // Preserve project identity first: truncate the badge only when the
+        // row cannot show it in full, then use the remaining space for the
+        // project label instead of dropping the badge altogether.
+        let badge = truncate(&row.badge, text_width);
+        let label = truncate(&row.label, text_width.saturating_sub(badge.width()));
         let pad = text_width.saturating_sub(label.width() + badge.width());
         let mut spans = vec![
             Span::styled(format!(" {marker}{label}"), style),

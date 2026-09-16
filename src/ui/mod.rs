@@ -38,7 +38,8 @@ pub fn draw_workspace(f: &mut Frame, tabs: &mut crate::workspace::Tabs) {
     if tabs.apps.len() > 1 || tabs.new_tab_prompt.is_some() {
         let list = tabstrip::WorkspaceList::from_tabs(tabs);
         let area = f.area();
-        tabs.strip_area = draw_area(f, tabs.active_app_mut(), area, Some(&list));
+        let shell = tabs.shell;
+        tabs.strip_area = draw_area(f, tabs.active_app_mut(), area, Some(&list), Some(shell));
         tabs.ensure_active_visible();
     } else {
         tabs.strip_area = Rect::default();
@@ -51,7 +52,7 @@ pub fn draw_workspace(f: &mut Frame, tabs: &mut crate::workspace::Tabs) {
 
 pub fn draw(f: &mut Frame, app: &mut App) {
     let area = f.area();
-    draw_area(f, app, area, None);
+    draw_area(f, app, area, None, None);
 }
 
 /// Draws one tab's frame into `area`. When `workspaces` is given, the list is
@@ -62,6 +63,7 @@ fn draw_area(
     app: &mut App,
     area: Rect,
     workspaces: Option<&tabstrip::WorkspaceList>,
+    shell: Option<crate::workspace::WorkspaceShell>,
 ) -> Rect {
     // Paint the themed background; widgets that don't set their own bg inherit
     // it. With the default theme this is Color::Reset (the terminal default).
@@ -70,7 +72,8 @@ fn draw_area(
         area,
     );
 
-    let menu_visible = app.config.ui.menu_bar || app.menu_bar_state.is_some();
+    let menu_visible = shell.map_or(app.config.ui.menu_bar, |shell| shell.menu_bar)
+        || app.menu_bar_state.is_some();
     let min_height = MIN_LAYOUT_HEIGHT + u16::from(menu_visible);
     // Allocate the status bar its configured number of rows (1 or 2), so a
     // two-row bar has room to spread segments instead of eliding them.
@@ -130,7 +133,9 @@ fn draw_area(
         return Rect::default();
     }
 
-    let tree_width = app.tree_width.clamp(5, 95);
+    let tree_width = shell
+        .map_or(app.tree_width, |shell| shell.tree_width)
+        .clamp(5, 95);
     let horiz = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([

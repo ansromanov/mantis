@@ -300,3 +300,29 @@ fn draw_records_statusbar_geometry_for_mouse_hit_testing() {
     assert_eq!(app.statusbar_area.height, 1);
     assert_eq!(app.statusbar_area.y as usize, rows.len() - 1);
 }
+
+#[test]
+fn workspace_shell_keeps_menu_and_tree_geometry_when_active_tab_changes() {
+    let mut first = make_app();
+    first.config.ui.menu_bar = true;
+    first.config.tree.width = 22;
+    let mut second = make_app();
+    second.config.ui.menu_bar = false;
+    second.config.tree.width = 40;
+    let mut tabs = crate::workspace::Tabs::new(vec![first, second], 0);
+
+    let backend = TestBackend::new(100, 30);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|f| super::draw_workspace(f, &mut tabs))
+        .unwrap();
+    let first_tree = tabs.active_app().tree_area;
+    let first_menu = tabs.active_app().menu_bar_area;
+
+    tabs.set_active(1);
+    terminal
+        .draw(|f| super::draw_workspace(f, &mut tabs))
+        .unwrap();
+    assert_eq!(tabs.active_app().tree_area.width, first_tree.width);
+    assert_eq!(tabs.active_app().menu_bar_area, first_menu);
+}

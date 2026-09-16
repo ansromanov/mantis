@@ -5,17 +5,19 @@
 
 `mantis` reads a `mantis.toml` file. It first looks for one in the directory being
 viewed (and its ancestors), then falls back to the global config at
-`$XDG_CONFIG_HOME/mantis/mantis.toml` (or `~/.config/mantis/mantis.toml`). A project-local file
-overrides the global one, so a repository can ship its own defaults.
+`$XDG_CONFIG_HOME/mantis/mantis.toml` (or `~/.config/mantis/mantis.toml`). These files are
+layered from global to local: a nearer project file overrides only the keys it
+sets, so a repository can ship its own defaults without hiding global preferences.
 
 ## Defaults vs. your config
 
-Configuration has two layers:
+Configuration has three layers:
 
 - **Built-in defaults** ship inside `mantis` and supply every value. You don't have
   to set anything.
-- **Your `mantis.toml`** overrides only the keys you set; everything else falls
-  through to the defaults.
+- **Global and project `mantis.toml` files** override the built-in values. They
+  are merged from global to project-local, with nearer ancestors taking priority
+  only for keys they set.
 
 On first run `mantis` creates a tiny stub `mantis.toml` (just a header comment) next to a
 read-only **`mantis.default.toml`** in your config directory. `mantis.default.toml` lists

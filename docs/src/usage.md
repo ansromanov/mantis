@@ -128,7 +128,8 @@ mouse wheel on the list to scroll through hidden workspaces.
 
 Tabs can also be reordered by dragging their labels in the strip. Duplicate
 root names expand to the shortest unique path suffix, and Git repositories
-show their branch and changed-file count when the strip has room. Reordering
+show their branch and changed-file count, truncating long labels or badges when
+the strip is narrow. Reordering
 is saved with the workspace manifest; closing a tab saves its per-root session
 so reopening it restores that state.
 
@@ -138,6 +139,10 @@ as a single-root launch. The set of open tabs and which one was active are
 also remembered and restored automatically the next time you launch `mantis`
 with no path arguments; disable this with `[tabs] restore_on_launch = false`
 in `mantis.toml` (see [Configuration](configuration.md)).
+
+The menu row and tree-pane width are workspace chrome, so they stay fixed while
+switching between tabs even when projects have different UI settings. The
+active tab still supplies the colors and menu actions.
 
 > 💡 **Can't remember a key?** Press `?` or `F1` for the help overlay, or `Ctrl+P`
 > to open the command palette and search for an action by name — it shows you

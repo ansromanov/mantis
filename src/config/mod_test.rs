@@ -139,6 +139,34 @@ fn config_paths_are_local_first_then_global() {
 }
 
 #[test]
+fn local_config_overrides_global_without_hiding_unspecified_values() {
+    let mut merged = toml::Value::Table(toml::map::Map::new());
+    merge_tables(
+        &mut merged,
+        toml::toml! {
+            ui = { menu_bar = true }
+            theme = { name = "monokai", accent = "red" }
+        }
+        .into(),
+    );
+    merge_tables(
+        &mut merged,
+        toml::toml! {
+            theme = { accent = "cyan" }
+        }
+        .into(),
+    );
+
+    let config: Config = merged.try_into().unwrap();
+    assert!(
+        config.ui.menu_bar,
+        "local config must not hide global UI values"
+    );
+    assert_eq!(config.theme.name.as_deref(), Some("monokai"));
+    assert_eq!(config.theme.accent.as_deref(), Some("cyan"));
+}
+
+#[test]
 fn validate_keys_accepts_full_default_template() {
     // The shipped template must validate cleanly against the schema.
     assert!(validate_keys(DEFAULT_CONFIG_TEMPLATE).is_empty());
@@ -224,7 +252,11 @@ fn unknown_key_surfaces_as_warning_but_config_still_loads() {
     ));
     fs::create_dir_all(&dir).unwrap();
     // Valid TOML, valid value, but a typo'd key name.
-    fs::write(dir.join("mantis.toml"), "tree_widht = 40\n").unwrap();
+    fs::write(
+        dir.join("mantis.toml"),
+        "[tree]\nwidth = 20\n\ntree_widht = 40\n",
+    )
+    .unwrap();
 
     let (config, path, error) = load(&dir);
     // The config still loads (the typo'd key is simply ignored)...

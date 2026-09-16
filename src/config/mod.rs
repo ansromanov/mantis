@@ -16,8 +16,9 @@
 //!   and the `pressed` matcher.
 //! - `validate` — schema validation for unknown-key detection.
 //!
-//! `load` locates and deserializes the config, returning any validation warning
-//! rather than failing the launch; `save` writes the current settings back.
+//! `load` merges the global config with project-local overrides, returning any
+//! validation warning rather than failing the launch; `save` writes the current
+//! settings back.
 //! Keep new fields in `types` in sync with the defaults so round-tripping
 //! a saved config is lossless.
 
@@ -65,49 +66,76 @@ pub fn load(root: &Path) -> (Config, Option<PathBuf>, Option<String>) {
     if let Some(ref path) = global {
         init_config_dir(path);
     }
+    let paths = config_paths(root);
     let mut error = None;
-    for path in config_paths(root) {
-        let Ok(s) = fs::read_to_string(&path) else {
+    let mut merged = toml::Value::Table(toml::map::Map::new());
+    let mut loaded_path = None;
+    let mut loaded_any = false;
+
+    // Apply the least-specific file first so nearer project/ancestor files
+    // override only the values they declare. A complete project reference
+    // file must not accidentally hide unrelated global settings.
+    for path in paths.iter().rev() {
+        let Ok(s) = fs::read_to_string(path) else {
             continue; // missing or unreadable: try the next candidate
         };
-        match toml::from_str::<Config>(&s) {
-            Ok(mut config) => {
-                config.migrate_legacy_flat_fields();
-                config.migrate_legacy_git_fields();
-                config.migrate_legacy_plugin_paths();
-                config.keys.migrate_legacy_keys();
-                // Remove any [plugins] entries referencing retired bundled
-                // plugin filenames (e.g. old shell scripts). This is done
-                // in memory only; the user's mantis.toml is not rewritten
-                // unless save_config is called for another reason.
-                let retired = crate::plugin::retired_bundled_plugins();
-                config.plugins.retain(|_name, entry| {
-                    let Some(fname) = entry.path.file_name().and_then(|s| s.to_str()) else {
-                        return true;
-                    };
-                    !retired.contains(&fname)
-                });
-                // The config parsed, but `#[serde(default)]` silently ignores
-                // unknown keys. Flag them (with nearest-match hints) so typos
-                // don't get dropped without a word. A higher-precedence parse
-                // failure already recorded above takes priority.
-                if error.is_none() {
-                    let unknown = validate::validate_keys(&s);
-                    if !unknown.is_empty() {
-                        error = Some(format!("{}: {}", path.display(), unknown.join("; ")));
-                    }
-                }
-                return (config, Some(path), error);
-            }
-            // Record the first malformed config but keep falling back so a valid
-            // lower-precedence file (e.g. the global config) can still load.
-            Err(e) if error.is_none() => {
+        if let Err(e) = toml::from_str::<Config>(&s) {
+            // Keep falling back when one layer is malformed, as before.
+            if error.is_none() {
                 error = Some(format!("{}: {e}", path.display()));
             }
-            Err(_) => {}
+            continue;
         }
+        let Ok(value) = toml::from_str::<toml::Value>(&s) else {
+            continue;
+        };
+        if error.is_none() {
+            let unknown = validate::validate_keys(&s);
+            if !unknown.is_empty() {
+                error = Some(format!("{}: {}", path.display(), unknown.join("; ")));
+            }
+        }
+        merge_tables(&mut merged, value);
+        loaded_any = true;
+        loaded_path = Some(path.clone());
     }
-    (Config::default(), global, error)
+
+    let mut config = if loaded_any {
+        merged.try_into().unwrap_or_default()
+    } else {
+        Config::default()
+    };
+    config.migrate_legacy_flat_fields();
+    config.migrate_legacy_git_fields();
+    config.migrate_legacy_plugin_paths();
+    config.keys.migrate_legacy_keys();
+    // Remove any [plugins] entries referencing retired bundled plugin
+    // filenames (e.g. old shell scripts). This is done in memory only; the
+    // user's mantis.toml is not rewritten unless save_config is called.
+    let retired = crate::plugin::retired_bundled_plugins();
+    config.plugins.retain(|_name, entry| {
+        let Some(fname) = entry.path.file_name().and_then(|s| s.to_str()) else {
+            return true;
+        };
+        !retired.contains(&fname)
+    });
+    (config, loaded_path.or(global), error)
+}
+
+/// Recursively merges a higher-precedence TOML table into `base`.
+fn merge_tables(base: &mut toml::Value, overlay: toml::Value) {
+    let (toml::Value::Table(base), toml::Value::Table(overlay)) = (base, overlay) else {
+        return;
+    };
+    for (key, value) in overlay {
+        if let Some(existing) = base.get_mut(&key) {
+            if existing.is_table() && value.is_table() {
+                merge_tables(existing, value);
+                continue;
+            }
+        }
+        base.insert(key, value);
+    }
 }
 
 /// Writes `config` back to the user's `path` as a *sparse* override file: only
