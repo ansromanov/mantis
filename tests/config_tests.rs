@@ -119,11 +119,12 @@ fn save_and_reload_preserves_theme() {
     fs::create_dir_all(&dir).unwrap();
     fs::write(dir.join("mantis.toml"), "tree_width = 30\n").unwrap();
 
-    let (mut cfg, path, _) = config::load(&dir);
-    assert_eq!(cfg.tree.width, 30);
+    let (loaded, path, _) = config::load(&dir);
+    assert_eq!(loaded.tree.width, 30);
 
+    let mut cfg = loaded.clone();
     cfg.theme = ThemeConfig::from_preset("synthwave84");
-    config::save(&cfg, path.as_deref().unwrap()).unwrap();
+    config::save_changes(&loaded, &cfg, path.as_deref().unwrap()).unwrap();
 
     let (reloaded, _, _) = config::load(&dir);
     let theme = reloaded.theme.resolve();

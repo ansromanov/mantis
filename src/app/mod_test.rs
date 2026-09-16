@@ -5025,6 +5025,8 @@ fn save_config_sets_status_on_failure() {
     // Initially no status.
     assert!(app.status_message.is_none(), "no status before save_config");
 
+    // Saves only write runtime changes, so make one.
+    app.config.tree.width = 42;
     app.save_config();
 
     let sm = app
@@ -5112,12 +5114,22 @@ fn ignore_gitignore_true_colors_ignored_files_in_status_map() {
 fn save_config_no_status_on_success() {
     let root = temp_tree();
     let good_path = root.join("mantis.toml");
-    let mut app = App::new(root.to_path_buf(), Config::default(), Some(good_path), None).unwrap();
+    let mut app = App::new(
+        root.to_path_buf(),
+        Config::default(),
+        Some(good_path.clone()),
+        None,
+    )
+    .unwrap();
 
     // Initially no status.
     assert!(app.status_message.is_none(), "no status before save_config");
 
+    app.config.tree.width = 42;
     app.save_config();
+    assert!(fs::read_to_string(&good_path)
+        .unwrap()
+        .contains("width = 42"));
 
     // Successful save should not produce a status message.
     assert!(
@@ -5394,4 +5406,30 @@ fn menu_bar_overlay_state_is_separate_from_persistent_visibility() {
     assert!(app.menu_bar_state.is_some());
     assert!(!app.config.ui.menu_bar);
     fs::remove_dir_all(root).ok();
+}
+
+#[test]
+fn save_config_keeps_comments_and_untouched_keys_in_the_config_file() {
+    let root = temp_tree();
+    let path = root.join("mantis.toml");
+    let original =
+        "# checked-in project config\n[tree]\nshow_hidden = false # keep\n\n[git]\nstatus = true\n";
+    fs::write(&path, original).unwrap();
+    let cfg: Config = toml::from_str(original).unwrap();
+    let mut app = App::new(root.to_path_buf(), cfg, Some(path.clone()), None).unwrap();
+
+    app.save_config();
+    assert_eq!(
+        fs::read_to_string(&path).unwrap(),
+        original,
+        "no-op save must not write"
+    );
+
+    app.config.git.status = false;
+    app.save_config();
+    assert_eq!(
+        fs::read_to_string(&path).unwrap(),
+        original.replace("status = true", "status = false")
+    );
+    fs::remove_dir_all(&root).ok();
 }

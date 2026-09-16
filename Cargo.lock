@@ -1071,6 +1071,7 @@ dependencies = [
  "syntect",
  "tempfile",
  "toml 0.8.23",
+ "toml_edit",
  "tracing",
  "tracing-subscriber",
  "unicode-width 0.2.2",

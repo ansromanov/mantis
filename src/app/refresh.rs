@@ -292,6 +292,7 @@ impl App {
         let theme = cfg.theme.resolve();
         self.apply_theme(&theme_name, theme);
 
+        self.config_baseline = cfg.clone();
         self.config = cfg;
         self.reload();
     }
