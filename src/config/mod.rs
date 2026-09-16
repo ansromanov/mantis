@@ -138,12 +138,55 @@ fn merge_tables(base: &mut toml::Value, overlay: toml::Value) {
     }
 }
 
-/// Writes `config` back to the user's `path` as a *sparse* override file: only
-/// the keys whose value differs from the built-in defaults are written, so the
-/// user config stays small and readable instead of growing into a full dump of
-/// every setting.
+/// Writes `config` back to the user's `path` as a *sparse* override file while
+/// preserving comments and formatting already present in that file.
 pub fn save(config: &Config, path: &Path) -> std::io::Result<()> {
-    fs::write(path, sparse_toml(config))
+    let output = match fs::read_to_string(path) {
+        Ok(existing) => preserve_document_comments(&existing, &sparse_toml(config)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => sparse_toml(config),
+        Err(error) => return Err(error),
+    };
+    fs::write(path, output)
+}
+
+/// Updates values represented by `desired` without replacing the existing
+/// document structure, so comments and unrelated formatting survive a save.
+fn preserve_document_comments(existing: &str, desired: &str) -> String {
+    let Ok(mut document) = existing.parse::<toml_edit::DocumentMut>() else {
+        return desired.to_string();
+    };
+    let Ok(desired_document) = desired.parse::<toml_edit::DocumentMut>() else {
+        return desired.to_string();
+    };
+    merge_document_tables(&mut document, &desired_document);
+    document.to_string()
+}
+
+fn merge_document_tables(document: &mut toml_edit::DocumentMut, desired: &toml_edit::DocumentMut) {
+    for (key, desired_item) in desired.iter() {
+        if let Some(existing_item) = document.get_mut(key) {
+            merge_document_items(existing_item, desired_item);
+        } else {
+            document.insert(key, desired_item.clone());
+        }
+    }
+}
+
+fn merge_document_items(existing: &mut toml_edit::Item, desired: &toml_edit::Item) {
+    match (existing, desired) {
+        (toml_edit::Item::Table(existing), toml_edit::Item::Table(desired)) => {
+            for (key, desired_item) in desired.iter() {
+                if let Some(existing_item) = existing.get_mut(key) {
+                    merge_document_items(existing_item, desired_item);
+                } else {
+                    existing.insert(key, desired_item.clone());
+                }
+            }
+        }
+        (existing, desired) => {
+            *existing = desired.clone();
+        }
+    }
 }
 
 /// Serialises `config` keeping only the top-level keys whose value differs from

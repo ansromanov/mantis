@@ -406,6 +406,27 @@ fn save_returns_ok_on_success_and_round_trips() {
 }
 
 #[test]
+fn save_preserves_comments_in_an_existing_config() {
+    let dir = scratch_dir("save_comments");
+    let path = dir.join("mantis.toml");
+    fs::write(
+        &path,
+        "# Keep this explanation\n[tree]\n# Width controls the sidebar\nwidth = 20\n",
+    )
+    .unwrap();
+    let mut cfg = Config::default();
+    cfg.tree.width = 42;
+
+    save(&cfg, &path).unwrap();
+
+    let output = fs::read_to_string(&path).unwrap();
+    assert!(output.contains("# Keep this explanation"));
+    assert!(output.contains("# Width controls the sidebar"));
+    assert!(output.contains("width = 42"));
+    fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
 fn unknown_key_still_warns_even_alongside_deprecated_keys() {
     let warnings = validate_keys("git_staus = true\n");
     assert!(
