@@ -639,3 +639,27 @@ fn draw_content_renders_csv_table_view() {
 
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn gutter_wider_than_a_narrow_pane_at_the_frame_edge_does_not_panic() {
+    let root = temp_tree();
+    for word_wrap in [false, true] {
+        let mut app = app_for(&root);
+        app.content = (1..=120_000).map(|i| format!("line {i}")).collect();
+        app.content_title = Some("huge.rs".to_string());
+        app.word_wrap = word_wrap;
+        let backend = TestBackend::new(40, 10);
+        let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        for width in 1..=9 {
+            terminal
+                .draw(|frame| {
+                    let area = frame.area();
+                    let pane =
+                        ratatui::layout::Rect::new(area.width - width, 0, width, area.height);
+                    draw_content(frame, &mut app, pane);
+                })
+                .unwrap();
+        }
+    }
+    fs::remove_dir_all(&root).ok();
+}
