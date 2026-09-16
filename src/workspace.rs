@@ -22,10 +22,19 @@ use ratatui::layout::Rect;
 
 use crate::app::{App, TabAction};
 
+/// Layout settings shared by the multi-project workspace shell.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct WorkspaceShell {
+    pub menu_bar: bool,
+    pub tree_width: u16,
+}
+
 /// The set of open tabs (project roots) in one `mantis` process.
 pub struct Tabs {
     pub apps: Vec<App>,
     pub active: usize,
+    /// Stable chrome settings captured when the workspace is created.
+    pub(crate) shell: WorkspaceShell,
     /// Index of the first visible row in the workspace list (vertical scroll offset).
     pub first_visible: usize,
     /// Path being typed for "open project as new tab"; `Some` while that
@@ -50,9 +59,20 @@ impl Tabs {
     /// clamped to a valid index and scrolled into view.
     pub fn new(apps: Vec<App>, active: usize) -> Self {
         let active = active.min(apps.len().saturating_sub(1));
+        let shell = apps.first().map_or(
+            WorkspaceShell {
+                menu_bar: false,
+                tree_width: 20,
+            },
+            |app| WorkspaceShell {
+                menu_bar: app.config.ui.menu_bar,
+                tree_width: app.config.tree.width,
+            },
+        );
         let mut tabs = Tabs {
             apps,
             active,
+            shell,
             first_visible: 0,
             new_tab_prompt: None,
             strip_area: Rect::default(),

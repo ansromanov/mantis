@@ -171,7 +171,34 @@ fn git_branch_and_changed_count_are_shown_when_the_row_has_room() {
     let wide = render(&mut tabs, Rect::new(0, 0, 40, 4));
     assert!(wide[1].contains("git_badge ·main ●3"), "{:?}", wide[1]);
     let narrow = render(&mut tabs, Rect::new(0, 0, 18, 4));
-    assert!(!narrow[1].contains("main"), "{:?}", narrow[1]);
+    assert!(
+        narrow[1].contains("main"),
+        "badge should survive truncation: {:?}",
+        narrow[1]
+    );
+    remove(&[root, second_root]);
+}
+
+#[test]
+fn long_badges_are_truncated_instead_of_dropped() {
+    let root = temp_dir("badge_priority");
+    let second_root = temp_dir("other");
+    let mut app = app_for(&root);
+    app.git_info = Some(crate::git::GitRepoInfo {
+        head: crate::git::GitHead::Branch("very-long-branch-name".into()),
+        ahead: 0,
+        behind: 0,
+        total_changed: 12,
+        staged: 0,
+        untracked: 0,
+    });
+    let mut tabs = Tabs::new(vec![app, app_for(&second_root)], 0);
+    let line = render(&mut tabs, Rect::new(0, 0, 24, 4)).remove(1);
+    assert!(
+        line.contains("very-long"),
+        "badge prefix should remain: {line:?}"
+    );
+    assert!(line.contains('…'), "overflow should be marked: {line:?}");
     remove(&[root, second_root]);
 }
 
