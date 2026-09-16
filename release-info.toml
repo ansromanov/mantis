@@ -1,4 +1,4 @@
-version = "0.22.1"
+version = "0.22.2"
 date = "2026-09-16"
 whats_new = """- fix(test): scope telemetry and update assertions in about popup test (#862)
 - fix: stop re-statting the filesystem on every tree redraw (#861)
