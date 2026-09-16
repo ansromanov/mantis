@@ -1956,7 +1956,7 @@ fn right_clicking_a_blame_row_opens_blame_actions() {
 // touched for log follow mode
 
 #[test]
-fn hovering_a_visible_menu_label_opens_its_dropdown() {
+fn hovering_a_menu_label_does_not_open_its_dropdown() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.config.ui.menu_bar = true;
@@ -1968,6 +1968,30 @@ fn hovering_a_visible_menu_label_opens_its_dropdown() {
         row: 0,
         modifiers: crossterm::event::KeyModifiers::empty(),
     });
+    assert!(app.menu_bar_state.is_none());
+    fs::remove_dir_all(root).ok();
+}
+
+#[test]
+fn hovering_another_label_switches_an_open_menu_and_leaving_keeps_it_open() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.config.ui.menu_bar = true;
+    app.menu_bar_area = Rect::new(0, 0, 80, 1);
+    let ranges = crate::ui::menu_bar::menu_ranges(app.menu_bar_area);
+    let at = |kind, column, row| MouseEvent {
+        kind,
+        column,
+        row,
+        modifiers: crossterm::event::KeyModifiers::empty(),
+    };
+    app.handle_mouse(at(MouseEventKind::Down(MouseButton::Left), ranges[0].0, 0));
+    assert_eq!(app.menu_bar_state.unwrap().menu_index, 0);
+    app.handle_mouse(at(MouseEventKind::Moved, ranges[1].0, 0));
     assert_eq!(app.menu_bar_state.unwrap().menu_index, 1);
+    app.handle_mouse(at(MouseEventKind::Moved, 70, 20));
+    assert_eq!(app.menu_bar_state.unwrap().menu_index, 1);
+    app.handle_mouse(at(MouseEventKind::Down(MouseButton::Left), ranges[1].0, 0));
+    assert!(app.menu_bar_state.is_none());
     fs::remove_dir_all(root).ok();
 }

@@ -154,9 +154,7 @@ impl App {
             return;
         }
         if self.menu_bar_state.is_some()
-            || (self.config.ui.menu_bar
-                && (rect_contains(self.menu_bar_area, ev.column, ev.row)
-                    || matches!(ev.kind, MouseEventKind::Moved)))
+            || (self.config.ui.menu_bar && rect_contains(self.menu_bar_area, ev.column, ev.row))
         {
             self.handle_menu_bar_mouse(ev);
             return;

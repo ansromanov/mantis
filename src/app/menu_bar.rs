@@ -8,6 +8,8 @@
 //! applicability are resolved from the current application state. Keyboard
 //! and pointer activation converge on the same canonical action dispatcher,
 //! preserving status messages, usage tracking, and action telemetry.
+//! Dropdowns open only on a left click (a second click on the same label
+//! closes it); hovering another label switches menus only while one is open.
 
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 
@@ -155,13 +157,18 @@ impl App {
         }
         if matches!(event.kind, MouseEventKind::Moved) {
             if in_bar {
+                let Some(state) = self.menu_bar_state else {
+                    return;
+                };
                 if let Some(index) =
                     crate::ui::menu_bar::menu_index_at(self.menu_bar_area, event.column)
                 {
-                    self.menu_bar_state = Some(MenuBarState {
-                        menu_index: index,
-                        selected: 0,
-                    });
+                    if index != state.menu_index {
+                        self.menu_bar_state = Some(MenuBarState {
+                            menu_index: index,
+                            selected: 0,
+                        });
+                    }
                 }
             } else if in_dropdown {
                 if let Some(state) = self.menu_bar_state {
@@ -180,21 +187,22 @@ impl App {
                         }
                     }
                 }
-            } else if self.config.ui.menu_bar {
-                self.menu_bar_state = None;
             }
             return;
         }
         if let MouseEventKind::Down(MouseButton::Left) = event.kind {
             if in_bar {
-                if let Some(index) =
-                    crate::ui::menu_bar::menu_index_at(self.menu_bar_area, event.column)
-                {
-                    self.menu_bar_state = Some(MenuBarState {
+                let index = crate::ui::menu_bar::menu_index_at(self.menu_bar_area, event.column);
+                let already_open = self
+                    .menu_bar_state
+                    .is_some_and(|state| Some(state.menu_index) == index);
+                self.menu_bar_state = match index {
+                    Some(index) if !already_open => Some(MenuBarState {
                         menu_index: index,
                         selected: 0,
-                    });
-                }
+                    }),
+                    _ => None,
+                };
                 return;
             }
             if in_dropdown {
