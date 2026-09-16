@@ -141,7 +141,7 @@ fn config_paths_are_local_first_then_global() {
 #[test]
 fn local_config_overrides_global_without_hiding_unspecified_values() {
     let mut merged = toml::Value::Table(toml::map::Map::new());
-    merge_tables(
+    merge_config_tables(
         &mut merged,
         toml::toml! {
             ui = { menu_bar = true }
@@ -149,7 +149,7 @@ fn local_config_overrides_global_without_hiding_unspecified_values() {
         }
         .into(),
     );
-    merge_tables(
+    merge_config_tables(
         &mut merged,
         toml::toml! {
             theme = { accent = "cyan" }
