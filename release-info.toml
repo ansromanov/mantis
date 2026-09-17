@@ -1,4 +1,4 @@
-version = "0.22.5"
+version = "0.22.6"
 date = "2026-09-17"
 whats_new = """- fix(config): edit mantis.toml in place, writing only runtime changes (#874)
 - fix(workspaces): preserve badges and shared layout (#872)
