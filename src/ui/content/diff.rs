@@ -11,7 +11,7 @@
 //! module's minimum width.
 
 use ratatui::{
-    layout::Rect,
+    layout::{Constraint, Direction, Layout, Rect},
     style::Style,
     text::{Line, Span},
     widgets::{Block, Paragraph},
@@ -21,6 +21,7 @@ use ratatui::{
 use crate::app::App;
 use crate::diff::{Cell, CellKind, DiffRow};
 
+use super::diff_header::draw_diff_info_bar;
 use super::scrollbar::draw_content_scrollbar;
 
 /// Renders the diff in a split old | new layout: two columns, each with its own
@@ -29,9 +30,23 @@ use super::scrollbar::draw_content_scrollbar;
 /// aligned row-for-row so the two halves scroll together.
 pub(crate) fn draw_side_by_side_diff(f: &mut Frame, app: &mut App, area: Rect, block: Block) {
     let inner = block.inner(area);
-    app.content_area = inner;
-    app.fold_gutter_rows = Vec::new();
     f.render_widget(block, area);
+
+    let (diff_bar, inner) = if inner.height >= 4 {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(1), Constraint::Min(0)])
+            .split(inner);
+        (Some(chunks[0]), chunks[1])
+    } else {
+        (None, inner)
+    };
+    app.content_area = inner;
+    app.diff_header_area = diff_bar.unwrap_or_default();
+    if let Some(bar_area) = diff_bar {
+        draw_diff_info_bar(f, app, bar_area);
+    }
+    app.fold_gutter_rows = Vec::new();
 
     let total = app.diff_rows.len();
     let view_height = inner.height as usize;

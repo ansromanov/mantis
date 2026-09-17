@@ -1995,3 +1995,106 @@ fn hovering_another_label_switches_an_open_menu_and_leaving_keeps_it_open() {
     assert!(app.menu_bar_state.is_none());
     fs::remove_dir_all(root).ok();
 }
+
+#[test]
+fn clicking_tree_top_border_toggles_git_mode() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.git_info = Some(crate::git::GitRepoInfo {
+        head: crate::git::GitHead::Branch("main".into()),
+        ahead: 0,
+        behind: 0,
+        total_changed: 1,
+        staged: 0,
+        untracked: 0,
+    });
+    app.tree_area = Rect::new(0, 1, 30, 20);
+    assert!(!app.git_mode);
+
+    app.handle_mouse(left_down_at(5, 0));
+    assert!(app.git_mode);
+
+    app.handle_mouse(left_down_at(5, 0));
+    assert!(!app.git_mode);
+
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn clicking_diff_header_area_cycles_mode_and_toggles_side_by_side() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.is_diff = true;
+    app.diff_header_area = Rect::new(30, 1, 60, 1);
+    app.diff_mode = crate::app::DiffMode::All;
+    app.diff_side_by_side = false;
+
+    // Click diff mode badge (rel_x < 20) -> cycles to Staged
+    app.handle_mouse(left_down_at(35, 1));
+    assert_eq!(app.diff_mode, crate::app::DiffMode::Staged);
+
+    // Click layout toggle (rel_x in 20..36) -> toggles side-by-side
+    app.handle_mouse(left_down_at(55, 1));
+    assert!(app.diff_side_by_side);
+
+    app.handle_mouse(left_down_at(55, 1));
+    assert!(!app.diff_side_by_side);
+
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn clicking_statusbar_git_badges_toggles_git_mode_and_diff_modes() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.statusbar_area = Rect::new(0, 23, 100, 1);
+    app.git_info = Some(crate::git::GitRepoInfo {
+        head: crate::git::GitHead::Branch("main".into()),
+        ahead: 0,
+        behind: 0,
+        total_changed: 1,
+        staged: 0,
+        untracked: 0,
+    });
+    app.git_mode = true;
+
+    let mut git_mode_col = None;
+    for col in 0..100 {
+        if let Some(text) = crate::ui::statusbar::segment_at(&app, app.statusbar_area, col, 23) {
+            if text.contains("git mode") {
+                git_mode_col = Some(col);
+                break;
+            }
+        }
+    }
+    let col = git_mode_col.expect("git mode badge should be rendered in statusbar");
+    app.handle_mouse(left_down_at(col, 23));
+    assert!(!app.git_mode);
+
+    app.is_diff = true;
+    app.git_mode = true;
+    app.diff_mode = crate::app::DiffMode::All;
+    app.diff_side_by_side = false;
+
+    let mut diff_mode_col = None;
+    let mut sxs_col = None;
+    for col in 0..100 {
+        if let Some(text) = crate::ui::statusbar::segment_at(&app, app.statusbar_area, col, 23) {
+            if text.contains("diff:") {
+                diff_mode_col = Some(col);
+            }
+            if text.contains("unified") || text.contains("sxs") {
+                sxs_col = Some(col);
+            }
+        }
+    }
+    let diff_col = diff_mode_col.expect("diff mode badge should be rendered");
+    app.handle_mouse(left_down_at(diff_col, 23));
+    assert_eq!(app.diff_mode, crate::app::DiffMode::Staged);
+
+    let s_col = sxs_col.expect("unified/sxs badge should be rendered");
+    app.handle_mouse(left_down_at(s_col, 23));
+    assert!(app.diff_side_by_side);
+
+    fs::remove_dir_all(&root).ok();
+}

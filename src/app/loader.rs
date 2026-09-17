@@ -106,6 +106,9 @@ pub(super) struct DiffLoad {
 /// Computed result of a git status scan (status map + repo info).
 pub(super) struct GitStatusLoad {
     pub status_map: HashMap<PathBuf, GitStatus>,
+    pub staged: HashSet<PathBuf>,
+    pub unstaged: HashSet<PathBuf>,
+    pub untracked: HashSet<PathBuf>,
     pub info: Option<crate::git::GitRepoInfo>,
 }
 
@@ -407,9 +410,15 @@ pub(super) fn compute_git_status_load(
     include_untracked: bool,
     include_ignored: bool,
 ) -> GitStatusLoad {
-    let status_map = crate::git::repo_status(root, include_untracked, include_ignored);
+    let details = crate::git::repo_status_details(root, include_untracked, include_ignored);
     let info = crate::git::repo_info(root);
-    GitStatusLoad { status_map, info }
+    GitStatusLoad {
+        status_map: details.status_map,
+        staged: details.staged,
+        unstaged: details.unstaged,
+        untracked: details.untracked,
+        info,
+    }
 }
 
 /// Runs the appropriate `git diff` variant for `path` and parses it into
@@ -612,7 +621,13 @@ impl Loader {
                             Err(e) => (HashMap::new(), Some(e)),
                         };
                         let info = crate::git::repo_info(&root);
-                        let load = Box::new(GitStatusLoad { status_map, info });
+                        let load = Box::new(GitStatusLoad {
+                            status_map,
+                            staged: HashSet::new(),
+                            unstaged: HashSet::new(),
+                            untracked: HashSet::new(),
+                            info,
+                        });
                         if res_tx
                             .send(LoadResponse::RangeStatus {
                                 seq,

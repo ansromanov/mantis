@@ -308,13 +308,20 @@ fn build_normal_lines(
                 StatusSegment::Badges,
                 P_INFO,
             ));
-        }
-        if let Some(ref commit) = app.commit_base {
+        } else if let Some(ref commit) = app.commit_base {
             segs.push((
                 Span::styled(format!(" [commit: {commit}]"), badge),
                 StatusSegment::Badges,
                 P_INFO,
             ));
+        } else {
+            let key = app.keys().label_for_action("git_mode_toggle");
+            let label = if key.is_empty() {
+                " [git mode]".to_string()
+            } else {
+                format!(" [git mode · {key}]")
+            };
+            segs.push((Span::styled(label, badge), StatusSegment::Badges, P_INFO));
         }
     }
     if app.show_blame && app.has_text_cursor() {
@@ -366,6 +373,25 @@ fn build_normal_lines(
         } else {
             segs.push((
                 Span::styled(format!(" [diff: {} · {key}]", app.diff_mode.label()), badge),
+                StatusSegment::Badges,
+                P_INFO,
+            ));
+        }
+        let sxs_key = app.keys().label_for_action("toggle_diff_side_by_side");
+        let layout_label = if app.diff_side_by_side {
+            "sxs"
+        } else {
+            "unified"
+        };
+        if sxs_key.is_empty() {
+            segs.push((
+                Span::styled(format!(" [{layout_label}]"), badge),
+                StatusSegment::Badges,
+                P_INFO,
+            ));
+        } else {
+            segs.push((
+                Span::styled(format!(" [{layout_label} · {sxs_key}]"), badge),
                 StatusSegment::Badges,
                 P_INFO,
             ));

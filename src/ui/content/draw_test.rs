@@ -663,3 +663,24 @@ fn gutter_wider_than_a_narrow_pane_at_the_frame_edge_does_not_panic() {
     }
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn draw_content_when_diff_renders_diff_header_bar() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.is_diff = true;
+    app.content = vec![
+        "@@ -1,1 +1,1 @@".to_string(),
+        "-old".to_string(),
+        "+new".to_string(),
+    ];
+    let backend = TestBackend::new(80, 10);
+    let mut terminal = ratatui::Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| {
+            draw_content(frame, &mut app, frame.area());
+        })
+        .unwrap();
+    assert_ne!(app.diff_header_area, ratatui::layout::Rect::default());
+    fs::remove_dir_all(&root).ok();
+}

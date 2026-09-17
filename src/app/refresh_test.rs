@@ -406,6 +406,9 @@ fn create_base_app() -> App {
         git_info: None,
         worktree_count: 0,
         git_status_map: HashMap::new(),
+        git_staged_files: std::collections::HashSet::new(),
+        git_unstaged_files: std::collections::HashSet::new(),
+        git_untracked_files: std::collections::HashSet::new(),
         git_mode: false,
         git_mode_flat: false,
         compare_base: None,
@@ -423,6 +426,7 @@ fn create_base_app() -> App {
         show_blame: false,
         blame_before_commit: false,
         blame_area: ratatui::layout::Rect::default(),
+        diff_header_area: ratatui::layout::Rect::default(),
         show_about: false,
         show_telemetry_notice: false,
         show_welcome: false,
@@ -1664,6 +1668,9 @@ fn apply_git_status_load_updates_map_and_info() {
     };
     let load = GitStatusLoad {
         status_map: sm.clone(),
+        staged: std::collections::HashSet::new(),
+        unstaged: std::collections::HashSet::new(),
+        untracked: std::collections::HashSet::new(),
         info: Some(info.clone()),
     };
     app.apply_git_status_load(load);
@@ -1704,6 +1711,9 @@ fn apply_git_status_load_rebuilds_tree_in_git_mode() {
     }];
     let load = GitStatusLoad {
         status_map: std::collections::HashMap::new(),
+        staged: std::collections::HashSet::new(),
+        unstaged: std::collections::HashSet::new(),
+        untracked: std::collections::HashSet::new(),
         info: None,
     };
     app.apply_git_status_load(load);

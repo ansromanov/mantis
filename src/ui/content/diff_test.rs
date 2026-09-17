@@ -203,3 +203,20 @@ fn side_by_side_diff_scroll_uses_diff_rows_before_first_render_geometry() {
     assert!(text.contains("context line 10"));
     assert!(!text.contains("context line 0"));
 }
+
+#[test]
+fn side_by_side_diff_renders_diff_header_info_bar() {
+    let (mut app, _dir) = render_app();
+    let lines: Vec<String> = ["@@ -1,1 +1,1 @@", "-removed", "+added"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    let rows = crate::diff::parse_side_by_side(&lines);
+    let buffer = render_diff(&mut app, rows);
+    let text = buffer_text(&buffer);
+    assert!(text.contains("Diff:"), "expected diff header bar: {text}");
+    assert!(
+        text.contains("[side-by-side]"),
+        "expected layout label: {text}"
+    );
+}

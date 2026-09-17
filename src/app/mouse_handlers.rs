@@ -299,6 +299,32 @@ impl App {
         if rect_contains(self.statusbar_area, ev.column, ev.row) {
             match ev.kind {
                 MouseEventKind::Down(MouseButton::Left) => {
+                    if let Some(text) = crate::ui::statusbar::segment_at(
+                        self,
+                        self.statusbar_area,
+                        ev.column,
+                        ev.row,
+                    ) {
+                        if text.contains("git mode") {
+                            self.toggle_git_mode();
+                            return;
+                        } else if text.contains("diff:") {
+                            self.diff_mode = self.diff_mode.next();
+                            self.config.git.diff.mode = self.diff_mode;
+                            self.save_config();
+                            if let Some(path) = self.current_file.clone() {
+                                self.show_working_tree_diff(&path);
+                            }
+                            return;
+                        } else if text.contains("sxs") || text.contains("unified") {
+                            self.diff_side_by_side = !self.diff_side_by_side;
+                            self.config.git.diff.side_by_side = self.diff_side_by_side;
+                            self.save_config();
+                            self.content_hscroll = 0;
+                            self.clamp_content_scroll();
+                            return;
+                        }
+                    }
                     if let Some(segment) = crate::ui::statusbar::hit_test(self, ev.column, ev.row) {
                         self.activate_statusbar_segment(segment);
                     }
@@ -347,6 +373,33 @@ impl App {
                     } else {
                         self.last_breadcrumb_click = Some((now, path));
                     }
+                    return;
+                }
+                if rect_contains(self.diff_header_area, ev.column, ev.row) {
+                    let rel_x = ev.column.saturating_sub(self.diff_header_area.x);
+                    if (20..36).contains(&rel_x) {
+                        self.diff_side_by_side = !self.diff_side_by_side;
+                        self.config.git.diff.side_by_side = self.diff_side_by_side;
+                        self.save_config();
+                        self.content_hscroll = 0;
+                        self.clamp_content_scroll();
+                    } else {
+                        self.diff_mode = self.diff_mode.next();
+                        self.config.git.diff.mode = self.diff_mode;
+                        self.save_config();
+                        if let Some(path) = self.current_file.clone() {
+                            self.show_working_tree_diff(&path);
+                        }
+                    }
+                    return;
+                }
+                let tree_top = self.tree_area.y.saturating_sub(1);
+                if ev.row == tree_top
+                    && ev.column >= self.tree_area.x
+                    && ev.column < self.tree_area.right()
+                    && (self.git_info.is_some() || self.git_mode)
+                {
+                    self.toggle_git_mode();
                     return;
                 }
                 if rect_contains(self.tree_area, ev.column, ev.row) {

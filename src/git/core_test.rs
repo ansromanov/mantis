@@ -784,3 +784,36 @@ fn file_commit_diff_shows_selected_commit_not_working_tree() {
         "working tree leaked: {diff}"
     );
 }
+
+#[test]
+fn repo_status_details_partitions_staged_unstaged_and_untracked() {
+    let dir = tempfile::tempdir().unwrap();
+    git(dir.path(), &["init", "-q"]);
+    let tracked = dir.path().join("tracked.txt");
+    fs::write(&tracked, "initial\n").unwrap();
+    git(dir.path(), &["add", "tracked.txt"]);
+    git(dir.path(), &["commit", "-q", "-m", "initial commit"]);
+
+    // Unstaged modification
+    fs::write(&tracked, "modified\n").unwrap();
+
+    // Staged addition
+    let staged_new = dir.path().join("staged_new.txt");
+    fs::write(&staged_new, "staged content\n").unwrap();
+    git(dir.path(), &["add", "staged_new.txt"]);
+
+    // Untracked file
+    let untracked = dir.path().join("untracked.txt");
+    fs::write(&untracked, "untracked\n").unwrap();
+
+    let details = repo_status_details(dir.path(), true, false);
+    let root = repo_root(dir.path());
+
+    assert!(details.unstaged.contains(&root.join("tracked.txt")));
+    assert!(!details.staged.contains(&root.join("tracked.txt")));
+
+    assert!(details.staged.contains(&root.join("staged_new.txt")));
+    assert!(!details.unstaged.contains(&root.join("staged_new.txt")));
+
+    assert!(details.untracked.contains(&root.join("untracked.txt")));
+}

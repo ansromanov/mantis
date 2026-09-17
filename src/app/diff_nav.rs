@@ -13,7 +13,7 @@ use super::App;
 impl App {
     /// Returns the display-row indices of hunk headers (`@@`) in the current
     /// diff, in the coordinate space matching the active layout.
-    fn diff_hunk_rows(&self) -> Vec<usize> {
+    pub(crate) fn diff_hunk_rows(&self) -> Vec<usize> {
         if self.diff_sbs_active() {
             self.diff_rows
                 .iter()

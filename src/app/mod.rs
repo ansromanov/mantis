@@ -256,6 +256,9 @@ pub struct App {
     /// Number of worktrees in the containing repository, used for discovery.
     pub worktree_count: usize,
     pub git_status_map: HashMap<PathBuf, GitStatus>,
+    pub git_staged_files: HashSet<PathBuf>,
+    pub git_unstaged_files: HashSet<PathBuf>,
+    pub git_untracked_files: HashSet<PathBuf>,
     pub git_mode: bool,
     pub git_mode_flat: bool,
     /// When `Some(rev)`, the tree and content pane show changes between `rev`
@@ -341,6 +344,8 @@ pub struct App {
     /// Hit area of the blame annotation strip recorded during the last render.
     /// `Rect::default()` when blame is not shown or there is no blame data.
     pub blame_area: Rect,
+    /// Hit area of the diff info and actions header bar at the top of the diff pane.
+    pub diff_header_area: Rect,
     pub search_area: Rect,
     pub search_offset: usize,
     pub command_palette_area: Rect,

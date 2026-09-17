@@ -444,6 +444,8 @@ impl App {
                     if !self.git_mode {
                         self.toggle_git_mode();
                     }
+                } else {
+                    self.toggle_git_mode();
                 }
             }
             ContextActionId::CloseOtherTabs => {

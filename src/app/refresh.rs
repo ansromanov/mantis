@@ -356,6 +356,9 @@ impl App {
     /// colors and filtering are current.
     pub(super) fn apply_git_status_load(&mut self, load: GitStatusLoad) {
         self.git_status_map = load.status_map;
+        self.git_staged_files = load.staged;
+        self.git_unstaged_files = load.unstaged;
+        self.git_untracked_files = load.untracked;
         self.git_info = load.info;
         if self.git_mode {
             self.expand_git_dirs();
@@ -376,6 +379,9 @@ impl App {
             return;
         }
         self.git_status_map = load.status_map;
+        self.git_staged_files = load.staged;
+        self.git_unstaged_files = load.unstaged;
+        self.git_untracked_files = load.untracked;
         self.git_info = load.info;
         if self.git_mode {
             self.expand_git_dirs();

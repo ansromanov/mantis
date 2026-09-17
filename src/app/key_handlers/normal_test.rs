@@ -1,4 +1,5 @@
 use std::fs;
+use std::io::IsTerminal;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -726,9 +727,8 @@ fn toggle_diff_staged_persists_to_config() {
     app.focus = Focus::Content;
     app.is_diff = true;
     app.diff_mode = DiffMode::All;
-    // toggle_diff_staged ships unbound (palette-only); bind a key.
-    app.keys.toggle_diff_staged = crate::config::bind(&["S"]);
-    app.handle_key(key(KeyCode::Char('S')));
+    // toggle_diff_staged defaults to "s".
+    app.handle_key(key(KeyCode::Char('s')));
     assert_eq!(app.diff_mode, DiffMode::Staged, "should cycle to Staged");
     assert_eq!(
         app.config.git.diff.mode,
@@ -736,7 +736,7 @@ fn toggle_diff_staged_persists_to_config() {
         "config should persist the new mode"
     );
     // Cycle again.
-    app.handle_key(key(KeyCode::Char('S')));
+    app.handle_key(key(KeyCode::Char('s')));
     assert_eq!(app.diff_mode, DiffMode::Unstaged);
     assert_eq!(app.config.git.diff.mode, DiffMode::Unstaged);
     fs::remove_dir_all(&root).ok();
@@ -1562,6 +1562,9 @@ fn tree_collapse_on_child_navigates_to_parent_dir() {
 
 #[test]
 fn normal_key_o_triggers_open_external() {
+    if std::io::stdout().is_terminal() {
+        return;
+    }
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));

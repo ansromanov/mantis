@@ -4924,11 +4924,9 @@ fn s_key_cycles_diff_mode_in_diff_view() {
     assert_eq!(app.diff_mode, DiffMode::All, "default mode should be All");
 
     app.focus = Focus::Content;
-    // 'S' has no default binding; bind it explicitly to exercise dispatch.
-    app.keys.toggle_diff_staged = global_char_binding('S');
 
-    // First S: All → Staged
-    app.handle_key(KeyEvent::new(KeyCode::Char('S'), KeyModifiers::SHIFT));
+    // First s: All → Staged
+    app.handle_key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::empty()));
     app.pump_loads();
     assert_eq!(app.diff_mode, DiffMode::Staged);
     assert!(
@@ -4944,8 +4942,8 @@ fn s_key_cycles_diff_mode_in_diff_view() {
         app.content_title
     );
 
-    // Second S: Staged → Unstaged
-    app.handle_key(KeyEvent::new(KeyCode::Char('S'), KeyModifiers::SHIFT));
+    // Second s: Staged → Unstaged
+    app.handle_key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::empty()));
     app.pump_loads();
     assert_eq!(app.diff_mode, DiffMode::Unstaged);
     assert!(
@@ -4957,8 +4955,8 @@ fn s_key_cycles_diff_mode_in_diff_view() {
         app.content_title
     );
 
-    // Third S: Unstaged → All (full cycle)
-    app.handle_key(KeyEvent::new(KeyCode::Char('S'), KeyModifiers::SHIFT));
+    // Third s: Unstaged → All (full cycle)
+    app.handle_key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::empty()));
     app.pump_loads();
     assert_eq!(app.diff_mode, DiffMode::All);
     assert!(

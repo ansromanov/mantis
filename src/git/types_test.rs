@@ -155,3 +155,12 @@ fn commit_carries_author() {
     assert_eq!(cloned.author, c.author);
     assert_eq!(cloned.subject, c.subject);
 }
+
+#[test]
+fn git_status_details_default_is_empty() {
+    let details = GitStatusDetails::default();
+    assert!(details.status_map.is_empty());
+    assert!(details.staged.is_empty());
+    assert!(details.unstaged.is_empty());
+    assert!(details.untracked.is_empty());
+}
