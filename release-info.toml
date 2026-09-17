@@ -1,6 +1,5 @@
-version = "0.22.6"
+version = "0.23.0"
 date = "2026-09-17"
-whats_new = """- fix(config): edit mantis.toml in place, writing only runtime changes (#874)
-- fix(workspaces): preserve badges and shared layout (#872)
-- chore: bump Homebrew formula to v0.22.3 [skip ci]"""
-release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.22.5"
+whats_new = """- feat(git): improve git UX clarity with badges, diff header bar, and mouse controls (#875)
+- chore: bump Homebrew formula to v0.22.5 [skip ci]"""
+release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.23.0"
