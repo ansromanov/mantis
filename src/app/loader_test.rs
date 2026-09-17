@@ -525,3 +525,12 @@ fn compute_file_load_csv_exceeding_prettify_limit_falls_back() {
     assert!(!load.show_csv_table);
     assert!(load.virtual_file.is_some() || !load.content.is_empty());
 }
+
+#[test]
+fn compute_git_status_load_populates_status_and_partitions() {
+    let dir = tempfile::tempdir().unwrap();
+    let load = compute_git_status_load(dir.path(), true, false);
+    assert!(load.staged.is_empty());
+    assert!(load.unstaged.is_empty());
+    assert!(load.untracked.is_empty());
+}

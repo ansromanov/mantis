@@ -311,13 +311,24 @@ fn parse_repo_info(text: &str) -> GitRepoInfo {
 ///
 /// Uses `git status --porcelain -z` so paths are never C-quoted (safe for
 /// non-ASCII, spaces, quotes, and control characters).
+#[allow(dead_code)]
 pub fn repo_status(
     dir: &Path,
     include_untracked: bool,
     include_ignored: bool,
 ) -> HashMap<PathBuf, GitStatus> {
+    repo_status_details(dir, include_untracked, include_ignored).status_map
+}
+
+/// Returns detailed git repository status for `dir`, recording per-file `GitStatus`
+/// and partitioning changed files into staged, unstaged, and untracked sets.
+pub fn repo_status_details(
+    dir: &Path,
+    include_untracked: bool,
+    include_ignored: bool,
+) -> GitStatusDetails {
     let Some(root) = git_toplevel(dir) else {
-        return HashMap::new();
+        return GitStatusDetails::default();
     };
 
     let mut cmd = git_cmd();
@@ -330,10 +341,10 @@ pub fn repo_status(
     }
     let out = match cmd.output() {
         Ok(o) if o.status.success() => o,
-        _ => return HashMap::new(),
+        _ => return GitStatusDetails::default(),
     };
 
-    let mut map: HashMap<PathBuf, GitStatus> = HashMap::new();
+    let mut details = GitStatusDetails::default();
 
     // With -z, each entry is NUL-terminated and paths are never C-quoted.
     //   Normal:  XY path\0
@@ -394,7 +405,17 @@ pub fn repo_status(
         };
 
         let abs = root.join(path_str);
-        set_if_higher(&mut map, abs.clone(), status);
+        if x != ' ' && x != '?' && x != '!' {
+            details.staged.insert(abs.clone());
+        }
+        if y != ' ' && y != '?' && y != '!' {
+            details.unstaged.insert(abs.clone());
+        }
+        if x == '?' && y == '?' {
+            details.untracked.insert(abs.clone());
+        }
+
+        set_if_higher(&mut details.status_map, abs.clone(), status);
 
         if status != GitStatus::Ignored {
             let mut cur = abs.parent();
@@ -402,7 +423,7 @@ pub fn repo_status(
                 if d == root.as_path() || !d.starts_with(&root) {
                     break;
                 }
-                set_if_higher(&mut map, d.to_path_buf(), status);
+                set_if_higher(&mut details.status_map, d.to_path_buf(), status);
                 cur = d.parent();
             }
         }
@@ -410,7 +431,7 @@ pub fn repo_status(
         i += 1;
     }
 
-    map
+    details
 }
 
 /// Returns the set of files changed between `<rev>` and the working tree, with

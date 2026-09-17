@@ -40,7 +40,17 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
     // borrows of `app` for them are done. Defer `let theme = &app.theme` until
     // after breadcrumb rendering, which needs a mutable borrow of `app`.
 
-    let title = format!(" {} ", app.panel_mode_label());
+    let mode_label = app.panel_mode_label();
+    let title = if app.git_mode {
+        let exit_key = app.keys().label_for_action("git_mode_toggle");
+        if !exit_key.is_empty() && area.width >= 24 {
+            format!(" {mode_label} [{exit_key} to exit] ")
+        } else {
+            format!(" {mode_label} ")
+        }
+    } else {
+        format!(" {mode_label} ")
+    };
 
     let block = Block::default()
         .title(title)
@@ -348,13 +358,9 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
             };
             spans.extend(name_spans);
 
-            // Git status badge (A/M/D/R) when in git mode
+            // Git status badge (A/M/D/R/S/SM/?) when in git mode or git status is enabled
             if app.git_status_enabled {
-                if let Some(label) = app
-                    .git_status_map
-                    .get(&node.path)
-                    .and_then(git_status_badge_label)
-                {
+                if let Some(label) = tree_git_badge_label(&node.path, app) {
                     spans.push(Span::styled(format!(" {label}"), badge_style));
                 }
             }
@@ -672,6 +678,36 @@ fn compact_segments(
         BreadcrumbItem::ParentUp(target),
         BreadcrumbItem::Real(segments.len() - 1),
     ]
+}
+
+/// Returns the badge label for a git status in the tree.
+/// Distinguishes untracked (?), staged addition (A), staged modification (S),
+/// both staged and unstaged changes (SM), unstaged modification (M), deleted (D), and renamed (R).
+pub(crate) fn tree_git_badge_label(node_path: &std::path::Path, app: &App) -> Option<&'static str> {
+    if !app.git_status_enabled {
+        return None;
+    }
+    let status = app.git_status_map.get(node_path)?;
+    if *status == GitStatus::Ignored {
+        return None;
+    }
+    let is_staged = app.git_staged_files.contains(node_path);
+    let is_unstaged = app.git_unstaged_files.contains(node_path);
+    let is_untracked = app.git_untracked_files.contains(node_path);
+
+    if is_untracked {
+        Some("?")
+    } else if is_staged && is_unstaged {
+        Some("SM")
+    } else if is_staged {
+        if *status == GitStatus::New {
+            Some("A")
+        } else {
+            Some("S")
+        }
+    } else {
+        git_status_badge_label(status)
+    }
 }
 
 /// Returns a short status badge label for a git status, or `None` if no badge

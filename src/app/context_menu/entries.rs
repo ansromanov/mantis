@@ -413,7 +413,13 @@ pub(super) fn statusbar_entries(app: &App, segment: &str) -> Vec<ContextMenuEntr
         .as_ref()
         .is_some_and(|info| label.contains(&info.head.display().to_ascii_lowercase()))
     {
+        let git_mode_label = if app.git_mode {
+            "Exit git mode"
+        } else {
+            "Toggle git mode (changed files)"
+        };
         return vec![
+            action(ContextActionId::DiffVsHead, git_mode_label),
             action(ContextActionId::StatusRepoLog, "Open repository history"),
             action(
                 ContextActionId::StatusWorktreePicker,

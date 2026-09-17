@@ -314,3 +314,13 @@ fn diff_nav_telemetry_check() {
     assert!(!app.telemetry.is_enabled());
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn diff_hunk_rows_finds_all_hunks_in_unified_diff() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    set_unified_diff(&mut app);
+    let rows = app.diff_hunk_rows();
+    assert_eq!(rows, vec![4, 9, 14]);
+    fs::remove_dir_all(&root).ok();
+}

@@ -12,6 +12,7 @@
 
 pub(crate) mod blame;
 mod diff;
+pub(crate) mod diff_header;
 mod draw;
 mod draw_text;
 mod scrollbar;

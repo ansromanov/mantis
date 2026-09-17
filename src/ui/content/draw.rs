@@ -96,6 +96,18 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         return;
     }
 
+    if app.is_diff && inner.height >= 4 {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(1), Constraint::Min(0)])
+            .split(inner);
+        app.diff_header_area = chunks[0];
+        super::diff_header::draw_diff_info_bar(f, app, chunks[0]);
+        inner = chunks[1];
+    } else if !app.is_diff {
+        app.diff_header_area = Rect::default();
+    }
+
     // ── Line blame bar: reserve 2 rows at the bottom ───────────────
     if app.show_line_blame && app.has_text_cursor() && app.current_file.is_some() {
         let chunks = Layout::default()

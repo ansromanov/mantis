@@ -213,10 +213,9 @@ content_bottom = ["ctrl+End", "G", "tree:End"]
 content_page_up = ["PageUp"]
 content_page_down = ["PageDown"]
 content_reset_col = ["Home", "0"]
-# toggle_wrap, toggle_line_numbers, toggle_pretty_json, toggle_table_view,
-# toggle_diff_side_by_side, and toggle_diff_staged have no default binding —
-# they're reachable from the command palette (Ctrl+P); bind them here
-# if you'd like a dedicated key.
+# toggle_wrap, toggle_line_numbers, toggle_pretty_json, and toggle_table_view
+# have no default binding — they're reachable from the command palette (Ctrl+P);
+# bind them here if you'd like a dedicated key.
 toggle_blame = ["ctrl+b"]
 blame_line = ["content:B"]
 # with the blame pane open, opens the file as it was at the commit on the
@@ -226,6 +225,8 @@ blame_open_commit = ["o"]
 # diff view
 diff_hunk_next = ["n"]
 diff_hunk_prev = ["N"]
+toggle_diff_staged = ["s"]
+toggle_diff_side_by_side = ["S"]
 # in a revision diff, toggles between the diff and the full file content
 # at that revision
 toggle_file_revision = ["ctrl+u"]

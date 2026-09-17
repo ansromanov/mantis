@@ -42,6 +42,17 @@ fn new_app_starts_with_no_provider_diagnostics() {
     assert!(app.pending_diagnostic_requests.is_empty());
 }
 
+#[test]
+fn new_app_starts_with_empty_git_status_subsets_and_diff_header_area() {
+    let root = temp_dir();
+    let app = App::new(root.clone(), Config::default(), None, None).unwrap();
+    assert!(app.git_staged_files.is_empty());
+    assert!(app.git_unstaged_files.is_empty());
+    assert!(app.git_untracked_files.is_empty());
+    assert_eq!(app.diff_header_area, ratatui::layout::Rect::default());
+    fs::remove_dir_all(&root).ok();
+}
+
 fn temp_dir() -> PathBuf {
     static COUNTER: AtomicUsize = AtomicUsize::new(0);
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);

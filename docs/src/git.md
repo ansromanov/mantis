@@ -10,12 +10,20 @@ blame annotations, and file diffs — is provided natively via the `git` CLI.
 > ℹ️ All git features need `git` on your `PATH` and the file to be tracked in a
 > repository.
 
-## Git status colors
+## Git status colors & badges
 
 Whenever `mantis` can read `git status`, tree entries are tinted by their state — new,
 modified, deleted, or ignored — so you can see at a glance what's changed without
-doing anything. Control this with `git_status` in your config (see
-[Configuration](configuration.md)).
+doing anything. In addition to colors, tree items show explicit badges:
+- `?` untracked file
+- `A` staged new file
+- `S` staged changes
+- `M` unstaged changes
+- `SM` file with both staged and unstaged modifications
+- `D` deleted file
+- `R` renamed file
+
+Control this with `git_status` in your config (see [Configuration](configuration.md)).
 
 The status bar also shows how far the current branch is from its upstream when a
 tracking branch exists, using the familiar `↑3 ↓1` summary.
@@ -68,10 +76,14 @@ all changes since it in compare mode. Press `Esc` to close the picker.
 ## Git mode
 
 Press `Ctrl+D` to switch the tree to show **only files with uncommitted changes**
-(modified, new, deleted, or renamed). Selecting a file shows its working-tree
-diff in the content panel instead of the file contents. The tree title displays a
-`[git]` badge while active — perfect for reviewing everything you're about to
-commit.
+(modified, new, deleted, or renamed). Selecting a file shows its diff in the
+content panel instead of the file contents.
+
+While git mode is active:
+- The tree header displays `[Git mode · Ctrl+D to exit]`.
+- The status bar displays a `[git mode · Ctrl+D]` badge.
+- Clicking the tree top border/header or the status bar badge toggles git mode off.
+- Right-clicking the status bar git indicator offers quick access to "Toggle git mode".
 
 Press `F` (while the tree is focused) inside git mode to toggle between the
 tree view (directories intact) and a flat, depth-0 list of every changed file
@@ -86,6 +98,23 @@ git repository, the placeholder says "Not a git repository" instead. Press
 
 All directories containing changes are auto-expanded when entering git mode.
 Diffs refresh on the 30-second auto-reload tick and on manual `r`.
+
+## Diff viewing & interactive controls
+
+When viewing any diff (in git mode, compare mode, or file history):
+- An informative **diff header bar** is shown at the top of the content pane:
+  - **Mode indicator**: `Diff: all`, `Diff: staged`, or `Diff: unstaged`.
+  - **Hunk statistics**: Displays total hunk count in the file (e.g. `3 hunks`).
+  - **Layout indicator**: `[unified]` or `[side-by-side]`.
+  - **Quick shortcuts hint**: `[s] stage  [S] split  [n/N] hunks`.
+- **Keyboard shortcuts**:
+  - `s`: Cycle diff mode (`all` -> `staged` -> `unstaged` -> `all`).
+  - `S`: Toggle between side-by-side and unified diff layout.
+  - `n` / `N`: Jump to the next / previous diff hunk (`@@ ... @@`).
+- **Mouse interactivity**:
+  - Click the diff mode badge on the diff header or status bar to cycle diff modes.
+  - Click the layout toggle on the diff header or status bar to switch side-by-side view.
+  - Click any hunk header row to jump or right-click to access hunk actions.
 
 `git_status` controls whether tree entries are coloured by git status at startup:
 

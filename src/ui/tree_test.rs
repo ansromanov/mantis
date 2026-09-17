@@ -132,6 +132,50 @@ fn git_status_badge_label_maps_each_status() {
     assert_eq!(git_status_badge_label(&GitStatus::Ignored), None);
 }
 
+#[test]
+fn tree_git_badge_label_distinguishes_staged_and_untracked() {
+    let mut app = make_app(true, HashMap::new());
+
+    let staged_file = PathBuf::from("staged.rs");
+    let unstaged_file = PathBuf::from("unstaged.rs");
+    let both_file = PathBuf::from("both.rs");
+    let untracked_file = PathBuf::from("untracked.rs");
+
+    app.git_status_map
+        .insert(staged_file.clone(), GitStatus::Modified);
+    app.git_staged_files.insert(staged_file.clone());
+
+    app.git_status_map
+        .insert(unstaged_file.clone(), GitStatus::Modified);
+    app.git_unstaged_files.insert(unstaged_file.clone());
+
+    app.git_status_map
+        .insert(both_file.clone(), GitStatus::Modified);
+    app.git_staged_files.insert(both_file.clone());
+    app.git_unstaged_files.insert(both_file.clone());
+
+    app.git_status_map
+        .insert(untracked_file.clone(), GitStatus::New);
+    app.git_untracked_files.insert(untracked_file.clone());
+
+    assert_eq!(tree_git_badge_label(&staged_file, &app), Some("S"));
+    assert_eq!(tree_git_badge_label(&unstaged_file, &app), Some("M"));
+    assert_eq!(tree_git_badge_label(&both_file, &app), Some("SM"));
+    assert_eq!(tree_git_badge_label(&untracked_file, &app), Some("?"));
+}
+
+#[test]
+fn draw_tree_shows_git_mode_exit_hint_in_title() {
+    let mut app = make_app(true, HashMap::new());
+    app.git_mode = true;
+    let lines = render_tree(&mut app, 40, 10);
+    assert!(
+        lines[0].contains("Git") && lines[0].contains("to exit"),
+        "title must include git mode and exit hint: {}",
+        lines[0]
+    );
+}
+
 // ---------------------------------------------------------------------------
 // draw_tree rendering tests
 // ---------------------------------------------------------------------------

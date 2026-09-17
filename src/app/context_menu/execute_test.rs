@@ -59,3 +59,18 @@ fn execute_plugin_context_action_closes_menu_and_dispatches() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn execute_diff_vs_head_toggles_git_mode() {
+    let root = temp_tree();
+    let mut app = App::new(root.clone(), Config::default(), None, None).unwrap();
+    assert!(!app.git_mode);
+
+    app.execute_context_action(ContextActionId::DiffVsHead);
+    assert!(app.git_mode);
+
+    app.execute_context_action(ContextActionId::DiffVsHead);
+    assert!(!app.git_mode);
+
+    fs::remove_dir_all(&root).ok();
+}

@@ -34,11 +34,15 @@ impl App {
         let git_show_untracked = cfg.git.show_untracked;
         let git_show_ignored = cfg.git.show_ignored;
         let effective_show_ignored = cfg.git.show_ignored || cfg.git.ignore_gitignore;
-        let git_status_map = if git_status_enabled {
-            crate::git::repo_status(&root, cfg.git.show_untracked, effective_show_ignored)
+        let git_details = if git_status_enabled {
+            crate::git::repo_status_details(&root, cfg.git.show_untracked, effective_show_ignored)
         } else {
-            HashMap::new()
+            crate::git::GitStatusDetails::default()
         };
+        let git_status_map = git_details.status_map;
+        let git_staged_files = git_details.staged;
+        let git_unstaged_files = git_details.unstaged;
+        let git_untracked_files = git_details.untracked;
         let git_info = if git_status_enabled {
             crate::git::repo_info(&root)
         } else {
@@ -191,6 +195,9 @@ impl App {
             git_info,
             worktree_count,
             git_status_map,
+            git_staged_files,
+            git_unstaged_files,
+            git_untracked_files,
             git_mode: false,
             git_mode_flat: false,
             compare_base: None,
@@ -232,6 +239,7 @@ impl App {
             content_image: None,
             image_area: ratatui::layout::Rect::default(),
             blame_area: ratatui::layout::Rect::default(),
+            diff_header_area: ratatui::layout::Rect::default(),
             search_area: ratatui::layout::Rect::default(),
             search_offset: 0,
             command_palette_area: ratatui::layout::Rect::default(),

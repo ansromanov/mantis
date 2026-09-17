@@ -453,7 +453,8 @@ fn pressed_in_honours_scope() {
 #[test]
 fn default_content_reachable_letters_are_motions_only() {
     let motions = [
-        'j', 'k', 'h', 'l', 'g', 'G', '0', 'n', 'N', 'M', 'o', 'O', 'y', 'Y', 'B', 'F', ' ',
+        'j', 'k', 'h', 'l', 'g', 'G', '0', 'n', 'N', 'M', 'o', 'O', 'y', 'Y', 'B', 'F', 's', 'S',
+        ' ',
     ];
     let tree_structural = [
         "tree_expand",
@@ -874,4 +875,13 @@ fn context_menu_defaults_to_menu_and_shift_f10() {
         &keymap.context_menu[1..2],
         &ev(KeyCode::F(10), KeyModifiers::empty())
     ));
+}
+
+#[test]
+fn diff_view_defaults_bind_s_and_shift_s() {
+    let keymap = Keymap::default();
+    let s = ev(KeyCode::Char('s'), KeyModifiers::empty());
+    let shift_s = ev(KeyCode::Char('S'), KeyModifiers::SHIFT);
+    assert!(pressed(&keymap.toggle_diff_staged, &s));
+    assert!(pressed(&keymap.toggle_diff_side_by_side, &shift_s));
 }

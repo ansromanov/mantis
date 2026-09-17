@@ -3,8 +3,18 @@
 //! These types are always compiled and populated by the built-in git
 //! implementation in `core.rs`.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+
+/// Detailed repository status distinguishing index (staged), worktree
+/// (unstaged), and untracked changes alongside per-file `GitStatus`.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct GitStatusDetails {
+    pub status_map: HashMap<PathBuf, GitStatus>,
+    pub staged: HashSet<PathBuf>,
+    pub unstaged: HashSet<PathBuf>,
+    pub untracked: HashSet<PathBuf>,
+}
 
 /// Per-file git working-tree status.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

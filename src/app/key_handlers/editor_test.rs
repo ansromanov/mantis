@@ -3,6 +3,7 @@ use crate::command_palette::COMMANDS;
 use crate::config::Config;
 use crate::search::CommandPalette;
 use std::fs;
+use std::io::IsTerminal;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -644,6 +645,9 @@ fn open_in_browser_empty_url_noop() {
 
 #[test]
 fn open_in_browser_non_tty_sets_status() {
+    if std::io::stdout().is_terminal() {
+        return;
+    }
     // In test context stdout is not a terminal, so the non-interactive branch fires.
     let root = temp_tree();
     let mut app = app_for(&root);
@@ -656,6 +660,9 @@ fn open_in_browser_non_tty_sets_status() {
 
 #[test]
 fn open_external_non_tty_sets_status() {
+    if std::io::stdout().is_terminal() {
+        return;
+    }
     let root = temp_tree();
     let mut app = app_for(&root);
     assert!(app.status_message.is_none());
@@ -671,6 +678,9 @@ fn open_external_non_tty_sets_status() {
 
 #[test]
 fn open_in_file_manager_non_tty_sets_status() {
+    if std::io::stdout().is_terminal() {
+        return;
+    }
     let root = temp_tree();
     let mut app = app_for(&root);
     assert!(app.status_message.is_none());
