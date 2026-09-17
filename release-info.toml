@@ -1,7 +1,6 @@
 version = "0.22.5"
-date = "2026-09-16"
-whats_new = """- fix(menu): open menu bar dropdowns on click, not hover (#865)
-- feat(tabs): show open projects as a Workspaces list above the file tree (#866)
-- fix(content): clamp line-number gutter to narrow content panes (#868)
-- chore: bump Homebrew formula to v0.22.0 [skip ci]"""
-release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.22.3"
+date = "2026-09-17"
+whats_new = """- fix(config): edit mantis.toml in place, writing only runtime changes (#874)
+- fix(workspaces): preserve badges and shared layout (#872)
+- chore: bump Homebrew formula to v0.22.3 [skip ci]"""
+release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.22.5"
