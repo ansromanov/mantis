@@ -304,6 +304,12 @@ Key pages to consider when changing code:
 - Keybindings (`src/config/mod.rs`, `mantis.toml`) → `docs/src/configuration.md`
 - New UI features → `docs/src/usage.md` or a new page added to `docs/src/SUMMARY.md`
 
+Mantis is a standalone code-viewer CLI and has no database, queue, or other
+service dependency for local development. It therefore does not provide a
+Docker Compose stack; run the binary directly with Cargo. If a future feature
+adds a required service, add a minimal compose file and document its lifecycle
+in the same change.
+
 ## File size limit
 
 - **Code files** — ideally under **700 lines**. When a source file approaches the

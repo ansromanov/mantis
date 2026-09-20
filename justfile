@@ -106,6 +106,12 @@ install: release
 test *args:
     cargo test {{args}}
 
+# Fast deterministic gate for local iteration and the shared project baseline.
+fast-test:
+    cargo test --lib
+
+test-fast: fast-test
+
 # run automated E2E tests (integration tests + whole-binary TUI smoke test)
 test-e2e:
     cargo test --test e2e_tests
@@ -134,9 +140,11 @@ test-pr:
         cargo nextest run -E "($filterset) & $dedup"
     fi
 
-# type-check without building
-check:
-    cargo check
+# Local merge gate: keep this aligned with the required CI baseline.
+check: fmt-check clippy fast-test
+
+fmt-check:
+    cargo fmt --all -- --check
 
 # lint with clippy
 clippy:
