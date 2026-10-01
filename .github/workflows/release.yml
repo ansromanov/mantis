@@ -126,18 +126,16 @@ jobs:
             echo "::error::Computed version is not SemVer: $new_version"
             exit 1
           fi
-          if [ "$new_version" != "$current" ]; then
-            sed -i "s/^version = \"${current}\"/version = \"${new_version}\"/" Cargo.toml
-            sed -i "/^name = \"mantis\"/{n;s/version = \"${current}\"/version = \"${new_version}\"/}" Cargo.lock
-          fi
           echo "version=${new_version}" >> "$GITHUB_OUTPUT"
 
       - name: Generate changelog
         id: changelog
         run: |
           set -euo pipefail
-          git-cliff --offline --tag "v${{ steps.version.outputs.version }}" --output CHANGELOG.md
-          git-cliff --offline --unreleased --strip header --output release-notes.md
+          git-cliff --offline --tag "v${{ steps.version.outputs.version }}" --output /tmp/CHANGELOG.md
+          git-cliff --offline --unreleased --strip header --output /tmp/release-notes.md
+          cp /tmp/CHANGELOG.md CHANGELOG.md
+          cp /tmp/release-notes.md release-notes.md
           log=$(cat release-notes.md)
           log=$(echo "$log" | sed 's/"""/\\"\\"\\"/g')
           {
@@ -145,6 +143,15 @@ jobs:
             echo "$log"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
+
+      - name: Update crate version
+        run: |
+          current=$(grep -m1 '^version = ' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+          new_version="${{ steps.version.outputs.version }}"
+          if [ "$new_version" != "$current" ]; then
+            sed -i "s/^version = \"${current}\"/version = \"${new_version}\"/" Cargo.toml
+            sed -i "/^name = \"mantis\"/{n;s/version = \"${current}\"/version = \"${new_version}\"/}" Cargo.lock
+          fi
 
       - name: Write release info
         run: |
