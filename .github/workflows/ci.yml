@@ -40,8 +40,8 @@ jobs:
 
   # Detects whether the PR touches any Rust/config code that requires
   # compilation, linting, and testing. Agent-only PRs (.agent/, .claude/,
-  # .opencode/, docs/, scripts/, .github/) set code=false and the pr job
-  # below is skipped entirely — no Rust toolchain is installed.
+  # .opencode/, docs/, and unrelated scripts/.github/ changes) set code=false;
+  # the file-size gate helper is an explicit exception so its changes stay gated.
   changes:
     name: Detect code changes
     runs-on: ubuntu-latest
@@ -58,7 +58,7 @@ jobs:
         run: |
           changed=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files \
             --paginate --jq '.[].filename')
-          if echo "$changed" | grep -qE '^(src/|tests/|benches/|Cargo\.(toml|lock)|mantis\.toml|themes/)'; then
+          if echo "$changed" | grep -qE '^(src/|tests/|benches/|Cargo\.(toml|lock)|mantis\.toml|themes/|scripts/(check-file-size\.py|changed-files\.sh)$)'; then
             echo "code=true" >> "$GITHUB_OUTPUT"
             echo "Code changes detected — pr job will run."
           else
@@ -96,6 +96,9 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: changed-files
+
+      - name: Enforce source file size
+        run: python3 scripts/check-file-size.py < changed_files.txt
 
       - name: Install lld
         run: sudo apt-get update && sudo apt-get install -y lld

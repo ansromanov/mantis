@@ -122,11 +122,12 @@ test-e2e:
 test-pr:
     #!/usr/bin/env bash
     set -euo pipefail
-    changed=$( { git diff --name-only origin/main...HEAD; git diff --name-only; git diff --name-only --cached; } | sort -u )
+    changed=$(bash scripts/changed-files.sh)
     # Gate first: every changed source module needs a sibling _test.rs in the diff
     # (escape hatch: "[skip-tests: <reason>]" in a commit message). Fails here, in
     # the agent's own ship loop, instead of only at commit-time or in CI.
     echo "$changed" | bash scripts/require-tests.sh
+    echo "$changed" | python3 scripts/check-file-size.py
     filterset=$(echo "$changed" | bash scripts/related-tests.sh)
     # The bin target re-declares every lib module, so each unit test exists in
     # both `mantis` (lib) and `mantis::bin/mantis`. Skip the bin copies, keeping
@@ -141,7 +142,13 @@ test-pr:
     fi
 
 # Local merge gate: keep this aligned with the required CI baseline.
-check: fmt-check clippy fast-test
+check: fmt-check clippy fast-test file-size
+
+file-size:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    changed=$(bash scripts/changed-files.sh)
+    printf '%s\n' "$changed" | python3 scripts/check-file-size.py
 
 fmt-check:
     cargo fmt --all -- --check
