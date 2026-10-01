@@ -99,9 +99,11 @@ coverage summary on your PR; plain `cargo test` locally is sufficient before pus
   in source.
 - **No `unwrap`/`expect` in production paths** — file and git errors degrade gracefully
   to UI messages. Tests may use them freely.
-- **File size limit** — code files ideally under 700 lines; test files have no hard
-  limit. Split code files into focused submodules when approaching the limit, and
-  split the associated `_test.rs` companion if the code file was split.
+- **File size limit** — production Rust source files must stay at or below 700
+  lines; test files have no hard limit. CI checks changed files and asks you to
+  split any module that crosses the limit, with its `_test.rs` companion.
+- **Fast test budget** — `just fast-test` runs the library unit tests and should
+  finish within 10 minutes on a warmed build cache.
 
 See [AGENTS.md → Rust Guidelines](AGENTS.md) for the complete style and
 error-handling rules.
