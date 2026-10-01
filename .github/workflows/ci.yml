@@ -40,8 +40,8 @@ jobs:
 
   # Detects whether the PR touches any Rust/config code that requires
   # compilation, linting, and testing. Agent-only PRs (.agent/, .claude/,
-  # .opencode/, docs/, scripts/, .github/) set code=false and the pr job
-  # below is skipped entirely — no Rust toolchain is installed.
+  # .opencode/, docs/, and unrelated scripts/.github/ changes) set code=false;
+  # the file-size gate helper is an explicit exception so its changes stay gated.
   changes:
     name: Detect code changes
     runs-on: ubuntu-latest

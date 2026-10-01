@@ -5,7 +5,7 @@ set -euo pipefail
 
 base_ref="${1:-origin/main}"
 {
-if git rev-parse --verify --quiet "${base_ref}^{commit}" >/dev/null; then
+    if git rev-parse --verify --quiet "${base_ref}^{commit}" >/dev/null; then
         if merge_base=$(git merge-base "$base_ref" HEAD 2>/dev/null); then
             git diff --name-only "$merge_base" HEAD
         else
