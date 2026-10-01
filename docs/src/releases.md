@@ -3,6 +3,11 @@
 What each release changed, in the order you would meet it. Every feature below
 works with the default configuration unless the text says otherwise.
 
+The release workflow defaults to a SemVer bump selected from Conventional
+Commits. It generates `CHANGELOG.md` and the GitHub release notes from commits
+since the preceding version tag. The curated digests on this page remain the
+human-readable feature tour for each release.
+
 ## v0.21: menus, a clickable status bar, and tabs that scale
 
 *Released 11 September 2026.*
