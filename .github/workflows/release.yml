@@ -104,7 +104,7 @@ jobs:
         id: version
         run: |
           set -euo pipefail
-          current=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          current=$(grep -m1 '^version = ' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
           major=$(echo "$current" | cut -d. -f1)
           minor=$(echo "$current" | cut -d. -f2)
           patch=$(echo "$current" | cut -d. -f3)
