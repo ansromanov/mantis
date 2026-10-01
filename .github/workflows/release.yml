@@ -87,6 +87,7 @@ jobs:
   bump:
     runs-on: ${{ inputs.runner == 'self-hosted' && fromJSON('["self-hosted", "Linux"]') || 'ubuntu-latest' }}
     outputs:
+      current: ${{ steps.version.outputs.current }}
       version: ${{ steps.version.outputs.version }}
       sha: ${{ steps.commit.outputs.sha }}
       changelog: ${{ steps.changelog.outputs.log }}
@@ -105,6 +106,11 @@ jobs:
         run: |
           set -euo pipefail
           current=$(grep -m1 '^version = ' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+          if [[ ! "$current" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Cargo.toml package version is missing or is not SemVer: $current"
+            exit 1
+          fi
+          echo "current=${current}" >> "$GITHUB_OUTPUT"
           major=$(echo "$current" | cut -d. -f1)
           minor=$(echo "$current" | cut -d. -f2)
           patch=$(echo "$current" | cut -d. -f3)
@@ -146,11 +152,38 @@ jobs:
 
       - name: Update crate version
         run: |
-          current=$(grep -m1 '^version = ' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+          set -euo pipefail
+          current="${{ steps.version.outputs.current }}"
           new_version="${{ steps.version.outputs.version }}"
+          if [[ -z "$current" ]]; then
+            echo "::error::Current crate version output is empty"
+            exit 1
+          fi
           if [ "$new_version" != "$current" ]; then
+            if ! grep -Fxq "version = \"${current}\"" Cargo.toml; then
+              echo "::error::Cargo.toml no longer contains the computed current version: $current"
+              exit 1
+            fi
+            if ! awk -v expected="version = \"${current}\"" '
+              $0 == "name = \"mantis\"" { getline; if ($0 == expected) found = 1 }
+              END { exit !found }
+            ' Cargo.lock; then
+              echo "::error::Cargo.lock has no mantis package at version $current"
+              exit 1
+            fi
             sed -i "s/^version = \"${current}\"/version = \"${new_version}\"/" Cargo.toml
             sed -i "/^name = \"mantis\"/{n;s/version = \"${current}\"/version = \"${new_version}\"/}" Cargo.lock
+            if ! grep -Fxq "version = \"${new_version}\"" Cargo.toml; then
+              echo "::error::Cargo.toml version update did not take effect"
+              exit 1
+            fi
+            if ! awk -v expected="version = \"${new_version}\"" '
+              $0 == "name = \"mantis\"" { getline; if ($0 == expected) found = 1 }
+              END { exit !found }
+            ' Cargo.lock; then
+              echo "::error::Cargo.lock version update did not take effect"
+              exit 1
+            fi
           fi
 
       - name: Write release info
