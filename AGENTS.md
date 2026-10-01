@@ -312,9 +312,8 @@ in the same change.
 
 ## File size limit
 
-- **Code files** — ideally under **700 lines**. When a source file approaches the
-  limit, split it into focused submodules using the module-directory pattern
-  (`src/app/`, `src/ui/`).
+- **Production Rust files must stay at or below 700 lines.** Split larger files
+  into focused submodules using the module-directory pattern (`src/app/`, `src/ui/`).
 - **Test files** — no hard limit, but if a code file is split, its related tests
   in the `_test.rs` companion should be split into sibling `_test.rs` files too.
 
@@ -333,6 +332,8 @@ in the same change.
 | `cargo build` / `cargo build --release` | Debug / release build |
 | `cargo run -- [path]` | Run with optional path |
 | `just test-pr` | **Run only tests related to your changes** (skips on broad changes — never runs full suite) |
+| `just file-size` | Enforce the 700-line limit on changed production Rust files |
+| `just check` | Format, lint, run fast library tests, and enforce changed-file size |
 | `cargo nextest run` | Run full test suite (use manually when `just test-pr` skips due to broad change) |
 | `cargo nextest run -E 'test(foo)'` | Run tests matching a filter |
 | `cargo test` | Run full suite via built-in runner (fallback if nextest unavailable) |
