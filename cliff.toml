@@ -1,0 +1,21 @@
+[changelog]
+filter_commit_regex = "\\[skip ci\\]"
+
+[bump]
+features_always_bump_minor = true
+breaking_always_bump_major = true
+initial_tag = "0.1.0"
+no_increment_regex = "^(build|chore|ci|docs|refactor|style|test)(\\([^)]*\\))?:"
+
+[git]
+conventional_commits = true
+filter_unconventional = false
+protect_breaking_commits = true
+commit_parsers = [
+  { message = "^[a-z]+(\\([^)]*\\))?!:", group = "Breaking Changes", bump = "major" },
+  { body = "BREAKING CHANGE", group = "Breaking Changes", bump = "major" },
+  { message = "^feat", group = "Features", bump = "minor" },
+  { message = "^fix", group = "Bug Fixes", bump = "patch" },
+  { message = "^perf", group = "Performance", bump = "patch" },
+  { message = "^.*", skip = true },
+]
