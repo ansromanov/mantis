@@ -453,6 +453,42 @@ fn break_line<'a>(line: &Line<'a>, max_width: usize) -> Vec<Line<'a>> {
         .collect()
 }
 
+/// Clips a styled `Line` to at most `max_width` terminal columns, dropping any
+/// overflow. Used for plugin-flagged no-wrap lines (e.g. markdown tables) so
+/// ratatui's word wrap doesn't reflow them into broken rows; the wrapped
+/// width math (`line_width` clamping) counts them as one visual row to match.
+pub(crate) fn truncate_line(line: &Line<'_>, max_width: usize) -> Line<'static> {
+    if max_width == 0 {
+        return Line::from(vec![]);
+    }
+    let total_w: usize = line.spans.iter().map(|s| s.content.as_ref().width()).sum();
+    if total_w <= max_width {
+        return Line::from(
+            line.spans
+                .iter()
+                .map(|s| Span::styled(s.content.to_string(), s.style))
+                .collect::<Vec<_>>(),
+        );
+    }
+    let mut spans: Vec<Span<'static>> = Vec::new();
+    let mut used = 0usize;
+    'outer: for span in &line.spans {
+        let mut buf = String::new();
+        for ch in span.content.chars() {
+            let w = char_width(ch);
+            if used + w > max_width {
+                break 'outer;
+            }
+            buf.push(ch);
+            used += w;
+        }
+        if !buf.is_empty() {
+            spans.push(Span::styled(buf, span.style));
+        }
+    }
+    Line::from(spans)
+}
+
 /// Build a blank gutter row (same widths and styles as the original, but with
 /// text replaced by spaces). Used for continuation rows of wrapped lines.
 fn blank_gutter<'a>(line: &Line<'a>) -> Line<'a> {

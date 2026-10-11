@@ -83,12 +83,19 @@ impl App {
     }
 
     /// Returns the display width of line `index` in terminal columns.
+    ///
+    /// Plugin-flagged no-wrap lines (e.g. markdown tables) report their width
+    /// clamped to the content pane while word wrap is on, so the wrap math
+    /// counts them as a single visual row even though they render clipped.
     pub fn line_width(&self, index: usize) -> Option<usize> {
         if let Some(path) = &self.current_file {
             if let Some(lines) = self.plugin_content.get(path) {
-                return lines
-                    .get(index)
-                    .map(|spans| spans.iter().map(|(_, text)| text.width()).sum());
+                let spans = lines.get(index)?;
+                let width: usize = spans.iter().map(|(_, text)| text.width()).sum();
+                if self.word_wrap && self.line_no_wrap(index) {
+                    return Some(width.min(self.content_wrap_width()));
+                }
+                return Some(width);
             }
         }
         if let Some(vf) = &self.virtual_file {
@@ -97,6 +104,17 @@ impl App {
             self.line_text(index)
                 .map(unicode_width::UnicodeWidthStr::width)
         }
+    }
+
+    /// Returns `true` when the physical content line at `index` is flagged by
+    /// the rendering plugin as not word-wrappable (e.g. a markdown table row).
+    pub(crate) fn line_no_wrap(&self, index: usize) -> bool {
+        let Some(path) = &self.current_file else {
+            return false;
+        };
+        self.plugin_content_no_wrap
+            .get(path)
+            .is_some_and(|lines| lines.contains(&index))
     }
 
     /// Syntax-highlights a slice of lines for the visible window, using the

@@ -23,7 +23,7 @@ use crate::search::InFileSearch;
 
 use super::blame;
 use super::diff::draw_side_by_side_diff;
-use super::draw_text::{render_inline_fallback, render_virtual_file, wrap_content};
+use super::draw_text::{render_inline_fallback, render_virtual_file, truncate_line, wrap_content};
 use super::scrollbar::draw_content_scrollbar;
 use super::search::apply_search_to_regions;
 use super::selection::apply_selection;
@@ -220,7 +220,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         // (rendering collapses blank lines, strips code fences, etc.). This
         // matches line_prefix_width() which already returns 0 for rendered
         // markdown, keeping input and render math consistent.
-        let lines: Vec<Line> = md_lines[render_scroll..visible_end]
+        let mut lines: Vec<Line> = md_lines[render_scroll..visible_end]
             .iter()
             .enumerate()
             .map(|(offset, spans)| {
@@ -263,6 +263,18 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
                 }
             })
             .collect();
+        // Plugin-flagged no-wrap lines (e.g. markdown tables) must not be
+        // reflowed by ratatui's word wrap; clip them to the pane width. The
+        // wrap math agrees (`line_width` clamps them to one visual row).
+        if app.word_wrap && inner.width > 0 {
+            let cw = inner.width as usize;
+            for (offset, line) in lines.iter_mut().enumerate() {
+                let physical_idx = app.display_to_physical(render_scroll + offset);
+                if app.line_no_wrap(physical_idx) {
+                    *line = truncate_line(line, cw);
+                }
+            }
+        }
         (0, vec![], lines, vec![])
     } else if let Some(vf) = app.virtual_file.as_ref() {
         render_virtual_file(

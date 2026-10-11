@@ -172,7 +172,24 @@ impl PluginState {
         let content_id = format!("markdown-{}", self.render_seq);
         let mut next_chunk = 0;
         render_to_ansi_batches(&src, &self.theme, |batch| {
-            next_chunk = send_content_chunk_batch(&batch, path_str, &content_id, next_chunk, out);
+            let mut flat: Vec<String> = Vec::with_capacity(batch.len());
+            for (l, _) in &batch {
+                flat.push(l.clone());
+            }
+            let mut no_wrap_indices: Vec<usize> = Vec::new();
+            for (i, (_, nowrap)) in batch.iter().enumerate() {
+                if *nowrap {
+                    no_wrap_indices.push(i);
+                }
+            }
+            next_chunk = send_content_chunk_batch_with_flags(
+                &flat,
+                &no_wrap_indices,
+                path_str,
+                &content_id,
+                next_chunk,
+                out,
+            );
         });
         send_content_end(path_str, &content_id, next_chunk, out);
     }
@@ -208,12 +225,20 @@ fn ansi(code: &str, text: &str) -> String {
 #[cfg(test)]
 fn render_to_ansi(src: &str, theme: &ThemeColors) -> Vec<String> {
     let mut lines = Vec::new();
-    render_to_ansi_batches(src, theme, |batch| lines.extend(batch));
+    render_to_ansi_batches(src, theme, |batch| {
+        for (line, _) in batch {
+            lines.push(line);
+        }
+    });
     lines
 }
 
-fn render_to_ansi_batches(src: &str, theme: &ThemeColors, mut emit: impl FnMut(Vec<String>)) {
-    let mut lines: Vec<String> = Vec::new();
+fn render_to_ansi_batches(
+    src: &str,
+    theme: &ThemeColors,
+    mut emit: impl FnMut(Vec<(String, bool)>),
+) {
+    let mut lines: Vec<(String, bool)> = Vec::new();
     let mut current = String::new();
     let mut style_stack: Vec<String> = Vec::new();
     let mut code_buf: Vec<String> = Vec::new();
@@ -238,7 +263,11 @@ fn render_to_ansi_batches(src: &str, theme: &ThemeColors, mut emit: impl FnMut(V
             }
             Event::End(Tag::Table(_)) => {
                 in_table = false;
-                render_table_ansi(&table_rows, &table_aligns, theme, &mut lines);
+                let mut table_out: Vec<(String, bool)> = Vec::new();
+                render_table_ansi(&table_rows, &table_aligns, theme, &mut table_out);
+                for (l, nowrap) in table_out.drain(..) {
+                    lines.push((l, nowrap));
+                }
                 table_rows.clear();
                 table_aligns.clear();
             }
@@ -252,11 +281,19 @@ fn render_to_ansi_batches(src: &str, theme: &ThemeColors, mut emit: impl FnMut(V
                     table_rows.push((true, std::mem::take(&mut table_row_cells)));
                 }
             }
-            Event::Start(Tag::TableRow) => table_row_cells.clear(),
+            Event::Start(Tag::TableRow) => {
+                if !in_table {
+                    flush_line(&mut lines, &mut current, bq_depth, theme);
+                }
+                table_row_cells.clear();
+            }
             Event::End(Tag::TableRow) => {
                 table_rows.push((in_table_header, std::mem::take(&mut table_row_cells)));
             }
             Event::Start(Tag::TableCell) => {
+                if !in_table {
+                    flush_line(&mut lines, &mut current, bq_depth, theme);
+                }
                 table_cell_buf.clear();
                 in_table_cell = true;
             }
@@ -271,13 +308,13 @@ fn render_to_ansi_batches(src: &str, theme: &ThemeColors, mut emit: impl FnMut(V
             Event::End(Tag::Heading(_, _, _)) => {
                 flush_line(&mut lines, &mut current, bq_depth, theme);
                 style_stack.pop();
-                lines.push(String::new());
+                lines.push((String::new(), false));
             }
             Event::Start(Tag::Paragraph) => {}
             Event::End(Tag::Paragraph) => {
                 if !in_table {
                     flush_line(&mut lines, &mut current, bq_depth, theme);
-                    lines.push(String::new());
+                    lines.push((String::new(), false));
                 }
             }
             Event::Start(Tag::Strong) => style_stack.push("1".to_string()),
@@ -301,22 +338,25 @@ fn render_to_ansi_batches(src: &str, theme: &ThemeColors, mut emit: impl FnMut(V
                 in_code = false;
                 if !code_buf.is_empty() {
                     if no_color_active() {
-                        lines.push("  ┌──".to_string());
+                        lines.push(("  ┌──".to_string(), false));
                         for cl in code_buf.drain(..) {
-                            lines.push(format!("  │ {cl}"));
+                            lines.push((format!("  │ {cl}"), false));
                         }
-                        lines.push("  └──".to_string());
+                        lines.push(("  └──".to_string(), false));
                     } else {
                         let dim = &theme.dim;
                         let code = &theme.code;
-                        lines.push(format!("\x1b[{dim}m  ┌──\x1b[0m"));
+                        lines.push((format!("\x1b[{dim}m  ┌──\x1b[0m"), false));
                         for cl in code_buf.drain(..) {
-                            lines.push(format!("\x1b[{dim}m  │ \x1b[0m\x1b[{code}m{cl}\x1b[0m"));
+                            lines.push((
+                                format!("\x1b[{dim}m  │ \x1b[0m\x1b[{code}m{cl}\x1b[0m"),
+                                false,
+                            ));
                         }
-                        lines.push(format!("\x1b[{dim}m  └──\x1b[0m"));
+                        lines.push((format!("\x1b[{dim}m  └──\x1b[0m"), false));
                     }
                 }
-                lines.push(String::new());
+                lines.push((String::new(), false));
             }
             Event::Start(Tag::List(_)) => {
                 if list_depth == 0 {
@@ -327,7 +367,7 @@ fn render_to_ansi_batches(src: &str, theme: &ThemeColors, mut emit: impl FnMut(V
             Event::End(Tag::List(_)) => {
                 list_depth = list_depth.saturating_sub(1);
                 if list_depth == 0 {
-                    lines.push(String::new());
+                    lines.push((String::new(), false));
                 }
             }
             Event::Start(Tag::Item) => {
@@ -351,7 +391,7 @@ fn render_to_ansi_batches(src: &str, theme: &ThemeColors, mut emit: impl FnMut(V
                 flush_line(&mut lines, &mut current, bq_depth, theme);
                 bq_depth = bq_depth.saturating_sub(1);
                 style_stack.pop();
-                lines.push(String::new());
+                lines.push((String::new(), false));
             }
             Event::Start(Tag::Link(_, _, _)) => {
                 style_stack.push(theme.accent.clone());
@@ -398,8 +438,8 @@ fn render_to_ansi_batches(src: &str, theme: &ThemeColors, mut emit: impl FnMut(V
             }
             Event::Rule => {
                 flush_line(&mut lines, &mut current, bq_depth, theme);
-                lines.push(ansi(&theme.dim, &"─".repeat(60)));
-                lines.push(String::new());
+                lines.push((ansi(&theme.dim, &"─".repeat(60)), false));
+                lines.push((String::new(), false));
             }
             Event::TaskListMarker(checked) => {
                 // TaskListMarker fires immediately after Start(Item) sets
@@ -440,7 +480,12 @@ fn apply_style(style: &str, text: &str) -> String {
     }
 }
 
-fn flush_line(lines: &mut Vec<String>, current: &mut String, bq_depth: usize, theme: &ThemeColors) {
+fn flush_line(
+    lines: &mut Vec<(String, bool)>,
+    current: &mut String,
+    bq_depth: usize,
+    theme: &ThemeColors,
+) {
     if current.is_empty() {
         return;
     }
@@ -450,7 +495,7 @@ fn flush_line(lines: &mut Vec<String>, current: &mut String, bq_depth: usize, th
         line.push_str(&ansi(&theme.dim, &bq_marker));
     }
     line.push_str(current);
-    lines.push(line);
+    lines.push((line, false));
     current.clear();
 }
 
@@ -467,12 +512,13 @@ fn heading_ansi(level: HeadingLevel, theme: &ThemeColors) -> String {
 
 #[cfg(test)]
 fn send_content_stream(lines: &[String], path: &str, content_id: &str, out: &mut impl Write) {
-    let next_chunk = send_content_chunk_batch(lines, path, content_id, 0, out);
+    let next_chunk = send_content_chunk_batch_with_flags(lines, &[], path, content_id, 0, out);
     send_content_end(path, content_id, next_chunk, out);
 }
 
-fn send_content_chunk_batch(
+fn send_content_chunk_batch_with_flags(
     lines: &[String],
+    no_wrap: &[usize],
     path: &str,
     content_id: &str,
     mut next_chunk: usize,
@@ -483,7 +529,23 @@ fn send_content_chunk_batch(
     let mut bytes = 0usize;
     for (index, line) in lines.iter().enumerate() {
         if index > start && bytes.saturating_add(line.len()) > TARGET_CHUNK_BYTES {
-            write_content_chunk(&lines[start..index], path, content_id, next_chunk, out);
+            let chunk_lines = &lines[start..index];
+            let mut chunk_no_wrap: Vec<usize> = no_wrap
+                .iter()
+                .copied()
+                .filter(|&local| local >= start && local < index)
+                .map(|local| local - start)
+                .collect();
+            chunk_no_wrap.sort_unstable();
+            chunk_no_wrap.dedup();
+            write_content_chunk_with_flags(
+                chunk_lines,
+                &chunk_no_wrap,
+                path,
+                content_id,
+                next_chunk,
+                out,
+            );
             next_chunk += 1;
             start = index;
             bytes = 0;
@@ -491,28 +553,49 @@ fn send_content_chunk_batch(
         bytes = bytes.saturating_add(line.len());
     }
     if start < lines.len() {
-        write_content_chunk(&lines[start..], path, content_id, next_chunk, out);
+        let chunk_lines = &lines[start..];
+        let mut chunk_no_wrap: Vec<usize> = no_wrap
+            .iter()
+            .copied()
+            .filter(|&local| local >= start && local < lines.len())
+            .map(|local| local - start)
+            .collect();
+        chunk_no_wrap.sort_unstable();
+        chunk_no_wrap.dedup();
+        write_content_chunk_with_flags(
+            chunk_lines,
+            &chunk_no_wrap,
+            path,
+            content_id,
+            next_chunk,
+            out,
+        );
         next_chunk += 1;
     }
     next_chunk
 }
 
-fn write_content_chunk(
+fn write_content_chunk_with_flags(
     lines: &[String],
+    no_wrap: &[usize],
     path: &str,
     content_id: &str,
     index: usize,
     out: &mut impl Write,
 ) {
+    let mut params = serde_json::json!({
+        "path": path,
+        "content_id": content_id,
+        "index": index,
+        "lines": lines,
+    });
+    if !no_wrap.is_empty() {
+        params["no_wrap"] = serde_json::json!(no_wrap);
+    }
     let msg = serde_json::json!({
         "event": "action",
         "action": "set_content_chunk",
-        "params": {
-            "path": path,
-            "content_id": content_id,
-            "index": index,
-            "lines": lines,
-        }
+        "params": params,
     });
     let _ = writeln!(out, "{}", serde_json::to_string(&msg).unwrap());
     let _ = out.flush();
@@ -538,7 +621,7 @@ fn render_table_ansi(
     rows: &[(bool, Vec<String>)],
     aligns: &[Alignment],
     theme: &ThemeColors,
-    out: &mut Vec<String>,
+    out: &mut Vec<(String, bool)>,
 ) {
     if rows.is_empty() {
         return;
@@ -559,7 +642,7 @@ fn render_table_ansi(
     let header = format!("1;{}", theme.heading1);
 
     if no_color_active() {
-        out.push(table_border('┌', '─', '┬', '┐', &col_widths));
+        out.push((table_border('┌', '─', '┬', '┐', &col_widths), true));
         for (is_header, cells) in rows {
             let mut line = String::from("│");
             for (i, w) in col_widths.iter().enumerate() {
@@ -572,16 +655,19 @@ fn render_table_ansi(
                     line.push_str(&format!(" {padded} │"));
                 }
             }
-            out.push(line);
+            out.push((line, true));
             if *is_header {
-                out.push(table_border('├', '─', '┼', '┤', &col_widths));
+                out.push((table_border('├', '─', '┼', '┤', &col_widths), true));
             }
         }
-        out.push(table_border('└', '─', '┴', '┘', &col_widths));
+        out.push((table_border('└', '─', '┴', '┘', &col_widths), true));
     } else {
-        out.push(format!(
-            "\x1b[{dim}m{}\x1b[0m",
-            table_border('┌', '─', '┬', '┐', &col_widths)
+        out.push((
+            format!(
+                "\x1b[{dim}m{}\x1b[0m",
+                table_border('┌', '─', '┬', '┐', &col_widths)
+            ),
+            true,
         ));
         for (is_header, cells) in rows {
             let style = if *is_header { &header } else { "" };
@@ -594,20 +680,26 @@ fn render_table_ansi(
                     "\x1b[{style}m {padded} \x1b[0m\x1b[{dim}m│\x1b[0m"
                 ));
             }
-            out.push(line);
+            out.push((line, true));
             if *is_header {
-                out.push(format!(
-                    "\x1b[{dim}m{}\x1b[0m",
-                    table_border('├', '─', '┼', '┤', &col_widths)
+                out.push((
+                    format!(
+                        "\x1b[{dim}m{}\x1b[0m",
+                        table_border('├', '─', '┼', '┤', &col_widths)
+                    ),
+                    true,
                 ));
             }
         }
-        out.push(format!(
-            "\x1b[{dim}m{}\x1b[0m",
-            table_border('└', '─', '┴', '┘', &col_widths)
+        out.push((
+            format!(
+                "\x1b[{dim}m{}\x1b[0m",
+                table_border('└', '─', '┴', '┘', &col_widths)
+            ),
+            true,
         ));
     }
-    out.push(String::new());
+    out.push((String::new(), false));
 }
 
 fn table_border(left: char, fill: char, mid: char, right: char, widths: &[usize]) -> String {
