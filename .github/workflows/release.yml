@@ -4,14 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       bump:
-        description: Version part to bump before releasing (none = tag current version)
+        description: Choose SemVer from Conventional Commits, or override explicitly
         type: choice
         options:
+          - auto
           - none
           - patch
           - minor
           - major
-        default: none
+        default: auto
       release_targets:
         description: Platforms to build and publish
         type: choice
@@ -86,6 +87,7 @@ jobs:
   bump:
     runs-on: ${{ inputs.runner == 'self-hosted' && fromJSON('["self-hosted", "Linux"]') || 'ubuntu-latest' }}
     outputs:
+      current: ${{ steps.version.outputs.current }}
       version: ${{ steps.version.outputs.version }}
       sha: ${{ steps.commit.outputs.sha }}
       changelog: ${{ steps.changelog.outputs.log }}
@@ -95,41 +97,94 @@ jobs:
           fetch-depth: 0
           ssh-key: ${{ secrets.DEPLOY_KEY }}
 
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: git-cliff@2.14.0
+
       - name: Compute version
         id: version
         run: |
-          current=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          set -euo pipefail
+          current=$(grep -m1 '^version = ' Cargo.toml | sed 's/version = "\(.*\)"/\1/' || true)
+          if [[ ! "$current" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Cargo.toml package version is missing or is not SemVer: $current"
+            exit 1
+          fi
+          echo "current=${current}" >> "$GITHUB_OUTPUT"
           major=$(echo "$current" | cut -d. -f1)
           minor=$(echo "$current" | cut -d. -f2)
           patch=$(echo "$current" | cut -d. -f3)
           case "${{ inputs.bump }}" in
+            auto)
+              new_version=$(git-cliff --offline --bumped-version)
+              new_version="${new_version#v}"
+              if [[ "$new_version" == "$current" ]]; then
+                echo "::error::No release-worthy Conventional Commits since the latest tag. Use an explicit bump only when intentional."
+                exit 1
+              fi
+              ;;
             major) new_version="$((major + 1)).0.0" ;;
             minor) new_version="${major}.$((minor + 1)).0" ;;
             patch) new_version="${major}.${minor}.$((patch + 1))" ;;
             none|*) new_version="${current}" ;;
           esac
-          if [ "$new_version" != "$current" ]; then
-            sed -i "s/^version = \"${current}\"/version = \"${new_version}\"/" Cargo.toml
-            sed -i "/^name = \"mantis\"/{n;s/version = \"${current}\"/version = \"${new_version}\"/}" Cargo.lock
+          if [[ ! "$new_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Computed version is not SemVer: $new_version"
+            exit 1
           fi
           echo "version=${new_version}" >> "$GITHUB_OUTPUT"
 
       - name: Generate changelog
         id: changelog
         run: |
-          prev_tag=$(git tag --sort=-version:refname | grep '^v' | head -1 || true)
-          if [ -z "$prev_tag" ]; then
-            log=$(git log --pretty=format:"- %s")
-          else
-            log=$(git log --pretty=format:"- %s" "${prev_tag}..HEAD")
-          fi
-          log=$(echo "$log" | grep -v "^- chore: bump version to v" || true)
+          set -euo pipefail
+          git-cliff --offline --tag "v${{ steps.version.outputs.version }}" --output /tmp/CHANGELOG.md
+          git-cliff --offline --unreleased --strip header --output /tmp/release-notes.md
+          cp /tmp/CHANGELOG.md CHANGELOG.md
+          cp /tmp/release-notes.md release-notes.md
+          log=$(cat release-notes.md)
           log=$(echo "$log" | sed 's/"""/\\"\\"\\"/g')
           {
             echo "log<<EOF"
             echo "$log"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
+
+      - name: Update crate version
+        run: |
+          set -euo pipefail
+          current="${{ steps.version.outputs.current }}"
+          new_version="${{ steps.version.outputs.version }}"
+          if [[ -z "$current" ]]; then
+            echo "::error::Current crate version output is empty"
+            exit 1
+          fi
+          if [ "$new_version" != "$current" ]; then
+            if ! grep -Fxq "version = \"${current}\"" Cargo.toml; then
+              echo "::error::Cargo.toml no longer contains the computed current version: $current"
+              exit 1
+            fi
+            if ! awk -v expected="version = \"${current}\"" '
+              $0 == "name = \"mantis\"" { getline; if ($0 == expected) found = 1 }
+              END { exit !found }
+            ' Cargo.lock; then
+              echo "::error::Cargo.lock has no mantis package at version $current"
+              exit 1
+            fi
+            sed -i "s/^version = \"${current}\"/version = \"${new_version}\"/" Cargo.toml
+            sed -i "/^name = \"mantis\"/{n;s/version = \"${current}\"/version = \"${new_version}\"/}" Cargo.lock
+            if ! grep -Fxq "version = \"${new_version}\"" Cargo.toml; then
+              echo "::error::Cargo.toml version update did not take effect"
+              exit 1
+            fi
+            if ! awk -v expected="version = \"${new_version}\"" '
+              $0 == "name = \"mantis\"" { getline; if ($0 == expected) found = 1 }
+              END { exit !found }
+            ' Cargo.lock; then
+              echo "::error::Cargo.lock version update did not take effect"
+              exit 1
+            fi
+          fi
 
       - name: Write release info
         run: |
@@ -150,7 +205,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Cargo.toml Cargo.lock release-info.toml
+          git add Cargo.toml Cargo.lock release-info.toml CHANGELOG.md
           if git diff --cached --quiet; then
             echo "Nothing to commit (version and release notes unchanged)."
           else
