@@ -27,6 +27,10 @@ pub(crate) const STREAM_IDLE_TIMEOUT: Duration = Duration::from_secs(10);
 pub(crate) struct StreamUpdate {
     /// Newly contiguous lines that can be rendered immediately.
     pub(crate) appended: Vec<String>,
+    /// Indices into `appended` for lines the plugin flagged as not
+    /// word-wrappable (e.g. markdown tables). Indices are assembled from the
+    /// source chunks so out-of-order arrival still maps correctly.
+    pub(crate) appended_no_wrap: Vec<usize>,
     /// Whether the explicit terminator and all chunks have arrived.
     pub(crate) complete: bool,
 }
@@ -46,7 +50,7 @@ pub(crate) enum StreamError {
 pub(crate) struct ContentStream {
     content_id: String,
     next_chunk: usize,
-    pending: BTreeMap<usize, Vec<String>>,
+    pending: BTreeMap<usize, (Vec<String>, Vec<usize>)>,
     accepted_bytes: usize,
     accepted_lines: usize,
     total_chunks: Option<usize>,
@@ -89,15 +93,20 @@ impl ContentStream {
     }
 
     /// Accepts a chunk, retaining gaps until preceding chunks arrive.
+    ///
+    /// `no_wrap` lists local indices within `lines` that the plugin flagged as
+    /// not word-wrappable; out-of-range entries are ignored.
     pub(crate) fn push_chunk(
         &mut self,
         index: usize,
         lines: Vec<String>,
+        no_wrap: Vec<usize>,
         now: Instant,
     ) -> Result<StreamUpdate, StreamError> {
         if !self.is_active() {
             return Ok(StreamUpdate {
                 appended: Vec::new(),
+                appended_no_wrap: Vec::new(),
                 complete: self.state == StreamState::Complete,
             });
         }
@@ -107,6 +116,7 @@ impl ContentStream {
         if index < self.next_chunk || self.pending.contains_key(&index) {
             return Ok(StreamUpdate {
                 appended: Vec::new(),
+                appended_no_wrap: Vec::new(),
                 complete: false,
             });
         }
@@ -133,17 +143,25 @@ impl ContentStream {
 
         self.accepted_bytes = total_bytes;
         self.accepted_lines = total_lines;
-        self.pending.insert(index, lines);
+        self.pending.insert(index, (lines, no_wrap));
         self.last_activity = now;
 
         let mut appended = Vec::new();
-        while let Some(mut chunk) = self.pending.remove(&self.next_chunk) {
+        let mut appended_no_wrap = Vec::new();
+        while let Some((mut chunk, chunk_no_wrap)) = self.pending.remove(&self.next_chunk) {
+            let offset = appended.len();
+            appended_no_wrap.extend(
+                chunk_no_wrap
+                    .into_iter()
+                    .filter_map(|local| (local < chunk.len()).then_some(offset + local)),
+            );
             appended.append(&mut chunk);
             self.next_chunk += 1;
         }
         self.finish_if_ready();
         Ok(StreamUpdate {
             appended,
+            appended_no_wrap,
             complete: self.state == StreamState::Complete,
         })
     }
@@ -157,6 +175,7 @@ impl ContentStream {
         if !self.is_active() {
             return Ok(StreamUpdate {
                 appended: Vec::new(),
+                appended_no_wrap: Vec::new(),
                 complete: self.state == StreamState::Complete,
             });
         }
@@ -173,6 +192,7 @@ impl ContentStream {
         self.finish_if_ready();
         Ok(StreamUpdate {
             appended: Vec::new(),
+            appended_no_wrap: Vec::new(),
             complete: self.state == StreamState::Complete,
         })
     }

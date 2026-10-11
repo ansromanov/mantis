@@ -42,8 +42,12 @@ impl App {
             .map(|spans| spans.iter().map(|(_, value)| value.as_str()).collect())
             .collect();
         let is_current = self.current_file.as_deref() == Some(path.as_path());
+        let no_wrap: std::collections::HashSet<usize> = parse_no_wrap_indices(params, lines.len())
+            .into_iter()
+            .collect();
         self.plugin_content_text.insert(path.clone(), text);
         self.plugin_content.insert(path.clone(), rendered);
+        self.plugin_content_no_wrap.insert(path.clone(), no_wrap);
         self.plugin_contributions
             .entry(name.to_string())
             .or_default()
@@ -86,6 +90,8 @@ impl App {
             return;
         };
 
+        let lines_len = lines.len();
+        let no_wrap: Vec<usize> = parse_no_wrap_indices(params, lines_len);
         self.ensure_plugin_content_stream(name, &path, content_id);
         let Some((owner, stream)) = self.plugin_content_streams.get_mut(&path) else {
             return;
@@ -93,8 +99,13 @@ impl App {
         if owner != name {
             return;
         }
-        match stream.push_chunk(index, lines, Instant::now()) {
-            Ok(update) => self.append_plugin_content_lines(name, &path, update.appended),
+        match stream.push_chunk(index, lines, no_wrap, Instant::now()) {
+            Ok(update) => self.append_plugin_content_lines(
+                name,
+                &path,
+                update.appended,
+                update.appended_no_wrap,
+            ),
             Err(error) => {
                 self.plugin_message =
                     Some(format!("[{name}] rendered content incomplete ({error:?})"));
@@ -145,6 +156,8 @@ impl App {
             self.plugin_content.insert(path.to_path_buf(), Vec::new());
             self.plugin_content_text
                 .insert(path.to_path_buf(), Vec::new());
+            self.plugin_content_no_wrap
+                .insert(path.to_path_buf(), std::collections::HashSet::new());
             if self.current_file.as_deref() == Some(path) && self.filter_query.is_some() {
                 self.filter_display_map.clear();
             }
@@ -164,7 +177,13 @@ impl App {
             .insert(path.to_path_buf());
     }
 
-    fn append_plugin_content_lines(&mut self, name: &str, path: &Path, lines: Vec<String>) {
+    fn append_plugin_content_lines(
+        &mut self,
+        name: &str,
+        path: &Path,
+        lines: Vec<String>,
+        no_wrap: Vec<usize>,
+    ) {
         if lines.is_empty() {
             return;
         }
@@ -177,6 +196,13 @@ impl App {
             .map(|spans| spans.iter().map(|(_, value)| value.as_str()).collect())
             .collect();
         let first_line = self.plugin_content_text.get(path).map_or(0, Vec::len);
+        if !no_wrap.is_empty() {
+            let entry = self
+                .plugin_content_no_wrap
+                .entry(path.to_path_buf())
+                .or_default();
+            entry.extend(no_wrap.into_iter().map(|index| first_line + index));
+        }
         let filter_matches = if self.current_file.as_deref() == Some(path) {
             self.filter_query
                 .as_deref()
@@ -240,6 +266,24 @@ impl App {
             }
         }
     }
+}
+
+/// Parses the optional `no_wrap` array from a `set_content` /
+/// `set_content_chunk` payload. Indices are line positions within the payload;
+/// out-of-range or malformed entries are dropped.
+fn parse_no_wrap_indices(params: &serde_json::Value, line_count: usize) -> Vec<usize> {
+    params
+        .get("no_wrap")
+        .and_then(serde_json::Value::as_array)
+        .map(|entries| {
+            entries
+                .iter()
+                .filter_map(serde_json::Value::as_u64)
+                .filter_map(|index| usize::try_from(index).ok())
+                .filter(|index| *index < line_count)
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 #[cfg(test)]

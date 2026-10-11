@@ -518,6 +518,11 @@ pub struct App {
     /// Stored separately because `plugin_content` holds styled spans whose text
     /// would require joining on every access.
     pub plugin_content_text: HashMap<PathBuf, Vec<String>>,
+    /// Line indices of plugin-rendered content that must not be word-wrapped,
+    /// keyed by file path (same keys as `plugin_content`). A plugin flags
+    /// preformatted lines whose structure breaks if reflowed — e.g. the
+    /// markdown renderer's tables. Ignored while word wrap is off.
+    pub(crate) plugin_content_no_wrap: HashMap<PathBuf, std::collections::HashSet<usize>>,
     /// Active or recently completed streamed plugin content, keyed by file path.
     /// The owner is retained for contribution teardown; the stream keeps its
     /// content id and reports whether delivery is active or incomplete.
@@ -636,6 +641,7 @@ impl App {
         for path in &contrib.content_paths {
             self.plugin_content.remove(path);
             self.plugin_content_text.remove(path);
+            self.plugin_content_no_wrap.remove(path);
             if self
                 .plugin_content_streams
                 .get(path)
@@ -1166,6 +1172,7 @@ impl App {
         self.plugin_content_active = false;
         self.plugin_content.clear();
         self.plugin_content_text.clear();
+        self.plugin_content_no_wrap.clear();
         self.plugin_content_streams.clear();
     }
 }
