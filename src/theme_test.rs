@@ -297,12 +297,11 @@ static COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize:
 /// Redirects the platform config-home env var to a fresh temp dir for the
 /// duration of `f`, then restores the original value and removes the temp dir.
 /// On Windows this is APPDATA; everywhere else it is XDG_CONFIG_HOME.
-/// Uses the shared ENV_LOCK from plugin.rs so this serialises against
-/// plugin_test.rs, which also mutates the same env var.
+/// Serialised by `ENV_LOCK`.
+static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 fn with_isolated_config_home<F: FnOnce(&std::path::Path)>(f: F) {
-    let _guard: MutexGuard<()> = crate::plugin::ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
+    let _guard: MutexGuard<()> = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let n = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let tmp = std::env::temp_dir().join(format!("tv2_theme_test_{}_{n}", std::process::id()));
     std::fs::create_dir_all(&tmp).unwrap();
@@ -488,19 +487,19 @@ fn theme_color_roles_constant_covers_role_color_branches() {
 fn diagnostic_severities_map_to_semantic_theme_roles() {
     let theme = Theme::load("default").expect("default theme must load");
     assert_eq!(
-        theme.diagnostic_color(crate::plugin::types::DiagnosticSeverity::Error),
+        theme.diagnostic_color(crate::code_intel::DiagnosticSeverity::Error),
         theme.git_conflict
     );
     assert_eq!(
-        theme.diagnostic_color(crate::plugin::types::DiagnosticSeverity::Warning),
+        theme.diagnostic_color(crate::code_intel::DiagnosticSeverity::Warning),
         theme.git_progress
     );
     assert_eq!(
-        theme.diagnostic_color(crate::plugin::types::DiagnosticSeverity::Info),
+        theme.diagnostic_color(crate::code_intel::DiagnosticSeverity::Info),
         theme.accent
     );
     assert_eq!(
-        theme.diagnostic_color(crate::plugin::types::DiagnosticSeverity::Hint),
+        theme.diagnostic_color(crate::code_intel::DiagnosticSeverity::Hint),
         theme.dim
     );
 }

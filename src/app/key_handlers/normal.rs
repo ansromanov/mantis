@@ -14,7 +14,7 @@ use crossterm::event::KeyEvent;
 
 use crate::config::{pressed_in, static_keys, BindingScope};
 use crate::search::{
-    CommandPalette, GotoLineState, InFileSearch, PluginPicker, SearchState, ThemePicker, TreeFilter,
+    CommandPalette, GotoLineState, InFileSearch, SearchState, ThemePicker, TreeFilter,
 };
 
 use super::super::{App, Focus, TabAction};
@@ -152,9 +152,6 @@ impl App {
         } else if pressed_in(&k.theme_picker, &key, scope) {
             self.context_menu = None;
             self.theme_picker = Some(ThemePicker::default());
-        } else if pressed_in(&k.plugin_picker, &key, scope) {
-            let entries = self.plugin_manager.plugin_entries();
-            self.plugin_picker = Some(PluginPicker::new(entries));
         } else if pressed_in(&k.command_palette, &key, scope) {
             self.last_click = None;
             let (base_order, base_pinned) = crate::command_palette::ranked_base_order(
@@ -166,18 +163,11 @@ impl App {
                 .iter()
                 .map(|cmd| self.check_applicability(&cmd.action_id).err())
                 .collect();
-            let plugin_commands = self
-                .plugin_manager
-                .all_plugin_commands()
-                .into_iter()
-                .cloned()
-                .collect();
             self.command_palette = Some(CommandPalette::new(
                 &self.keys,
                 base_order,
                 base_pinned,
                 inapplicability_reasons,
-                plugin_commands,
             ));
         } else if pressed_in(&k.symbol_outline, &key, scope) {
             self.open_symbol_outline();
@@ -362,8 +352,6 @@ impl App {
                         };
                         if nd.depth < depth {
                             self.tree_selected = i;
-                            let p = nd.path.clone();
-                            self.plugin_manager.on_selection_change(Some(&p));
                             break;
                         }
                     }
@@ -643,18 +631,6 @@ impl App {
     /// Nudges `content_scroll` so `active_line` stays within the visible
     /// viewport after a cursor move. Delegates to the unified helper.
     pub(crate) fn scroll_active_line_into_view(&mut self) {
-        let previous_path = self.current_file.clone();
-        let previous_line = self
-            .has_text_cursor()
-            .then(|| self.display_to_physical(self.active_line));
         self.scroll_line_into_view(self.active_line);
-        let line = self
-            .has_text_cursor()
-            .then(|| self.display_to_physical(self.active_line));
-        if previous_path != self.current_file || previous_line != line {
-            self.plugin_manager
-                .on_selection_change_at(self.current_file.as_deref(), line);
-        }
-        self.schedule_content_cursor_change();
     }
 }

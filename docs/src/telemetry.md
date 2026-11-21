@@ -33,11 +33,11 @@ The report contains, in full:
 - open-file facts: extension, size, line count, encoding, line endings,
   detected syntax name, and JSON/diff/memory-mapped flags — never the name
 - which config keys differ from defaults (key paths only, never values),
-  the theme name, and the plugin *count*
+  and the theme name
 - whether telemetry is enabled
 
 It deliberately contains **no personal data**: no absolute paths, no file or
-directory names, no file content, no config values, no plugin names, and no
+directory names, no file content, no config values, and no
 environment variables beyond the terminal whitelist above.
 
 ## Telemetry
@@ -67,12 +67,11 @@ the session started (no wall-clock timestamps).
 
 | Event | Fields | Recorded when |
 |---|---|---|
-| `session_start` | `app_version`, `os`, `arch`, `terminal`, `os_version`, `wsl`, `term_program`, `term_program_version`, `colorterm`, `windows_terminal`, `ssh_session`, `terminal_size`, `tree_nodes`, `tree_files`, `tree_dirs`, `tree_max_depth`, `expanded_dirs`, `tree_filter_active`, `walk_errors`, `git_repo`, `git_mode`, `file_open`, `file_extension`, `file_size_bytes`, `file_line_count`, `file_encoding`, `file_line_ending`, `file_syntax`, `file_is_json`, `file_is_diff`, `file_uses_mmap`, `theme`, `plugin_count`, `telemetry_enabled` | mantis starts — same privacy rules as bug-report snapshot: counts and whitelisted env vars only, never paths or names |
+| `session_start` | `app_version`, `os`, `arch`, `terminal`, `os_version`, `wsl`, `term_program`, `term_program_version`, `colorterm`, `windows_terminal`, `ssh_session`, `terminal_size`, `tree_nodes`, `tree_files`, `tree_dirs`, `tree_max_depth`, `expanded_dirs`, `tree_filter_active`, `walk_errors`, `git_repo`, `git_mode`, `file_open`, `file_extension`, `file_size_bytes`, `file_line_count`, `file_encoding`, `file_line_ending`, `file_syntax`, `file_is_json`, `file_is_diff`, `file_uses_mmap`, `theme`, `telemetry_enabled` | mantis starts — same privacy rules as bug-report snapshot: counts and whitelisted env vars only, never paths or names |
 | `session_end` | `duration_s`, `events_dropped` | mantis exits |
 | `action_invoked` | `action` (canonical action id), `source` (`palette`, `key`, `mouse`) | a command palette, key binding, or mouse action runs |
 | `overlay_opened` | `kind` (help, about, theme_picker, command_palette, etc.) | an overlay popup is opened |
 | `feature_used` | `feature` (fold, diff_nav, git_history, visual_mode, git_blame) | a core feature is used |
-| `plugin_toggled` | `kind` (linter, formatter, etc.), `enabled` (bool) | a plugin is enabled/disabled |
 | `file_opened` | `size_bucket` (under_1kb, from_1kb_to_1mb, etc.), `source_kind` (tree, search, history, etc.), `encoding`, `is_binary` | a file is opened in the content pane |
 | `perf_span` | `span` (open_file, build_visible, highlight, etc.), `duration_bucket` (<1ms, 1-16ms, 16-100ms, >100ms) | an instrumented hot-path span finishes |
 | `error_occurred` | `module`, `kind` (error classification/variant name) | an error event is intercepted |

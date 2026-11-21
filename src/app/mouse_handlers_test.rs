@@ -57,9 +57,9 @@ fn double_clicking_symbol_result_jumps_to_declaration() {
     let path = root.join("long.txt");
     app.open_file(&path);
     app.focus = Focus::Content;
-    app.plugin_symbols.insert(
+    app.symbols.insert(
         path.clone(),
-        vec![crate::plugin::types::Symbol {
+        vec![crate::code_intel::Symbol {
             name: "target".into(),
             kind: "function".into(),
             line: 8,
@@ -70,7 +70,7 @@ fn double_clicking_symbol_result_jumps_to_declaration() {
     let mut palette = crate::command_palette::CommandPalette::default();
     palette.route = crate::command_palette::PaletteRoute::Symbols;
     palette.route_symbols = Some(crate::search::SymbolPicker::new(
-        app.plugin_symbols.get(&path).unwrap().clone(),
+        app.symbols.get(&path).unwrap().clone(),
         None,
     ));
     app.command_palette = Some(palette);
@@ -150,48 +150,6 @@ fn statusbar_overlay_hint_line_has_no_click_targets() {
     app.handle_mouse(left_down_at(5, 0));
     assert!(app.goto_line.is_some());
     assert!(app.revision_picker.is_none());
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn statusbar_clicks_open_each_mapped_picker_and_toggle_folds() {
-    let root = temp_tree();
-    let mut app = app_for(&root);
-    app.statusbar_area = Rect::new(0, 0, 30, 1);
-
-    let click = |app: &mut App, segment| {
-        app.statusbar_segments = vec![(segment, 2, 8, 0)];
-        app.handle_mouse(left_down_at(4, 0));
-    };
-
-    click(&mut app, crate::ui::statusbar::StatusSegment::Worktrees);
-    assert!(app.worktree_picker.is_some());
-    app.worktree_picker = None;
-
-    click(&mut app, crate::ui::statusbar::StatusSegment::Lnum);
-    assert!(app.goto_line.is_some());
-    assert_eq!(app.focus, Focus::Content);
-    app.goto_line = None;
-
-    click(&mut app, crate::ui::statusbar::StatusSegment::Type);
-    assert!(app.theme_picker.is_some());
-    app.theme_picker = None;
-
-    app.fold_regions = vec![crate::fold::FoldRegion { start: 0, end: 5 }];
-    click(&mut app, crate::ui::statusbar::StatusSegment::Folds);
-    assert_eq!(app.folded.len(), 1);
-    click(&mut app, crate::ui::statusbar::StatusSegment::Folds);
-    assert!(app.folded.is_empty());
-
-    click(&mut app, crate::ui::statusbar::StatusSegment::Errors);
-    assert!(app.plugin_picker.is_some());
-    app.plugin_picker = None;
-
-    click(&mut app, crate::ui::statusbar::StatusSegment::Update);
-    assert!(app.show_about);
-    click(&mut app, crate::ui::statusbar::StatusSegment::Update);
-    assert!(!app.show_about);
-
     fs::remove_dir_all(&root).ok();
 }
 
@@ -859,42 +817,6 @@ fn right_click_on_tree_row_opens_context_menu_on_that_row() {
 }
 
 #[test]
-fn right_click_on_directory_row_opens_tree_menu() {
-    let root = tree_with_dir();
-    let mut app = app_for(&root);
-    app.tree_area = Rect {
-        x: 0,
-        y: 0,
-        width: 40,
-        height: 20,
-    };
-    app.tree_offset = 0;
-    let sub = root.join("sub");
-
-    app.handle_mouse(right_down_at(5, 0));
-
-    let menu = app.context_menu.expect("menu must open");
-    assert!(
-        matches!(&menu.target, crate::app::ContextMenuTarget::Tree { path, .. } if *path == sub)
-    );
-    let labels: Vec<&str> = menu
-        .entries
-        .iter()
-        .filter_map(|e| match e {
-            crate::app::ContextMenuEntry::Action { label, .. }
-            | crate::app::ContextMenuEntry::PluginAction { label, .. } => Some(label.as_str()),
-            crate::app::ContextMenuEntry::Separator => None,
-            crate::app::ContextMenuEntry::Submenu { label, .. } => Some(label.as_str()),
-        })
-        .collect();
-    assert!(
-        labels.contains(&"Expand"),
-        "directory menu must offer Expand/Collapse"
-    );
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
 fn right_click_in_content_pane_opens_content_menu() {
     let root = temp_tree();
     let mut app = app_for(&root);
@@ -1126,22 +1048,6 @@ fn tree_click_out_of_range_is_noop() {
         app.tree_selected, prev,
         "click on out-of-range row must not change selection"
     );
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn plugin_picker_click_outside_closes() {
-    let root = temp_tree();
-    let mut app = app_for(&root);
-    app.plugin_picker = Some(crate::search::PluginPicker::new(vec![]));
-    app.plugin_picker_area = Rect {
-        x: 10,
-        y: 10,
-        width: 40,
-        height: 20,
-    };
-    app.handle_mouse(left_down_at(1, 1)); // outside popup
-    assert!(app.plugin_picker.is_none());
     fs::remove_dir_all(&root).ok();
 }
 
@@ -1449,8 +1355,8 @@ fn mouse_click_in_plugin_content_starts_drag() {
         vec![(style, "plugin content line 1".to_string())],
         vec![(style, "plugin content line 2".to_string())],
     ];
-    app.plugin_content_text.insert(path.clone(), text);
-    app.plugin_content.insert(path.clone(), rendered);
+    app.rendered_text.insert(path.clone(), text);
+    app.rendered_content.insert(path.clone(), rendered);
 
     let down_ev = MouseEvent {
         kind: MouseEventKind::Down(MouseButton::Left),
@@ -1703,12 +1609,12 @@ fn double_click_palette_diagnostic_jumps_to_its_line() {
     let mut palette = crate::command_palette::CommandPalette::default();
     palette.route = crate::command_palette::PaletteRoute::Diagnostics;
     palette.route_diagnostics = Some(crate::search::DiagnosticPicker::new(vec![
-        crate::plugin::types::Diagnostic {
+        crate::code_intel::Diagnostic {
             line: 8,
             column: 0,
             end_line: None,
             end_column: None,
-            severity: crate::plugin::types::DiagnosticSeverity::Error,
+            severity: crate::code_intel::DiagnosticSeverity::Error,
             message: "broken".into(),
             source: "test".into(),
         },

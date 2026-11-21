@@ -9,8 +9,7 @@ A fast terminal file-tree viewer built with ratatui: browse a filesystem, previe
 files with syntax highlighting (`syntect`), fuzzy-search files and content, browse
 git history/diff/blame (via the `git` CLI), switch themes — mouse and keyboard.
 
-Rust library in `src/lib.rs`, binary in `src/main.rs`. The crate is a Cargo workspace
-(see `Cargo.toml` for members).
+Single crate: library in `src/lib.rs`, binary in `src/main.rs`.
 
 ## Architecture in one page
 

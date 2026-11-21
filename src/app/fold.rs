@@ -6,11 +6,9 @@
 //! `fold_display_map` — the display-line to physical-line table the renderer
 //! and scroll math consult while folds are active. Toggling a fold here keeps
 //! that map and the recorded gutter click rows in sync, so mouse and keyboard
-//! fold operations always agree on what is visible. Regions can come from
-//! either the built-in YAML indentation detector (`yaml_fold`) or from a
-//! language provider registered via the plugin protocol; plugin-supplied
-//! regions arrive via `apply_plugin_fold_regions` and override the built-in
-//! output for the matching file extension.
+//! fold operations always agree on what is visible. Regions are computed by the
+//! file loader: the YAML indentation detector (`yaml_fold`) for YAML, and the
+//! per-language detectors in `crate::fold_detectors` for everything else.
 
 use super::App;
 
@@ -82,17 +80,6 @@ impl App {
         self.yaml_error = None;
         self.yaml_anchor_count = 0;
         self.yaml_alias_count = 0;
-    }
-
-    /// Applies provider-supplied fold regions for `path`, if any exist, replacing
-    /// the current built-in regions. No-op when no provider has registered regions
-    /// for the path.
-    pub(crate) fn apply_plugin_fold_regions(&mut self, path: &std::path::Path) {
-        if let Some(regions) = self.plugin_fold_regions.get(path) {
-            self.fold_regions = regions.clone();
-            self.folded.clear();
-            self.rebuild_fold_display_map();
-        }
     }
 }
 

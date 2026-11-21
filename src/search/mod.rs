@@ -6,7 +6,7 @@
 //! `SkimMatcherV2`, debouncing the expensive content scans. `ContentMatch`
 //! carries a hit's path, line number, and surrounding context. The same
 //! query/filtered-list/selected-index shape backs `HistoryState`, `ThemePicker`,
-//! `CommandPalette`, `RecentFilesState`, `PluginPicker`, the in-file search
+//! `CommandPalette`, `RecentFilesState`, the in-file search
 //! (`InFileSearch`), the go-to-line dialog (`GotoLineState`), symbol outline
 //! (`SymbolPicker`), and per-file diagnostics (`DiagnosticPicker`), all defined
 //! here. The shared `fuzzy_refilter` helper scores
@@ -25,8 +25,8 @@ pub use repo_log::RepoLogState;
 #[allow(unused_imports)]
 pub use pickers::{
     BugReportFocus, BugReportState, DiagnosticPicker, FilterBarState, GotoLineState, InFileMatch,
-    InFileSearch, PluginPicker, RecentFilesState, RevisionItem, RevisionPicker, RevisionTab,
-    SymbolPicker, TabPicker, TabPickerItem, ThemePicker, TreeFilter, WorktreePicker,
+    InFileSearch, RecentFilesState, RevisionItem, RevisionPicker, RevisionTab, SymbolPicker,
+    TabPicker, TabPickerItem, ThemePicker, TreeFilter, WorktreePicker,
 };
 
 use std::collections::{HashMap, HashSet};

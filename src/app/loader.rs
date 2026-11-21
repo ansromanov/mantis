@@ -22,7 +22,6 @@
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{Receiver, Sender};
-use std::sync::Arc;
 use std::thread::JoinHandle;
 
 use ratatui::style::Style;
@@ -35,7 +34,6 @@ use crate::fold::FoldRegion;
 use crate::git::GitStatus;
 use crate::highlight::Highlighter;
 use crate::jsonl;
-use crate::plugin::ExtraSyntax;
 use crate::theme::Theme;
 use crate::virtual_file::VirtualFile;
 use crate::yaml_fold;
@@ -63,7 +61,7 @@ pub(super) struct FileLoad {
     /// Fold regions from the built-in per-language detector (non-YAML files).
     pub fold_regions: Vec<crate::fold::FoldRegion>,
     /// Symbol outline from the built-in detector (currently Rust only).
-    pub symbols: Vec<crate::plugin::types::Symbol>,
+    pub symbols: Vec<crate::code_intel::Symbol>,
     /// `true` when the file size exceeds the configured `prettify_size_limit`
     /// and JSON/YAML pretty-printing / fold detection was skipped.
     pub prettify_size_limit_exceeded: bool,
@@ -529,8 +527,6 @@ pub(super) enum LoadRequest {
     },
     /// Rebuild the worker's highlighter/theme after a theme change.
     SetTheme(Box<Theme>),
-    /// Rebuild the worker's highlighter with updated syntax definitions.
-    SetExtraSyntaxes(Vec<ExtraSyntax>),
     /// Test-only: echoed back once the worker has drained every request
     /// queued ahead of it, giving `App::pump_loads` a deterministic
     /// completion signal instead of a silence-based timeout.
@@ -580,27 +576,18 @@ pub(super) struct Loader {
 }
 
 impl Loader {
-    pub fn new(
-        theme: &Theme,
-        extra_syntaxes: Vec<ExtraSyntax>,
-        prettify_size_limit: usize,
-    ) -> Self {
+    pub fn new(theme: &Theme, prettify_size_limit: usize) -> Self {
         let (req_tx, req_rx) = std::sync::mpsc::channel::<LoadRequest>();
         let (res_tx, res_rx) = std::sync::mpsc::channel::<LoadResponse>();
-        let mut extra_for_thread = Arc::new(extra_syntaxes);
         let mut theme = theme.clone();
         let handle = std::thread::spawn(move || {
-            let mut hl = Highlighter::with_extra_syntaxes(&theme.syntax, &extra_for_thread);
+            let mut hl = Highlighter::new(&theme.syntax);
             while let Ok(req) = req_rx.recv() {
                 match req {
                     LoadRequest::Shutdown => break,
                     LoadRequest::SetTheme(t) => {
                         theme = *t;
-                        hl = Highlighter::with_extra_syntaxes(&theme.syntax, &extra_for_thread);
-                    }
-                    LoadRequest::SetExtraSyntaxes(extra) => {
-                        extra_for_thread = Arc::new(extra);
-                        hl = Highlighter::with_extra_syntaxes(&theme.syntax, &extra_for_thread);
+                        hl = Highlighter::new(&theme.syntax);
                     }
                     LoadRequest::File { seq, path } => {
                         let load = Box::new(compute_file_load(&path, &hl, prettify_size_limit));

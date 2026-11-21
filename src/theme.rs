@@ -19,7 +19,7 @@ use std::sync::{OnceLock, RwLock};
 use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
 
-use crate::plugin::types::DiagnosticSeverity;
+use crate::code_intel::DiagnosticSeverity;
 
 /// The valid semantic color-role names accepted by feature metadata that
 /// references theme roles by name (e.g. the `[statusbar.colors]` overrides).

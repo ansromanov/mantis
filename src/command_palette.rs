@@ -40,7 +40,6 @@ use fuzzy_matcher::skim::SkimMatcherV2;
 use crate::actions::ACTIONS;
 use crate::config::Keymap;
 use crate::list_picker::ListPicker;
-use crate::plugin::PluginCommand;
 use crate::search::fuzzy_refilter;
 use crate::search::{DiagnosticPicker, GotoLineState, SearchState, SymbolPicker};
 
@@ -171,7 +170,6 @@ impl Default for CommandPalette {
             Vec::new(),
             0,
             vec![None; COMMANDS.len()],
-            Vec::new(),
         )
     }
 }
@@ -182,18 +180,8 @@ impl CommandPalette {
         base_order: Vec<usize>,
         base_pinned: usize,
         inapplicability_reasons: Vec<Option<&'static str>>,
-        plugin_commands: Vec<PluginCommand>,
     ) -> Self {
-        // Build combined command list: built-in COMMANDS + plugin commands.
-        let mut all_commands: Vec<CommandEntry> = COMMANDS.to_vec();
-        for pc in &plugin_commands {
-            all_commands.push(CommandEntry {
-                name: pc.name.clone(),
-                action_id: pc.id.clone(),
-                category: pc.category.clone(),
-                description: pc.description.clone(),
-            });
-        }
+        let all_commands: Vec<CommandEntry> = COMMANDS.to_vec();
         let total = all_commands.len();
         let static_count = COMMANDS.len();
 

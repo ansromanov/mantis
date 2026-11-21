@@ -29,7 +29,6 @@ use crate::sys_info;
 pub struct DiagnosticReport {
     // Application.
     pub app_version: &'static str,
-    pub target_triple: &'static str,
     pub release_date: Option<String>,
     // Operating system.
     pub os: &'static str,
@@ -69,7 +68,6 @@ pub struct DiagnosticReport {
     // Configuration (key paths that differ from defaults; values omitted).
     pub theme: Option<String>,
     pub config_overrides: Vec<String>,
-    pub plugin_count: usize,
     pub telemetry_enabled: bool,
     pub body: String,
 }
@@ -90,7 +88,6 @@ impl DiagnosticReport {
         DiagnosticReport {
             body,
             app_version: env!("CARGO_PKG_VERSION"),
-            target_triple: env!("TARGET"),
             release_date: crate::release_info::RELEASE
                 .as_ref()
                 .map(|r| r.date.clone()),
@@ -132,7 +129,6 @@ impl DiagnosticReport {
             file_uses_mmap: app.virtual_file.is_some(),
             theme: app.config.theme.name.clone(),
             config_overrides: changed_config_paths(&app.config),
-            plugin_count: app.config.plugins.len(),
             telemetry_enabled: app.telemetry.is_enabled(),
         }
     }
@@ -151,7 +147,6 @@ impl DiagnosticReport {
         }
         md.push_str(&format!(
             "- **app version**: {}\n\
-             - **target**: {}\n\
              - **release date**: {}\n\
              - **os**: {} ({} / {})\n\
              - **arch**: {}\n\
@@ -159,7 +154,6 @@ impl DiagnosticReport {
              - **terminal**: term={} colorterm={} prog={} prog_ver={} wt={} ssh={}\n\
              - **size**: {}\n",
             self.app_version,
-            self.target_triple,
             opt(&self.release_date),
             self.os,
             opt(&self.os_version),
@@ -220,7 +214,6 @@ impl DiagnosticReport {
                 self.config_overrides.join(", ")
             }
         ));
-        md.push_str(&format!("- **plugins**: {}\n", self.plugin_count));
         md.push_str(&format!(
             "- **telemetry**: {}\n",
             if self.telemetry_enabled {
@@ -256,8 +249,7 @@ impl DiagnosticReport {
 
 /// Dotted key paths where `cfg` differs from `Config::default()`. Only the
 /// *paths* are reported, never the values, so string-typed settings cannot
-/// leak. The `plugins` table is collapsed to a single `plugins` entry because
-/// its keys are user-chosen plugin names.
+/// leak.
 fn changed_config_paths(cfg: &Config) -> Vec<String> {
     let (Ok(current), Ok(default)) = (
         toml::Value::try_from(cfg.clone()),
@@ -280,12 +272,6 @@ fn diff_value(prefix: &str, current: &toml::Value, default: &toml::Value, out: &
                 } else {
                     format!("{prefix}.{key}")
                 };
-                if path == "plugins" {
-                    if !matches!(value, toml::Value::Table(t) if t.is_empty()) {
-                        out.push("plugins".to_string());
-                    }
-                    continue;
-                }
                 match def.get(key) {
                     Some(default_value) => diff_value(&path, value, default_value, out),
                     None => out.push(path),

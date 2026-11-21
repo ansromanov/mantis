@@ -184,7 +184,6 @@ These work no matter which panel is focused.
 | `.` (tree)             | Toggle hidden files     |
 | `H` (tree)             | Git history of current file |
 | `Ctrl+O`               | Recent files (jump to a recently opened file) |
-| `p` (tree)             | Plugin palette (enable/disable plugins) |
 | `Ctrl+g`               | Go to line              |
 | `O` (content)          | Open the symbol outline (when a provider supplies symbols) |
 | `!` (content)          | Open diagnostics for the current file (when available) |
@@ -230,7 +229,7 @@ When full-file blame is toggled on (`Ctrl+b`), the tree panel is replaced by a d
 | `B`            | Blame the active line        |
 | `/`            | In-file search               |
 | `n`/`N`        | Next / previous hunk (in a diff) |
-| `M`            | Toggle raw/rendered markdown (provided by markdown plugin) |
+| `M`            | Toggle raw/rendered markdown |
 
 Word wrap, line numbers, JSON pretty-print, CSV/TSV table view, side-by-side diff, and the
 staged/unstaged diff cycle have no default content-pane key — use the command
@@ -240,11 +239,11 @@ palette (`Ctrl+P`) or bind one yourself in `mantis.toml`.
 
 `.csv` and `.tsv` files are parsed (supporting RFC 4180 quotes and escaped characters) and rendered as aligned tables with Unicode box-drawing borders and headers. Like JSON pretty-printing, table formatting respects `prettify_size_limit` (files exceeding the limit show as raw text). You can toggle between table view and raw text using the command palette (`Ctrl+P` → "Toggle CSV/TSV table view") or by binding `toggle_table_view` in `mantis.toml`. Wide tables can be scrolled horizontally with `Left`/`Right`.
 
-### Rendered plugin content and line numbers
+### Rendered markdown and line numbers
 
-`mantis` has no built-in markdown renderer; install and enable the `markdown` plugin (`p` in-app, or `[plugins.markdown]` in `mantis.toml`) for rendered Markdown. When a plugin renders a file's content, line numbers are hidden in the gutter. This is by design: rendered content collapses blank lines, strips code fences, and restructures formatting, so rendered-line numbers don't correspond to source-file line numbers.
+Markdown files (`.md`, `.markdown`) are rendered by a built-in renderer: headings, lists, block quotes, code blocks and tables are styled with the active theme, and the rendered view is already on screen the moment the file opens. Line numbers are hidden in the gutter for the rendered view, because rendered content collapses blank lines, strips code fences and restructures formatting, so rendered-line numbers don't correspond to source-file line numbers.
 
-When the markdown plugin is active and rendering a file, you can press `M` (or run "Toggle markdown render (markdown plugin)" from the command palette) to toggle between the raw file content and the rendered view.
+Press `M` (or run "Toggle markdown render" from the command palette) to switch between the raw file and the rendered view. Files larger than 2 MiB are shown raw.
 
 ## Git features
 
@@ -418,23 +417,14 @@ the status-bar width limit cannot be clicked.
 
 Press `Space` to fold or unfold the block at the cursor. A fold gutter appears
 in the content pane when foldable regions are detected, and the status bar shows
-fold stats. Fold regions come from two sources: a built-in YAML indentation
-detector, and language plugins that supply per-file-type regions over the
-[plugin protocol](plugins.md). Plugin regions override the built-in output for
-their file extension.
+fold stats. Fold regions are computed while the file loads, so they are present
+on the first frame. Built-in detectors cover YAML (by indentation), Rust, Go,
+CSS/SCSS/Less, JavaScript/TypeScript (brace blocks), Python (indentation), shell
+scripts, Terraform/HCL (blocks; comments, quoted strings and heredocs are
+ignored), Go/Helm/Jinja templates, and JSON.
 
-Note that folding for a mainstream language like Rust (`.rs`) or Go (`.go`) can be
-provided by a language provider plugin — the bundled `rust` and `go` plugins register
-this way. You must explicitly enable such plugins in `mantis.toml` (or via the plugin
-manager popup) for folding to work on those files.
-
-Objects and arrays in `.json` files can be folded the same way, via the bundled
-`json` plugin (also opt-in). It folds against the pretty-printed view below, so
+Objects and arrays in `.json` files fold against the pretty-printed view, so
 regions line up whether or not the file was originally minified.
-
-Terraform / HCL files (`.tf`, `.tfvars`, `.hcl`) fold via the bundled
-`terraform` language provider plugin, which detects HCL blocks while ignoring
-`#`/`//`/`/* */` comments, quoted strings, and heredocs.
 
 INI-family files (`.ini`, `.service`, `.timer`, `.conf`, `.properties`, `.cfg`,
 `.desktop`) fold by section. SQL files (`.sql`) fold multiline statements and
@@ -447,8 +437,6 @@ Viewing a JSON file? Use the command palette (`Ctrl+P` → "Toggle JSON
 pretty-print") to reformat it with indentation for easier reading, and again
 to return to the raw text. Handy for minified `.json`. There's no default key
 for this — bind `toggle_pretty_json` in `mantis.toml` if you want one.
-JSON pretty-printing itself is always core, not a plugin concern — the `json`
-plugin only adds fold regions on top of it.
 
 ## JSON Lines
 

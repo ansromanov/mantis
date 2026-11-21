@@ -1,9 +1,8 @@
 //! App construction: `App::new` and its helpers.
 //!
 //! Building the app requires walking the root directory, loading git status,
-//! resolving the theme, seeding bundled plugins, discovering plugin manifests,
-//! constructing the highlighter and loader, spawning the plugin subprocess
-//! manager, and applying any persisted session state on top of the config.
+//! resolving the theme, constructing the highlighter and loader, and applying
+//! any persisted session state on top of the config.
 //! This module isolates the constructor so the main `App` struct definition
 //! in `mod.rs` stays focused on the data model.
 
@@ -13,7 +12,6 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use crate::highlight::Highlighter;
-use crate::plugin::{self, PluginManager};
 use crate::tree::build_visible;
 
 use super::loader::Loader;
@@ -24,7 +22,7 @@ impl App {
     /// the theme, and opens the first selected file.
     pub fn new(
         root: PathBuf,
-        mut cfg: crate::config::Config,
+        cfg: crate::config::Config,
         config_path: Option<std::path::PathBuf>,
         config_error: Option<String>,
     ) -> anyhow::Result<Self> {
@@ -59,47 +57,10 @@ impl App {
         );
         let theme = cfg.theme.resolve();
 
-        // Ensure bundled plugins and syntaxes are installed to the plugin directory.
-        plugin::install_bundled_plugins();
-
-        // Seed bundled plugins into the config map (insert-if-absent) so the
-        // plugin palette shows them even when mantis.toml has no [plugins] section.
-        for (name, entry) in plugin::bundled_plugin_entries() {
-            cfg.plugins.entry(name).or_insert(entry);
-        }
-
-        // Discover plugins from the plugin directory via plugin.toml manifests.
-        // Explicit mantis.toml entries win on name collision; discovered plugins
-        // default to disabled so no freshly fetched code runs without user opt-in.
-        for (name, entry) in plugin::manifest::discover(&plugin::default_plugin_dir()) {
-            cfg.plugins.entry(name).or_insert(entry);
-        }
-
         let saved_config = cfg.clone();
 
-        // Collect extra syntax definitions from plugins before constructing
-        // the highlighter and loader (they need them at creation time).
-        let mut plugin_entries: Vec<_> = cfg.plugins.clone().into_iter().collect();
-        plugin_entries.sort_by(|a, b| a.0.cmp(&b.0));
-        let extra_syntaxes = plugin::load_extra_syntaxes(&plugin_entries);
-
-        let highlighter = Highlighter::with_extra_syntaxes(&theme.syntax, &extra_syntaxes);
-        let loader = Loader::new(
-            &theme,
-            extra_syntaxes.clone(),
-            cfg.content.prettify_size_limit,
-        );
-
-        // Syntax plugins go to the highlighter AND the manager (so they appear
-        // in the plugin palette). The manager skips non-Process entries in
-        // activate_all/activate_one.
-        let mut plugin_manager = PluginManager::new(plugin_entries);
-        plugin_manager.activate_all(cfg.theme.name.as_deref(), &theme);
-        let plugin_spawn_error = plugin_manager
-            .take_spawn_errors()
-            .into_iter()
-            .next()
-            .map(|e| format!("[plugin] {e}"));
+        let highlighter = Highlighter::new(&theme.syntax);
+        let loader = Loader::new(&theme, cfg.content.prettify_size_limit);
         let (new_version_available, update_rx) =
             crate::update::check_for_updates(cfg.updates.check);
 
@@ -160,9 +121,6 @@ impl App {
             history: None,
             repo_log: None,
             theme_picker: None,
-            plugin_picker: None,
-            plugin_picker_area: ratatui::layout::Rect::default(),
-            plugin_picker_offset: 0,
             recent_ring: Vec::new(),
             recent_files: None,
             bookmark_paths: Vec::new(),
@@ -222,10 +180,6 @@ impl App {
             show_file_info: cfg.content.show_file_info,
             indent_guides: cfg.tree.indent_guides,
             icons_enabled: cfg.tree.icons,
-            icon_map: HashMap::new(),
-            icon_dir_open: String::new(),
-            icon_dir_closed: String::new(),
-            icon_fallback: String::new(),
             keys: cfg.keys,
             config_baseline: saved_config.clone(),
             config: saved_config,
@@ -258,7 +212,6 @@ impl App {
             last_breadcrumb_click: None,
             content_scrolled_at: Instant::now() - std::time::Duration::from_secs(10),
             highlighter,
-            extra_syntaxes,
             last_refresh: Instant::now(),
             file_watcher: None,
             file_watch_rx: None,
@@ -269,8 +222,6 @@ impl App {
             config_watch_rx: None,
             config_dirty: false,
             config_dirty_at: None,
-            pending_content_cursor: None,
-            content_cursor_dirty_at: None,
             tree_dirty: false,
             tree_dirty_at: None,
             selection: None,
@@ -280,13 +231,10 @@ impl App {
             needs_clear: false,
             fold_regions: Vec::new(),
             folded: HashSet::new(),
-            plugin_fold_regions: HashMap::new(),
-            plugin_status_facts: HashMap::new(),
-            plugin_symbols: HashMap::new(),
-            plugin_diagnostics: HashMap::new(),
-            plugin_diagnostic_lines: HashMap::new(),
+            symbols: HashMap::new(),
+            file_diagnostics: HashMap::new(),
+            file_diagnostic_lines: HashMap::new(),
             diagnostic_owners: HashMap::new(),
-            pending_diagnostic_requests: HashMap::new(),
             latest_diagnostic_requests: HashMap::new(),
             fold_display_map: Vec::new(),
             fold_gutter_rows: Vec::new(),
@@ -297,20 +245,12 @@ impl App {
             load_seq: 0,
             loading: false,
             git_seq: 0,
-            plugin_manager,
-            plugin_is_opening_file: false,
-            plugin_message: plugin_spawn_error,
-            plugin_error: None,
-            pending_keypress: None,
-            pending_keypress_handled: false,
-            plugin_contributions: HashMap::new(),
-            plugin_content: HashMap::new(),
-            plugin_content_text: HashMap::new(),
-            plugin_content_streams: HashMap::new(),
+            rendered_content: HashMap::new(),
+            rendered_text: HashMap::new(),
             cursor_positions: HashMap::new(),
-            plugin_content_active: false,
+            rendered_active: false,
             show_raw_markdown: false,
-            plugin_content_active_path: None,
+            rendered_active_path: None,
             status_message: None,
             breadcrumb_areas: Vec::new(),
             content_highlight_cache: RefCell::new(None),

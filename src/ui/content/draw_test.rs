@@ -111,11 +111,11 @@ fn wrapped_plugin_content_scrolls_by_visual_row() {
     let chars: String = (0..80).map(|i| char::from(b'a' + (i % 26) as u8)).collect();
     let rendered = format!("{chars}{chars}");
     app.current_file = Some(path.clone());
-    app.plugin_content.insert(
+    app.rendered_content.insert(
         path.clone(),
         vec![vec![(ratatui::style::Style::default(), rendered.clone())]],
     );
-    app.plugin_content_text.insert(path, vec![rendered]);
+    app.rendered_text.insert(path, vec![rendered]);
     app.word_wrap = true;
 
     let backend = TestBackend::new(20, 6);
@@ -396,14 +396,14 @@ fn plugin_content_is_rendered_for_current_file() {
     let mut app = app_for(&root);
     let path = root.join("long.txt");
     app.open_file(&path);
-    app.plugin_content.insert(
+    app.rendered_content.insert(
         path.clone(),
         vec![vec![(
             ratatui::style::Style::default(),
             "PLUGIN_RENDERED_MARKER".to_string(),
         )]],
     );
-    app.plugin_content_text
+    app.rendered_text
         .insert(path, vec!["PLUGIN_RENDERED_MARKER".to_string()]);
     let out = render_to_string(&mut app);
     assert!(
@@ -465,7 +465,7 @@ fn plugin_content_no_line_number_gutter() {
     app.open_file(&path);
     app.show_line_numbers = true;
     // Install plugin content.
-    app.plugin_content.insert(
+    app.rendered_content.insert(
         path.clone(),
         vec![
             vec![(
@@ -478,7 +478,7 @@ fn plugin_content_no_line_number_gutter() {
             )],
         ],
     );
-    app.plugin_content_text.insert(
+    app.rendered_text.insert(
         path,
         vec!["PLUGIN LINE 1".to_string(), "PLUGIN LINE 2".to_string()],
     );

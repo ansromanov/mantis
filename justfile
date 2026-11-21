@@ -59,7 +59,7 @@ fmt-check:
 
 # lint with clippy
 clippy:
-    cargo clippy --lib --bins --tests -- -D warnings
+    cargo clippy --all-targets -- -D warnings
 
 # run performance benchmarks
 bench *args:

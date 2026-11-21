@@ -598,7 +598,6 @@ fn canonical_action_ids_resolve_bindings() {
         "recent_files",
         "toggle_bookmark",
         "bookmarks",
-        "plugin_picker",
         "goto_line",
     ] {
         assert!(

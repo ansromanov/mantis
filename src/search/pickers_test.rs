@@ -3,14 +3,14 @@ use super::*;
 #[test]
 fn symbol_picker_fuzzy_filters_and_keeps_nested_cursor_symbol_selected() {
     let symbols = vec![
-        crate::plugin::types::Symbol {
+        crate::code_intel::Symbol {
             name: "Service".into(),
             kind: "struct".into(),
             line: 0,
             end_line: Some(10),
             parent: None,
         },
-        crate::plugin::types::Symbol {
+        crate::code_intel::Symbol {
             name: "run".into(),
             kind: "method".into(),
             line: 3,
@@ -36,21 +36,21 @@ fn symbol_picker_fuzzy_filters_and_keeps_nested_cursor_symbol_selected() {
 #[test]
 fn diagnostic_picker_filters_source_and_message_and_clamps_selection() {
     let diagnostics = vec![
-        crate::plugin::types::Diagnostic {
+        crate::code_intel::Diagnostic {
             line: 4,
             column: 2,
             end_line: None,
             end_column: None,
-            severity: crate::plugin::types::DiagnosticSeverity::Warning,
+            severity: crate::code_intel::DiagnosticSeverity::Warning,
             message: "unused variable name".into(),
             source: "ruff:F841".into(),
         },
-        crate::plugin::types::Diagnostic {
+        crate::code_intel::Diagnostic {
             line: 8,
             column: 0,
             end_line: Some(8),
             end_column: Some(12),
-            severity: crate::plugin::types::DiagnosticSeverity::Error,
+            severity: crate::code_intel::DiagnosticSeverity::Error,
             message: "undefined name".into(),
             source: "ruff:F821".into(),
         },
@@ -772,47 +772,6 @@ fn tree_filter_pop_rebuilds_regex() {
 }
 
 // -- PluginPicker ------------------------------------------------------------
-
-#[test]
-fn plugin_picker_new_stores_entries_and_starts_selected_at_zero() {
-    let entries = vec![
-        (
-            "alpha".to_string(),
-            true,
-            crate::plugin::PluginKind::Process,
-            None,
-        ),
-        (
-            "beta".to_string(),
-            false,
-            crate::plugin::PluginKind::Process,
-            Some("panic: oh no".to_string()),
-        ),
-    ];
-    let picker = PluginPicker::new(entries.clone());
-    assert_eq!(picker.entries, entries);
-    assert_eq!(picker.selected, 0);
-}
-
-#[test]
-fn plugin_picker_entries_carry_crash_badge_only_for_dead_plugins() {
-    let picker = PluginPicker::new(vec![
-        (
-            "running".to_string(),
-            true,
-            crate::plugin::PluginKind::Process,
-            None,
-        ),
-        (
-            "crashed".to_string(),
-            false,
-            crate::plugin::PluginKind::Process,
-            Some("exited unexpectedly".to_string()),
-        ),
-    ]);
-    assert_eq!(picker.entries[0].3, None);
-    assert_eq!(picker.entries[1].3.as_deref(), Some("exited unexpectedly"));
-}
 
 // -- fuzzy_refilter integration (new return type) -----------------------------
 

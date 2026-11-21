@@ -31,6 +31,7 @@ use crate::workspace::Tabs;
 mod actions;
 mod ansi;
 mod app;
+mod code_intel;
 mod command_palette;
 mod command_usage;
 mod config;
@@ -45,6 +46,7 @@ mod fold_detectors;
 mod git;
 mod graphics;
 mod highlight;
+mod icons;
 mod json_path;
 #[allow(dead_code)]
 mod json_query;
@@ -52,7 +54,6 @@ mod jsonl;
 mod list_picker;
 mod markdown;
 mod pager;
-mod plugin;
 mod release_info;
 mod scroll;
 mod search;
@@ -572,12 +573,6 @@ fn run_app(
 
     // Persist every tab's session and the workspace manifest.
     tabs.save_all_and_persist_workspace();
-
-    // Notify plugins of quit on every exit path, then shut them down.
-    for app in &mut tabs.apps {
-        app.plugin_manager.on_quit();
-        app.plugin_manager.deactivate_all();
-    }
 
     loop_result?;
 

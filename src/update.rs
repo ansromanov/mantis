@@ -18,9 +18,7 @@ pub struct UpdateCache {
 
 /// Resolves the update cache path, located next to the user's config file.
 pub fn get_cache_path() -> Option<PathBuf> {
-    crate::plugin::default_plugin_dir()
-        .parent()
-        .map(|p| p.join(".update_cache"))
+    crate::config::config_dir().map(|p| p.join(".update_cache"))
 }
 
 /// Reads the update cache file.

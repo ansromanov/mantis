@@ -232,10 +232,6 @@ impl App {
             self.handle_theme_mouse(ev);
             return;
         }
-        if self.plugin_picker.is_some() {
-            self.handle_plugin_mouse(ev);
-            return;
-        }
         if self.command_palette.is_some() {
             self.handle_command_palette_mouse(ev);
             return;
@@ -700,10 +696,6 @@ impl App {
                     self.mark_content_scrolled();
                 }
             }
-            "plugin_picker" => {
-                let entries = self.plugin_manager.plugin_entries();
-                self.plugin_picker = Some(crate::search::PluginPicker::new(entries));
-            }
             "show_about" => self.show_about = !self.show_about,
             "copy_path" => {
                 self.focus = Focus::Content;
@@ -864,16 +856,6 @@ impl App {
                 crate::command_palette::PaletteRoute::Diagnostics => {
                     self.dispatch_palette_diagnostic()
                 }
-            }
-        }
-    }
-
-    /// Handles mouse events on the plugin picker overlay: close on click
-    /// outside the popup area.
-    fn handle_plugin_mouse(&mut self, ev: MouseEvent) {
-        if let MouseEventKind::Down(MouseButton::Left) = ev.kind {
-            if !rect_contains(self.plugin_picker_area, ev.column, ev.row) {
-                self.plugin_picker = None;
             }
         }
     }

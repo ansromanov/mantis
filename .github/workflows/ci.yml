@@ -34,10 +34,10 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Clippy
-        run: cargo clippy --lib --bins --tests -- -D warnings
+        run: cargo clippy --all-targets -- -D warnings
 
       - name: Tests
-        run: cargo nextest run --profile ci --workspace
+        run: cargo nextest run --profile ci
 
       - name: E2E smoke test
         run: python3 scripts/ci-e2e.py

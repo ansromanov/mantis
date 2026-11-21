@@ -172,7 +172,6 @@ impl App {
             self.last_open_source = crate::telemetry::FileSourceKind::Tree;
             self.request_open_file(path);
         }
-        self.plugin_manager.on_selection_change(Some(path));
     }
 
     /// Toggles git mode on/off. Enabling git mode fetches git status (async in
@@ -311,7 +310,6 @@ impl App {
             } else {
                 self.request_open_file(&p);
             }
-            self.plugin_manager.on_selection_change(Some(&p));
         }
     }
 
@@ -401,8 +399,7 @@ impl App {
         self.file_watcher = None;
         self.file_watch_rx = None;
         self.file_watch_path = None;
-        self.plugin_content_active_path = None;
-        self.plugin_contributions.clear();
+        self.rendered_active_path = None;
         self.load_seq = self.load_seq.wrapping_add(1);
         if self.git_status_enabled {
             self.request_git_status_refresh();
@@ -413,10 +410,6 @@ impl App {
         self.rebuild(false);
         self.tree_selected = 0;
         self.scroll_tree_into_view();
-        if let Some(node) = self.nodes.get(self.tree_selected) {
-            self.plugin_manager
-                .on_selection_change(Some(node.path.as_path()));
-        }
     }
 
     /// Collapses every expanded directory, resetting the tree to its top-level
@@ -447,10 +440,6 @@ impl App {
             }
         }
         self.scroll_tree_into_view();
-        if let Some(node) = self.nodes.get(self.tree_selected) {
-            self.plugin_manager
-                .on_selection_change(Some(node.path.as_path()));
-        }
     }
 
     /// Expands every directory in the tree so all files are visible. The
@@ -464,10 +453,6 @@ impl App {
         self.mark_session_dirty();
         self.rebuild(true);
         self.scroll_tree_into_view();
-        if let Some(node) = self.nodes.get(self.tree_selected) {
-            self.plugin_manager
-                .on_selection_change(Some(node.path.as_path()));
-        }
     }
 
     /// Moves the tree selection "up" one directory level: navigates to the

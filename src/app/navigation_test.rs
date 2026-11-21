@@ -332,39 +332,11 @@ fn descend_to_selected_clears_plugin_content() {
     let root = deep_tree();
     let mut app = app_for(&root);
     let path = root.join("top.txt");
-    app.plugin_content.insert(
+    app.rendered_content.insert(
         path.clone(),
         vec![vec![(ratatui::style::Style::default(), "x".to_string())]],
     );
-    app.plugin_content_text.insert(path, vec!["x".to_string()]);
-
-    let sub1_idx = app
-        .nodes
-        .iter()
-        .position(|n| n.is_dir && n.path == root.join("sub1"))
-        .expect("sub1 dir should exist");
-    app.tree_selected = sub1_idx;
-    app.descend_to_selected();
-
-    assert!(app.plugin_content.is_empty(), "plugin_content must clear");
-    assert!(
-        app.plugin_content_text.is_empty(),
-        "plugin_content_text must clear"
-    );
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn descend_to_selected_clears_plugin_contributions() {
-    // Root change must drop per-plugin contribution tracking for the old tree;
-    // otherwise teardown after a root switch would target stale paths.
-    use crate::plugin::PluginContributions;
-    let root = deep_tree();
-    let mut app = app_for(&root);
-    let mut contrib = PluginContributions::default();
-    contrib.content_paths.insert(root.join("top.txt"));
-    app.plugin_contributions
-        .insert("iconize".to_string(), contrib);
+    app.rendered_text.insert(path, vec!["x".to_string()]);
 
     let sub1_idx = app
         .nodes
@@ -375,9 +347,10 @@ fn descend_to_selected_clears_plugin_contributions() {
     app.descend_to_selected();
 
     assert!(
-        app.plugin_contributions.is_empty(),
-        "plugin_contributions must clear on root change"
+        app.rendered_content.is_empty(),
+        "rendered_content must clear"
     );
+    assert!(app.rendered_text.is_empty(), "rendered_text must clear");
     fs::remove_dir_all(&root).ok();
 }
 
@@ -888,11 +861,11 @@ fn set_root_clears_plugin_content_active_path() {
         .position(|n| n.path == sub.join("c.txt"))
         .expect("c.txt node");
     app.tree_selected = file_idx;
-    app.plugin_content_active_path = Some(sub.join("c.txt"));
+    app.rendered_active_path = Some(sub.join("c.txt"));
     app.tree_up_dir();
     assert!(
-        app.plugin_content_active_path.is_none(),
-        "set_root must clear plugin_content_active_path so the next plugin render is treated as first-render"
+        app.rendered_active_path.is_none(),
+        "set_root must clear rendered_active_path so the next plugin render is treated as first-render"
     );
     fs::remove_dir_all(&orig_root).ok();
 }
@@ -1023,25 +996,24 @@ fn rebuild_empty_git_mode_clears_plugin_content() {
     app.open_file(&path);
     app.current_file = Some(path.clone());
     app.content = vec!["original".to_string()];
-    app.plugin_content.insert(
+    app.rendered_content.insert(
         path.clone(),
         vec![vec![(
             ratatui::style::Style::default(),
             "plugin".to_string(),
         )]],
     );
-    app.plugin_content_text
-        .insert(path, vec!["plugin".to_string()]);
+    app.rendered_text.insert(path, vec!["plugin".to_string()]);
     app.git_mode = true;
     app.git_status_map.clear();
     app.rebuild(false);
     assert!(
-        app.plugin_content.is_empty(),
-        "rebuild with empty git set must clear plugin_content"
+        app.rendered_content.is_empty(),
+        "rebuild with empty git set must clear rendered_content"
     );
     assert!(
-        app.plugin_content_text.is_empty(),
-        "rebuild with empty git set must clear plugin_content_text"
+        app.rendered_text.is_empty(),
+        "rebuild with empty git set must clear rendered_text"
     );
     fs::remove_dir_all(&root).ok();
 }

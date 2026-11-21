@@ -50,7 +50,6 @@ fn pinned_entries_show_star_prefix_when_query_empty() {
         order,
         1,
         vec![None; crate::command_palette::COMMANDS.len()],
-        Vec::new(),
     ));
 
     let backend = TestBackend::new(80, 30);
@@ -85,7 +84,6 @@ fn star_prefix_hidden_when_query_is_typed() {
         order,
         1,
         vec![None; crate::command_palette::COMMANDS.len()],
-        Vec::new(),
     );
     // Typing a query disables the pin prefix.
     palette.push('h');
@@ -118,7 +116,6 @@ fn category_label_appears_in_palette_rendering() {
         (0..crate::command_palette::COMMANDS.len()).collect(),
         0,
         vec![None; crate::command_palette::COMMANDS.len()],
-        Vec::new(),
     ));
 
     if let Some(p) = &mut app.command_palette {
@@ -152,7 +149,6 @@ fn description_appears_in_palette_rendering() {
         (0..crate::command_palette::COMMANDS.len()).collect(),
         0,
         vec![None; crate::command_palette::COMMANDS.len()],
-        Vec::new(),
     ));
 
     if let Some(p) = &mut app.command_palette {
@@ -235,7 +231,7 @@ fn symbols_route_renders_symbol_name_and_source_line() {
     let mut palette = CommandPalette::default();
     palette.push('@');
     palette.route_symbols = Some(crate::search::SymbolPicker::new(
-        vec![crate::plugin::types::Symbol {
+        vec![crate::code_intel::Symbol {
             name: "render_tree".into(),
             kind: "function".into(),
             line: 4,
@@ -265,12 +261,12 @@ fn diagnostics_route_renders_message_and_source_line() {
     let mut palette = CommandPalette::default();
     palette.push('!');
     palette.route_diagnostics = Some(crate::search::DiagnosticPicker::new(vec![
-        crate::plugin::types::Diagnostic {
+        crate::code_intel::Diagnostic {
             line: 4,
             column: 1,
             end_line: None,
             end_column: None,
-            severity: crate::plugin::types::DiagnosticSeverity::Error,
+            severity: crate::code_intel::DiagnosticSeverity::Error,
             message: "bad token".into(),
             source: "ruff:E999".into(),
         },

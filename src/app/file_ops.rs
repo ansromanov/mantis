@@ -8,8 +8,6 @@
 //! background `loader` via `compute_file_load`/`compute_diff_load`, with
 //! synchronous variants used at startup and for reloads. It also installs the
 //! per-file watcher so an open file auto-reloads when it changes on disk.
-//! Applying a successful load caches its optional shebang with the plugin
-//! manager before `on_file_open` can produce language-provider actions.
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -283,7 +281,7 @@ impl App {
         self.clear_diagnostics_for_path(path);
         self.current_syntax = None;
         self.mark_session_dirty();
-        self.plugin_content_active = false;
+        self.rendered_active = false;
         self.is_json = false;
         self.show_pretty_json = false;
         self.json_pretty_text = Vec::new();
@@ -306,7 +304,7 @@ impl App {
             self.show_line_blame = false;
             self.jsonl_expanded.clear();
             self.clear_selection();
-            self.plugin_content_active_path = None;
+            self.rendered_active_path = None;
         } else {
             self.clear_selection();
         }
@@ -327,9 +325,6 @@ impl App {
             }
         }
         self.set_file_watch(Some(path));
-        if !self.plugin_is_opening_file {
-            self.plugin_manager.on_file_open(path);
-        }
     }
 
     /// Shows a "[deleted]" placeholder for a file that was removed from the
@@ -343,8 +338,8 @@ impl App {
         self.current_file = Some(path.to_path_buf());
         self.current_syntax = None;
         self.mark_session_dirty();
-        self.plugin_content_active = false;
-        self.plugin_content_active_path = None;
+        self.rendered_active = false;
+        self.rendered_active_path = None;
         self.is_diff = false;
         self.diff_rows = Vec::new();
         self.is_json = false;
@@ -423,8 +418,6 @@ impl App {
     /// selection, then installs the rendered content/highlighting/JSON/YAML
     /// state. Shared by the synchronous and worker-thread code paths.
     pub(super) fn apply_file_load(&mut self, path: &Path, load: FileLoad) {
-        self.plugin_manager
-            .cache_file_shebang(path, if load.ok { load.shebang.clone() } else { None });
         if load.ok {
             let size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
             let size_bucket = crate::telemetry::FileSizeBucket::from_size(size);
@@ -504,7 +497,7 @@ impl App {
             self.active_line = line;
             self.show_line_blame = false;
             self.clear_selection();
-            self.plugin_content_active_path = None;
+            self.rendered_active_path = None;
         } else {
             self.clear_selection();
         }
@@ -564,10 +557,8 @@ impl App {
             self.fold_regions = load.fold_regions;
         }
         if load.ok && path.extension().is_some_and(|e| e == "rs") {
-            self.plugin_symbols.insert(path.to_path_buf(), load.symbols);
+            self.symbols.insert(path.to_path_buf(), load.symbols);
         }
-        // Language provider fold regions override built-in regions.
-        self.apply_plugin_fold_regions(path);
 
         if load.prettify_size_limit_exceeded {
             self.set_status("too large to pretty-print / fold");
@@ -600,15 +591,11 @@ impl App {
             }
             self.current_file = Some(path.to_path_buf());
             self.current_syntax = load.syntax_name;
-            self.plugin_content_active = false;
+            self.rendered_active = false;
             self.set_file_watch(Some(path));
             let is_markdown = crate::file::is_markdown_path(path);
             if is_markdown && !self.show_raw_markdown {
                 self.install_native_markdown(path);
-            }
-            if !self.plugin_is_opening_file {
-                self.plugin_manager.on_file_open(path);
-                self.request_file_diagnostics(path);
             }
             if is_new_file {
                 self.push_recent(path.to_path_buf());
@@ -779,8 +766,8 @@ impl App {
         self.virtual_file = None;
         self.current_file = Some(file.to_path_buf());
         self.mark_session_dirty();
-        self.plugin_content_active = false;
-        self.plugin_content_active_path = None;
+        self.rendered_active = false;
+        self.rendered_active_path = None;
         self.is_json = false;
         self.show_pretty_json = false;
         self.json_pretty_text = Vec::new();

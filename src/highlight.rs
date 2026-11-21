@@ -9,16 +9,15 @@
 //! `base16-ocean.dark` when unknown, and can be swapped when the user changes
 //! themes. Its output feeds both the synchronous and background file-load paths.
 //!
-//! Extra syntax definitions (e.g. from plugins) can be passed via
-//! [`with_extra_syntaxes`]; each is a `.sublime-syntax` file loaded into the
-//! `SyntaxSet` so its file extensions are recognised during highlighting.
+//! Syntaxes syntect lacks (Dockerfile, justfile, nginx, Terraform, TOML,
+//! TypeScript, Go templates) are compiled in from `syntaxes/*.sublime-syntax`
+//! and added to the shared `SyntaxSet` once.
 //!
 //! For well-known filenames that syntect's extension matching can't resolve
 //! (e.g. `Dockerfile`, `Containerfile`, `justfile`, `nginx.conf`),
 //! [`resolve_syntax_for_file`] falls back to a name-based lookup.
 
 use ratatui::style::{Color, Modifier, Style};
-use std::fs;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 use syntect::{
@@ -26,8 +25,6 @@ use syntect::{
     highlighting::{FontStyle, Style as SynStyle, ThemeSet},
     parsing::{SyntaxDefinition, SyntaxReference, SyntaxSet},
 };
-
-use crate::plugin::ExtraSyntax;
 
 /// Wraps a syntect `SyntaxSet` + `ThemeSet` to provide syntax highlighting
 /// for file contents. Compiled once at startup and reused across file opens.
@@ -37,10 +34,46 @@ pub struct Highlighter {
     theme: String,
 }
 
-/// Returns the process-wide default `SyntaxSet`, loading it on first call.
+/// Extra `.sublime-syntax` definitions compiled into the binary, as
+/// `(name, source)`. They cover languages syntect's defaults lack.
+const BUNDLED_SYNTAXES: &[(&str, &str)] = &[
+    (
+        "dockerfile",
+        include_str!("../syntaxes/dockerfile.sublime-syntax"),
+    ),
+    (
+        "gotemplate",
+        include_str!("../syntaxes/gotemplate.sublime-syntax"),
+    ),
+    (
+        "justfile",
+        include_str!("../syntaxes/justfile.sublime-syntax"),
+    ),
+    ("nginx", include_str!("../syntaxes/nginx.sublime-syntax")),
+    (
+        "terraform",
+        include_str!("../syntaxes/terraform.sublime-syntax"),
+    ),
+    ("toml", include_str!("../syntaxes/toml.sublime-syntax")),
+    (
+        "typescript",
+        include_str!("../syntaxes/typescript.sublime-syntax"),
+    ),
+];
+
+/// Returns the process-wide `SyntaxSet` (syntect defaults plus the bundled
+/// extra syntaxes), built on first call.
 fn default_ss() -> &'static Arc<SyntaxSet> {
     static SS: OnceLock<Arc<SyntaxSet>> = OnceLock::new();
-    SS.get_or_init(|| Arc::new(SyntaxSet::load_defaults_nonewlines()))
+    SS.get_or_init(|| {
+        let mut builder = SyntaxSet::load_defaults_nonewlines().into_builder();
+        for (name, source) in BUNDLED_SYNTAXES {
+            if let Ok(def) = SyntaxDefinition::load_from_str(source, false, Some(name)) {
+                builder.add(def);
+            }
+        }
+        Arc::new(builder.build())
+    })
 }
 
 /// Returns the process-wide default `ThemeSet`, loading it on first call.
@@ -50,37 +83,21 @@ fn default_ts() -> &'static Arc<ThemeSet> {
 }
 
 impl Highlighter {
-    /// Builds a highlighter with extra syntax definitions loaded from plugins.
-    /// Each [`ExtraSyntax`] provides a `.sublime-syntax` file path that is
-    /// loaded into the `SyntaxSet` so syntect recognises its file extensions.
-    ///
-    /// When `extra` is empty the process-wide cached `SyntaxSet` and `ThemeSet`
-    /// are reused (Arc clone), so repeated construction is nearly free.
-    pub fn with_extra_syntaxes(theme: &str, extra: &[ExtraSyntax]) -> Self {
+    /// Builds a highlighter for the named syntect theme, falling back to
+    /// `base16-ocean.dark` when the name is unknown. The syntax and theme sets
+    /// are process-wide and shared, so repeated construction is nearly free.
+    pub fn new(theme: &str) -> Self {
         let ts = default_ts().clone();
         let theme = if ts.themes.contains_key(theme) {
             theme.to_string()
         } else {
             "base16-ocean.dark".to_string()
         };
-        let ss = if extra.is_empty() {
-            default_ss().clone()
-        } else {
-            let mut builder = (**default_ss()).clone().into_builder();
-            for extra_syn in extra {
-                if let Ok(s) = fs::read_to_string(&extra_syn.syntax_path) {
-                    if let Ok(def) = SyntaxDefinition::load_from_str(
-                        &s,
-                        false,
-                        extra_syn.syntax_path.file_stem().and_then(|n| n.to_str()),
-                    ) {
-                        builder.add(def);
-                    }
-                }
-            }
-            Arc::new(builder.build())
-        };
-        Highlighter { ss, ts, theme }
+        Highlighter {
+            ss: default_ss().clone(),
+            ts,
+            theme,
+        }
     }
 
     /// Returns the detected syntax name for the given file path, or `None` if

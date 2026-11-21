@@ -77,13 +77,6 @@ fn test_is_toggle_modal() {
 }
 
 #[test]
-fn test_is_toggle_selection() {
-    assert!(is_toggle_selection(&make_key(KeyCode::Char(' '))));
-    assert!(!is_toggle_selection(&make_key(KeyCode::Tab)));
-    assert!(!is_toggle_selection(&make_key(KeyCode::Char('x'))));
-}
-
-#[test]
 fn test_is_open_release() {
     assert!(is_open_release(&make_key(KeyCode::Char('o'))));
     assert!(!is_open_release(&make_key(KeyCode::Char('O'))));

@@ -55,13 +55,9 @@ pub(crate) enum StatusSegment {
     Folds,
     Diagnostics,
     DiagnosticMessage,
-    PluginFacts,
-    PluginContent,
     Message,
-    PluginError,
     Version,
     Update,
-    Plugin { id: String, side: StatusSide },
 }
 
 /// Rendered horizontal bounds and screen row for an actionable status segment.
@@ -82,13 +78,9 @@ impl StatusSegment {
             StatusSegment::Errors => "errors",
             StatusSegment::Folds => "folds",
             StatusSegment::Diagnostics | StatusSegment::DiagnosticMessage => "diagnostics",
-            StatusSegment::PluginFacts => "pluginfacts",
-            StatusSegment::PluginContent => "plugincontent",
             StatusSegment::Message => "message",
-            StatusSegment::PluginError => "pluginerror",
             StatusSegment::Version => "version",
             StatusSegment::Update => "update",
-            StatusSegment::Plugin { id, .. } => id.as_str(),
         }
     }
 
@@ -96,19 +88,14 @@ impl StatusSegment {
     /// (both `left` and `right` are `None`). Explicit mode uses `split_sides`
     /// directly and never calls this.
     fn side(&self) -> StatusSide {
-        match self {
-            StatusSegment::Plugin { side, .. } => *side,
-            _ => {
-                if [
-                    "lnum", "type", "jsonpath", "scope", "git", "version", "update",
-                ]
-                .contains(&self.id_str())
-                {
-                    StatusSide::Right
-                } else {
-                    StatusSide::Left
-                }
-            }
+        if [
+            "lnum", "type", "jsonpath", "scope", "git", "version", "update",
+        ]
+        .contains(&self.id_str())
+        {
+            StatusSide::Right
+        } else {
+            StatusSide::Left
         }
     }
 
@@ -124,10 +111,8 @@ impl StatusSegment {
             }
             StatusSegment::Type => Some("theme_picker"),
             StatusSegment::Folds => Some("fold_all"),
-            StatusSegment::Errors | StatusSegment::PluginError => Some("plugin_picker"),
             StatusSegment::Update => Some("show_about"),
             StatusSegment::FileInfo => Some("copy_path"),
-            StatusSegment::Plugin { .. } => None,
             _ => None,
         }
     }
@@ -355,13 +340,6 @@ fn build_normal_lines(
         };
         segs.push((Span::styled(label, badge), StatusSegment::Badges, P_INFO));
     }
-    if !app.plugin_manager.is_empty() {
-        segs.push((
-            Span::styled(" [plugin]", badge),
-            StatusSegment::Badges,
-            P_INFO,
-        ));
-    }
     if app.is_diff && app.git_mode {
         let key = app.keys().label_for_action("toggle_diff_staged");
         if key.is_empty() {
@@ -433,9 +411,9 @@ fn build_normal_lines(
         if let Some(symbol) = app
             .current_file
             .as_deref()
-            .and_then(|path| app.plugin_symbols.get(path))
+            .and_then(|path| app.symbols.get(path))
             .and_then(|symbols| {
-                crate::plugin::types::enclosing_symbol(
+                crate::code_intel::enclosing_symbol(
                     symbols,
                     app.display_to_physical(app.active_line),
                 )
@@ -504,18 +482,16 @@ fn build_normal_lines(
     let diagnostics = app
         .current_file
         .as_deref()
-        .and_then(|path| app.plugin_diagnostics.get(path))
+        .and_then(|path| app.file_diagnostics.get(path))
         .map(Vec::as_slice)
         .unwrap_or_default();
     let errors = diagnostics
         .iter()
-        .filter(|diagnostic| diagnostic.severity == crate::plugin::types::DiagnosticSeverity::Error)
+        .filter(|diagnostic| diagnostic.severity == crate::code_intel::DiagnosticSeverity::Error)
         .count();
     let warnings = diagnostics
         .iter()
-        .filter(|diagnostic| {
-            diagnostic.severity == crate::plugin::types::DiagnosticSeverity::Warning
-        })
+        .filter(|diagnostic| diagnostic.severity == crate::code_intel::DiagnosticSeverity::Warning)
         .count();
     let informational = diagnostics.len().saturating_sub(errors + warnings);
     if warnings > 0 {
@@ -524,7 +500,7 @@ fn build_normal_lines(
                 format!(" ⚠{warnings}"),
                 base.fg(app
                     .theme
-                    .diagnostic_color(crate::plugin::types::DiagnosticSeverity::Warning)),
+                    .diagnostic_color(crate::code_intel::DiagnosticSeverity::Warning)),
             ),
             StatusSegment::Diagnostics,
             P_ERR,
@@ -536,7 +512,7 @@ fn build_normal_lines(
                 format!(" ✖{errors}"),
                 base.fg(app
                     .theme
-                    .diagnostic_color(crate::plugin::types::DiagnosticSeverity::Error)),
+                    .diagnostic_color(crate::code_intel::DiagnosticSeverity::Error)),
             ),
             StatusSegment::Diagnostics,
             P_ERR,
@@ -548,7 +524,7 @@ fn build_normal_lines(
                 format!(" ℹ{informational}"),
                 base.fg(app
                     .theme
-                    .diagnostic_color(crate::plugin::types::DiagnosticSeverity::Info)),
+                    .diagnostic_color(crate::code_intel::DiagnosticSeverity::Info)),
             ),
             StatusSegment::Diagnostics,
             P_INFO,
@@ -624,49 +600,7 @@ fn build_normal_lines(
         ));
     }
 
-    // -- Priority 2: plugin-supplied status facts (`set_status_facts`) --
-    if let Some(facts) = app
-        .current_file
-        .as_deref()
-        .and_then(|p| app.plugin_status_facts.get(p))
-    {
-        segs.push((
-            Span::styled(format!(" [{facts}]"), base.fg(app.theme.accent)),
-            StatusSegment::PluginFacts,
-            P_INFO,
-        ));
-    }
-
-    // -- Streamed plugin content progress / partial result state --
-    if let Some((plugin, stream)) = app
-        .current_file
-        .as_deref()
-        .and_then(|path| app.plugin_content_streams.get(path))
-    {
-        let state = if stream.is_active() {
-            "rendering"
-        } else if stream.is_incomplete() {
-            "incomplete"
-        } else {
-            ""
-        };
-        if !state.is_empty() {
-            segs.push((
-                Span::styled(format!(" [{plugin}: {state}]"), base.fg(app.theme.accent)),
-                StatusSegment::PluginContent,
-                P_META,
-            ));
-        }
-    }
-
-    // -- Priority 1: plugin / status messages --
-    if let Some(ref msg) = app.plugin_message {
-        segs.push((
-            Span::styled(format!(" {msg}"), base.fg(app.theme.accent)),
-            StatusSegment::Message,
-            P_META,
-        ));
-    }
+    // -- Priority 1: status messages --
     if let Some(ref sm) = app.status_message {
         segs.push((
             Span::styled(format!(" {}", sm.text), base.fg(app.theme.accent)),
@@ -674,18 +608,6 @@ fn build_normal_lines(
             P_META,
         ));
     }
-    // A `plugin_error` action (protocol 3+) is distinct from routine
-    // `show_message` text: it gets error styling and its own (higher)
-    // priority so it survives eliding on narrow terminals alongside the
-    // other error indicators above.
-    if let Some(ref err) = app.plugin_error {
-        segs.push((
-            Span::styled(format!(" {err}"), err_style),
-            StatusSegment::PluginError,
-            P_ERR,
-        ));
-    }
-
     // -- Priority 4: update notice --
     if let Some(ref latest) = app.new_version_available {
         let update_style = base.fg(app.theme.accent_alt).add_modifier(Modifier::BOLD);
@@ -705,28 +627,6 @@ fn build_normal_lines(
         StatusSegment::Version,
         P_VER,
     ));
-
-    // -- Plugin-contributed status segments (`register_status_segments`) --
-    for (_, seg) in app.plugin_manager.all_status_segments() {
-        let side = match seg.side.unwrap_or_default() {
-            crate::plugin::StatusSidePreference::Left => StatusSide::Left,
-            crate::plugin::StatusSidePreference::Right => StatusSide::Right,
-        };
-        let priority = seg.priority.unwrap_or(P_INFO).clamp(1, 5);
-        let span_text = if seg.text.starts_with(' ') {
-            seg.text.clone()
-        } else {
-            format!(" {}", seg.text)
-        };
-        segs.push((
-            Span::styled(span_text, base.fg(app.theme.accent)),
-            StatusSegment::Plugin {
-                id: seg.id.clone(),
-                side,
-            },
-            priority,
-        ));
-    }
 
     let statusbar = &app.config.statusbar;
     if statusbar.height >= 2 {

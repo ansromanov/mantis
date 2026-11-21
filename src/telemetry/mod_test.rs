@@ -38,7 +38,6 @@ fn test_snapshot() -> SessionSnapshot {
         file_is_diff: false,
         file_uses_mmap: false,
         theme: None,
-        plugin_count: 0,
         telemetry_enabled: true,
     }
 }

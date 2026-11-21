@@ -212,10 +212,6 @@ fn draw_area(
         popups::draw_repo_log(f, app, area);
     }
 
-    if app.plugin_picker.is_some() {
-        popups::draw_plugin_picker(f, app, area);
-    }
-
     if app.theme_picker.is_some() {
         popups::draw_theme(f, app, area);
     }

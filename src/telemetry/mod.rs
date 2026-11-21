@@ -48,7 +48,6 @@ pub enum OverlayKind {
     Help,
     About,
     ThemePicker,
-    PluginPicker,
     CommandPalette,
     History,
     RecentFiles,
@@ -175,7 +174,6 @@ pub enum TelemetryEvent {
         file_uses_mmap: bool,
         // ---- Config overview ----
         theme: Option<String>,
-        plugin_count: usize,
         telemetry_enabled: bool,
     },
     SessionEnd {
@@ -192,10 +190,6 @@ pub enum TelemetryEvent {
     },
     FeatureUsed {
         feature: Feature,
-    },
-    PluginToggled {
-        kind: crate::plugin::types::PluginKind,
-        enabled: bool,
     },
     FileOpened {
         size_bucket: FileSizeBucket,
@@ -257,7 +251,6 @@ pub struct SessionSnapshot {
     pub file_uses_mmap: bool,
     // Config overview.
     pub theme: Option<String>,
-    pub plugin_count: usize,
     pub telemetry_enabled: bool,
 }
 
@@ -307,7 +300,6 @@ impl SessionSnapshot {
             file_is_diff: app.is_diff,
             file_uses_mmap: app.virtual_file.is_some(),
             theme: app.config.theme.name.clone(),
-            plugin_count: app.config.plugins.len(),
             telemetry_enabled: app.telemetry.is_enabled(),
         }
     }
@@ -349,7 +341,6 @@ where
                 "highlight_range",
                 "search_refresh",
                 "diff_parse",
-                "plugin_round_trip",
             ];
             if ALLOWED_SPANS.contains(&span.name()) {
                 span.extensions_mut().insert(SpanStart(Instant::now()));
@@ -367,7 +358,6 @@ where
                 "highlight_range",
                 "search_refresh",
                 "diff_parse",
-                "plugin_round_trip",
             ];
             if !ALLOWED_SPANS.contains(&name) {
                 return;
@@ -527,7 +517,6 @@ impl Telemetry {
             file_is_diff: snapshot.file_is_diff,
             file_uses_mmap: snapshot.file_uses_mmap,
             theme: snapshot.theme,
-            plugin_count: snapshot.plugin_count,
             telemetry_enabled: snapshot.telemetry_enabled,
         });
     }

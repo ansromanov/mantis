@@ -34,7 +34,7 @@ fn markdown_is_rendered_synchronously_on_open() {
     let mut app = app_for(&root);
     app.open_file(&md);
     assert!(
-        app.plugin_content_active,
+        app.rendered_active,
         "rendered view must be active as soon as the file is open, with no plugin round trip"
     );
     let first = app.line_text(0).unwrap_or_default();
@@ -56,12 +56,12 @@ fn raw_toggle_shows_source_and_back_again() {
 
     app.toggle_raw_markdown();
     assert!(app.show_raw_markdown);
-    assert!(!app.plugin_content_active);
-    assert_eq!(app.line_text(0).as_deref(), Some("# Title"));
+    assert!(!app.rendered_active);
+    assert_eq!(app.line_text(0), Some("# Title"));
 
     app.toggle_raw_markdown();
     assert!(!app.show_raw_markdown);
-    assert!(app.plugin_content_active);
+    assert!(app.rendered_active);
     assert!(!app.line_text(0).unwrap_or_default().contains('#'));
     fs::remove_dir_all(&root).ok();
 }
@@ -79,7 +79,7 @@ fn same_file_reload_keeps_rendered_view_and_scroll() {
 
     app.reload_content();
 
-    assert!(app.plugin_content_active, "reload must not drop the view");
+    assert!(app.rendered_active, "reload must not drop the view");
     assert_eq!(app.content_scroll, before, "reload must not reset scroll");
     fs::remove_dir_all(&root).ok();
 }
@@ -92,7 +92,7 @@ fn oversized_markdown_falls_back_to_raw() {
     fs::write(&md, line.repeat(2200)).unwrap(); // ~2.2 MB
     let mut app = app_for(&root);
     app.open_file(&md);
-    assert!(!app.plugin_content_active);
+    assert!(!app.rendered_active);
     fs::remove_dir_all(&root).ok();
 }
 
@@ -103,6 +103,6 @@ fn non_markdown_files_are_not_rendered() {
     fs::write(&txt, "# not a heading\n").unwrap();
     let mut app = app_for(&root);
     app.open_file(&txt);
-    assert!(!app.plugin_content_active);
+    assert!(!app.rendered_active);
     fs::remove_dir_all(&root).ok();
 }

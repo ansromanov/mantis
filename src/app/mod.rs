@@ -43,11 +43,9 @@ use crate::config::{self, Config, Keymap};
 use crate::fold::FoldRegion;
 use crate::git::GitStatus;
 use crate::highlight::Highlighter;
-use crate::plugin::{ExtraSyntax, PluginContributions, PluginManager};
 use crate::search::{
-    BugReportState, CommandPalette, GotoLineState, HistoryState, InFileSearch, PluginPicker,
-    RecentFilesState, RepoLogState, RevisionPicker, SearchState, ThemePicker, TreeFilter,
-    WorktreePicker,
+    BugReportState, CommandPalette, GotoLineState, HistoryState, InFileSearch, RecentFilesState,
+    RepoLogState, RevisionPicker, SearchState, ThemePicker, TreeFilter, WorktreePicker,
 };
 use crate::selection::TextSelection;
 use crate::theme::Theme;
@@ -68,8 +66,6 @@ pub(crate) mod menu_bar;
 mod mouse_handlers;
 mod navigation;
 mod pager;
-mod plugin_content;
-mod plugin_ops;
 mod refresh;
 mod types;
 mod util;
@@ -80,7 +76,7 @@ use loader::Loader;
 #[cfg_attr(not(test), allow(unused_imports))]
 pub use context_menu::{ContextActionId, ContextMenuEntry, ContextMenuState, ContextMenuTarget};
 pub use types::{DiffMode, Focus, StatusMessage, TabAction};
-pub(crate) use types::{HighlightCacheKey, HighlightCacheValue, PendingKeypress};
+pub(crate) use types::{HighlightCacheKey, HighlightCacheValue};
 pub(crate) use util::{deleted_set, diff_line_style, rect_contains};
 
 #[derive(Default, Clone, Copy, PartialEq, Eq)]
@@ -88,7 +84,6 @@ pub(crate) struct ActiveOverlays {
     pub help: bool,
     pub about: bool,
     pub theme_picker: bool,
-    pub plugin_picker: bool,
     pub command_palette: bool,
     pub history: bool,
     pub repo_log: bool,
@@ -199,12 +194,6 @@ pub struct App {
     /// is open; `None` otherwise.
     pub repo_log: Option<RepoLogState>,
     pub theme_picker: Option<ThemePicker>,
-    /// State for the plugin manager overlay. `Some` while the picker is open.
-    pub plugin_picker: Option<PluginPicker>,
-    /// Hit area of the plugin list recorded during the last render.
-    pub plugin_picker_area: Rect,
-    /// Scroll offset of the plugin list recorded during the last render.
-    pub plugin_picker_offset: usize,
     /// Persistent ring of recently opened file paths, most-recent-first, capped at
     /// `config.recent_files_count`. Maintained across overlay open/close cycles.
     pub recent_ring: Vec<PathBuf>,
@@ -302,15 +291,6 @@ pub struct App {
     /// a plugin via the `set_icon_map` action; off by default because they
     /// require a Nerd Font in the terminal.
     pub icons_enabled: bool,
-    /// Extension (lowercase) → Nerd Font icon glyph, provided by the iconize
-    /// plugin. Used when `icons_enabled` is true and non-empty.
-    pub icon_map: HashMap<String, String>,
-    /// Folder icon for expanded directories.
-    pub icon_dir_open: String,
-    /// Folder icon for collapsed directories.
-    pub icon_dir_closed: String,
-    /// Fallback icon for file types not in `icon_map`.
-    pub icon_fallback: String,
     keys: Keymap,
     pub config: Config,
     /// The config as last loaded from or written to `config_path`. Saves write
@@ -375,9 +355,6 @@ pub struct App {
     // scrollbar is hidden on first render.
     pub content_scrolled_at: Instant,
     highlighter: Highlighter,
-    /// Syntax definitions loaded from plugins. Kept so `apply_theme` can
-    /// rebuild the highlighter without losing plugin syntax definitions.
-    extra_syntaxes: Vec<ExtraSyntax>,
     last_refresh: Instant,
     file_watcher: Option<RecommendedWatcher>,
     file_watch_rx: Option<Receiver<notify::Result<notify::Event>>>,
@@ -400,10 +377,6 @@ pub struct App {
     /// (e.g. an editor's atomic temp-write-then-rename save) into a single
     /// reload once the config file goes quiet, mirroring `tree_dirty_at`.
     config_dirty_at: Option<Instant>,
-    /// Latest content-cursor position waiting for the debounce window to pass.
-    pub(crate) pending_content_cursor: Option<(PathBuf, usize, usize)>,
-    /// Instant of the latest content-cursor move, used to coalesce key bursts.
-    pub(crate) content_cursor_dirty_at: Option<Instant>,
     /// A relevant root filesystem event was seen and a debounced reload is due.
     tree_dirty: bool,
     /// Instant of the most recent root event, used to debounce bursts (e.g. a
@@ -419,25 +392,15 @@ pub struct App {
     // Folding state (built-in YAML detector or language provider)
     pub fold_regions: Vec<FoldRegion>,
     pub folded: HashSet<usize>,
-    /// Per-path fold regions supplied by language providers via `set_fold_regions`.
-    /// When the named path is the current file, regions are applied immediately.
-    pub plugin_fold_regions: HashMap<PathBuf, Vec<FoldRegion>>,
-    /// Per-path status-bar summary text supplied by language providers via
-    /// `set_status_facts` (protocol 3+). Shown for the current file alongside
-    /// the fold-count segment, parallel to YAML's built-in anchor/alias counts
-    /// but generic to any provider.
-    pub plugin_status_facts: HashMap<PathBuf, String>,
     /// Per-path symbol outlines supplied by language providers via `set_symbols`.
-    pub plugin_symbols: HashMap<PathBuf, Vec<crate::plugin::types::Symbol>>,
+    pub symbols: HashMap<PathBuf, Vec<crate::code_intel::Symbol>>,
     /// Per-path diagnostics returned by the selected language provider.
-    pub plugin_diagnostics: HashMap<PathBuf, Vec<crate::plugin::types::Diagnostic>>,
+    pub file_diagnostics: HashMap<PathBuf, Vec<crate::code_intel::Diagnostic>>,
     /// Highest-severity diagnostic per physical line, precomputed for visible-row rendering.
-    pub plugin_diagnostic_lines:
-        HashMap<PathBuf, HashMap<usize, crate::plugin::types::DiagnosticSeverity>>,
+    pub file_diagnostic_lines:
+        HashMap<PathBuf, HashMap<usize, crate::code_intel::DiagnosticSeverity>>,
     /// Provider owning each path's current diagnostic set.
     pub(crate) diagnostic_owners: HashMap<PathBuf, String>,
-    /// Diagnostic request ids mapped to their file and expected provider.
-    pub(crate) pending_diagnostic_requests: HashMap<u64, (PathBuf, String)>,
     /// Latest outstanding diagnostic request for each path; older replies are ignored.
     pub(crate) latest_diagnostic_requests: HashMap<PathBuf, u64>,
     /// display_line → physical_line mapping; empty when no folds are active.
@@ -484,45 +447,14 @@ pub struct App {
     /// Responses with a lower seq are stale and discarded, which coalesces
     /// rapid root changes / toggles into one scan.
     git_seq: u64,
-    /// Plugin subprocess manager. Spawned at startup, deactivated on quit.
-    pub(crate) plugin_manager: PluginManager,
-    /// Set to `true` while handling a plugin-originated `open_file` action, so
-    /// `apply_file_load` / `apply_diff_load` can suppress the re-emission of
-    /// `on_file_open` back to plugins (breaking the recursion loop).
-    plugin_is_opening_file: bool,
-    /// Most recent plugin message, shown in the status bar.
-    pub plugin_message: Option<String>,
-    /// Most recent `plugin_error` action (protocol 3+), shown in the status
-    /// bar with error styling. Distinct from `plugin_message`, which is for
-    /// routine `show_message` text.
-    pub plugin_error: Option<String>,
-    /// A keypress dispatched to `on_keypress` subscribers, awaiting a
-    /// `key_handled` reply before its deadline (protocol 3+). `None` when no
-    /// keypress is currently in flight. See `key_handlers::mod` for where
-    /// this is set and `refresh::process_pending_keypress` for where it is
-    /// resolved.
-    pub(crate) pending_keypress: Option<PendingKeypress>,
-    /// Set to `true` by the `key_handled` action handler when a reply arrives
-    /// for the current `pending_keypress`. Consumed and reset by
-    /// `process_pending_keypress` on the next tick.
-    pub(crate) pending_keypress_handled: bool,
-    /// Tracks what application state each plugin has contributed so that
-    /// disabling or crashing the plugin tears down exactly its output.
-    /// Populated by `handle_plugin_action` and consumed by
-    /// `teardown_plugin_contributions`.
-    pub(crate) plugin_contributions: HashMap<String, PluginContributions>,
     /// Plugin-rendered content keyed by file path. Populated by the `set_content`
     /// action; the content pane checks this before markdown/virtual-file rendering.
-    pub plugin_content: HashMap<PathBuf, Vec<Vec<(ratatui::style::Style, String)>>>,
+    pub rendered_content: HashMap<PathBuf, Vec<Vec<(ratatui::style::Style, String)>>>,
     /// Plain text of plugin-provided content, keyed by file path (same keys as
-    /// `plugin_content`). Used for in-file search, selection, and blame display.
-    /// Stored separately because `plugin_content` holds styled spans whose text
+    /// `rendered_content`). Used for in-file search, selection, and blame display.
+    /// Stored separately because `rendered_content` holds styled spans whose text
     /// would require joining on every access.
-    pub plugin_content_text: HashMap<PathBuf, Vec<String>>,
-    /// Active or recently completed streamed plugin content, keyed by file path.
-    /// The owner is retained for contribution teardown; the stream keeps its
-    /// content id and reports whether delivery is active or incomplete.
-    pub(crate) plugin_content_streams: HashMap<PathBuf, (String, crate::plugin::ContentStream)>,
+    pub rendered_text: HashMap<PathBuf, Vec<String>>,
     /// Remembered cursor position per file (active_line, content_scroll), so
     /// returning to a previously-viewed file restores where you left off. Session-
     /// scoped (in memory); restart restore of the last file is handled by session.
@@ -530,14 +462,14 @@ pub struct App {
     /// Set to `true` when a plugin sends `set_content` for the current file and
     /// reset to `false` when `current_file` changes, so the `[rendering…]`
     /// placeholder only shows while the plugin is actively working on that file.
-    pub plugin_content_active: bool,
+    pub rendered_active: bool,
     /// When `true`, rendered markdown files are instead displayed as raw plain text natively.
     pub show_raw_markdown: bool,
     /// The last path for which a plugin sent `set_content` while it was the
     /// current file. Used to detect re-renders of the same file vs. first-time
     /// renders of a newly opened file, so scroll position is preserved across
     /// plugin re-render ticks.
-    pub(super) plugin_content_active_path: Option<PathBuf>,
+    pub(super) rendered_active_path: Option<PathBuf>,
     /// Transient status message (e.g. "path copied"), shown until the next keypress
     /// or auto-expires after ~3 seconds.
     pub status_message: Option<StatusMessage>,
@@ -607,139 +539,6 @@ impl App {
         self.session_dirty = false;
         self.session_dirty_at = None;
         self.session_last_save = self.now();
-    }
-
-    /// Tears down all application state produced by the named plugin.
-    ///
-    /// Removes content, fold-region, and icon-map contributions, clears the
-    /// plugin's provider and palette-command registrations, and reloads the current file if the
-    /// plugin had rendered content for it — so the display falls back to core
-    /// rendering (markdown, JSON, or plain text).
-    pub(crate) fn teardown_plugin_contributions(&mut self, name: &str) {
-        let pending_diagnostic_ids: Vec<u64> = self
-            .pending_diagnostic_requests
-            .iter()
-            .filter_map(|(id, (_, provider))| (provider == name).then_some(*id))
-            .collect();
-        for id in pending_diagnostic_ids {
-            if let Some((path, _)) = self.pending_diagnostic_requests.remove(&id) {
-                if self.latest_diagnostic_requests.get(&path) == Some(&id) {
-                    self.latest_diagnostic_requests.remove(&path);
-                }
-            }
-        }
-        let Some(contrib) = self.plugin_contributions.remove(name) else {
-            self.plugin_manager.remove_provider_registrations(name);
-            return;
-        };
-
-        // Content — clear plugin-rendered lines for contributed paths.
-        for path in &contrib.content_paths {
-            self.plugin_content.remove(path);
-            self.plugin_content_text.remove(path);
-            if self
-                .plugin_content_streams
-                .get(path)
-                .is_some_and(|(owner, _)| owner == name)
-            {
-                self.plugin_content_streams.remove(path);
-            }
-        }
-        let had_current_content = contrib
-            .content_paths
-            .iter()
-            .any(|p| self.current_file.as_deref() == Some(p));
-
-        // Fold regions.
-        for path in &contrib.fold_region_paths {
-            self.plugin_fold_regions.remove(path);
-        }
-        if contrib
-            .fold_region_paths
-            .iter()
-            .any(|p| self.current_file.as_deref() == Some(p))
-        {
-            self.clear_fold_state();
-        }
-
-        // Status-bar facts.
-        for path in &contrib.status_fact_paths {
-            self.plugin_status_facts.remove(path);
-        }
-        for path in &contrib.symbol_paths {
-            self.plugin_symbols.remove(path);
-        }
-        for path in &contrib.diagnostic_paths {
-            if self
-                .diagnostic_owners
-                .get(path)
-                .is_some_and(|owner| owner == name)
-            {
-                self.plugin_diagnostics.remove(path);
-                self.plugin_diagnostic_lines.remove(path);
-                self.diagnostic_owners.remove(path);
-            }
-        }
-        if !contrib.symbol_paths.is_empty()
-            && self.command_palette.as_ref().is_some_and(|palette| {
-                palette.route == crate::command_palette::PaletteRoute::Symbols
-            })
-        {
-            self.command_palette = None;
-        }
-        if self
-            .current_file
-            .as_ref()
-            .is_some_and(|path| contrib.diagnostic_paths.contains(path))
-        {
-            if let Some(picker) = self
-                .command_palette
-                .as_mut()
-                .filter(|palette| {
-                    palette.route == crate::command_palette::PaletteRoute::Diagnostics
-                })
-                .and_then(|palette| palette.route_diagnostics.as_mut())
-            {
-                picker.set_diagnostics(Vec::new());
-            }
-        }
-
-        // Icon map (Nerd Font glyphs).
-        if contrib.has_icon_map {
-            self.icons_enabled = false;
-            self.icon_map.clear();
-            self.icon_dir_open.clear();
-            self.icon_dir_closed.clear();
-            self.icon_fallback.clear();
-        }
-
-        // Provider registrations (language / fold / etc.).
-        self.plugin_manager.remove_provider_registrations(name);
-
-        // Plugin-contributed palette commands. Close an open palette that may
-        // list this plugin's commands so a stale entry can't dispatch to the
-        // dead plugin.
-        self.plugin_manager.remove_command_registrations(name);
-        if !contrib.command_ids.is_empty() && self.command_palette.is_some() {
-            self.command_palette = None;
-        }
-
-        // Plugin-contributed context-menu items. Close an open context menu if
-        // it may list this plugin's items.
-        self.plugin_manager.remove_context_items(name);
-        if !contrib.context_item_ids.is_empty() && self.context_menu.is_some() {
-            self.context_menu = None;
-        }
-
-        // Plugin-contributed status segments.
-        self.plugin_manager.remove_status_segments(name);
-
-        // Re-render the current file without plugin content.
-        if had_current_content {
-            self.plugin_content_active = false;
-            self.plugin_content_active_path = None;
-            self.reload_content();
-        }
     }
 
     /// Rebuilds the file tree, re-fetches git status (async), and reloads the
@@ -890,11 +689,11 @@ impl App {
                 }
                 Ok(())
             }
-            crate::actions::Applicability::PluginContentActive => {
+            crate::actions::Applicability::RenderedMarkdownActive => {
                 if self.current_file.is_none() {
                     return Err("no file is open");
                 }
-                if !self.plugin_content_active {
+                if !self.rendered_active {
                     return Err("not available (current file not plugin-rendered)");
                 }
                 Ok(())
@@ -906,7 +705,7 @@ impl App {
                 if self
                     .current_file
                     .as_deref()
-                    .and_then(|path| self.plugin_symbols.get(path))
+                    .and_then(|path| self.symbols.get(path))
                     .is_none_or(Vec::is_empty)
                 {
                     return Err("no symbols in file");
@@ -920,7 +719,7 @@ impl App {
                 if self
                     .current_file
                     .as_deref()
-                    .and_then(|path| self.plugin_diagnostics.get(path))
+                    .and_then(|path| self.file_diagnostics.get(path))
                     .is_none_or(Vec::is_empty)
                 {
                     return Err("no diagnostics in file");
@@ -1172,10 +971,9 @@ impl App {
         self.in_file_search_open = false;
         self.json_query = None;
         self.json_query_original.clear();
-        self.plugin_content_active = false;
-        self.plugin_content.clear();
-        self.plugin_content_text.clear();
-        self.plugin_content_streams.clear();
+        self.rendered_active = false;
+        self.rendered_content.clear();
+        self.rendered_text.clear();
     }
 }
 

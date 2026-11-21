@@ -2,7 +2,6 @@ use super::*;
 use crate::app::{App, Focus, StatusMessage};
 use crate::config::{Config, StatusBarConfig};
 use crate::git::{GitHead, GitRepoInfo};
-use crate::plugin::ContentStream;
 use crate::search::{GotoLineState, HistoryState, SearchState, ThemePicker};
 use ratatui::backend::TestBackend;
 use ratatui::style::{Color, Modifier};
@@ -10,27 +9,13 @@ use ratatui::Terminal;
 use std::path::{Path, PathBuf};
 
 fn make_app() -> App {
-    let mut cfg = Config {
+    let cfg = Config {
         git: crate::config::GitConfig {
             status: false,
             ..Default::default()
         },
         ..Config::default()
     };
-    // The bundled `markdown` plugin is enabled by default and gets spawned as
-    // a real subprocess in `App::new`. On a machine where it hasn't been
-    // installed to the platform plugin dir (e.g. a fresh CI runner), the spawn
-    // fails and the error — which includes the plugin name — lands in
-    // `app.plugin_message`, leaking into the status bar text these tests
-    // assert against. Disable it explicitly so these tests don't depend on
-    // real plugin-binary installation state.
-    cfg.plugins.insert(
-        "markdown".to_string(),
-        crate::plugin::PluginEntry {
-            enabled: false,
-            ..Default::default()
-        },
-    );
     App::new(PathBuf::from("."), cfg, None, None).unwrap()
 }
 
@@ -41,28 +26,6 @@ fn statusbar_displays_worktree_count() {
     let mut app = make_app();
     app.worktree_count = 3;
     assert!(render_bar(&app).contains("[worktrees: 3]"));
-}
-
-#[test]
-fn statusbar_shows_streaming_and_incomplete_plugin_content_state() {
-    let mut app = make_app();
-    let path = PathBuf::from("/tmp/streamed.md");
-    app.current_file = Some(path.clone());
-    app.plugin_content_streams.insert(
-        path.clone(),
-        (
-            "markdown".into(),
-            ContentStream::new("r1".into(), std::time::Instant::now()),
-        ),
-    );
-    assert!(render_bar(&app).contains("[markdown: rendering]"));
-
-    app.plugin_content_streams
-        .get_mut(&path)
-        .unwrap()
-        .1
-        .expire(std::time::Instant::now() + crate::plugin::STREAM_IDLE_TIMEOUT);
-    assert!(render_bar(&app).contains("[markdown: incomplete]"));
 }
 
 #[test]
@@ -84,36 +47,6 @@ fn worktree_status_segment_can_be_selected_in_explicit_config() {
 }
 
 #[test]
-fn statusbar_segments_map_to_their_existing_actions() {
-    let cases = [
-        (StatusSegment::Git, Some("compare_against")),
-        (StatusSegment::Worktrees, Some("worktree_picker")),
-        (StatusSegment::Lnum, Some("goto_line")),
-        (StatusSegment::Scope, Some("symbol_outline")),
-        (StatusSegment::Type, Some("theme_picker")),
-        (StatusSegment::Folds, Some("fold_all")),
-        (StatusSegment::Errors, Some("plugin_picker")),
-        (StatusSegment::PluginError, Some("plugin_picker")),
-        (StatusSegment::Update, Some("show_about")),
-        (StatusSegment::FileInfo, Some("copy_path")),
-        (StatusSegment::Badges, None),
-        (StatusSegment::Scroll, None),
-        (StatusSegment::JsonPath, None),
-        (StatusSegment::PluginFacts, None),
-        (StatusSegment::PluginContent, None),
-        (StatusSegment::Message, None),
-        (StatusSegment::Version, None),
-    ];
-    for (segment, action) in cases {
-        assert_eq!(
-            segment.action_id(),
-            action,
-            "unexpected action for {segment:?}"
-        );
-    }
-}
-
-#[test]
 fn statusbar_shows_the_enclosing_symbol_scope() {
     let mut app = make_app();
     app.current_file = Some(PathBuf::from("src/lib.rs"));
@@ -124,17 +57,17 @@ fn statusbar_shows_the_enclosing_symbol_scope() {
         "}".into(),
     ];
     app.active_line = 2;
-    app.plugin_symbols.insert(
+    app.symbols.insert(
         PathBuf::from("src/lib.rs"),
         vec![
-            crate::plugin::types::Symbol {
+            crate::code_intel::Symbol {
                 name: "app".into(),
                 kind: "module".into(),
                 line: 0,
                 end_line: Some(3),
                 parent: None,
             },
-            crate::plugin::types::Symbol {
+            crate::code_intel::Symbol {
                 name: "open".into(),
                 kind: "function".into(),
                 line: 1,
@@ -152,24 +85,24 @@ fn statusbar_shows_diagnostic_counts_and_active_line_message() {
     let path = PathBuf::from("src/lib.rs");
     app.current_file = Some(path.clone());
     app.active_line = 1;
-    app.plugin_diagnostics.insert(
+    app.file_diagnostics.insert(
         path,
         vec![
-            crate::plugin::types::Diagnostic {
+            crate::code_intel::Diagnostic {
                 line: 1,
                 column: 0,
                 end_line: None,
                 end_column: None,
-                severity: crate::plugin::types::DiagnosticSeverity::Warning,
+                severity: crate::code_intel::DiagnosticSeverity::Warning,
                 message: "unused variable".into(),
                 source: "clippy".into(),
             },
-            crate::plugin::types::Diagnostic {
+            crate::code_intel::Diagnostic {
                 line: 2,
                 column: 0,
                 end_line: None,
                 end_column: None,
-                severity: crate::plugin::types::DiagnosticSeverity::Error,
+                severity: crate::code_intel::DiagnosticSeverity::Error,
                 message: "type mismatch".into(),
                 source: "rustc".into(),
             },
@@ -972,38 +905,6 @@ fn fold_stats_with_yaml_anchors() {
 }
 
 #[test]
-fn plugin_status_facts_shown_for_current_file() {
-    let mut app = make_app();
-    app.focus = Focus::Content;
-    app.current_file = Some(PathBuf::from("deploy.yaml"));
-    app.plugin_status_facts.insert(
-        PathBuf::from("deploy.yaml"),
-        "Deployment/nginx (default)".to_string(),
-    );
-    let text = render_bar(&app);
-    assert!(
-        text.contains("[Deployment/nginx (default)]"),
-        "expected plugin status facts in {text:?}"
-    );
-}
-
-#[test]
-fn plugin_status_facts_not_shown_for_a_different_file() {
-    let mut app = make_app();
-    app.focus = Focus::Content;
-    app.current_file = Some(PathBuf::from("other.yaml"));
-    app.plugin_status_facts.insert(
-        PathBuf::from("deploy.yaml"),
-        "Deployment/nginx (default)".to_string(),
-    );
-    let text = render_bar(&app);
-    assert!(
-        !text.contains("Deployment/nginx"),
-        "facts for an unrelated path must not leak into the bar: {text:?}"
-    );
-}
-
-#[test]
 fn bar_never_overflows_various_widths() {
     let mut app = make_app();
     app.show_hidden = true;
@@ -1328,43 +1229,6 @@ fn right_segment_flush_at_various_widths() {
 }
 
 #[test]
-fn plugin_error_renders_in_bar() {
-    let mut app = make_app();
-    app.plugin_error = Some("[markdown] failed to render (on_file_open)".to_string());
-    let text = render_bar(&app);
-    assert!(
-        text.contains("[markdown] failed to render (on_file_open)"),
-        "plugin_error text should appear in the status bar, got: {text:?}"
-    );
-}
-
-#[test]
-fn plugin_error_absent_by_default() {
-    let app = make_app();
-    assert!(app.plugin_error.is_none());
-    let text = render_bar(&app);
-    assert!(!text.contains("markdown"), "no plugin_error means no badge");
-}
-
-#[test]
-fn plugin_error_outlasts_status_message_on_narrow_bar() {
-    // plugin_error (P_ERR) must survive eliding alongside other error
-    // indicators even when a lower-priority status_message (P_META) does not.
-    let mut app = make_app();
-    app.status_message = Some(StatusMessage::new("hello", std::time::Instant::now()));
-    app.plugin_error = Some("boom".to_string());
-    let text = render_bar_width(&app, 15);
-    assert!(
-        !text.contains("hello"),
-        "status message (P_META) should be elided before plugin_error"
-    );
-    assert!(
-        text.contains("boom"),
-        "plugin_error (P_ERR) must survive eliding, got: {text:?}"
-    );
-}
-
-#[test]
 fn monochrome_theme_uses_reversed_modifier_not_bg_color() {
     let mut app = make_app();
     app.theme = crate::theme::Theme::monochrome();
@@ -1554,118 +1418,4 @@ fn custom_separator_replaces_space_between_segments() {
             "segment {seg} should be preceded by the separator, got: {before:?}"
         );
     }
-}
-
-#[test]
-fn segment_ids_match_config_valid_segments() {
-    // Every StatusSegment must have an id the config schema/validation knows.
-    let segments = [
-        StatusSegment::Badges,
-        StatusSegment::Worktrees,
-        StatusSegment::Scroll,
-        StatusSegment::Lnum,
-        StatusSegment::Type,
-        StatusSegment::JsonPath,
-        StatusSegment::FileInfo,
-        StatusSegment::Git,
-        StatusSegment::Errors,
-        StatusSegment::Folds,
-        StatusSegment::PluginFacts,
-        StatusSegment::Scope,
-        StatusSegment::Message,
-        StatusSegment::PluginError,
-        StatusSegment::Version,
-        StatusSegment::Update,
-    ];
-    let ids: Vec<&str> = segments.iter().map(|s| s.id_str()).collect();
-    let mut sorted_ids = ids.clone();
-    sorted_ids.sort_unstable();
-    let mut valid = StatusBarConfig::VALID_SEGMENTS.to_vec();
-    valid.sort_unstable();
-    assert_eq!(sorted_ids, valid);
-    assert_eq!(sorted_ids.len(), valid.len());
-}
-
-#[test]
-fn statusbar_plugin_segment_properties() {
-    let seg = StatusSegment::Plugin {
-        id: "git-stats".to_string(),
-        side: StatusSide::Right,
-    };
-    assert_eq!(seg.id_str(), "git-stats");
-    assert_eq!(seg.side(), StatusSide::Right);
-    assert_eq!(seg.action_id(), None);
-}
-
-#[test]
-fn statusbar_plugin_segments_render_with_side_and_color() {
-    let mut app = make_app();
-    app.plugin_manager.register_status_segments(
-        "linter",
-        vec![
-            crate::plugin::PluginStatusSegment {
-                id: "linter-status".to_string(),
-                text: "Lint: OK".to_string(),
-                priority: Some(1),
-                side: Some(crate::plugin::StatusSidePreference::Left),
-            },
-            crate::plugin::PluginStatusSegment {
-                id: "extra-info".to_string(),
-                text: "Extra: 123".to_string(),
-                priority: Some(5),
-                side: Some(crate::plugin::StatusSidePreference::Right),
-            },
-        ],
-    );
-
-    let text = render_bar_width(&app, 200);
-    assert!(text.contains("Lint: OK"));
-    assert!(text.contains("Extra: 123"));
-
-    // Check color override from config
-    app.config
-        .statusbar
-        .colors
-        .insert("linter-status".to_string(), "diff_del".to_string());
-    let (line, _) = build_normal_line(&app, Style::default(), 200);
-    let lint_span = line
-        .spans
-        .iter()
-        .find(|s| s.content.contains("Lint: OK"))
-        .unwrap();
-    assert_eq!(lint_span.style.fg, Some(app.theme.diff_del));
-}
-
-#[test]
-fn statusbar_plugin_segments_participate_in_elision_and_allowlist() {
-    let mut app = make_app();
-    app.plugin_manager.register_status_segments(
-        "metrics",
-        vec![
-            crate::plugin::PluginStatusSegment {
-                id: "low-prio".to_string(),
-                text: "LowPriorityTextThatCanBeDropped".to_string(),
-                priority: Some(1),
-                side: Some(crate::plugin::StatusSidePreference::Left),
-            },
-            crate::plugin::PluginStatusSegment {
-                id: "high-prio".to_string(),
-                text: "HighPrio".to_string(),
-                priority: Some(5),
-                side: Some(crate::plugin::StatusSidePreference::Left),
-            },
-        ],
-    );
-
-    // Explicit allowlist filtering: only include high-prio
-    app.config.statusbar.left = Some(vec!["high-prio".to_string()]);
-    app.config.statusbar.right = Some(Vec::new());
-    let (line, _) = build_normal_line(&app, Style::default(), 200);
-    let text = line
-        .spans
-        .iter()
-        .map(|s| s.content.as_ref())
-        .collect::<String>();
-    assert!(text.contains("HighPrio"));
-    assert!(!text.contains("LowPriorityTextThatCanBeDropped"));
 }

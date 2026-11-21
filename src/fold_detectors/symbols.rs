@@ -5,7 +5,7 @@
 //! heuristic: the provider protocol accepts symbols from parsers with richer
 //! language support, while bundled plugins can share this small implementation.
 
-use crate::plugin::types::Symbol;
+use crate::code_intel::Symbol;
 
 /// Finds common Rust declarations and their enclosing brace-delimited ranges.
 pub fn rust_symbols(source: &str) -> Vec<Symbol> {

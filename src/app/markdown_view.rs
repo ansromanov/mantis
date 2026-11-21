@@ -2,7 +2,7 @@
 //!
 //! When a markdown file finishes loading, [`App::install_native_markdown`]
 //! renders it with [`crate::markdown`] and installs the result as the
-//! content-pane takeover (the same `plugin_content` storage external plugins
+//! content-pane takeover (the same `rendered_content` storage external plugins
 //! used) *before the first frame is drawn*. There is no raw-then-rendered swap,
 //! so the gutter, width and scroll position stay put. Rendering is skipped for
 //! very large files, which fall back to the raw view.
@@ -35,20 +35,20 @@ impl App {
             .iter()
             .map(|spans| spans.iter().map(|(_, value)| value.as_str()).collect())
             .collect();
-        self.plugin_content_text.insert(path.to_path_buf(), text);
-        self.plugin_content.insert(path.to_path_buf(), rendered);
-        self.plugin_content_active_path = Some(path.to_path_buf());
-        self.plugin_content_active = true;
+        self.rendered_text.insert(path.to_path_buf(), text);
+        self.rendered_content.insert(path.to_path_buf(), rendered);
+        self.rendered_active_path = Some(path.to_path_buf());
+        self.rendered_active = true;
         self.content_revision += 1;
         self.clamp_content_scroll();
     }
 
     /// Drops the rendered view of `path` so the raw file is shown.
     pub(super) fn clear_native_markdown(&mut self, path: &Path) {
-        self.plugin_content.remove(path);
-        self.plugin_content_text.remove(path);
-        self.plugin_content_active = false;
-        self.plugin_content_active_path = None;
+        self.rendered_content.remove(path);
+        self.rendered_text.remove(path);
+        self.rendered_active = false;
+        self.rendered_active_path = None;
     }
 }
 

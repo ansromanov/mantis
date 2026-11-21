@@ -162,7 +162,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     let render_lines: Option<&Vec<Vec<(ratatui::style::Style, String)>>> = app
         .current_file
         .as_ref()
-        .and_then(|p| app.plugin_content.get(p));
+        .and_then(|p| app.rendered_content.get(p));
 
     let sel = app.selection.as_ref().map(|s| s.normalized());
     let sel_bg = app.theme.selection_bg;

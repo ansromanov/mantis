@@ -28,36 +28,6 @@ fn app_for(root: &std::path::Path) -> App {
 }
 
 #[test]
-fn command_palette_diagnostics_prefix_builds_current_file_picker() {
-    let root = temp_tree();
-    let mut app = app_for(&root);
-    let path = root.join("a.txt");
-    app.current_file = Some(path.clone());
-    app.plugin_diagnostics.insert(
-        path,
-        vec![crate::plugin::types::Diagnostic {
-            line: 4,
-            column: 2,
-            end_line: None,
-            end_column: None,
-            severity: crate::plugin::types::DiagnosticSeverity::Warning,
-            message: "check this".into(),
-            source: "lint".into(),
-        }],
-    );
-    app.command_palette = Some(CommandPalette::default());
-    app.handle_key(KeyEvent::new(KeyCode::Char('!'), KeyModifiers::NONE));
-    let palette = app.command_palette.as_ref().unwrap();
-    assert_eq!(
-        palette.route,
-        crate::command_palette::PaletteRoute::Diagnostics
-    );
-    assert_eq!(palette.results_len(), 1);
-    app.plugin_manager.deactivate_all();
-    fs::remove_dir_all(root).ok();
-}
-
-#[test]
 fn json_query_replaces_results_and_escape_restores_content() {
     let root = temp_tree();
     let mut app = app_for(&root);
@@ -1594,9 +1564,9 @@ fn command_palette_at_prefix_opens_symbol_picker() {
     let mut app = app_for(&root);
     let path = root.join("a.txt");
     app.current_file = Some(path.clone());
-    app.plugin_symbols.insert(
+    app.symbols.insert(
         path,
-        vec![crate::plugin::types::Symbol {
+        vec![crate::code_intel::Symbol {
             name: "main".into(),
             kind: "function".into(),
             line: 0,

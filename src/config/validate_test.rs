@@ -160,7 +160,6 @@ fn schema_paths_includes_all_known_config_paths() {
     let paths = schema_paths();
 
     // Top-level paths
-    assert!(paths.contains(&"plugins".to_string()));
     assert!(paths.contains(&"recent_files_count".to_string()));
     assert!(paths.contains(&"palette_pin_recent".to_string()));
     assert!(paths.contains(&"palette_frequent_count".to_string()));

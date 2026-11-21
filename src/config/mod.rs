@@ -48,7 +48,6 @@ pub use types::{GitConfig, GitDiffConfig, TreeConfig};
 // Only referenced in doc links or via field access — never named in code.
 #[allow(unused_imports)]
 pub use keymap::KeyBinding;
-use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 #[allow(unused_imports)]
@@ -108,15 +107,7 @@ pub fn load(root: &Path) -> (Config, Option<PathBuf>, Option<String>) {
     };
     config.migrate_legacy_flat_fields();
     config.migrate_legacy_git_fields();
-    config.migrate_legacy_plugin_paths();
     config.keys.migrate_legacy_keys();
-    let retired = crate::plugin::retired_bundled_plugins();
-    config.plugins.retain(|_name, entry| {
-        let Some(fname) = entry.path.file_name().and_then(|s| s.to_str()) else {
-            return true;
-        };
-        !retired.contains(&fname)
-    });
     (config, loaded_path.or(global), error)
 }
 
@@ -283,9 +274,6 @@ fn toml_item(key: &str, value: &toml::Value) -> Option<toml_edit::Item> {
 /// untouched settings fall through to the embedded defaults rather than being
 /// pinned to their current value (which would also mask future default changes).
 ///
-/// For `[plugins]`, entries matching the default bundled definitions are omitted,
-/// serialising only user-defined customizations (e.g. disabled bundled plugins or
-/// custom plugin paths).
 pub fn sparse_toml(config: &Config) -> String {
     let current = toml::Value::try_from(config);
     let default = toml::Value::try_from(Config::default());
@@ -294,34 +282,9 @@ pub fn sparse_toml(config: &Config) -> String {
         // dump rather than losing the user's settings.
         return toml::to_string_pretty(config).unwrap_or_default();
     };
-    let bundled_defaults: HashMap<String, crate::plugin::PluginEntry> =
-        crate::plugin::bundled_plugin_entries()
-            .into_iter()
-            .collect();
     let mut out = toml::map::Map::new();
     for (k, v) in &cur {
-        if k == "plugins" {
-            if let toml::Value::Table(ref plugins_map) = v {
-                let mut sparse_plugins = toml::map::Map::new();
-                for (pname, pval) in plugins_map {
-                    let is_default = if let Some(bundled_entry) = bundled_defaults.get(pname) {
-                        config
-                            .plugins
-                            .get(pname)
-                            .map(|e| e == bundled_entry)
-                            .unwrap_or(false)
-                    } else {
-                        false
-                    };
-                    if !is_default {
-                        sparse_plugins.insert(pname.clone(), pval.clone());
-                    }
-                }
-                if !sparse_plugins.is_empty() {
-                    out.insert(k.clone(), toml::Value::Table(sparse_plugins));
-                }
-            }
-        } else if def.get(k) != Some(v) {
+        if def.get(k) != Some(v) {
             out.insert(k.clone(), v.clone());
         }
     }
@@ -345,8 +308,6 @@ fn init_config_dir(user_path: &Path) {
         let _ = fs::write(user_path, USER_CONFIG_STUB);
         crate::theme::install_embedded_themes();
     }
-    // Always run: install/refresh bundled plugins and clean up retired ones.
-    crate::plugin::install_bundled_plugins();
 }
 
 /// Writes the embedded fully-commented template to `{dir}/mantis.default.toml`, but
@@ -430,9 +391,6 @@ modal_close = [\"?\", \"q\", \"Esc\", \"Enter\"]  # close modal (About/Help)
 
 # Search overlay
 toggle_search_mode = \"Tab\"              # toggle file/content search mode
-
-# Plugin picker
-plugin_toggle = \"Space\"                 # toggle plugin selection
 ";
 
 /// Filename of the read-only static keys reference written next to the user config.
@@ -449,10 +407,12 @@ fn config_paths(root: &Path) -> Vec<PathBuf> {
 }
 
 fn global_config_path() -> Option<PathBuf> {
-    dirs_next()?.join("mantis.toml").into()
+    config_dir()?.join("mantis.toml").into()
 }
 
-fn dirs_next() -> Option<PathBuf> {
+/// The per-user mantis config directory (`$XDG_CONFIG_HOME/mantis`, `~/.config/mantis`
+/// or `%APPDATA%\mantis`), without creating it.
+pub fn config_dir() -> Option<PathBuf> {
     #[cfg(windows)]
     {
         std::env::var_os("APPDATA").map(|p| PathBuf::from(p).join("mantis"))
@@ -473,8 +433,8 @@ fn dirs_next() -> Option<PathBuf> {
 /// renamed to `mantis.toml` and `tv.default.toml` to `mantis.default.toml`.
 /// Best-effort: never destroys data on failure.
 fn migrate_legacy_config() {
-    let old_dir = legacy_dirs_next();
-    let new_dir = dirs_next();
+    let old_dir = legacy_config_dir();
+    let new_dir = config_dir();
     let (Some(old), Some(new)) = (old_dir, new_dir) else {
         return;
     };
@@ -498,7 +458,7 @@ fn migrate_legacy_config() {
 
 /// Returns the legacy config directory path (`tree-viewer`). Used only for
 /// one-time migration.
-fn legacy_dirs_next() -> Option<PathBuf> {
+fn legacy_config_dir() -> Option<PathBuf> {
     #[cfg(windows)]
     {
         std::env::var_os("APPDATA").map(|p| PathBuf::from(p).join("tree-viewer"))

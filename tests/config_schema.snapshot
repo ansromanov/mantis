@@ -60,7 +60,6 @@ keys.new_tab
 keys.next_tab
 keys.open_external
 keys.open_in_editor
-keys.plugin_picker
 keys.prev_tab
 keys.quit
 keys.recent_files
@@ -95,7 +94,6 @@ keys.tree_width_grow
 keys.tree_width_shrink
 palette_frequent_count
 palette_pin_recent
-plugins
 recent_files_count
 search
 search.context_lines
@@ -111,8 +109,6 @@ statusbar.colors.git
 statusbar.colors.jsonpath
 statusbar.colors.lnum
 statusbar.colors.message
-statusbar.colors.pluginerror
-statusbar.colors.pluginfacts
 statusbar.colors.scope
 statusbar.colors.scroll
 statusbar.colors.type

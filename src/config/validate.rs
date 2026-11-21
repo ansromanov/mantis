@@ -17,6 +17,11 @@ use crate::theme::{ThemeConfig, THEME_COLOR_ROLES};
 /// into their new home by a `migrate_legacy_*` step, or genuinely gone and safe
 /// to drop silently.
 const DEPRECATED_KEYS: &[&str] = &[
+    // the plugin system was removed; old `[plugins]` tables are ignored
+    "plugins",
+    "keys.plugin_picker",
+    "statusbar.colors.pluginerror",
+    "statusbar.colors.pluginfacts",
     // git (#342)
     "git_status",
     "git_show_deleted",
@@ -61,21 +66,11 @@ const DEPRECATED_KEYS: &[&str] = &[
 pub fn schema_paths() -> Vec<String> {
     let mut paths = Vec::new();
     collect_schema_paths(&schema_table(), "", &mut paths);
-    // `plugins` is a known top-level key whose contents are user-defined
-    // (plugin names as keys). The schema table omits it when the map is
-    // empty, but it is always a valid config path.
-    if !paths
-        .iter()
-        .any(|p| p == "plugins" || p.starts_with("plugins."))
-    {
-        paths.push("plugins".to_string());
-    }
     paths.sort();
     paths
 }
 
 /// Recursively walks a `toml::Table` schema and collects every dotted path.
-/// Does not recurse into `plugins` (user-defined keys).
 #[cfg_attr(not(test), allow(dead_code))]
 fn collect_schema_paths(table: &toml::Table, prefix: &str, out: &mut Vec<String>) {
     for (key, val) in table {
@@ -86,9 +81,7 @@ fn collect_schema_paths(table: &toml::Table, prefix: &str, out: &mut Vec<String>
         };
         out.push(path.clone());
         if let Some(sub) = val.as_table() {
-            if key != "plugins" {
-                collect_schema_paths(sub, &path, out);
-            }
+            collect_schema_paths(sub, &path, out);
         }
     }
 }
@@ -149,12 +142,8 @@ fn collect_unknown(
                 out.push(format!("unknown key '{path}'{hint}"));
             }
             Some(schema_val) => {
-                // The [plugins] table has user-defined plugin names as keys;
-                // do not recurse into it or every plugin entry would be flagged.
-                if key != "plugins" {
-                    if let (Some(a), Some(s)) = (val.as_table(), schema_val.as_table()) {
-                        collect_unknown(a, s, &path, out);
-                    }
+                if let (Some(a), Some(s)) = (val.as_table(), schema_val.as_table()) {
+                    collect_unknown(a, s, &path, out);
                 }
             }
         }

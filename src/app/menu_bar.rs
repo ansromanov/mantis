@@ -65,18 +65,7 @@ pub(crate) fn menu_actions(app: &App, menu: &str) -> Vec<MenuAction> {
         })
         .collect();
     actions.sort_by_key(|(order, _)| *order);
-    let mut result: Vec<MenuAction> = actions.into_iter().map(|(_, action)| action).collect();
-    if menu == "Plugins" {
-        for cmd in app.plugin_manager.all_plugin_commands() {
-            result.push(MenuAction {
-                id: Cow::Owned(cmd.id.clone()),
-                label: Cow::Owned(cmd.name.clone()),
-                binding: "-".to_string(),
-                applicable: true,
-            });
-        }
-    }
-    result
+    actions.into_iter().map(|(_, action)| action).collect()
 }
 
 /// Top row index needed to keep a selected action visible in a short dropdown.

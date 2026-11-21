@@ -2,7 +2,7 @@
 //!
 //! This module root collects every floating overlay the UI can draw on top of
 //! the main layout: about, command palette, context menu, help, history, recent
-//! files, in-file search, file/content search, the theme picker, and the plugin
+//! files, in-file search, file/content search, the theme picker, and the
 //! manager. Each lives in its own submodule and is re-exported as a `draw_*`
 //! function for the UI orchestrator, which decides which (if any) is visible.
 //! Shared layout helpers - notably `centered_rect` - live in `util`. Popups
@@ -17,7 +17,6 @@ mod goto_line;
 mod help;
 mod history;
 mod in_file;
-mod plugin;
 mod recent;
 mod repo_log;
 mod revision;
@@ -39,7 +38,6 @@ pub(super) use help::draw_help;
 pub(crate) use help::{help_tab_ranges, help_tab_scroll_offset, help_tabs};
 pub(super) use history::draw_history;
 pub(super) use in_file::{draw_filter_bar, draw_in_file_search};
-pub(super) use plugin::draw_plugin_picker;
 pub(super) use recent::{draw_bookmarks, draw_recent};
 pub(super) use repo_log::draw_repo_log;
 pub(super) use revision::draw_revision_picker;
@@ -54,10 +52,6 @@ pub(super) use worktree::draw_worktree_picker;
 #[cfg(test)]
 #[path = "popups_test.rs"]
 mod tests;
-
-#[cfg(test)]
-#[path = "plugin_test.rs"]
-mod plugin_tests;
 
 #[cfg(test)]
 #[path = "help_test.rs"]

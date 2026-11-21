@@ -164,7 +164,7 @@ fn expand_all(root: &Path) -> HashSet<PathBuf> {
 }
 
 fn highlighter() -> Highlighter {
-    Highlighter::with_extra_syntaxes("base16-ocean.dark", &[])
+    Highlighter::new("base16-ocean.dark")
 }
 
 // ---------------------------------------------------------------------------
@@ -642,8 +642,8 @@ fn bench_indent_fold(c: &mut Criterion) {
 
 fn generate_json_source(line_count: usize) -> String {
     // An array of objects, each with a nested array — mirrors what
-    // `serde_json::to_string_pretty` produces, which is what the `json`
-    // plugin actually folds.
+    // `serde_json::to_string_pretty` produces, which is what the JSON
+    // built-in detector actually folds.
     let mut content = String::with_capacity(line_count * 24);
     content.push_str("[\n");
     for i in 0..line_count / 6 {

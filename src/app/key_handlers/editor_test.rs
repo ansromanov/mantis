@@ -28,14 +28,14 @@ fn diagnostics_picker_opens_the_diagnostics_palette_route() {
     let mut app = app_for(&root);
     let path = root.join("a.txt");
     app.current_file = Some(path.clone());
-    app.plugin_diagnostics.insert(
+    app.file_diagnostics.insert(
         path,
-        vec![crate::plugin::types::Diagnostic {
+        vec![crate::code_intel::Diagnostic {
             line: 1,
             column: 0,
             end_line: None,
             end_column: None,
-            severity: crate::plugin::types::DiagnosticSeverity::Warning,
+            severity: crate::code_intel::DiagnosticSeverity::Warning,
             message: "unused value".into(),
             source: "lint".into(),
         }],
@@ -217,11 +217,11 @@ fn apply_theme_clears_plugin_content() {
     let root = temp_tree();
     let mut app = app_for(&root);
     let path = root.join("a.txt");
-    app.plugin_content.insert(
+    app.rendered_content.insert(
         path.clone(),
         vec![vec![(ratatui::style::Style::default(), "x".to_string())]],
     );
-    app.plugin_content_text.insert(path, vec!["x".to_string()]);
+    app.rendered_text.insert(path, vec!["x".to_string()]);
 
     let mut picker = ThemePicker::default();
     for c in "default".chars() {
@@ -231,79 +231,12 @@ fn apply_theme_clears_plugin_content() {
     if picker.selected_name() == Some("default") {
         app.theme_picker = Some(picker);
         app.apply_selected_theme();
-        assert!(app.plugin_content.is_empty(), "plugin_content must clear");
         assert!(
-            app.plugin_content_text.is_empty(),
-            "plugin_content_text must clear"
+            app.rendered_content.is_empty(),
+            "rendered_content must clear"
         );
+        assert!(app.rendered_text.is_empty(), "rendered_text must clear");
     }
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-#[cfg(unix)]
-fn apply_theme_sends_new_theme_colors_to_plugins() {
-    // editor.rs's apply_theme hands the newly-resolved Theme to
-    // plugin_manager.on_theme_change so plugins get the new theme's actual
-    // colors, not just its name.
-    use std::io::Write as _;
-    use std::os::unix::fs::PermissionsExt;
-    use std::time::{Duration, Instant};
-
-    let root = temp_tree();
-    let plugin_dir = std::env::temp_dir().join(format!(
-        "tv_editor_theme_colors_{}_{}",
-        std::process::id(),
-        root.file_name().unwrap().to_string_lossy()
-    ));
-    fs::create_dir_all(&plugin_dir).unwrap();
-    let out = plugin_dir.join("recv.txt");
-    let script = plugin_dir.join("rec.sh");
-    let mut f = fs::File::create(&script).unwrap();
-    write!(f, "#!/bin/sh\ncat > \"{}\"\n", out.display()).unwrap();
-    drop(f);
-    fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
-
-    let mut cfg = Config::default();
-    cfg.plugins.insert(
-        "rec".to_string(),
-        crate::plugin::PluginEntry {
-            path: script.clone(),
-            enabled: true,
-            ..Default::default()
-        },
-    );
-    let mut app = App::new(root.clone(), cfg, None, None).unwrap();
-
-    let monokai = crate::theme::Theme::load("monokai").expect("monokai theme must load");
-    app.apply_theme("monokai", monokai.clone());
-
-    let deadline = Instant::now() + Duration::from_secs(10);
-    let contents = loop {
-        if let Ok(s) = fs::read_to_string(&out) {
-            if s.matches(r#""event":"on_theme_change""#).count() >= 1 {
-                break s;
-            }
-        }
-        assert!(
-            Instant::now() < deadline,
-            "plugin never received on_theme_change"
-        );
-        std::thread::sleep(Duration::from_millis(25));
-    };
-    app.plugin_manager.deactivate_all();
-    let line = contents
-        .lines()
-        .find(|l| l.contains(r#""event":"on_theme_change""#))
-        .expect("on_theme_change event must be sent");
-    let expected = format!(
-        r#""heading1":"{}""#,
-        crate::theme::color_to_hex(monokai.heading1)
-    );
-    assert!(
-        line.contains(&expected),
-        "on_theme_change colors must reflect the new theme, got: {line}"
-    );
     fs::remove_dir_all(&root).ok();
 }
 
@@ -841,7 +774,7 @@ fn dispatch_command_toggle_raw_markdown() {
     let mut app = app_for(&root);
     app.current_file = Some(root.join("a.txt"));
 
-    // When plugin_content_active is false, it should show a status message
+    // When rendered_active is false, it should show a status message
     app.command_palette = Some(palette_with_query("Toggle markdown render"));
     assert!(app.dispatch_command());
     assert!(app
@@ -851,8 +784,8 @@ fn dispatch_command_toggle_raw_markdown() {
         .text
         .contains("not available"));
 
-    // When plugin_content_active is true, it should run successfully (returns true)
-    app.plugin_content_active = true;
+    // When rendered_active is true, it should run successfully (returns true)
+    app.rendered_active = true;
     app.command_palette = Some(palette_with_query("Toggle markdown render"));
     assert!(app.dispatch_command());
 
@@ -993,7 +926,7 @@ fn test_command_applicability_predicates() {
     app.is_json = false;
     app.is_diff = false;
     app.fold_regions = Vec::new();
-    app.plugin_content_active = false;
+    app.rendered_active = false;
     app.git_mode = false;
 
     // Test applicability checks under this fixture
@@ -1087,7 +1020,7 @@ fn test_command_applicability_predicates() {
     // Fixture 5: plugin-rendered content has no text cursor, so blame must
     // be reported inapplicable even though a file is open in a git repo.
     let plugin_path = app.current_file.clone().unwrap();
-    app.plugin_content.insert(plugin_path, Vec::new());
+    app.rendered_content.insert(plugin_path, Vec::new());
     assert_eq!(
         app.check_applicability("blame_line"),
         Err("not available (current file not plugin-rendered)")
@@ -1120,7 +1053,6 @@ fn test_dispatch_inapplicable_command_sets_status_message() {
         vec![json_idx],
         0,
         inapplicability_reasons,
-        Vec::new(),
     ));
 
     if let Some(ref mut p) = app.command_palette {
@@ -1329,24 +1261,24 @@ fn outline_opens_with_cursor_symbol_selected_and_enter_jumps_to_declaration() {
         .map(str::to_owned)
         .collect();
     app.active_line = 2;
-    app.plugin_symbols.insert(
+    app.symbols.insert(
         path,
         vec![
-            crate::plugin::types::Symbol {
+            crate::code_intel::Symbol {
                 name: "Service".into(),
                 kind: "struct".into(),
                 line: 0,
                 end_line: Some(4),
                 parent: None,
             },
-            crate::plugin::types::Symbol {
+            crate::code_intel::Symbol {
                 name: "run".into(),
                 kind: "method".into(),
                 line: 1,
                 end_line: Some(3),
                 parent: Some("Service".into()),
             },
-            crate::plugin::types::Symbol {
+            crate::code_intel::Symbol {
                 name: "other".into(),
                 kind: "function".into(),
                 line: 5,
@@ -1407,49 +1339,6 @@ fn dispatch_palette_goto_line_jumps_and_closes_palette() {
         "matches the standalone goto-line dialog"
     );
     fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn test_dispatch_plugin_command_closes_palette_and_returns_true() {
-    let dir = tempfile::tempdir().unwrap();
-    let mut app = app_for(dir.path());
-
-    let plugin_cmd = crate::plugin::PluginCommand {
-        id: "demo.hello".to_string(),
-        name: "Say Hello".to_string(),
-        category: Some("Plugin".to_string()),
-        description: None,
-    };
-    app.plugin_manager
-        .register_commands("demo", vec![plugin_cmd.clone()]);
-
-    let inapplicability_reasons = crate::command_palette::COMMANDS
-        .iter()
-        .map(|cmd| app.check_applicability(&cmd.action_id).err())
-        .collect();
-    app.command_palette = Some(crate::command_palette::CommandPalette::new(
-        app.keys(),
-        Vec::new(),
-        0,
-        inapplicability_reasons,
-        vec![plugin_cmd],
-    ));
-
-    // Select the plugin command (appended after the built-ins).
-    let plugin_idx = crate::command_palette::COMMANDS.len();
-    if let Some(ref mut p) = app.command_palette {
-        let pos = p.filtered.iter().position(|&i| i == plugin_idx).unwrap();
-        p.selected = pos;
-        assert_eq!(
-            p.selected_command().map(|c| c.action_id.as_str()),
-            Some("demo.hello")
-        );
-    }
-
-    // Dispatch must claim the id (owned by "demo") and close the palette.
-    // The plugin has no live subprocess, so send_command_event is a noop.
-    assert!(app.dispatch_command());
-    assert!(app.command_palette.is_none());
 }
 
 // -- repo log overlay ---------------------------------------------------------

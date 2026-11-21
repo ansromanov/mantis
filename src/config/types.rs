@@ -12,7 +12,6 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::app::DiffMode;
-use crate::plugin::PluginEntry;
 use crate::theme::ThemeConfig;
 
 use super::keymap::Keymap;
@@ -250,9 +249,7 @@ impl StatusBarConfig {
         "git",
         "errors",
         "folds",
-        "pluginfacts",
         "message",
-        "pluginerror",
         "version",
         "update",
     ];
@@ -347,9 +344,6 @@ pub struct Config {
     /// Number of most-frequently-used commands to pin below the recent one in
     /// the command palette's empty-query view. 0 disables. Default: 3.
     pub palette_frequent_count: usize,
-    /// Per-plugin entries registered in `[plugins]`.
-    #[serde(default)]
-    pub plugins: HashMap<String, PluginEntry>,
     /// Grouped git settings.
     pub git: GitConfig,
     /// Status-bar segment alignment config.
@@ -420,7 +414,6 @@ impl Default for Config {
             theme: ThemeConfig::default(),
             palette_pin_recent: true,
             palette_frequent_count: 3,
-            plugins: HashMap::new(),
             git: GitConfig::default(),
             statusbar: StatusBarConfig::default(),
             updates: UpdatesConfig::default(),
@@ -527,43 +520,6 @@ impl Config {
                 "staged" => self.git.diff.mode = DiffMode::Staged,
                 "unstaged" => self.git.diff.mode = DiffMode::Unstaged,
                 _ => {}
-            }
-        }
-    }
-
-    /// Migrates old process plugin paths (e.g. `mantis-plugin-markdown` -> `markdown`)
-    /// on load, keeping any custom config like `enabled` intact.
-    pub fn migrate_legacy_plugin_paths(&mut self) {
-        // 1. Rename any plugins map keys from "mantis-plugin-*" to bare names
-        let old_keys: Vec<String> = self
-            .plugins
-            .keys()
-            .filter(|k| *k == "mantis-plugin-markdown" || *k == "mantis-plugin-iconize")
-            .cloned()
-            .collect();
-        for old_key in old_keys {
-            if let Some(entry) = self.plugins.remove(&old_key) {
-                let new_key = if old_key == "mantis-plugin-markdown" {
-                    "markdown".to_string()
-                } else {
-                    "iconize".to_string()
-                };
-                self.plugins.entry(new_key).or_insert(entry);
-            }
-        }
-
-        // 2. Migrate the path inside each entry
-        for entry in self.plugins.values_mut() {
-            if let Some(fname) = entry.path.file_name().and_then(|s| s.to_str()) {
-                if fname == "mantis-plugin-markdown" {
-                    entry.path.set_file_name("markdown");
-                } else if fname == "mantis-plugin-markdown.exe" {
-                    entry.path.set_file_name("markdown.exe");
-                } else if fname == "mantis-plugin-iconize" {
-                    entry.path.set_file_name("iconize");
-                } else if fname == "mantis-plugin-iconize.exe" {
-                    entry.path.set_file_name("iconize.exe");
-                }
             }
         }
     }
