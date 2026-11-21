@@ -13,7 +13,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::Style,
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph, Wrap},
+    widgets::{Block, Borders, Clear, Paragraph},
     Frame,
 };
 use unicode_width::UnicodeWidthStr;
@@ -316,9 +316,18 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     // Word-wrap expansion: break content + gutters into visual rows so they
     // stay aligned under wrap (ratatui's Wrap can't communicate row count to
     // the gutter Paragraph, causing cumulative drift on each wrapped line).
-    let mut visual_to_display: Vec<usize> = if app.word_wrap && ln_width > 0 {
+    //
+    // Gutterless views (rendered markdown, diffs) take the same path with
+    // blank gutters, so they wrap with the exact function the scroll math
+    // assumes. Ratatui's own `Wrap` breaks on word boundaries, which yields a
+    // different row count than the hard character wrap `content_pos` uses and
+    // made the scroll range and bottom of the view drift.
+    let mut visual_to_display: Vec<usize> = if app.word_wrap {
         let cw = inner.width.saturating_sub(ln_width as u16) as usize;
         if cw > 0 {
+            if ln_width == 0 {
+                ln_lines = vec![Line::from(""); content_lines.len()];
+            }
             let (exp_gutters, exp_content, vmap, updated_fold) = wrap_content(
                 &content_lines,
                 &ln_lines,
@@ -337,10 +346,10 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         (0..content_lines.len()).collect()
     };
 
-    if app.word_wrap && ln_width > 0 && leading_rows > 0 {
+    if app.word_wrap && leading_rows > 0 {
         let skip = leading_rows.min(content_lines.len());
         content_lines.drain(..skip);
-        ln_lines.drain(..skip);
+        ln_lines.drain(..skip.min(ln_lines.len()));
         // The map is parallel to the expanded rows and must be clipped with
         // them, otherwise active-line highlighting is shifted after the first
         // partially visible wrapped line.
@@ -427,21 +436,9 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     // vertical scroll is 0. Horizontal scroll is still applied.
     let cx = inner.x + gutter_width;
     let cw = inner.width - gutter_width;
-    // When there is no gutter (ln_width == 0) but word-wrap is on, fall back to
-    // ratatui's built-in Wrap — there is no drift risk without a parallel gutter
-    // paragraph, so the pre-expansion path is skipped and ratatui handles it.
-    // `content_scroll` is measured in visual rows when wrapping is enabled.
-    // The first logical line can therefore be partially visible; pass its
-    // intra-line offset to ratatui when there is no gutter to pre-expand.
-    let wrap_scroll = if app.word_wrap && ln_width == 0 {
-        leading_rows as u16
-    } else {
-        0
-    };
-    let mut para = Paragraph::new(content_lines).scroll((wrap_scroll, hscroll));
-    if app.word_wrap && ln_width == 0 {
-        para = para.wrap(Wrap { trim: false });
-    }
+    // Word wrap has already been applied above (pre-wrapped visual rows), so
+    // the paragraph is never wrapped again and only scrolls horizontally.
+    let para = Paragraph::new(content_lines).scroll((0, hscroll));
     f.render_widget(
         para,
         Rect {

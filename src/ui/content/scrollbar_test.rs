@@ -88,17 +88,38 @@ fn scrollbar_thumb_moves_toward_bottom_as_scroll_increases() {
     app.content_scroll = 0;
     let top_buffer = render(&app, 10, 10);
     let top_thumb_row = (0..10)
-        .find(|&y| top_buffer[(10u16, y + 1)].symbol() == "█")
+        .find(|&y| top_buffer[(11u16, y + 1)].symbol() == "█")
         .expect("thumb should render near the top");
 
     app.content_scroll = 990;
     let bottom_buffer = render(&app, 10, 10);
     let bottom_thumb_row = (0..10)
-        .find(|&y| bottom_buffer[(10u16, y + 1)].symbol() == "█")
+        .find(|&y| bottom_buffer[(11u16, y + 1)].symbol() == "█")
         .expect("thumb should render near the bottom");
 
     assert!(
         bottom_thumb_row > top_thumb_row,
         "thumb should move down as content_scroll increases: top={top_thumb_row} bottom={bottom_thumb_row}"
     );
+}
+
+#[test]
+fn scrollbar_never_draws_over_the_text_columns() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = app_for(dir.path());
+    app.show_scrollbar = true;
+    app.content = (0..100).map(|i| format!("line {i}")).collect();
+    app.content_scrolled_at = Instant::now();
+    let buffer = render(&app, 10, 10);
+    // Text occupies columns 1..=10 of a 12-wide buffer; column 11 is the border.
+    for y in 0..12u16 {
+        for x in 0..11u16 {
+            assert_eq!(
+                buffer[(x, y)].symbol(),
+                " ",
+                "cell ({x},{y}) inside the text area must stay untouched"
+            );
+        }
+    }
+    assert!((1..11u16).any(|y| buffer[(11, y)].symbol() == "█"));
 }

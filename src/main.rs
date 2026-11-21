@@ -606,7 +606,7 @@ fn run_event_loop(
         let active = now.duration_since(last_input) < ACTIVE_WINDOW;
         let due = last_render.is_none_or(|t| now.duration_since(t) >= IDLE_FRAME);
         if active || due {
-            render_frame(terminal, tabs)?;
+            with_synchronized_update(|| render_frame(terminal, tabs))?;
             last_render = Some(std::time::Instant::now());
         }
 
@@ -682,6 +682,21 @@ fn terminal_gone() -> bool {
 #[cfg(not(unix))]
 fn terminal_gone() -> bool {
     false
+}
+
+/// Runs `draw` between terminal "synchronized update" markers (CSI ?2026), so a
+/// terminal that supports them presents the whole frame atomically instead of
+/// tearing mid-repaint during large redraws. Unsupporting terminals ignore the
+/// markers. Skipped when stdout is not a terminal (tests, pipes).
+fn with_synchronized_update<T>(draw: impl FnOnce() -> T) -> T {
+    use std::io::IsTerminal;
+    if !io::stdout().is_terminal() {
+        return draw();
+    }
+    let _ = crossterm::execute!(io::stdout(), crossterm::terminal::BeginSynchronizedUpdate);
+    let result = draw();
+    let _ = crossterm::execute!(io::stdout(), crossterm::terminal::EndSynchronizedUpdate);
+    result
 }
 
 /// Clears the terminal when requested, then renders one frame of the UI.
