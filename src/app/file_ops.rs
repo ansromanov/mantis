@@ -560,7 +560,13 @@ impl App {
             self.yaml_anchor_count = y.anchor_count;
             self.yaml_alias_count = y.alias_count;
         }
-        // Language provider fold regions override built-in YAML regions.
+        if !load.fold_regions.is_empty() {
+            self.fold_regions = load.fold_regions;
+        }
+        if load.ok && path.extension().is_some_and(|e| e == "rs") {
+            self.plugin_symbols.insert(path.to_path_buf(), load.symbols);
+        }
+        // Language provider fold regions override built-in regions.
         self.apply_plugin_fold_regions(path);
 
         if load.prettify_size_limit_exceeded {

@@ -40,6 +40,8 @@ mod diff;
 mod event_source;
 mod file;
 mod fold;
+#[allow(dead_code)] // detectors are used via the lib; the bin only needs the loader's subset
+mod fold_detectors;
 mod git;
 mod graphics;
 mod highlight;

@@ -60,6 +60,10 @@ pub(super) struct FileLoad {
     pub csv_table_lines: Spans,
     pub show_csv_table: bool,
     pub yaml: Option<YamlLoad>,
+    /// Fold regions from the built-in per-language detector (non-YAML files).
+    pub fold_regions: Vec<crate::fold::FoldRegion>,
+    /// Symbol outline from the built-in detector (currently Rust only).
+    pub symbols: Vec<crate::plugin::types::Symbol>,
     /// `true` when the file size exceeds the configured `prettify_size_limit`
     /// and JSON/YAML pretty-printing / fold detection was skipped.
     pub prettify_size_limit_exceeded: bool,
@@ -129,6 +133,8 @@ impl FileLoad {
             csv_table_lines: Vec::new(),
             show_csv_table: false,
             yaml: None,
+            fold_regions: Vec::new(),
+            symbols: Vec::new(),
             prettify_size_limit_exceeded: false,
             ok: true,
             encoding: None,
@@ -206,6 +212,11 @@ pub(super) fn compute_file_load(
                 load.line_ending = detect_line_ending(raw).map(|s| s.to_string());
                 load.syntax_name = hl.syntax_name(path);
                 load.shebang = parse_shebang(raw);
+                if !too_large {
+                    if let Ok(text) = std::str::from_utf8(raw) {
+                        apply_language_features(&mut load, path, text);
+                    }
+                }
                 load.virtual_file = Some(vf);
                 load.prettify_size_limit_exceeded = too_large;
                 return load;
@@ -313,6 +324,15 @@ pub(super) fn compute_file_load(
             }
         }
     }
+    if !is_yaml {
+        // JSON folds against the pretty-printed lines, which is what is shown.
+        let text = if load.show_pretty_json {
+            load.json_pretty_text.join("\n")
+        } else {
+            load.content.join("\n")
+        };
+        apply_language_features(&mut load, path, &text);
+    }
     if is_csv {
         let delimiter = crate::csv_table::delimiter_for_path(path);
         let rows = crate::csv_table::parse_delimited(&s, delimiter);
@@ -325,6 +345,19 @@ pub(super) fn compute_file_load(
         }
     }
     load
+}
+
+/// Fills `load.fold_regions` and `load.symbols` from the built-in per-language
+/// detectors. `text` must be what the content pane displays so line numbers match.
+fn apply_language_features(load: &mut FileLoad, path: &Path, text: &str) {
+    if let Some(regions) =
+        crate::fold_detectors::detect_for_path(path, load.shebang.as_deref(), text)
+    {
+        load.fold_regions = regions;
+    }
+    if path.extension().is_some_and(|e| e == "rs") {
+        load.symbols = crate::fold_detectors::rust_symbols(text);
+    }
 }
 
 /// Extracts the interpreter executable name from a UTF-8 shebang line.

@@ -1543,3 +1543,37 @@ fn opening_a_file_clears_a_previously_shown_inline_image() {
     assert!(app.content_image.is_none());
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn opening_rust_file_computes_native_folds_and_symbols() {
+    let root = temp_dir();
+    let f = root.join("lib.rs");
+    fs::write(
+        &f,
+        "fn alpha() {\n    let x = 1;\n}\n\nfn beta() {\n    let y = 2;\n}\n",
+    )
+    .unwrap();
+    let mut app = app_for(&root);
+    app.open_file(&f);
+    assert_eq!(app.fold_regions.len(), 2, "one fold per multi-line fn");
+    let symbols = app.plugin_symbols.get(&f).expect("symbols recorded");
+    let names: Vec<&str> = symbols.iter().map(|s| s.name.as_str()).collect();
+    assert_eq!(names, ["alpha", "beta"]);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn opening_json_file_folds_the_pretty_printed_text() {
+    let root = temp_dir();
+    let f = root.join("data.json");
+    fs::write(&f, r#"{"a":[1,2],"b":{"c":1}}"#).unwrap();
+    let mut app = app_for(&root);
+    app.open_file(&f);
+    // Minified on disk, but displayed pretty-printed: folds must match the display.
+    assert!(app.show_pretty_json);
+    assert!(
+        app.fold_regions.iter().any(|r| r.end > r.start),
+        "pretty-printed JSON should have multi-line fold regions"
+    );
+    fs::remove_dir_all(&root).ok();
+}
