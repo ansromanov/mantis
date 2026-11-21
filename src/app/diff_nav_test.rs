@@ -308,14 +308,6 @@ fn diff_nav_noop_when_not_a_diff() {
 }
 
 #[test]
-fn diff_nav_telemetry_check() {
-    let root = temp_tree();
-    let app = app_for(&root);
-    assert!(!app.telemetry.is_enabled());
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
 fn diff_hunk_rows_finds_all_hunks_in_unified_diff() {
     let root = temp_tree();
     let mut app = app_for(&root);

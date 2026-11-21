@@ -121,9 +121,6 @@ statusbar.right
 statusbar.separator
 tabs
 tabs.restore_on_launch
-telemetry
-telemetry.enabled
-telemetry.notice_shown
 theme
 theme.accent
 theme.accent_alt

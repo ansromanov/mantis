@@ -273,7 +273,6 @@ fn unknown_key_surfaces_as_warning_but_config_still_loads() {
 }
 
 // Serialize env-var manipulation across parallel tests.
-static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 fn unique_migrate_tmp(label: &str) -> std::path::PathBuf {
     std::env::temp_dir().join(format!(
@@ -289,7 +288,7 @@ fn unique_migrate_tmp(label: &str) -> std::path::PathBuf {
 #[test]
 #[cfg(not(windows))]
 fn migrate_renames_old_dir_to_new() {
-    let _guard = ENV_LOCK.lock().unwrap();
+    let _guard = crate::config::CONFIG_HOME_ENV_LOCK.lock().unwrap();
     let tmp = unique_migrate_tmp("a");
     let old_dir = tmp.join("tree-viewer");
     let new_dir = tmp.join("mantis");
@@ -314,7 +313,7 @@ fn migrate_renames_old_dir_to_new() {
 #[test]
 #[cfg(not(windows))]
 fn migrate_skips_when_new_dir_exists() {
-    let _guard = ENV_LOCK.lock().unwrap();
+    let _guard = crate::config::CONFIG_HOME_ENV_LOCK.lock().unwrap();
     let tmp = unique_migrate_tmp("b");
     let old_dir = tmp.join("tree-viewer");
     let new_dir = tmp.join("mantis");
@@ -336,7 +335,7 @@ fn migrate_skips_when_new_dir_exists() {
 #[test]
 #[cfg(not(windows))]
 fn migrate_no_op_when_old_dir_absent() {
-    let _guard = ENV_LOCK.lock().unwrap();
+    let _guard = crate::config::CONFIG_HOME_ENV_LOCK.lock().unwrap();
     let tmp = unique_migrate_tmp("c");
     fs::create_dir_all(&tmp).unwrap();
 

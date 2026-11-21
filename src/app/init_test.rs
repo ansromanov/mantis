@@ -518,42 +518,6 @@ fn app_new_starts_with_no_update_notice_regardless_of_config() {
 }
 
 #[test]
-fn telemetry_disabled_by_default() {
-    let dir = temp_dir();
-    let app = new_app(&dir, Config::default());
-    assert!(!app.telemetry.is_enabled());
-}
-
-#[test]
-fn telemetry_enabled_when_configured() {
-    let _guard = crate::session::STATE_DIR_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
-    let state = tempfile::tempdir().unwrap();
-    std::env::set_var("MANTIS_STATE_DIR", state.path());
-    let dir = temp_dir();
-    let cfg = Config {
-        telemetry: crate::config::TelemetryConfig {
-            enabled: true,
-            notice_shown: false,
-        },
-        ..Config::default()
-    };
-    let app = new_app(&dir, cfg);
-    assert!(app.telemetry.is_enabled());
-    drop(app);
-    let telemetry_dir = state.path().join("telemetry");
-    assert!(std::fs::read_dir(&telemetry_dir)
-        .unwrap()
-        .flatten()
-        .any(|e| e
-            .file_name()
-            .to_str()
-            .is_some_and(|n| n.starts_with("events-") && n.ends_with(".jsonl"))));
-    std::env::remove_var("MANTIS_STATE_DIR");
-}
-
-#[test]
 fn app_new_initializes_initial_root() {
     let root = temp_dir();
     let app = new_app(&root, Config::default());
@@ -638,14 +602,6 @@ fn app_new_ignores_stale_initial_root_that_is_ancestor_of_launch_root() {
     );
     fs::remove_dir_all(&ancestor).ok();
     fs::remove_dir_all(&state_dir).ok();
-}
-
-#[test]
-fn init_telemetry_check() {
-    let root = temp_dir();
-    let app = new_app(&root, Config::default());
-    assert!(!app.telemetry.is_enabled());
-    fs::remove_dir_all(&root).ok();
 }
 
 // -- welcome overlay ---------------------------------------------------------

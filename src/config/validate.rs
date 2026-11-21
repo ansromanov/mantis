@@ -19,6 +19,10 @@ use crate::theme::{ThemeConfig, THEME_COLOR_ROLES};
 const DEPRECATED_KEYS: &[&str] = &[
     // the plugin system was removed; old `[plugins]` tables are ignored
     "plugins",
+    // local telemetry was removed
+    "telemetry",
+    "telemetry.enabled",
+    "telemetry.notice_shown",
     "keys.plugin_picker",
     "statusbar.colors.pluginerror",
     "statusbar.colors.pluginfacts",

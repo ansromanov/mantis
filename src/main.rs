@@ -61,7 +61,6 @@ mod secret_mask;
 mod selection;
 mod session;
 mod sys_info;
-mod telemetry;
 mod theme;
 mod tree;
 mod ui;
@@ -112,10 +111,6 @@ struct Cli {
     /// Self-update to the latest release
     #[arg(long = "update")]
     update: bool,
-
-    /// Print telemetry status and directory
-    #[arg(long = "telemetry-status")]
-    telemetry_status: bool,
 }
 
 /// Prints shell completions for the given shell to stdout.
@@ -139,23 +134,6 @@ fn print_man_page() -> anyhow::Result<()> {
     let mut stdout = std::io::stdout();
     let man = clap_mangen::Man::new(cmd);
     man.render(&mut stdout)?;
-    Ok(())
-}
-
-/// Prints the telemetry status to stdout.
-fn print_telemetry_status() -> anyhow::Result<()> {
-    let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    let (cfg, _, _) = config::load(&current_dir);
-    let status = if cfg.telemetry.enabled {
-        "active"
-    } else {
-        "disabled"
-    };
-    let dir = crate::session::state_dir()
-        .map(|d| d.join("telemetry"))
-        .map(|p| p.display().to_string())
-        .unwrap_or_else(|| "unknown".to_string());
-    println!("Telemetry: {status}\nDirectory: {dir}");
     Ok(())
 }
 
@@ -367,11 +345,6 @@ fn redirect_stdin_to_tty_with(open: impl FnOnce() -> io::Result<std::fs::File>) 
 }
 
 fn main() -> anyhow::Result<()> {
-    use tracing_subscriber::prelude::*;
-    let layer = crate::telemetry::TelemetryLayer;
-    let subscriber = tracing_subscriber::registry().with(layer);
-    let _ = tracing::subscriber::set_global_default(subscriber);
-
     let cli = Cli::parse();
 
     if let Some(shell) = &cli.completions {
@@ -382,9 +355,6 @@ fn main() -> anyhow::Result<()> {
     }
     if cli.update {
         return crate::update::run_self_update();
-    }
-    if cli.telemetry_status {
-        return print_telemetry_status();
     }
 
     let stdin_piped = pager::is_piped_stdin();

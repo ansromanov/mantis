@@ -284,16 +284,6 @@ fn draw_double_checks_default_config_honoured_default_layout() {
     assert!(rows[29].contains(&format!("v{}", env!("CARGO_PKG_VERSION"))));
 }
 #[test]
-fn draw_telemetry_notice_overlay() {
-    let mut app = make_app();
-    app.show_telemetry_notice = true;
-    let rows = render(&mut app);
-    let joined = rows.join("\n");
-    assert!(joined.contains("Telemetry Enabled"));
-    assert!(joined.contains("Storage directory:"));
-}
-
-#[test]
 fn draw_records_statusbar_geometry_for_mouse_hit_testing() {
     let mut app = make_app();
     let rows = render(&mut app);

@@ -286,7 +286,7 @@ fn theme_config_from_preset_sets_name_and_no_overrides() {
 // install_embedded_themes + discover_all user-themes code path
 //
 // These tests mutate XDG_CONFIG_HOME to redirect to a temporary directory so
-// they never touch the developer's real config. ENV_LOCK serialises the three
+// they never touch the developer's real config. CONFIG_HOME_ENV_LOCK serialises the three
 // tests so concurrent env-var reads from other threads don't race.
 // ---------------------------------------------------------------------------
 
@@ -297,16 +297,16 @@ static COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize:
 /// Redirects the platform config-home env var to a fresh temp dir for the
 /// duration of `f`, then restores the original value and removes the temp dir.
 /// On Windows this is APPDATA; everywhere else it is XDG_CONFIG_HOME.
-/// Serialised by `ENV_LOCK`.
-static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
+/// Serialised by `CONFIG_HOME_ENV_LOCK`.
 fn with_isolated_config_home<F: FnOnce(&std::path::Path)>(f: F) {
-    let _guard: MutexGuard<()> = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _guard: MutexGuard<()> = crate::config::CONFIG_HOME_ENV_LOCK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     let n = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let tmp = std::env::temp_dir().join(format!("tv2_theme_test_{}_{n}", std::process::id()));
     std::fs::create_dir_all(&tmp).unwrap();
 
-    // SAFETY: ENV_LOCK serialises all callers; no other thread mutates this var.
+    // SAFETY: CONFIG_HOME_ENV_LOCK serialises all callers; no other thread mutates this var.
     #[cfg(windows)]
     let env_key = "APPDATA";
     #[cfg(not(windows))]

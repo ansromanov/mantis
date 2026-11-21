@@ -287,18 +287,6 @@ impl Default for UpdatesConfig {
     }
 }
 
-/// Local telemetry configuration, grouped under `[telemetry]` in the TOML.
-#[derive(Serialize, Deserialize, Clone, PartialEq, Default)]
-#[serde(default)]
-pub struct TelemetryConfig {
-    /// Collect anonymous usage events into a local, size-capped log under the
-    /// state directory. Nothing is ever sent anywhere. Disabled by default.
-    pub enabled: bool,
-    /// Whether the telemetry collection notice has been shown to the user.
-    #[serde(default)]
-    pub notice_shown: bool,
-}
-
 /// Tabs/workspace configuration, grouped under `[tabs]` in the TOML.
 #[derive(Serialize, Deserialize, Clone, PartialEq)]
 #[serde(default)]
@@ -350,8 +338,6 @@ pub struct Config {
     pub statusbar: StatusBarConfig,
     /// Grouped update settings.
     pub updates: UpdatesConfig,
-    /// Grouped local-telemetry settings.
-    pub telemetry: TelemetryConfig,
     /// Grouped tabs/workspace settings.
     pub tabs: TabsConfig,
     /// User-interface chrome settings.
@@ -417,7 +403,6 @@ impl Default for Config {
             git: GitConfig::default(),
             statusbar: StatusBarConfig::default(),
             updates: UpdatesConfig::default(),
-            telemetry: TelemetryConfig::default(),
             tabs: TabsConfig::default(),
             ui: UiConfig::default(),
 

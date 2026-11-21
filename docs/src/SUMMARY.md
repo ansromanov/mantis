@@ -15,7 +15,7 @@
 - [Git Features](git.md)
 - [Configuration](configuration.md)
 - [Themes](themes.md)
-- [Telemetry & Bug Reports](telemetry.md)
+- [Bug Reports](bug-reports.md)
 
 # Reference
 

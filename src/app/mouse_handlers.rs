@@ -428,21 +428,9 @@ impl App {
                         );
                         if double && is_dir {
                             self.last_click = None;
-                            self.telemetry.record(
-                                crate::telemetry::TelemetryEvent::ActionInvoked {
-                                    action: "tree_expand",
-                                    source: crate::telemetry::ActionSource::Mouse,
-                                },
-                            );
                             self.descend_to_selected();
                         } else {
                             self.last_click = Some((now, index));
-                            self.telemetry.record(
-                                crate::telemetry::TelemetryEvent::ActionInvoked {
-                                    action: "tree_expand",
-                                    source: crate::telemetry::ActionSource::Mouse,
-                                },
-                            );
                             self.activate_selected();
                         }
                     }
@@ -464,12 +452,6 @@ impl App {
                             .find(|&&(y, _)| y == ev.row)
                             .map(|&(_, ri)| ri);
                         if let Some(ri) = hit {
-                            self.telemetry.record(
-                                crate::telemetry::TelemetryEvent::ActionInvoked {
-                                    action: "fold_toggle",
-                                    source: crate::telemetry::ActionSource::Mouse,
-                                },
-                            );
                             self.toggle_fold_region(ri);
                             self.mark_content_scrolled();
                             return;
@@ -597,19 +579,9 @@ impl App {
                     || (self.show_blame && rect_contains(self.blame_area, ev.column, ev.row))
                 {
                     self.focus = Focus::Content;
-                    self.telemetry
-                        .record(crate::telemetry::TelemetryEvent::ActionInvoked {
-                            action: "content_scroll_down",
-                            source: crate::telemetry::ActionSource::Mouse,
-                        });
                     self.scroll_content_by(WHEEL_STEP as isize);
                 } else if rect_contains(self.tree_area, ev.column, ev.row) {
                     self.focus = Focus::Tree;
-                    self.telemetry
-                        .record(crate::telemetry::TelemetryEvent::ActionInvoked {
-                            action: "tree_scroll_down",
-                            source: crate::telemetry::ActionSource::Mouse,
-                        });
                     self.tree_scroll = (self.tree_scroll + WHEEL_STEP).min(self.tree_scroll_max());
                 }
             }
@@ -618,19 +590,9 @@ impl App {
                     || (self.show_blame && rect_contains(self.blame_area, ev.column, ev.row))
                 {
                     self.focus = Focus::Content;
-                    self.telemetry
-                        .record(crate::telemetry::TelemetryEvent::ActionInvoked {
-                            action: "content_scroll_up",
-                            source: crate::telemetry::ActionSource::Mouse,
-                        });
                     self.scroll_content_by(-(WHEEL_STEP as isize));
                 } else if rect_contains(self.tree_area, ev.column, ev.row) {
                     self.focus = Focus::Tree;
-                    self.telemetry
-                        .record(crate::telemetry::TelemetryEvent::ActionInvoked {
-                            action: "tree_scroll_up",
-                            source: crate::telemetry::ActionSource::Mouse,
-                        });
                     self.tree_scroll = self.tree_scroll.saturating_sub(WHEEL_STEP);
                 }
             }
@@ -660,11 +622,6 @@ impl App {
         } else {
             return;
         };
-        self.telemetry
-            .record(crate::telemetry::TelemetryEvent::ActionInvoked {
-                action,
-                source: crate::telemetry::ActionSource::Mouse,
-            });
 
         match action {
             "compare_against" => {

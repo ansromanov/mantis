@@ -206,8 +206,8 @@ fn test_compare_mode_records_base_revision() {
     assert_eq!(app.compare_base.as_deref(), Some("HEAD"));
 }
 
-/// Regression test for PRs #621/#638/#639: the bug-report and telemetry
-/// palette commands from the diagnostics work must stay registered with
+/// Regression test for PRs #621/#638/#639: the bug-report
+/// palette command from the diagnostics work must stay registered with
 /// their documented labels.
 #[test]
 fn test_diagnostics_palette_actions_registered() {
@@ -219,12 +219,6 @@ fn test_diagnostics_palette_actions_registered() {
         bug_report.palette,
         Some("Report a bug (save diagnostics locally)")
     );
-
-    let toggle_telemetry = ACTIONS
-        .iter()
-        .find(|a| a.id == "toggle_telemetry")
-        .expect("toggle_telemetry action must be registered");
-    assert_eq!(toggle_telemetry.palette, Some("Toggle telemetry"));
 
     let compare_against = ACTIONS
         .iter()

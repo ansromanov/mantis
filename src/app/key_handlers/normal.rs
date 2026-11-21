@@ -23,26 +23,9 @@ impl App {
     /// Handles all key events when no overlay is active. Dispatches global
     /// actions (quit, help, search, reload, etc.) and routes to tree/content
     /// handlers based on `self.focus`.
-    ///
-    /// `pub(crate)` rather than `pub(super)`: `app::refresh`'s
-    /// `process_pending_keypress`/`preempt_pending_keypress` (protocol 3+
-    /// `on_keypress` key consumption) call this directly from a sibling
-    /// submodule of `key_handlers`, not just from within `key_handlers`.
     pub(crate) fn handle_normal_key(&mut self, key: KeyEvent) {
         // Clear transient status messages on the next handled keypress.
         self.status_message = None;
-
-        let scope = match self.focus {
-            Focus::Tree => crate::config::BindingScope::Tree,
-            Focus::Content => crate::config::BindingScope::Content,
-        };
-        if let Some(action_id) = self.keys.action_for_key(&key, scope) {
-            self.telemetry
-                .record(crate::telemetry::TelemetryEvent::ActionInvoked {
-                    action: action_id,
-                    source: crate::telemetry::ActionSource::Key,
-                });
-        }
 
         if static_keys::is_close(&key) {
             if self.show_blame {

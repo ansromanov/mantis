@@ -13,8 +13,6 @@
 
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 
-use crate::telemetry::ActionSource;
-
 use super::{rect_contains, App};
 
 use std::borrow::Cow;
@@ -116,7 +114,7 @@ impl App {
                 {
                     let id = item.id.clone();
                     self.menu_bar_state = None;
-                    self.dispatch_action_id(&id, ActionSource::Menu);
+                    self.dispatch_action_id(&id);
                     return;
                 }
             }
@@ -209,7 +207,7 @@ impl App {
                 if let Some(item) = menu_actions(self, MENUS[state.menu_index]).get(row) {
                     let id = item.id.clone();
                     self.menu_bar_state = None;
-                    self.dispatch_action_id(&id, ActionSource::Mouse);
+                    self.dispatch_action_id(&id);
                 }
                 return;
             }

@@ -114,9 +114,6 @@ impl App {
             tree_filter: None,
             goto_line: None,
             command_usage: crate::command_usage::UsageStats::load(),
-            telemetry: crate::telemetry::Telemetry::new(cfg.telemetry.enabled),
-            last_open_source: crate::telemetry::FileSourceKind::Startup,
-            active_overlays: crate::app::ActiveOverlays::default(),
             command_palette: None,
             history: None,
             repo_log: None,
@@ -171,7 +168,6 @@ impl App {
             show_blame: false,
             blame_before_commit: false,
             show_about: false,
-            show_telemetry_notice: false,
             show_welcome: false,
             welcome_area: ratatui::layout::Rect::default(),
             walk_errors,
@@ -325,13 +321,6 @@ impl App {
                 app.set_content_scroll(s.content_scroll);
                 app.active_line = s.active_line.min(app.line_count().saturating_sub(1));
             }
-        }
-
-        // Emit a rich SessionStart event with the full environment and
-        // workspace snapshot now that the app is fully initialized.
-        if app.telemetry.is_enabled() {
-            let snapshot = crate::telemetry::SessionSnapshot::collect(&app);
-            app.telemetry.record_session_start(snapshot);
         }
 
         Ok(app)

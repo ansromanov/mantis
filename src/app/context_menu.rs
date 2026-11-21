@@ -172,11 +172,6 @@ impl App {
             },
             submenu_stack: Vec::new(),
         });
-        self.telemetry
-            .record(crate::telemetry::TelemetryEvent::ActionInvoked {
-                action: "context_menu_open",
-                source: crate::telemetry::ActionSource::Mouse,
-            });
     }
 
     /// Opens the context menu over the content pane, targeting the open file.
@@ -190,11 +185,6 @@ impl App {
             target: ContextMenuTarget::Content,
             submenu_stack: Vec::new(),
         });
-        self.telemetry
-            .record(crate::telemetry::TelemetryEvent::ActionInvoked {
-                action: "context_menu_open",
-                source: crate::telemetry::ActionSource::Mouse,
-            });
     }
 
     /// Closes the context menu if it is open.

@@ -563,33 +563,6 @@ fn updates_check_round_trips_through_serde() {
     assert!(!parsed.updates.check);
 }
 
-#[test]
-fn telemetry_defaults_to_disabled() {
-    let cfg = Config::default();
-    assert!(!cfg.telemetry.enabled);
-}
-
-#[test]
-fn telemetry_enabled_round_trips_through_serde() {
-    let cfg = Config {
-        telemetry: TelemetryConfig {
-            enabled: true,
-            notice_shown: true,
-        },
-        ..Config::default()
-    };
-    let toml_str = toml::to_string_pretty(&cfg).unwrap();
-    let parsed: Config = toml::from_str(&toml_str).unwrap();
-    assert!(parsed.telemetry.enabled);
-    assert!(parsed.telemetry.notice_shown);
-}
-
-#[test]
-fn telemetry_section_parses_from_toml() {
-    let parsed: Config = toml::from_str("[telemetry]\nenabled = true\n").unwrap();
-    assert!(parsed.telemetry.enabled);
-}
-
 // -- GeneralConfig -----------------------------------------------------------
 
 #[test]

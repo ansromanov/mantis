@@ -169,7 +169,6 @@ impl App {
         } else if self.git_mode {
             self.request_working_tree_diff(path);
         } else {
-            self.last_open_source = crate::telemetry::FileSourceKind::Tree;
             self.request_open_file(path);
         }
     }
@@ -544,7 +543,6 @@ impl App {
         });
         self.search = None;
         if let Some((path, line)) = action {
-            self.last_open_source = crate::telemetry::FileSourceKind::Search;
             self.open_file(&path);
             if let Some(ln) = line {
                 self.set_content_scroll(ln.saturating_sub(1));

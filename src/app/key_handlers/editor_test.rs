@@ -179,23 +179,6 @@ fn editor_blame_line_action_noop_when_is_diff() {
 }
 
 #[test]
-fn dispatch_command_toggle_telemetry_toggles_config_and_handle() {
-    let root = temp_tree();
-    let mut app = app_for(&root);
-    assert!(!app.config.telemetry.enabled);
-
-    let mut p = CommandPalette::default();
-    for c in "Toggle telemetry".chars() {
-        p.push(c);
-    }
-    app.command_palette = Some(p);
-    assert!(app.dispatch_command());
-    assert!(app.config.telemetry.enabled);
-    assert!(app.telemetry.is_enabled());
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
 fn commands_includes_blame_line_action() {
     assert!(COMMANDS.iter().any(|c| c.action_id == "blame_line"));
 }
@@ -867,55 +850,6 @@ fn dispatch_bug_report_saves_report_and_sets_status() {
 }
 
 #[test]
-fn dispatch_records_palette_action_in_telemetry_when_enabled() {
-    let _guard = crate::session::STATE_DIR_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
-    let state = tempfile::tempdir().unwrap();
-    std::env::set_var("MANTIS_STATE_DIR", state.path());
-
-    let root = temp_tree();
-    let cfg = Config {
-        telemetry: crate::config::TelemetryConfig {
-            enabled: true,
-            notice_shown: false,
-        },
-        ..Config::default()
-    };
-    let mut app = App::new(root.clone(), cfg, None, None).unwrap();
-    let mut p = CommandPalette::default();
-    for c in "Toggle help".chars() {
-        p.push(c);
-    }
-    app.command_palette = Some(p);
-    assert!(app.dispatch_command());
-    drop(app); // flush the telemetry writer
-
-    let telemetry_dir = state.path().join("telemetry");
-    let mut files: Vec<_> = std::fs::read_dir(&telemetry_dir)
-        .unwrap()
-        .flatten()
-        .filter_map(|e| {
-            let name = e.file_name();
-            let name = name.to_str()?;
-            if name.starts_with("events-") && name.ends_with(".jsonl") {
-                Some(e.path())
-            } else {
-                None
-            }
-        })
-        .collect();
-    files.sort();
-    let raw = std::fs::read_to_string(files.into_iter().next().unwrap()).unwrap();
-    assert!(
-        raw.lines()
-            .any(|l| l.contains("\"action_invoked\"") && l.contains("\"help\"")),
-        "palette dispatch must be recorded: {raw}"
-    );
-    std::env::remove_var("MANTIS_STATE_DIR");
-}
-
-#[test]
 fn test_command_applicability_predicates() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = app_for(dir.path());
@@ -1073,16 +1007,6 @@ fn test_dispatch_inapplicable_command_sets_status_message() {
         .contains("Toggle JSON pretty-print: requires JSON file"));
     // 3. Changes nothing else (e.g. show_pretty_json is not toggled)
     assert!(!app.show_pretty_json);
-}
-
-#[test]
-fn open_external_with_telemetry_enabled() {
-    let root = temp_tree();
-    let mut app = app_for(&root);
-    app.telemetry = crate::telemetry::Telemetry::new(true);
-    app.open_external(std::path::Path::new("test.png"));
-    assert!(app.status_message.is_some());
-    fs::remove_dir_all(&root).ok();
 }
 
 // -- tree_width_grow / tree_width_shrink via command palette (issue #665) ----
@@ -1465,14 +1389,4 @@ fn toggle_secret_reveal_switches_display_content() {
     app.dispatch_command();
     assert_eq!(app.content[0], "API_TOKEN=super-secret");
     fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn generic_action_dispatch_runs_without_a_command_palette() {
-    let root = temp_tree();
-    let mut app = app_for(&root);
-    assert!(app.dispatch_action_id("quit", crate::telemetry::ActionSource::Menu));
-    assert!(app.should_quit);
-    assert!(app.command_palette.is_none());
-    fs::remove_dir_all(root).ok();
 }

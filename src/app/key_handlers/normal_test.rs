@@ -1523,14 +1523,6 @@ fn esc_exits_compare_mode() {
     fs::remove_dir_all(&root).ok();
 }
 
-#[test]
-fn normal_telemetry_check() {
-    let root = temp_tree();
-    let app = app_for(&root);
-    assert!(!app.telemetry.is_enabled());
-    fs::remove_dir_all(&root).ok();
-}
-
 // -- tree width grow/shrink (issue #665) ------------------------------------
 
 #[test]

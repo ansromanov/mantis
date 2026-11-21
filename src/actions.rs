@@ -116,14 +116,6 @@ pub static ACTIONS: &[ActionSpec] = &[
         description: Some("Temporarily reveal credential-shaped file values"),
     },
     ActionSpec {
-        id: "toggle_telemetry",
-        palette: Some("Toggle telemetry"),
-        help: None,
-        category: "General",
-        menu: Some(4),
-        description: Some("Enable or disable local usage telemetry"),
-    },
-    ActionSpec {
         id: "theme_picker",
         palette: Some("Open theme picker"),
         help: Some("pick a theme"),

@@ -21,14 +21,6 @@ fn tick_debounce_holds_while_not_quiet() {
 }
 
 #[test]
-fn active_overlays_tracks_bookmarks_picker() {
-    let mut app = create_base_app();
-    app.bookmarks = Some(crate::search::RecentFilesState::new(Vec::new()));
-    app.check_overlay_transitions();
-    assert!(app.active_overlays.bookmarks);
-}
-
-#[test]
 fn tick_debounce_clears_dirty_after_quiet_period() {
     let mut app = create_base_app();
     app.tree_dirty = true;
@@ -177,7 +169,6 @@ fn create_base_app() -> App {
         blame_area: ratatui::layout::Rect::default(),
         diff_header_area: ratatui::layout::Rect::default(),
         show_about: false,
-        show_telemetry_notice: false,
         show_welcome: false,
         welcome_area: ratatui::layout::Rect::default(),
         walk_errors: 0,
@@ -262,9 +253,6 @@ fn create_base_app() -> App {
         session_last_save: std::time::Instant::now(),
         clipboard_capture: Vec::new(),
         command_usage: crate::command_usage::UsageStats::default(),
-        telemetry: crate::telemetry::Telemetry::disabled(),
-        last_open_source: crate::telemetry::FileSourceKind::Startup,
-        active_overlays: crate::app::ActiveOverlays::default(),
         diff_mode: crate::app::DiffMode::default(),
         goto_line: None,
         tree_filter: None,
@@ -338,12 +326,6 @@ show_file_info = true
         "got status: {:?}",
         status.text
     );
-}
-
-#[test]
-fn refresh_telemetry_check() {
-    let app = create_base_app();
-    assert!(!app.telemetry.is_enabled());
 }
 
 // -- palette sub-picker debounce ------------------------------------------------

@@ -364,7 +364,7 @@ open an interactive modal where you can write a description and preview the
 collected diagnostics. Submitting the modal (`Ctrl+S` or `Ctrl+Enter`) saves the
 report locally, attempts to open the GitHub issue creator in your browser
 prefilled with the report, and falls back to copying the report to your clipboard
-if needed. See [Telemetry & Bug Reports](telemetry.md) for exactly what the
+if needed. See [Bug Reports](bug-reports.md) for exactly what the
 report contains.
 
 ## Git mode history

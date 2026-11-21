@@ -105,15 +105,6 @@ menu_bar = false              # keep the action menu row visible
 check = true                 # check for newer releases (at most once per day)
 
 
-# --- telemetry --------------------------------------------------------------
-# Anonymous, local-only usage telemetry. When enabled, whitelisted events
-# (session start/end, invoked command ids) are appended to a size-capped log
-# under the state directory (see the Telemetry doc page). Nothing is ever
-# sent anywhere, and no paths, file names, or typed text are recorded.
-[telemetry]
-enabled = false              # collect anonymous usage events locally
-
-
 # --- tabs ---------------------------------------------------------------
 # Multiple project tabs and workspace restore.
 [tabs]

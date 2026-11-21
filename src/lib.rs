@@ -5,7 +5,7 @@
 //! architecture: `app` owns the central state machine and input handling, `ui`
 //! owns ratatui rendering, and `config` parses `mantis.toml`. The remaining leaf
 //! modules (`tree`, `git`, `highlight`, `search`, `diff`,
-//! `selection`, `session`, `telemetry`, `theme`,
+//! `selection`, `session`, `theme`,
 //! `virtual_file`, `fold`, `yaml_fold`, `file`, `command_palette`,
 //! `release_info`, `ansi`, `actions`, `pager`, and `update` each provide
 //! one focused capability consumed by `app`/`ui`. Keep this list in sync with
@@ -45,7 +45,6 @@ pub mod secret_mask;
 pub mod selection;
 pub mod session;
 pub mod sys_info;
-pub mod telemetry;
 pub mod theme;
 pub mod tree;
 pub mod ui;

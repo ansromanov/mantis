@@ -39,7 +39,7 @@ pub use types::UiConfig;
 pub use types::{Config, GeneralConfig, StatusBarConfig};
 // Only referenced in test struct literals.
 #[cfg_attr(not(test), allow(unused_imports))]
-pub use types::{TelemetryConfig, UpdatesConfig};
+pub use types::UpdatesConfig;
 #[allow(unused_imports)]
 pub use validate::schema_paths;
 // Used by name only in test code (struct literals in *_test helpers).
@@ -409,6 +409,12 @@ fn config_paths(root: &Path) -> Vec<PathBuf> {
 fn global_config_path() -> Option<PathBuf> {
     config_dir()?.join("mantis.toml").into()
 }
+
+/// Serialises every test that mutates the process-global config-home env var
+/// (`XDG_CONFIG_HOME` / `APPDATA`); separate per-module locks would not stop
+/// concurrent mutations of the same variable.
+#[cfg(test)]
+pub(crate) static CONFIG_HOME_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// The per-user mantis config directory (`$XDG_CONFIG_HOME/mantis`, `~/.config/mantis`
 /// or `%APPDATA%\mantis`), without creating it.

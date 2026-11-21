@@ -215,7 +215,6 @@ impl SearchState {
     }
 
     fn refresh(&mut self) {
-        let _span = tracing::info_span!("search_refresh").entered();
         self.selected = 0;
         match self.mode {
             SearchMode::Files => self.refresh_files(),

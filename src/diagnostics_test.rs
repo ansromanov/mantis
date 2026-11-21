@@ -97,7 +97,6 @@ fn to_markdown_lists_all_sections() {
         "- **open file**:",
         "- **theme**:",
         "- **config overrides**:",
-        "- **telemetry**:",
     ] {
         assert!(md.contains(needle), "missing section {needle}");
     }

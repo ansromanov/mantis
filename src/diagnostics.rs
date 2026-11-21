@@ -68,7 +68,6 @@ pub struct DiagnosticReport {
     // Configuration (key paths that differ from defaults; values omitted).
     pub theme: Option<String>,
     pub config_overrides: Vec<String>,
-    pub telemetry_enabled: bool,
     pub body: String,
 }
 
@@ -129,7 +128,6 @@ impl DiagnosticReport {
             file_uses_mmap: app.virtual_file.is_some(),
             theme: app.config.theme.name.clone(),
             config_overrides: changed_config_paths(&app.config),
-            telemetry_enabled: app.telemetry.is_enabled(),
         }
     }
 
@@ -212,14 +210,6 @@ impl DiagnosticReport {
                 "none".to_string()
             } else {
                 self.config_overrides.join(", ")
-            }
-        ));
-        md.push_str(&format!(
-            "- **telemetry**: {}\n",
-            if self.telemetry_enabled {
-                "enabled"
-            } else {
-                "disabled"
             }
         ));
         md

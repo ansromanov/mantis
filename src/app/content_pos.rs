@@ -422,7 +422,6 @@ impl App {
         self.show_help
             || self.show_about
             || self.show_welcome
-            || self.show_telemetry_notice
             || self.theme_picker.is_some()
             || self.command_palette.is_some()
             || self.history.is_some()

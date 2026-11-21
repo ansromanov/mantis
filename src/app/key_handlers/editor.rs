@@ -41,7 +41,7 @@ impl App {
             .as_ref()
             .and_then(|p| p.selected_command().map(|c| c.action_id.clone()));
         match action_id {
-            Some(id) => self.dispatch_action_id(&id, crate::telemetry::ActionSource::Palette),
+            Some(id) => self.dispatch_action_id(&id),
             None => {
                 self.command_palette = None;
                 false
@@ -52,11 +52,7 @@ impl App {
     /// Dispatches a canonical registry action from a non-palette surface.
     /// Applicability, usage recording, and telemetry stay shared with the
     /// command palette so menu items have identical behavior.
-    pub(crate) fn dispatch_action_id(
-        &mut self,
-        id: &str,
-        source: crate::telemetry::ActionSource,
-    ) -> bool {
+    pub(crate) fn dispatch_action_id(&mut self, id: &str) -> bool {
         if let Err(reason) = self.check_applicability(id) {
             let name = crate::actions::ACTIONS
                 .iter()
@@ -75,11 +71,6 @@ impl App {
         {
             self.command_usage.record(spec.id);
             self.command_usage.save();
-            self.telemetry
-                .record(crate::telemetry::TelemetryEvent::ActionInvoked {
-                    action: spec.id,
-                    source,
-                });
         }
         self.command_palette = None;
         match Some(id) {
@@ -98,10 +89,6 @@ impl App {
             Some("bug_report") => {
                 let report = crate::diagnostics::DiagnosticReport::collect(self);
                 self.bug_report = Some(crate::search::BugReportState::new(report.to_markdown()));
-                true
-            }
-            Some("toggle_telemetry") => {
-                self.toggle_telemetry();
                 true
             }
             Some("quit") => {
@@ -490,7 +477,6 @@ impl App {
         });
         self.command_palette = None;
         if let Some(path) = action {
-            self.last_open_source = crate::telemetry::FileSourceKind::Search;
             self.open_file(&path);
             self.reveal_in_tree(&path);
         }
@@ -508,7 +494,6 @@ impl App {
         });
         self.command_palette = None;
         if let Some((path, line)) = action {
-            self.last_open_source = crate::telemetry::FileSourceKind::Search;
             self.open_file(&path);
             self.set_content_scroll(line.saturating_sub(1));
             self.reveal_in_tree(&path);
@@ -862,11 +847,6 @@ impl App {
         match spawn_system_open(path.as_os_str()) {
             Ok(_) => self.set_status("opened file externally"),
             Err(e) => {
-                self.telemetry
-                    .record(crate::telemetry::TelemetryEvent::ErrorOccurred {
-                        module: "editor",
-                        kind: "external_open_failed",
-                    });
                 self.set_status(format!("external open failed: {e}"));
             }
         }
@@ -883,11 +863,6 @@ impl App {
         match spawn_reveal_in_file_manager(path) {
             Ok(_) => self.set_status(format!("revealed {}", path.display())),
             Err(e) => {
-                self.telemetry
-                    .record(crate::telemetry::TelemetryEvent::ErrorOccurred {
-                        module: "editor",
-                        kind: "file_manager_open_failed",
-                    });
                 self.set_status(format!("file manager open failed: {e}"));
             }
         }

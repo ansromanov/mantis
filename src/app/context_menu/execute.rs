@@ -220,11 +220,6 @@ impl App {
     /// the menu. Same behaviour as the equivalent keybindings; user-visible
     /// failures surface as status messages rather than being swallowed.
     pub(crate) fn execute_context_action(&mut self, id: ContextActionId) {
-        self.telemetry
-            .record(crate::telemetry::TelemetryEvent::ActionInvoked {
-                action: "context_menu_action",
-                source: crate::telemetry::ActionSource::Mouse,
-            });
         if matches!(
             id,
             ContextActionId::FileHistory
