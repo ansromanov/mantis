@@ -3,8 +3,6 @@ use super::*;
 
 use std::fs;
 
-use crate::config::TelemetryConfig;
-
 fn fixture_root() -> tempfile::TempDir {
     let tmp = tempfile::tempdir().unwrap();
     fs::create_dir(tmp.path().join("sub")).unwrap();
@@ -15,25 +13,6 @@ fn fixture_root() -> tempfile::TempDir {
 
 fn app_for(root: &std::path::Path) -> App {
     App::new(root.to_path_buf(), Config::default(), None, None).unwrap()
-}
-
-#[test]
-fn collect_counts_workspace_shape() {
-    let tmp = fixture_root();
-    let app = app_for(tmp.path());
-    let report = DiagnosticReport::collect(&app);
-
-    assert_eq!(report.app_version, env!("CARGO_PKG_VERSION"));
-    assert_eq!(report.os, std::env::consts::OS);
-    // Only the root's direct children are visible while `sub/` is collapsed.
-    assert_eq!(report.tree_nodes, 2);
-    assert_eq!(report.tree_files, 1);
-    assert_eq!(report.tree_dirs, 1);
-    assert_eq!(report.tree_files + report.tree_dirs, report.tree_nodes);
-    assert!(!report.file_open);
-    // Bundled plugins are seeded into the config at construction time.
-    assert_eq!(report.plugin_count, app.config.plugins.len());
-    assert!(!report.telemetry_enabled);
 }
 
 #[test]
@@ -77,29 +56,6 @@ fn serialized_report_never_contains_paths_or_names() {
 }
 
 #[test]
-fn changed_config_paths_reports_paths_without_values() {
-    let mut cfg = Config::default();
-    cfg.tree.show_hidden = true;
-    cfg.telemetry = TelemetryConfig {
-        enabled: true,
-        notice_shown: false,
-    };
-    cfg.plugins.insert(
-        "my-secret-plugin".into(),
-        crate::plugin::PluginEntry::default(),
-    );
-
-    let paths = changed_config_paths(&cfg);
-    assert!(paths.contains(&"tree.show_hidden".to_string()));
-    assert!(paths.contains(&"telemetry.enabled".to_string()));
-    assert!(paths.contains(&"plugins".to_string()));
-    assert!(
-        !paths.iter().any(|p| p.contains("my-secret-plugin")),
-        "plugin names must never appear"
-    );
-}
-
-#[test]
 fn changed_config_paths_empty_for_default_config() {
     assert!(changed_config_paths(&Config::default()).is_empty());
 }
@@ -131,7 +87,6 @@ fn to_markdown_lists_all_sections() {
     let md = DiagnosticReport::collect(&app).to_markdown();
     for needle in [
         "- **app version**:",
-        "- **target**:",
         "- **release date**:",
         "- **os**:",
         "- **arch**:",
@@ -142,25 +97,7 @@ fn to_markdown_lists_all_sections() {
         "- **open file**:",
         "- **theme**:",
         "- **config overrides**:",
-        "- **plugins**:",
-        "- **telemetry**:",
     ] {
         assert!(md.contains(needle), "missing section {needle}");
     }
-}
-
-#[test]
-fn collect_includes_bug_report_body() {
-    let tmp = fixture_root();
-    let mut app = app_for(tmp.path());
-    let mut state = crate::search::BugReportState::new(String::new());
-    state.text = vec!["Hello bug".to_string(), "Line 2".to_string()];
-    app.bug_report = Some(state);
-
-    let report = DiagnosticReport::collect(&app);
-    assert_eq!(report.body, "Hello bug\nLine 2");
-    assert!(!report.target_triple.is_empty());
-
-    let md = report.to_markdown();
-    assert!(md.contains("## bug report body\n\nHello bug\nLine 2\n\n"));
 }

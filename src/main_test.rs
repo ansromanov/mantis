@@ -197,12 +197,6 @@ fn cli_parses_update() {
 }
 
 #[test]
-fn cli_parses_telemetry_status() {
-    let cli = Cli::try_parse_from(["mantis", "--telemetry-status"]).unwrap();
-    assert!(cli.telemetry_status);
-}
-
-#[test]
 fn cli_parses_path_and_language() {
     let cli = Cli::try_parse_from(["mantis", "--language", "rust", "/some/path"]).unwrap();
     assert_eq!(cli.language.as_deref(), Some("rust"));

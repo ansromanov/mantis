@@ -63,12 +63,9 @@ fn render_virtual_file_marks_diagnostic_lines() {
     app.open_file(&path);
 
     let screen = render(&mut app, |app| {
-        app.plugin_diagnostic_lines.insert(
+        app.file_diagnostic_lines.insert(
             path.clone(),
-            std::collections::HashMap::from([(
-                1,
-                crate::plugin::types::DiagnosticSeverity::Warning,
-            )]),
+            std::collections::HashMap::from([(1, crate::code_intel::DiagnosticSeverity::Warning)]),
         );
     });
 

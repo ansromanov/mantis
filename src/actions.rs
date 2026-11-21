@@ -43,7 +43,7 @@ pub struct ActionSpec {
 /// Canonical action groups shared by help, the command palette, and the menu bar.
 /// Add a new group here before using it in an action.
 pub const ACTION_CATEGORIES: &[&str] = &[
-    "General", "View", "Git", "Copy", "Navigate", "Tree", "Tabs", "Safety", "Plugins",
+    "General", "View", "Git", "Copy", "Navigate", "Tree", "Tabs", "Safety",
 ];
 
 /// The canonical action registry. Add a new bound action here first, then
@@ -114,14 +114,6 @@ pub static ACTIONS: &[ActionSpec] = &[
         category: "Safety",
         menu: Some(0),
         description: Some("Temporarily reveal credential-shaped file values"),
-    },
-    ActionSpec {
-        id: "toggle_telemetry",
-        palette: Some("Toggle telemetry"),
-        help: None,
-        category: "General",
-        menu: Some(4),
-        description: Some("Enable or disable local usage telemetry"),
     },
     ActionSpec {
         id: "theme_picker",
@@ -202,14 +194,6 @@ pub static ACTIONS: &[ActionSpec] = &[
         category: "Tabs",
         menu: Some(7),
         description: Some("Restore the most recently closed tab"),
-    },
-    ActionSpec {
-        id: "plugin_picker",
-        palette: Some("Open plugin manager"),
-        help: Some("plugin manager"),
-        category: "Plugins",
-        menu: Some(0),
-        description: Some("Manage installed plugins"),
     },
     ActionSpec {
         id: "git_mode_toggle",
@@ -572,8 +556,8 @@ pub static ACTIONS: &[ActionSpec] = &[
     },
     ActionSpec {
         id: "toggle_raw_markdown",
-        palette: Some("Toggle markdown render (markdown plugin)"),
-        help: Some("toggle markdown render (md files, markdown plugin)"),
+        palette: Some("Toggle markdown render"),
+        help: Some("toggle markdown render (md files)"),
         category: "View",
         menu: Some(9),
         description: Some("Toggle between rendered and raw markdown"),
@@ -745,7 +729,7 @@ pub enum Applicability {
     /// Requires the current file to have fold regions.
     FoldRegions,
     /// Requires the current file to be rendered by a plugin (active plugin content).
-    PluginContentActive,
+    RenderedMarkdownActive,
     /// Requires being in git mode.
     GitMode,
     /// Requires a current file with symbols from its language provider.
@@ -772,7 +756,7 @@ impl ActionSpec {
             "toggle_file_revision" => Applicability::GitRepoAndDiffView,
             "blame_open_commit" => Applicability::GitRepoAndNoDiff,
             "fold_toggle" | "fold_all" | "unfold_all" => Applicability::FoldRegions,
-            "toggle_raw_markdown" => Applicability::PluginContentActive,
+            "toggle_raw_markdown" => Applicability::RenderedMarkdownActive,
             "open_in_editor" | "open_external" | "copy_path" | "copy_relative_path"
             | "copy_line" | "copy_file" | "goto_line" => Applicability::OpenFile,
             "symbol_outline" => Applicability::Symbols,

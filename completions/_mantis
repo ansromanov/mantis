@@ -20,12 +20,11 @@ _mantis() {
 '--completions=[Generate shell completions (bash, zsh, fish, powershell)]:SHELL:_default' \
 '--print-man-page[Print the man page to stdout]' \
 '--update[Self-update to the latest release]' \
-'--telemetry-status[Print telemetry status and directory]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \
 '-V[Print version]' \
 '--version[Print version]' \
-'::path -- File or directory to open (default\: current directory):_files' \
+'*::paths -- File(s) or directory(ies) to open, each as its own tab (default\: current directory):_files' \
 && ret=0
 }
 

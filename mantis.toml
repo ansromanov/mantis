@@ -10,7 +10,7 @@
 # overrides the global config.
 #
 # Sections below: [general] keys first (must precede any table), then
-# [tree] [content] [search] [git] [statusbar] [ui] [keys] [theme] [plugins].
+# [tree] [content] [search] [git] [statusbar] [ui] [keys] [theme].
 # ============================================================================
 
 
@@ -36,7 +36,7 @@ independent_scroll = false   # PageUp/Down scroll the viewport without moving
                              #   the selection (Up/Down still move the cursor)
 indent_guides = true         # draw indentation guides (│)
 icons = false                # Nerd Font file-type icons (needs a Nerd Font in
-                             #   the terminal AND the iconize plugin enabled)
+                             #   the terminal)
 
 
 # --- content ----------------------------------------------------------------
@@ -81,7 +81,7 @@ side_by_side = false         # start the diff view in side-by-side layout
 # render on their configured side, in listed order; unlisted ids are hidden.
 # Set both to empty lists for an empty bar.
 # Valid ids: badges scroll lnum type jsonpath fileinfo git errors folds
-# pluginfacts message pluginerror version update
+# message version update
 [statusbar]
 # left = ["hint", "badges", "scroll", "lnum", "type", "fileinfo", "git", "errors", "folds", "message"]
 # right = ["lnum", "type", "git", "version", "update"]
@@ -103,15 +103,6 @@ menu_bar = false              # keep the action menu row visible
 # Optional background update check.
 [updates]
 check = true                 # check for newer releases (at most once per day)
-
-
-# --- telemetry --------------------------------------------------------------
-# Anonymous, local-only usage telemetry. When enabled, whitelisted events
-# (session start/end, invoked command ids) are appended to a size-capped log
-# under the state directory (see the Telemetry doc page). Nothing is ever
-# sent anywhere, and no paths, file names, or typed text are recorded.
-[telemetry]
-enabled = false              # collect anonymous usage events locally
 
 
 # --- tabs ---------------------------------------------------------------
@@ -137,7 +128,6 @@ switch_panel = ["Tab"]
 context_menu = ["Menu", "shift+F10"]
 toggle_hidden = [".", "alt+."]
 theme_picker = ["t"]
-plugin_picker = ["p"]
 open_in_editor = ["e"]
 copy_path = ["y"]
 copy_relative_path = ["Y"]
@@ -223,40 +213,3 @@ diff_hunk_prev = ["N"]
 # breadcrumb_fg = "white"           # path breadcrumb bar
 # breadcrumb_bg = "#303030"
 # active_line_bg = "#303030"        # highlight under the content cursor line
-
-
-# --- plugins ----------------------------------------------------------------
-# Subprocess plugins extend mantis over newline-delimited JSON on stdin/stdout.
-# Relative paths resolve against the plugin directory:
-#   Linux/macOS: ~/.config/mantis/plugins/   Windows: %APPDATA%\mantis\plugins\
-# Protocol docs: https://github.com/ansromanov/mantis
-#
-# Entry fields:
-#   path        executable (process) or .sublime-syntax file (syntax)  [required]
-#   enabled     spawn at startup; default true
-#   kind        "process" (default) | "syntax"
-#   extensions  file extensions a syntax plugin handles, e.g. ["tf"]
-#   syntax_file path to the .sublime-syntax file (syntax plugins)
-#   events      manifest events to subscribe to; empty = all
-#
-# Bundled plugins (installed to the plugin dir on first run). All enabled by default:
-#
-# [plugins.iconize]                 # Nerd Font file-type icons (set tree.icons = true)
-# enabled = true
-# path = "iconize"
-#
-# [plugins.markdown]                # render .md with pulldown-cmark; M toggles raw
-# enabled = true
-# path = "markdown"
-#
-# To disable a bundled plugin, set enabled = false:
-# [plugins.rust]
-# enabled = false
-#
-# Syntax plugin example (extra highlighting; no subprocess spawned):
-# [plugins.terraform]
-# enabled = true
-# kind = "syntax"
-# path = "syntaxes/terraform.sublime-syntax"
-# syntax_file = "syntaxes/terraform.sublime-syntax"
-# extensions = ["tf", "tfvars"]

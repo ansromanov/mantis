@@ -33,10 +33,6 @@ impl App {
 
     /// Scrolls to the next hunk header below the current scroll position.
     pub(crate) fn diff_next_hunk(&mut self) {
-        self.telemetry
-            .record(crate::telemetry::TelemetryEvent::FeatureUsed {
-                feature: crate::telemetry::Feature::DiffNav,
-            });
         let cur = self.content_scroll;
         if let Some(&next) = self.diff_hunk_rows().iter().find(|&&i| i > cur) {
             self.set_content_scroll(next);
@@ -46,10 +42,6 @@ impl App {
 
     /// Scrolls to the previous hunk header above the current scroll position.
     pub(crate) fn diff_prev_hunk(&mut self) {
-        self.telemetry
-            .record(crate::telemetry::TelemetryEvent::FeatureUsed {
-                feature: crate::telemetry::Feature::DiffNav,
-            });
         let cur = self.content_scroll;
         if let Some(&prev) = self.diff_hunk_rows().iter().rev().find(|&&i| i < cur) {
             self.set_content_scroll(prev);

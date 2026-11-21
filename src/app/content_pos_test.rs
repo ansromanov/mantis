@@ -23,19 +23,25 @@ fn temp_root() -> PathBuf {
 }
 
 fn app_for(root: &std::path::Path) -> App {
-    App::new(root.to_path_buf(), Config::default(), None, None).unwrap()
+    let mut app = App::new(root.to_path_buf(), Config::default(), None, None).unwrap();
+    // App::new auto-opens the placeholder markdown file, which now renders
+    // natively; these tests drive `content` / seeded rendered content directly.
+    app.rendered_active = false;
+    app.rendered_content.clear();
+    app.rendered_text.clear();
+    app
 }
 
 fn span(text: &str) -> Vec<(Style, String)> {
     vec![(Style::default(), text.to_string())]
 }
 
-/// Seed `plugin_content` (styled spans) and `plugin_content_text` for `path`.
+/// Seed `rendered_content` (styled spans) and `rendered_text` for `path`.
 fn seed_plugin(app: &mut App, path: PathBuf, lines: &[&str]) {
     let rendered: Vec<Vec<(Style, String)>> = lines.iter().map(|l| span(l)).collect();
     let text: Vec<String> = lines.iter().map(|l| l.to_string()).collect();
-    app.plugin_content_text.insert(path.clone(), text);
-    app.plugin_content.insert(path.clone(), rendered);
+    app.rendered_text.insert(path.clone(), text);
+    app.rendered_content.insert(path.clone(), rendered);
     app.current_file = Some(path);
 }
 
@@ -298,24 +304,6 @@ fn can_mouse_select_true_for_plugin_content() {
 // -- set_active_line_from_physical tests --
 
 #[test]
-fn set_active_line_from_physical_is_identity_without_folds() {
-    let root = temp_root();
-    let mut app = app_for(&root);
-    app.virtual_file = None;
-    app.content = (0..20).map(|i| format!("line {i}")).collect();
-    app.current_file = Some(root.join("cursor.txt"));
-    app.session_dirty = false;
-    app.set_active_line_from_physical(7);
-    assert_eq!(app.active_line, 7);
-    assert!(app.session_dirty);
-    assert_eq!(
-        app.pending_content_cursor,
-        Some((root.join("cursor.txt"), 8, 1))
-    );
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
 fn set_active_line_from_physical_maps_through_fold_display_map() {
     let root = temp_root();
     let mut app = app_for(&root);
@@ -486,36 +474,6 @@ fn scroll_blame_into_view_does_not_nudge_when_already_in_view() {
     app.active_line = 7;
     app.scroll_blame_into_view();
     assert_eq!(app.content_scroll, 5, "content_scroll must not change");
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn scroll_content_by_keeps_cursor_in_view() {
-    let root = temp_root();
-    let mut app = app_for(&root);
-    app.content = (0..50).map(|i| format!("line {i}")).collect();
-    app.virtual_file = None;
-    app.current_file = Some(root.join("cursor.txt"));
-    app.content_area = Rect {
-        x: 0,
-        y: 0,
-        width: 30,
-        height: 10,
-    };
-
-    app.scroll_content_by(3);
-
-    assert_eq!(app.content_scroll, 3);
-    assert_eq!(app.active_line, 3);
-    assert_eq!(
-        app.pending_content_cursor,
-        Some((root.join("cursor.txt"), 4, 1))
-    );
-
-    app.scroll_content_by(-3);
-
-    assert_eq!(app.content_scroll, 0);
-    assert_eq!(app.active_line, 3);
     fs::remove_dir_all(&root).ok();
 }
 

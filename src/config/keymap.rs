@@ -291,7 +291,6 @@ impl Keymap {
             "copy_relative_path" => &self.copy_relative_path,
             "copy_line" => &self.copy_line,
             "copy_file" => &self.copy_file,
-            "plugin_picker" => &self.plugin_picker,
             "goto_line" => &self.goto_line,
             "symbol_outline" => &self.symbol_outline,
             "diagnostics_picker" => &self.diagnostics_picker,
@@ -312,16 +311,6 @@ impl Keymap {
             "reopen_tab" => &self.reopen_tab,
             _ => &[],
         }
-    }
-
-    pub fn action_for_key(&self, key: &KeyEvent, scope: BindingScope) -> Option<&'static str> {
-        for spec in crate::actions::ACTIONS {
-            let bindings = self.bindings_for_action(spec.id);
-            if crate::config::pressed_in(bindings, key, scope) {
-                return Some(spec.id);
-            }
-        }
-        None
     }
 
     /// Returns a display label for the first binding mapped to `action_id`,
@@ -427,7 +416,6 @@ pub struct Keymap {
     pub copy_relative_path: Vec<KeyBinding>,
     pub copy_line: Vec<KeyBinding>,
     pub copy_file: Vec<KeyBinding>,
-    pub plugin_picker: Vec<KeyBinding>,
     pub goto_line: Vec<KeyBinding>,
     /// Opens the current file's language-provider symbol outline.
     pub symbol_outline: Vec<KeyBinding>,
@@ -463,10 +451,7 @@ impl Default for Keymap {
     /// are `tree:`-scoped so the content pane stays letter-free apart from
     /// the vim motion set (`j k h l g G 0 n N`), the copy/blame pairs
     /// (`content:y`/`content:Y`, `content:B`), and `M` (markdown raw/rendered
-    /// toggle — bare, unscoped, because the bundled markdown plugin only
-    /// recognizes the literal key `M` over its `on_keypress` event; a rebound
-    /// key is translated back to `M` before being forwarded, see
-    /// `key_handlers::normal::handle_content_key`). All other content-pane
+    /// toggle). All other content-pane
     /// toggles go through modifier combos or the command palette.
     /// No default uses Ctrl+Shift (kitty's `kitty_mod`, Windows Terminal's
     /// own palette/search, indistinguishable from plain Ctrl on legacy
@@ -530,7 +515,6 @@ impl Default for Keymap {
             copy_relative_path: bind(&["tree:Y"]),
             copy_line: bind(&["content:y"]),
             copy_file: bind(&["content:Y"]),
-            plugin_picker: bind(&["tree:p"]),
             goto_line: bind(&["ctrl+g"]),
             symbol_outline: bind(&["content:O"]),
             diagnostics_picker: bind(&["content:!"]),

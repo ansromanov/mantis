@@ -1064,7 +1064,9 @@ pub fn yaml_fold(lines: &[impl AsRef<str>]) -> Vec<FoldRegion> {
     crate::yaml_fold::detect_fold_regions(lines)
 }
 
+mod dispatch;
 mod symbols;
+pub use dispatch::detect_for_path;
 pub use symbols::rust_symbols;
 
 #[cfg(test)]

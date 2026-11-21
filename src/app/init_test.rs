@@ -35,14 +35,6 @@ fn new_app_starts_with_no_cached_affordances() {
 }
 
 #[test]
-fn new_app_starts_with_no_provider_diagnostics() {
-    let app = App::new(std::path::PathBuf::from("."), Config::default(), None, None).unwrap();
-    assert!(app.plugin_diagnostics.is_empty());
-    assert!(app.plugin_diagnostic_lines.is_empty());
-    assert!(app.pending_diagnostic_requests.is_empty());
-}
-
-#[test]
 fn new_app_starts_with_empty_git_status_subsets_and_diff_header_area() {
     let root = temp_dir();
     let app = App::new(root.clone(), Config::default(), None, None).unwrap();
@@ -109,68 +101,6 @@ fn app_new_starts_with_no_tree_guide_cache() {
 }
 
 #[test]
-fn app_new_starts_with_no_plugin_contributions() {
-    // A freshly constructed App has produced no plugin output yet, so the
-    // per-plugin contribution tracker must be empty.
-    let root = temp_dir();
-    fs::write(root.join("a.txt"), "one\n").unwrap();
-
-    let app = new_app(&root, Config::default());
-
-    assert!(
-        app.plugin_contributions.is_empty(),
-        "new App must have no plugin contributions"
-    );
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn app_new_plugin_open_guard_defaults_false() {
-    // The re-entrancy guard that suppresses `on_file_open` re-emission for
-    // plugin-originated opens must start cleared.
-    let root = temp_dir();
-    let app = new_app(&root, Config::default());
-    assert!(!app.plugin_is_opening_file);
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn app_new_starts_with_empty_plugin_content() {
-    // Fresh App must have no plugin-provided content cached, neither the styled
-    // spans nor the parallel plain-text store.
-    let root = temp_dir();
-    let app = new_app(&root, Config::default());
-    assert!(
-        app.plugin_content.is_empty(),
-        "plugin_content must start empty"
-    );
-    assert!(
-        app.plugin_content_text.is_empty(),
-        "plugin_content_text must start empty"
-    );
-    assert!(
-        app.plugin_content_streams.is_empty(),
-        "plugin_content_streams must start empty"
-    );
-    assert!(
-        app.plugin_status_facts.is_empty(),
-        "plugin_status_facts must start empty"
-    );
-    assert!(app.pending_content_cursor.is_none());
-    assert!(app.content_cursor_dirty_at.is_none());
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn app_new_starts_with_empty_plugin_symbols() {
-    let root = temp_dir();
-    let mut app = new_app(&root, Config::default());
-    assert!(app.plugin_symbols.is_empty());
-    app.plugin_manager.deactivate_all();
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
 fn app_new_hides_dotfiles_by_default() {
     let root = temp_dir();
     fs::write(root.join("visible.txt"), "x\n").unwrap();
@@ -203,148 +133,6 @@ fn app_new_show_hidden_includes_dotfiles() {
 
     let names: Vec<&str> = app.nodes.iter().map(|n| n.name.as_str()).collect();
     assert!(names.contains(&".hidden"), "got {names:?}");
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn app_new_registers_syntax_plugins_in_manager_for_palette() {
-    // init.rs hands *all* plugin entries (including syntax-kind) to the
-    // PluginManager so they surface in the plugin palette; the bundled
-    // toml syntax plugin is seeded into the config by default.
-    let root = temp_dir();
-    let app = new_app(&root, Config::default());
-    let entries = app.plugin_manager.plugin_entries();
-    assert!(
-        entries
-            .iter()
-            .any(|(_, _, kind, _)| *kind == crate::plugin::PluginKind::Syntax),
-        "a syntax plugin must be registered in the manager so it appears in the \
-         plugin palette; got {entries:?}"
-    );
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-#[cfg(unix)]
-fn app_new_sends_resolved_theme_colors_to_plugins_on_init() {
-    // init.rs resolves the configured theme and hands it to
-    // `plugin_manager.activate_all` so plugins get real theme colors on
-    // `init` instead of just a theme name (they used to have to hardcode a
-    // palette per theme name).
-    use std::io::Write as _;
-    use std::os::unix::fs::PermissionsExt;
-    use std::time::{Duration, Instant};
-
-    let root = temp_dir();
-    let plugin_dir = std::env::temp_dir().join(format!(
-        "tv_init_colors_plugin_{}_{}",
-        std::process::id(),
-        root.file_name().unwrap().to_string_lossy()
-    ));
-    fs::create_dir_all(&plugin_dir).unwrap();
-    let out = plugin_dir.join("recv.txt");
-    let script = plugin_dir.join("rec.sh");
-    let mut f = fs::File::create(&script).unwrap();
-    write!(f, "#!/bin/sh\ncat > \"{}\"\n", out.display()).unwrap();
-    drop(f);
-    fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
-
-    let mut cfg = Config::default();
-    cfg.theme.name = Some("monokai".into());
-    cfg.plugins.insert(
-        "rec".to_string(),
-        crate::plugin::PluginEntry {
-            path: script.clone(),
-            enabled: true,
-            ..Default::default()
-        },
-    );
-
-    let mut app = new_app(&root, cfg);
-
-    let deadline = Instant::now() + Duration::from_secs(10);
-    let contents = loop {
-        if let Ok(s) = fs::read_to_string(&out) {
-            if !s.is_empty() {
-                break s;
-            }
-        }
-        assert!(Instant::now() < deadline, "plugin never received init");
-        std::thread::sleep(Duration::from_millis(25));
-    };
-    app.plugin_manager.deactivate_all();
-    let init_line = contents
-        .lines()
-        .find(|l| l.contains(r#""event":"init""#))
-        .expect("init event must be sent");
-    let monokai = crate::theme::Theme::load("monokai").expect("monokai theme must load");
-    let expected = format!(
-        r#""heading1":"{}""#,
-        crate::theme::color_to_hex(monokai.heading1)
-    );
-    assert!(
-        init_line.contains(&expected),
-        "init colors must carry the configured theme's actual heading1 hex, got: {init_line}"
-    );
-    fs::remove_dir_all(&root).ok();
-    fs::remove_dir_all(&plugin_dir).ok();
-}
-
-#[test]
-fn app_new_bundled_plugins_appear_in_config_plugins_map() {
-    // Regression: bundled/manifest plugins were seeded into `cfg.plugins` only
-    // *after* `saved_config = cfg.clone()`, so `self.config.plugins` was empty
-    // and `toggle_plugin_picker_selection` could never persist the enabled flag.
-    let root = temp_dir();
-    let app = new_app(&root, Config::default());
-    assert!(
-        !app.config.plugins.is_empty(),
-        "bundled plugins must appear in config.plugins; got empty map"
-    );
-    // At least one bundled entry should be present (e.g. the markdown plugin).
-    let bundled: Vec<String> = crate::plugin::bundled_plugin_entries()
-        .into_iter()
-        .map(|(n, _)| n)
-        .collect();
-    for name in &bundled {
-        assert!(
-            app.config.plugins.contains_key(name),
-            "bundled plugin {name} must appear in config.plugins"
-        );
-    }
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn app_new_bundled_plugin_toggle_flips_enabled_flag() {
-    // Toggling a bundled plugin's enabled flag via config.plugins.get_mut
-    // must succeed because the entry is present in self.config.plugins.
-    let root = temp_dir();
-    let mut app = new_app(&root, Config::default());
-    let bundled: Vec<String> = crate::plugin::bundled_plugin_entries()
-        .into_iter()
-        .map(|(n, _)| n)
-        .collect();
-    let name = bundled.first().expect("at least one bundled plugin");
-    let orig = app
-        .config
-        .plugins
-        .get(name)
-        .map(|e| e.enabled)
-        .unwrap_or(false);
-    if let Some(entry) = app.config.plugins.get_mut(name) {
-        entry.enabled = !orig;
-    }
-    let flipped = app
-        .config
-        .plugins
-        .get(name)
-        .map(|e| e.enabled)
-        .unwrap_or(orig);
-    assert_ne!(
-        orig, flipped,
-        "toggling bundled plugin {name}: enabled should have flipped from {orig}"
-    );
     fs::remove_dir_all(&root).ok();
 }
 
@@ -582,8 +370,8 @@ fn plugin_content_active_path_initialises_to_none() {
     let root = temp_dir();
     let app = new_app(&root, Config::default());
     assert!(
-        app.plugin_content_active_path.is_none(),
-        "plugin_content_active_path must be None at construction so the first set_content is treated as first-render"
+        app.rendered_active_path.is_none(),
+        "rendered_active_path must be None at construction so the first set_content is treated as first-render"
     );
     fs::remove_dir_all(&root).ok();
 }
@@ -730,42 +518,6 @@ fn app_new_starts_with_no_update_notice_regardless_of_config() {
 }
 
 #[test]
-fn telemetry_disabled_by_default() {
-    let dir = temp_dir();
-    let app = new_app(&dir, Config::default());
-    assert!(!app.telemetry.is_enabled());
-}
-
-#[test]
-fn telemetry_enabled_when_configured() {
-    let _guard = crate::session::STATE_DIR_ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
-    let state = tempfile::tempdir().unwrap();
-    std::env::set_var("MANTIS_STATE_DIR", state.path());
-    let dir = temp_dir();
-    let cfg = Config {
-        telemetry: crate::config::TelemetryConfig {
-            enabled: true,
-            notice_shown: false,
-        },
-        ..Config::default()
-    };
-    let app = new_app(&dir, cfg);
-    assert!(app.telemetry.is_enabled());
-    drop(app);
-    let telemetry_dir = state.path().join("telemetry");
-    assert!(std::fs::read_dir(&telemetry_dir)
-        .unwrap()
-        .flatten()
-        .any(|e| e
-            .file_name()
-            .to_str()
-            .is_some_and(|n| n.starts_with("events-") && n.ends_with(".jsonl"))));
-    std::env::remove_var("MANTIS_STATE_DIR");
-}
-
-#[test]
 fn app_new_initializes_initial_root() {
     let root = temp_dir();
     let app = new_app(&root, Config::default());
@@ -850,14 +602,6 @@ fn app_new_ignores_stale_initial_root_that_is_ancestor_of_launch_root() {
     );
     fs::remove_dir_all(&ancestor).ok();
     fs::remove_dir_all(&state_dir).ok();
-}
-
-#[test]
-fn init_telemetry_check() {
-    let root = temp_dir();
-    let app = new_app(&root, Config::default());
-    assert!(!app.telemetry.is_enabled());
-    fs::remove_dir_all(&root).ok();
 }
 
 // -- welcome overlay ---------------------------------------------------------
@@ -997,46 +741,4 @@ fn app_new_starts_with_no_pending_tab_action() {
     assert!(app.tab_action_request.is_none());
     assert!(app.commit_base.is_none());
     fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn app_new_installs_bundled_plugins_on_startup() {
-    let _guard = crate::plugin::ENV_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
-    let tmp = std::env::temp_dir().join(format!(
-        "mantis_app_new_plugin_install_{}_{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_nanos())
-            .unwrap_or(0)
-    ));
-    std::fs::create_dir_all(&tmp).unwrap();
-    let var = if cfg!(windows) {
-        "APPDATA"
-    } else {
-        "XDG_CONFIG_HOME"
-    };
-    let old = std::env::var_os(var);
-    unsafe { std::env::set_var(var, &tmp) };
-
-    let root = temp_dir();
-    let mut app = new_app(&root, Config::default());
-    app.plugin_manager.deactivate_all();
-
-    let plugin_dir = tmp.join("mantis").join("plugins");
-    assert!(
-        plugin_dir.exists(),
-        "App::new must ensure default plugin dir is created and populated"
-    );
-
-    unsafe {
-        match old {
-            Some(v) => std::env::set_var(var, v),
-            None => std::env::remove_var(var),
-        }
-    }
-    fs::remove_dir_all(&root).ok();
-    std::fs::remove_dir_all(&tmp).ok();
 }

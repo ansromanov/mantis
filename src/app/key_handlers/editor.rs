@@ -23,7 +23,7 @@ use std::io::IsTerminal;
 use std::path::Path;
 
 use crate::highlight::Highlighter;
-use crate::search::{GotoLineState, PluginPicker, SearchState, ThemePicker};
+use crate::search::{GotoLineState, SearchState, ThemePicker};
 use crate::theme::{Theme, ThemeConfig};
 
 use super::super::{diff_line_style, App, Focus};
@@ -41,7 +41,7 @@ impl App {
             .as_ref()
             .and_then(|p| p.selected_command().map(|c| c.action_id.clone()));
         match action_id {
-            Some(id) => self.dispatch_action_id(&id, crate::telemetry::ActionSource::Palette),
+            Some(id) => self.dispatch_action_id(&id),
             None => {
                 self.command_palette = None;
                 false
@@ -52,11 +52,7 @@ impl App {
     /// Dispatches a canonical registry action from a non-palette surface.
     /// Applicability, usage recording, and telemetry stay shared with the
     /// command palette so menu items have identical behavior.
-    pub(crate) fn dispatch_action_id(
-        &mut self,
-        id: &str,
-        source: crate::telemetry::ActionSource,
-    ) -> bool {
+    pub(crate) fn dispatch_action_id(&mut self, id: &str) -> bool {
         if let Err(reason) = self.check_applicability(id) {
             let name = crate::actions::ACTIONS
                 .iter()
@@ -75,11 +71,6 @@ impl App {
         {
             self.command_usage.record(spec.id);
             self.command_usage.save();
-            self.telemetry
-                .record(crate::telemetry::TelemetryEvent::ActionInvoked {
-                    action: spec.id,
-                    source,
-                });
         }
         self.command_palette = None;
         match Some(id) {
@@ -98,10 +89,6 @@ impl App {
             Some("bug_report") => {
                 let report = crate::diagnostics::DiagnosticReport::collect(self);
                 self.bug_report = Some(crate::search::BugReportState::new(report.to_markdown()));
-                true
-            }
-            Some("toggle_telemetry") => {
-                self.toggle_telemetry();
                 true
             }
             Some("quit") => {
@@ -187,11 +174,6 @@ impl App {
             }
             Some("reopen_tab") => {
                 self.tab_action_request = Some(super::super::TabAction::Reopen);
-                true
-            }
-            Some("plugin_picker") => {
-                let entries = self.plugin_manager.plugin_entries();
-                self.plugin_picker = Some(PluginPicker::new(entries));
                 true
             }
             Some("git_mode_toggle") => {
@@ -477,21 +459,7 @@ impl App {
                 true
             }
             Some("toggle_raw_markdown") => {
-                if self.plugin_content_active {
-                    let key = crossterm::event::KeyEvent::new(
-                        crossterm::event::KeyCode::Char('M'),
-                        crossterm::event::KeyModifiers::SHIFT,
-                    );
-                    self.plugin_manager.on_keypress(&key);
-                } else {
-                    self.set_status(
-                        "markdown render toggle: not available (current file not plugin-rendered)",
-                    );
-                }
-                true
-            }
-            Some(id) if self.plugin_manager.plugin_for_command(id).is_some() => {
-                self.plugin_manager.send_command_event(id);
+                self.toggle_raw_markdown();
                 true
             }
             _ => false,
@@ -509,7 +477,6 @@ impl App {
         });
         self.command_palette = None;
         if let Some(path) = action {
-            self.last_open_source = crate::telemetry::FileSourceKind::Search;
             self.open_file(&path);
             self.reveal_in_tree(&path);
         }
@@ -527,7 +494,6 @@ impl App {
         });
         self.command_palette = None;
         if let Some((path, line)) = action {
-            self.last_open_source = crate::telemetry::FileSourceKind::Search;
             self.open_file(&path);
             self.set_content_scroll(line.saturating_sub(1));
             self.reveal_in_tree(&path);
@@ -553,12 +519,7 @@ impl App {
             self.set_status("symbol outline: no file is open");
             return;
         };
-        let Some(symbols) = self
-            .plugin_symbols
-            .get(path)
-            .cloned()
-            .filter(|s| !s.is_empty())
-        else {
+        let Some(symbols) = self.symbols.get(path).cloned().filter(|s| !s.is_empty()) else {
             self.set_status("symbol outline: no symbols in file");
             return;
         };
@@ -571,18 +532,11 @@ impl App {
             .iter()
             .map(|command| self.check_applicability(&command.action_id).err())
             .collect();
-        let commands = self
-            .plugin_manager
-            .all_plugin_commands()
-            .into_iter()
-            .cloned()
-            .collect();
         let mut palette = crate::command_palette::CommandPalette::new(
             &self.keys,
             base_order,
             base_pinned,
             reasons,
-            commands,
         );
         palette.route = crate::command_palette::PaletteRoute::Symbols;
         palette.route_symbols = Some(crate::search::SymbolPicker::new(
@@ -618,7 +572,7 @@ impl App {
             return;
         };
         let Some(diagnostics) = self
-            .plugin_diagnostics
+            .file_diagnostics
             .get(path)
             .cloned()
             .filter(|diagnostics| !diagnostics.is_empty())
@@ -635,18 +589,11 @@ impl App {
             .iter()
             .map(|command| self.check_applicability(&command.action_id).err())
             .collect();
-        let commands = self
-            .plugin_manager
-            .all_plugin_commands()
-            .into_iter()
-            .cloned()
-            .collect();
         let mut palette = crate::command_palette::CommandPalette::new(
             &self.keys,
             base_order,
             base_pinned,
             reasons,
-            commands,
         );
         palette.route = crate::command_palette::PaletteRoute::Diagnostics;
         palette.route_diagnostics = Some(crate::search::DiagnosticPicker::new(diagnostics));
@@ -848,14 +795,11 @@ impl App {
 
     /// Switches the active theme and re-renders the current view with it,
     /// preserving scroll position.
-    pub(crate) fn apply_theme(&mut self, theme_name: &str, theme: Theme) {
-        // Notify plugins so they can re-render content with matching colours.
-        self.plugin_manager.on_theme_change(theme_name, &theme);
-        self.plugin_content.clear();
-        self.plugin_content_text.clear();
+    pub(crate) fn apply_theme(&mut self, _theme_name: &str, theme: Theme) {
+        self.rendered_content.clear();
+        self.rendered_text.clear();
         self.theme = theme;
-        self.highlighter =
-            Highlighter::with_extra_syntaxes(&self.theme.syntax, &self.extra_syntaxes);
+        self.highlighter = Highlighter::new(&self.theme.syntax);
         self.loader_set_theme();
         if self.is_diff {
             self.highlighted = self
@@ -903,11 +847,6 @@ impl App {
         match spawn_system_open(path.as_os_str()) {
             Ok(_) => self.set_status("opened file externally"),
             Err(e) => {
-                self.telemetry
-                    .record(crate::telemetry::TelemetryEvent::ErrorOccurred {
-                        module: "editor",
-                        kind: "external_open_failed",
-                    });
                 self.set_status(format!("external open failed: {e}"));
             }
         }
@@ -924,11 +863,6 @@ impl App {
         match spawn_reveal_in_file_manager(path) {
             Ok(_) => self.set_status(format!("revealed {}", path.display())),
             Err(e) => {
-                self.telemetry
-                    .record(crate::telemetry::TelemetryEvent::ErrorOccurred {
-                        module: "editor",
-                        kind: "file_manager_open_failed",
-                    });
                 self.set_status(format!("file manager open failed: {e}"));
             }
         }

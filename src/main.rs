@@ -31,6 +31,7 @@ use crate::workspace::Tabs;
 mod actions;
 mod ansi;
 mod app;
+mod code_intel;
 mod command_palette;
 mod command_usage;
 mod config;
@@ -40,16 +41,19 @@ mod diff;
 mod event_source;
 mod file;
 mod fold;
+#[allow(dead_code)] // detectors are used via the lib; the bin only needs the loader's subset
+mod fold_detectors;
 mod git;
 mod graphics;
 mod highlight;
+mod icons;
 mod json_path;
 #[allow(dead_code)]
 mod json_query;
 mod jsonl;
 mod list_picker;
+mod markdown;
 mod pager;
-mod plugin;
 mod release_info;
 mod scroll;
 mod search;
@@ -57,7 +61,6 @@ mod secret_mask;
 mod selection;
 mod session;
 mod sys_info;
-mod telemetry;
 mod theme;
 mod tree;
 mod ui;
@@ -108,10 +111,6 @@ struct Cli {
     /// Self-update to the latest release
     #[arg(long = "update")]
     update: bool,
-
-    /// Print telemetry status and directory
-    #[arg(long = "telemetry-status")]
-    telemetry_status: bool,
 }
 
 /// Prints shell completions for the given shell to stdout.
@@ -135,23 +134,6 @@ fn print_man_page() -> anyhow::Result<()> {
     let mut stdout = std::io::stdout();
     let man = clap_mangen::Man::new(cmd);
     man.render(&mut stdout)?;
-    Ok(())
-}
-
-/// Prints the telemetry status to stdout.
-fn print_telemetry_status() -> anyhow::Result<()> {
-    let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    let (cfg, _, _) = config::load(&current_dir);
-    let status = if cfg.telemetry.enabled {
-        "active"
-    } else {
-        "disabled"
-    };
-    let dir = crate::session::state_dir()
-        .map(|d| d.join("telemetry"))
-        .map(|p| p.display().to_string())
-        .unwrap_or_else(|| "unknown".to_string());
-    println!("Telemetry: {status}\nDirectory: {dir}");
     Ok(())
 }
 
@@ -363,11 +345,6 @@ fn redirect_stdin_to_tty_with(open: impl FnOnce() -> io::Result<std::fs::File>) 
 }
 
 fn main() -> anyhow::Result<()> {
-    use tracing_subscriber::prelude::*;
-    let layer = crate::telemetry::TelemetryLayer;
-    let subscriber = tracing_subscriber::registry().with(layer);
-    let _ = tracing::subscriber::set_global_default(subscriber);
-
     let cli = Cli::parse();
 
     if let Some(shell) = &cli.completions {
@@ -378,9 +355,6 @@ fn main() -> anyhow::Result<()> {
     }
     if cli.update {
         return crate::update::run_self_update();
-    }
-    if cli.telemetry_status {
-        return print_telemetry_status();
     }
 
     let stdin_piped = pager::is_piped_stdin();
@@ -474,6 +448,7 @@ fn launch_tui(roots: Vec<PathBuf>, active: usize, initial: InitialContent) -> an
         redirect_stdin_to_tty()?;
     }
 
+    install_termination_handlers();
     enable_raw_mode()?;
     crate::theme::detect_terminal_background();
     // Probe Kitty graphics support before the alternate screen is entered, same
@@ -569,12 +544,6 @@ fn run_app(
     // Persist every tab's session and the workspace manifest.
     tabs.save_all_and_persist_workspace();
 
-    // Notify plugins of quit on every exit path, then shut them down.
-    for app in &mut tabs.apps {
-        app.plugin_manager.on_quit();
-        app.plugin_manager.deactivate_all();
-    }
-
     loop_result?;
 
     if let Some(err) = &tabs.active_app().config_error {
@@ -594,10 +563,25 @@ fn run_event_loop(
     tabs: &mut Tabs,
     events: &mut dyn EventSource,
 ) -> anyhow::Result<()> {
+    // Idle throttling: right after input we redraw every iteration (~60 fps) so
+    // scrolling and animations stay smooth; once the UI has been quiet for
+    // `ACTIVE_WINDOW` we only redraw every `IDLE_FRAME` to pick up async
+    // results (loader, watcher, git) without burning CPU on identical frames.
+    const ACTIVE_WINDOW: Duration = Duration::from_millis(500);
+    const IDLE_FRAME: Duration = Duration::from_millis(100);
+    let mut last_input = std::time::Instant::now();
+    let mut last_render: Option<std::time::Instant> = None;
     loop {
-        render_frame(terminal, tabs)?;
+        let now = std::time::Instant::now();
+        let active = now.duration_since(last_input) < ACTIVE_WINDOW;
+        let due = last_render.is_none_or(|t| now.duration_since(t) >= IDLE_FRAME);
+        if active || due {
+            with_synchronized_update(|| render_frame(terminal, tabs))?;
+            last_render = Some(std::time::Instant::now());
+        }
 
         if let Some(event) = events.next_event()? {
+            last_input = std::time::Instant::now();
             dispatch_event(tabs, event);
             // Drain a burst (e.g. mouse-wheel) so it applies in one frame.
             let mut drained = 0;
@@ -610,13 +594,79 @@ fn run_event_loop(
             }
         }
 
-        if tabs.active_app().should_quit {
+        if tabs.active_app().should_quit || terminal_gone() {
             break;
         }
 
         tabs.active_app_mut().tick();
     }
     Ok(())
+}
+
+/// Set by the SIGHUP/SIGTERM handler installed in `install_termination_handlers`.
+#[cfg(unix)]
+static TERMINATION_REQUESTED: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+#[cfg(unix)]
+extern "C" fn on_termination_signal(_sig: libc::c_int) {
+    TERMINATION_REQUESTED.store(true, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Makes SIGHUP/SIGTERM end the event loop instead of killing the process
+/// mid-frame (which would skip terminal restore). Best-effort.
+#[cfg(unix)]
+fn install_termination_handlers() {
+    let handler = on_termination_signal as extern "C" fn(libc::c_int) as libc::sighandler_t;
+    unsafe {
+        libc::signal(libc::SIGHUP, handler);
+        libc::signal(libc::SIGTERM, handler);
+    }
+}
+
+#[cfg(not(unix))]
+fn install_termination_handlers() {}
+
+/// True when the terminal has been closed under us: a termination signal was
+/// received, or stdin is a tty whose peer hung up. Without this check the
+/// event loop busy-reads EOF forever after the terminal window disappears.
+#[cfg(unix)]
+fn terminal_gone() -> bool {
+    if TERMINATION_REQUESTED.load(std::sync::atomic::Ordering::Relaxed) {
+        return true;
+    }
+    unsafe {
+        if libc::isatty(libc::STDIN_FILENO) != 1 {
+            return false;
+        }
+        let mut pfd = libc::pollfd {
+            fd: libc::STDIN_FILENO,
+            events: 0,
+            revents: 0,
+        };
+        libc::poll(&mut pfd, 1, 0) > 0
+            && pfd.revents & (libc::POLLHUP | libc::POLLERR | libc::POLLNVAL) != 0
+    }
+}
+
+#[cfg(not(unix))]
+fn terminal_gone() -> bool {
+    false
+}
+
+/// Runs `draw` between terminal "synchronized update" markers (CSI ?2026), so a
+/// terminal that supports them presents the whole frame atomically instead of
+/// tearing mid-repaint during large redraws. Unsupporting terminals ignore the
+/// markers. Skipped when stdout is not a terminal (tests, pipes).
+fn with_synchronized_update<T>(draw: impl FnOnce() -> T) -> T {
+    use std::io::IsTerminal;
+    if !io::stdout().is_terminal() {
+        return draw();
+    }
+    let _ = crossterm::execute!(io::stdout(), crossterm::terminal::BeginSynchronizedUpdate);
+    let result = draw();
+    let _ = crossterm::execute!(io::stdout(), crossterm::terminal::EndSynchronizedUpdate);
+    result
 }
 
 /// Clears the terminal when requested, then renders one frame of the UI.

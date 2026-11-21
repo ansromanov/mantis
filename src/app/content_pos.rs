@@ -169,7 +169,7 @@ impl App {
             return 0;
         }
         if let Some(path) = &self.current_file {
-            if self.plugin_content.contains_key(path) {
+            if self.rendered_content.contains_key(path) {
                 return 0;
             }
         }
@@ -203,8 +203,8 @@ impl App {
                 for display_idx in first_display..display_total {
                     let physical_idx = self.display_to_physical(display_idx);
                     let display_width: usize = if let Some(ref path) = self.current_file {
-                        if let Some(plugin_lines) = self.plugin_content.get(path) {
-                            plugin_lines
+                        if let Some(rendered_lines) = self.rendered_content.get(path) {
+                            rendered_lines
                                 .get(physical_idx)
                                 .map(|spans| spans.iter().map(|(_, t)| t.width()).sum())
                                 .unwrap_or(0)
@@ -239,7 +239,6 @@ impl App {
     pub(super) fn set_active_line_from_physical(&mut self, physical: usize) {
         let max = self.display_line_count().saturating_sub(1);
         self.active_line = self.physical_to_display(physical).min(max);
-        self.schedule_content_cursor_change();
         self.mark_session_dirty();
     }
 
@@ -256,9 +255,9 @@ impl App {
 
         // Plugin-rendered content: extract text from styled spans.
         if let Some(path) = &self.current_file {
-            if let Some(plugin_lines) = self.plugin_content.get(path) {
+            if let Some(rendered_lines) = self.rendered_content.get(path) {
                 return spans_selection_text(
-                    plugin_lines,
+                    rendered_lines,
                     start_line,
                     start_col,
                     end_line,
@@ -375,9 +374,7 @@ impl App {
                 .min(last_line);
             self.active_line = self.active_line.clamp(self.content_scroll, last_visible);
         }
-        if self.active_line != previous_active_line {
-            self.schedule_content_cursor_change();
-        }
+        if self.active_line != previous_active_line {}
     }
 
     /// Ensures `active_line` is visible in the content pane viewport. Since
@@ -405,7 +402,7 @@ impl App {
         }
         // Plugin-rendered content has no cursor.
         if let Some(path) = &self.current_file {
-            if self.plugin_content.contains_key(path) {
+            if self.rendered_content.contains_key(path) {
                 return false;
             }
         }
@@ -425,9 +422,7 @@ impl App {
         self.show_help
             || self.show_about
             || self.show_welcome
-            || self.show_telemetry_notice
             || self.theme_picker.is_some()
-            || self.plugin_picker.is_some()
             || self.command_palette.is_some()
             || self.history.is_some()
             || self.repo_log.is_some()

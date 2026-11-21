@@ -1,6 +1,6 @@
 // Tests for the plugin-content branches of the content-source queries:
-// `line_count` and `line_text` must read from `plugin_content` /
-// `plugin_content_text` when the current file has plugin-provided content.
+// `line_count` and `line_text` must read from `rendered_content` /
+// `rendered_text` when the current file has plugin-provided content.
 
 use std::fs;
 use std::path::PathBuf;
@@ -22,7 +22,13 @@ fn temp_root() -> PathBuf {
 }
 
 fn app_for(root: &std::path::Path) -> App {
-    App::new(root.to_path_buf(), Config::default(), None, None).unwrap()
+    let mut app = App::new(root.to_path_buf(), Config::default(), None, None).unwrap();
+    // App::new auto-opens the placeholder markdown file, which now renders
+    // natively; these tests drive `content` / seeded rendered content directly.
+    app.rendered_active = false;
+    app.rendered_content.clear();
+    app.rendered_text.clear();
+    app
 }
 
 #[test]
@@ -31,13 +37,13 @@ fn diagnostic_severity_query_reads_the_current_file_index() {
     let mut app = app_for(&root);
     let path = root.join("doc.md");
     app.current_file = Some(path.clone());
-    app.plugin_diagnostic_lines.insert(
+    app.file_diagnostic_lines.insert(
         path,
-        std::collections::HashMap::from([(3, crate::plugin::types::DiagnosticSeverity::Error)]),
+        std::collections::HashMap::from([(3, crate::code_intel::DiagnosticSeverity::Error)]),
     );
     assert_eq!(
         app.diagnostic_severity_at(3),
-        Some(crate::plugin::types::DiagnosticSeverity::Error)
+        Some(crate::code_intel::DiagnosticSeverity::Error)
     );
     assert_eq!(app.diagnostic_severity_at(4), None);
     fs::remove_dir_all(root).ok();
@@ -49,8 +55,8 @@ fn seed_plugin(app: &mut App, path: PathBuf, lines: &[&str]) {
         .map(|l| vec![(Style::default(), l.to_string())])
         .collect();
     let text: Vec<String> = lines.iter().map(|l| l.to_string()).collect();
-    app.plugin_content_text.insert(path.clone(), text);
-    app.plugin_content.insert(path.clone(), rendered);
+    app.rendered_text.insert(path.clone(), text);
+    app.rendered_content.insert(path.clone(), rendered);
     app.current_file = Some(path);
 }
 
@@ -104,8 +110,8 @@ fn line_count_ignores_plugin_content_for_other_file() {
     let rendered: Vec<Vec<(Style, String)>> = (0..5)
         .map(|i| vec![(Style::default(), format!("l{i}"))])
         .collect();
-    app.plugin_content.insert(other.clone(), rendered);
-    app.plugin_content_text
+    app.rendered_content.insert(other.clone(), rendered);
+    app.rendered_text
         .insert(other, (0..5).map(|i| format!("l{i}")).collect());
     app.current_file = Some(root.join("doc.md"));
     // Falls through to the normal content source, not the 5-line plugin entry
@@ -115,15 +121,29 @@ fn line_count_ignores_plugin_content_for_other_file() {
 }
 
 #[test]
-fn line_count_md_file_uses_virtual_file_not_builtin_markdown() {
+fn line_count_md_file_in_raw_mode_uses_virtual_file() {
     let root = temp_root();
     let mut app = app_for(&root);
     let path = root.join("doc.md");
     fs::write(&path, "line1\nline2\nline3\n").unwrap();
+    app.show_raw_markdown = true;
     app.open_file(&path);
-    // Without the built-in markdown renderer, .md files fall through to
-    // VirtualFile, so line_count reflects the raw file.
+    // Raw mode skips the markdown renderer, so .md files fall through to
+    // VirtualFile and line_count reflects the raw file.
     assert_eq!(app.line_count(), 3);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn line_count_md_file_rendered_uses_rendered_lines() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    let path = root.join("doc.md");
+    // Two paragraphs render as two lines plus a blank separator.
+    fs::write(&path, "first\n\nsecond\n").unwrap();
+    app.open_file(&path);
+    assert!(app.rendered_active);
+    assert_eq!(app.line_text(0), Some("first"));
     fs::remove_dir_all(&root).ok();
 }
 
@@ -238,7 +258,7 @@ fn line_width_uses_rendered_plugin_lines_over_virtual_file() {
     let path = root.join("doc.md");
     app.current_file = Some(path.clone());
     app.virtual_file = crate::virtual_file::VirtualFile::open(&path);
-    app.plugin_content.insert(
+    app.rendered_content.insert(
         path,
         vec![vec![(
             Style::default(),

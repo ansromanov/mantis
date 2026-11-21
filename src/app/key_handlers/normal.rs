@@ -14,7 +14,7 @@ use crossterm::event::KeyEvent;
 
 use crate::config::{pressed_in, static_keys, BindingScope};
 use crate::search::{
-    CommandPalette, GotoLineState, InFileSearch, PluginPicker, SearchState, ThemePicker, TreeFilter,
+    CommandPalette, GotoLineState, InFileSearch, SearchState, ThemePicker, TreeFilter,
 };
 
 use super::super::{App, Focus, TabAction};
@@ -23,26 +23,9 @@ impl App {
     /// Handles all key events when no overlay is active. Dispatches global
     /// actions (quit, help, search, reload, etc.) and routes to tree/content
     /// handlers based on `self.focus`.
-    ///
-    /// `pub(crate)` rather than `pub(super)`: `app::refresh`'s
-    /// `process_pending_keypress`/`preempt_pending_keypress` (protocol 3+
-    /// `on_keypress` key consumption) call this directly from a sibling
-    /// submodule of `key_handlers`, not just from within `key_handlers`.
     pub(crate) fn handle_normal_key(&mut self, key: KeyEvent) {
         // Clear transient status messages on the next handled keypress.
         self.status_message = None;
-
-        let scope = match self.focus {
-            Focus::Tree => crate::config::BindingScope::Tree,
-            Focus::Content => crate::config::BindingScope::Content,
-        };
-        if let Some(action_id) = self.keys.action_for_key(&key, scope) {
-            self.telemetry
-                .record(crate::telemetry::TelemetryEvent::ActionInvoked {
-                    action: action_id,
-                    source: crate::telemetry::ActionSource::Key,
-                });
-        }
 
         if static_keys::is_close(&key) {
             if self.show_blame {
@@ -152,9 +135,6 @@ impl App {
         } else if pressed_in(&k.theme_picker, &key, scope) {
             self.context_menu = None;
             self.theme_picker = Some(ThemePicker::default());
-        } else if pressed_in(&k.plugin_picker, &key, scope) {
-            let entries = self.plugin_manager.plugin_entries();
-            self.plugin_picker = Some(PluginPicker::new(entries));
         } else if pressed_in(&k.command_palette, &key, scope) {
             self.last_click = None;
             let (base_order, base_pinned) = crate::command_palette::ranked_base_order(
@@ -166,18 +146,11 @@ impl App {
                 .iter()
                 .map(|cmd| self.check_applicability(&cmd.action_id).err())
                 .collect();
-            let plugin_commands = self
-                .plugin_manager
-                .all_plugin_commands()
-                .into_iter()
-                .cloned()
-                .collect();
             self.command_palette = Some(CommandPalette::new(
                 &self.keys,
                 base_order,
                 base_pinned,
                 inapplicability_reasons,
-                plugin_commands,
             ));
         } else if pressed_in(&k.symbol_outline, &key, scope) {
             self.open_symbol_outline();
@@ -362,8 +335,6 @@ impl App {
                         };
                         if nd.depth < depth {
                             self.tree_selected = i;
-                            let p = nd.path.clone();
-                            self.plugin_manager.on_selection_change(Some(&p));
                             break;
                         }
                     }
@@ -613,13 +584,9 @@ impl App {
         self.save_config();
     }
 
-    /// Toggles between rendered and raw markdown when the markdown plugin is
-    /// active on a markdown file; otherwise surfaces a status message.
+    /// Toggles between rendered and raw markdown on a markdown file; otherwise
+    /// surfaces a status message.
     pub(crate) fn toggle_raw_markdown(&mut self) {
-        if !self.plugin_manager.is_plugin_active("markdown") {
-            self.set_status("markdown render toggle: not available (markdown plugin not active)");
-            return;
-        }
         let is_markdown = self
             .current_file
             .as_ref()
@@ -633,15 +600,10 @@ impl App {
             let scroll = self.content_scroll;
             let active_line = self.active_line;
             if self.show_raw_markdown {
-                self.plugin_content.remove(&path);
-                self.plugin_content_text.remove(&path);
-                self.plugin_content_active = false;
-                self.plugin_content_active_path = None;
-            } else {
-                // Plugin rendering is asynchronous; identify this as a
-                // same-file mode switch so its response preserves the view.
-                self.plugin_content_active_path = Some(path.clone());
+                self.clear_native_markdown(&path);
             }
+            // Re-opening re-renders synchronously when not raw, so the view
+            // flips in a single frame.
             self.reload_content();
             self.active_line = active_line.min(self.display_line_count().saturating_sub(1));
             self.set_content_scroll(scroll);
@@ -652,18 +614,6 @@ impl App {
     /// Nudges `content_scroll` so `active_line` stays within the visible
     /// viewport after a cursor move. Delegates to the unified helper.
     pub(crate) fn scroll_active_line_into_view(&mut self) {
-        let previous_path = self.current_file.clone();
-        let previous_line = self
-            .has_text_cursor()
-            .then(|| self.display_to_physical(self.active_line));
         self.scroll_line_into_view(self.active_line);
-        let line = self
-            .has_text_cursor()
-            .then(|| self.display_to_physical(self.active_line));
-        if previous_path != self.current_file || previous_line != line {
-            self.plugin_manager
-                .on_selection_change_at(self.current_file.as_deref(), line);
-        }
-        self.schedule_content_cursor_change();
     }
 }

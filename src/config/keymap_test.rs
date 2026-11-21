@@ -598,7 +598,6 @@ fn canonical_action_ids_resolve_bindings() {
         "recent_files",
         "toggle_bookmark",
         "bookmarks",
-        "plugin_picker",
         "goto_line",
     ] {
         assert!(
@@ -728,16 +727,6 @@ fn diagnostics_picker_is_bound_to_content_exclamation() {
 }
 
 #[test]
-fn action_for_key_resolves_correctly() {
-    let keymap = Keymap::default();
-    let key = ev(KeyCode::Char('o'), KeyModifiers::NONE);
-    assert_eq!(
-        keymap.action_for_key(&key, BindingScope::Content),
-        Some("open_external")
-    );
-}
-
-#[test]
 fn tree_width_grow_default_binding_is_right_bracket() {
     let keymap = Keymap::default();
     let grow = ev(KeyCode::Char(']'), KeyModifiers::empty());
@@ -801,20 +790,6 @@ fn prev_tab_default_binding_is_ctrl_pageup() {
     let keymap = Keymap::default();
     let key = ev(KeyCode::PageUp, KeyModifiers::CONTROL);
     assert!(pressed_in(&keymap.prev_tab, &key, BindingScope::Global));
-}
-
-#[test]
-fn action_for_key_resolves_next_tab_globally_regardless_of_scope() {
-    let keymap = Keymap::default();
-    let key = ev(KeyCode::PageDown, KeyModifiers::CONTROL);
-    assert_eq!(
-        keymap.action_for_key(&key, BindingScope::Tree),
-        Some("next_tab")
-    );
-    assert_eq!(
-        keymap.action_for_key(&key, BindingScope::Content),
-        Some("next_tab")
-    );
 }
 
 #[test]

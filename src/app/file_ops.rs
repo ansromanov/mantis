@@ -8,8 +8,6 @@
 //! background `loader` via `compute_file_load`/`compute_diff_load`, with
 //! synchronous variants used at startup and for reloads. It also installs the
 //! per-file watcher so an open file auto-reloads when it changes on disk.
-//! Applying a successful load caches its optional shebang with the plugin
-//! manager before `on_file_open` can produce language-provider actions.
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -156,6 +154,10 @@ impl App {
         };
         let mut tree_changed = false;
         let mut newest: Option<(std::time::SystemTime, PathBuf)> = None;
+        // mantis's own state/config dirs may live under the root (e.g. when
+        // run from `~`); events from our own session writes must not trigger
+        // a reload, or the reload's session save re-triggers the watcher.
+        let mut own_dirs: Option<Vec<PathBuf>> = None;
         while let Ok(res) = rx.try_recv() {
             if let Ok(evt) = res {
                 if matches!(
@@ -165,6 +167,19 @@ impl App {
                     for path in evt.paths {
                         if !path.starts_with(&self.root) || path.starts_with(self.root.join(".git"))
                         {
+                            continue;
+                        }
+                        let own = own_dirs.get_or_insert_with(|| {
+                            let mut dirs: Vec<PathBuf> =
+                                crate::session::state_dir().into_iter().collect();
+                            dirs.extend(
+                                self.config_path
+                                    .as_ref()
+                                    .and_then(|p| p.parent().map(PathBuf::from)),
+                            );
+                            dirs
+                        });
+                        if own.iter().any(|d| path.starts_with(d)) {
                             continue;
                         }
                         tree_changed = true;
@@ -266,7 +281,7 @@ impl App {
         self.clear_diagnostics_for_path(path);
         self.current_syntax = None;
         self.mark_session_dirty();
-        self.plugin_content_active = false;
+        self.rendered_active = false;
         self.is_json = false;
         self.show_pretty_json = false;
         self.json_pretty_text = Vec::new();
@@ -289,7 +304,7 @@ impl App {
             self.show_line_blame = false;
             self.jsonl_expanded.clear();
             self.clear_selection();
-            self.plugin_content_active_path = None;
+            self.rendered_active_path = None;
         } else {
             self.clear_selection();
         }
@@ -310,9 +325,6 @@ impl App {
             }
         }
         self.set_file_watch(Some(path));
-        if !self.plugin_is_opening_file {
-            self.plugin_manager.on_file_open(path);
-        }
     }
 
     /// Shows a "[deleted]" placeholder for a file that was removed from the
@@ -326,8 +338,8 @@ impl App {
         self.current_file = Some(path.to_path_buf());
         self.current_syntax = None;
         self.mark_session_dirty();
-        self.plugin_content_active = false;
-        self.plugin_content_active_path = None;
+        self.rendered_active = false;
+        self.rendered_active_path = None;
         self.is_diff = false;
         self.diff_rows = Vec::new();
         self.is_json = false;
@@ -371,7 +383,6 @@ impl App {
     /// uses `request_open_file`; both share `apply_file_load`. Errors and empty
     /// files produce inline messages rather than crashing.
     pub fn open_file(&mut self, path: &Path) {
-        let _span = tracing::info_span!("open_file").entered();
         self.invalidate_pending_load();
         let load = compute_file_load(
             path,
@@ -406,28 +417,6 @@ impl App {
     /// selection, then installs the rendered content/highlighting/JSON/YAML
     /// state. Shared by the synchronous and worker-thread code paths.
     pub(super) fn apply_file_load(&mut self, path: &Path, load: FileLoad) {
-        self.plugin_manager
-            .cache_file_shebang(path, if load.ok { load.shebang.clone() } else { None });
-        if load.ok {
-            let size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
-            let size_bucket = crate::telemetry::FileSizeBucket::from_size(size);
-            let is_new_file = self.current_file.as_deref() != Some(path);
-            let source_kind = if is_new_file {
-                self.last_open_source
-            } else {
-                crate::telemetry::FileSourceKind::Reopen
-            };
-            let encoding = crate::telemetry::FileEncoding::from_str(load.encoding.as_deref());
-            let is_binary = encoding == crate::telemetry::FileEncoding::Binary;
-            self.telemetry
-                .record(crate::telemetry::TelemetryEvent::FileOpened {
-                    size_bucket,
-                    source_kind,
-                    encoding,
-                    is_binary,
-                });
-        }
-
         let is_log = if load.ok {
             if let Some(ref vf) = load.virtual_file {
                 let mut first_lines = Vec::new();
@@ -487,7 +476,7 @@ impl App {
             self.active_line = line;
             self.show_line_blame = false;
             self.clear_selection();
-            self.plugin_content_active_path = None;
+            self.rendered_active_path = None;
         } else {
             self.clear_selection();
         }
@@ -543,8 +532,12 @@ impl App {
             self.yaml_anchor_count = y.anchor_count;
             self.yaml_alias_count = y.alias_count;
         }
-        // Language provider fold regions override built-in YAML regions.
-        self.apply_plugin_fold_regions(path);
+        if !load.fold_regions.is_empty() {
+            self.fold_regions = load.fold_regions;
+        }
+        if load.ok && path.extension().is_some_and(|e| e == "rs") {
+            self.symbols.insert(path.to_path_buf(), load.symbols);
+        }
 
         if load.prettify_size_limit_exceeded {
             self.set_status("too large to pretty-print / fold");
@@ -570,17 +563,18 @@ impl App {
         }
 
         if load.ok {
+            // Only a newly opened file changes persisted session state; a
+            // same-file reload (watcher/refresh) must not dirty the session.
+            if is_new_file {
+                self.mark_session_dirty();
+            }
             self.current_file = Some(path.to_path_buf());
             self.current_syntax = load.syntax_name;
-            self.mark_session_dirty();
-            self.plugin_content_active = false;
+            self.rendered_active = false;
             self.set_file_watch(Some(path));
-            if !self.plugin_is_opening_file {
-                let is_markdown = crate::file::is_markdown_path(path);
-                if !(is_markdown && self.show_raw_markdown) {
-                    self.plugin_manager.on_file_open(path);
-                }
-                self.request_file_diagnostics(path);
+            let is_markdown = crate::file::is_markdown_path(path);
+            if is_markdown && !self.show_raw_markdown {
+                self.install_native_markdown(path);
             }
             if is_new_file {
                 self.push_recent(path.to_path_buf());
@@ -638,7 +632,6 @@ impl App {
             .and_then(|r| r.selected_path().cloned());
         self.recent_files = None;
         if let Some(path) = path {
-            self.last_open_source = crate::telemetry::FileSourceKind::RecentFiles;
             self.open_and_reveal(&path);
         }
     }
@@ -681,7 +674,6 @@ impl App {
             .and_then(|picker| picker.selected_path().cloned());
         self.bookmarks = None;
         if let Some(path) = path {
-            self.last_open_source = crate::telemetry::FileSourceKind::RecentFiles;
             self.open_and_reveal(&path);
         }
     }
@@ -715,10 +707,6 @@ impl App {
         if commits.is_empty() {
             return;
         }
-        self.telemetry
-            .record(crate::telemetry::TelemetryEvent::FeatureUsed {
-                feature: crate::telemetry::Feature::GitHistory,
-            });
         self.history = Some(HistoryState::new(file, commits));
     }
 
@@ -730,7 +718,6 @@ impl App {
         });
         self.history = None;
         if let Some((hash, short, file)) = picked {
-            self.last_open_source = crate::telemetry::FileSourceKind::History;
             let diff = crate::git::file_commit_diff(&self.root, &hash, &file);
             self.show_diff(&file, &short, &diff, Some(&hash));
         }
@@ -751,8 +738,8 @@ impl App {
         self.virtual_file = None;
         self.current_file = Some(file.to_path_buf());
         self.mark_session_dirty();
-        self.plugin_content_active = false;
-        self.plugin_content_active_path = None;
+        self.rendered_active = false;
+        self.rendered_active_path = None;
         self.is_json = false;
         self.show_pretty_json = false;
         self.json_pretty_text = Vec::new();
@@ -795,10 +782,6 @@ impl App {
         if self.git_info.is_none() {
             return;
         }
-        self.telemetry
-            .record(crate::telemetry::TelemetryEvent::FeatureUsed {
-                feature: crate::telemetry::Feature::GitHistory,
-            });
         self.repo_log = Some(crate::search::RepoLogState::new(self.root.clone()));
     }
 

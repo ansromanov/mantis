@@ -23,7 +23,7 @@ markdown, fuzzy search, and git diff/blame/history always one keystroke away.
 - 🎨 **Readable files.** Syntax highlighting for source code, rendered markdown,
   and JSON pretty-printing.
 - 🔧 **Git built in.** Per-line blame, working-tree diffs, file history, and
-  status-colored tree entries — no plugins required.
+  status-colored tree entries.
 - ⌨️ **Discoverable.** Press `?` for help or `Ctrl+P` for a searchable command
   palette. You don't have to memorize anything.
 

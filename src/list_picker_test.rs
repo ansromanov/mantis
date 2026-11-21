@@ -169,30 +169,6 @@ fn unknown_key_returns_pass() {
 }
 
 #[test]
-fn plugin_picker_impl_backspace_closes() {
-    // PluginPicker has no query, so query_is_empty always true.
-    // Backspace should therefore return Close.
-    let mut p = crate::search::PluginPicker::new(vec![]);
-    assert!(p.query_is_empty());
-    let result = handle_list_picker_key(&mut p, &key(KeyCode::Backspace));
-    assert_eq!(result, OverlayKey::Close);
-}
-
-#[test]
-fn plugin_picker_impl_push_pop_noop() {
-    let mut p = crate::search::PluginPicker::new(vec![(
-        "a".into(),
-        true,
-        crate::plugin::PluginKind::Process,
-        None,
-    )]);
-    p.query_push('x');
-    assert!(p.query_is_empty());
-    p.query_pop();
-    assert!(p.query_is_empty());
-}
-
-#[test]
 fn tree_filter_impl_up_down_noop() {
     let mut f = crate::search::TreeFilter::new();
     f.query_push('a');

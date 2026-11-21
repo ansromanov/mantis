@@ -22,7 +22,7 @@ impl App {
     /// (plugin content, virtual file, raw content, or JSON pretty).
     pub fn line_count(&self) -> usize {
         if let Some(path) = &self.current_file {
-            if let Some(lines) = self.plugin_content.get(path) {
+            if let Some(lines) = self.rendered_content.get(path) {
                 return lines.len();
             }
         }
@@ -67,7 +67,7 @@ impl App {
     /// source: plugin content, pretty JSON, CSV table, virtual file, or raw content vec.
     pub fn line_text(&self, index: usize) -> Option<&str> {
         if let Some(path) = &self.current_file {
-            if let Some(lines) = self.plugin_content_text.get(path) {
+            if let Some(lines) = self.rendered_text.get(path) {
                 return lines.get(index).map(|s| s.as_str());
             }
         }
@@ -85,7 +85,7 @@ impl App {
     /// Returns the display width of line `index` in terminal columns.
     pub fn line_width(&self, index: usize) -> Option<usize> {
         if let Some(path) = &self.current_file {
-            if let Some(lines) = self.plugin_content.get(path) {
+            if let Some(lines) = self.rendered_content.get(path) {
                 return lines
                     .get(index)
                     .map(|spans| spans.iter().map(|(_, text)| text.width()).sum());
@@ -156,9 +156,9 @@ impl App {
     pub(crate) fn diagnostic_severity_at(
         &self,
         physical_line: usize,
-    ) -> Option<crate::plugin::types::DiagnosticSeverity> {
+    ) -> Option<crate::code_intel::DiagnosticSeverity> {
         let path = self.current_file.as_ref()?;
-        self.plugin_diagnostic_lines
+        self.file_diagnostic_lines
             .get(path)?
             .get(&physical_line)
             .copied()

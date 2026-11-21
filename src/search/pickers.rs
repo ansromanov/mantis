@@ -1,5 +1,5 @@
 //! All remaining fuzzy-picker overlay types extracted from the monolithic
-//! `search.rs`. Hosts `ThemePicker`, `RecentFilesState`, `PluginPicker`,
+//! `search.rs`. Hosts `ThemePicker`, `RecentFilesState`,
 //! `GotoLineState`, `SymbolPicker`, `DiagnosticPicker`, `TreeFilter`, and
 //! `InFileSearch`/`InFileMatch`, plus
 //! their `ListPicker` implementations, plus the git-worktree picker and its
@@ -17,8 +17,8 @@ use std::time::{Duration, Instant};
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
 
+use crate::code_intel::{Diagnostic, Symbol};
 use crate::list_picker::ListPicker;
-use crate::plugin::types::{Diagnostic, Symbol};
 
 const WORKTREE_CACHE_TTL: Duration = Duration::from_secs(5);
 
@@ -39,7 +39,7 @@ impl SymbolPicker {
     /// Creates a picker and initially selects the symbol containing `line`.
     pub fn new(symbols: Vec<Symbol>, line: Option<usize>) -> Self {
         let selected_source = line.and_then(|line| {
-            crate::plugin::types::enclosing_symbol(&symbols, line)
+            crate::code_intel::enclosing_symbol(&symbols, line)
                 .and_then(|current| symbols.iter().position(|symbol| symbol == current))
         });
         let mut picker = Self {
@@ -1246,46 +1246,6 @@ impl ListPicker for RecentFilesState {
     }
     fn query_is_empty(&self) -> bool {
         self.query.is_empty()
-    }
-    fn results_len(&self) -> usize {
-        self.results_len()
-    }
-    fn selected(&self) -> usize {
-        self.selected
-    }
-    fn set_selected(&mut self, i: usize) {
-        self.selected = i;
-    }
-}
-
-/// Scrollable list of registered plugins with their running state for the plugin manager overlay.
-pub struct PluginPicker {
-    /// `(name, is_running, kind, crash_badge)` for each registered plugin, in
-    /// the order provided by the manager (alphabetical by name as loaded from
-    /// config). `crash_badge` is `Some(summary)` when the plugin isn't running
-    /// and its last run exited unexpectedly.
-    pub entries: Vec<(String, bool, crate::plugin::PluginKind, Option<String>)>,
-    pub selected: usize,
-}
-
-impl PluginPicker {
-    pub fn new(entries: Vec<(String, bool, crate::plugin::PluginKind, Option<String>)>) -> Self {
-        PluginPicker {
-            entries,
-            selected: 0,
-        }
-    }
-
-    pub fn results_len(&self) -> usize {
-        self.entries.len()
-    }
-}
-
-impl ListPicker for PluginPicker {
-    fn query_push(&mut self, _c: char) {}
-    fn query_pop(&mut self) {}
-    fn query_is_empty(&self) -> bool {
-        true
     }
     fn results_len(&self) -> usize {
         self.results_len()

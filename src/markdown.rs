@@ -1,0 +1,480 @@
+//! Native markdown renderer: turns markdown source into ANSI-styled lines.
+//!
+//! This is the former bundled markdown plugin, moved into the host so a
+//! markdown file is rendered synchronously while it loads: the first painted
+//! frame already shows the rendered document instead of raw text that is later
+//! replaced by an out-of-process stream (which caused flicker, a jumping gutter
+//! and a scroll reset). The output is plain ANSI lines that the content pane
+//! parses with [`crate::ansi`], so theme colours, tables, block quotes, lists
+//! and code blocks all flow through the existing content-takeover path.
+//!
+//! Public items:
+//! - [`MarkdownColors`]: the seven theme roles the renderer uses, as SGR codes.
+//! - [`render_to_ansi`]: renders markdown source to a `Vec<String>` of lines.
+
+use pulldown_cmark::{Alignment, Event, HeadingLevel, Options, Parser, Tag};
+use unicode_width::UnicodeWidthStr;
+
+use crate::theme::{color_to_hex, Theme};
+
+/// Theme roles the renderer styles with, stored as SGR parameter strings.
+pub struct MarkdownColors {
+    heading1: String,
+    heading2: String,
+    heading3: String,
+    accent: String,
+    dim: String,
+    code: String,
+    text: String,
+}
+
+impl MarkdownColors {
+    /// Fallback used when the host doesn't send a `colors` object (an older
+    /// protocol version) or a color fails to parse.
+    pub fn default_theme() -> Self {
+        MarkdownColors {
+            heading1: "38;5;81".into(),  // light cyan
+            heading2: "38;5;229".into(), // light yellow
+            heading3: "38;5;120".into(), // light green
+            accent: "38;5;51".into(),    // cyan
+            dim: "38;5;243".into(),      // dark gray
+            code: "38;5;229".into(),     // light yellow
+            text: "38;5;15".into(),      // white
+        }
+    }
+
+    /// Builds the palette from the active theme's colour roles. Falls back to
+    /// [`default_theme`](Self::default_theme) if any role has no RGB form.
+    pub fn from_theme(theme: &Theme) -> Self {
+        let hex = |c| hex_to_truecolor(&color_to_hex(c));
+        (|| {
+            Some(MarkdownColors {
+                heading1: hex(theme.heading1)?,
+                heading2: hex(theme.heading2)?,
+                heading3: hex(theme.heading3)?,
+                accent: hex(theme.accent)?,
+                dim: hex(theme.dim)?,
+                code: hex(theme.code)?,
+                text: hex(theme.text)?,
+            })
+        })()
+        .unwrap_or_else(Self::default_theme)
+    }
+}
+
+/// Converts a `#rrggbb` hex string to a truecolor ANSI SGR code
+/// (`38;2;R;G;B`). Returns `None` if `hex` isn't a well-formed 6-digit hex.
+fn hex_to_truecolor(hex: &str) -> Option<String> {
+    let h = hex.strip_prefix('#')?;
+    if h.len() != 6 || !h.is_ascii() {
+        return None;
+    }
+    let r = u8::from_str_radix(&h[0..2], 16).ok()?;
+    let g = u8::from_str_radix(&h[2..4], 16).ok()?;
+    let b = u8::from_str_radix(&h[4..6], 16).ok()?;
+    Some(format!("38;2;{r};{g};{b}"))
+}
+
+fn no_color_active() -> bool {
+    if cfg!(test) {
+        std::env::var_os("MANTIS_TEST_NO_COLOR").is_some()
+    } else {
+        std::env::var_os("NO_COLOR").is_some() || std::env::var("TERM").as_deref() == Ok("dumb")
+    }
+}
+
+fn ansi(code: &str, text: &str) -> String {
+    if no_color_active() {
+        let mut modifiers = Vec::new();
+        if code.split(';').any(|s| s == "1") {
+            modifiers.push("1");
+        }
+        if code.split(';').any(|s| s == "4") {
+            modifiers.push("4");
+        }
+        if modifiers.is_empty() {
+            text.to_string()
+        } else {
+            format!("\x1b[{}m{}\x1b[0m", modifiers.join(";"), text)
+        }
+    } else {
+        format!("\x1b[{code}m{text}\x1b[0m")
+    }
+}
+
+/// Renders markdown `src` to ANSI-styled lines using `theme`.
+pub fn render_to_ansi(src: &str, theme: &MarkdownColors) -> Vec<String> {
+    let mut lines = Vec::new();
+    render_to_ansi_batches(src, theme, |batch| lines.extend(batch));
+    lines
+}
+
+fn render_to_ansi_batches(src: &str, theme: &MarkdownColors, mut emit: impl FnMut(Vec<String>)) {
+    let mut lines: Vec<String> = Vec::new();
+    let mut current = String::new();
+    let mut style_stack: Vec<String> = Vec::new();
+    let mut code_buf: Vec<String> = Vec::new();
+    let mut in_code = false;
+    let mut list_depth: usize = 0;
+    let mut bq_depth: usize = 0;
+    let mut in_table = false;
+    let mut in_table_header = false;
+    let mut in_table_cell = false;
+    let mut table_aligns: Vec<Alignment> = Vec::new();
+    let mut table_rows: Vec<(bool, Vec<String>)> = Vec::new();
+    let mut table_row_cells: Vec<String> = Vec::new();
+    let mut table_cell_buf = String::new();
+
+    for event in Parser::new_ext(src, Options::all()) {
+        match event {
+            Event::Start(Tag::Table(aligns)) => {
+                flush_line(&mut lines, &mut current, bq_depth, theme);
+                table_aligns = aligns;
+                table_rows.clear();
+                in_table = true;
+            }
+            Event::End(Tag::Table(_)) => {
+                in_table = false;
+                render_table_ansi(&table_rows, &table_aligns, theme, &mut lines);
+                table_rows.clear();
+                table_aligns.clear();
+            }
+            Event::Start(Tag::TableHead) => {
+                in_table_header = true;
+                table_row_cells.clear();
+            }
+            Event::End(Tag::TableHead) => {
+                in_table_header = false;
+                if !table_row_cells.is_empty() {
+                    table_rows.push((true, std::mem::take(&mut table_row_cells)));
+                }
+            }
+            Event::Start(Tag::TableRow) => table_row_cells.clear(),
+            Event::End(Tag::TableRow) => {
+                table_rows.push((in_table_header, std::mem::take(&mut table_row_cells)));
+            }
+            Event::Start(Tag::TableCell) => {
+                table_cell_buf.clear();
+                in_table_cell = true;
+            }
+            Event::End(Tag::TableCell) => {
+                in_table_cell = false;
+                table_row_cells.push(std::mem::take(&mut table_cell_buf));
+            }
+            Event::Start(Tag::Heading(level, _, _)) => {
+                flush_line(&mut lines, &mut current, bq_depth, theme);
+                style_stack.push(heading_ansi(level, theme));
+            }
+            Event::End(Tag::Heading(_, _, _)) => {
+                flush_line(&mut lines, &mut current, bq_depth, theme);
+                style_stack.pop();
+                lines.push(String::new());
+            }
+            Event::Start(Tag::Paragraph) => {}
+            Event::End(Tag::Paragraph) => {
+                if !in_table {
+                    flush_line(&mut lines, &mut current, bq_depth, theme);
+                    lines.push(String::new());
+                }
+            }
+            Event::Start(Tag::Strong) => style_stack.push("1".to_string()),
+            Event::End(Tag::Strong) => {
+                style_stack.pop();
+            }
+            Event::Start(Tag::Emphasis) => style_stack.push("3".to_string()),
+            Event::End(Tag::Emphasis) => {
+                style_stack.pop();
+            }
+            Event::Start(Tag::Strikethrough) => style_stack.push("9".to_string()),
+            Event::End(Tag::Strikethrough) => {
+                style_stack.pop();
+            }
+            Event::Start(Tag::CodeBlock(_)) => {
+                flush_line(&mut lines, &mut current, bq_depth, theme);
+                in_code = true;
+                code_buf.clear();
+            }
+            Event::End(Tag::CodeBlock(_)) => {
+                in_code = false;
+                if !code_buf.is_empty() {
+                    if no_color_active() {
+                        lines.push("  ┌──".to_string());
+                        for cl in code_buf.drain(..) {
+                            lines.push(format!("  │ {cl}"));
+                        }
+                        lines.push("  └──".to_string());
+                    } else {
+                        let dim = &theme.dim;
+                        let code = &theme.code;
+                        lines.push(format!("\x1b[{dim}m  ┌──\x1b[0m"));
+                        for cl in code_buf.drain(..) {
+                            lines.push(format!("\x1b[{dim}m  │ \x1b[0m\x1b[{code}m{cl}\x1b[0m"));
+                        }
+                        lines.push(format!("\x1b[{dim}m  └──\x1b[0m"));
+                    }
+                }
+                lines.push(String::new());
+            }
+            Event::Start(Tag::List(_)) => {
+                if list_depth == 0 {
+                    flush_line(&mut lines, &mut current, bq_depth, theme);
+                }
+                list_depth += 1;
+            }
+            Event::End(Tag::List(_)) => {
+                list_depth = list_depth.saturating_sub(1);
+                if list_depth == 0 {
+                    lines.push(String::new());
+                }
+            }
+            Event::Start(Tag::Item) => {
+                flush_line(&mut lines, &mut current, bq_depth, theme);
+                let indent = "  ".repeat(list_depth.saturating_sub(1));
+                if no_color_active() {
+                    current = format!("{indent}• ");
+                } else {
+                    current = format!("\x1b[{accent}m{indent}• \x1b[0m", accent = theme.accent);
+                }
+            }
+            Event::End(Tag::Item) => {
+                flush_line(&mut lines, &mut current, bq_depth, theme);
+            }
+            Event::Start(Tag::BlockQuote) => {
+                flush_line(&mut lines, &mut current, bq_depth, theme);
+                bq_depth += 1;
+                style_stack.push(theme.dim.clone());
+            }
+            Event::End(Tag::BlockQuote) => {
+                flush_line(&mut lines, &mut current, bq_depth, theme);
+                bq_depth = bq_depth.saturating_sub(1);
+                style_stack.pop();
+                lines.push(String::new());
+            }
+            Event::Start(Tag::Link(_, _, _)) => {
+                style_stack.push(theme.accent.clone());
+            }
+            Event::End(Tag::Link(_, _, _)) => {
+                style_stack.pop();
+            }
+            Event::Start(Tag::Image(_, _, _)) => {
+                if !in_table_cell {
+                    current.push_str(&ansi(&theme.dim, "[img]"));
+                }
+            }
+            Event::End(Tag::Image(_, _, _)) => {}
+            Event::Text(t) => {
+                if in_code {
+                    for line in t.lines() {
+                        code_buf.push(line.to_owned());
+                    }
+                } else if in_table_cell {
+                    table_cell_buf.push_str(&t);
+                } else {
+                    let combined = style_stack.join(";");
+                    current.push_str(&apply_style(&combined, &t));
+                }
+            }
+            Event::Code(t) => {
+                if in_table_cell {
+                    table_cell_buf.push('`');
+                    table_cell_buf.push_str(&t);
+                    table_cell_buf.push('`');
+                } else {
+                    current.push_str(&ansi(&theme.code, &format!("`{t}`")));
+                }
+            }
+            Event::SoftBreak => {
+                if !in_table_cell {
+                    current.push(' ');
+                }
+            }
+            Event::HardBreak => {
+                if !in_table_cell {
+                    flush_line(&mut lines, &mut current, bq_depth, theme);
+                }
+            }
+            Event::Rule => {
+                flush_line(&mut lines, &mut current, bq_depth, theme);
+                lines.push(ansi(&theme.dim, &"─".repeat(60)));
+                lines.push(String::new());
+            }
+            Event::TaskListMarker(checked) => {
+                // TaskListMarker fires immediately after Start(Item) sets
+                // `current` to the bullet prefix. Replace the bullet in
+                // `current` directly — lines hasn't been flushed yet.
+                let indent = "  ".repeat(list_depth.saturating_sub(1));
+                let marker = if checked { "☑" } else { "☐" };
+                if no_color_active() {
+                    current = format!("{indent}{marker} ");
+                } else {
+                    current = format!(
+                        "\x1b[{accent}m{indent}{marker} \x1b[0m",
+                        accent = theme.accent
+                    );
+                }
+            }
+            _ => {}
+        }
+        if lines.len() >= 128 {
+            emit(std::mem::take(&mut lines));
+        }
+    }
+    flush_line(&mut lines, &mut current, bq_depth, theme);
+    if !lines.is_empty() {
+        emit(lines);
+    }
+}
+
+fn apply_style(style: &str, text: &str) -> String {
+    if style.is_empty() || text.is_empty() {
+        return text.to_string();
+    }
+    // style is an ANSI code like "38;5;81" or a modifier like "1"
+    if style.contains(';') || (style.len() <= 2 && style.chars().all(|c| c.is_ascii_digit())) {
+        ansi(style, text)
+    } else {
+        text.to_string()
+    }
+}
+
+fn flush_line(
+    lines: &mut Vec<String>,
+    current: &mut String,
+    bq_depth: usize,
+    theme: &MarkdownColors,
+) {
+    if current.is_empty() {
+        return;
+    }
+    let mut line = String::new();
+    if bq_depth > 0 {
+        let bq_marker = "│ ".repeat(bq_depth);
+        line.push_str(&ansi(&theme.dim, &bq_marker));
+    }
+    line.push_str(current);
+    lines.push(line);
+    current.clear();
+}
+
+fn heading_ansi(level: HeadingLevel, theme: &MarkdownColors) -> String {
+    match level {
+        HeadingLevel::H1 => format!("1;{}", theme.heading1),
+        HeadingLevel::H2 => format!("1;{}", theme.heading2),
+        HeadingLevel::H3 => format!("1;{}", theme.heading3),
+        HeadingLevel::H4 | HeadingLevel::H5 | HeadingLevel::H6 => {
+            format!("1;{}", theme.text)
+        }
+    }
+}
+
+// --- Table rendering ---------------------------------------------------------
+
+fn render_table_ansi(
+    rows: &[(bool, Vec<String>)],
+    aligns: &[Alignment],
+    theme: &MarkdownColors,
+    out: &mut Vec<String>,
+) {
+    if rows.is_empty() {
+        return;
+    }
+    let col_count = rows.iter().map(|(_, c)| c.len()).max().unwrap_or(0);
+    if col_count == 0 {
+        return;
+    }
+    let mut col_widths: Vec<usize> = vec![1; col_count];
+    for (_, cells) in rows {
+        for (i, cell) in cells.iter().enumerate() {
+            if i < col_count {
+                col_widths[i] = col_widths[i].max(visible_width(cell));
+            }
+        }
+    }
+    let dim = &theme.dim;
+    let header = format!("1;{}", theme.heading1);
+
+    if no_color_active() {
+        out.push(table_border('┌', '─', '┬', '┐', &col_widths));
+        for (is_header, cells) in rows {
+            let mut line = String::from("│");
+            for (i, w) in col_widths.iter().enumerate() {
+                let text = cells.get(i).map(|s| s.as_str()).unwrap_or("");
+                let align = aligns.get(i).copied().unwrap_or(Alignment::None);
+                let padded = pad_width(text, *w, align);
+                if *is_header {
+                    line.push_str(&format!(" \x1b[1m{padded}\x1b[0m │"));
+                } else {
+                    line.push_str(&format!(" {padded} │"));
+                }
+            }
+            out.push(line);
+            if *is_header {
+                out.push(table_border('├', '─', '┼', '┤', &col_widths));
+            }
+        }
+        out.push(table_border('└', '─', '┴', '┘', &col_widths));
+    } else {
+        out.push(format!(
+            "\x1b[{dim}m{}\x1b[0m",
+            table_border('┌', '─', '┬', '┐', &col_widths)
+        ));
+        for (is_header, cells) in rows {
+            let style = if *is_header { &header } else { "" };
+            let mut line = format!("\x1b[{dim}m│\x1b[0m");
+            for (i, w) in col_widths.iter().enumerate() {
+                let text = cells.get(i).map(|s| s.as_str()).unwrap_or("");
+                let align = aligns.get(i).copied().unwrap_or(Alignment::None);
+                let padded = pad_width(text, *w, align);
+                line.push_str(&format!(
+                    "\x1b[{style}m {padded} \x1b[0m\x1b[{dim}m│\x1b[0m"
+                ));
+            }
+            out.push(line);
+            if *is_header {
+                out.push(format!(
+                    "\x1b[{dim}m{}\x1b[0m",
+                    table_border('├', '─', '┼', '┤', &col_widths)
+                ));
+            }
+        }
+        out.push(format!(
+            "\x1b[{dim}m{}\x1b[0m",
+            table_border('└', '─', '┴', '┘', &col_widths)
+        ));
+    }
+    out.push(String::new());
+}
+
+fn table_border(left: char, fill: char, mid: char, right: char, widths: &[usize]) -> String {
+    let mut s = String::from(left);
+    for (i, w) in widths.iter().enumerate() {
+        for _ in 0..(*w + 2) {
+            s.push(fill);
+        }
+        s.push(if i < widths.len() - 1 { mid } else { right });
+    }
+    s
+}
+
+fn pad_width(text: &str, width: usize, align: Alignment) -> String {
+    let vw = visible_width(text);
+    let pad = width.saturating_sub(vw);
+    match align {
+        Alignment::Right => format!("{}{}", " ".repeat(pad), text),
+        Alignment::Center => format!(
+            "{}{}{}",
+            " ".repeat(pad / 2),
+            text,
+            " ".repeat(pad - pad / 2)
+        ),
+        _ => format!("{}{}", text, " ".repeat(pad)),
+    }
+}
+
+fn visible_width(s: &str) -> usize {
+    UnicodeWidthStr::width(s)
+}
+
+#[cfg(test)]
+#[path = "markdown_test.rs"]
+mod tests;

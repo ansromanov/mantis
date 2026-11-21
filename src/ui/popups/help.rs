@@ -2,7 +2,7 @@
 //!
 //! `draw_help` renders a centered overlay with action groups derived from the
 //! canonical registry, plus prose-only topics for getting started, settings,
-//! themes, plugins, and mouse gestures. The user can switch tabs using
+//! themes, and mouse gestures. The user can switch tabs using
 //! Left/Right arrows, h/l, or Tab/Shift-Tab, and scroll using Up/Down arrows or j/k.
 //! Key columns are built dynamically from the live `Keymap` so that remapped
 //! keys are reflected immediately.
@@ -28,7 +28,7 @@ use crate::app::App;
 static HELP_TABS: LazyLock<Vec<&'static str>> = LazyLock::new(|| {
     let mut tabs = vec!["Getting started"];
     tabs.extend(crate::actions::ACTION_CATEGORIES.iter().copied());
-    tabs.extend(["Settings", "Themes", "Plugins", "Mouse"]);
+    tabs.extend(["Settings", "Themes", "Mouse"]);
     tabs
 });
 
@@ -42,7 +42,6 @@ pub(crate) fn help_doc_link(tab: &str) -> &'static str {
         "Git" => "git.md",
         "Settings" => "configuration.md",
         "Themes" => "themes.md",
-        "Plugins" => "plugins.md",
         _ => "usage.md",
     }
 }
@@ -357,25 +356,6 @@ pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
         ));
         rows.push(normal_text(
             "  - Windows:     %APPDATA%\\mantis\\themes\\*.toml",
-        ));
-    } else if tab == "Plugins" {
-        rows.push(section("Overview"));
-        rows.push(normal_text(
-            "Plugins are external processes that extend mantis capabilities.",
-        ));
-        rows.push(gap.clone());
-        rows.push(section("Plugin Manager"));
-        rows.push(row_key("plugin_picker"));
-        rows.push(gap.clone());
-        rows.push(section("For Developers"));
-        rows.push(normal_text("Plugins are discovered and loaded from:"));
-        rows.push(normal_text(
-            "  - macOS/Linux: $XDG_CONFIG_HOME/mantis/plugins/ (defaults to ~/.config/mantis/plugins/)",
-        ));
-        rows.push(normal_text("  - Windows:     %APPDATA%\\mantis\\plugins\\"));
-        rows.push(gap.clone());
-        rows.push(normal_text(
-            "See docs/src/plugin-development.md for the plugin protocol.",
         ));
     } else if tab == "Mouse" {
         rows.push(section("General Actions"));

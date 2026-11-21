@@ -81,11 +81,6 @@ pub fn search_toggle(key: &KeyEvent) -> Option<SearchToggle> {
     }
 }
 
-/// Plugin picker toggle (Space).
-pub fn is_toggle_selection(key: &KeyEvent) -> bool {
-    key.code == KeyCode::Char(' ')
-}
-
 /// Modal about screen: open release URL (o).
 pub fn is_open_release(key: &KeyEvent) -> bool {
     key.code == KeyCode::Char('o')

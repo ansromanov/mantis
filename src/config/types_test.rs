@@ -563,60 +563,6 @@ fn updates_check_round_trips_through_serde() {
     assert!(!parsed.updates.check);
 }
 
-#[test]
-fn migrate_legacy_plugin_paths_works() {
-    let toml_str = r#"
-[plugins.markdown]
-enabled = false
-path = "mantis-plugin-markdown"
-
-[plugins.iconize]
-enabled = true
-path = "mantis-plugin-iconize.exe"
-
-[plugins.mantis-plugin-markdown]
-enabled = true
-path = "mantis-plugin-markdown"
-"#;
-    let mut config: Config = toml::from_str(toml_str).unwrap();
-    config.migrate_legacy_plugin_paths();
-
-    let md_entry = config.plugins.get("markdown").unwrap();
-    assert_eq!(md_entry.path.to_str().unwrap(), "markdown");
-    assert!(!md_entry.enabled);
-
-    let ic_entry = config.plugins.get("iconize").unwrap();
-    assert_eq!(ic_entry.path.to_str().unwrap(), "iconize.exe");
-    assert!(ic_entry.enabled);
-}
-
-#[test]
-fn telemetry_defaults_to_disabled() {
-    let cfg = Config::default();
-    assert!(!cfg.telemetry.enabled);
-}
-
-#[test]
-fn telemetry_enabled_round_trips_through_serde() {
-    let cfg = Config {
-        telemetry: TelemetryConfig {
-            enabled: true,
-            notice_shown: true,
-        },
-        ..Config::default()
-    };
-    let toml_str = toml::to_string_pretty(&cfg).unwrap();
-    let parsed: Config = toml::from_str(&toml_str).unwrap();
-    assert!(parsed.telemetry.enabled);
-    assert!(parsed.telemetry.notice_shown);
-}
-
-#[test]
-fn telemetry_section_parses_from_toml() {
-    let parsed: Config = toml::from_str("[telemetry]\nenabled = true\n").unwrap();
-    assert!(parsed.telemetry.enabled);
-}
-
 // -- GeneralConfig -----------------------------------------------------------
 
 #[test]

@@ -183,7 +183,6 @@ const KEYMAP_FIELD_ACTION_IDS: &[&str] = &[
     "copy_relative_path",
     "copy_line",
     "copy_file",
-    "plugin_picker",
     "goto_line",
     "tree_up_dir",
     "tree_width_grow",
@@ -378,19 +377,6 @@ fn command_palette_has_help_section() {
 }
 
 #[test]
-fn toggle_telemetry_action_is_palette_only() {
-    let action = ACTIONS
-        .iter()
-        .find(|a| a.id == "toggle_telemetry")
-        .expect("toggle_telemetry must be registered");
-    assert!(action.palette.is_some(), "reachable via Ctrl-P");
-    assert!(
-        !KEYMAP_FIELD_ACTION_IDS.contains(&"toggle_telemetry"),
-        "palette-only: no keymap field expected"
-    );
-}
-
-#[test]
 fn bug_report_action_is_palette_only() {
     let action = ACTIONS
         .iter()
@@ -529,7 +515,7 @@ fn applicability_maps_each_special_cased_action_to_its_precondition() {
     assert_eq!(applicability_of("unfold_all"), Applicability::FoldRegions);
     assert_eq!(
         applicability_of("toggle_raw_markdown"),
-        Applicability::PluginContentActive
+        Applicability::RenderedMarkdownActive
     );
     assert_eq!(applicability_of("open_in_editor"), Applicability::OpenFile);
     assert_eq!(applicability_of("open_external"), Applicability::OpenFile);
@@ -556,15 +542,4 @@ fn repo_commit_log_action_requires_git_repo() {
         .expect("repo_commit_log must be registered in ACTIONS");
     assert_eq!(spec.palette, Some("Browse repository commits"));
     assert_eq!(spec.category, "Git");
-}
-
-#[test]
-fn plugins_category_and_plugin_picker_action() {
-    assert!(ACTION_CATEGORIES.contains(&"Plugins"));
-    let action = ACTIONS
-        .iter()
-        .find(|a| a.id == "plugin_picker")
-        .expect("plugin_picker action exists");
-    assert_eq!(action.category, "Plugins");
-    assert_eq!(action.menu, Some(0));
 }

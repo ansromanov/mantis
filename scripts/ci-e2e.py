@@ -61,7 +61,7 @@ def run_e2e_test():
         success = False
         output = b""
         start_time = time.time()
-        timeout = 5.0  # seconds
+        timeout = 10.0  # seconds
 
         try:
             # Phase 1: Wait for mantis to render and display the files

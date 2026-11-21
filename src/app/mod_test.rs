@@ -50,15 +50,6 @@ fn statusbar_action_targets_keep_their_rendered_row() {
     fs::remove_dir_all(root).ok();
 }
 
-#[test]
-fn new_app_has_no_pending_plugin_content_cursor() {
-    let root = temp_tree();
-    let app = app_for(&root);
-    assert!(app.pending_content_cursor.is_none());
-    assert!(app.content_cursor_dirty_at.is_none());
-    fs::remove_dir_all(root).ok();
-}
-
 fn app_for(root: &std::path::Path) -> App {
     App::new(root.to_path_buf(), Config::default(), None, None).unwrap()
 }
@@ -1064,7 +1055,7 @@ fn line_prefix_width_zero_for_diff_and_markdown() {
     app.is_diff = false;
     let md_path = root.join("doc.md");
     app.current_file = Some(md_path.clone());
-    app.plugin_content.insert(
+    app.rendered_content.insert(
         md_path,
         vec![vec![(ratatui::style::Style::default(), "x".to_string())]],
     );
@@ -1773,7 +1764,7 @@ fn content_pos_word_wrap_first_visual_row_of_first_line() {
     // Plugin content mode: prefix = 0.
     let md_path = root.join("doc.md");
     app.current_file = Some(md_path.clone());
-    app.plugin_content.insert(
+    app.rendered_content.insert(
         md_path,
         vec![
             // Line 0: 5 chars -> ceil(5/10) = 1 visual row.
@@ -1807,7 +1798,7 @@ fn content_pos_word_wrap_first_visual_row_of_second_line() {
     let mut app = app_for(&root);
     let md_path = root.join("doc.md");
     app.current_file = Some(md_path.clone());
-    app.plugin_content.insert(
+    app.rendered_content.insert(
         md_path,
         vec![
             vec![(ratatui::style::Style::default(), "hello".to_string())],
@@ -1838,7 +1829,7 @@ fn content_pos_word_wrap_second_visual_row_of_second_line() {
     let mut app = app_for(&root);
     let md_path = root.join("doc.md");
     app.current_file = Some(md_path.clone());
-    app.plugin_content.insert(
+    app.rendered_content.insert(
         md_path,
         vec![
             vec![(ratatui::style::Style::default(), "hello".to_string())],
@@ -1869,7 +1860,7 @@ fn content_pos_word_wrap_third_visual_row_of_second_line() {
     let mut app = app_for(&root);
     let md_path = root.join("doc.md");
     app.current_file = Some(md_path.clone());
-    app.plugin_content.insert(
+    app.rendered_content.insert(
         md_path,
         vec![
             vec![(ratatui::style::Style::default(), "hello".to_string())],
@@ -1900,7 +1891,7 @@ fn content_pos_word_wrap_past_all_content_clamps_to_last_line() {
     let mut app = app_for(&root);
     let md_path = root.join("doc.md");
     app.current_file = Some(md_path.clone());
-    app.plugin_content.insert(
+    app.rendered_content.insert(
         md_path,
         vec![
             vec![(ratatui::style::Style::default(), "hello".to_string())],
@@ -1930,7 +1921,7 @@ fn content_pos_word_wrap_empty_line_counts_as_one_visual_row() {
     let mut app = app_for(&root);
     let md_path = root.join("doc.md");
     app.current_file = Some(md_path.clone());
-    app.plugin_content.insert(
+    app.rendered_content.insert(
         md_path,
         vec![
             vec![(ratatui::style::Style::default(), "".to_string())],
@@ -1957,7 +1948,7 @@ fn content_pos_word_wrap_respects_content_scroll() {
     let mut app = app_for(&root);
     let md_path = root.join("doc.md");
     app.current_file = Some(md_path.clone());
-    app.plugin_content.insert(
+    app.rendered_content.insert(
         md_path,
         vec![
             vec![(ratatui::style::Style::default(), "line0".to_string())],
@@ -2026,7 +2017,7 @@ fn content_pos_word_wrap_counts_wide_chars_by_display_width() {
     // Plugin content mode: prefix = 0, wrap_width = content_area.width = 8.
     let md_path = root.join("doc.md");
     app.current_file = Some(md_path.clone());
-    app.plugin_content.insert(
+    app.rendered_content.insert(
         md_path,
         vec![
             // 5 wide CJK glyphs: 5 chars but display width 10 -> ceil(10/8) = 2 rows.
@@ -3814,7 +3805,7 @@ fn content_pos_word_wrap_zero_width_area_falls_through() {
     let mut app = app_for(&root);
     let md_path = root.join("doc.md");
     app.current_file = Some(md_path.clone());
-    app.plugin_content.insert(
+    app.rendered_content.insert(
         md_path,
         vec![vec![(
             ratatui::style::Style::default(),
@@ -4721,18 +4712,6 @@ fn set_scroll_from_mouse_y_track_range_zero() {
 // -- icons_enabled ------------------------------------------------------------
 
 #[test]
-fn icons_enabled_defaults_to_false() {
-    let root = temp_tree();
-    let app = app_for(&root);
-    assert!(!app.icons_enabled);
-    assert!(app.icon_map.is_empty());
-    assert!(app.icon_dir_open.is_empty());
-    assert!(app.icon_dir_closed.is_empty());
-    assert!(app.icon_fallback.is_empty());
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
 fn icons_enabled_true_when_config_says_so() {
     let root = temp_tree();
     let cfg = Config {
@@ -4748,103 +4727,6 @@ fn icons_enabled_true_when_config_says_so() {
 }
 
 // -- plugin picker ------------------------------------------------------------
-
-#[test]
-fn plugin_picker_key_opens_overlay() {
-    let root = temp_tree();
-    let mut app = app_for(&root);
-    assert!(app.plugin_picker.is_none());
-    app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::empty()));
-    assert!(app.plugin_picker.is_some());
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn plugin_picker_esc_closes_overlay() {
-    let root = temp_tree();
-    let mut app = app_for(&root);
-    app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::empty()));
-    assert!(app.plugin_picker.is_some());
-    app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
-    assert!(app.plugin_picker.is_none());
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn plugin_picker_opens_empty_when_no_plugins_configured() {
-    // Even with an empty mantis.toml, bundled plugins are seeded so the palette
-    // is not empty.
-    let root = temp_tree();
-    let mut app = app_for(&root);
-    app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::empty()));
-    let picker = app.plugin_picker.as_ref().unwrap();
-    assert!(
-        picker.results_len() > 0,
-        "bundled plugins must appear even with a bare config"
-    );
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn plugin_picker_nav_down_and_up() {
-    use crate::plugin::PluginEntry;
-    use std::path::PathBuf;
-
-    let root = temp_tree();
-    // Two plugins with bad paths so activate_all silently skips them.
-    let mut cfg = Config::default();
-    cfg.plugins.insert(
-        "alpha".to_string(),
-        PluginEntry {
-            path: PathBuf::from("/nonexistent/a"),
-            enabled: false,
-            ..Default::default()
-        },
-    );
-    cfg.plugins.insert(
-        "beta".to_string(),
-        PluginEntry {
-            path: PathBuf::from("/nonexistent/b"),
-            enabled: false,
-            ..Default::default()
-        },
-    );
-    let mut app = App::new(root.clone(), cfg, None, None).unwrap();
-
-    app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::empty()));
-    assert_eq!(app.plugin_picker.as_ref().unwrap().selected, 0);
-
-    app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
-    assert_eq!(app.plugin_picker.as_ref().unwrap().selected, 1);
-
-    app.handle_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()));
-    assert_eq!(app.plugin_picker.as_ref().unwrap().selected, 0);
-
-    // Can't navigate above the first item.
-    app.handle_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()));
-    assert_eq!(app.plugin_picker.as_ref().unwrap().selected, 0);
-
-    // Navigate to the very last item and verify we can't go further.
-    let total = app.plugin_picker.as_ref().unwrap().results_len();
-    // Move to the end.
-    for _ in 0..total {
-        app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
-    }
-    let last_idx = app.plugin_picker.as_ref().unwrap().selected;
-    app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
-    assert_eq!(app.plugin_picker.as_ref().unwrap().selected, last_idx);
-
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn plugin_picker_command_palette_entry_exists() {
-    use crate::command_palette::COMMANDS;
-    assert!(
-        COMMANDS.iter().any(|c| c.action_id == "plugin_picker"),
-        "command palette must include plugin_picker"
-    );
-}
 
 // -- panel_mode_label ---------------------------------------------------------
 
@@ -5208,165 +5090,6 @@ fn resolve_bug_report_title_uses_custom_or_falls_back_to_default() {
     assert_eq!(resolve_bug_report_title(Some("")), "App Bug Report");
     assert_eq!(resolve_bug_report_title(Some("   ")), "App Bug Report");
     assert_eq!(resolve_bug_report_title(None), "App Bug Report");
-}
-
-#[test]
-fn toggle_telemetry_flips_config_persists_and_reports_status() {
-    let root = temp_tree();
-    let config_path = root.join("mantis.toml");
-    let mut app = App::new(
-        root.to_path_buf(),
-        Config::default(),
-        Some(config_path.clone()),
-        None,
-    )
-    .unwrap();
-    assert!(!app.config.telemetry.enabled, "disabled by default");
-    assert!(
-        !app.config.telemetry.notice_shown,
-        "notice not shown by default"
-    );
-    assert!(!app.telemetry.is_enabled());
-
-    app.toggle_telemetry();
-    assert!(app.config.telemetry.enabled, "toggle must flip config on");
-    assert!(
-        app.config.telemetry.notice_shown,
-        "toggle must record notice shown"
-    );
-    assert!(
-        app.show_telemetry_notice,
-        "first enable must show the notice popup"
-    );
-    assert!(
-        app.telemetry.is_enabled(),
-        "toggle must rebuild a live telemetry handle"
-    );
-    assert_eq!(
-        app.status_message.as_ref().unwrap().text,
-        "telemetry enabled"
-    );
-    let saved = fs::read_to_string(&config_path).unwrap();
-    assert!(
-        saved.contains("enabled = true"),
-        "toggle must persist the new state: {saved}"
-    );
-    assert!(
-        saved.contains("notice_shown = true"),
-        "toggle must persist notice shown: {saved}"
-    );
-
-    // Dismiss the notice popup
-    app.show_telemetry_notice = false;
-
-    app.toggle_telemetry();
-    assert!(!app.config.telemetry.enabled, "toggle must flip config off");
-    assert!(app.config.telemetry.notice_shown, "notice_shown stays true");
-    assert!(
-        !app.show_telemetry_notice,
-        "disabling does not show notice popup"
-    );
-    assert!(!app.telemetry.is_enabled());
-    assert_eq!(
-        app.status_message.as_ref().unwrap().text,
-        "telemetry disabled"
-    );
-
-    // Enable telemetry a second time; notice must not be shown
-    app.toggle_telemetry();
-    assert!(
-        app.config.telemetry.enabled,
-        "toggle must flip config on second time"
-    );
-    assert!(
-        !app.show_telemetry_notice,
-        "subsequent enable must not show notice popup"
-    );
-
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn teardown_plugin_contributions_removes_palette_commands_and_closes_palette() {
-    let root = temp_tree();
-    let mut app = app_for(&root);
-
-    app.plugin_manager.register_commands(
-        "demo",
-        vec![crate::plugin::PluginCommand {
-            id: "demo.hello".to_string(),
-            name: "Say Hello".to_string(),
-            category: None,
-            description: None,
-        }],
-    );
-    app.plugin_contributions
-        .entry("demo".to_string())
-        .or_default()
-        .command_ids
-        .insert("demo.hello".to_string());
-    app.command_palette = Some(crate::command_palette::CommandPalette::default());
-
-    app.teardown_plugin_contributions("demo");
-
-    assert_eq!(
-        app.plugin_manager.plugin_for_command("demo.hello"),
-        None,
-        "teardown must remove the plugin's command registrations"
-    );
-    assert!(
-        app.command_palette.is_none(),
-        "an open palette must close so stale plugin entries can't dispatch"
-    );
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn teardown_plugin_contributions_removes_partial_streamed_content() {
-    let root = temp_tree();
-    let mut app = app_for(&root);
-    let path = root.join("a.txt");
-    app.plugin_content.insert(path.clone(), Vec::new());
-    app.plugin_content_text
-        .insert(path.clone(), vec!["partial".to_string()]);
-    app.plugin_content_streams.insert(
-        path.clone(),
-        (
-            "demo".to_string(),
-            crate::plugin::ContentStream::new("render-1".into(), std::time::Instant::now()),
-        ),
-    );
-    app.plugin_contributions
-        .entry("demo".to_string())
-        .or_default()
-        .content_paths
-        .insert(path.clone());
-
-    app.teardown_plugin_contributions("demo");
-
-    assert!(!app.plugin_content.contains_key(&path));
-    assert!(!app.plugin_content_text.contains_key(&path));
-    assert!(!app.plugin_content_streams.contains_key(&path));
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn teardown_plugin_contributions_keeps_palette_when_plugin_had_no_commands() {
-    let root = temp_tree();
-    let mut app = app_for(&root);
-
-    app.plugin_contributions
-        .entry("quiet".to_string())
-        .or_default();
-    app.command_palette = Some(crate::command_palette::CommandPalette::default());
-
-    app.teardown_plugin_contributions("quiet");
-
-    assert!(
-        app.command_palette.is_some(),
-        "palette must stay open when the torn-down plugin contributed no commands"
-    );
-    fs::remove_dir_all(&root).ok();
 }
 
 #[test]

@@ -175,8 +175,6 @@ impl Tabs {
         let mut app = self.apps.remove(self.active);
         let root = app.root.clone();
         app.save_session();
-        app.plugin_manager.on_quit();
-        app.plugin_manager.deactivate_all();
         self.closed_tabs.push_back(root);
         while self.closed_tabs.len() > 10 {
             self.closed_tabs.pop_front();
@@ -194,8 +192,6 @@ impl Tabs {
         }
         let mut app = self.apps.remove(index);
         app.save_session();
-        app.plugin_manager.on_quit();
-        app.plugin_manager.deactivate_all();
         if self.active > index {
             self.active -= 1;
         }
@@ -219,8 +215,6 @@ impl Tabs {
                 kept = Some(app);
             } else {
                 app.save_session();
-                app.plugin_manager.on_quit();
-                app.plugin_manager.deactivate_all();
             }
         }
         if let Some(app) = kept {

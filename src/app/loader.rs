@@ -22,7 +22,6 @@
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{Receiver, Sender};
-use std::sync::Arc;
 use std::thread::JoinHandle;
 
 use ratatui::style::Style;
@@ -35,7 +34,6 @@ use crate::fold::FoldRegion;
 use crate::git::GitStatus;
 use crate::highlight::Highlighter;
 use crate::jsonl;
-use crate::plugin::ExtraSyntax;
 use crate::theme::Theme;
 use crate::virtual_file::VirtualFile;
 use crate::yaml_fold;
@@ -60,6 +58,10 @@ pub(super) struct FileLoad {
     pub csv_table_lines: Spans,
     pub show_csv_table: bool,
     pub yaml: Option<YamlLoad>,
+    /// Fold regions from the built-in per-language detector (non-YAML files).
+    pub fold_regions: Vec<crate::fold::FoldRegion>,
+    /// Symbol outline from the built-in detector (currently Rust only).
+    pub symbols: Vec<crate::code_intel::Symbol>,
     /// `true` when the file size exceeds the configured `prettify_size_limit`
     /// and JSON/YAML pretty-printing / fold detection was skipped.
     pub prettify_size_limit_exceeded: bool,
@@ -129,6 +131,8 @@ impl FileLoad {
             csv_table_lines: Vec::new(),
             show_csv_table: false,
             yaml: None,
+            fold_regions: Vec::new(),
+            symbols: Vec::new(),
             prettify_size_limit_exceeded: false,
             ok: true,
             encoding: None,
@@ -206,6 +210,11 @@ pub(super) fn compute_file_load(
                 load.line_ending = detect_line_ending(raw).map(|s| s.to_string());
                 load.syntax_name = hl.syntax_name(path);
                 load.shebang = parse_shebang(raw);
+                if !too_large {
+                    if let Ok(text) = std::str::from_utf8(raw) {
+                        apply_language_features(&mut load, path, text);
+                    }
+                }
                 load.virtual_file = Some(vf);
                 load.prettify_size_limit_exceeded = too_large;
                 return load;
@@ -313,6 +322,15 @@ pub(super) fn compute_file_load(
             }
         }
     }
+    if !is_yaml {
+        // JSON folds against the pretty-printed lines, which is what is shown.
+        let text = if load.show_pretty_json {
+            load.json_pretty_text.join("\n")
+        } else {
+            load.content.join("\n")
+        };
+        apply_language_features(&mut load, path, &text);
+    }
     if is_csv {
         let delimiter = crate::csv_table::delimiter_for_path(path);
         let rows = crate::csv_table::parse_delimited(&s, delimiter);
@@ -325,6 +343,19 @@ pub(super) fn compute_file_load(
         }
     }
     load
+}
+
+/// Fills `load.fold_regions` and `load.symbols` from the built-in per-language
+/// detectors. `text` must be what the content pane displays so line numbers match.
+fn apply_language_features(load: &mut FileLoad, path: &Path, text: &str) {
+    if let Some(regions) =
+        crate::fold_detectors::detect_for_path(path, load.shebang.as_deref(), text)
+    {
+        load.fold_regions = regions;
+    }
+    if path.extension().is_some_and(|e| e == "rs") {
+        load.symbols = crate::fold_detectors::rust_symbols(text);
+    }
 }
 
 /// Extracts the interpreter executable name from a UTF-8 shebang line.
@@ -496,8 +527,6 @@ pub(super) enum LoadRequest {
     },
     /// Rebuild the worker's highlighter/theme after a theme change.
     SetTheme(Box<Theme>),
-    /// Rebuild the worker's highlighter with updated syntax definitions.
-    SetExtraSyntaxes(Vec<ExtraSyntax>),
     /// Test-only: echoed back once the worker has drained every request
     /// queued ahead of it, giving `App::pump_loads` a deterministic
     /// completion signal instead of a silence-based timeout.
@@ -547,27 +576,18 @@ pub(super) struct Loader {
 }
 
 impl Loader {
-    pub fn new(
-        theme: &Theme,
-        extra_syntaxes: Vec<ExtraSyntax>,
-        prettify_size_limit: usize,
-    ) -> Self {
+    pub fn new(theme: &Theme, prettify_size_limit: usize) -> Self {
         let (req_tx, req_rx) = std::sync::mpsc::channel::<LoadRequest>();
         let (res_tx, res_rx) = std::sync::mpsc::channel::<LoadResponse>();
-        let mut extra_for_thread = Arc::new(extra_syntaxes);
         let mut theme = theme.clone();
         let handle = std::thread::spawn(move || {
-            let mut hl = Highlighter::with_extra_syntaxes(&theme.syntax, &extra_for_thread);
+            let mut hl = Highlighter::new(&theme.syntax);
             while let Ok(req) = req_rx.recv() {
                 match req {
                     LoadRequest::Shutdown => break,
                     LoadRequest::SetTheme(t) => {
                         theme = *t;
-                        hl = Highlighter::with_extra_syntaxes(&theme.syntax, &extra_for_thread);
-                    }
-                    LoadRequest::SetExtraSyntaxes(extra) => {
-                        extra_for_thread = Arc::new(extra);
-                        hl = Highlighter::with_extra_syntaxes(&theme.syntax, &extra_for_thread);
+                        hl = Highlighter::new(&theme.syntax);
                     }
                     LoadRequest::File { seq, path } => {
                         let load = Box::new(compute_file_load(&path, &hl, prettify_size_limit));

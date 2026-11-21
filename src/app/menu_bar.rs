@@ -13,8 +13,6 @@
 
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 
-use crate::telemetry::ActionSource;
-
 use super::{rect_contains, App};
 
 use std::borrow::Cow;
@@ -65,18 +63,7 @@ pub(crate) fn menu_actions(app: &App, menu: &str) -> Vec<MenuAction> {
         })
         .collect();
     actions.sort_by_key(|(order, _)| *order);
-    let mut result: Vec<MenuAction> = actions.into_iter().map(|(_, action)| action).collect();
-    if menu == "Plugins" {
-        for cmd in app.plugin_manager.all_plugin_commands() {
-            result.push(MenuAction {
-                id: Cow::Owned(cmd.id.clone()),
-                label: Cow::Owned(cmd.name.clone()),
-                binding: "-".to_string(),
-                applicable: true,
-            });
-        }
-    }
-    result
+    actions.into_iter().map(|(_, action)| action).collect()
 }
 
 /// Top row index needed to keep a selected action visible in a short dropdown.
@@ -127,7 +114,7 @@ impl App {
                 {
                     let id = item.id.clone();
                     self.menu_bar_state = None;
-                    self.dispatch_action_id(&id, ActionSource::Menu);
+                    self.dispatch_action_id(&id);
                     return;
                 }
             }
@@ -220,7 +207,7 @@ impl App {
                 if let Some(item) = menu_actions(self, MENUS[state.menu_index]).get(row) {
                     let id = item.id.clone();
                     self.menu_bar_state = None;
-                    self.dispatch_action_id(&id, ActionSource::Mouse);
+                    self.dispatch_action_id(&id);
                 }
                 return;
             }

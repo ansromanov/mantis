@@ -273,7 +273,6 @@ fn unknown_key_surfaces_as_warning_but_config_still_loads() {
 }
 
 // Serialize env-var manipulation across parallel tests.
-static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 fn unique_migrate_tmp(label: &str) -> std::path::PathBuf {
     std::env::temp_dir().join(format!(
@@ -289,7 +288,7 @@ fn unique_migrate_tmp(label: &str) -> std::path::PathBuf {
 #[test]
 #[cfg(not(windows))]
 fn migrate_renames_old_dir_to_new() {
-    let _guard = ENV_LOCK.lock().unwrap();
+    let _guard = crate::config::CONFIG_HOME_ENV_LOCK.lock().unwrap();
     let tmp = unique_migrate_tmp("a");
     let old_dir = tmp.join("tree-viewer");
     let new_dir = tmp.join("mantis");
@@ -314,7 +313,7 @@ fn migrate_renames_old_dir_to_new() {
 #[test]
 #[cfg(not(windows))]
 fn migrate_skips_when_new_dir_exists() {
-    let _guard = ENV_LOCK.lock().unwrap();
+    let _guard = crate::config::CONFIG_HOME_ENV_LOCK.lock().unwrap();
     let tmp = unique_migrate_tmp("b");
     let old_dir = tmp.join("tree-viewer");
     let new_dir = tmp.join("mantis");
@@ -336,7 +335,7 @@ fn migrate_skips_when_new_dir_exists() {
 #[test]
 #[cfg(not(windows))]
 fn migrate_no_op_when_old_dir_absent() {
-    let _guard = ENV_LOCK.lock().unwrap();
+    let _guard = crate::config::CONFIG_HOME_ENV_LOCK.lock().unwrap();
     let tmp = unique_migrate_tmp("c");
     fs::create_dir_all(&tmp).unwrap();
 
@@ -541,120 +540,6 @@ fn refresh_static_keys_reference_rewrites_only_when_stale() {
 }
 
 #[test]
-fn load_filters_out_retired_bundled_plugin_entries() {
-    let dir = std::env::temp_dir().join(format!(
-        "mantis_cfg_retired_plugins_{}_{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_nanos())
-            .unwrap_or(0)
-    ));
-    fs::create_dir_all(&dir).unwrap();
-    fs::write(
-        dir.join("mantis.toml"),
-        r#"
-[plugins]
-"git-diff" = { path = "git-diff.sh", enabled = true }
-"my-plugin" = { path = "my-custom-plugin", enabled = true }
-"#,
-    )
-    .unwrap();
-
-    let (config, _path, _error) = load(&dir);
-    assert!(
-        !config.plugins.contains_key("git-diff"),
-        "retired plugin 'git-diff' must be filtered out from config"
-    );
-    assert!(
-        config.plugins.contains_key("my-plugin"),
-        "user plugin 'my-plugin' must be preserved"
-    );
-
-    fs::remove_dir_all(&dir).ok();
-}
-
-#[test]
-fn load_preserves_all_plugins_when_none_are_retired() {
-    let dir = std::env::temp_dir().join(format!(
-        "mantis_cfg_all_ok_{}_{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_nanos())
-            .unwrap_or(0)
-    ));
-    fs::create_dir_all(&dir).unwrap();
-    fs::write(
-        dir.join("mantis.toml"),
-        r#"
-[plugins]
-"my-plugin" = { path = "my-custom-plugin", enabled = true }
-"other" = { path = "some-tool", enabled = false }
-"#,
-    )
-    .unwrap();
-
-    let (config, _path, _error) = load(&dir);
-    assert!(config.plugins.contains_key("my-plugin"));
-    assert!(config.plugins.contains_key("other"));
-
-    fs::remove_dir_all(&dir).ok();
-}
-
-#[test]
-fn sparse_toml_omits_default_bundled_plugins() {
-    let mut cfg = Config::default();
-    for (name, entry) in crate::plugin::bundled_plugin_entries() {
-        cfg.plugins.insert(name, entry);
-    }
-    let out = sparse_toml(&cfg);
-    assert!(
-        !out.contains("[plugins"),
-        "default bundled plugins should be omitted from sparse TOML: {out}"
-    );
-}
-
-#[test]
-fn sparse_toml_keeps_overridden_or_custom_plugins() {
-    let mut cfg = Config::default();
-    for (name, entry) in crate::plugin::bundled_plugin_entries() {
-        cfg.plugins.insert(name, entry);
-    }
-    // Disable rust plugin
-    if let Some(rust_entry) = cfg.plugins.get_mut("rust") {
-        rust_entry.enabled = false;
-    }
-    // Add custom plugin
-    cfg.plugins.insert(
-        "custom-clock".to_string(),
-        crate::plugin::PluginEntry {
-            path: PathBuf::from("clock.sh"),
-            enabled: true,
-            ..Default::default()
-        },
-    );
-
-    let out = sparse_toml(&cfg);
-    assert!(
-        out.contains("[plugins"),
-        "overridden/custom plugins must be serialized: {out}"
-    );
-    assert!(
-        out.contains("rust"),
-        "disabled rust plugin must be serialized: {out}"
-    );
-    assert!(
-        out.contains("custom-clock"),
-        "custom plugin must be serialized: {out}"
-    );
-    assert!(
-        !out.contains("markdown"),
-        "unmodified markdown plugin should not be serialized: {out}"
-    );
-}
-
-#[test]
 fn ui_config_is_exported_for_callers() {
     let ui = super::UiConfig::default();
     assert!(!ui.menu_bar);
@@ -726,33 +611,6 @@ fn save_changes_adds_new_non_default_keys_sparsely() {
     let reloaded = load_from(&saved);
     assert!(reloaded.tree.show_hidden);
     assert_eq!(reloaded.content.word_wrap, current.content.word_wrap);
-    fs::remove_dir_all(&dir).ok();
-}
-
-#[test]
-fn save_changes_writes_a_toggled_plugin_as_a_whole_entry() {
-    let dir = save_dir("plugin");
-    let path = dir.join("mantis.toml");
-    let original = "# no plugins section yet\n[tree]\nwidth = 30\n";
-    fs::write(&path, original).unwrap();
-    let mut previous = load_from(original);
-    for (name, entry) in crate::plugin::bundled_plugin_entries() {
-        previous.plugins.insert(name, entry);
-    }
-    let name = previous.plugins.keys().next().unwrap().clone();
-    let mut current = previous.clone();
-    current.plugins.get_mut(&name).unwrap().enabled = false;
-
-    save_changes(&previous, &current, &path).unwrap();
-    let saved = fs::read_to_string(&path).unwrap();
-    assert!(saved.starts_with(original), "{saved}");
-    assert_eq!(
-        saved.matches("[plugins.").count(),
-        1,
-        "only the changed plugin: {saved}"
-    );
-    let reloaded = load_from(&saved);
-    assert_eq!(reloaded.plugins.get(&name), current.plugins.get(&name));
     fs::remove_dir_all(&dir).ok();
 }
 

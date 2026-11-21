@@ -232,10 +232,6 @@ impl App {
             self.handle_theme_mouse(ev);
             return;
         }
-        if self.plugin_picker.is_some() {
-            self.handle_plugin_mouse(ev);
-            return;
-        }
         if self.command_palette.is_some() {
             self.handle_command_palette_mouse(ev);
             return;
@@ -432,21 +428,9 @@ impl App {
                         );
                         if double && is_dir {
                             self.last_click = None;
-                            self.telemetry.record(
-                                crate::telemetry::TelemetryEvent::ActionInvoked {
-                                    action: "tree_expand",
-                                    source: crate::telemetry::ActionSource::Mouse,
-                                },
-                            );
                             self.descend_to_selected();
                         } else {
                             self.last_click = Some((now, index));
-                            self.telemetry.record(
-                                crate::telemetry::TelemetryEvent::ActionInvoked {
-                                    action: "tree_expand",
-                                    source: crate::telemetry::ActionSource::Mouse,
-                                },
-                            );
                             self.activate_selected();
                         }
                     }
@@ -468,12 +452,6 @@ impl App {
                             .find(|&&(y, _)| y == ev.row)
                             .map(|&(_, ri)| ri);
                         if let Some(ri) = hit {
-                            self.telemetry.record(
-                                crate::telemetry::TelemetryEvent::ActionInvoked {
-                                    action: "fold_toggle",
-                                    source: crate::telemetry::ActionSource::Mouse,
-                                },
-                            );
                             self.toggle_fold_region(ri);
                             self.mark_content_scrolled();
                             return;
@@ -601,19 +579,9 @@ impl App {
                     || (self.show_blame && rect_contains(self.blame_area, ev.column, ev.row))
                 {
                     self.focus = Focus::Content;
-                    self.telemetry
-                        .record(crate::telemetry::TelemetryEvent::ActionInvoked {
-                            action: "content_scroll_down",
-                            source: crate::telemetry::ActionSource::Mouse,
-                        });
                     self.scroll_content_by(WHEEL_STEP as isize);
                 } else if rect_contains(self.tree_area, ev.column, ev.row) {
                     self.focus = Focus::Tree;
-                    self.telemetry
-                        .record(crate::telemetry::TelemetryEvent::ActionInvoked {
-                            action: "tree_scroll_down",
-                            source: crate::telemetry::ActionSource::Mouse,
-                        });
                     self.tree_scroll = (self.tree_scroll + WHEEL_STEP).min(self.tree_scroll_max());
                 }
             }
@@ -622,19 +590,9 @@ impl App {
                     || (self.show_blame && rect_contains(self.blame_area, ev.column, ev.row))
                 {
                     self.focus = Focus::Content;
-                    self.telemetry
-                        .record(crate::telemetry::TelemetryEvent::ActionInvoked {
-                            action: "content_scroll_up",
-                            source: crate::telemetry::ActionSource::Mouse,
-                        });
                     self.scroll_content_by(-(WHEEL_STEP as isize));
                 } else if rect_contains(self.tree_area, ev.column, ev.row) {
                     self.focus = Focus::Tree;
-                    self.telemetry
-                        .record(crate::telemetry::TelemetryEvent::ActionInvoked {
-                            action: "tree_scroll_up",
-                            source: crate::telemetry::ActionSource::Mouse,
-                        });
                     self.tree_scroll = self.tree_scroll.saturating_sub(WHEEL_STEP);
                 }
             }
@@ -664,11 +622,6 @@ impl App {
         } else {
             return;
         };
-        self.telemetry
-            .record(crate::telemetry::TelemetryEvent::ActionInvoked {
-                action,
-                source: crate::telemetry::ActionSource::Mouse,
-            });
 
         match action {
             "compare_against" => {
@@ -699,10 +652,6 @@ impl App {
                     self.unfold_all();
                     self.mark_content_scrolled();
                 }
-            }
-            "plugin_picker" => {
-                let entries = self.plugin_manager.plugin_entries();
-                self.plugin_picker = Some(crate::search::PluginPicker::new(entries));
             }
             "show_about" => self.show_about = !self.show_about,
             "copy_path" => {
@@ -864,16 +813,6 @@ impl App {
                 crate::command_palette::PaletteRoute::Diagnostics => {
                     self.dispatch_palette_diagnostic()
                 }
-            }
-        }
-    }
-
-    /// Handles mouse events on the plugin picker overlay: close on click
-    /// outside the popup area.
-    fn handle_plugin_mouse(&mut self, ev: MouseEvent) {
-        if let MouseEventKind::Down(MouseButton::Left) = ev.kind {
-            if !rect_contains(self.plugin_picker_area, ev.column, ev.row) {
-                self.plugin_picker = None;
             }
         }
     }

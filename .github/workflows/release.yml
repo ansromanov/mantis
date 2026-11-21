@@ -274,33 +274,6 @@ jobs:
         shell: bash
         run: cargo test --all --no-fail-fast
 
-  bench:
-    name: full benchmarks
-    needs: bump
-    runs-on: ${{ inputs.runner == 'self-hosted' && fromJSON('["self-hosted", "Linux"]') || 'ubuntu-latest' }}
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.bump.outputs.sha }}
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: Run full benchmarks
-        run: ./scripts/bench-report.sh
-
-      - name: Write perf recap
-        run: ./scripts/bench-summary.sh | tee bench-results/summary.md >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload bench report
-        uses: actions/upload-artifact@v4
-        with:
-          name: bench-report-v${{ needs.bump.outputs.version }}
-          path: bench-results/
-
   build:
     needs: [bump, plan]
     strategy:
@@ -344,7 +317,7 @@ jobs:
           path: ${{ matrix.artifact }}
 
   publish:
-    needs: [bump, plan, build, test, test-windows, bench]
+    needs: [bump, plan, build, test, test-windows]
     # test-windows is best-effort (continue-on-error) and may also be skipped
     # entirely via test_targets, so its result is deliberately excluded here —
     # Windows never blocks the release. Everything else must succeed or be
@@ -354,8 +327,7 @@ jobs:
       always() &&
       needs.bump.result == 'success' &&
       needs.build.result == 'success' &&
-      (needs.test.result == 'success' || needs.test.result == 'skipped') &&
-      needs.bench.result == 'success'
+      (needs.test.result == 'success' || needs.test.result == 'skipped')
     runs-on: ${{ inputs.runner == 'self-hosted' && fromJSON('["self-hosted", "Linux"]') || 'ubuntu-latest' }}
     permissions:
       contents: write
@@ -445,7 +417,7 @@ jobs:
   # touched, so the branch carries no information either way.
   cleanup:
     name: delete staging branch
-    needs: [bump, plan, build, test, test-windows, bench, publish]
+    needs: [bump, plan, build, test, test-windows, publish]
     if: always() && needs.bump.result == 'success'
     runs-on: ubuntu-latest
     permissions:

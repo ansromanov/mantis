@@ -308,7 +308,7 @@ fn draw_plugin_content_passes_through() {
         let plugin_path = PathBuf::from("plugin.md");
         app.current_file = Some(plugin_path.clone());
         app.virtual_file = None;
-        app.plugin_content.insert(
+        app.rendered_content.insert(
             plugin_path,
             vec![
                 vec![(Style::default().fg(Color::Cyan), "# Title".to_string())],

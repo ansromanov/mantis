@@ -164,7 +164,7 @@ fn expand_all(root: &Path) -> HashSet<PathBuf> {
 }
 
 fn highlighter() -> Highlighter {
-    Highlighter::with_extra_syntaxes("base16-ocean.dark", &[])
+    Highlighter::new("base16-ocean.dark")
 }
 
 // ---------------------------------------------------------------------------
@@ -642,8 +642,8 @@ fn bench_indent_fold(c: &mut Criterion) {
 
 fn generate_json_source(line_count: usize) -> String {
     // An array of objects, each with a nested array — mirrors what
-    // `serde_json::to_string_pretty` produces, which is what the `json`
-    // plugin actually folds.
+    // `serde_json::to_string_pretty` produces, which is what the JSON
+    // built-in detector actually folds.
     let mut content = String::with_capacity(line_count * 24);
     content.push_str("[\n");
     for i in 0..line_count / 6 {
@@ -716,36 +716,6 @@ fn bench_hcl_brace_fold(c: &mut Criterion) {
     group.finish();
 }
 
-fn bench_telemetry_overhead(c: &mut Criterion) {
-    let mut group = c.benchmark_group("telemetry_overhead");
-
-    let tel_disabled = mantis::telemetry::Telemetry::new(false);
-    group.bench_function(BenchmarkId::new("disabled", ""), |b| {
-        b.iter(|| {
-            tel_disabled.record(black_box(
-                mantis::telemetry::TelemetryEvent::ActionInvoked {
-                    action: "test_action",
-                    source: mantis::telemetry::ActionSource::Key,
-                },
-            ));
-        })
-    });
-
-    let tel_enabled = mantis::telemetry::Telemetry::new(true);
-    group.bench_function(BenchmarkId::new("enabled", ""), |b| {
-        b.iter(|| {
-            tel_enabled.record(black_box(
-                mantis::telemetry::TelemetryEvent::ActionInvoked {
-                    action: "test_action",
-                    source: mantis::telemetry::ActionSource::Key,
-                },
-            ));
-        })
-    });
-
-    group.finish();
-}
-
 // ---------------------------------------------------------------------------
 // Criterion entry point
 // ---------------------------------------------------------------------------
@@ -765,7 +735,6 @@ criterion_group!(
     bench_indent_fold,
     bench_brace_fold_with_brackets,
     bench_hcl_brace_fold,
-    bench_telemetry_overhead,
 );
 
 criterion_main!(benches);

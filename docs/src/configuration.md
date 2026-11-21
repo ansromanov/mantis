@@ -35,10 +35,8 @@ into your `mantis.toml`.
 `mantis` watches your `mantis.toml` while running. Saving the file re-reads it and
 hot-reloads most settings (theme, keybindings, tree/content display options)
 immediately — the status bar shows `mantis.toml reloaded`, or the specific problem
-if the file failed to parse or contains unknown keys. Changes to `[plugins]`
-entries can't be applied to an already-running plugin process, so those show
-`mantis.toml changed — restart to apply` instead and take effect on the next
-launch.
+if the file failed to parse or contains unknown keys. (A leftover `[plugins]` table
+from older versions is ignored: the plugin system was removed.)
 
 ## Options
 
@@ -67,7 +65,7 @@ show_hidden = false          # show dotfiles / hidden entries
 width = 20                   # tree panel width as a percentage (5-95) of terminal width
 independent_scroll = false   # PageUp/Down scroll the viewport, not the selection
 indent_guides = true         # draw indentation guide lines (│)
-icons = false                # Nerd Font file-type icons (icon map from a plugin)
+icons = false                # Nerd Font file-type icons
 
 [content]
 word_wrap = false            # wrap long lines in the content pane
@@ -101,9 +99,6 @@ side_by_side = false         # start the diff view in side-by-side layout
 
 [ui]
 menu_bar = false             # keep the action menu row visible; F10 opens it either way
-
-[telemetry]
-enabled = false              # anonymous, local-only usage log — see Telemetry & Bug Reports
 
 [tabs]
 restore_on_launch = true     # reopen last session's tabs when launched with no path
@@ -159,7 +154,6 @@ switch_panel = ["Tab"]
 context_menu = ["Menu", "shift+F10"]
 toggle_hidden = ["tree:."]
 theme_picker = ["tree:t"]
-plugin_picker = ["tree:p"]
 open_in_editor = ["ctrl+e", "tree:e"]
 copy_path = ["tree:y"]
 copy_relative_path = ["tree:Y"]
@@ -289,7 +283,7 @@ height = 1       # 1 = single row, 2 = spread the two groups over two rows
 ```
 
 Valid ids: `badges` `worktrees` `scroll` `lnum` `type` `jsonpath` `scope` `fileinfo` `git` `errors`
-`folds` `pluginfacts` `message` `pluginerror` `version` `update`. There is no
+`folds` `message` `version` `update`. There is no
 keybinding-hint segment — the `?`/`F1` help overlay and the command palette are
 the discovery surfaces for bindings.
 

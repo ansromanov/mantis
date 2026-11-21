@@ -14,7 +14,7 @@ irm https://raw.githubusercontent.com/ansromanov/mantis/main/install.ps1 | iex
 
 `mantis` is a fast, lightweight tree viewer for reading code in your terminal:
 syntax highlighting, fuzzy search, and code folding in one small binary. No
-config required, with an optional plugin system when you want more. Built with
+config required. Built with
 [ratatui](https://ratatui.rs).
 
 <p align="center">
@@ -55,8 +55,7 @@ Be clear about the trade-offs before you install:
 - **No LSP / IntelliSense.** No autocomplete, go-to-definition, diagnostics, or
   refactoring. It highlights syntax; it doesn't understand your code.
 - **No integrated terminal, debugger, or task runner.** It's a viewer, not an IDE.
-- **Batteries are opt-in.** Anything beyond the core (icons, extra languages, custom
-  overlays) comes from plugins you enable yourself — less out-of-the-box than VS Code.
+- **Fewer batteries.** A deliberately small feature set — less out-of-the-box than VS Code.
 - **Terminal-bound.** A TUI in your terminal, not a GUI; icons need a Nerd Font.
 
 If you want a fast, throwaway way to **explore a repo, read a file, or skim a
@@ -91,7 +90,6 @@ fills.
 - Live theme switching — built-in presets, fully recolorable
 - Remappable keybindings and configurable layout via a simple TOML file
 - Nerd Font file-type icons (optional), full mouse support
-- Opt-in plugins — extra languages, icons, markdown rendering, and custom overlays
 
 ## Install
 
@@ -139,38 +137,14 @@ mantis --completions zsh > /usr/local/share/zsh/site-functions/_mantis
 man mantis    # view the man page
 ```
 
-## Plugins
-
-`mantis` works fully without plugins, but a plugin system is there when you want to
-extend it. Two kinds:
-
-- **Process plugins** — standalone executables that hook into app events and send
-  actions back over newline-delimited JSON on stdin/stdout. They can add language
-  providers (syntax highlighting + per-file-type fold regions), file-tree icons,
-  custom overlays, and more. A plugin can be any executable — a compiled binary, a
-  script, anything that reads stdin and writes stdout.
-- **Syntax plugins** — `.sublime-syntax` files loaded into the highlighter at
-  startup to add new file types without rebuilding `mantis`.
-
-Press `p` for the plugin palette to enable/disable plugins; the choice persists
-across restarts (under `[plugins]` in `mantis.toml`). Bundled plugins auto-register
-and install on first enable, and a git-backed registry (`index.json`) lets `mantis`
-discover and fetch community plugins.
-
-See the [Plugins guide](https://ansromanov.github.io/mantis/plugins.html),
-[Plugin Registry](https://ansromanov.github.io/mantis/plugin-registry.html), and
-[Plugin Development](https://ansromanov.github.io/mantis/plugin-development.html)
-docs for the full protocol and manifest (`plugin.toml`) format.
-
 ## Documentation
 
 - [Usage & Keybindings](https://ansromanov.github.io/mantis/usage.html) — every key and action
 - [Configuration](https://ansromanov.github.io/mantis/configuration.html) — `mantis.toml` options and `[keys]`
 - [Themes](https://ansromanov.github.io/mantis/themes.html) — presets and every recolorable role
-- [Plugins](https://ansromanov.github.io/mantis/plugins.html) — enable, install, and build plugins
 
-See [`example.md`](example.md) for a document that exercises the `markdown` plugin's
-renderer (enable it with `p` in-app, or `[plugins.markdown]` in `mantis.toml`).
+See [`example.md`](example.md) for a document that exercises the built-in markdown
+renderer (press `M` to toggle raw/rendered).
 
 ## Development
 

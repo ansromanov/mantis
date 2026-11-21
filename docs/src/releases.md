@@ -330,7 +330,7 @@ and use the displayed shortcut or `Enter` to run it.
 
 Use **Report a bug (save diagnostics locally)** from the palette to create a
 local, reviewable report, or **Toggle telemetry** to opt into the local-only
-usage log. Neither feature uploads data. See [Telemetry & Bug Reports](telemetry.md)
+usage log. Neither feature uploads data. See [Bug Reports](bug-reports.md)
 for the saved locations and contents.
 
 ## v0.15: navigation and compatibility polish

@@ -403,24 +403,6 @@ impl App {
         }
     }
 
-    /// Handles keyboard input while the plugin manager overlay is open.
-    /// Extra keys: Space toggles; j/k navigate (handled by list_picker now).
-    pub(super) fn handle_plugin_key(&mut self, key: KeyEvent) {
-        let Some(ref mut p) = self.plugin_picker else {
-            return;
-        };
-        // Extra keys first
-        if static_keys::is_toggle_selection(&key) {
-            self.toggle_plugin_picker_selection();
-            return;
-        }
-        match handle_list_picker_key(p, &key) {
-            OverlayKey::Activate => self.toggle_plugin_picker_selection(),
-            OverlayKey::Close => self.plugin_picker = None,
-            _ => {}
-        }
-    }
-
     /// Handles keyboard input while the inline tree filter is open.
     /// Up/Down/PageUp/PageDown navigate between matches; other keys
     /// (typing, Backspace, Esc, Enter) go through the generic picker.
@@ -778,7 +760,7 @@ impl App {
                 let symbols = self
                     .current_file
                     .as_deref()
-                    .and_then(|path| self.plugin_symbols.get(path))
+                    .and_then(|path| self.symbols.get(path))
                     .cloned()
                     .unwrap_or_default();
                 let picker = crate::search::SymbolPicker::new(
@@ -793,7 +775,7 @@ impl App {
                 let diagnostics = self
                     .current_file
                     .as_deref()
-                    .and_then(|path| self.plugin_diagnostics.get(path))
+                    .and_then(|path| self.file_diagnostics.get(path))
                     .cloned()
                     .unwrap_or_default();
                 let picker = crate::search::DiagnosticPicker::new(diagnostics);

@@ -1,7 +1,7 @@
 use super::*;
 
 fn hl() -> Highlighter {
-    Highlighter::with_extra_syntaxes("base16-ocean.dark", &[])
+    Highlighter::new("base16-ocean.dark")
 }
 
 fn load_yaml(input: &str) -> YamlLoad {
@@ -311,7 +311,7 @@ fn worker_round_trip_returns_matching_seq() {
     let mut f = tempfile::NamedTempFile::with_suffix(".rs").unwrap();
     use std::io::Write;
     f.write_all(b"let x = 1;\n").unwrap();
-    let loader = Loader::new(&Theme::default(), Vec::new(), usize::MAX);
+    let loader = Loader::new(&Theme::default(), usize::MAX);
     loader.request(LoadRequest::File {
         seq: 7,
         path: f.path().to_path_buf(),
@@ -331,7 +331,7 @@ fn worker_echoes_barrier_after_prior_requests_are_applied() {
     let mut f = tempfile::NamedTempFile::with_suffix(".rs").unwrap();
     use std::io::Write;
     f.write_all(b"let x = 1;\n").unwrap();
-    let loader = Loader::new(&Theme::default(), Vec::new(), usize::MAX);
+    let loader = Loader::new(&Theme::default(), usize::MAX);
     loader.request(LoadRequest::File {
         seq: 3,
         path: f.path().to_path_buf(),
@@ -350,29 +350,6 @@ fn worker_echoes_barrier_after_prior_requests_are_applied() {
 }
 
 #[test]
-fn worker_rebuilds_highlighter_on_set_extra_syntaxes_and_keeps_serving() {
-    let mut f = tempfile::NamedTempFile::with_suffix(".rs").unwrap();
-    use std::io::Write;
-    f.write_all(b"let x = 1;\n").unwrap();
-    let loader = Loader::new(&Theme::default(), Vec::new(), usize::MAX);
-    // Push an updated syntax set; the worker must rebuild its highlighter and
-    // continue to process file loads (the SetExtraSyntaxes match arm).
-    loader.request(LoadRequest::SetExtraSyntaxes(Vec::new()));
-    loader.request(LoadRequest::File {
-        seq: 9,
-        path: f.path().to_path_buf(),
-    });
-    let resp = loader.rx.recv().expect("worker response");
-    match resp {
-        LoadResponse::File { seq, load, .. } => {
-            assert_eq!(seq, 9);
-            assert!(load.ok);
-        }
-        _ => panic!("expected File response"),
-    }
-}
-
-#[test]
 fn compute_file_load_sets_syntax_name_for_rust_file() {
     let mut f = tempfile::NamedTempFile::with_suffix(".rs").unwrap();
     use std::io::Write;
@@ -383,7 +360,7 @@ fn compute_file_load_sets_syntax_name_for_rust_file() {
 
 #[test]
 fn git_status_worker_round_trip_returns_matching_seq() {
-    let loader = Loader::new(&Theme::default(), Vec::new(), usize::MAX);
+    let loader = Loader::new(&Theme::default(), usize::MAX);
     loader.request(LoadRequest::GitStatus {
         seq: 42,
         root: std::path::PathBuf::from("/nonexistent"),
@@ -405,7 +382,7 @@ fn git_status_worker_round_trip_returns_matching_seq() {
 
 #[test]
 fn range_status_worker_round_trip_reports_error_outside_repo() {
-    let loader = Loader::new(&Theme::default(), Vec::new(), usize::MAX);
+    let loader = Loader::new(&Theme::default(), usize::MAX);
     loader.request(LoadRequest::RangeStatus {
         seq: 7,
         root: std::path::PathBuf::from("/nonexistent"),
@@ -446,7 +423,7 @@ fn range_status_worker_round_trip_succeeds_in_real_repo() {
     git(&["commit", "-q", "-m", "init"]);
     std::fs::write(dir.path().join("f.txt"), "v2\n").unwrap();
 
-    let loader = Loader::new(&Theme::default(), Vec::new(), usize::MAX);
+    let loader = Loader::new(&Theme::default(), usize::MAX);
     loader.request(LoadRequest::RangeStatus {
         seq: 3,
         root: dir.path().to_path_buf(),

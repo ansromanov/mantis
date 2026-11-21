@@ -111,11 +111,11 @@ fn wrapped_plugin_content_scrolls_by_visual_row() {
     let chars: String = (0..80).map(|i| char::from(b'a' + (i % 26) as u8)).collect();
     let rendered = format!("{chars}{chars}");
     app.current_file = Some(path.clone());
-    app.plugin_content.insert(
+    app.rendered_content.insert(
         path.clone(),
         vec![vec![(ratatui::style::Style::default(), rendered.clone())]],
     );
-    app.plugin_content_text.insert(path, vec![rendered]);
+    app.rendered_text.insert(path, vec![rendered]);
     app.word_wrap = true;
 
     let backend = TestBackend::new(20, 6);
@@ -396,14 +396,14 @@ fn plugin_content_is_rendered_for_current_file() {
     let mut app = app_for(&root);
     let path = root.join("long.txt");
     app.open_file(&path);
-    app.plugin_content.insert(
+    app.rendered_content.insert(
         path.clone(),
         vec![vec![(
             ratatui::style::Style::default(),
             "PLUGIN_RENDERED_MARKER".to_string(),
         )]],
     );
-    app.plugin_content_text
+    app.rendered_text
         .insert(path, vec!["PLUGIN_RENDERED_MARKER".to_string()]);
     let out = render_to_string(&mut app);
     assert!(
@@ -465,7 +465,7 @@ fn plugin_content_no_line_number_gutter() {
     app.open_file(&path);
     app.show_line_numbers = true;
     // Install plugin content.
-    app.plugin_content.insert(
+    app.rendered_content.insert(
         path.clone(),
         vec![
             vec![(
@@ -478,7 +478,7 @@ fn plugin_content_no_line_number_gutter() {
             )],
         ],
     );
-    app.plugin_content_text.insert(
+    app.rendered_text.insert(
         path,
         vec!["PLUGIN LINE 1".to_string(), "PLUGIN LINE 2".to_string()],
     );
@@ -682,5 +682,59 @@ fn draw_content_when_diff_renders_diff_header_bar() {
         })
         .unwrap();
     assert_ne!(app.diff_header_area, ratatui::layout::Rect::default());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn wrapped_rendered_text_with_spaces_matches_the_scroll_math() {
+    // Rendered content (no gutter) used to be wrapped by ratatui on word
+    // boundaries while the scroll math assumed a hard character wrap, so the
+    // number of painted rows and the scroll range disagreed. With spaces in the
+    // text the two wraps differ; the last row at max scroll must now be the
+    // tail of the text, with no row missing or duplicated.
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    let path = root.join("readme.md");
+    let text = "alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu".to_string();
+    app.current_file = Some(path.clone());
+    app.rendered_content.insert(
+        path.clone(),
+        vec![vec![(ratatui::style::Style::default(), text.clone())]],
+    );
+    app.rendered_text.insert(path, vec![text.clone()]);
+    app.rendered_active = true;
+    app.word_wrap = true;
+
+    let (w, h) = (16u16, 6u16);
+    let backend = TestBackend::new(w, h);
+    let mut terminal = ratatui::Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| draw_content(frame, &mut app, frame.area()))
+        .unwrap();
+
+    let inner_w = (w - 2) as usize;
+    let expected_rows = text.chars().count().div_ceil(inner_w);
+    assert_eq!(app.wrapped_content_rows(), expected_rows);
+
+    app.set_content_scroll(usize::MAX);
+    terminal
+        .draw(|frame| draw_content(frame, &mut app, frame.area()))
+        .unwrap();
+    // Reassemble the visible rows; hard wrapping preserves every character.
+    let buffer = terminal.backend().buffer();
+    let mut painted = String::new();
+    for y in 1..(h - 1) {
+        for x in 1..(w - 1) {
+            painted.push_str(buffer[(x, y)].symbol());
+        }
+    }
+    let tail: String = text
+        .chars()
+        .skip(text.chars().count().saturating_sub(10))
+        .collect();
+    assert!(
+        painted.contains(&tail),
+        "last row must show the end of the text, got {painted:?}"
+    );
     fs::remove_dir_all(&root).ok();
 }

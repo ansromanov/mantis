@@ -30,9 +30,9 @@ fn uppercase_o_opens_symbol_outline_when_provider_symbols_exist() {
     let path = root.join("long.txt");
     app.current_file = Some(path.clone());
     app.focus = crate::app::Focus::Content;
-    app.plugin_symbols.insert(
+    app.symbols.insert(
         path,
-        vec![crate::plugin::types::Symbol {
+        vec![crate::code_intel::Symbol {
             name: "main".into(),
             kind: "function".into(),
             line: 0,
@@ -57,14 +57,14 @@ fn content_exclamation_opens_diagnostics_picker() {
     let path = root.join("long.txt");
     app.current_file = Some(path.clone());
     app.focus = crate::app::Focus::Content;
-    app.plugin_diagnostics.insert(
+    app.file_diagnostics.insert(
         path,
-        vec![crate::plugin::types::Diagnostic {
+        vec![crate::code_intel::Diagnostic {
             line: 2,
             column: 0,
             end_line: None,
             end_column: None,
-            severity: crate::plugin::types::DiagnosticSeverity::Error,
+            severity: crate::code_intel::DiagnosticSeverity::Error,
             message: "broken".into(),
             source: "test".into(),
         }],
@@ -188,32 +188,6 @@ fn tree_B_toggles_bookmark_for_open_file() {
     app.focus = Focus::Tree;
     app.handle_key(key(KeyCode::Char('B')));
     assert_eq!(app.bookmark_paths, vec![path]);
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn content_cursor_scroll_helper_accepts_physical_line_notifications() {
-    let root = temp_tree();
-    let mut app = app_for(&root);
-    app.open_file(&root.join("long.txt"));
-    app.focus = Focus::Content;
-    app.active_line = 7;
-    app.content_area = Rect {
-        x: 0,
-        y: 0,
-        width: 80,
-        height: 10,
-    };
-
-    app.scroll_active_line_into_view();
-
-    assert_eq!(app.display_to_physical(app.active_line), 7);
-    assert_eq!(
-        app.pending_content_cursor,
-        Some((root.join("long.txt"), 8, 1)),
-        "plugin cursor coordinates are one-based, with the line cursor at column 1"
-    );
-    assert!(app.content_cursor_dirty_at.is_some());
     fs::remove_dir_all(&root).ok();
 }
 
@@ -868,49 +842,6 @@ fn toggle_raw_markdown_not_active_shows_status() {
         .unwrap()
         .text
         .contains("not available"));
-
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn toggle_raw_markdown_active_toggles_state() {
-    let root = temp_tree();
-    let mut app = app_for(&root);
-    app.focus = Focus::Content;
-
-    // Create a markdown file and open it
-    let md_path = root.join("test.md");
-    fs::write(
-        &md_path,
-        (1..=20)
-            .map(|i| format!("# Heading {i}\n"))
-            .collect::<String>(),
-    )
-    .unwrap();
-    app.open_file(&md_path);
-
-    // Mock active markdown plugin
-    app.plugin_manager
-        .plugins
-        .push(crate::plugin::Plugin::new("markdown".to_string(), vec![]));
-
-    assert!(
-        !app.show_raw_markdown,
-        "initially show_raw_markdown should be false"
-    );
-
-    app.content_area = Rect::new(0, 0, 80, 2);
-    app.content_scroll = 5;
-    app.active_line = 5;
-
-    // Pressing 'M' should toggle it
-    app.handle_key(key(KeyCode::Char('M')));
-    assert!(app.show_raw_markdown, "should toggle to true");
-    assert_eq!(app.content_scroll, 5);
-
-    // Pressing 'M' again should toggle it back
-    app.handle_key(key(KeyCode::Char('M')));
-    assert!(!app.show_raw_markdown, "should toggle back to false");
 
     fs::remove_dir_all(&root).ok();
 }
@@ -1592,14 +1523,6 @@ fn esc_exits_compare_mode() {
     fs::remove_dir_all(&root).ok();
 }
 
-#[test]
-fn normal_telemetry_check() {
-    let root = temp_tree();
-    let app = app_for(&root);
-    assert!(!app.telemetry.is_enabled());
-    fs::remove_dir_all(&root).ok();
-}
-
 // -- tree width grow/shrink (issue #665) ------------------------------------
 
 #[test]
@@ -1679,42 +1602,6 @@ fn tree_width_brackets_do_not_fire_in_content_mode() {
     assert_eq!(
         app.tree_width, 50,
         "'[' must not affect tree_width in content mode (tree-scoped binding)"
-    );
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
-fn ctrl_p_includes_registered_plugin_commands() {
-    let root = temp_tree();
-    let mut app = app_for(&root);
-    app.plugin_manager.register_commands(
-        "demo",
-        vec![crate::plugin::PluginCommand {
-            id: "demo.hello".to_string(),
-            name: "Say Hello".to_string(),
-            category: Some("Plugin".to_string()),
-            description: Some("greets".to_string()),
-        }],
-    );
-    app.handle_key(ctrl('P'));
-    let palette = app
-        .command_palette
-        .as_ref()
-        .expect("Ctrl+P must open command_palette");
-    let n = crate::command_palette::COMMANDS.len();
-    assert_eq!(
-        palette.all_commands.len(),
-        n + 1,
-        "palette must append the plugin command after the built-ins"
-    );
-    assert_eq!(palette.all_commands[n].action_id, "demo.hello");
-    assert!(
-        palette.base_order.contains(&n),
-        "plugin command must be reachable in base_order"
-    );
-    assert_eq!(
-        palette.inapplicability_reasons[n], None,
-        "plugin commands are always applicable"
     );
     fs::remove_dir_all(&root).ok();
 }

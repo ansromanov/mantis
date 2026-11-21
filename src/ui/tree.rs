@@ -276,11 +276,7 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
 
             let is_open = node.is_dir && app.expanded.contains(&node.path);
 
-            let icons_active = app.icons_enabled
-                && (!app.icon_map.is_empty()
-                    || !app.icon_fallback.is_empty()
-                    || !app.icon_dir_open.is_empty()
-                    || !app.icon_dir_closed.is_empty());
+            let icons_active = app.icons_enabled;
             if !icons_active {
                 let arrow = if node.is_dir {
                     if is_open {
@@ -297,34 +293,15 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
             if icons_active {
                 let icon = if node.is_dir {
                     if is_open {
-                        &app.icon_dir_open
+                        crate::icons::DIR_OPEN
                     } else {
-                        &app.icon_dir_closed
+                        crate::icons::DIR_CLOSED
                     }
                 } else {
-                    let ext = node
-                        .path
-                        .extension()
-                        .and_then(|e| e.to_str())
-                        .unwrap_or("")
-                        .to_lowercase();
-                    let key = if ext.is_empty() {
-                        node.path
-                            .file_name()
-                            .and_then(|n| n.to_str())
-                            .unwrap_or("")
-                            .to_lowercase()
-                    } else {
-                        ext
-                    };
-                    app.icon_map.get(&key).unwrap_or(&app.icon_fallback)
+                    crate::icons::file_icon(&node.path)
                 };
-                if !icon.is_empty() {
-                    spans.push(Span::styled(icon.as_str(), name_style));
-                    spans.push(Span::styled(" ", name_style));
-                } else {
-                    spans.push(Span::styled("  ", name_style));
-                }
+                spans.push(Span::styled(icon, name_style));
+                spans.push(Span::styled(" ", name_style));
             }
 
             let affordance = app

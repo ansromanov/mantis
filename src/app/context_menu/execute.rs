@@ -87,11 +87,7 @@ impl App {
         if next < n
             && matches!(
                 menu.visible_entries().get(next),
-                Some(
-                    ContextMenuEntry::Action { .. }
-                        | ContextMenuEntry::PluginAction { .. }
-                        | ContextMenuEntry::Submenu { .. }
-                )
+                Some(ContextMenuEntry::Action { .. } | ContextMenuEntry::Submenu { .. })
             )
         {
             menu.set_visible_selected(next);
@@ -175,11 +171,6 @@ impl App {
                         ContextMenuEntry::Action { id, .. } => {
                             self.execute_context_action(*id);
                         }
-                        ContextMenuEntry::PluginAction { plugin, id, .. } => {
-                            let plugin = plugin.clone();
-                            let id = id.clone();
-                            self.execute_plugin_context_action(&plugin, &id);
-                        }
                         ContextMenuEntry::Submenu { .. } | ContextMenuEntry::Separator => {}
                     }
                 }
@@ -202,9 +193,6 @@ impl App {
             .and_then(|menu| menu.visible_entries().get(menu.visible_selected()).cloned());
         match selected_entry {
             Some(ContextMenuEntry::Action { id, .. }) => self.execute_context_action(id),
-            Some(ContextMenuEntry::PluginAction { plugin, id, .. }) => {
-                self.execute_plugin_context_action(&plugin, &id);
-            }
             Some(ContextMenuEntry::Submenu { entries, .. }) => {
                 if let Some(menu) = self.context_menu.as_mut() {
                     menu.push_submenu(entries);
@@ -228,51 +216,10 @@ impl App {
         }
     }
 
-    /// Runs a plugin context-menu action against the menu's target and closes
-    /// the menu. Dispatches a `command` event carrying `id` and target information
-    /// to the plugin.
-    pub(crate) fn execute_plugin_context_action(&mut self, plugin: &str, id: &str) {
-        self.telemetry
-            .record(crate::telemetry::TelemetryEvent::ActionInvoked {
-                action: "context_menu_action",
-                source: crate::telemetry::ActionSource::Mouse,
-            });
-        let target_kind = match &self.context_menu.as_ref().map(|m| &m.target) {
-            Some(ContextMenuTarget::Tree { path, .. }) => {
-                if path.is_dir() {
-                    crate::plugin::ContextItemTargetKind::TreeDir
-                } else {
-                    crate::plugin::ContextItemTargetKind::TreeFile
-                }
-            }
-            Some(ContextMenuTarget::Content) => crate::plugin::ContextItemTargetKind::Content,
-            Some(ContextMenuTarget::Tab { .. }) => crate::plugin::ContextItemTargetKind::Tab,
-            Some(ContextMenuTarget::Blame { .. }) => crate::plugin::ContextItemTargetKind::Blame,
-            _ => crate::plugin::ContextItemTargetKind::Content,
-        };
-        let path = self
-            .context_target_path()
-            .map(|p| p.to_string_lossy().to_string());
-        let line = match &self.context_menu.as_ref().map(|m| &m.target) {
-            Some(ContextMenuTarget::Content) => Some(self.display_to_physical(self.active_line)),
-            Some(ContextMenuTarget::Blame { line, .. }) => Some(*line),
-            _ => None,
-        };
-        self.select_context_tree_target();
-        self.plugin_manager
-            .send_context_menu_event(plugin, id, target_kind.as_str(), path, line);
-        self.close_context_menu();
-    }
-
     /// Runs a chosen context-menu action against the menu's target and closes
     /// the menu. Same behaviour as the equivalent keybindings; user-visible
     /// failures surface as status messages rather than being swallowed.
     pub(crate) fn execute_context_action(&mut self, id: ContextActionId) {
-        self.telemetry
-            .record(crate::telemetry::TelemetryEvent::ActionInvoked {
-                action: "context_menu_action",
-                source: crate::telemetry::ActionSource::Mouse,
-            });
         if matches!(
             id,
             ContextActionId::FileHistory

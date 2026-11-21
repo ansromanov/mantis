@@ -47,17 +47,17 @@ fn clearing_file_diagnostics_removes_results_and_line_markers() {
     fs::write(&path, "a\n").unwrap();
     let mut app = app_for(&root);
     app.current_file = Some(path.clone());
-    app.plugin_diagnostics.insert(path.clone(), Vec::new());
-    app.plugin_diagnostic_lines.insert(
+    app.file_diagnostics.insert(path.clone(), Vec::new());
+    app.file_diagnostic_lines.insert(
         path.clone(),
-        std::collections::HashMap::from([(0, crate::plugin::types::DiagnosticSeverity::Warning)]),
+        std::collections::HashMap::from([(0, crate::code_intel::DiagnosticSeverity::Warning)]),
     );
-    let mut picker = crate::search::DiagnosticPicker::new(vec![crate::plugin::types::Diagnostic {
+    let mut picker = crate::search::DiagnosticPicker::new(vec![crate::code_intel::Diagnostic {
         line: 0,
         column: 0,
         end_line: None,
         end_column: None,
-        severity: crate::plugin::types::DiagnosticSeverity::Warning,
+        severity: crate::code_intel::DiagnosticSeverity::Warning,
         message: "old result".into(),
         source: "test".into(),
     }]);
@@ -67,8 +67,8 @@ fn clearing_file_diagnostics_removes_results_and_line_markers() {
     palette.route_diagnostics = Some(picker);
     app.command_palette = Some(palette);
     app.clear_diagnostics_for_path(&path);
-    assert!(!app.plugin_diagnostics.contains_key(&path));
-    assert!(!app.plugin_diagnostic_lines.contains_key(&path));
+    assert!(!app.file_diagnostics.contains_key(&path));
+    assert!(!app.file_diagnostic_lines.contains_key(&path));
     let picker = app
         .command_palette
         .as_ref()
@@ -77,48 +77,6 @@ fn clearing_file_diagnostics_removes_results_and_line_markers() {
     assert_eq!(picker.query, "o");
     assert!(picker.filtered.is_empty());
     fs::remove_dir_all(root).ok();
-}
-
-#[test]
-fn apply_file_load_caches_and_refreshes_provider_shebang() {
-    let root = temp_dir();
-    let path = root.join("run-script");
-    fs::write(&path, "#!/usr/bin/env -S bash -e\necho hi\n").unwrap();
-    let mut app = app_for(&root);
-    app.plugin_manager
-        .register_provider(crate::plugin::LanguageProviderRegistration {
-            plugin_name: "shell".to_string(),
-            extensions: Vec::new(),
-            filenames: Vec::new(),
-            shebangs: vec!["bash".to_string()],
-            capabilities: [crate::plugin::Capability::Fold].into(),
-            priority: 0,
-        });
-
-    let loaded = crate::app::loader::compute_file_load(
-        &path,
-        &crate::highlight::Highlighter::with_extra_syntaxes("base16-ocean.dark", &[]),
-        usize::MAX,
-    );
-    app.apply_file_load(&path, loaded);
-    assert!(app
-        .plugin_manager
-        .provider_for_file(&path, &crate::plugin::Capability::Fold)
-        .is_some());
-
-    fs::write(&path, "echo no shebang\n").unwrap();
-    let loaded = crate::app::loader::compute_file_load(
-        &path,
-        &crate::highlight::Highlighter::with_extra_syntaxes("base16-ocean.dark", &[]),
-        usize::MAX,
-    );
-    app.apply_file_load(&path, loaded);
-    assert!(app
-        .plugin_manager
-        .provider_for_file(&path, &crate::plugin::Capability::Fold)
-        .is_none());
-
-    fs::remove_dir_all(&root).ok();
 }
 
 #[test]
@@ -328,23 +286,6 @@ fn failed_reload_does_not_break_same_file_detection() {
 }
 
 #[test]
-fn open_file_keeps_plugin_open_guard_false() {
-    // A user-initiated open must leave `plugin_is_opening_file` cleared so the
-    // `on_file_open` notification is still emitted to plugins. The guard is set
-    // only around plugin-originated opens (see refresh.rs).
-    let root = temp_dir();
-    let f = root.join("a.txt");
-    fs::write(&f, "line1\n").unwrap();
-    let mut app = app_for(&root);
-    app.open_file(&f);
-    assert!(
-        !app.plugin_is_opening_file,
-        "guard must stay false after a normal open_file"
-    );
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
 fn open_file_sets_current_syntax_from_load() {
     let root = temp_dir();
     let f = root.join("main.rs");
@@ -363,13 +304,32 @@ fn open_file_sets_current_syntax_from_load() {
 fn open_file_marks_session_dirty() {
     let root = temp_dir();
     let a = root.join("a.txt");
+    let b = root.join("b.txt");
+    fs::write(&a, "line1\nline2\n").unwrap();
+    fs::write(&b, "other\n").unwrap();
+    let mut app = app_for(&root);
+    app.open_file(&a);
+    app.session_dirty = false;
+    app.open_file(&b);
+    assert!(
+        app.session_dirty,
+        "opening a different file must mark the session dirty so the new current_file persists"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn reopening_same_file_does_not_mark_session_dirty() {
+    let root = temp_dir();
+    let a = root.join("a.txt");
     fs::write(&a, "line1\nline2\n").unwrap();
     let mut app = app_for(&root);
+    app.open_file(&a);
     app.session_dirty = false;
     app.open_file(&a);
     assert!(
-        app.session_dirty,
-        "opening a file must mark the session dirty so the new current_file persists"
+        !app.session_dirty,
+        "a same-file reload must not dirty the session (it re-arms the session-save/watch loop)"
     );
     fs::remove_dir_all(&root).ok();
 }
@@ -1231,14 +1191,6 @@ fn large_json_shows_raw_content_with_status_message() {
     fs::remove_dir_all(&root).ok();
 }
 
-#[test]
-fn file_ops_telemetry_check() {
-    let root = temp_dir();
-    let app = app_for(&root);
-    assert!(!app.telemetry.is_enabled());
-    fs::remove_dir_all(&root).ok();
-}
-
 // -- repo log overlay ---------------------------------------------------------
 
 fn git_info() -> crate::git::GitRepoInfo {
@@ -1399,39 +1351,6 @@ fn file_at_revision_initially_none() {
 }
 
 #[test]
-fn open_file_with_show_raw_markdown_true_skips_plugin_open() {
-    let root = temp_dir();
-    let f = root.join("test.md");
-    fs::write(&f, "# Hello\n").unwrap();
-    let mut app = app_for(&root);
-
-    // Setup mock plugin with a channel to intercept on_file_open
-    let (tx, rx) = std::sync::mpsc::sync_channel(10);
-    let mut plugin =
-        crate::plugin::Plugin::new("markdown".to_string(), vec!["on_file_open".to_string()]);
-    plugin.write_tx = Some(tx);
-    app.plugin_manager.plugins.push(plugin);
-
-    // When show_raw_markdown is true, it should skip sending on_file_open
-    app.show_raw_markdown = true;
-    app.open_file(&f);
-    assert!(
-        rx.try_recv().is_err(),
-        "should not have sent on_file_open when show_raw_markdown is true"
-    );
-
-    // When show_raw_markdown is false, it should send on_file_open
-    app.show_raw_markdown = false;
-    app.open_file(&f);
-    let msg = rx
-        .try_recv()
-        .expect("should have sent on_file_open when show_raw_markdown is false");
-    assert!(msg.contains("on_file_open"));
-
-    fs::remove_dir_all(&root).ok();
-}
-
-#[test]
 fn opening_jsonl_marks_the_active_source() {
     let root = temp_dir();
     let path = root.join("events.jsonl");
@@ -1522,5 +1441,39 @@ fn opening_a_file_clears_a_previously_shown_inline_image() {
     );
     app.open_file(&path);
     assert!(app.content_image.is_none());
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn opening_rust_file_computes_native_folds_and_symbols() {
+    let root = temp_dir();
+    let f = root.join("lib.rs");
+    fs::write(
+        &f,
+        "fn alpha() {\n    let x = 1;\n}\n\nfn beta() {\n    let y = 2;\n}\n",
+    )
+    .unwrap();
+    let mut app = app_for(&root);
+    app.open_file(&f);
+    assert_eq!(app.fold_regions.len(), 2, "one fold per multi-line fn");
+    let symbols = app.symbols.get(&f).expect("symbols recorded");
+    let names: Vec<&str> = symbols.iter().map(|s| s.name.as_str()).collect();
+    assert_eq!(names, ["alpha", "beta"]);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn opening_json_file_folds_the_pretty_printed_text() {
+    let root = temp_dir();
+    let f = root.join("data.json");
+    fs::write(&f, r#"{"a":[1,2],"b":{"c":1}}"#).unwrap();
+    let mut app = app_for(&root);
+    app.open_file(&f);
+    // Minified on disk, but displayed pretty-printed: folds must match the display.
+    assert!(app.show_pretty_json);
+    assert!(
+        app.fold_regions.iter().any(|r| r.end > r.start),
+        "pretty-printed JSON should have multi-line fold regions"
+    );
     fs::remove_dir_all(&root).ok();
 }

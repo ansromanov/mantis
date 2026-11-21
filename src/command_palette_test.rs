@@ -325,13 +325,7 @@ fn ranked_base_order_typing_query_still_fuzzy() {
     // After typing a query, push/pop/refilter should use fuzzy matching.
     let usage = crate::command_usage::UsageStats::default();
     let (base, _) = ranked_base_order(&usage, true, 3);
-    let mut p = CommandPalette::new(
-        &Keymap::default(),
-        base,
-        0,
-        vec![None; COMMANDS.len()],
-        Vec::new(),
-    );
+    let mut p = CommandPalette::new(&Keymap::default(), base, 0, vec![None; COMMANDS.len()]);
     assert_eq!(p.results_len(), COMMANDS.len());
     // Type a query — results should be fuzzy-filtered
     for c in "git".chars() {
@@ -352,13 +346,7 @@ fn command_palette_list_picker_impl_delegates() {
     use crate::list_picker::ListPicker;
     let usage = crate::command_usage::UsageStats::default();
     let (base, _) = ranked_base_order(&usage, true, 0);
-    let mut p = CommandPalette::new(
-        &Keymap::default(),
-        base,
-        0,
-        vec![None; COMMANDS.len()],
-        Vec::new(),
-    );
+    let mut p = CommandPalette::new(&Keymap::default(), base, 0, vec![None; COMMANDS.len()]);
     assert!(ListPicker::query_is_empty(&p));
     assert_eq!(ListPicker::selected(&p), 0);
     ListPicker::set_selected(&mut p, 1);
@@ -486,14 +474,14 @@ fn at_route_fuzzy_filters_symbols_and_selects_the_match() {
     assert_eq!(palette.route, PaletteRoute::Symbols);
     palette.route_symbols = Some(crate::search::SymbolPicker::new(
         vec![
-            crate::plugin::types::Symbol {
+            crate::code_intel::Symbol {
                 name: "render_tree".into(),
                 kind: "function".into(),
                 line: 2,
                 end_line: Some(8),
                 parent: None,
             },
-            crate::plugin::types::Symbol {
+            crate::code_intel::Symbol {
                 name: "load_file".into(),
                 kind: "function".into(),
                 line: 12,

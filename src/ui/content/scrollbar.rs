@@ -1,13 +1,14 @@
 //! Transient content-pane scrollbar overlay.
 //!
-//! `draw_content_scrollbar` paints a thin scrollbar on the right edge of the
-//! content area, sized and positioned from the current scroll offset and total
-//! line count. It is deliberately transient: it appears only for a short fade
-//! window (`SCROLLBAR_FADE`) after the user last scrolled, tracked via
-//! `App::content_scrolled_at`, so it does not permanently occupy a column. The
-//! optional scroll-percentage readout is drawn alongside it. Whether it shows at
-//! all is gated by the user's `scrollbar` config option, so it can be disabled
-//! entirely.
+//! `draw_content_scrollbar` paints a thin scrollbar thumb on the pane's right
+//! border column, sized and positioned from the current scroll offset and total
+//! line count. Drawing on the border (rather than over the last text column)
+//! means it never hides or shifts text, so the content does not appear to
+//! change width or lose its last character when the bar fades in and out. It is
+//! deliberately transient: it appears only for a short fade window
+//! (`SCROLLBAR_FADE`) after the user last scrolled, tracked via
+//! `App::content_scrolled_at`. Whether it shows at all is gated by the user's
+//! `scrollbar` config option, so it can be disabled entirely.
 
 use std::time::Duration;
 
@@ -23,7 +24,7 @@ use crate::app::App;
 
 const SCROLLBAR_FADE: Duration = Duration::from_millis(2000);
 
-/// Draws the transient scrollbar overlay on the right edge of the content area.
+/// Draws the transient scrollbar thumb on the content pane's right border.
 pub(crate) fn draw_content_scrollbar(
     f: &mut Frame,
     app: &App,
@@ -49,23 +50,20 @@ pub(crate) fn draw_content_scrollbar(
         .unwrap_or(0))
     .min(track_range);
 
-    let lines: Vec<Line> = (0..inner_h)
-        .map(|i| {
-            if i >= thumb_start && i < thumb_start + thumb_size {
-                Line::from(Span::styled("█", Style::default().fg(app.theme.dim)))
-            } else {
-                Line::from(Span::raw(" "))
-            }
-        })
+    // Only the thumb is drawn; the rest of the border keeps its own glyph, so
+    // the track needs no cells of its own.
+    let lines: Vec<Line> = (0..thumb_size)
+        .map(|_| Line::from(Span::styled("█", Style::default().fg(app.theme.dim))))
         .collect();
 
     f.render_widget(
         Paragraph::new(lines),
         Rect {
-            x: inner_x + inner_w as u16 - 1,
-            y: inner_y,
+            // `inner_x + inner_w` is the border column just right of the text.
+            x: inner_x + inner_w as u16,
+            y: inner_y + thumb_start as u16,
             width: 1,
-            height: inner_h as u16,
+            height: thumb_size as u16,
         },
     );
 }
