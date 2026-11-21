@@ -61,7 +61,9 @@ def run_e2e_test():
         success = False
         output = b""
         start_time = time.time()
-        timeout = 5.0  # seconds
+        # Startup copies every bundled plugin binary (tens of MB each in debug
+        # builds) before the first frame, so allow generous time.
+        timeout = 30.0  # seconds
 
         try:
             # Phase 1: Wait for mantis to render and display the files
