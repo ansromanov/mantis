@@ -363,13 +363,32 @@ fn open_file_sets_current_syntax_from_load() {
 fn open_file_marks_session_dirty() {
     let root = temp_dir();
     let a = root.join("a.txt");
+    let b = root.join("b.txt");
+    fs::write(&a, "line1\nline2\n").unwrap();
+    fs::write(&b, "other\n").unwrap();
+    let mut app = app_for(&root);
+    app.open_file(&a);
+    app.session_dirty = false;
+    app.open_file(&b);
+    assert!(
+        app.session_dirty,
+        "opening a different file must mark the session dirty so the new current_file persists"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn reopening_same_file_does_not_mark_session_dirty() {
+    let root = temp_dir();
+    let a = root.join("a.txt");
     fs::write(&a, "line1\nline2\n").unwrap();
     let mut app = app_for(&root);
+    app.open_file(&a);
     app.session_dirty = false;
     app.open_file(&a);
     assert!(
-        app.session_dirty,
-        "opening a file must mark the session dirty so the new current_file persists"
+        !app.session_dirty,
+        "a same-file reload must not dirty the session (it re-arms the session-save/watch loop)"
     );
     fs::remove_dir_all(&root).ok();
 }
