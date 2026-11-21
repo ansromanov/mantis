@@ -63,6 +63,7 @@ mod fold;
 mod init;
 mod key_handlers;
 mod loader;
+mod markdown_view;
 pub(crate) mod menu_bar;
 mod mouse_handlers;
 mod navigation;

@@ -100,7 +100,6 @@ fn dirs_next() -> Option<PathBuf> {
 /// always available regardless of install method.
 pub(crate) const BUNDLED_PLUGINS: &[(&str, &str, &[u8])] = &[
     ("iconize", "iconize", ICONIZE),
-    ("markdown", "markdown", MARKDOWN),
     ("python", "python", PYTHON),
     ("rust", "rust", RUST),
     ("go", "go", GO),

@@ -38,7 +38,6 @@ use std::process::Command;
 fn main() {
     let plugins = &[
         "iconize",
-        "markdown",
         "python",
         "rust",
         "go",

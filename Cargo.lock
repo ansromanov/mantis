@@ -1062,6 +1062,7 @@ dependencies = [
  "libc",
  "memmap2",
  "notify",
+ "pulldown-cmark",
  "ratatui",
  "regex",
  "serde",
@@ -1074,15 +1075,6 @@ dependencies = [
  "toml_edit",
  "tracing",
  "tracing-subscriber",
- "unicode-width 0.2.2",
-]
-
-[[package]]
-name = "markdown"
-version = "0.1.0"
-dependencies = [
- "pulldown-cmark",
- "serde_json",
  "unicode-width 0.2.2",
 ]
 

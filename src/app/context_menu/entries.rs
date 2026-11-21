@@ -184,12 +184,11 @@ pub(super) fn content_entries(app: &App) -> Vec<ContextMenuEntry> {
             "Word wrap: off".to_string()
         },
     });
-    let markdown_plugin_active = app.plugin_manager.is_plugin_active("markdown");
     let is_markdown = app
         .current_file
         .as_ref()
         .is_some_and(|p| crate::file::is_markdown_path(p));
-    if markdown_plugin_active && (is_markdown || app.show_raw_markdown) {
+    if is_markdown || app.show_raw_markdown {
         entries.push(ContextMenuEntry::Action {
             id: ContextActionId::ToggleRawMarkdown,
             label: if app.show_raw_markdown {

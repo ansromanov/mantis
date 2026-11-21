@@ -1,83 +1,24 @@
-//! Bundled markdown renderer plugin for mantis.
+//! Native markdown renderer: turns markdown source into ANSI-styled lines.
 //!
-//! Implements the mantis plugin protocol to render `.md` files to ANSI escape
-//! codes. On `on_file_open`, reads the file and sends rendered lines as bounded
-//! `set_content_chunk` actions followed by an explicit end marker. Responds to
-//! `on_theme_change` to re-render with matching colours, and `on_keypress` for
-//! `M` (raw/rendered toggle).
+//! This is the former bundled markdown plugin, moved into the host so a
+//! markdown file is rendered synchronously while it loads: the first painted
+//! frame already shows the rendered document instead of raw text that is later
+//! replaced by an out-of-process stream (which caused flicker, a jumping gutter
+//! and a scroll reset). The output is plain ANSI lines that the content pane
+//! parses with [`crate::ansi`], so theme colours, tables, block quotes, lists
+//! and code blocks all flow through the existing content-takeover path.
 //!
-//! ## Theme colours
-//!
-//! `init` and `on_theme_change` events carry a `colors` object with the
-//! active theme's actual `heading1`/`heading2`/`heading3`/`accent`/`dim`/
-//! `code`/`text` roles as `#rrggbb` hex strings (see
-//! `docs/src/plugin-development.md`). The plugin converts each to a
-//! truecolor (`38;2;R;G;B`) ANSI code, so any theme — built-in or a user's
-//! own `mantis.toml` preset — renders with its real colours, with no
-//! per-theme-name dictionary to keep in sync. If `colors` is absent (an
-//! older host), the plugin falls back to a built-in dark-terminal default.
-
-use std::io::{self, BufRead, Write};
-use std::path::Path;
+//! Public items:
+//! - [`MarkdownColors`]: the seven theme roles the renderer uses, as SGR codes.
+//! - [`render_to_ansi`]: renders markdown source to a `Vec<String>` of lines.
 
 use pulldown_cmark::{Alignment, Event, HeadingLevel, Options, Parser, Tag};
 use unicode_width::UnicodeWidthStr;
 
-fn main() {
-    let stdin = io::stdin();
-    let stdout = io::stdout();
-    let mut state = PluginState::new();
+use crate::theme::{color_to_hex, Theme};
 
-    for line in stdin.lock().lines() {
-        let line = match line {
-            Ok(l) => l,
-            Err(_) => break,
-        };
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-        let msg: serde_json::Value = match serde_json::from_str(trimmed) {
-            Ok(v) => v,
-            Err(_) => continue,
-        };
-        let event = msg["event"].as_str().unwrap_or("");
-        match event {
-            "init" => {
-                state.handle_theme_change(msg.get("colors"), &mut stdout.lock());
-            }
-            "on_file_open" => {
-                if let Some(path) = msg["path"].as_str() {
-                    state.handle_open(path, &mut stdout.lock());
-                }
-            }
-            "on_theme_change" => {
-                state.handle_theme_change(msg.get("colors"), &mut stdout.lock());
-            }
-            "on_keypress" => {
-                if let Some(key) = msg["key"].as_str() {
-                    if key == "M" {
-                        state.toggle_raw = !state.toggle_raw;
-                        if let Some(path) = state.current_file.clone() {
-                            state.handle_open(&path, &mut stdout.lock());
-                        }
-                    }
-                }
-            }
-            "on_quit" | "shutdown" => break,
-            _ => {}
-        }
-    }
-}
-
-struct PluginState {
-    current_file: Option<String>,
-    theme: ThemeColors,
-    toggle_raw: bool,
-    render_seq: u64,
-}
-
-struct ThemeColors {
+/// Theme roles the renderer styles with, stored as SGR parameter strings.
+pub struct MarkdownColors {
     heading1: String,
     heading2: String,
     heading3: String,
@@ -87,11 +28,11 @@ struct ThemeColors {
     text: String,
 }
 
-impl ThemeColors {
+impl MarkdownColors {
     /// Fallback used when the host doesn't send a `colors` object (an older
     /// protocol version) or a color fails to parse.
-    fn default_theme() -> Self {
-        ThemeColors {
+    pub fn default_theme() -> Self {
+        MarkdownColors {
             heading1: "38;5;81".into(),  // light cyan
             heading2: "38;5;229".into(), // light yellow
             heading3: "38;5;120".into(), // light green
@@ -102,20 +43,22 @@ impl ThemeColors {
         }
     }
 
-    /// Builds a truecolor palette from the host's `colors` object (hex
-    /// strings per role). Returns `None` if any role is missing or malformed
-    /// so the caller can fall back to [`default_theme`](Self::default_theme).
-    fn from_json(v: &serde_json::Value) -> Option<Self> {
-        let hex = |role: &str| v[role].as_str().and_then(hex_to_truecolor);
-        Some(ThemeColors {
-            heading1: hex("heading1")?,
-            heading2: hex("heading2")?,
-            heading3: hex("heading3")?,
-            accent: hex("accent")?,
-            dim: hex("dim")?,
-            code: hex("code")?,
-            text: hex("text")?,
-        })
+    /// Builds the palette from the active theme's colour roles. Falls back to
+    /// [`default_theme`](Self::default_theme) if any role has no RGB form.
+    pub fn from_theme(theme: &Theme) -> Self {
+        let hex = |c| hex_to_truecolor(&color_to_hex(c));
+        (|| {
+            Some(MarkdownColors {
+                heading1: hex(theme.heading1)?,
+                heading2: hex(theme.heading2)?,
+                heading3: hex(theme.heading3)?,
+                accent: hex(theme.accent)?,
+                dim: hex(theme.dim)?,
+                code: hex(theme.code)?,
+                text: hex(theme.text)?,
+            })
+        })()
+        .unwrap_or_else(Self::default_theme)
     }
 }
 
@@ -130,52 +73,6 @@ fn hex_to_truecolor(hex: &str) -> Option<String> {
     let g = u8::from_str_radix(&h[2..4], 16).ok()?;
     let b = u8::from_str_radix(&h[4..6], 16).ok()?;
     Some(format!("38;2;{r};{g};{b}"))
-}
-
-impl PluginState {
-    fn new() -> Self {
-        PluginState {
-            current_file: None,
-            theme: ThemeColors::default_theme(),
-            toggle_raw: false,
-            render_seq: 0,
-        }
-    }
-
-    fn handle_theme_change(&mut self, colors: Option<&serde_json::Value>, out: &mut impl Write) {
-        self.theme = colors
-            .and_then(ThemeColors::from_json)
-            .unwrap_or_else(ThemeColors::default_theme);
-        // Re-render the current file if one is open.
-        if let Some(path) = self.current_file.clone() {
-            self.handle_open(&path, out);
-        }
-    }
-
-    fn handle_open(&mut self, path_str: &str, out: &mut impl Write) {
-        let path = Path::new(path_str);
-        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-        let is_md = matches!(ext, "md" | "markdown");
-        if !is_md {
-            return;
-        }
-        self.current_file = Some(path_str.to_string());
-        if self.toggle_raw {
-            // When raw mode is toggled, skip logic entirely to let host render natively.
-            return;
-        }
-        let src = match std::fs::read_to_string(path) {
-            Ok(s) => s,
-            Err(_) => return,
-        };
-        self.render_seq = self.render_seq.wrapping_add(1);
-        let content_id = format!("markdown-{}", self.render_seq);
-        let mut next_chunk = 0;
-        render_to_ansi_batches(&src, &self.theme, |batch| {
-            next_chunk = send_content_chunk_batch(&batch, path_str, &content_id, next_chunk, out);
-        });
-        send_content_end(path_str, &content_id, next_chunk, out);
-    }
 }
 
 fn no_color_active() -> bool {
@@ -205,14 +102,14 @@ fn ansi(code: &str, text: &str) -> String {
     }
 }
 
-#[cfg(test)]
-fn render_to_ansi(src: &str, theme: &ThemeColors) -> Vec<String> {
+/// Renders markdown `src` to ANSI-styled lines using `theme`.
+pub fn render_to_ansi(src: &str, theme: &MarkdownColors) -> Vec<String> {
     let mut lines = Vec::new();
     render_to_ansi_batches(src, theme, |batch| lines.extend(batch));
     lines
 }
 
-fn render_to_ansi_batches(src: &str, theme: &ThemeColors, mut emit: impl FnMut(Vec<String>)) {
+fn render_to_ansi_batches(src: &str, theme: &MarkdownColors, mut emit: impl FnMut(Vec<String>)) {
     let mut lines: Vec<String> = Vec::new();
     let mut current = String::new();
     let mut style_stack: Vec<String> = Vec::new();
@@ -440,7 +337,12 @@ fn apply_style(style: &str, text: &str) -> String {
     }
 }
 
-fn flush_line(lines: &mut Vec<String>, current: &mut String, bq_depth: usize, theme: &ThemeColors) {
+fn flush_line(
+    lines: &mut Vec<String>,
+    current: &mut String,
+    bq_depth: usize,
+    theme: &MarkdownColors,
+) {
     if current.is_empty() {
         return;
     }
@@ -454,7 +356,7 @@ fn flush_line(lines: &mut Vec<String>, current: &mut String, bq_depth: usize, th
     current.clear();
 }
 
-fn heading_ansi(level: HeadingLevel, theme: &ThemeColors) -> String {
+fn heading_ansi(level: HeadingLevel, theme: &MarkdownColors) -> String {
     match level {
         HeadingLevel::H1 => format!("1;{}", theme.heading1),
         HeadingLevel::H2 => format!("1;{}", theme.heading2),
@@ -465,79 +367,12 @@ fn heading_ansi(level: HeadingLevel, theme: &ThemeColors) -> String {
     }
 }
 
-#[cfg(test)]
-fn send_content_stream(lines: &[String], path: &str, content_id: &str, out: &mut impl Write) {
-    let next_chunk = send_content_chunk_batch(lines, path, content_id, 0, out);
-    send_content_end(path, content_id, next_chunk, out);
-}
-
-fn send_content_chunk_batch(
-    lines: &[String],
-    path: &str,
-    content_id: &str,
-    mut next_chunk: usize,
-    out: &mut impl Write,
-) -> usize {
-    const TARGET_CHUNK_BYTES: usize = 768 * 1024;
-    let mut start = 0;
-    let mut bytes = 0usize;
-    for (index, line) in lines.iter().enumerate() {
-        if index > start && bytes.saturating_add(line.len()) > TARGET_CHUNK_BYTES {
-            write_content_chunk(&lines[start..index], path, content_id, next_chunk, out);
-            next_chunk += 1;
-            start = index;
-            bytes = 0;
-        }
-        bytes = bytes.saturating_add(line.len());
-    }
-    if start < lines.len() {
-        write_content_chunk(&lines[start..], path, content_id, next_chunk, out);
-        next_chunk += 1;
-    }
-    next_chunk
-}
-
-fn write_content_chunk(
-    lines: &[String],
-    path: &str,
-    content_id: &str,
-    index: usize,
-    out: &mut impl Write,
-) {
-    let msg = serde_json::json!({
-        "event": "action",
-        "action": "set_content_chunk",
-        "params": {
-            "path": path,
-            "content_id": content_id,
-            "index": index,
-            "lines": lines,
-        }
-    });
-    let _ = writeln!(out, "{}", serde_json::to_string(&msg).unwrap());
-    let _ = out.flush();
-}
-
-fn send_content_end(path: &str, content_id: &str, total_chunks: usize, out: &mut impl Write) {
-    let end = serde_json::json!({
-        "event": "action",
-        "action": "set_content_end",
-        "params": {
-            "path": path,
-            "content_id": content_id,
-            "total_chunks": total_chunks,
-        }
-    });
-    let _ = writeln!(out, "{}", serde_json::to_string(&end).unwrap());
-    let _ = out.flush();
-}
-
-// ─── Table Rendering ───────────────────────────────────────────────────────
+// --- Table rendering ---------------------------------------------------------
 
 fn render_table_ansi(
     rows: &[(bool, Vec<String>)],
     aligns: &[Alignment],
-    theme: &ThemeColors,
+    theme: &MarkdownColors,
     out: &mut Vec<String>,
 ) {
     if rows.is_empty() {
@@ -641,5 +476,5 @@ fn visible_width(s: &str) -> usize {
 }
 
 #[cfg(test)]
-#[path = "main_test.rs"]
+#[path = "markdown_test.rs"]
 mod tests;

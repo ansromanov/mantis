@@ -50,6 +50,7 @@ mod json_path;
 mod json_query;
 mod jsonl;
 mod list_picker;
+mod markdown;
 mod pager;
 mod plugin;
 mod release_info;

@@ -602,11 +602,12 @@ impl App {
             self.current_syntax = load.syntax_name;
             self.plugin_content_active = false;
             self.set_file_watch(Some(path));
+            let is_markdown = crate::file::is_markdown_path(path);
+            if is_markdown && !self.show_raw_markdown {
+                self.install_native_markdown(path);
+            }
             if !self.plugin_is_opening_file {
-                let is_markdown = crate::file::is_markdown_path(path);
-                if !(is_markdown && self.show_raw_markdown) {
-                    self.plugin_manager.on_file_open(path);
-                }
+                self.plugin_manager.on_file_open(path);
                 self.request_file_diagnostics(path);
             }
             if is_new_file {

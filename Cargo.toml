@@ -1,6 +1,5 @@
 [workspace]
 members = [
-    "plugins/markdown",
     "plugins/iconize",
     "plugins/python",
     "plugins/rust",
@@ -62,6 +61,7 @@ toml = "0.8"
 toml_edit = "0.22"
 notify = "6"
 unicode-width = "0.2"
+pulldown-cmark = "0.9"
 arboard = "3"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp"] }
 memmap2 = "0.9"

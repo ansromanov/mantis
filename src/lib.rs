@@ -34,6 +34,7 @@ pub mod json_path;
 pub mod json_query;
 pub mod jsonl;
 pub mod list_picker;
+pub mod markdown;
 pub mod pager;
 pub mod plugin;
 pub mod release_info;

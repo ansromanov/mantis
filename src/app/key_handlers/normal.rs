@@ -613,13 +613,9 @@ impl App {
         self.save_config();
     }
 
-    /// Toggles between rendered and raw markdown when the markdown plugin is
-    /// active on a markdown file; otherwise surfaces a status message.
+    /// Toggles between rendered and raw markdown on a markdown file; otherwise
+    /// surfaces a status message.
     pub(crate) fn toggle_raw_markdown(&mut self) {
-        if !self.plugin_manager.is_plugin_active("markdown") {
-            self.set_status("markdown render toggle: not available (markdown plugin not active)");
-            return;
-        }
         let is_markdown = self
             .current_file
             .as_ref()
@@ -633,15 +629,10 @@ impl App {
             let scroll = self.content_scroll;
             let active_line = self.active_line;
             if self.show_raw_markdown {
-                self.plugin_content.remove(&path);
-                self.plugin_content_text.remove(&path);
-                self.plugin_content_active = false;
-                self.plugin_content_active_path = None;
-            } else {
-                // Plugin rendering is asynchronous; identify this as a
-                // same-file mode switch so its response preserves the view.
-                self.plugin_content_active_path = Some(path.clone());
+                self.clear_native_markdown(&path);
             }
+            // Re-opening re-renders synchronously when not raw, so the view
+            // flips in a single frame.
             self.reload_content();
             self.active_line = active_line.min(self.display_line_count().saturating_sub(1));
             self.set_content_scroll(scroll);
