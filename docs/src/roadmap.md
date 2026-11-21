@@ -96,7 +96,7 @@ graduate into a shared `ScrollState`-style helper (see AGENTS.md →
 Consistency & performance) rather than being copied a third time.
 
 ### 5. Language & format intelligence
-*Epic: [#602](https://github.com/ansromanov/mantis/issues/602) (absorbing #482 & #485); [Roadmap Spec](superpowers/specs/2026-09-06-language-and-format-coverage-roadmap.md)*
+*Epic: [#602](https://github.com/ansromanov/mantis/issues/602) (absorbing #482 & #485)*
 
 Language smarts and format viewing are delivered via the v3 plugin architecture and shared core detectors (`fold_detectors`):
 

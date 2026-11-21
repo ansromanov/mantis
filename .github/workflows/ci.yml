@@ -1,118 +1,32 @@
 name: CI
 
-# Pull-request gate: format, lint, and only the tests related to the changed
-# files. Broad changes run a small smoke set (integration + plugin + bin-only
-# tests), never the full suite. The full suite and Windows run on release
-# (release.yml) and on demand (tests.yml); benchmarks run on release; merge to
-# main runs a related-tests sanity pass (main.yml); coverage is on demand
-# (coverage.yml).
+# One gate for pull requests and pushes to main: format, lint, the full test
+# suite, and a whole-binary e2e smoke test. Releases are cut by release.yml.
 on:
   pull_request:
     branches: [main]
-    # `edited` so editing the PR body re-runs the issue-link check.
-    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
+  push:
+    branches: [main]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  link:
-    name: PR closes an issue
+  check:
+    name: fmt, clippy, tests (Linux)
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    steps:
-      - name: Require a closing keyword
-        env:
-          BODY: ${{ github.event.pull_request.body }}
-          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
-        run: |
-          if echo "$LABELS" | tr ',' '\n' | grep -qx 'no-issue'; then
-            echo "no-issue label present — skipping link check."
-            exit 0
-          fi
-          if echo "$BODY" | grep -qiE '(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved) +#[0-9]+'; then
-            echo "PR links an issue."
-            exit 0
-          fi
-          echo "::error::PR body must close an issue (e.g. 'Closes #123') so it auto-closes on merge. Add the keyword or apply the 'no-issue' label."
-          exit 1
-
-  # Detects whether the PR touches any Rust/config code that requires
-  # compilation, linting, and testing. Agent-only PRs (.agent/, .claude/,
-  # .opencode/, docs/, and unrelated scripts/.github/ changes) set code=false;
-  # the file-size gate helper is an explicit exception so its changes stay gated.
-  changes:
-    name: Detect code changes
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: read
-    outputs:
-      code: ${{ steps.detect.outputs.code }}
-    steps:
-      - name: Check changed files
-        id: detect
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          changed=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files \
-            --paginate --jq '.[].filename')
-          if echo "$changed" | grep -qE '^(src/|tests/|benches/|Cargo\.(toml|lock)|mantis\.toml|themes/|scripts/(check-file-size\.py|changed-files\.sh)$)'; then
-            echo "code=true" >> "$GITHUB_OUTPUT"
-            echo "Code changes detected — pr job will run."
-          else
-            echo "code=false" >> "$GITHUB_OUTPUT"
-            echo "Agent/docs/config-only changes — pr job skipped."
-          fi
-          # Stash the changed-file list for the pr job's related-tests step.
-          printf '%s\n' "$changed" > changed_files.txt
-
-      - name: Upload changed-file list
-        if: steps.detect.outputs.code == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: changed-files
-          path: changed_files.txt
-          retention-days: 1
-
-  pr:
-    name: fmt, clippy, related tests (Linux)
-    needs: changes
-    if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    env:
-      # Link with lld in CI only (local builds keep the default linker).
-      # Linux-only — the Windows job below uses the default MSVC linker.
-      RUSTFLAGS: "-C link-arg=-fuse-ld=lld"
     steps:
       - uses: actions/checkout@v6
-        with:
-          fetch-depth: 2
 
-      - name: Download changed-file list
-        uses: actions/download-artifact@v4
-        with:
-          name: changed-files
-
-      - name: Enforce source file size
-        run: python3 scripts/check-file-size.py < changed_files.txt
-
-      - name: Install lld
-        run: sudo apt-get update && sudo apt-get install -y lld
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
 
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2
 
-      - name: Install nextest
-        uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@v2
         with:
           tool: nextest
 
@@ -120,38 +34,10 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Clippy
-        # Skip benches (criterion) on PRs — they are compile-checked in main.yml.
-        run: cargo clippy --lib --bins --tests -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings
 
-      - name: Select related tests
-        id: select
-        run: |
-          filter=$(bash scripts/related-tests.sh < changed_files.txt)
-          echo "filter<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$filter" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-          echo "Selected filter: $filter"
+      - name: Tests
+        run: cargo nextest run --profile ci --workspace
 
-      - name: Run related tests
-        env:
-          FILTER: ${{ steps.select.outputs.filter }}
-        run: |
-          # The bin target re-declares every lib module, so each unit test
-          # exists twice: in `mantis` (lib) and `mantis::bin/mantis`. Drop the
-          # bin copies, keeping only its exclusive modules (`tests`,
-          # `draw_tests` from src/main_test.rs / src/main_draw_test.rs).
-          dedup='not (binary_id(mantis::bin/mantis) & !test(/^(tests|draw_tests)::/))'
-          if [ "$FILTER" = "__ALL__" ]; then
-            echo "Broad change — running smoke set instead of the full suite."
-            # Integration binaries + plugin bin tests + main.rs-only tests
-            # (~100 tests). The full suite runs on release.
-            cargo nextest run --profile ci --all -E "(kind(test) + kind(bin)) & $dedup"
-          else
-            cargo nextest run --profile ci --all -E "($FILTER) & $dedup"
-          fi
-
-      - name: Run E2E whole-binary smoke test
+      - name: E2E smoke test
         run: python3 scripts/ci-e2e.py
-
-      - name: Require sibling _test.rs (backstop for --no-verify)
-        run: bash scripts/require-tests.sh < changed_files.txt
