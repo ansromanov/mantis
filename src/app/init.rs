@@ -61,6 +61,7 @@ impl App {
 
         let highlighter = Highlighter::new(&theme.syntax);
         let loader = Loader::new(&theme, cfg.content.prettify_size_limit);
+        let (diagnostics_tx, diagnostics_rx) = std::sync::mpsc::channel();
         let (new_version_available, update_rx) =
             crate::update::check_for_updates(cfg.updates.check);
 
@@ -230,12 +231,15 @@ impl App {
             symbols: HashMap::new(),
             file_diagnostics: HashMap::new(),
             file_diagnostic_lines: HashMap::new(),
-            diagnostic_owners: HashMap::new(),
+            diagnostics_tx,
+            diagnostics_rx,
+            diagnostic_seq: 0,
             latest_diagnostic_requests: HashMap::new(),
             fold_display_map: Vec::new(),
             fold_gutter_rows: Vec::new(),
             yaml_error: None,
             yaml_anchor_count: 0,
+            k8s_summary: None,
             yaml_alias_count: 0,
             loader,
             load_seq: 0,

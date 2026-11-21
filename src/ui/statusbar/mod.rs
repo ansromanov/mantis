@@ -53,6 +53,7 @@ pub(crate) enum StatusSegment {
     Git,
     Errors,
     Folds,
+    K8s,
     Diagnostics,
     DiagnosticMessage,
     Message,
@@ -77,6 +78,7 @@ impl StatusSegment {
             StatusSegment::Git => "git",
             StatusSegment::Errors => "errors",
             StatusSegment::Folds => "folds",
+            StatusSegment::K8s => "k8s",
             StatusSegment::Diagnostics | StatusSegment::DiagnosticMessage => "diagnostics",
             StatusSegment::Message => "message",
             StatusSegment::Version => "version",
@@ -579,6 +581,19 @@ fn build_normal_lines(
             StatusSegment::Errors,
             P_ERR,
         ));
+    }
+
+    // -- Priority 2: Kubernetes manifest facts for the resource under the cursor --
+    if let Some(k8s) = &app.k8s_summary {
+        let line = app.display_to_physical(app.active_line) + 1;
+        let facts = k8s.facts_at(Some(line));
+        if !facts.is_empty() {
+            segs.push((
+                Span::styled(format!(" [{facts}]"), base.fg(app.theme.accent)),
+                StatusSegment::K8s,
+                P_INFO,
+            ));
+        }
     }
 
     // -- Priority 2: fold stats --

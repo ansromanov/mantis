@@ -30,6 +30,7 @@ impl App {
             picker.poll_changed_counts();
         }
         self.drain_loads();
+        self.drain_diagnostics();
         if let Some(latest) = self.update_rx.as_ref().and_then(|rx| rx.try_recv().ok()) {
             self.new_version_available = Some(latest);
             self.update_rx = None;
@@ -438,7 +439,6 @@ impl App {
     pub(crate) fn clear_diagnostics_for_path(&mut self, path: &std::path::Path) {
         self.file_diagnostics.remove(path);
         self.file_diagnostic_lines.remove(path);
-        self.diagnostic_owners.remove(path);
         self.latest_diagnostic_requests.remove(path);
         if self.current_file.as_deref() == Some(path) {
             if let Some(picker) = self

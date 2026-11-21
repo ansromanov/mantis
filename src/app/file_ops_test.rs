@@ -1477,3 +1477,30 @@ fn opening_json_file_folds_the_pretty_printed_text() {
     );
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn opening_a_kubernetes_manifest_builds_the_status_summary() {
+    let root = temp_dir();
+    let f = root.join("deploy.yaml");
+    fs::write(
+        &f,
+        "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  namespace: prod\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: web\n",
+    )
+    .unwrap();
+    let mut app = app_for(&root);
+    app.open_file(&f);
+    let summary = app.k8s_summary.as_ref().expect("manifest summary");
+    assert_eq!(
+        summary.facts_at(Some(2)),
+        "Deployment/web (prod) \u{b7} 1 Deployment \u{b7} 1 Service"
+    );
+    // A different document selects the other resource.
+    assert!(summary.facts_at(Some(8)).starts_with("Service/web"));
+
+    // Opening a non-YAML file drops the summary.
+    let other = root.join("a.txt");
+    fs::write(&other, "x\n").unwrap();
+    app.open_file(&other);
+    assert!(app.k8s_summary.is_none());
+    fs::remove_dir_all(&root).ok();
+}

@@ -531,6 +531,7 @@ impl App {
             self.yaml_error = y.error;
             self.yaml_anchor_count = y.anchor_count;
             self.yaml_alias_count = y.alias_count;
+            self.k8s_summary = y.k8s;
         }
         if !load.fold_regions.is_empty() {
             self.fold_regions = load.fold_regions;
@@ -572,6 +573,7 @@ impl App {
             self.current_syntax = load.syntax_name;
             self.rendered_active = false;
             self.set_file_watch(Some(path));
+            self.request_file_diagnostics(path);
             let is_markdown = crate::file::is_markdown_path(path);
             if is_markdown && !self.show_raw_markdown {
                 self.install_native_markdown(path);

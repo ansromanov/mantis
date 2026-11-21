@@ -60,6 +60,7 @@ mod file_ops;
 mod fold;
 mod init;
 mod key_handlers;
+mod lint;
 mod loader;
 mod markdown_view;
 pub(crate) mod menu_bar;
@@ -372,8 +373,12 @@ pub struct App {
     /// Highest-severity diagnostic per physical line, precomputed for visible-row rendering.
     pub file_diagnostic_lines:
         HashMap<PathBuf, HashMap<usize, crate::code_intel::DiagnosticSeverity>>,
-    /// Provider owning each path's current diagnostic set.
-    pub(crate) diagnostic_owners: HashMap<PathBuf, String>,
+    /// Sender cloned into each background lint thread.
+    pub(crate) diagnostics_tx: std::sync::mpsc::Sender<lint::LintResult>,
+    /// Receives finished lint runs; drained by `tick`.
+    pub(crate) diagnostics_rx: std::sync::mpsc::Receiver<lint::LintResult>,
+    /// Monotonic id for lint requests.
+    pub(crate) diagnostic_seq: u64,
     /// Latest outstanding diagnostic request for each path; older replies are ignored.
     pub(crate) latest_diagnostic_requests: HashMap<PathBuf, u64>,
     /// display_line → physical_line mapping; empty when no folds are active.
@@ -385,6 +390,8 @@ pub struct App {
     pub yaml_error: Option<String>,
     /// Number of YAML anchors (`&name`) found in the current file.
     pub yaml_anchor_count: usize,
+    /// Kubernetes manifest summary for the open YAML file, shown in the status bar.
+    pub k8s_summary: Option<crate::k8s_facts::K8sSummary>,
     /// Number of YAML aliases (`*name`) found in the current file.
     pub yaml_alias_count: usize,
     pub is_log: bool,

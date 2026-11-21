@@ -35,6 +35,8 @@ pub mod icons;
 pub mod json_path;
 pub mod json_query;
 pub mod jsonl;
+pub mod k8s_facts;
+pub mod lint;
 pub mod list_picker;
 pub mod markdown;
 pub mod pager;

@@ -283,7 +283,7 @@ height = 1       # 1 = single row, 2 = spread the two groups over two rows
 ```
 
 Valid ids: `badges` `worktrees` `scroll` `lnum` `type` `jsonpath` `scope` `fileinfo` `git` `errors`
-`folds` `message` `version` `update`. There is no
+`folds` `k8s` `message` `version` `update`. There is no
 keybinding-hint segment — the `?`/`F1` help overlay and the command palette are
 the discovery surfaces for bindings.
 

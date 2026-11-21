@@ -1419,3 +1419,20 @@ fn custom_separator_replaces_space_between_segments() {
         );
     }
 }
+
+#[test]
+fn statusbar_shows_kubernetes_facts_for_the_cursor_resource() {
+    let mut app = make_app();
+    app.k8s_summary = crate::k8s_facts::summarize(
+        "apiVersion: v1\nkind: Service\nmetadata:\n  name: web\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: cfg\n",
+    );
+    app.content = (0..9).map(|i| format!("line {i}")).collect();
+    app.active_line = 7;
+    let bar = render_bar(&app);
+    assert!(
+        bar.contains("[ConfigMap/cfg"),
+        "facts must follow the cursor into the second document: {bar:?}"
+    );
+    app.active_line = 1;
+    assert!(render_bar(&app).contains("[Service/web"));
+}
