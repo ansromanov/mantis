@@ -154,7 +154,7 @@ impl App {
             if quiet {
                 self.tree_dirty = false;
                 self.tree_dirty_at = None;
-                self.reload();
+                self.reload_tree();
                 if self.follow_mode {
                     self.follow_latest_candidate();
                 }

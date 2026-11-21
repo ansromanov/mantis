@@ -746,6 +746,15 @@ impl App {
     /// filesystem events from the root watcher, or by the periodic fallback
     /// timer when no root watcher is installed.
     pub fn reload(&mut self) {
+        self.reload_tree();
+        self.reload_content();
+    }
+
+    /// Like [`reload`](Self::reload) but leaves the open file alone. Used for
+    /// filesystem-watcher driven refreshes: the per-file watcher already
+    /// reloads the open file when *it* changes, so re-reading and
+    /// re-highlighting it for unrelated events is wasted work.
+    pub(crate) fn reload_tree(&mut self) {
         self.last_refresh = self.now();
         if self.git_status_enabled {
             if let Some(ref rev) = self.compare_base.clone() {
@@ -772,7 +781,6 @@ impl App {
             s.reload_files(&root, show_hidden, ignore_gitignore, changed.as_ref());
         }
         self.rebuild(false);
-        self.reload_content();
     }
 
     /// Injectible time source. Returns `Instant::now()` in production; tests may

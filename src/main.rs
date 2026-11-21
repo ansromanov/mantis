@@ -474,6 +474,7 @@ fn launch_tui(roots: Vec<PathBuf>, active: usize, initial: InitialContent) -> an
         redirect_stdin_to_tty()?;
     }
 
+    install_termination_handlers();
     enable_raw_mode()?;
     crate::theme::detect_terminal_background();
     // Probe Kitty graphics support before the alternate screen is entered, same
@@ -594,10 +595,25 @@ fn run_event_loop(
     tabs: &mut Tabs,
     events: &mut dyn EventSource,
 ) -> anyhow::Result<()> {
+    // Idle throttling: right after input we redraw every iteration (~60 fps) so
+    // scrolling and animations stay smooth; once the UI has been quiet for
+    // `ACTIVE_WINDOW` we only redraw every `IDLE_FRAME` to pick up async
+    // results (loader, watcher, git) without burning CPU on identical frames.
+    const ACTIVE_WINDOW: Duration = Duration::from_millis(500);
+    const IDLE_FRAME: Duration = Duration::from_millis(100);
+    let mut last_input = std::time::Instant::now();
+    let mut last_render: Option<std::time::Instant> = None;
     loop {
-        render_frame(terminal, tabs)?;
+        let now = std::time::Instant::now();
+        let active = now.duration_since(last_input) < ACTIVE_WINDOW;
+        let due = last_render.is_none_or(|t| now.duration_since(t) >= IDLE_FRAME);
+        if active || due {
+            render_frame(terminal, tabs)?;
+            last_render = Some(std::time::Instant::now());
+        }
 
         if let Some(event) = events.next_event()? {
+            last_input = std::time::Instant::now();
             dispatch_event(tabs, event);
             // Drain a burst (e.g. mouse-wheel) so it applies in one frame.
             let mut drained = 0;
@@ -610,13 +626,64 @@ fn run_event_loop(
             }
         }
 
-        if tabs.active_app().should_quit {
+        if tabs.active_app().should_quit || terminal_gone() {
             break;
         }
 
         tabs.active_app_mut().tick();
     }
     Ok(())
+}
+
+/// Set by the SIGHUP/SIGTERM handler installed in `install_termination_handlers`.
+#[cfg(unix)]
+static TERMINATION_REQUESTED: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+#[cfg(unix)]
+extern "C" fn on_termination_signal(_sig: libc::c_int) {
+    TERMINATION_REQUESTED.store(true, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Makes SIGHUP/SIGTERM end the event loop instead of killing the process
+/// mid-frame (which would skip terminal restore). Best-effort.
+#[cfg(unix)]
+fn install_termination_handlers() {
+    let handler = on_termination_signal as extern "C" fn(libc::c_int) as libc::sighandler_t;
+    unsafe {
+        libc::signal(libc::SIGHUP, handler);
+        libc::signal(libc::SIGTERM, handler);
+    }
+}
+
+#[cfg(not(unix))]
+fn install_termination_handlers() {}
+
+/// True when the terminal has been closed under us: a termination signal was
+/// received, or stdin is a tty whose peer hung up. Without this check the
+/// event loop busy-reads EOF forever after the terminal window disappears.
+#[cfg(unix)]
+fn terminal_gone() -> bool {
+    if TERMINATION_REQUESTED.load(std::sync::atomic::Ordering::Relaxed) {
+        return true;
+    }
+    unsafe {
+        if libc::isatty(libc::STDIN_FILENO) != 1 {
+            return false;
+        }
+        let mut pfd = libc::pollfd {
+            fd: libc::STDIN_FILENO,
+            events: 0,
+            revents: 0,
+        };
+        libc::poll(&mut pfd, 1, 0) > 0
+            && pfd.revents & (libc::POLLHUP | libc::POLLERR | libc::POLLNVAL) != 0
+    }
+}
+
+#[cfg(not(unix))]
+fn terminal_gone() -> bool {
+    false
 }
 
 /// Clears the terminal when requested, then renders one frame of the UI.

@@ -156,6 +156,10 @@ impl App {
         };
         let mut tree_changed = false;
         let mut newest: Option<(std::time::SystemTime, PathBuf)> = None;
+        // mantis's own state/config dirs may live under the root (e.g. when
+        // run from `~`); events from our own session writes must not trigger
+        // a reload, or the reload's session save re-triggers the watcher.
+        let mut own_dirs: Option<Vec<PathBuf>> = None;
         while let Ok(res) = rx.try_recv() {
             if let Ok(evt) = res {
                 if matches!(
@@ -165,6 +169,19 @@ impl App {
                     for path in evt.paths {
                         if !path.starts_with(&self.root) || path.starts_with(self.root.join(".git"))
                         {
+                            continue;
+                        }
+                        let own = own_dirs.get_or_insert_with(|| {
+                            let mut dirs: Vec<PathBuf> =
+                                crate::session::state_dir().into_iter().collect();
+                            dirs.extend(
+                                self.config_path
+                                    .as_ref()
+                                    .and_then(|p| p.parent().map(PathBuf::from)),
+                            );
+                            dirs
+                        });
+                        if own.iter().any(|d| path.starts_with(d)) {
                             continue;
                         }
                         tree_changed = true;
@@ -570,9 +587,13 @@ impl App {
         }
 
         if load.ok {
+            // Only a newly opened file changes persisted session state; a
+            // same-file reload (watcher/refresh) must not dirty the session.
+            if is_new_file {
+                self.mark_session_dirty();
+            }
             self.current_file = Some(path.to_path_buf());
             self.current_syntax = load.syntax_name;
-            self.mark_session_dirty();
             self.plugin_content_active = false;
             self.set_file_watch(Some(path));
             if !self.plugin_is_opening_file {
