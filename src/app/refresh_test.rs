@@ -65,6 +65,7 @@ fn create_base_app() -> App {
 
     let theme = Theme::default();
     let highlighter = Highlighter::new(&theme.syntax);
+    let (diagnostics_tx, diagnostics_rx) = std::sync::mpsc::channel();
 
     App {
         root: PathBuf::from("/tmp"),
@@ -228,8 +229,8 @@ fn create_base_app() -> App {
         symbols: HashMap::new(),
         file_diagnostics: HashMap::new(),
         file_diagnostic_lines: HashMap::new(),
-        diagnostics_tx: std::sync::mpsc::channel().0,
-        diagnostics_rx: std::sync::mpsc::channel().1,
+        diagnostics_tx,
+        diagnostics_rx,
         diagnostic_seq: 0,
         latest_diagnostic_requests: HashMap::new(),
         fold_display_map: Vec::new(),
