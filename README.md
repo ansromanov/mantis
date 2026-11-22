@@ -21,6 +21,11 @@ config required. Built with
   <img src="media/intro.png" alt="mantis" width="800">
 </p>
 
+<p align="center">
+  <a href="https://ansromanov.github.io/mantis/demo.html">▶ Watch the 40-second demo</a>
+  · or <code>asciinema play media/demo.cast</code>
+</p>
+
 ```sh
 mantis      # open the current directory and start browsing
 ```
