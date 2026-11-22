@@ -68,6 +68,7 @@ impl App {
         self.yaml_error = None;
         self.yaml_anchor_count = 0;
         self.yaml_alias_count = 0;
+        self.k8s_summary = None;
     }
 }
 

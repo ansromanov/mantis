@@ -249,6 +249,7 @@ impl StatusBarConfig {
         "git",
         "errors",
         "folds",
+        "k8s",
         "message",
         "version",
         "update",

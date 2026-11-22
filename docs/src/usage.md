@@ -185,8 +185,8 @@ These work no matter which panel is focused.
 | `H` (tree)             | Git history of current file |
 | `Ctrl+O`               | Recent files (jump to a recently opened file) |
 | `Ctrl+g`               | Go to line              |
-| `O` (content)          | Open the symbol outline (when a provider supplies symbols) |
-| `!` (content)          | Open diagnostics for the current file (when available) |
+| `O` (content)          | Open the symbol outline (Rust files) |
+| `!` (content)          | Open diagnostics for the current file (Python files, needs ruff) |
 | `Ctrl+b`               | Toggle full-file blame (dedicated pane replacing the tree) |
 | `B` (content)          | Toggle single-line blame bar for the active line |
 | `t` (tree)             | Theme picker            |
@@ -352,10 +352,20 @@ symbols. Press `Enter` to jump to the declaration. Press `O` in the content
 pane to open the same outline with the symbol containing the cursor selected.
 The status bar shows the enclosing symbol as a scope breadcrumb.
 
-With a language provider that supports diagnostics enabled, type `!` to search
+For Python files (`.py`, `.pyi`) mantis runs [`ruff`](https://docs.astral.sh/ruff/)
+in the background when the file opens, if it is installed (no setup needed; if
+`ruff` is missing there are simply no diagnostics). Type `!` to search
 the current file's diagnostics. Press `Enter` to jump to the selected location.
 The content gutter marks diagnostic lines, while the status bar shows diagnostic
 counts and the active line's message.
+
+## Kubernetes manifests
+
+For YAML files that contain Kubernetes manifests (documents with `apiVersion` and
+`kind`), the status bar shows the resource under the cursor, e.g.
+`[Deployment/web (prod)]`, plus per-kind counts when the file holds several
+resources (`3 Deployments · 2 Services`). Detection is heuristic, not a full YAML
+parse. The segment id is `k8s` (see `[statusbar]` in the configuration docs).
 
 ## Reporting a bug
 

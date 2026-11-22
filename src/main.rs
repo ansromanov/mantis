@@ -51,6 +51,8 @@ mod json_path;
 #[allow(dead_code)]
 mod json_query;
 mod jsonl;
+mod k8s_facts;
+mod lint;
 mod list_picker;
 mod markdown;
 mod pager;

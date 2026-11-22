@@ -107,6 +107,7 @@ statusbar.colors.fileinfo
 statusbar.colors.folds
 statusbar.colors.git
 statusbar.colors.jsonpath
+statusbar.colors.k8s
 statusbar.colors.lnum
 statusbar.colors.message
 statusbar.colors.scope

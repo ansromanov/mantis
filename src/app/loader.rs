@@ -95,6 +95,8 @@ pub(super) struct YamlLoad {
     pub error: Option<String>,
     pub anchor_count: usize,
     pub alias_count: usize,
+    /// Kubernetes manifest summary for the status bar, when the file has manifests.
+    pub k8s: Option<crate::k8s_facts::K8sSummary>,
 }
 
 /// Computed result of a working-tree diff.
@@ -308,6 +310,7 @@ pub(super) fn compute_file_load(
             error,
             anchor_count,
             alias_count,
+            k8s: crate::k8s_facts::summarize(&s),
         });
     }
     load.highlighted = hl.highlight(path, &load.content);
