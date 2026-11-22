@@ -167,3 +167,24 @@ fn clicking_menu_label_toggles_dropdown_and_hover_switches_only_while_open() {
     drop(app);
     fs::remove_dir_all(root).ok();
 }
+
+#[test]
+fn menu_accepts_the_same_vim_and_home_end_keys_as_the_lists() {
+    let (mut app, root) = app();
+    app.open_menu_bar();
+    app.handle_menu_bar_key(key(KeyCode::Char('l')));
+    assert_eq!(app.menu_bar_state.unwrap().menu_index, 1);
+    app.handle_menu_bar_key(key(KeyCode::Char('h')));
+    assert_eq!(app.menu_bar_state.unwrap().menu_index, 0);
+    app.handle_menu_bar_key(key(KeyCode::End));
+    let last = app.menu_bar_state.unwrap().selected;
+    assert!(last > 0, "End must move to the last item");
+    app.handle_menu_bar_key(key(KeyCode::Char('k')));
+    assert_eq!(app.menu_bar_state.unwrap().selected, last - 1);
+    app.handle_menu_bar_key(key(KeyCode::Home));
+    assert_eq!(app.menu_bar_state.unwrap().selected, 0);
+    app.handle_menu_bar_key(key(KeyCode::Char('j')));
+    assert_eq!(app.menu_bar_state.unwrap().selected, 1);
+    drop(app);
+    fs::remove_dir_all(root).ok();
+}

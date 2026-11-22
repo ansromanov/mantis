@@ -489,10 +489,10 @@ impl Default for Keymap {
             content_page_up: bind(&["PageUp"]),
             content_page_down: bind(&["PageDown"]),
             content_reset_col: bind(&["Home", "0"]),
-            toggle_wrap: Vec::new(),
-            toggle_line_numbers: Vec::new(),
-            toggle_pretty_json: Vec::new(),
-            toggle_table_view: Vec::new(),
+            toggle_wrap: bind(&["content:z"]),
+            toggle_line_numbers: bind(&["content:L"]),
+            toggle_pretty_json: bind(&["content:J"]),
+            toggle_table_view: bind(&["content:T"]),
             toggle_blame: bind(&["ctrl+b"]),
             blame_line: bind(&["content:B"]),
             toggle_diff_side_by_side: bind(&["S"]),
@@ -679,14 +679,22 @@ impl Serialize for KeyBinding {
             KeyCode::F(n) => format!("F{n}"),
             ref other => format!("{other:?}"),
         };
-        let spec = match (self.ctrl, self.alt, self.super_key) {
-            (true, true, false) => format!("ctrl+alt+{key}"),
-            (true, false, false) => format!("ctrl+{key}"),
-            (false, true, false) => format!("alt+{key}"),
-            (false, false, true) => format!("cmd+{key}"),
-            (true, false, true) => format!("ctrl+cmd+{key}"),
-            _ => key,
-        };
+        // Every modifier must survive the round trip: `shift+F10` and `F10`
+        // are different bindings.
+        let mut spec = String::new();
+        if self.ctrl {
+            spec.push_str("ctrl+");
+        }
+        if self.alt {
+            spec.push_str("alt+");
+        }
+        if self.shift {
+            spec.push_str("shift+");
+        }
+        if self.super_key {
+            spec.push_str("cmd+");
+        }
+        spec.push_str(&key);
         let spec = match self.scope {
             BindingScope::Global => spec,
             BindingScope::Tree => format!("tree:{spec}"),

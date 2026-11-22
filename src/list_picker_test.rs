@@ -249,3 +249,26 @@ fn modifier_characters_are_not_inserted_as_query_text() {
     assert_eq!(handle_list_picker_key(&mut p, &key), OverlayKey::Pass);
     assert!(p.query.is_empty());
 }
+
+#[test]
+fn home_and_end_jump_to_first_and_last_result() {
+    let mut p = TestPicker::new(vec!["a".into(), "b".into(), "c".into()]);
+    p.selected = 1;
+    assert_eq!(
+        handle_list_picker_key(&mut p, &key(KeyCode::End)),
+        OverlayKey::Handled
+    );
+    assert_eq!(p.selected, 2);
+    assert_eq!(
+        handle_list_picker_key(&mut p, &key(KeyCode::Home)),
+        OverlayKey::Handled
+    );
+    assert_eq!(p.selected, 0);
+}
+
+#[test]
+fn end_on_an_empty_list_stays_at_zero() {
+    let mut p = TestPicker::new(Vec::new());
+    handle_list_picker_key(&mut p, &key(KeyCode::End));
+    assert_eq!(p.selected, 0);
+}

@@ -443,18 +443,19 @@ fn pressed_in_honours_scope() {
     assert!(pressed(&binds, &q));
 }
 
-/// The content pane must stay free of bare letters (for future editing)
-/// except the vim motion set, plus `M`, `o`, and `O` — the bundled markdown plugin
-/// only recognizes the literal key `M`, and `o` is used to open files
-/// externally, while `O` opens the symbol outline — plus `y`/`Y` for copy-line/copy-file clipboard operations
-/// and `B` for blame-line (the Shift pair of the `ctrl+b` blame toggle).
+/// The content pane keeps its bare-letter keyspace small: the vim motion set,
+/// plus `M` (markdown raw/rendered), `o` (open externally), `O` (symbol
+/// outline), `y`/`Y` (copy line/file), `B` (blame line, the Shift pair of the
+/// `ctrl+b` blame toggle), and the four display toggles `z` (word wrap),
+/// `L` (line numbers), `J` (JSON pretty-print) and `T` (CSV table view).
+/// Adding a letter here is a deliberate decision, hence the allowlist.
 /// Tree-structural actions are exempt: their bindings only dispatch from the
 /// tree handler.
 #[test]
 fn default_content_reachable_letters_are_motions_only() {
     let motions = [
         'j', 'k', 'h', 'l', 'g', 'G', '0', 'n', 'N', 'M', 'o', 'O', 'y', 'Y', 'B', 'F', 's', 'S',
-        ' ',
+        ' ', 'z', 'L', 'J', 'T',
     ];
     let tree_structural = [
         "tree_expand",
@@ -829,7 +830,7 @@ fn blame_open_commit_default_binding_is_o() {
 #[test]
 fn toggle_table_view_bindings_for_action() {
     let mut keymap = Keymap::default();
-    assert!(keymap.bindings_for_action("toggle_table_view").is_empty());
+    assert_eq!(keymap.bindings_for_action("toggle_table_view").len(), 1);
     keymap.toggle_table_view = bind(&["ctrl+t"]);
     assert_eq!(keymap.bindings_for_action("toggle_table_view").len(), 1);
 }
@@ -859,4 +860,57 @@ fn diff_view_defaults_bind_s_and_shift_s() {
     let shift_s = ev(KeyCode::Char('S'), KeyModifiers::SHIFT);
     assert!(pressed(&keymap.toggle_diff_staged, &s));
     assert!(pressed(&keymap.toggle_diff_side_by_side, &shift_s));
+}
+#[test]
+fn every_default_binding_round_trips_through_its_spec() {
+    // Serialization feeds the "config differs from defaults" report, so a
+    // lossy spec (e.g. shift+F10 written as F10) would hide real overrides.
+    let value = toml::Value::try_from(Keymap::default()).unwrap();
+    for (action, specs) in value.as_table().unwrap() {
+        for spec in specs.as_array().unwrap() {
+            let spec = spec.as_str().unwrap();
+            let parsed = parse_binding(spec).unwrap_or_else(|e| panic!("{action}: {e}"));
+            let again = toml::Value::try_from(parsed).unwrap();
+            assert_eq!(
+                again.as_str(),
+                Some(spec),
+                "{action}: {spec} does not round-trip"
+            );
+        }
+    }
+}
+
+#[test]
+fn shift_function_key_keeps_its_modifier_when_serialized() {
+    let binding = parse_binding("shift+F10").unwrap();
+    assert_eq!(
+        toml::Value::try_from(binding).unwrap().as_str(),
+        Some("shift+F10")
+    );
+}
+
+#[test]
+fn display_toggles_have_content_scoped_default_keys() {
+    let keymap = Keymap::default();
+    for (id, ch) in [
+        ("toggle_wrap", 'z'),
+        ("toggle_line_numbers", 'L'),
+        ("toggle_pretty_json", 'J'),
+        ("toggle_table_view", 'T'),
+    ] {
+        let binds = keymap.bindings_for_action(id);
+        // Windows reports an uppercase letter together with the SHIFT bit and
+        // the matcher derives the case from it, so build a realistic event.
+        let mods = if ch.is_ascii_uppercase() {
+            KeyModifiers::SHIFT
+        } else {
+            KeyModifiers::empty()
+        };
+        let key = ev(KeyCode::Char(ch), mods);
+        assert!(pressed_in(binds, &key, BindingScope::Content), "{id}");
+        assert!(
+            !pressed_in(binds, &key, BindingScope::Tree),
+            "{id} must not fire in the tree"
+        );
+    }
 }

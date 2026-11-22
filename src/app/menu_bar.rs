@@ -90,7 +90,7 @@ impl App {
             return;
         };
         match key.code {
-            KeyCode::Left => {
+            KeyCode::Left | KeyCode::Char('h') => {
                 state.menu_index = if state.menu_index == 0 {
                     MENUS.len().saturating_sub(1)
                 } else {
@@ -98,14 +98,19 @@ impl App {
                 };
                 state.selected = 0;
             }
-            KeyCode::Right => {
+            KeyCode::Right | KeyCode::Char('l') => {
                 state.menu_index = (state.menu_index + 1) % MENUS.len().max(1);
                 state.selected = 0;
             }
-            KeyCode::Up => {
+            KeyCode::Up | KeyCode::Char('k') => {
                 state.selected = state.selected.saturating_sub(1);
             }
-            KeyCode::Down => {
+            KeyCode::Home => state.selected = 0,
+            KeyCode::End => {
+                let items = menu_actions(self, MENUS[state.menu_index]);
+                state.selected = items.len().saturating_sub(1);
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
                 let items = menu_actions(self, MENUS[state.menu_index]);
                 state.selected = (state.selected + 1).min(items.len().saturating_sub(1));
             }
