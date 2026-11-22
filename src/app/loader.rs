@@ -418,8 +418,8 @@ pub(super) fn parse_shebang(bytes: &[u8]) -> Option<String> {
 
 /// Returns the first YAML parse error across all documents in a YAML stream.
 fn yaml_parse_error(input: &str) -> Option<String> {
-    serde_yaml::Deserializer::from_str(input).find_map(|document| {
-        <serde_yaml::Value as serde::Deserialize>::deserialize(document)
+    serde_yaml_ng::Deserializer::from_str(input).find_map(|document| {
+        <serde_yaml_ng::Value as serde::Deserialize>::deserialize(document)
             .err()
             .map(|error| error.to_string())
     })
