@@ -1,3 +1,13 @@
+## [0.25.0] - 2026-11-22
+
+### Bug Fixes
+
+- *(render)* Word wrap and scroll that survive resize; README and housekeeping (#885)
+- *(keys)* One source of truth for default keys; real defaults for display toggles (#890)
+
+### Performance
+
+- Block for a whole idle frame in the input wait instead of waking every 16 ms (#887)
 ## [0.24.0] - 2026-11-22
 
 ### Features
