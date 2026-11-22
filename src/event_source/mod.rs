@@ -301,11 +301,12 @@ impl RawEventSource {
         }
     }
 
-    /// Parse and return the next event from the buffer, blocking briefly (16 ms)
-    /// for data when the buffer is empty.
-    pub fn next_raw_event(&mut self) -> io::Result<Option<Event>> {
+    /// Parse and return the next event from the buffer, blocking for up to
+    /// `wait` for data when the buffer is empty.
+    pub fn next_raw_event(&mut self, wait: std::time::Duration) -> io::Result<Option<Event>> {
         CURRENT_ALT_KEYS.with(|c| c.set(AltKeys::default()));
-        self.fill(16)?;
+        let timeout_ms = wait.as_millis().min(libc::c_int::MAX as u128) as libc::c_int;
+        self.fill(timeout_ms)?;
         self.parse_next()
     }
 

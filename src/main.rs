@@ -238,8 +238,8 @@ fn plan_startup(
 /// A source of input events for the event loop. Abstracted so the loop can be
 /// driven by a real terminal in production and a scripted queue in tests.
 trait EventSource {
-    /// Waits briefly (≈16 ms) for the next event. Returns `None` on timeout.
-    fn next_event(&mut self) -> anyhow::Result<Option<Event>>;
+    /// Waits up to `wait` for the next event. Returns `None` on timeout.
+    fn next_event(&mut self, wait: Duration) -> anyhow::Result<Option<Event>>;
 
     /// Returns an already-buffered event without waiting. `None` when none is
     /// immediately available. Never blocks.
@@ -250,8 +250,8 @@ trait EventSource {
 struct CrosstermEvents;
 
 impl EventSource for CrosstermEvents {
-    fn next_event(&mut self) -> anyhow::Result<Option<Event>> {
-        if crossterm::event::poll(Duration::from_millis(16))? {
+    fn next_event(&mut self, wait: Duration) -> anyhow::Result<Option<Event>> {
+        if crossterm::event::poll(wait)? {
             Ok(Some(crossterm::event::read()?))
         } else {
             Ok(None)
@@ -269,8 +269,8 @@ impl EventSource for CrosstermEvents {
 
 #[cfg(unix)]
 impl EventSource for event_source::RawEventSource {
-    fn next_event(&mut self) -> anyhow::Result<Option<Event>> {
-        self.next_raw_event().map_err(Into::into)
+    fn next_event(&mut self, wait: Duration) -> anyhow::Result<Option<Event>> {
+        self.next_raw_event(wait).map_err(Into::into)
     }
 
     fn try_next_event(&mut self) -> anyhow::Result<Option<Event>> {
@@ -566,11 +566,13 @@ fn run_event_loop(
     tabs: &mut Tabs,
     events: &mut dyn EventSource,
 ) -> anyhow::Result<()> {
-    // Idle throttling: right after input we redraw every iteration (~60 fps) so
-    // scrolling and animations stay smooth; once the UI has been quiet for
-    // `ACTIVE_WINDOW` we only redraw every `IDLE_FRAME` to pick up async
-    // results (loader, watcher, git) without burning CPU on identical frames.
+    // Idle throttling: right after input we wake and redraw every ~16 ms (~60
+    // fps) so scrolling and animations stay smooth; once the UI has been quiet
+    // for `ACTIVE_WINDOW` we sleep in the input wait for a whole `IDLE_FRAME`
+    // and redraw once per wake, which still picks up async results (loader,
+    // watcher, git) within 100 ms but costs ~10 wakeups a second, not 60.
     const ACTIVE_WINDOW: Duration = Duration::from_millis(500);
+    const ACTIVE_FRAME: Duration = Duration::from_millis(16);
     const IDLE_FRAME: Duration = Duration::from_millis(100);
     let mut last_input = std::time::Instant::now();
     let mut last_render: Option<std::time::Instant> = None;
@@ -583,7 +585,8 @@ fn run_event_loop(
             last_render = Some(std::time::Instant::now());
         }
 
-        if let Some(event) = events.next_event()? {
+        let wait = if active { ACTIVE_FRAME } else { IDLE_FRAME };
+        if let Some(event) = events.next_event(wait)? {
             last_input = std::time::Instant::now();
             dispatch_event(tabs, event);
             // Drain a burst (e.g. mouse-wheel) so it applies in one frame.

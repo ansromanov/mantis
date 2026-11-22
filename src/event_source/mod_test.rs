@@ -13,7 +13,7 @@ fn high_byte_skipped_by_next_raw_event() {
     let mut src = RawEventSource::new();
     src.buf.push(0x80);
     src.buf.push(b'q'); // a valid event after the bad byte
-    let result = src.next_raw_event();
+    let result = src.next_raw_event(std::time::Duration::from_millis(16));
     assert!(
         result.is_ok(),
         "bad byte must not propagate Err from next_raw_event"
@@ -169,6 +169,8 @@ fn from_tty_opener_reads_through_the_opened_fd() {
     assert!(src._tty_file.is_some());
     assert_ne!(src.fd, libc::STDIN_FILENO);
 
-    let ev = src.next_raw_event().expect("must not error");
+    let ev = src
+        .next_raw_event(std::time::Duration::from_millis(16))
+        .expect("must not error");
     assert!(ev.is_some(), "event must be read through the injected fd");
 }
