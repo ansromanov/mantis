@@ -899,7 +899,14 @@ fn display_toggles_have_content_scoped_default_keys() {
         ("toggle_table_view", 'T'),
     ] {
         let binds = keymap.bindings_for_action(id);
-        let key = ev(KeyCode::Char(ch), KeyModifiers::empty());
+        // Windows reports an uppercase letter together with the SHIFT bit and
+        // the matcher derives the case from it, so build a realistic event.
+        let mods = if ch.is_ascii_uppercase() {
+            KeyModifiers::SHIFT
+        } else {
+            KeyModifiers::empty()
+        };
+        let key = ev(KeyCode::Char(ch), mods);
         assert!(pressed_in(binds, &key, BindingScope::Content), "{id}");
         assert!(
             !pressed_in(binds, &key, BindingScope::Tree),
