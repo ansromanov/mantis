@@ -36,7 +36,7 @@ impl ScriptedEvents {
 }
 
 impl EventSource for ScriptedEvents {
-    fn next_event(&mut self) -> anyhow::Result<Option<Event>> {
+    fn next_event(&mut self, _wait: Duration) -> anyhow::Result<Option<Event>> {
         // Fail fast instead of spinning forever if a test forgets to quit.
         match self.queue.pop_front() {
             Some(event) => Ok(Some(event)),
@@ -110,7 +110,7 @@ impl IdleThenQuit {
 }
 
 impl EventSource for IdleThenQuit {
-    fn next_event(&mut self) -> anyhow::Result<Option<Event>> {
+    fn next_event(&mut self, _wait: Duration) -> anyhow::Result<Option<Event>> {
         if !self.yielded_idle {
             self.yielded_idle = true;
             return Ok(None);
