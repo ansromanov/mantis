@@ -18,7 +18,7 @@ use super::App;
 /// Number of lines to scroll per mouse wheel tick or drag-edge auto-scroll.
 pub const WHEEL_STEP: usize = 3;
 
-/// Extract the selected text from styled span lines (plugin content or rendered
+/// Extract the selected text from styled span lines (rendered content or rendered
 /// markdown share the same `Vec<Vec<(Style, String)>>` shape). `start`/`end` are
 /// the normalized selection bounds in (line, char-column) space.
 fn spans_selection_text(
@@ -312,7 +312,7 @@ impl App {
         let ((start_line, start_col), (end_line, end_col)) = sel.normalized();
         let total = self.line_count();
 
-        // Plugin-rendered content: extract text from styled spans.
+        // Rendered content: extract text from styled spans.
         if let Some(path) = &self.current_file {
             if let Some(rendered_lines) = self.rendered_content.get(path) {
                 return spans_selection_text(
@@ -453,13 +453,13 @@ impl App {
     }
 
     /// Returns `true` when the content pane uses a text cursor (`active_line`)
-    /// instead of raw scroll. Diff and plugin-rendered views are cursorless —
+    /// instead of raw scroll. Diff and rendered views are cursorless —
     /// they scroll directly without an active-line cursor.
     pub fn has_text_cursor(&self) -> bool {
         if self.is_diff {
             return false;
         }
-        // Plugin-rendered content has no cursor.
+        // Rendered content has no cursor.
         if let Some(path) = &self.current_file {
             if self.rendered_content.contains_key(path) {
                 return false;
@@ -469,7 +469,7 @@ impl App {
     }
 
     /// Returns `true` if mouse text selection can be initiated on the content.
-    /// Plugin-rendered views support selection but diff views do not.
+    /// Rendered views support selection but diff views do not.
     pub fn can_mouse_select(&self) -> bool {
         !self.is_diff
     }

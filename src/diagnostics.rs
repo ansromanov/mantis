@@ -4,8 +4,8 @@
 //! reproduce a problem — app version, OS and terminal identity, the *shape*
 //! of the workspace (node counts, depth), facts about the open file (size,
 //! extension, encoding), and which config keys differ from defaults — while
-//! deliberately excluding anything personal: no absolute paths, no file or
-//! plugin names, no file content, no config values. The report is a closed
+//! deliberately excluding anything personal: no absolute paths, no file
+//! names, no file content, no config values. The report is a closed
 //! struct of typed fields, so nothing can leak in by accident; the sibling
 //! test file asserts the serialized form never contains the workspace root,
 //! the open file's name, or the home directory. `save` writes the rendered

@@ -64,7 +64,7 @@ impl App {
             return true;
         }
         // Usage stats and telemetry record canonical action ids only;
-        // plugin-contributed command ids are not in ACTIONS.
+        // other ids are not in ACTIONS.
         if let Some(spec) = crate::actions::ACTIONS
             .iter()
             .find(|action| action.id == id)
@@ -617,7 +617,7 @@ impl App {
 
     /// Parses a goto-line query and jumps to the resulting line. Supports
     /// absolute (`42`, 1-indexed, clamped to the file), relative forward
-    /// (`+5`), and relative backward (`-3`) jumps. Diff and plugin-rendered
+    /// (`+5`), and relative backward (`-3`) jumps. Diff and rendered
     /// views have no active-line cursor, so relative jumps are based on
     /// `content_scroll` there instead. Shared by the standalone goto-line
     /// dialog and the palette's `:` route.

@@ -6,11 +6,7 @@
 //! the same or shallower level. `detect_fold_regions` produces these regions as
 //! `crate::fold::FoldRegion` values; `count_anchors_aliases` scans for YAML
 //! anchor/alias markers. `crate::fold_detectors::yaml_fold` delegates to
-//! `detect_fold_regions` so the bundled `yaml` plugin (`plugins/yaml`) links
-//! the same pure function, matching the `brace_fold`/`indent_fold` pattern used
-//! by the `rust`/`go`/`python` plugins, without duplicating this module into
-//! the `mantis` binary crate's separate module tree (`src/main.rs`). This
-//! module knows nothing about `App` or rendering; `app::fold` adapts the
+//! `detect_fold_regions`. This module knows nothing about `App` or rendering; `app::fold` adapts the
 //! generic region type to live editor state. The display-map computation has
 //! moved to `crate::fold::build_display_map` so all file types share the same
 //! folding logic.

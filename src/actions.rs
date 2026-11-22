@@ -728,7 +728,7 @@ pub enum Applicability {
     DiffView,
     /// Requires the current file to have fold regions.
     FoldRegions,
-    /// Requires the current file to be rendered by a plugin (active plugin content).
+    /// Requires the current file to be shown by the built-in markdown renderer.
     RenderedMarkdownActive,
     /// Requires being in git mode.
     GitMode,

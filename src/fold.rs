@@ -5,9 +5,8 @@
 //! collapsible block; `build_display_map` converts the set of currently-folded
 //! regions into a display-line-to-physical-line table that the renderer and
 //! scroll math consume. Both types are file-format agnostic: the YAML
-//! indentation detector in `crate::yaml_fold` and language providers registered
-//! via the plugin protocol (`Capability::Fold`, `register_language_provider`,
-//! `set_fold_regions`) both produce `Vec<FoldRegion>` and share the same
+//! indentation detector in `crate::yaml_fold` and the brace/indent detectors in
+//! `crate::fold_detectors` all produce `Vec<FoldRegion>` and share the same
 //! display-map builder. Nothing here knows about `App` or rendering;
 //! `app::fold` adapts these types to live editor state.
 

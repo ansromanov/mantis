@@ -15,7 +15,7 @@
 //! installed, or a failed command yields empty/`None` results instead of an
 //! error, so the viewer works fine outside a repository.
 //!
-//! All git functionality is built in — no feature gate, no plugin fallback.
+//! All git functionality is built in.
 //!
 //! Three diff helpers cover the main diff modes available in the content pane:
 //! `working_tree_diff` (all changes vs HEAD), `staged_diff` (index vs HEAD),

@@ -1,6 +1,6 @@
 //! Kubernetes manifest awareness for YAML files: a status-bar summary.
 //!
-//! This is the former bundled `k8s` plugin, now a plain module. It
+//! Kubernetes manifest facts for the status bar. It
 //! heuristically scans a YAML file (no full parse) for `---`-separated documents
 //! that carry both `apiVersion` and `kind` at column 0, recording each one's
 //! `kind`, `metadata.name` and `metadata.namespace`. The loader builds a

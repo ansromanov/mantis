@@ -1,6 +1,6 @@
-//! ANSI escape code parser for plugin-rendered content.
+//! ANSI escape code parser for rendered content.
 //!
-//! Plugins can send `set_content` actions with lines containing ANSI escape
+//! The markdown renderer emits lines containing ANSI escape
 //! codes (e.g. `\x1b[31mred\x1b[0m`). This module converts those lines into
 //! ratatui `(Style, String)` spans so the content pane can render them
 //! alongside natively-highlighted text.

@@ -1,5 +1,5 @@
 //! Pure fold-region detectors for brace-delimited, indentation-based, and
-//! YAML-style languages, intended for consumption by language-provider plugins.
+//! YAML-style languages.
 //!
 //! Public functions share the `crate::fold::FoldRegion` output type:
 //!
@@ -8,7 +8,7 @@
 //!   strings (with `\"` escapes), Rust raw strings (`r"…"`, `r#"…"#`, …), and
 //!   Go backtick strings.
 //! * `brace_fold_with_brackets` — same state machine, additionally matching
-//!   `[`/`]` pairs.  Used by the JSON plugin, where multiline arrays are as
+//!   `[`/`]` pairs.  Used for JSON, where multiline arrays are as
 //!   foldable as objects; kept separate from `brace_fold` so Rust/Go (where
 //!   folding every multiline array literal would be noise) are unaffected.
 //! * `shell_brace_fold` — shell-specific brace detector.  Matches `{`/`}`
@@ -36,7 +36,7 @@
 //! * `rust_symbols` — lightweight Rust declaration detector shared with the
 //!   bundled Rust language provider.
 //!
-//! None of these functions know about `App`, plugins, or IPC — they are pure
+//! None of these functions know about `App` or any I/O — they are pure
 //! transformations to `Vec<FoldRegion>`.
 
 use crate::fold::FoldRegion;
@@ -1057,9 +1057,7 @@ fn is_toml_header(line: &str) -> bool {
 /// Detects foldable regions in YAML content by indentation nesting.
 ///
 /// Delegates to `crate::yaml_fold::detect_fold_regions` — the original
-/// built-in YAML fold algorithm — so this crate has a single implementation
-/// that both the app's built-in YAML handling and the bundled `yaml`
-/// language-provider plugin (`plugins/yaml`) share.
+/// built-in YAML fold algorithm — so there is a single YAML implementation.
 pub fn yaml_fold(lines: &[impl AsRef<str>]) -> Vec<FoldRegion> {
     crate::yaml_fold::detect_fold_regions(lines)
 }

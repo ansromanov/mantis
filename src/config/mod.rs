@@ -56,7 +56,7 @@ pub use types::{ContentConfig, SearchConfig};
 /// Loads config for the given view root. A project-local `mantis.toml` found in
 /// the root or any ancestor takes precedence over the global config; this lets
 /// a repo ship its own defaults. On first run it seeds a minimal user config and
-/// the bundled themes/plugins, and on every run refreshes the `mantis.default.toml`
+/// the bundled themes, and on every run refreshes the `mantis.default.toml`
 /// reference; it never overwrites an existing user config. Returns the loaded
 /// config, the path it was loaded from
 /// (so that live changes are saved back to the same file), and a warning
@@ -195,10 +195,10 @@ fn apply_table_changes(
                 Some(toml::Value::Table(t)) => Some(t),
                 _ => None,
             };
-            // A config section (one with defaults, e.g. `[ui]` or `[plugins]`)
+            // A config section (one with defaults, e.g. `[ui]` or `[statusbar]`)
             // missing from the file is created as an implicit table so only
             // its changed keys are written. Map entries without defaults
-            // (a single `[plugins.<name>]`) fall through and are written whole.
+            // (a single user-named sub-table) fall through and are written whole.
             let created = !table.contains_key(key) && child_default.is_some() && !table.is_dotted();
             if created {
                 let mut section = toml_edit::Table::new();
@@ -296,7 +296,7 @@ pub fn sparse_toml(config: &Config) -> String {
 /// are refreshed whenever they are missing or stale (i.e. after an upgrade), so users
 /// always have an up-to-date catalogue of every option and reserved key. The user's own
 /// `mantis.toml` is **never** overwritten: it is created once, as a minimal stub, only
-/// when absent. Bundled themes and plugins are seeded on that same first run.
+/// when absent. Bundled themes are seeded on that same first run.
 fn init_config_dir(user_path: &Path) {
     let Some(dir) = user_path.parent() else {
         return;

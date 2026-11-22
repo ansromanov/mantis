@@ -1,7 +1,6 @@
 //! Native markdown renderer: turns markdown source into ANSI-styled lines.
 //!
-//! This is the former bundled markdown plugin, moved into the host so a
-//! markdown file is rendered synchronously while it loads: the first painted
+//! A markdown file is rendered synchronously while it loads: the first painted
 //! frame already shows the rendered document instead of raw text that is later
 //! replaced by an out-of-process stream (which caused flicker, a jumping gutter
 //! and a scroll reset). The output is plain ANSI lines that the content pane

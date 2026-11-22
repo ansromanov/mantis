@@ -1,7 +1,7 @@
 //! Main content-pane renderer.
 //!
 //! `draw_content` renders the right-hand panel across its four modes: a styled
-//! unified/side-by-side diff (no gutter, no selection), a plugin-rendered view
+//! unified/side-by-side diff (no gutter, no selection), a rendered view
 //! from precomputed spans, a memory-mapped virtual-file view that highlights
 //! only the visible window on the fly, and an inline fallback for errors,
 //! binaries, and small buffers. It draws the line-number and fold gutters,
@@ -30,7 +30,7 @@ use super::selection::apply_selection;
 
 /// Renders the content/diff panel. Handles four modes:
 /// - Diff view (styled per-line, no gutter, no selection)
-/// - Plugin-rendered view (styled spans)
+/// - Rendered view (styled spans)
 /// - Virtual file view (mmap-backed, syntax-highlighted on the fly for the visible window)
 /// - Inline fallback view (for errors, binaries, small files)
 pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
@@ -164,7 +164,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         (render_scroll + view_height).min(total_lines)
     };
 
-    // Rendered-content source from plugins.
+    // Rendered content (markdown) installed by the app.
     let render_lines: Option<&Vec<Vec<(ratatui::style::Style, String)>>> = app
         .current_file
         .as_ref()
@@ -220,7 +220,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
             sel_bg,
         )
     } else if let Some(md_lines) = render_lines {
-        // Rendered content (plugin): iterate only the visible
+        // Rendered content: iterate only the visible
         // window of pre-rendered lines. Line numbers are hidden for rendered
         // content since rendered-line indices don't correspond to source lines
         // (rendering collapses blank lines, strips code fences, etc.). This

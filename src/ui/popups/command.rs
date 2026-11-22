@@ -2,7 +2,7 @@
 //!
 //! `draw_command_palette` renders the command palette as a centered overlay: a
 //! query input on top and, below it, the fuzzy-filtered list of the picker's
-//! commands (built-in plus plugin-contributed) with the selected entry
+//! commands with the selected entry
 //! highlighted. It reads the live `CommandPalette` picker
 //! state from `App` (query, filtered-and-scored entries, selection, match
 //! positions) and is a no-op when the palette is closed. Selection and dispatch

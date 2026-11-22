@@ -362,7 +362,7 @@ impl App {
                     .unwrap_or_else(|| "default".to_string());
                 // resolve() silently falls back to the default theme when the
                 // configured name can't be loaded; report that same fallback
-                // name here so plugins/UI aren't told an invalid theme name.
+                // name here so the UI isn't told an invalid theme name.
                 let name = if Theme::load(&requested_name).is_some() {
                     requested_name
                 } else {

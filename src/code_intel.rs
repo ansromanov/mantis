@@ -1,8 +1,7 @@
 //! Plain data types for code intelligence shown in the content pane and
 //! status bar: outline symbols and diagnostics.
 //!
-//! These used to live in the plugin protocol module. They are now ordinary
-//! host types: symbols are produced by the built-in detectors in
+//! Symbols are produced by the built-in detectors in
 //! [`crate::fold_detectors`], and the helpers here are shared by the status
 //! bar breadcrumb, the symbol picker and the diagnostics gutter.
 //!

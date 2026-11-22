@@ -135,7 +135,7 @@ pub struct CommandPalette {
     pub binding_labels: Vec<String>,
     /// Index order used when the query is empty. Always a permutation of
     /// `0..all_commands.len()`. Built by [`ranked_base_order`] for the
-    /// built-in commands, with plugin commands appended after.
+    /// commands.
     pub base_order: Vec<usize>,
     /// How many of the first entries in `base_order` are pinned (recent +
     /// frequent). Used by the UI to show a star prefix for pinned commands
@@ -158,7 +158,7 @@ pub struct CommandPalette {
     pub route_symbols: Option<SymbolPicker>,
     /// Sub-picker for diagnostics returned for the current file.
     pub route_diagnostics: Option<DiagnosticPicker>,
-    /// Combined list of built-in + plugin commands. Indices in `filtered`
+    /// All commands. Indices in `filtered`
     /// and `base_order` reference this list.
     pub all_commands: Vec<CommandEntry>,
 }
@@ -183,7 +183,6 @@ impl CommandPalette {
     ) -> Self {
         let all_commands: Vec<CommandEntry> = COMMANDS.to_vec();
         let total = all_commands.len();
-        let static_count = COMMANDS.len();
 
         let binding_labels = all_commands
             .iter()
@@ -214,8 +213,7 @@ impl CommandPalette {
         };
 
         // Empty-query ranking keeps pinned/frequent ordering but sinks
-        // inapplicable entries below applicable ones. Only built-in commands
-        // can be pinned (plugin commands have no usage history).
+        // inapplicable entries below applicable ones.
         let mut applicable = Vec::new();
         let mut inapplicable = Vec::new();
         let mut applicable_pinned_count = 0;
@@ -235,16 +233,6 @@ impl CommandPalette {
         let mut base_order = applicable;
         base_order.extend(inapplicable);
 
-        // Plugin commands (indices >= static_count) are not in base_order
-        // from ranked_base_order (which only knows built-in commands), so
-        // append them at the end if missing.
-        for i in static_count..total {
-            if !base_order.contains(&i) {
-                base_order.push(i);
-            }
-        }
-
-        // Extend inapplicability_reasons for plugin commands (always applicable).
         let mut inapplicability_reasons = inapplicability_reasons;
         inapplicability_reasons.resize(total, None);
 

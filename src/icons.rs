@@ -1,7 +1,6 @@
 //! Nerd Font file-type icons for the tree (`tree.icons = true`).
 //!
-//! A static extension to glyph table. This replaces the bundled `iconize`
-//! plugin, which sent the same table over IPC at startup. Lookup is by
+//! A static extension to glyph table. Lookup is by
 //! lowercase extension, or by lowercase file name for extension-less files
 //! (e.g. `dockerfile`). Requires a Nerd Font in the terminal.
 //!

@@ -2,8 +2,7 @@
 //!
 //! When a markdown file finishes loading, [`App::install_native_markdown`]
 //! renders it with [`crate::markdown`] and installs the result as the
-//! content-pane takeover (the same `rendered_content` storage external plugins
-//! used) *before the first frame is drawn*. There is no raw-then-rendered swap,
+//! content-pane takeover (`rendered_content`) *before the first frame is drawn*. There is no raw-then-rendered swap,
 //! so the gutter, width and scroll position stay put. Rendering is skipped for
 //! very large files, which fall back to the raw view.
 

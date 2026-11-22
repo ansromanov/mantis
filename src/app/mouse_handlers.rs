@@ -1,7 +1,7 @@
 //! Mouse event dispatch for `App`.
 //!
 //! `handle_mouse` mirrors the keyboard overlay precedence chain for pointer
-//! input: theme picker, plugin picker, command palette, history, recent files,
+//! input: theme picker, command palette, history, recent files,
 //! and search overlays intercept clicks first, then events route to the tree or
 //! content panel by hit-testing the `Rect`s recorded during the last render. It
 //! handles left-click selection, drag-selection of text, splitter dragging to
@@ -96,7 +96,7 @@ fn handle_picker_mouse<P: ListPicker>(
 mod tests;
 
 impl App {
-    /// Dispatches a mouse event. Overlays (theme, plugin, command palette,
+    /// Dispatches a mouse event. Overlays (theme, command palette,
     /// history, recent files, search) intercept first; otherwise routes based
     /// on click location (tree vs content panel). Handles left-click, drag,
     /// scroll, and double-click for search/history/theme results.

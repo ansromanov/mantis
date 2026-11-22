@@ -148,7 +148,7 @@ impl App {
 
     /// Opens the tree node at `self.tree_selected` if it is a file (skips
     /// directories). Delegates to `show_deleted`, `show_working_tree_diff`, or
-    /// `open_file` based on state. Notifies plugins of the selection change.
+    /// `open_file` based on state.
     pub(super) fn try_open_selected(&mut self) {
         let path = self.nodes.get(self.tree_selected).map(|n| n.path.clone());
         let Some(ref path) = path else {
