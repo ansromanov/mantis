@@ -24,7 +24,7 @@ pub(crate) fn draw_bug_report(f: &mut Frame, app: &mut App, area: Rect) {
 
     // Centered modal: larger size to fit input + preview
     let popup = centered_rect(75, 75, area);
-    app.bug_report_area = popup;
+    app.geo.bug_report_area = popup;
     f.render_widget(Clear, popup);
 
     let block = Block::default()
@@ -185,7 +185,7 @@ pub(crate) fn draw_bug_report(f: &mut Frame, app: &mut App, area: Rect) {
         .borders(Borders::ALL)
         .border_style(Style::default().fg(theme.dim));
     let preview_inner = preview_block.inner(parts[5]);
-    app.bug_report_preview_area = preview_inner;
+    app.geo.bug_report_preview_area = preview_inner;
     f.render_widget(preview_block, parts[5]);
 
     let body_text = state.text.join("\n");

@@ -58,7 +58,7 @@ pub(crate) fn draw_context_menu(f: &mut Frame, app: &mut App, area: Rect) {
     state.select(Some(menu.visible_selected()));
     f.render_stateful_widget(list, inner, &mut state);
 
-    app.context_menu_area = popup;
+    app.geo.context_menu_area = popup;
 }
 
 /// Computes the popup `Rect` for a context menu: one cell right and below the

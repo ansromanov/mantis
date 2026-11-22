@@ -112,7 +112,7 @@ impl App {
         if !above_menu_bar
             && top != Some(Overlay::MenuBar)
             && self.config.ui.menu_bar
-            && rect_contains(self.menu_bar_area, ev.column, ev.row)
+            && rect_contains(self.geo.menu_bar_area, ev.column, ev.row)
         {
             self.handle_menu_bar_mouse(ev);
             return;
@@ -174,12 +174,12 @@ impl App {
             // Clicks outside the tree filter / go-to-line prompt reach the panes.
             _ => {}
         }
-        if rect_contains(self.statusbar_area, ev.column, ev.row) {
+        if rect_contains(self.geo.statusbar_area, ev.column, ev.row) {
             match ev.kind {
                 MouseEventKind::Down(MouseButton::Left) => {
                     if let Some(text) = crate::ui::statusbar::segment_at(
                         self,
-                        self.statusbar_area,
+                        self.geo.statusbar_area,
                         ev.column,
                         ev.row,
                     ) {
@@ -211,7 +211,7 @@ impl App {
                 MouseEventKind::Down(MouseButton::Right) => {
                     let segment = crate::ui::statusbar::segment_at(
                         self,
-                        self.statusbar_area,
+                        self.geo.statusbar_area,
                         ev.column,
                         ev.row,
                     )
@@ -225,12 +225,13 @@ impl App {
         let scroll_before = self.content_scroll;
         match ev.kind {
             MouseEventKind::Down(MouseButton::Left) => {
-                if rect_contains(self.splitter_area, ev.column, ev.row) {
+                if rect_contains(self.geo.splitter_area, ev.column, ev.row) {
                     self.splitter_drag = true;
                     return;
                 }
                 // Breadcrumb double-click: navigate on second click within 400 ms.
                 let clicked = self
+                    .geo
                     .breadcrumb_areas
                     .iter()
                     .find(|(_, area)| rect_contains(*area, ev.column, ev.row))
@@ -253,8 +254,8 @@ impl App {
                     }
                     return;
                 }
-                if rect_contains(self.diff_header_area, ev.column, ev.row) {
-                    let rel_x = ev.column.saturating_sub(self.diff_header_area.x);
+                if rect_contains(self.geo.diff_header_area, ev.column, ev.row) {
+                    let rel_x = ev.column.saturating_sub(self.geo.diff_header_area.x);
                     if (20..36).contains(&rel_x) {
                         self.diff_side_by_side = !self.diff_side_by_side;
                         self.config.git.diff.side_by_side = self.diff_side_by_side;
@@ -271,20 +272,20 @@ impl App {
                     }
                     return;
                 }
-                let tree_top = self.tree_area.y.saturating_sub(1);
+                let tree_top = self.geo.tree_area.y.saturating_sub(1);
                 if ev.row == tree_top
-                    && ev.column >= self.tree_area.x
-                    && ev.column < self.tree_area.right()
+                    && ev.column >= self.geo.tree_area.x
+                    && ev.column < self.geo.tree_area.right()
                     && (self.git_info.is_some() || self.git_mode)
                 {
                     self.toggle_git_mode();
                     return;
                 }
-                if rect_contains(self.tree_area, ev.column, ev.row) {
+                if rect_contains(self.geo.tree_area, ev.column, ev.row) {
                     self.focus = Focus::Tree;
                     self.clear_selection();
-                    let row = (ev.row - self.tree_area.y) as usize;
-                    let index = self.tree_offset + row;
+                    let row = (ev.row - self.geo.tree_area.y) as usize;
+                    let index = self.geo.tree_offset + row;
 
                     // When the inline tree filter is active, map the click
                     // through the visible-indices array to get the global node
@@ -321,9 +322,9 @@ impl App {
                     self.scrollbar_drag = true;
                     self.set_scroll_from_mouse_y(ev.row);
                     self.mark_content_scrolled();
-                } else if rect_contains(self.content_area, ev.column, ev.row) {
+                } else if rect_contains(self.geo.content_area, ev.column, ev.row) {
                     self.focus = Focus::Content;
-                    let rel_col = (ev.column.saturating_sub(self.content_area.x)) as usize;
+                    let rel_col = (ev.column.saturating_sub(self.geo.content_area.x)) as usize;
                     // Check if click is on the fold gutter (at the start of the gutter).
                     let fold_gw = self.fold_gutter_width();
                     if fold_gw > 0 && rel_col < fold_gw {
@@ -350,10 +351,10 @@ impl App {
                     }
                 } else if self.show_blame
                     && self.has_text_cursor()
-                    && rect_contains(self.blame_area, ev.column, ev.row)
+                    && rect_contains(self.geo.blame_area, ev.column, ev.row)
                 {
                     self.focus = Focus::Content;
-                    let rel_row = (ev.row.saturating_sub(self.blame_area.y)) as usize;
+                    let rel_row = (ev.row.saturating_sub(self.geo.blame_area.y)) as usize;
                     let display_line = self.content_scroll + rel_row;
                     if display_line < self.display_line_count() {
                         let phys = self.display_to_physical(display_line);
@@ -364,23 +365,24 @@ impl App {
             MouseEventKind::Down(MouseButton::Right) => {
                 let anchor = (ev.column, ev.row);
                 let breadcrumb = self
+                    .geo
                     .breadcrumb_areas
                     .iter()
                     .find(|(_, area)| rect_contains(*area, ev.column, ev.row))
                     .map(|(path, _)| path.clone());
                 if let Some(path) = breadcrumb {
                     self.open_breadcrumb_context_menu(path, anchor);
-                } else if self.show_blame && rect_contains(self.blame_area, ev.column, ev.row) {
+                } else if self.show_blame && rect_contains(self.geo.blame_area, ev.column, ev.row) {
                     let display_line = self
                         .content_scroll
-                        .saturating_add(ev.row.saturating_sub(self.blame_area.y) as usize);
+                        .saturating_add(ev.row.saturating_sub(self.geo.blame_area.y) as usize);
                     if display_line < self.display_line_count() {
                         let physical = self.display_to_physical(display_line);
                         self.open_blame_context_menu(physical, anchor);
                     }
-                } else if rect_contains(self.tree_area, ev.column, ev.row) {
-                    let row = (ev.row - self.tree_area.y) as usize;
-                    let index = self.tree_offset + row;
+                } else if rect_contains(self.geo.tree_area, ev.column, ev.row) {
+                    let row = (ev.row - self.geo.tree_area.y) as usize;
+                    let index = self.geo.tree_offset + row;
                     if self.tree_filter.is_some() {
                         if let Some(ref vis) = self.tree_visible_indices {
                             if index < vis.len() {
@@ -391,14 +393,14 @@ impl App {
                     } else if self.nodes.get(index).is_some() {
                         self.open_tree_context_menu(index, anchor);
                     }
-                } else if rect_contains(self.content_area, ev.column, ev.row) {
+                } else if rect_contains(self.geo.content_area, ev.column, ev.row) {
                     if !self.is_diff && self.has_text_cursor() {
                         let pos = self.content_pos(ev.column, ev.row);
                         self.set_active_line_from_physical(pos.0);
                     }
                     let row = self
                         .content_scroll
-                        .saturating_add(ev.row.saturating_sub(self.content_area.y) as usize);
+                        .saturating_add(ev.row.saturating_sub(self.geo.content_area.y) as usize);
                     let header_row = self
                         .is_diff
                         .then(|| self.diff_hunk_header_for_row(row))
@@ -412,8 +414,8 @@ impl App {
             }
             MouseEventKind::Drag(MouseButton::Left) => {
                 if self.splitter_drag {
-                    let left = self.tree_area.x.saturating_sub(1);
-                    let total = (self.tree_area.width + self.content_area.width + 4) as u32;
+                    let left = self.geo.tree_area.x.saturating_sub(1);
+                    let total = (self.geo.tree_area.width + self.geo.content_area.width + 4) as u32;
                     let col = ev.column.saturating_sub(left) as u32;
                     if let Some(pct) = (col * 100 + total / 2).checked_div(total) {
                         self.tree_width = (pct.min(100) as u16).clamp(5, 95);
@@ -424,7 +426,7 @@ impl App {
                 } else if let Some(start) = self.drag_start {
                     // Auto-scroll before computing position so that selection.active
                     // is calculated with the already-updated scroll offset.
-                    let ca = self.content_area;
+                    let ca = self.geo.content_area;
                     if ev.row < ca.y + 2 {
                         self.set_content_scroll(self.content_scroll.saturating_sub(1));
                     } else if ev.row >= ca.y + ca.height.saturating_sub(2) {
@@ -457,23 +459,23 @@ impl App {
                 }
             }
             MouseEventKind::ScrollDown => {
-                if rect_contains(self.content_area, ev.column, ev.row)
-                    || (self.show_blame && rect_contains(self.blame_area, ev.column, ev.row))
+                if rect_contains(self.geo.content_area, ev.column, ev.row)
+                    || (self.show_blame && rect_contains(self.geo.blame_area, ev.column, ev.row))
                 {
                     self.focus = Focus::Content;
                     self.scroll_content_by(WHEEL_STEP as isize);
-                } else if rect_contains(self.tree_area, ev.column, ev.row) {
+                } else if rect_contains(self.geo.tree_area, ev.column, ev.row) {
                     self.focus = Focus::Tree;
                     self.tree_scroll = (self.tree_scroll + WHEEL_STEP).min(self.tree_scroll_max());
                 }
             }
             MouseEventKind::ScrollUp => {
-                if rect_contains(self.content_area, ev.column, ev.row)
-                    || (self.show_blame && rect_contains(self.blame_area, ev.column, ev.row))
+                if rect_contains(self.geo.content_area, ev.column, ev.row)
+                    || (self.show_blame && rect_contains(self.geo.blame_area, ev.column, ev.row))
                 {
                     self.focus = Focus::Content;
                     self.scroll_content_by(-(WHEEL_STEP as isize));
-                } else if rect_contains(self.tree_area, ev.column, ev.row) {
+                } else if rect_contains(self.geo.tree_area, ev.column, ev.row) {
                     self.focus = Focus::Tree;
                     self.tree_scroll = self.tree_scroll.saturating_sub(WHEEL_STEP);
                 }
@@ -549,9 +551,9 @@ impl App {
     fn handle_recent_mouse(&mut self, ev: MouseEvent) {
         match ev.kind {
             MouseEventKind::Down(MouseButton::Left) => {
-                if rect_contains(self.recent_area, ev.column, ev.row) {
-                    let row = (ev.row - self.recent_area.y) as usize;
-                    let index = self.recent_offset + row;
+                if rect_contains(self.geo.recent_area, ev.column, ev.row) {
+                    let row = (ev.row - self.geo.recent_area.y) as usize;
+                    let index = self.geo.recent_offset + row;
                     let in_range = self
                         .recent_files
                         .as_ref()
@@ -586,9 +588,9 @@ impl App {
     fn handle_bookmarks_mouse(&mut self, ev: MouseEvent) {
         match ev.kind {
             MouseEventKind::Down(MouseButton::Left) => {
-                if rect_contains(self.recent_area, ev.column, ev.row) {
-                    let row = (ev.row - self.recent_area.y) as usize;
-                    let index = self.recent_offset + row;
+                if rect_contains(self.geo.recent_area, ev.column, ev.row) {
+                    let row = (ev.row - self.geo.recent_area.y) as usize;
+                    let index = self.geo.recent_offset + row;
                     let in_range = self
                         .bookmarks
                         .as_ref()
@@ -625,8 +627,8 @@ impl App {
     fn handle_history_mouse(&mut self, ev: MouseEvent) {
         if handle_picker_mouse(
             ev,
-            self.history_area,
-            self.history_offset,
+            self.geo.history_area,
+            self.geo.history_offset,
             &mut self.history,
             &mut self.last_click,
         ) == PickerMouseAction::Activate
@@ -641,8 +643,8 @@ impl App {
     fn handle_repo_log_mouse(&mut self, ev: MouseEvent) {
         if handle_picker_mouse(
             ev,
-            self.repo_log_area,
-            self.repo_log_offset,
+            self.geo.repo_log_area,
+            self.geo.repo_log_offset,
             &mut self.repo_log,
             &mut self.last_click,
         ) == PickerMouseAction::Activate
@@ -657,8 +659,8 @@ impl App {
     fn handle_theme_mouse(&mut self, ev: MouseEvent) {
         if handle_picker_mouse(
             ev,
-            self.theme_area,
-            self.theme_offset,
+            self.geo.theme_area,
+            self.geo.theme_offset,
             &mut self.theme_picker,
             &mut self.last_click,
         ) == PickerMouseAction::Activate
@@ -673,8 +675,8 @@ impl App {
     fn handle_command_palette_mouse(&mut self, ev: MouseEvent) {
         if handle_picker_mouse(
             ev,
-            self.command_palette_area,
-            self.command_palette_offset,
+            self.geo.command_palette_area,
+            self.geo.command_palette_offset,
             &mut self.command_palette,
             &mut self.last_click,
         ) == PickerMouseAction::Activate
@@ -705,8 +707,8 @@ impl App {
     fn handle_search_mouse(&mut self, ev: MouseEvent) {
         if handle_picker_mouse(
             ev,
-            self.search_area,
-            self.search_offset,
+            self.geo.search_area,
+            self.geo.search_offset,
             &mut self.search,
             &mut self.last_click,
         ) == PickerMouseAction::Activate
@@ -717,7 +719,7 @@ impl App {
 
     /// Returns whether a click is on the painted scrollbar or its adjacent pane border.
     fn content_scrollbar_hit(&self, column: u16, row: u16) -> bool {
-        let ca = self.content_area;
+        let ca = self.geo.content_area;
         let row_inside = row >= ca.y && row < ca.y.saturating_add(ca.height);
         let right_cell = ca.x.saturating_add(ca.width.saturating_sub(1));
         let adjacent_border = ca.x.saturating_add(ca.width);
@@ -730,7 +732,7 @@ impl App {
     /// Maps a mouse row to a content scroll position, used for scrollbar dragging.
     pub(super) fn set_scroll_from_mouse_y(&mut self, row: u16) {
         let total = self.display_line_count();
-        let inner_h = self.content_area.height as usize;
+        let inner_h = self.geo.content_area.height as usize;
         if total <= inner_h || inner_h == 0 {
             return;
         }
@@ -740,7 +742,7 @@ impl App {
         if track_range == 0 {
             return;
         }
-        let y = (row as usize).saturating_sub(self.content_area.y as usize);
+        let y = (row as usize).saturating_sub(self.geo.content_area.y as usize);
         let y = y.min(track_range);
         self.set_content_scroll(y * scroll_range / track_range);
     }
@@ -749,7 +751,7 @@ impl App {
     fn handle_bug_report_mouse(&mut self, ev: MouseEvent) {
         match ev.kind {
             MouseEventKind::ScrollDown => {
-                if rect_contains(self.bug_report_preview_area, ev.column, ev.row) {
+                if rect_contains(self.geo.bug_report_preview_area, ev.column, ev.row) {
                     if let Some(ref mut state) = self.bug_report {
                         let body_text = state.text.join("\n");
                         let report_md = if body_text.trim().is_empty() {
@@ -763,21 +765,21 @@ impl App {
                             )
                         };
                         let total_lines = report_md.lines().count();
-                        let preview_height = self.bug_report_preview_area.height as usize;
+                        let preview_height = self.geo.bug_report_preview_area.height as usize;
                         let max_scroll = total_lines.saturating_sub(preview_height);
                         state.preview_scroll.scroll_down(WHEEL_STEP, max_scroll);
                     }
                 }
             }
             MouseEventKind::ScrollUp => {
-                if rect_contains(self.bug_report_preview_area, ev.column, ev.row) {
+                if rect_contains(self.geo.bug_report_preview_area, ev.column, ev.row) {
                     if let Some(ref mut state) = self.bug_report {
                         state.preview_scroll.scroll_up(WHEEL_STEP);
                     }
                 }
             }
             MouseEventKind::Down(MouseButton::Left)
-                if !rect_contains(self.bug_report_area, ev.column, ev.row) =>
+                if !rect_contains(self.geo.bug_report_area, ev.column, ev.row) =>
             {
                 self.bug_report = None;
             }
@@ -787,7 +789,7 @@ impl App {
 
     fn handle_welcome_mouse(&mut self, ev: MouseEvent) {
         if let MouseEventKind::Down(MouseButton::Left) = ev.kind {
-            if !rect_contains(self.welcome_area, ev.column, ev.row) {
+            if !rect_contains(self.geo.welcome_area, ev.column, ev.row) {
                 self.show_welcome = false;
                 crate::session::mark_welcome_shown();
             }
@@ -803,17 +805,17 @@ impl App {
                 self.help_scroll.scroll_up(WHEEL_STEP);
             }
             MouseEventKind::Down(MouseButton::Left) => {
-                if !rect_contains(self.help_area, ev.column, ev.row) {
+                if !rect_contains(self.geo.help_area, ev.column, ev.row) {
                     self.show_help = false;
                     self.help_scroll.scroll = 0;
                     self.help_tab = 0;
                     return;
                 }
-                if ev.row == self.help_area.y + 1 && ev.column > self.help_area.x {
-                    let available_width = self.help_area.width.saturating_sub(2);
+                if ev.row == self.geo.help_area.y + 1 && ev.column > self.geo.help_area.x {
+                    let available_width = self.geo.help_area.width.saturating_sub(2);
                     let offset =
                         crate::ui::popups::help_tab_scroll_offset(self.help_tab, available_width);
-                    let content_col = (ev.column - (self.help_area.x + 1)) + offset;
+                    let content_col = (ev.column - (self.geo.help_area.x + 1)) + offset;
                     let ranges = crate::ui::popups::help_tab_ranges(0);
                     for (i, (start, end)) in ranges.iter().enumerate() {
                         if content_col >= *start && content_col < *end {
@@ -832,7 +834,7 @@ impl App {
 
     fn handle_filter_bar_mouse(&mut self, ev: MouseEvent) {
         if let MouseEventKind::Down(MouseButton::Left) = ev.kind {
-            let ca = self.content_area;
+            let ca = self.geo.content_area;
             let bar_y = ca.y + ca.height.saturating_sub(2);
             let on_bar = ev.row == bar_y && ev.column >= ca.x && ev.column < ca.x + ca.width;
             if !on_bar {
@@ -853,8 +855,8 @@ impl App {
     fn handle_revision_mouse(&mut self, ev: MouseEvent) {
         if handle_picker_mouse(
             ev,
-            self.revision_picker_area,
-            self.revision_picker_offset,
+            self.geo.revision_picker_area,
+            self.geo.revision_picker_offset,
             &mut self.revision_picker,
             &mut self.last_click,
         ) == PickerMouseAction::Activate
@@ -878,8 +880,8 @@ impl App {
     fn handle_worktree_mouse(&mut self, ev: MouseEvent) {
         if handle_picker_mouse(
             ev,
-            self.worktree_picker_area,
-            self.worktree_picker_offset,
+            self.geo.worktree_picker_area,
+            self.geo.worktree_picker_offset,
             &mut self.worktree_picker,
             &mut self.last_click,
         ) == PickerMouseAction::Activate

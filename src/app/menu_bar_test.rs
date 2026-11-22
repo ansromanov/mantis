@@ -115,8 +115,8 @@ fn inapplicable_menu_action_is_dimmed_and_refused() {
 #[test]
 fn clicking_a_menu_row_then_an_action_dispatches_it() {
     let (mut app, root) = app();
-    app.menu_bar_area = Rect::new(0, 0, 80, 1);
-    app.menu_dropdown_area = Rect::new(0, 1, 40, 10);
+    app.geo.menu_bar_area = Rect::new(0, 0, 80, 1);
+    app.geo.menu_dropdown_area = Rect::new(0, 1, 40, 10);
     app.handle_menu_bar_mouse(MouseEvent {
         kind: MouseEventKind::Down(MouseButton::Left),
         column: 1,
@@ -139,8 +139,8 @@ fn clicking_a_menu_row_then_an_action_dispatches_it() {
 #[test]
 fn clicking_menu_label_toggles_dropdown_and_hover_switches_only_while_open() {
     let (mut app, root) = app();
-    app.menu_bar_area = Rect::new(0, 0, 80, 1);
-    let ranges = crate::ui::menu_bar::menu_ranges(app.menu_bar_area);
+    app.geo.menu_bar_area = Rect::new(0, 0, 80, 1);
+    let ranges = crate::ui::menu_bar::menu_ranges(app.geo.menu_bar_area);
     let at = |kind, column, row| MouseEvent {
         kind,
         column,

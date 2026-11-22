@@ -694,7 +694,7 @@ fn same_file_reload_clamps_scroll_when_file_shrinks() {
     fs::write(&f, many_lines).unwrap();
     let mut app = app_for(&root);
     app.open_file(&f);
-    app.content_area = ratatui::layout::Rect {
+    app.geo.content_area = ratatui::layout::Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -868,7 +868,7 @@ fn same_diff_reload_clamps_scroll_when_diff_shrinks() {
     // Now modify the file to create diff lines
     fs::write(&f, "x\nb\nc\nd\ne\nf\ng\nh\ni\ny\n").unwrap();
     app.show_working_tree_diff(&f);
-    app.content_area = ratatui::layout::Rect {
+    app.geo.content_area = ratatui::layout::Rect {
         x: 0,
         y: 0,
         width: 80,

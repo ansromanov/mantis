@@ -118,7 +118,7 @@ fn set_content_scroll_clamps_to_max() {
     let mut app = app_for(&root);
     app.virtual_file = None;
     // Simulate a content area 10 rows tall with 20 lines of content.
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -143,7 +143,7 @@ fn set_content_scroll_clamps_to_max() {
 fn set_content_scroll_zero_always_works() {
     let root = temp_root();
     let mut app = app_for(&root);
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -161,7 +161,7 @@ fn clamp_content_scroll_reduces_when_content_shrinks() {
     let root = temp_root();
     let mut app = app_for(&root);
     app.virtual_file = None; // clear auto-loaded vf from temp_root doc.md
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -186,7 +186,7 @@ fn clamp_content_scroll_does_not_increase_when_content_grows() {
     let root = temp_root();
     let mut app = app_for(&root);
     app.virtual_file = None; // clear auto-loaded vf from temp_root doc.md
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -207,7 +207,7 @@ fn clamp_content_scroll_does_not_increase_when_content_grows() {
 fn page_rows_defaults_to_viewport_height_minus_one() {
     let root = temp_root();
     let mut app = app_for(&root);
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -221,14 +221,14 @@ fn page_rows_defaults_to_viewport_height_minus_one() {
 fn page_rows_at_least_one() {
     let root = temp_root();
     let mut app = app_for(&root);
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
         height: 0,
     };
     assert_eq!(app.page_rows(), 1);
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -336,7 +336,7 @@ fn set_active_line_from_physical_clamps_to_display_line_count() {
 fn scroll_line_into_view_already_visible_noop() {
     let root = temp_root();
     let mut app = app_for(&root);
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -354,7 +354,7 @@ fn scroll_line_into_view_above_viewport() {
     let root = temp_root();
     let mut app = app_for(&root);
     app.virtual_file = None;
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -372,7 +372,7 @@ fn scroll_line_into_view_below_viewport() {
     let root = temp_root();
     let mut app = app_for(&root);
     app.virtual_file = None;
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -392,7 +392,7 @@ fn scroll_line_into_view_last_row() {
     let root = temp_root();
     let mut app = app_for(&root);
     app.virtual_file = None;
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -411,7 +411,7 @@ fn scroll_line_into_view_clamps_to_max() {
     let root = temp_root();
     let mut app = app_for(&root);
     app.virtual_file = None;
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -432,7 +432,7 @@ fn scroll_blame_into_view_nudges_scroll_when_active_line_outside_viewport() {
     // Don't open_file — set content directly so line_count() reads app.content.
     app.content = (0..50).map(|i| format!("line {i}")).collect();
     app.virtual_file = None;
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 30,
@@ -446,7 +446,7 @@ fn scroll_blame_into_view_nudges_scroll_when_active_line_outside_viewport() {
         app.content_scroll > 0,
         "content_scroll should advance so active_line is visible"
     );
-    let vh = app.content_area.height as usize;
+    let vh = app.geo.content_area.height as usize;
     assert!(
         app.active_line >= app.content_scroll && app.active_line < app.content_scroll + vh,
         "active_line={} should be within [content_scroll={}, {}]",
@@ -464,7 +464,7 @@ fn scroll_blame_into_view_does_not_nudge_when_already_in_view() {
     // Don't open_file — set content directly so line_count() reads app.content.
     app.content = (0..50).map(|i| format!("line {i}")).collect();
     app.virtual_file = None;
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 30,
@@ -485,7 +485,7 @@ fn wrapped_content_uses_visual_rows_for_scroll_bounds() {
     app.content = vec!["x".repeat(100), "tail".into()];
     app.word_wrap = true;
     app.show_line_numbers = false;
-    app.content_area = Rect::new(0, 0, 20, 4);
+    app.geo.content_area = Rect::new(0, 0, 20, 4);
 
     assert_eq!(app.wrapped_content_rows(), 7);
     assert_eq!(app.content_scroll_max(), 3);
@@ -500,7 +500,7 @@ fn wrapped_scroll_into_view_accounts_for_rows_before_cursor() {
     app.content = vec!["x".repeat(100), "tail".into()];
     app.word_wrap = true;
     app.show_line_numbers = false;
-    app.content_area = Rect::new(0, 0, 20, 4);
+    app.geo.content_area = Rect::new(0, 0, 20, 4);
     app.scroll_line_into_view(1);
 
     assert_eq!(app.content_scroll, 3);
@@ -582,7 +582,7 @@ fn wrapped_app(root: &std::path::Path) -> App {
 fn resize_keeps_the_same_logical_line_at_the_top() {
     let root = temp_root();
     let mut app = wrapped_app(&root);
-    app.content_area = Rect::new(0, 0, 44, 10);
+    app.geo.content_area = Rect::new(0, 0, 44, 10);
     app.scroll_wrap_width = 44;
     app.content_scroll = app.wrapped_line_start_at(44, 12);
 
@@ -598,7 +598,7 @@ fn resize_keeps_the_same_logical_line_at_the_top() {
 fn remap_is_a_noop_when_width_is_unchanged_or_unknown() {
     let root = temp_root();
     let mut app = wrapped_app(&root);
-    app.content_area = Rect::new(0, 0, 44, 10);
+    app.geo.content_area = Rect::new(0, 0, 44, 10);
     app.content_scroll = 17;
     app.remap_scroll_for_width(44); // first frame: width was unknown
     assert_eq!(app.content_scroll, 17);
@@ -612,7 +612,7 @@ fn toggling_wrap_keeps_the_same_logical_line_at_the_top() {
     let root = temp_root();
     let mut app = wrapped_app(&root);
     app.word_wrap = false;
-    app.content_area = Rect::new(0, 0, 44, 10);
+    app.geo.content_area = Rect::new(0, 0, 44, 10);
     app.content_scroll = 7; // logical line 7
 
     app.set_word_wrap(true);

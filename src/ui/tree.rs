@@ -61,7 +61,7 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
     f.render_widget(block, area);
 
     // ── Breadcrumb ──────────────────────────────────────────────────────
-    app.breadcrumb_areas.clear();
+    app.geo.breadcrumb_areas.clear();
     let breadcrumb_segments = compute_breadcrumb(app);
     // Only reserve a row for the breadcrumb when the inner width is wide enough
     // for render_breadcrumb to actually draw something (it early-returns at < 3).
@@ -117,8 +117,8 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
             .alignment(Alignment::Center)
             .style(Style::default());
         f.render_widget(placeholder, list_area);
-        app.tree_area = list_area;
-        app.tree_offset = 0;
+        app.geo.tree_area = list_area;
+        app.geo.tree_offset = 0;
         app.tree_visible_indices = None;
         return;
     }
@@ -357,8 +357,8 @@ pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
     f.render_stateful_widget(list, list_area, &mut state);
 
     // ── Record geometry ─────────────────────────────────────────────────
-    app.tree_area = list_area;
-    app.tree_offset = offset + state.offset();
+    app.geo.tree_area = list_area;
+    app.geo.tree_offset = offset + state.offset();
     app.tree_scroll = offset + state.offset();
     // When no filter is active, set visible_indices to None (identity).
     let has_filter = app.tree_filter.as_ref().is_some_and(|f| !f.is_empty());
@@ -489,7 +489,7 @@ enum BreadcrumbItem {
 /// Renders the breadcrumb path bar as a styled line of clickable segments with
 /// " / " separators. Compacts deep paths by collapsing leading ancestors into
 /// a single ".." segment when the path is wider than the available area.
-/// Records each visible segment's `Rect` onto `app.breadcrumb_areas` for mouse
+/// Records each visible segment's `Rect` onto `app.geo.breadcrumb_areas` for mouse
 /// hit-testing.
 fn render_breadcrumb(f: &mut Frame, app: &mut App, area: Rect, segments: &[(String, PathBuf)]) {
     let theme = &app.theme;
@@ -546,7 +546,7 @@ fn render_breadcrumb(f: &mut Frame, app: &mut App, area: Rect, segments: &[(Stri
                     width: 2,
                     height: 1,
                 };
-                app.breadcrumb_areas.push((target.clone(), rect));
+                app.geo.breadcrumb_areas.push((target.clone(), rect));
                 col += 2;
             }
             BreadcrumbItem::Real(idx) => {
@@ -562,7 +562,9 @@ fn render_breadcrumb(f: &mut Frame, app: &mut App, area: Rect, segments: &[(Stri
                         width: 1,
                         height: 1,
                     };
-                    app.breadcrumb_areas.push((segments[*idx].1.clone(), rect));
+                    app.geo
+                        .breadcrumb_areas
+                        .push((segments[*idx].1.clone(), rect));
                     col += 1;
                     after_root = true;
                 } else {
@@ -588,7 +590,9 @@ fn render_breadcrumb(f: &mut Frame, app: &mut App, area: Rect, segments: &[(Stri
                         width: text_w,
                         height: 1,
                     };
-                    app.breadcrumb_areas.push((segments[*idx].1.clone(), rect));
+                    app.geo
+                        .breadcrumb_areas
+                        .push((segments[*idx].1.clone(), rect));
                     col += text_w;
                 }
             }

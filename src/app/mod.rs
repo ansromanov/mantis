@@ -37,8 +37,6 @@ use std::time::Instant;
 
 use notify::RecommendedWatcher;
 
-use ratatui::layout::Rect;
-
 use crate::config::{self, Config, Keymap};
 use crate::fold::FoldRegion;
 use crate::git::GitStatus;
@@ -58,12 +56,14 @@ mod context_menu;
 mod diff_nav;
 mod file_ops;
 mod fold;
+mod geometry;
 mod init;
 mod key_handlers;
 mod lint;
 mod loader;
 mod markdown_view;
 mod overlay;
+pub use geometry::Geometry;
 pub(crate) use overlay::Overlay;
 pub(crate) mod menu_bar;
 mod mouse_handlers;
@@ -183,23 +183,10 @@ pub struct App {
     pub bookmark_paths: Vec<PathBuf>,
     /// State for the bookmarks overlay. `Some` while the picker is open.
     pub bookmarks: Option<RecentFilesState>,
-    /// Hit area of the recent-files list recorded during the last render.
-    pub recent_area: Rect,
-    /// Scroll offset of the recent-files list recorded during the last render.
-    pub recent_offset: usize,
     /// State for the right-click context menu. `Some` while the menu is open.
     pub context_menu: Option<ContextMenuState>,
-    /// Hit area of the context menu recorded during the last render, used to
-    /// hit-test item clicks and click-away dismissal.
-    pub context_menu_area: ratatui::layout::Rect,
     /// Keyboard or pointer-opened action menu dropdown state.
     pub(crate) menu_bar_state: Option<menu_bar::MenuBarState>,
-    /// Hit area of the optional menu row.
-    pub(crate) menu_bar_area: Rect,
-    /// Hit area of the currently open menu dropdown.
-    pub(crate) menu_dropdown_area: Rect,
-    /// Status-bar hit area recorded during the last render.
-    pub statusbar_area: ratatui::layout::Rect,
     pub show_hidden: bool,
     pub ignore_gitignore: bool,
     /// Monotonically increasing counter bumped every time the tree is rebuilt.
@@ -209,9 +196,6 @@ pub struct App {
     pub show_help: bool,
     pub help_scroll: crate::scroll::ScrollState,
     pub help_tab: usize,
-    pub help_area: ratatui::layout::Rect,
-    pub bug_report_area: ratatui::layout::Rect,
-    pub bug_report_preview_area: ratatui::layout::Rect,
     pub should_quit: bool,
     /// Set by the tab-related keybindings/palette entries, which this single-root `App` has
     /// no way to act on itself. The `Tabs` wrapper (`src/workspace.rs`) that
@@ -242,8 +226,6 @@ pub struct App {
     pub revision_picker: Option<RevisionPicker>,
     /// State for the git worktree switcher overlay.
     pub worktree_picker: Option<WorktreePicker>,
-    pub worktree_picker_area: Rect,
-    pub worktree_picker_offset: usize,
     pub bug_report: Option<BugReportState>,
     pub show_scrollbar: bool,
     pub show_scroll_percentage: bool,
@@ -257,7 +239,6 @@ pub struct App {
     /// Set during construction on first-ever launch; cleared on dismiss and
     /// never set again (persisted via `welcome_shown.flag` in the state dir).
     pub show_welcome: bool,
-    pub welcome_area: ratatui::layout::Rect,
     pub walk_errors: usize,
     /// Warning describing a malformed config that was ignored at startup, if any.
     pub config_error: Option<String>,
@@ -277,9 +258,6 @@ pub struct App {
     /// changed at runtime (and the file's comments) are left untouched.
     config_baseline: Config,
     config_path: Option<std::path::PathBuf>,
-    // Geometry captured during the last render, used to map mouse events.
-    pub tree_area: Rect,
-    pub tree_offset: usize,
     /// The set of node indices (into `nodes`) that were visible during the last
     /// tree render. Populated by `draw_tree` when `tree_filter` is active so
     /// mouse handlers can map screen rows back to global indices.
@@ -293,37 +271,10 @@ pub struct App {
     /// are filled in lazily for the rows actually rendered and reused until
     /// the tree is rebuilt.
     pub(crate) tree_affordance_cache: Option<(u64, Vec<Option<crate::tree::TreeAffordance>>)>,
-    pub content_area: Rect,
     /// Raw bytes + dimensions of the image in `current_file`, when it is an
     /// image and the terminal supports inline rendering. `None` otherwise. Set
     /// by the loader; consumed by `graphics::render_overlay` after each frame.
     pub content_image: Option<crate::graphics::ContentImage>,
-    /// Cell rectangle the content pane reserved for the inline image during the
-    /// last render. `Rect::default()` when no image is being shown.
-    pub image_area: Rect,
-    /// Hit area of the blame annotation strip recorded during the last render.
-    /// `Rect::default()` when blame is not shown or there is no blame data.
-    pub blame_area: Rect,
-    /// Hit area of the diff info and actions header bar at the top of the diff pane.
-    pub diff_header_area: Rect,
-    pub search_area: Rect,
-    pub search_offset: usize,
-    pub command_palette_area: Rect,
-    pub command_palette_offset: usize,
-    pub history_area: Rect,
-    pub history_offset: usize,
-    /// Hit area of the repo log list recorded during the last render.
-    pub repo_log_area: Rect,
-    /// Scroll offset of the repo log list recorded during the last render.
-    pub repo_log_offset: usize,
-    pub theme_area: Rect,
-    pub theme_offset: usize,
-    /// Hit area of the revision picker list recorded during the last render.
-    pub revision_picker_area: Rect,
-    /// Scroll offset of the revision picker list recorded during the last render.
-    pub revision_picker_offset: usize,
-    /// Hit area of the splitter bar between tree and content panes.
-    pub splitter_area: Rect,
     /// Clickable status-bar column ranges recorded during the last render.
     pub(crate) statusbar_segments: Vec<crate::ui::statusbar::StatusbarHit>,
     // Time and result index of the last search-result click, for double-click.
@@ -457,9 +408,6 @@ pub struct App {
     /// Transient status message (e.g. "path copied"), shown until the next keypress
     /// or auto-expires after ~3 seconds.
     pub status_message: Option<StatusMessage>,
-    /// Breadcrumb segment areas recorded during the last render, used for mouse
-    /// hit-testing. Each entry is (target_directory_path, clickable_rect).
-    pub breadcrumb_areas: Vec<(std::path::PathBuf, Rect)>,
     /// Cache of the most recently highlighted visible window, so consecutive
     /// renders with the same scroll/theme/content skip re-highlighting.
     pub(crate) content_highlight_cache: RefCell<Option<(HighlightCacheKey, HighlightCacheValue)>>,
@@ -477,6 +425,8 @@ pub struct App {
     pub new_version_available: Option<String>,
     /// Background channel receiver for update check results.
     pub(crate) update_rx: Option<std::sync::mpsc::Receiver<String>>,
+    /// Panel/popup rectangles and list offsets recorded by the renderer.
+    pub geo: Geometry,
 }
 
 impl App {

@@ -41,8 +41,8 @@ pub(crate) fn draw_side_by_side_diff(f: &mut Frame, app: &mut App, area: Rect, b
     } else {
         (None, inner)
     };
-    app.content_area = inner;
-    app.diff_header_area = diff_bar.unwrap_or_default();
+    app.geo.content_area = inner;
+    app.geo.diff_header_area = diff_bar.unwrap_or_default();
     if let Some(bar_area) = diff_bar {
         draw_diff_info_bar(f, app, bar_area);
     }

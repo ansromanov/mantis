@@ -353,7 +353,7 @@ impl App {
     /// Number of tree rows that fit in the visible viewport, from the geometry
     /// captured during the last render. Falls back to 1 before the first draw.
     fn tree_page_size(&self) -> usize {
-        (self.tree_area.height as usize).max(1)
+        (self.geo.tree_area.height as usize).max(1)
     }
 
     /// Largest valid `tree_scroll` value so the last row can sit at the bottom

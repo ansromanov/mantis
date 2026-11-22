@@ -95,7 +95,7 @@ impl App {
     /// Maximum valid content_scroll so the last line sits at the bottom edge,
     /// not the top. Falls back to `total - 1` before the first render (height 0).
     pub fn content_scroll_max(&self) -> usize {
-        let vh = (self.content_area.height as usize).max(1);
+        let vh = (self.geo.content_area.height as usize).max(1);
         let total = if self.word_wrap {
             self.wrapped_content_rows()
         } else {
@@ -131,7 +131,7 @@ impl App {
         if !self.word_wrap {
             return self.display_line_count();
         }
-        let width = self.wrap_text_width(self.content_area.width as usize);
+        let width = self.wrap_text_width(self.geo.content_area.width as usize);
         if width == 0 {
             return self.display_line_count();
         }
@@ -143,7 +143,7 @@ impl App {
     /// Maps a visual wrapped-row offset to its logical display line and the
     /// number of visual rows to skip within that line.
     pub(crate) fn wrapped_display_position(&self, visual_offset: usize) -> (usize, usize) {
-        self.wrapped_display_position_at(self.content_area.width as usize, visual_offset)
+        self.wrapped_display_position_at(self.geo.content_area.width as usize, visual_offset)
     }
 
     /// Like [`wrapped_display_position`](Self::wrapped_display_position) for a
@@ -170,7 +170,7 @@ impl App {
 
     /// Returns the visual row at which a logical display line begins.
     pub(crate) fn wrapped_line_start(&self, target: usize) -> usize {
-        self.wrapped_line_start_at(self.content_area.width as usize, target)
+        self.wrapped_line_start_at(self.geo.content_area.width as usize, target)
     }
 
     /// Like [`wrapped_line_start`](Self::wrapped_line_start) for an explicit pane width.
@@ -203,7 +203,7 @@ impl App {
         } else {
             top_line
         };
-        self.scroll_wrap_width = self.content_area.width as usize;
+        self.scroll_wrap_width = self.geo.content_area.width as usize;
         self.content_hscroll = 0;
         self.clamp_content_scroll();
     }
@@ -246,7 +246,7 @@ impl App {
     /// rows, so `rel_row` must be translated through the per-line row counts
     /// rather than added directly to `content_scroll`.
     pub fn content_pos(&self, col: u16, row: u16) -> (usize, usize) {
-        let ca = self.content_area;
+        let ca = self.geo.content_area;
         let rel_row = (row.saturating_sub(ca.y)) as usize;
         let rel_col = (col.saturating_sub(ca.x)) as usize;
         let prefix = self.line_prefix_width();
@@ -421,15 +421,22 @@ impl App {
         if self.word_wrap {
             let (first, _) = self.wrapped_display_position(self.content_scroll);
             let (last, _) = self.wrapped_display_position(
-                self.content_scroll
-                    .saturating_add((self.content_area.height as usize).max(1).saturating_sub(1)),
+                self.content_scroll.saturating_add(
+                    (self.geo.content_area.height as usize)
+                        .max(1)
+                        .saturating_sub(1),
+                ),
             );
             self.active_line = self.active_line.clamp(first, last);
         } else {
             let last_line = self.display_line_count().saturating_sub(1);
             let last_visible = self
                 .content_scroll
-                .saturating_add((self.content_area.height as usize).max(1).saturating_sub(1))
+                .saturating_add(
+                    (self.geo.content_area.height as usize)
+                        .max(1)
+                        .saturating_sub(1),
+                )
                 .min(last_line);
             self.active_line = self.active_line.clamp(self.content_scroll, last_visible);
         }
@@ -449,7 +456,9 @@ impl App {
 
     /// Number of rows in a page — viewport height minus one overlap row.
     pub fn page_rows(&self) -> usize {
-        (self.content_area.height as usize).saturating_sub(1).max(1)
+        (self.geo.content_area.height as usize)
+            .saturating_sub(1)
+            .max(1)
     }
 
     /// Returns `true` when the content pane uses a text cursor (`active_line`)
@@ -487,14 +496,14 @@ impl App {
     /// Unified scroll-into-view helper: nudges `content_scroll` so the given
     /// `display_line` becomes visible. No-op when already visible.
     pub fn scroll_line_into_view(&mut self, display_line: usize) {
-        let view_height = (self.content_area.height as usize).max(1);
+        let view_height = (self.geo.content_area.height as usize).max(1);
         if self.word_wrap {
             let start = self.wrapped_line_start(display_line);
             let rows = self
                 .line_width(self.display_to_physical(display_line))
                 .unwrap_or(0)
                 .div_ceil(
-                    (self.content_area.width as usize)
+                    (self.geo.content_area.width as usize)
                         .saturating_sub(self.line_prefix_width())
                         .max(1),
                 )

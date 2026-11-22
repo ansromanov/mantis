@@ -1080,7 +1080,7 @@ fn toggle_wrap_via_command_preserves_content_scroll() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("a.txt"));
-    app.content_area = ratatui::layout::Rect {
+    app.geo.content_area = ratatui::layout::Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -1117,7 +1117,7 @@ fn toggle_pretty_json_via_command_preserves_content_scroll() {
         "}".to_string(),
     ];
     app.show_pretty_json = false;
-    app.content_area = ratatui::layout::Rect {
+    app.geo.content_area = ratatui::layout::Rect {
         x: 0,
         y: 0,
         width: 80,

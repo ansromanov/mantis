@@ -409,7 +409,7 @@ fn rebuild_scrolls_restored_selection_into_view() {
     }
     let mut app = app_for(&root);
     assert!(!app.tree_independent_scroll, "default mode under test");
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 0,
         y: 0,
         width: 40,
@@ -427,7 +427,7 @@ fn rebuild_scrolls_restored_selection_into_view() {
 
     // Selection preserved by path, viewport nudged so it stays visible.
     assert_eq!(app.nodes[app.tree_selected].path, sel_path);
-    let h = app.tree_area.height as usize;
+    let h = app.geo.tree_area.height as usize;
     assert!(
         app.tree_selected >= app.tree_scroll && app.tree_selected < app.tree_scroll + h,
         "restored selection {} must be within viewport [{}, {})",
@@ -541,7 +541,7 @@ fn rebuild_false_preserves_scroll() {
         fs::write(root.join(format!("f{i:02}.txt")), "").unwrap();
     }
     let mut app = app_for(&root);
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 0,
         y: 0,
         width: 40,
@@ -571,7 +571,7 @@ fn rebuild_false_preserves_scroll() {
 fn rebuild_false_clamps_scroll_when_tree_shrinks() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 0,
         y: 0,
         width: 40,
@@ -601,7 +601,7 @@ fn rebuild_true_recenters_selection() {
         fs::write(root.join(format!("f{i:02}.txt")), "").unwrap();
     }
     let mut app = app_for(&root);
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 0,
         y: 0,
         width: 40,
@@ -616,7 +616,7 @@ fn rebuild_true_recenters_selection() {
     app.rebuild(true);
 
     // After recenter=true, selection must be visible in the viewport.
-    let h = app.tree_area.height as usize;
+    let h = app.geo.tree_area.height as usize;
     assert!(
         app.tree_selected >= app.tree_scroll && app.tree_selected < app.tree_scroll + h,
         "rebuild(true) must nudge viewport so selection {} is visible in [{}, {})",

@@ -606,10 +606,10 @@ fn draw_tree_records_tree_area_geometry() {
     let mut app = make_app(false, HashMap::new());
     app.nodes = vec![];
     render_tree(&mut app, 40, 10);
-    assert_eq!(app.tree_area.x, 1);
-    assert_eq!(app.tree_area.y, 1);
-    assert_eq!(app.tree_area.width, 38);
-    assert_eq!(app.tree_area.height, 8);
+    assert_eq!(app.geo.tree_area.x, 1);
+    assert_eq!(app.geo.tree_area.y, 1);
+    assert_eq!(app.geo.tree_area.width, 38);
+    assert_eq!(app.geo.tree_area.height, 8);
 }
 
 #[test]
@@ -617,7 +617,7 @@ fn draw_tree_records_tree_offset_zero_on_first_render() {
     let mut app = make_app(false, HashMap::new());
     app.nodes = vec![];
     render_tree(&mut app, 40, 10);
-    assert_eq!(app.tree_offset, 0);
+    assert_eq!(app.geo.tree_offset, 0);
 }
 
 #[test]
@@ -635,7 +635,7 @@ fn draw_tree_independent_scroll_preserves_scroll_position() {
     // height=6 gives view_height=4; max_scroll=20-4=16, so scroll=3 is valid
     render_tree(&mut app, 40, 6);
     assert_eq!(app.tree_scroll, 3);
-    assert_eq!(app.tree_offset, 3);
+    assert_eq!(app.geo.tree_offset, 3);
 }
 
 #[test]
@@ -650,7 +650,7 @@ fn tree_auto_scroll_brings_selection_into_view() {
         .collect();
     app.tree_selected = 15;
     app.tree_scroll = 0;
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 0,
         y: 0,
         width: 40,
@@ -709,13 +709,13 @@ fn breadcrumb_areas_match_rendered_columns() {
     render_tree(&mut app, 40, 6);
     // Breadcrumb shows root + ancestors only: "/" and "r".
     assert_eq!(
-        app.breadcrumb_areas.len(),
+        app.geo.breadcrumb_areas.len(),
         2,
         "expected 2 segments (/, r), got {}",
-        app.breadcrumb_areas.len()
+        app.geo.breadcrumb_areas.len()
     );
-    let (fs_path, fs_rect) = &app.breadcrumb_areas[0];
-    let (root_path, root_rect) = &app.breadcrumb_areas[1];
+    let (fs_path, fs_rect) = &app.geo.breadcrumb_areas[0];
+    let (root_path, root_rect) = &app.geo.breadcrumb_areas[1];
     assert_eq!(fs_path, &PathBuf::from("/"));
     assert_eq!(root_path, &PathBuf::from("/r"));
     assert_eq!(fs_rect.width, 1);
@@ -744,7 +744,7 @@ fn render_breadcrumb_truncation_does_not_panic() {
     app.tree_selected = 0;
     render_tree(&mut app, 20, 6);
     // Breadcrumb areas must contain only real segments — never a sentinel.
-    for (path, _rect) in &app.breadcrumb_areas {
+    for (path, _rect) in &app.geo.breadcrumb_areas {
         assert!(!path.as_os_str().is_empty());
     }
 }
@@ -774,7 +774,7 @@ fn compact_breadcrumb_collapses_ancestors_to_dotdot() {
     );
     // The ".." target must be a proper ancestor of the root path.
     let root_path = PathBuf::from("/a/b/c/d/root");
-    let dotdot = app.breadcrumb_areas.first().map(|(p, _)| p.clone());
+    let dotdot = app.geo.breadcrumb_areas.first().map(|(p, _)| p.clone());
     assert!(
         dotdot
             .clone()
@@ -825,7 +825,7 @@ fn compact_breadcrumb_dotdot_target_is_parent_of_first_kept() {
     // The ".." target is the parent of the first kept segment (which is "b"
     // when first_kept=2: keeping "b", "c", "root"). Parent of "b" is "/a".
     let dotdot_target =
-        app.breadcrumb_areas.iter().find_map(
+        app.geo.breadcrumb_areas.iter().find_map(
             |(p, r)| {
                 if r.width == 2 {
                     Some(p.clone())
@@ -915,12 +915,12 @@ fn breadcrumb_when_root_is_filesystem_root() {
     );
     // Exactly one clickable area: "/".
     assert_eq!(
-        app.breadcrumb_areas.len(),
+        app.geo.breadcrumb_areas.len(),
         1,
         "expected 1 segment (/), got {}",
-        app.breadcrumb_areas.len()
+        app.geo.breadcrumb_areas.len()
     );
-    assert_eq!(app.breadcrumb_areas[0].0, PathBuf::from("/"));
+    assert_eq!(app.geo.breadcrumb_areas[0].0, PathBuf::from("/"));
 }
 
 #[test]
@@ -980,7 +980,7 @@ fn compact_breadcrumb_dotdot_target_is_root_parent() {
     // Very narrow — only ".. / root" fits, falling back to the last segment's
     // parent = root.parent() = /a/b/c/d.
     render_tree(&mut app, 10, 6);
-    let dotdot = app.breadcrumb_areas.first().map(|(p, _)| p.clone());
+    let dotdot = app.geo.breadcrumb_areas.first().map(|(p, _)| p.clone());
     assert_eq!(
         dotdot,
         Some(PathBuf::from("/a/b/c/d")),
@@ -1009,8 +1009,8 @@ fn breadcrumb_root_is_filesystem_root_renders_single_segment() {
         "root segment / must render, got: {:?}",
         breadcrumb_row
     );
-    assert_eq!(app.breadcrumb_areas.len(), 1);
-    assert_eq!(app.breadcrumb_areas[0].0, PathBuf::from("/"));
+    assert_eq!(app.geo.breadcrumb_areas.len(), 1);
+    assert_eq!(app.geo.breadcrumb_areas[0].0, PathBuf::from("/"));
 }
 
 // ---------------------------------------------------------------------------

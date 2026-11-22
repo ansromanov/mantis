@@ -6,6 +6,7 @@ use crate::config::Config;
 use crate::fold::FoldRegion;
 use crate::search::{GotoLineState, InFileMatch, SearchMode, TreeFilter};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use ratatui::layout::Rect;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// Creates a temp directory tree:
@@ -292,8 +293,8 @@ fn full_rect() -> Rect {
 fn left_click_in_tree_opens_file() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.tree_area = full_rect();
-    app.tree_offset = 0;
+    app.geo.tree_area = full_rect();
+    app.geo.tree_offset = 0;
     app.focus = Focus::Content;
 
     let idx = app.nodes.iter().position(|n| !n.is_dir).unwrap();
@@ -311,8 +312,8 @@ fn left_click_in_tree_opens_file() {
 fn left_click_on_dir_toggles_expand() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.tree_area = full_rect();
-    app.tree_offset = 0;
+    app.geo.tree_area = full_rect();
+    app.geo.tree_offset = 0;
 
     let dir_idx = app.nodes.iter().position(|n| n.is_dir).unwrap();
     let dir_path = app.nodes[dir_idx].path.clone();
@@ -335,8 +336,8 @@ fn left_click_on_dir_toggles_expand() {
 fn left_click_respects_scroll_offset() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.tree_area = full_rect();
-    app.tree_offset = 1; // first visible row is node index 1
+    app.geo.tree_area = full_rect();
+    app.geo.tree_offset = 1; // first visible row is node index 1
 
     app.handle_mouse(click(1, 0));
     assert_eq!(app.tree_selected, 1);
@@ -359,8 +360,8 @@ fn tree_filter_mouse_click_maps_through_visible_indices_and_closes() {
         .collect();
     assert!(!matching.is_empty(), "long.txt should match");
     app.tree_visible_indices = Some(matching.clone());
-    app.tree_area = full_rect();
-    app.tree_offset = 0;
+    app.geo.tree_area = full_rect();
+    app.geo.tree_offset = 0;
 
     // Click on the first visible row (which maps to matching[0]).
     app.handle_mouse(click(1, 0));
@@ -379,8 +380,8 @@ fn tree_filter_mouse_click_maps_through_visible_indices_and_closes() {
 fn click_below_last_node_is_ignored() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.tree_area = full_rect();
-    app.tree_offset = 0;
+    app.geo.tree_area = full_rect();
+    app.geo.tree_offset = 0;
     app.tree_selected = 0;
 
     // Row far past the last node.
@@ -393,13 +394,13 @@ fn click_below_last_node_is_ignored() {
 fn scroll_wheel_scrolls_tree_viewport() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 0,
         y: 0,
         width: 40,
         height: 1,
     };
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 100,
         y: 0,
         width: 40,
@@ -430,8 +431,8 @@ fn scroll_wheel_scrolls_content() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
-    app.content_area = full_rect();
-    app.tree_area = Rect {
+    app.geo.content_area = full_rect();
+    app.geo.tree_area = Rect {
         x: 100,
         y: 0,
         width: 40,
@@ -452,8 +453,8 @@ fn open_file_search(app: &mut App) {
     app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
     assert!(app.search.is_some());
-    app.search_area = full_rect();
-    app.search_offset = 0;
+    app.geo.search_area = full_rect();
+    app.geo.search_offset = 0;
 }
 
 #[test]
@@ -521,7 +522,7 @@ fn g_key_stops_at_scroll_max_not_last_line() {
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt")); // 50 lines
     app.focus = Focus::Content;
-    app.content_area = viewport(10); // scroll_max = 50 - 10 = 40
+    app.geo.content_area = viewport(10); // scroll_max = 50 - 10 = 40
 
     app.handle_key(KeyEvent::new(KeyCode::Char('G'), KeyModifiers::SHIFT));
     assert_eq!(
@@ -537,7 +538,7 @@ fn j_key_stops_at_scroll_max() {
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt")); // 50 lines
     app.focus = Focus::Content;
-    app.content_area = viewport(10); // scroll_max = 40
+    app.geo.content_area = viewport(10); // scroll_max = 40
 
     for _ in 0..60 {
         app.handle_key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::empty()));
@@ -552,7 +553,7 @@ fn page_down_stops_at_scroll_max() {
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt")); // 50 lines → last display line = 49
     app.focus = Focus::Content;
-    app.content_area = viewport(10); // page_rows = 9
+    app.geo.content_area = viewport(10); // page_rows = 9
 
     // Many PageDowns: active_line must clamp at display_line_count()-1 = 49
     for _ in 0..10 {
@@ -570,8 +571,8 @@ fn mouse_scroll_down_stops_at_scroll_max() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt")); // 50 lines
-    app.content_area = viewport(10); // scroll_max = 40
-    app.tree_area = Rect {
+    app.geo.content_area = viewport(10); // scroll_max = 40
+    app.geo.tree_area = Rect {
         x: 100,
         y: 0,
         width: 10,
@@ -1034,7 +1035,7 @@ fn content_scroll_max_with_multiple_lines() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -1362,7 +1363,7 @@ fn goto_line_key_enter_clamps_to_max() {
     let mut app = app_for(&root);
     app.focus = Focus::Content;
     app.open_file(&root.join("long.txt"));
-    app.content_area = Rect::new(0, 0, 80, 10);
+    app.geo.content_area = Rect::new(0, 0, 80, 10);
     app.content_scroll = 0;
     app.goto_line = Some(GotoLineState::new());
     app.handle_key(KeyEvent::new(KeyCode::Char('9'), KeyModifiers::empty()));
@@ -1481,7 +1482,7 @@ fn content_key_toggle_wrap_preserves_scroll_and_resets_hscroll() {
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
     app.focus = Focus::Content;
-    app.content_area = viewport(10);
+    app.geo.content_area = viewport(10);
     app.content_scroll = 10;
     app.content_hscroll = 5;
     app.keys.toggle_wrap = global_char_binding('z');
@@ -1504,7 +1505,7 @@ fn content_key_g_top_and_g_bottom() {
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
     app.focus = Focus::Content;
-    app.content_area = viewport(10);
+    app.geo.content_area = viewport(10);
     app.content_scroll = 20;
     app.handle_key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::empty()));
     assert_eq!(app.content_scroll, 0);
@@ -1532,7 +1533,7 @@ fn mouse_drag_selects_text_in_content() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("a.txt"));
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 5,
         y: 5,
         width: 50,
@@ -1560,7 +1561,7 @@ fn mouse_click_in_diff_does_not_start_drag() {
     let mut app = app_for(&root);
     app.open_file(&root.join("a.txt"));
     app.is_diff = true;
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 5,
         y: 5,
         width: 50,
@@ -1582,13 +1583,13 @@ fn search_mouse_scroll_down_up() {
     app.focus = Focus::Content;
     app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
-    app.search_area = Rect {
+    app.geo.search_area = Rect {
         x: 0,
         y: 0,
         width: 40,
         height: 20,
     };
-    app.search_offset = 0;
+    app.geo.search_offset = 0;
 
     if app.search.as_ref().unwrap().results_len() >= 2 {
         app.handle_mouse(mouse(MouseEventKind::ScrollDown, 1, 1));
@@ -1607,13 +1608,13 @@ fn history_mouse_scroll_down_up() {
     let mut app = app_for(&root);
     app.open_file(&root.join("tracked.txt"));
     app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::SHIFT));
-    app.history_area = Rect {
+    app.geo.history_area = Rect {
         x: 0,
         y: 0,
         width: 40,
         height: 20,
     };
-    app.history_offset = 0;
+    app.geo.history_offset = 0;
 
     if app.history.as_ref().unwrap().results_len() >= 2 {
         app.handle_mouse(mouse(MouseEventKind::ScrollDown, 1, 1));
@@ -1631,13 +1632,13 @@ fn theme_mouse_scroll_down_up() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::empty()));
-    app.theme_area = Rect {
+    app.geo.theme_area = Rect {
         x: 0,
         y: 0,
         width: 40,
         height: 20,
     };
-    app.theme_offset = 0;
+    app.geo.theme_offset = 0;
 
     app.handle_mouse(mouse(MouseEventKind::ScrollDown, 1, 1));
     assert_eq!(app.theme_picker.as_ref().unwrap().selected, 1);
@@ -1716,13 +1717,13 @@ fn command_palette_mouse_scroll_down_up() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.handle_key(KeyEvent::new(KeyCode::Char('P'), KeyModifiers::CONTROL));
-    app.command_palette_area = Rect {
+    app.geo.command_palette_area = Rect {
         x: 0,
         y: 0,
         width: 40,
         height: 20,
     };
-    app.command_palette_offset = 0;
+    app.geo.command_palette_offset = 0;
 
     app.handle_mouse(mouse(MouseEventKind::ScrollDown, 1, 1));
     assert_eq!(app.command_palette.as_ref().unwrap().selected, 1);
@@ -1741,7 +1742,7 @@ fn content_pos_no_wrap_plain_text() {
     app.word_wrap = false;
     app.content_scroll = 0;
     app.content_hscroll = 0;
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 2,
         y: 3,
         width: 80,
@@ -1778,7 +1779,7 @@ fn content_pos_word_wrap_first_visual_row_of_first_line() {
     );
     app.word_wrap = true;
     app.content_scroll = 0;
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 2,
         y: 2,
         width: 10,
@@ -1810,7 +1811,7 @@ fn content_pos_word_wrap_first_visual_row_of_second_line() {
     );
     app.word_wrap = true;
     app.content_scroll = 0;
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 10,
@@ -1841,7 +1842,7 @@ fn content_pos_word_wrap_second_visual_row_of_second_line() {
     );
     app.word_wrap = true;
     app.content_scroll = 0;
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 10,
@@ -1872,7 +1873,7 @@ fn content_pos_word_wrap_third_visual_row_of_second_line() {
     );
     app.word_wrap = true;
     app.content_scroll = 0;
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 10,
@@ -1903,7 +1904,7 @@ fn content_pos_word_wrap_past_all_content_clamps_to_last_line() {
     );
     app.word_wrap = true;
     app.content_scroll = 0;
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 10,
@@ -1930,7 +1931,7 @@ fn content_pos_word_wrap_empty_line_counts_as_one_visual_row() {
     );
     app.word_wrap = true;
     app.content_scroll = 0;
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 10,
@@ -1958,7 +1959,7 @@ fn content_pos_word_wrap_respects_content_scroll() {
     );
     app.word_wrap = true;
     app.content_scroll = 1; // first visible logical line is index 1
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 10,
@@ -1988,7 +1989,7 @@ fn content_pos_word_wrap_plain_text_multi_span_line() {
     app.word_wrap = true;
     app.content_scroll = 0;
     // prefix = line_prefix_width() = 4; wrap_width = 10 - 4 = 6.
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 10,
@@ -2031,7 +2032,7 @@ fn content_pos_word_wrap_counts_wide_chars_by_display_width() {
     );
     app.word_wrap = true;
     app.content_scroll = 0;
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 8,
@@ -2197,7 +2198,7 @@ fn setup_in_file_search(app: &mut App) {
         "foo bar".to_string(),
         "hello again".to_string(),
     ];
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -2309,7 +2310,7 @@ fn in_file_search_backspace_and_char() {
     app.in_file_search = Some(InFileSearch::new());
     app.in_file_search_open = true;
     app.content = vec!["hello".to_string()];
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -2328,7 +2329,7 @@ fn in_file_search_no_matches_is_noop() {
     let mut app = app_for(&root);
     app.in_file_search = Some(InFileSearch::new());
     app.content = vec!["hello".to_string()];
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -2675,7 +2676,7 @@ fn tree_independent_scroll_page_keys_move_viewport_not_cursor() {
     app.focus = Focus::Tree;
     app.tree_independent_scroll = true;
     // Small viewport so the 4 top-level nodes overflow it.
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 0,
         y: 0,
         width: 20,
@@ -2701,7 +2702,7 @@ fn tree_independent_scroll_home_end_move_viewport_only() {
     let mut app = app_for(&root);
     app.focus = Focus::Tree;
     app.tree_independent_scroll = true;
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 0,
         y: 0,
         width: 20,
@@ -2727,7 +2728,7 @@ fn tree_independent_scroll_disabled_ignores_page_keys() {
     let mut app = app_for(&root);
     app.focus = Focus::Tree;
     assert!(!app.tree_independent_scroll); // default
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 0,
         y: 0,
         width: 20,
@@ -2748,7 +2749,7 @@ fn tree_independent_scroll_up_down_still_move_cursor_and_follow() {
     let mut app = app_for(&root);
     app.focus = Focus::Tree;
     app.tree_independent_scroll = true;
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 0,
         y: 0,
         width: 20,
@@ -2769,11 +2770,11 @@ fn tree_independent_scroll_up_down_still_move_cursor_and_follow() {
     assert_eq!(app.tree_selected, last);
     assert!(
         app.tree_selected >= app.tree_scroll
-            && app.tree_selected < app.tree_scroll + app.tree_area.height as usize,
+            && app.tree_selected < app.tree_scroll + app.geo.tree_area.height as usize,
         "selection {} should stay within viewport [{}, {})",
         app.tree_selected,
         app.tree_scroll,
-        app.tree_scroll + app.tree_area.height as usize
+        app.tree_scroll + app.geo.tree_area.height as usize
     );
     fs::remove_dir_all(&root).ok();
 }
@@ -2784,7 +2785,7 @@ fn tree_independent_scroll_reveal_keeps_selection_in_viewport() {
     let mut app = app_for(&root);
     app.focus = Focus::Tree;
     app.tree_independent_scroll = true;
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 0,
         y: 0,
         width: 20,
@@ -2800,11 +2801,11 @@ fn tree_independent_scroll_reveal_keeps_selection_in_viewport() {
     assert_eq!(app.tree_selected, idx);
     assert!(
         app.tree_selected >= app.tree_scroll
-            && app.tree_selected < app.tree_scroll + app.tree_area.height as usize,
+            && app.tree_selected < app.tree_scroll + app.geo.tree_area.height as usize,
         "revealed node {} should be inside viewport [{}, {})",
         app.tree_selected,
         app.tree_scroll,
-        app.tree_scroll + app.tree_area.height as usize
+        app.tree_scroll + app.geo.tree_area.height as usize
     );
     fs::remove_dir_all(&root).ok();
 }
@@ -2862,7 +2863,7 @@ fn content_key_page_up_scrolls_up() {
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
     app.focus = Focus::Content;
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -3162,7 +3163,7 @@ fn scroll_in_file_search_to_current_scrolls_if_above() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.content = vec!["line0".to_string(), "line1".to_string()];
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -3186,7 +3187,7 @@ fn scroll_in_file_search_to_current_scrolls_if_below() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.content = (0..50).map(|i| format!("line {i}")).collect();
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -3248,7 +3249,7 @@ fn mouse_content_click_on_scrollbar_sets_drag() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt")); // 50 lines
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 5,
         y: 5,
         width: 15,
@@ -3266,7 +3267,7 @@ fn mouse_scrollbar_drag_updates_scroll() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt")); // 50 lines
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 5,
         y: 5,
         width: 15,
@@ -3311,7 +3312,7 @@ fn mouse_drag_auto_scroll_up_when_near_top() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 5,
         y: 5,
         width: 50,
@@ -3331,7 +3332,7 @@ fn mouse_drag_auto_scroll_down_when_near_bottom() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 5,
         y: 5,
         width: 50,
@@ -3364,7 +3365,7 @@ fn history_mouse_click_outside_area_closes() {
     let mut app = app_for(&root);
     app.open_file(&root.join("tracked.txt"));
     app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::SHIFT));
-    app.history_area = Rect {
+    app.geo.history_area = Rect {
         x: 5,
         y: 5,
         width: 30,
@@ -3381,7 +3382,7 @@ fn history_mouse_click_out_of_range_index_noop() {
     let mut app = app_for(&root);
     app.open_file(&root.join("tracked.txt"));
     app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::SHIFT));
-    app.history_area = Rect {
+    app.geo.history_area = Rect {
         x: 0,
         y: 0,
         width: 30,
@@ -3399,13 +3400,13 @@ fn history_mouse_single_then_double_click_opens() {
     let mut app = app_for(&root);
     app.open_file(&root.join("tracked.txt"));
     app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::SHIFT));
-    app.history_area = Rect {
+    app.geo.history_area = Rect {
         x: 0,
         y: 0,
         width: 30,
         height: 10,
     };
-    app.history_offset = 0;
+    app.geo.history_offset = 0;
 
     app.handle_mouse(click(1, 0));
     assert!(app.history.is_some());
@@ -3421,7 +3422,7 @@ fn theme_mouse_click_outside_area_closes() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::empty()));
-    app.theme_area = Rect {
+    app.geo.theme_area = Rect {
         x: 5,
         y: 5,
         width: 30,
@@ -3437,13 +3438,13 @@ fn theme_mouse_single_then_double_click_opens() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::empty()));
-    app.theme_area = Rect {
+    app.geo.theme_area = Rect {
         x: 0,
         y: 0,
         width: 30,
         height: 30,
     };
-    app.theme_offset = 0;
+    app.geo.theme_offset = 0;
 
     let before = app.theme.accent;
     app.handle_mouse(click(1, 0));
@@ -3460,7 +3461,7 @@ fn command_palette_mouse_click_outside_area_closes() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.handle_key(KeyEvent::new(KeyCode::Char('P'), KeyModifiers::CONTROL));
-    app.command_palette_area = Rect {
+    app.geo.command_palette_area = Rect {
         x: 5,
         y: 5,
         width: 30,
@@ -3476,13 +3477,13 @@ fn command_palette_mouse_single_then_double_click_executes() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.handle_key(KeyEvent::new(KeyCode::Char('P'), KeyModifiers::CONTROL));
-    app.command_palette_area = Rect {
+    app.geo.command_palette_area = Rect {
         x: 0,
         y: 0,
         width: 30,
         height: 30,
     };
-    app.command_palette_offset = 0;
+    app.geo.command_palette_offset = 0;
     // Filter to "about" so double-click triggers show_about
     for c in "about".chars() {
         if let Some(p) = &mut app.command_palette {
@@ -3507,7 +3508,7 @@ fn search_mouse_click_outside_area_closes() {
     app.focus = Focus::Content;
     app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
-    app.search_area = Rect {
+    app.geo.search_area = Rect {
         x: 5,
         y: 5,
         width: 30,
@@ -3525,13 +3526,13 @@ fn search_mouse_click_out_of_range_index_noop() {
     app.focus = Focus::Content;
     app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
-    app.search_area = Rect {
+    app.geo.search_area = Rect {
         x: 0,
         y: 0,
         width: 30,
         height: 20,
     };
-    app.search_offset = 100; // offset past results -> index out of range
+    app.geo.search_offset = 100; // offset past results -> index out of range
     let selected_before = app.search.as_ref().unwrap().selected;
     app.handle_mouse(click(1, 5)); // within area, but index = 100 + 5 = 105
     assert_eq!(app.search.as_ref().unwrap().selected, selected_before);
@@ -3545,7 +3546,7 @@ fn set_scroll_from_mouse_y_noop_when_total_less_than_height() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("a.txt")); // 2 lines
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 50,
@@ -3563,7 +3564,7 @@ fn set_scroll_from_mouse_y_with_track_range_zero() {
     let mut app = app_for(&root);
     // line_count = 50, inner_h = 50, scroll_range = 0
     app.open_file(&root.join("long.txt"));
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 50,
@@ -3580,7 +3581,7 @@ fn set_scroll_from_mouse_y_calculates_position() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt")); // 50 lines
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 50,
@@ -3678,9 +3679,9 @@ fn diff_sbs_active_requires_min_width() {
     app.show_working_tree_diff(&root.join("tracked.txt"));
     app.diff_side_by_side = true;
 
-    app.content_area.width = crate::diff::MIN_SIDE_BY_SIDE_WIDTH - 1;
+    app.geo.content_area.width = crate::diff::MIN_SIDE_BY_SIDE_WIDTH - 1;
     assert!(!app.diff_sbs_active(), "too narrow → falls back to unified");
-    app.content_area.width = crate::diff::MIN_SIDE_BY_SIDE_WIDTH;
+    app.geo.content_area.width = crate::diff::MIN_SIDE_BY_SIDE_WIDTH;
     assert!(app.diff_sbs_active(), "wide enough → side-by-side active");
     fs::remove_dir_all(&root).ok();
 }
@@ -3692,7 +3693,7 @@ fn content_scroll_max_zero_total_content() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.content = Vec::new();
-    app.content_area = viewport(10);
+    app.geo.content_area = viewport(10);
     assert_eq!(app.content_scroll_max(), 0);
     fs::remove_dir_all(&root).ok();
 }
@@ -3702,7 +3703,7 @@ fn content_scroll_max_lines_less_than_height() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.content = vec!["a".to_string(), "b".to_string()];
-    app.content_area = viewport(10);
+    app.geo.content_area = viewport(10);
     assert_eq!(app.content_scroll_max(), 0);
     fs::remove_dir_all(&root).ok();
 }
@@ -3712,7 +3713,7 @@ fn content_scroll_max_zero_height_falls_back_to_one() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.content = vec!["a".to_string(); 5];
-    app.content_area = viewport(0);
+    app.geo.content_area = viewport(0);
     // vh = max(0,1) = 1, so max = 5 - 1 = 4
     assert_eq!(app.content_scroll_max(), 4);
     fs::remove_dir_all(&root).ok();
@@ -3728,7 +3729,7 @@ fn content_pos_no_wrap_with_hscroll() {
     app.word_wrap = false;
     app.content_scroll = 0;
     app.content_hscroll = 5;
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 2,
         y: 2,
         width: 80,
@@ -3746,7 +3747,7 @@ fn content_pos_no_wrap_below_content_clamps_to_last() {
     let mut app = app_for(&root);
     app.open_file(&root.join("a.txt")); // 2 lines
     app.content_scroll = 0;
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -3768,7 +3769,7 @@ fn content_pos_virtual_file_no_wrap() {
     app.word_wrap = false;
     app.content_scroll = 0;
     app.content_hscroll = 0;
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -3787,7 +3788,7 @@ fn content_pos_with_fold_display_map() {
                                         // Simulate folding: mark line 0 as hidden via fold_display_map.
     app.fold_display_map = vec![1]; // display line 0 → physical line 1
     app.content_scroll = 0;
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -3815,7 +3816,7 @@ fn content_pos_word_wrap_zero_width_area_falls_through() {
     app.word_wrap = true;
     app.content_scroll = 0;
     // wrap_width = 0 → NonZeroUsize::new(0) is None → falls through to no-wrap path
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 0,
@@ -3833,7 +3834,7 @@ fn content_pos_diff_mode_prefix_zero() {
     app.content = vec!["@@ -1 +1 @@".to_string(), "+hello".to_string()];
     app.is_diff = true;
     app.content_scroll = 0;
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -3987,7 +3988,7 @@ fn content_pos_word_wrap_visual_rows_past_content_clamps() {
     app.content = vec!["hello".to_string()];
     app.word_wrap = true;
     app.content_scroll = 0;
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -4024,7 +4025,7 @@ fn diff_hunk_navigation_jumps_between_headers() {
     let mut app = app_for(&root);
     app.show_working_tree_diff(&root.join("f.txt"));
     app.focus = Focus::Content;
-    app.content_area.height = 5;
+    app.geo.content_area.height = 5;
 
     // Header rows in the unified content.
     let headers: Vec<usize> = app
@@ -4237,7 +4238,7 @@ fn content_key_toggle_diff_side_by_side_toggles() {
     let root = temp_git_tree();
     let mut app = app_for(&root);
     app.show_working_tree_diff(&root.join("tracked.txt"));
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 120,
@@ -4277,13 +4278,13 @@ fn mouse_fold_gutter_click_toggles_region() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("a.txt"));
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 50,
         height: 20,
     };
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 100,
         y: 0,
         width: 10,
@@ -4304,8 +4305,8 @@ fn mouse_fold_gutter_click_toggles_region() {
 fn mouse_scroll_up_tree_at_zero_is_noop() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.tree_area = full_rect();
-    app.content_area = Rect {
+    app.geo.tree_area = full_rect();
+    app.geo.content_area = Rect {
         x: 100,
         y: 0,
         width: 40,
@@ -4322,8 +4323,8 @@ fn mouse_scroll_up_tree_at_zero_is_noop() {
 fn mouse_scroll_down_tree_at_last_is_noop() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.tree_area = full_rect();
-    app.content_area = Rect {
+    app.geo.tree_area = full_rect();
+    app.geo.content_area = Rect {
         x: 100,
         y: 0,
         width: 40,
@@ -4370,13 +4371,13 @@ fn history_mouse_scroll_at_boundary() {
     let mut app = app_for(&root);
     app.open_file(&root.join("f.txt"));
     app.handle_key(KeyEvent::new(KeyCode::Char('H'), KeyModifiers::SHIFT));
-    app.history_area = Rect {
+    app.geo.history_area = Rect {
         x: 0,
         y: 0,
         width: 40,
         height: 20,
     };
-    app.history_offset = 0;
+    app.geo.history_offset = 0;
 
     let h = app.history.as_ref().unwrap();
     assert!(h.results_len() >= 2, "need 2+ commits");
@@ -4400,8 +4401,8 @@ fn theme_mouse_scroll_up_at_zero() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::empty()));
-    app.theme_area = full_rect();
-    app.theme_offset = 0;
+    app.geo.theme_area = full_rect();
+    app.geo.theme_offset = 0;
     app.theme_picker.as_mut().unwrap().selected = 0;
     app.handle_mouse(mouse(MouseEventKind::ScrollUp, 1, 1));
     assert_eq!(app.theme_picker.as_ref().unwrap().selected, 0);
@@ -4413,8 +4414,8 @@ fn command_palette_mouse_scroll_up_at_zero() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.handle_key(KeyEvent::new(KeyCode::Char('P'), KeyModifiers::CONTROL));
-    app.command_palette_area = full_rect();
-    app.command_palette_offset = 0;
+    app.geo.command_palette_area = full_rect();
+    app.geo.command_palette_offset = 0;
     app.command_palette.as_mut().unwrap().selected = 0;
     app.handle_mouse(mouse(MouseEventKind::ScrollUp, 1, 1));
     assert_eq!(app.command_palette.as_ref().unwrap().selected, 0);
@@ -4428,8 +4429,8 @@ fn search_mouse_scroll_up_at_zero() {
     app.focus = Focus::Content;
     app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
-    app.search_area = full_rect();
-    app.search_offset = 0;
+    app.geo.search_area = full_rect();
+    app.geo.search_offset = 0;
     if app.search.as_ref().unwrap().results_len() > 0 {
         app.search.as_mut().unwrap().selected = 0;
         app.handle_mouse(mouse(MouseEventKind::ScrollUp, 1, 1));
@@ -4470,7 +4471,7 @@ fn breadcrumb_mouse_click_navigates_to_root() {
     assert!(prev > 0, "nested file should not be at index 0");
 
     // Simulate a rendered breadcrumb: root segment spanning columns 1..5 at row 1.
-    app.breadcrumb_areas.push((
+    app.geo.breadcrumb_areas.push((
         root.clone(),
         Rect {
             x: 1,
@@ -4522,7 +4523,7 @@ fn breadcrumb_mouse_click_navigates_to_intermediate_dir() {
         .unwrap();
 
     // Breadcrumb: root (cols 1..5), sub (cols 9..12) with " / " separator.
-    app.breadcrumb_areas.push((
+    app.geo.breadcrumb_areas.push((
         root.clone(),
         Rect {
             x: 1,
@@ -4531,7 +4532,7 @@ fn breadcrumb_mouse_click_navigates_to_intermediate_dir() {
             height: 1,
         },
     ));
-    app.breadcrumb_areas.push((
+    app.geo.breadcrumb_areas.push((
         root.join("sub"),
         Rect {
             x: 9,
@@ -4571,7 +4572,7 @@ fn breadcrumb_mouse_click_parent_changes_root() {
     app.tree_selected = nested;
 
     // Simulate a breadcrumb that includes the parent directory segment.
-    app.breadcrumb_areas.push((
+    app.geo.breadcrumb_areas.push((
         parent.clone(),
         Rect {
             x: 1,
@@ -4580,7 +4581,7 @@ fn breadcrumb_mouse_click_parent_changes_root() {
             height: 1,
         },
     ));
-    app.breadcrumb_areas.push((
+    app.geo.breadcrumb_areas.push((
         root.clone(),
         Rect {
             x: 9,
@@ -4694,7 +4695,7 @@ fn set_scroll_from_mouse_y_track_range_zero() {
     let mut app = app_for(&root);
     // A file with fewer lines than the content height: track_range = 0.
     app.open_file(&root.join("a.txt")); // 2 lines
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 50,

@@ -709,6 +709,6 @@ fn draw_recent_shows_paths_and_records_geometry() {
     assert!(joined.contains("alpha.rs"));
     assert!(joined.contains("beta.rs"));
     // geometry must be recorded for mouse hit-testing
-    assert!(app.recent_area.width > 0);
-    assert!(app.recent_area.height > 0);
+    assert!(app.geo.recent_area.width > 0);
+    assert!(app.geo.recent_area.height > 0);
 }

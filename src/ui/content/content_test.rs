@@ -394,7 +394,7 @@ fn draw_content_records_area_and_fold_gutter_rows() {
         terminal.backend().buffer().clone()
     };
     assert!(
-        app.content_area.width > 0,
+        app.geo.content_area.width > 0,
         "content_area should be recorded after draw"
     );
     assert!(app.fold_gutter_rows.is_empty());

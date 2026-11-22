@@ -113,7 +113,7 @@ impl App {
         self.is_diff
             && self.diff_side_by_side
             && !self.diff_rows.is_empty()
-            && self.content_area.width >= crate::diff::MIN_SIDE_BY_SIDE_WIDTH
+            && self.geo.content_area.width >= crate::diff::MIN_SIDE_BY_SIDE_WIDTH
     }
 
     /// Returns the number of **display** lines after folding/filtering. Equals

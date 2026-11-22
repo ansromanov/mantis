@@ -157,7 +157,7 @@ pub fn render_overlay<W: Write>(app: &App, out: &mut W) {
 /// be shown (no image loaded, pane too small, or an overlay covers the pane).
 fn desired_placement(app: &App) -> Option<(&ContentImage, ImagePlacement)> {
     let img = app.content_image.as_ref()?;
-    let area = app.image_area;
+    let area = app.geo.image_area;
     if area == Rect::default() || area.width == 0 || area.height == 0 {
         return None;
     }

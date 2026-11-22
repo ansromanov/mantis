@@ -16,14 +16,14 @@ use crate::config::{Config, ContentConfig};
 fn new_app_starts_with_search_bar_closed() {
     let app = App::new(std::path::PathBuf::from("."), Config::default(), None, None).unwrap();
     assert!(!app.in_file_search_open);
-    assert_eq!(app.statusbar_area, ratatui::layout::Rect::default());
+    assert_eq!(app.geo.statusbar_area, ratatui::layout::Rect::default());
     assert!(app.statusbar_segments.is_empty());
 }
 
 #[test]
 fn new_app_starts_with_empty_statusbar_geometry() {
     let app = App::new(std::path::PathBuf::from("."), Config::default(), None, None).unwrap();
-    assert_eq!(app.statusbar_area, ratatui::layout::Rect::default());
+    assert_eq!(app.geo.statusbar_area, ratatui::layout::Rect::default());
 }
 
 #[test]
@@ -41,7 +41,7 @@ fn new_app_starts_with_empty_git_status_subsets_and_diff_header_area() {
     assert!(app.git_staged_files.is_empty());
     assert!(app.git_unstaged_files.is_empty());
     assert!(app.git_untracked_files.is_empty());
-    assert_eq!(app.diff_header_area, ratatui::layout::Rect::default());
+    assert_eq!(app.geo.diff_header_area, ratatui::layout::Rect::default());
     fs::remove_dir_all(&root).ok();
 }
 
@@ -342,7 +342,7 @@ fn blame_area_initialises_to_default() {
     let root = temp_dir();
     let app = new_app(&root, Config::default());
     assert_eq!(
-        app.blame_area,
+        app.geo.blame_area,
         ratatui::layout::Rect::default(),
         "blame_area must be default (inactive) until first render"
     );
@@ -630,7 +630,7 @@ fn app_new_starts_without_repo_log_overlay() {
     let root = temp_dir();
     let app = new_app(&root, Config::default());
     assert!(app.repo_log.is_none());
-    assert_eq!(app.repo_log_offset, 0);
+    assert_eq!(app.geo.repo_log_offset, 0);
     fs::remove_dir_all(&root).ok();
 }
 
@@ -687,13 +687,13 @@ fn app_new_starts_with_no_context_menu() {
         "App::new must not open a context menu"
     );
     assert_eq!(
-        app.context_menu_area,
+        app.geo.context_menu_area,
         ratatui::layout::Rect::default(),
         "App::new must start with a default context-menu hit area"
     );
     assert!(app.menu_bar_state.is_none());
-    assert_eq!(app.menu_bar_area, ratatui::layout::Rect::default());
-    assert_eq!(app.menu_dropdown_area, ratatui::layout::Rect::default());
+    assert_eq!(app.geo.menu_bar_area, ratatui::layout::Rect::default());
+    assert_eq!(app.geo.menu_dropdown_area, ratatui::layout::Rect::default());
     fs::remove_dir_all(&root).ok();
 }
 
@@ -730,7 +730,7 @@ fn app_new_starts_without_inline_image_state() {
     let root = temp_dir();
     let app = new_app(&root, Config::default());
     assert!(app.content_image.is_none());
-    assert_eq!(app.image_area, ratatui::layout::Rect::default());
+    assert_eq!(app.geo.image_area, ratatui::layout::Rect::default());
     fs::remove_dir_all(&root).ok();
 }
 

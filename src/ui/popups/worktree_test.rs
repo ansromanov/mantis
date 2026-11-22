@@ -17,5 +17,5 @@ fn draw_worktree_picker_records_list_area() {
     terminal
         .draw(|f| draw_worktree_picker(f, &mut app, f.area()))
         .unwrap();
-    assert!(app.worktree_picker_area.height > 0);
+    assert!(app.geo.worktree_picker_area.height > 0);
 }

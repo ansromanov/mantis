@@ -29,7 +29,7 @@ fn set_fold_regions(app: &mut App) {
         FoldRegion { start: 5, end: 8 },
         FoldRegion { start: 10, end: 12 },
     ];
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -86,7 +86,7 @@ fn toggle_fold_region_adds_and_removes() {
     let mut app = app_for(&root);
     // Open long.txt to have enough content for the fold regions
     app.open_file(&root.join("long.txt")); // 50 lines
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -121,7 +121,7 @@ fn toggle_fold_region_rebuilds_display_map() {
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt")); // 50 lines
     app.fold_regions = vec![FoldRegion { start: 0, end: 2 }];
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -150,7 +150,7 @@ fn toggle_fold_region_clamps_scroll() {
         FoldRegion { start: 0, end: 45 },
         FoldRegion { start: 46, end: 48 },
     ];
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,

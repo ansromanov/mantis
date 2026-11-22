@@ -197,10 +197,10 @@ pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) -> Vec<Status
 
 /// Returns the segment under a click using geometry generated with the line.
 pub(crate) fn hit_test(app: &App, column: u16, row: u16) -> Option<StatusSegment> {
-    if row < app.statusbar_area.y
-        || row >= app.statusbar_area.bottom()
-        || column < app.statusbar_area.x
-        || column >= app.statusbar_area.right()
+    if row < app.geo.statusbar_area.y
+        || row >= app.geo.statusbar_area.bottom()
+        || column < app.geo.statusbar_area.x
+        || column >= app.geo.statusbar_area.right()
     {
         return None;
     }

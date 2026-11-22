@@ -120,7 +120,7 @@ fn draw_context_menu_records_hit_area() {
         .draw(|f| draw_context_menu(f, &mut app, Rect::new(0, 0, 80, 24)))
         .unwrap();
 
-    let area = app.context_menu_area;
+    let area = app.geo.context_menu_area;
     assert_ne!(area.width, 0, "render must record the popup hit area");
     assert_eq!(area.height, 3 + 2, "hit area must match the popup height");
 }

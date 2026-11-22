@@ -92,8 +92,8 @@ pub(crate) fn draw_repo_log(f: &mut Frame, app: &mut App, area: Rect) {
 
     f.render_stateful_widget(list, parts[2], &mut state);
 
-    app.repo_log_area = parts[2];
-    app.repo_log_offset = state.offset();
+    app.geo.repo_log_area = parts[2];
+    app.geo.repo_log_offset = state.offset();
 }
 
 #[cfg(test)]
