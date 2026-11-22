@@ -63,6 +63,7 @@ mod secret_mask;
 mod selection;
 mod session;
 mod sys_info;
+mod text_width;
 mod theme;
 mod tree;
 mod ui;

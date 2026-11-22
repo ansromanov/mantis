@@ -94,6 +94,7 @@ fn create_base_app() -> App {
         secret_revealed: false,
         content_scroll: 0,
         content_hscroll: 0,
+        scroll_wrap_width: 0,
         active_line: 0,
         show_line_blame: false,
         word_wrap: false,

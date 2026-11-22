@@ -365,12 +365,6 @@ pub(crate) fn render_inline_fallback<'a>(
 // the content — ratatui's built-in Wrap doesn't expose row counts to the gutter
 // Paragraph, causing cumulative drift on each wrapped line.
 
-/// Width of a single character in terminal columns.
-fn char_width(c: char) -> usize {
-    let mut buf = [0u8; 4];
-    UnicodeWidthStr::width(c.encode_utf8(&mut buf))
-}
-
 /// Group consecutive `(char, Style)` pairs into styled `Span`s, merging spans
 /// that share the same style.
 fn chars_to_spans(chars: &[(char, Style)]) -> Vec<Span<'static>> {
@@ -393,51 +387,17 @@ fn chars_to_spans(chars: &[(char, Style)]) -> Vec<Span<'static>> {
     spans
 }
 
-/// Split a flat list of `(char, Style)` pairs into visual rows, each at most
-/// `max_width` terminal columns wide. Simple character-width break (no word
-/// boundary preference), matching the existing `content_pos` heuristic.
-fn split_at_width(chars: &[(char, Style)], max_width: usize) -> Vec<Vec<(char, Style)>> {
-    if chars.is_empty() || max_width == 0 {
-        return vec![chars.to_vec()];
-    }
-    let mut rows: Vec<Vec<(char, Style)>> = Vec::new();
-    let mut line_start = 0;
-    while line_start < chars.len() {
-        let mut line_width = 0usize;
-        let mut i = line_start;
-        while i < chars.len() {
-            let (ch, _) = chars[i];
-            let ch_w = char_width(ch);
-            if line_width + ch_w > max_width {
-                break;
-            }
-            line_width += ch_w;
-            i += 1;
-        }
-        if i == chars.len() {
-            rows.push(chars[line_start..].to_vec());
-            break;
-        }
-        if line_start == i {
-            // Single char (e.g. a wide CJK char) doesn't fit; include it
-            // anyway to avoid an infinite loop.
-            rows.push(chars[line_start..=line_start].to_vec());
-            line_start += 1;
-        } else {
-            rows.push(chars[line_start..i].to_vec());
-            line_start = i;
-        }
-    }
-    rows
-}
-
 /// Break a single styled `Line` into one or more visual rows at `max_width`.
 /// Returns one `Line` per visual row; the first is unchanged if it fits.
 fn break_line<'a>(line: &Line<'a>, max_width: usize) -> Vec<Line<'a>> {
     if max_width == 0 {
         return vec![line.clone()];
     }
-    let total_w: usize = line.spans.iter().map(|s| s.content.as_ref().width()).sum();
+    let total_w: usize = line
+        .spans
+        .iter()
+        .map(|s| crate::text_width::str_width(s.content.as_ref()))
+        .sum();
     if total_w <= max_width {
         return vec![line.clone()];
     }
@@ -446,10 +406,11 @@ fn break_line<'a>(line: &Line<'a>, max_width: usize) -> Vec<Line<'a>> {
         .iter()
         .flat_map(|s| s.content.chars().map(|c| (c, s.style)))
         .collect();
-    let char_rows = split_at_width(&chars, max_width);
-    char_rows
-        .into_iter()
-        .map(|row| Line::from(chars_to_spans(&row)))
+    let mut breaks = crate::text_width::row_breaks(chars.iter().map(|(c, _)| *c), max_width);
+    breaks.push(chars.len());
+    breaks
+        .windows(2)
+        .map(|w| Line::from(chars_to_spans(&chars[w[0]..w[1]])))
         .collect()
 }
 

@@ -713,14 +713,18 @@ fn wrapped_rendered_text_with_spaces_matches_the_scroll_math() {
         .unwrap();
 
     let inner_w = (w - 2) as usize;
-    let expected_rows = text.chars().count().div_ceil(inner_w);
-    assert_eq!(app.wrapped_content_rows(), expected_rows);
+    let expected_rows = crate::text_width::wrap_row_count(&text, inner_w);
+    assert_eq!(
+        app.wrapped_content_rows(),
+        expected_rows,
+        "scroll math must use the same wrap as the renderer"
+    );
 
     app.set_content_scroll(usize::MAX);
     terminal
         .draw(|frame| draw_content(frame, &mut app, frame.area()))
         .unwrap();
-    // Reassemble the visible rows; hard wrapping preserves every character.
+    // Reassemble the visible rows: every word of the tail must be on screen.
     let buffer = terminal.backend().buffer();
     let mut painted = String::new();
     for y in 1..(h - 1) {
@@ -728,13 +732,89 @@ fn wrapped_rendered_text_with_spaces_matches_the_scroll_math() {
             painted.push_str(buffer[(x, y)].symbol());
         }
     }
-    let tail: String = text
-        .chars()
-        .skip(text.chars().count().saturating_sub(10))
-        .collect();
+    let squashed: String = painted.split_whitespace().collect::<Vec<_>>().join(" ");
     assert!(
-        painted.contains(&tail),
-        "last row must show the end of the text, got {painted:?}"
+        squashed.ends_with("lambda mu"),
+        "last row must show the end of the text, got {squashed:?}"
     );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn resizing_the_pane_keeps_the_same_line_at_the_top() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.virtual_file = None;
+    app.rendered_content.clear();
+    app.rendered_text.clear();
+    app.rendered_active = false;
+    app.word_wrap = true;
+    app.content = (0..40)
+        .map(|i| format!("line {i}: the quick brown fox jumps over the lazy dog and runs far away"))
+        .collect();
+    app.highlighted = app
+        .content
+        .iter()
+        .map(|l| vec![(Style::default(), l.clone())])
+        .collect();
+
+    let draw = |app: &mut App, w: u16| {
+        let backend = TestBackend::new(w, 10);
+        let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        terminal
+            .draw(|frame| draw_content(frame, app, frame.area()))
+            .unwrap();
+        let buffer = terminal.backend().buffer().clone();
+        (1..w - 1)
+            .map(|x| buffer[(x, 1)].symbol().to_string())
+            .collect::<String>()
+    };
+
+    draw(&mut app, 70);
+    let start = app.wrapped_line_start(20);
+    app.set_content_scroll(start);
+    let wide_top = draw(&mut app, 70);
+    assert!(wide_top.contains("line 20:"), "{wide_top:?}");
+
+    // Shrink the pane: the same logical line must still be the top row.
+    let narrow_top = draw(&mut app, 34);
+    assert!(
+        narrow_top.contains("line 20:"),
+        "after a resize the view drifted to {narrow_top:?}"
+    );
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn wrapped_text_breaks_between_words_not_inside_them() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.virtual_file = None;
+    app.rendered_content.clear();
+    app.rendered_text.clear();
+    app.rendered_active = false;
+    app.word_wrap = true;
+    app.content = vec!["alpha beta gamma delta epsilon zeta".to_string()];
+    app.highlighted = vec![vec![(Style::default(), app.content[0].clone())]];
+
+    let backend = TestBackend::new(18, 8);
+    let mut terminal = ratatui::Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| draw_content(frame, &mut app, frame.area()))
+        .unwrap();
+    let buffer = terminal.backend().buffer();
+    let mut rows = Vec::new();
+    for y in 1..7u16 {
+        let row: String = (1..17u16)
+            .map(|x| buffer[(x, y)].symbol().to_string())
+            .collect();
+        rows.push(row.trim_end().to_string());
+    }
+    for word in ["alpha", "beta", "gamma", "delta", "epsilon", "zeta"] {
+        assert!(
+            rows.iter().any(|r| r.split_whitespace().any(|w| w == word)),
+            "word {word:?} was split across rows: {rows:?}"
+        );
+    }
     fs::remove_dir_all(&root).ok();
 }

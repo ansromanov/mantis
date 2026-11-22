@@ -138,6 +138,12 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         }
     }
 
+    // Record this frame's geometry *before* any scroll math reads it. It used to
+    // be written at the end of the frame, so the math ran on last frame's size and
+    // a resize painted one wrong frame (and could leave the view off-position).
+    app.content_area = inner;
+    app.remap_scroll_for_width(inner.width as usize);
+
     let view_height = inner.height as usize;
     let total_lines = app.display_line_count();
     let scroll = app.content_scroll.min(app.content_scroll_max());

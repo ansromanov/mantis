@@ -116,6 +116,9 @@ pub struct App {
     pub secret_revealed: bool,
     pub content_scroll: usize,
     pub content_hscroll: usize,
+    /// Pane width `content_scroll` was last expressed in (wrapped rows depend on
+    /// it); 0 until the first draw. See `remap_scroll_for_width`.
+    pub(crate) scroll_wrap_width: usize,
     /// Cursor (active line) index in the content pane (display-line coordinate).
     /// `j`/`k` move this when the content pane is focused; the viewport
     /// auto-scrolls to keep it visible.

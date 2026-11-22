@@ -577,10 +577,8 @@ impl App {
     /// Toggles content word wrap, persisting the new value and clamping the
     /// scroll position to the (possibly narrower) content.
     pub(crate) fn toggle_word_wrap(&mut self) {
-        self.word_wrap = !self.word_wrap;
+        self.set_word_wrap(!self.word_wrap);
         self.config.content.word_wrap = self.word_wrap;
-        self.content_hscroll = 0;
-        self.clamp_content_scroll();
         self.save_config();
     }
 

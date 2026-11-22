@@ -200,7 +200,7 @@ impl App {
         self.ignore_gitignore = cfg.git.ignore_gitignore;
         self.tree_width = cfg.tree.width;
         self.tree_independent_scroll = cfg.tree.independent_scroll;
-        self.word_wrap = cfg.content.word_wrap;
+        self.set_word_wrap(cfg.content.word_wrap);
         self.git_status_enabled = cfg.git.status;
         self.git_show_deleted = cfg.git.show_deleted;
         self.git_show_untracked = cfg.git.show_untracked;
