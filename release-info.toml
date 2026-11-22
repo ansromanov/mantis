@@ -1,5 +1,11 @@
-version = "0.23.0"
-date = "2026-09-17"
-whats_new = """- feat(git): improve git UX clarity with badges, diff header bar, and mouse controls (#875)
-- chore: bump Homebrew formula to v0.22.5 [skip ci]"""
-release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.23.0"
+version = "0.24.0"
+date = "2026-11-22"
+whats_new = """## [unreleased]
+
+### Features
+
+- Enforce the Rust file-size limit (#880)
+- Derive Mantis release versions from Conventional Commits (#878)
+- Revive and simplify mantis (native folds and markdown, no plugin system)
+- Bring Python diagnostics and Kubernetes facts into the app"""
+release_url = "https://github.com/ansromanov/mantis/releases/tag/v0.24.0"
