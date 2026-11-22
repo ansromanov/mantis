@@ -53,7 +53,7 @@ pub(crate) fn menu_index_at(area: Rect, column: u16) -> Option<usize> {
 }
 
 pub(crate) fn draw_menu_bar(f: &mut Frame, app: &mut App, row: Rect) {
-    app.menu_bar_area = row;
+    app.geo.menu_bar_area = row;
     let active = app.menu_bar_state.map(|state| state.menu_index);
     let mut spans = Vec::new();
     for (index, menu) in MENUS.iter().enumerate() {
@@ -74,7 +74,7 @@ pub(crate) fn draw_menu_bar(f: &mut Frame, app: &mut App, row: Rect) {
         Paragraph::new(Line::from(spans)).alignment(Alignment::Left),
         row,
     );
-    app.menu_dropdown_area = Rect::default();
+    app.geo.menu_dropdown_area = Rect::default();
     if let Some(state) = app.menu_bar_state {
         draw_dropdown(f, app, row, state);
     }
@@ -155,7 +155,7 @@ fn draw_dropdown(f: &mut Frame, app: &mut App, row: Rect, state: MenuBarState) {
     let list =
         List::new(list_items).highlight_style(theme.selection_style().add_modifier(Modifier::BOLD));
     f.render_stateful_widget(list, inner, &mut list_state);
-    app.menu_dropdown_area = popup;
+    app.geo.menu_dropdown_area = popup;
 }
 
 #[cfg(test)]

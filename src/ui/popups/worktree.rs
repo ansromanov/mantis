@@ -71,8 +71,8 @@ pub(crate) fn draw_worktree_picker(f: &mut Frame, app: &mut App, area: Rect) {
         state.select(Some(picker.selected));
     }
     f.render_stateful_widget(list, parts[3], &mut state);
-    app.worktree_picker_area = parts[3];
-    app.worktree_picker_offset = state.offset();
+    app.geo.worktree_picker_area = parts[3];
+    app.geo.worktree_picker_offset = state.offset();
 }
 
 #[cfg(test)]

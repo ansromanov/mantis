@@ -27,6 +27,6 @@ fn draw_welcome_does_not_panic() {
         .draw(|f| draw_welcome(f, &mut app, f.area()))
         .unwrap();
 
-    assert_eq!(app.welcome_area.width, 48); // 80 * 60% = 48
-    assert_eq!(app.welcome_area.height, 21); // 30 * 70% = 21
+    assert_eq!(app.geo.welcome_area.width, 48); // 80 * 60% = 48
+    assert_eq!(app.geo.welcome_area.height, 21); // 30 * 70% = 21
 }

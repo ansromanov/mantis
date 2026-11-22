@@ -410,7 +410,7 @@ impl App {
         if self.tree_filter.is_none() {
             return;
         }
-        let page = (self.tree_area.height as usize).max(1) as isize;
+        let page = (self.geo.tree_area.height as usize).max(1) as isize;
         if key.code == KeyCode::Up {
             self.move_tree_filter_selection(-1);
             return;
@@ -1011,7 +1011,7 @@ impl App {
                         )
                     };
                     let lines_count = report_md.lines().count();
-                    let height = self.bug_report_preview_area.height.max(1) as usize;
+                    let height = self.geo.bug_report_preview_area.height.max(1) as usize;
                     let max_scroll = lines_count.saturating_sub(height);
                     state.preview_scroll.scroll_down(10, max_scroll);
                 }

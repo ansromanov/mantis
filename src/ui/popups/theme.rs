@@ -82,8 +82,8 @@ pub(crate) fn draw_theme(f: &mut Frame, app: &mut App, area: Rect) {
 
     f.render_stateful_widget(list, parts[2], &mut state);
 
-    app.theme_area = parts[2];
-    app.theme_offset = state.offset();
+    app.geo.theme_area = parts[2];
+    app.geo.theme_offset = state.offset();
 }
 
 #[cfg(test)]

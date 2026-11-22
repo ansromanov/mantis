@@ -264,8 +264,8 @@ fn draw_command_results(
 
     f.render_stateful_widget(list, list_area, &mut state);
 
-    app.command_palette_area = list_area;
-    app.command_palette_offset = state.offset();
+    app.geo.command_palette_area = list_area;
+    app.geo.command_palette_offset = state.offset();
 }
 
 /// Renders file-path results for the `/` (Files) route.
@@ -296,8 +296,8 @@ fn draw_file_results(f: &mut Frame, app: &mut App, list_area: Rect, theme: &crat
 
     f.render_stateful_widget(list, list_area, &mut state);
 
-    app.command_palette_area = list_area;
-    app.command_palette_offset = state.offset();
+    app.geo.command_palette_area = list_area;
+    app.geo.command_palette_offset = state.offset();
 }
 
 /// Renders content-match results for the `#` (Content) route.
@@ -348,8 +348,8 @@ fn draw_content_results(
 
     f.render_stateful_widget(list, list_area, &mut state);
 
-    app.command_palette_area = list_area;
-    app.command_palette_offset = state.offset();
+    app.geo.command_palette_area = list_area;
+    app.geo.command_palette_offset = state.offset();
 }
 
 /// Renders a hint for the `:` (Go to Line) route, which has no selectable list.
@@ -373,8 +373,8 @@ fn draw_symbol_results(f: &mut Frame, app: &mut App, list_area: Rect, theme: &cr
     };
     if picker.filtered.is_empty() {
         f.render_widget(Paragraph::new("No matching symbols"), list_area);
-        app.command_palette_area = list_area;
-        app.command_palette_offset = 0;
+        app.geo.command_palette_area = list_area;
+        app.geo.command_palette_offset = 0;
         return;
     }
     let items: Vec<ListItem> = picker
@@ -402,8 +402,8 @@ fn draw_symbol_results(f: &mut Frame, app: &mut App, list_area: Rect, theme: &cr
         list_area,
         &mut state,
     );
-    app.command_palette_area = list_area;
-    app.command_palette_offset = state.offset();
+    app.geo.command_palette_area = list_area;
+    app.geo.command_palette_offset = state.offset();
 }
 
 /// Renders diagnostics for the `!` command-palette route.
@@ -423,8 +423,8 @@ fn draw_diagnostic_results(
     };
     if picker.filtered.is_empty() {
         f.render_widget(Paragraph::new("No matching diagnostics"), list_area);
-        app.command_palette_area = list_area;
-        app.command_palette_offset = 0;
+        app.geo.command_palette_area = list_area;
+        app.geo.command_palette_offset = 0;
         return;
     }
     let items: Vec<ListItem> = picker
@@ -458,6 +458,6 @@ fn draw_diagnostic_results(
         list_area,
         &mut state,
     );
-    app.command_palette_area = list_area;
-    app.command_palette_offset = state.offset();
+    app.geo.command_palette_area = list_area;
+    app.geo.command_palette_offset = state.offset();
 }

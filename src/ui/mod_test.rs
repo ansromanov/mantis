@@ -72,7 +72,7 @@ fn render(app: &mut App) -> Vec<String> {
 fn draw_no_overlay() {
     let mut app = make_app();
     let rows = render(&mut app);
-    assert_eq!(app.menu_bar_area, ratatui::layout::Rect::default());
+    assert_eq!(app.geo.menu_bar_area, ratatui::layout::Rect::default());
     let joined = rows.join("\n");
     assert!(joined.contains("mantis"));
     // The version badge (P_VER, highest priority) fills the 80-char status bar;
@@ -90,8 +90,8 @@ fn menu_bar_uses_an_extra_row_and_seven_row_minimum() {
     let backend = TestBackend::new(80, 7);
     let mut terminal = Terminal::new(backend).unwrap();
     terminal.draw(|f| super::draw(f, &mut app)).unwrap();
-    assert_eq!(app.menu_bar_area.y, 0);
-    assert_eq!(app.menu_bar_area.height, 1);
+    assert_eq!(app.geo.menu_bar_area.y, 0);
+    assert_eq!(app.geo.menu_bar_area.height, 1);
     assert!(buffer_rows(&terminal)[0].contains("General"));
 
     let backend = TestBackend::new(80, 6);
@@ -223,9 +223,9 @@ fn draw_narrow_terminal_shows_resize_message_and_clears_panel_geometry() {
     let joined = buffer_rows(&terminal).join("\n");
     assert!(joined.contains("Terminal too"));
     assert!(joined.contains("80 columns"));
-    assert_eq!(app.tree_area, ratatui::layout::Rect::default());
-    assert_eq!(app.content_area, ratatui::layout::Rect::default());
-    assert_eq!(app.splitter_area, ratatui::layout::Rect::default());
+    assert_eq!(app.geo.tree_area, ratatui::layout::Rect::default());
+    assert_eq!(app.geo.content_area, ratatui::layout::Rect::default());
+    assert_eq!(app.geo.splitter_area, ratatui::layout::Rect::default());
 }
 
 #[test]
@@ -287,8 +287,8 @@ fn draw_double_checks_default_config_honoured_default_layout() {
 fn draw_records_statusbar_geometry_for_mouse_hit_testing() {
     let mut app = make_app();
     let rows = render(&mut app);
-    assert_eq!(app.statusbar_area.height, 1);
-    assert_eq!(app.statusbar_area.y as usize, rows.len() - 1);
+    assert_eq!(app.geo.statusbar_area.height, 1);
+    assert_eq!(app.geo.statusbar_area.y as usize, rows.len() - 1);
 }
 
 #[test]
@@ -306,13 +306,13 @@ fn workspace_shell_keeps_menu_and_tree_geometry_when_active_tab_changes() {
     terminal
         .draw(|f| super::draw_workspace(f, &mut tabs))
         .unwrap();
-    let first_tree = tabs.active_app().tree_area;
-    let first_menu = tabs.active_app().menu_bar_area;
+    let first_tree = tabs.active_app().geo.tree_area;
+    let first_menu = tabs.active_app().geo.menu_bar_area;
 
     tabs.set_active(1);
     terminal
         .draw(|f| super::draw_workspace(f, &mut tabs))
         .unwrap();
-    assert_eq!(tabs.active_app().tree_area.width, first_tree.width);
-    assert_eq!(tabs.active_app().menu_bar_area, first_menu);
+    assert_eq!(tabs.active_app().geo.tree_area.width, first_tree.width);
+    assert_eq!(tabs.active_app().geo.menu_bar_area, first_menu);
 }

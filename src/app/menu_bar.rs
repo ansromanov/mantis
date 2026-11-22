@@ -125,8 +125,8 @@ impl App {
 
     /// Routes pointer movement and clicks within the menu row and dropdown.
     pub(crate) fn handle_menu_bar_mouse(&mut self, event: MouseEvent) {
-        let in_bar = rect_contains(self.menu_bar_area, event.column, event.row);
-        let in_dropdown = rect_contains(self.menu_dropdown_area, event.column, event.row);
+        let in_bar = rect_contains(self.geo.menu_bar_area, event.column, event.row);
+        let in_dropdown = rect_contains(self.geo.menu_dropdown_area, event.column, event.row);
         if matches!(
             event.kind,
             MouseEventKind::ScrollDown | MouseEventKind::ScrollUp
@@ -148,7 +148,7 @@ impl App {
                     return;
                 };
                 if let Some(index) =
-                    crate::ui::menu_bar::menu_index_at(self.menu_bar_area, event.column)
+                    crate::ui::menu_bar::menu_index_at(self.geo.menu_bar_area, event.column)
                 {
                     if index != state.menu_index {
                         self.menu_bar_state = Some(MenuBarState {
@@ -159,14 +159,15 @@ impl App {
                 }
             } else if in_dropdown {
                 if let Some(state) = self.menu_bar_state {
-                    if event.row <= self.menu_dropdown_area.y
-                        || event.row >= self.menu_dropdown_area.bottom().saturating_sub(1)
+                    if event.row <= self.geo.menu_dropdown_area.y
+                        || event.row >= self.geo.menu_dropdown_area.bottom().saturating_sub(1)
                     {
                         return;
                     }
-                    let visible_rows = self.menu_dropdown_area.height.saturating_sub(2) as usize;
+                    let visible_rows =
+                        self.geo.menu_dropdown_area.height.saturating_sub(2) as usize;
                     let row = dropdown_scroll_offset(state.selected, visible_rows)
-                        + event.row.saturating_sub(self.menu_dropdown_area.y + 1) as usize;
+                        + event.row.saturating_sub(self.geo.menu_dropdown_area.y + 1) as usize;
                     let count = menu_actions(self, MENUS[state.menu_index]).len();
                     if row < count {
                         if let Some(state) = self.menu_bar_state.as_mut() {
@@ -179,7 +180,8 @@ impl App {
         }
         if let MouseEventKind::Down(MouseButton::Left) = event.kind {
             if in_bar {
-                let index = crate::ui::menu_bar::menu_index_at(self.menu_bar_area, event.column);
+                let index =
+                    crate::ui::menu_bar::menu_index_at(self.geo.menu_bar_area, event.column);
                 let already_open = self
                     .menu_bar_state
                     .is_some_and(|state| Some(state.menu_index) == index);
@@ -196,14 +198,14 @@ impl App {
                 let Some(state) = self.menu_bar_state else {
                     return;
                 };
-                if event.row <= self.menu_dropdown_area.y
-                    || event.row >= self.menu_dropdown_area.bottom().saturating_sub(1)
+                if event.row <= self.geo.menu_dropdown_area.y
+                    || event.row >= self.geo.menu_dropdown_area.bottom().saturating_sub(1)
                 {
                     return;
                 }
-                let visible_rows = self.menu_dropdown_area.height.saturating_sub(2) as usize;
+                let visible_rows = self.geo.menu_dropdown_area.height.saturating_sub(2) as usize;
                 let row = dropdown_scroll_offset(state.selected, visible_rows)
-                    + event.row.saturating_sub(self.menu_dropdown_area.y + 1) as usize;
+                    + event.row.saturating_sub(self.geo.menu_dropdown_area.y + 1) as usize;
                 if let Some(item) = menu_actions(self, MENUS[state.menu_index]).get(row) {
                     let id = item.id.clone();
                     self.menu_bar_state = None;

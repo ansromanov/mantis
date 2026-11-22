@@ -114,7 +114,7 @@ fn action_desc(action_id: &str) -> &'static str {
 pub(crate) fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
     let theme = &app.theme;
     let popup = centered_rect(80, 80, area);
-    app.help_area = popup;
+    app.geo.help_area = popup;
     f.render_widget(Clear, popup);
 
     let block = Block::default()

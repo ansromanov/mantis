@@ -470,7 +470,7 @@ fn bench_tree_redraw(c: &mut Criterion) {
                     terminal
                         .draw(|f| mantis::ui::tree::draw_tree(f, &mut app, area))
                         .unwrap();
-                    black_box(&app.tree_area);
+                    black_box(&app.geo.tree_area);
                 })
             },
         );
@@ -485,7 +485,7 @@ fn bench_tree_redraw(c: &mut Criterion) {
                     terminal
                         .draw(|f| mantis::ui::tree::draw_tree(f, &mut app, area))
                         .unwrap();
-                    black_box(&app.tree_area);
+                    black_box(&app.geo.tree_area);
                 })
             },
         );
@@ -502,7 +502,7 @@ fn bench_tree_redraw(c: &mut Criterion) {
                     terminal
                         .draw(|f| mantis::ui::tree::draw_tree(f, &mut app, area))
                         .unwrap();
-                    black_box(&app.tree_area);
+                    black_box(&app.geo.tree_area);
                 })
             },
         );

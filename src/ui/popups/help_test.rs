@@ -728,7 +728,7 @@ fn help_mouse_click_tabs_and_outside() {
     let mut terminal = Terminal::new(backend).unwrap();
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
 
-    let area = app.help_area;
+    let area = app.geo.help_area;
     assert!(area.width > 0);
 
     // Left click outside area: should close help overlay and reset tab
@@ -892,7 +892,7 @@ fn help_mouse_click_reaches_neighbor_of_scrolled_tab() {
     let mut terminal = Terminal::new(backend).unwrap();
     terminal.draw(|f| draw_help(f, &mut app, f.area())).unwrap();
 
-    let area = app.help_area;
+    let area = app.geo.help_area;
     let available_width = area.width.saturating_sub(2);
     let offset = help_tab_scroll_offset(app.help_tab, available_width);
     assert!(

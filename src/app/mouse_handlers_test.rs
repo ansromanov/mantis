@@ -44,7 +44,7 @@ fn clicking_outside_bookmarks_closes_picker() {
     app.bookmarks = Some(crate::search::RecentFilesState::new(vec![
         root.join("long.txt")
     ]));
-    app.recent_area = Rect::new(10, 10, 20, 5);
+    app.geo.recent_area = Rect::new(10, 10, 20, 5);
     app.handle_mouse(left_down_at(0, 0));
     assert!(app.bookmarks.is_none());
     fs::remove_dir_all(&root).ok();
@@ -74,7 +74,7 @@ fn double_clicking_symbol_result_jumps_to_declaration() {
         None,
     ));
     app.command_palette = Some(palette);
-    app.command_palette_area = Rect::new(10, 5, 40, 8);
+    app.geo.command_palette_area = Rect::new(10, 5, 40, 8);
 
     app.handle_mouse(left_down_at(11, 5));
     app.handle_mouse(left_down_at(11, 5));
@@ -124,7 +124,7 @@ fn right_down_at(column: u16, row: u16) -> MouseEvent {
 fn statusbar_segment_click_opens_revision_picker_and_blank_space_is_noop() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.statusbar_area = Rect::new(0, 0, 30, 1);
+    app.geo.statusbar_area = Rect::new(0, 0, 30, 1);
     app.statusbar_segments = vec![(crate::ui::statusbar::StatusSegment::Git, 4, 14, 0)];
 
     app.handle_mouse(left_down_at(7, 0));
@@ -144,7 +144,7 @@ fn statusbar_overlay_hint_line_has_no_click_targets() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.goto_line = Some(crate::search::GotoLineState::new());
-    app.statusbar_area = Rect::new(0, 0, 30, 1);
+    app.geo.statusbar_area = Rect::new(0, 0, 30, 1);
     app.statusbar_segments.clear();
 
     app.handle_mouse(left_down_at(5, 0));
@@ -160,7 +160,7 @@ fn scrolling_content_marks_session_dirty() {
     app.open_file(&root.join("long.txt"));
     // Give the content pane a real area so the scroll has somewhere to land and
     // content_scroll_max() is non-zero.
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 40,
         y: 0,
         width: 40,
@@ -184,7 +184,7 @@ fn scroll_up_at_content_top_is_noop() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 40,
         y: 0,
         width: 40,
@@ -209,7 +209,7 @@ fn wheel_scrolling_keeps_text_cursor_visible() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 40,
         y: 0,
         width: 40,
@@ -237,13 +237,13 @@ fn scroll_outside_content_does_not_mark_dirty() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 40,
         y: 0,
         width: 40,
         height: 10,
     };
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 0,
         y: 0,
         width: 40,
@@ -265,7 +265,7 @@ fn help_overlay_intercepts_wheel_before_content_pane() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -326,7 +326,7 @@ fn help_overlay_mouse_click_actions() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.show_help = true;
-    app.help_area = Rect {
+    app.geo.help_area = Rect {
         x: 10,
         y: 10,
         width: 80,
@@ -374,13 +374,13 @@ fn wheel_over_tree_scrolls_without_moving_cursor() {
         "temp_tree must have >2 nodes for this test; got {}",
         app.nodes.len()
     );
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 40,
         y: 0,
         width: 40,
         height: 10,
     };
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 0,
         y: 0,
         width: 40,
@@ -393,7 +393,7 @@ fn wheel_over_tree_scrolls_without_moving_cursor() {
         max_scroll > 0,
         "precondition: tree_scroll_max() must be > 0 (nodes={}, height={})",
         app.nodes.len(),
-        app.tree_area.height
+        app.geo.tree_area.height
     );
 
     app.handle_mouse(scroll_down_at(5, 0));
@@ -415,7 +415,7 @@ fn double_click_dir_descends_root() {
     let mut app = app_for(&root);
 
     // Set up tree area so clicks land on the tree panel.
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 0,
         y: 0,
         width: 40,
@@ -464,7 +464,7 @@ fn double_click_file_does_not_descend() {
     let root = tree_with_dir();
     let mut app = app_for(&root);
 
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 0,
         y: 0,
         width: 40,
@@ -498,7 +498,7 @@ fn breadcrumb_single_click_does_not_navigate() {
     let root = tree_with_dir();
     let mut app = app_for(&root);
 
-    app.breadcrumb_areas.push((
+    app.geo.breadcrumb_areas.push((
         root.clone(),
         Rect {
             x: 1,
@@ -527,7 +527,7 @@ fn breadcrumb_double_click_navigates() {
     let root = tree_with_dir();
     let mut app = app_for(&root);
 
-    app.breadcrumb_areas.push((
+    app.geo.breadcrumb_areas.push((
         root.clone(),
         Rect {
             x: 1,
@@ -557,7 +557,7 @@ fn breadcrumb_double_click_expired_does_not_navigate() {
     let root = tree_with_dir();
     let mut app = app_for(&root);
 
-    app.breadcrumb_areas.push((
+    app.geo.breadcrumb_areas.push((
         root.clone(),
         Rect {
             x: 1,
@@ -588,7 +588,7 @@ fn breadcrumb_double_click_on_compact_dotdot_changes_root() {
 
     // Simulate a compact breadcrumb: a ".." segment pointing to the parent,
     // followed by the root segment.
-    app.breadcrumb_areas.push((
+    app.geo.breadcrumb_areas.push((
         parent.clone(),
         Rect {
             x: 1,
@@ -597,7 +597,7 @@ fn breadcrumb_double_click_on_compact_dotdot_changes_root() {
             height: 1,
         },
     ));
-    app.breadcrumb_areas.push((
+    app.geo.breadcrumb_areas.push((
         root.clone(),
         Rect {
             x: 6,
@@ -627,13 +627,13 @@ fn blame_area_click_moves_active_line() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 30,
         y: 1,
         width: 50,
         height: 20,
     };
-    app.blame_area = Rect {
+    app.geo.blame_area = Rect {
         x: 30,
         y: 1,
         width: 30,
@@ -661,13 +661,13 @@ fn blame_area_click_does_not_set_show_line_blame() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 30,
         y: 1,
         width: 50,
         height: 20,
     };
-    app.blame_area = Rect {
+    app.geo.blame_area = Rect {
         x: 30,
         y: 1,
         width: 30,
@@ -691,13 +691,13 @@ fn tree_click_does_not_set_show_line_blame_when_blame_active() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 0,
         y: 1,
         width: 30,
         height: 20,
     };
-    app.tree_offset = 0;
+    app.geo.tree_offset = 0;
     app.active_line = 0;
     app.show_blame = true;
     app.show_line_blame = false;
@@ -715,7 +715,7 @@ fn mouse_content_click_moves_active_line() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 5,
         y: 5,
         width: 50,
@@ -734,7 +734,7 @@ fn mouse_content_click_moves_active_line_in_display_space_when_folded() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 5,
         y: 5,
         width: 50,
@@ -764,13 +764,13 @@ fn tree_click_with_no_filter_selects_node_directly() {
     let mut app = app_for(&root);
     // tree_visible_indices is None (no filter) by default.
     assert!(app.tree_visible_indices.is_none());
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 0,
         y: 2,
         width: 20,
         height: 20,
     };
-    app.tree_offset = 0;
+    app.geo.tree_offset = 0;
     // Click on the second row (index 1).
     app.handle_mouse(left_down_at(1, 3));
     assert_eq!(
@@ -786,13 +786,13 @@ fn tree_click_with_no_filter_selects_node_directly() {
 fn right_click_on_tree_row_opens_context_menu_on_that_row() {
     let root = tree_with_dir();
     let mut app = app_for(&root);
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 0,
         y: 1,
         width: 40,
         height: 20,
     };
-    app.tree_offset = 0;
+    app.geo.tree_offset = 0;
     let target = root.join("a.txt");
     let target_idx = app
         .nodes
@@ -821,13 +821,13 @@ fn right_click_in_content_pane_opens_content_menu() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 40,
         y: 5,
         width: 40,
         height: 10,
     };
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 0,
         y: 5,
         width: 40,
@@ -853,13 +853,13 @@ fn right_click_in_content_pane_opens_content_menu() {
 fn right_click_outside_panes_is_noop() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 0,
         y: 0,
         width: 40,
         height: 10,
     };
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 40,
         y: 0,
         width: 40,
@@ -876,13 +876,13 @@ fn right_click_outside_panes_is_noop() {
 fn right_click_out_of_range_tree_row_is_noop() {
     let root = tree_with_dir();
     let mut app = app_for(&root);
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 0,
         y: 0,
         width: 40,
         height: 20,
     };
-    app.tree_offset = 0;
+    app.geo.tree_offset = 0;
 
     app.handle_mouse(right_down_at(5, 100));
 
@@ -894,16 +894,16 @@ fn right_click_out_of_range_tree_row_is_noop() {
 fn open_context_menu_intercepts_subsequent_clicks() {
     let root = tree_with_dir();
     let mut app = app_for(&root);
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 0,
         y: 0,
         width: 40,
         height: 20,
     };
-    app.tree_offset = 0;
+    app.geo.tree_offset = 0;
     app.handle_mouse(right_down_at(5, 1));
     assert!(app.context_menu.is_some());
-    app.context_menu_area = Rect {
+    app.geo.context_menu_area = Rect {
         x: 10,
         y: 10,
         width: 30,
@@ -931,7 +931,7 @@ fn scrollbar_drag_no_op_when_content_fits_viewport() {
     let root = temp_tree();
     let mut app = app_for(&root);
     // Viewport taller than the 200-line file → total (200) <= inner_h (201), early return.
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -948,7 +948,7 @@ fn scrollbar_drag_maps_top_row_to_zero_scroll() {
     let root = temp_tree();
     let mut app = app_for(&root);
     // 200 lines, 10-row viewport. Row 0 (top of track) must yield scroll 0.
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -964,7 +964,7 @@ fn scrollbar_drag_clamps_at_scroll_max() {
     let root = temp_tree();
     let mut app = app_for(&root);
     // 200 lines, 10-row viewport → scroll_max = 190. A row past the end must stay ≤ max.
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -979,7 +979,7 @@ fn scrollbar_drag_clamps_at_scroll_max() {
 fn scrollbar_border_drag_does_not_start_text_selection() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 40,
         y: 0,
         width: 40,
@@ -1000,13 +1000,13 @@ fn splitter_drag_release_saves_tree_width_to_config() {
     let root = temp_tree();
     let mut app = app_for(&root);
     // Simulate a splitter drag: set splitter_drag and adjust tree_width, then release.
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 0,
         y: 0,
         width: 28,
         height: 40,
     };
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 32,
         y: 0,
         width: 48,
@@ -1034,13 +1034,13 @@ fn splitter_drag_release_saves_tree_width_to_config() {
 fn tree_click_out_of_range_is_noop() {
     let root = tree_with_dir();
     let mut app = app_for(&root);
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 0,
         y: 0,
         width: 20,
         height: 10,
     };
-    app.tree_offset = 0;
+    app.geo.tree_offset = 0;
     let prev = app.tree_selected;
     // Click on row 100, well past the end of the node list.
     app.handle_mouse(left_down_at(1, 100));
@@ -1056,7 +1056,7 @@ fn wheel_over_tree_filter_does_not_scroll_underlying_panels() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.content = (0..50).map(|i| format!("line {i}")).collect();
-    app.content_area = Rect::new(40, 0, 40, 10);
+    app.geo.content_area = Rect::new(40, 0, 40, 10);
     app.tree_filter = Some(crate::search::TreeFilter::new());
     app.focus = Focus::Tree;
     let content_scroll = app.content_scroll;
@@ -1339,7 +1339,7 @@ fn mouse_click_in_plugin_content_starts_drag() {
     fs::write(&path, "plugin content line 1\nplugin content line 2\n").unwrap();
     let mut app = app_for(&root);
     app.open_file(&path);
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 5,
         y: 5,
         width: 50,
@@ -1399,7 +1399,7 @@ fn click_outside_welcome_dismisses_it() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.show_welcome = true;
-    app.welcome_area = Rect {
+    app.geo.welcome_area = Rect {
         x: 10,
         y: 10,
         width: 20,
@@ -1427,7 +1427,7 @@ fn revision_picker_click_outside_closes() {
     picker.items.clear();
     picker.filtered.clear();
     app.revision_picker = Some(picker);
-    app.revision_picker_area = Rect {
+    app.geo.revision_picker_area = Rect {
         x: 10,
         y: 10,
         width: 40,
@@ -1456,7 +1456,7 @@ fn revision_picker_double_click_selects_revision_and_enters_compare_mode() {
             display: "HEAD (current)".into(),
         },
     ]));
-    app.revision_picker_area = Rect {
+    app.geo.revision_picker_area = Rect {
         x: 10,
         y: 10,
         width: 40,
@@ -1490,7 +1490,7 @@ fn revision_picker_double_click_with_empty_filtered_list_uses_typed_query() {
     picker.query = "HEAD~3".to_string();
     picker.filtered = vec![];
     app.revision_picker = Some(picker);
-    app.revision_picker_area = Rect {
+    app.geo.revision_picker_area = Rect {
         x: 10,
         y: 10,
         width: 40,
@@ -1519,7 +1519,7 @@ fn revision_picker_scroll_down_navigates() {
             display: "branch: main".into(),
         },
     ]));
-    app.revision_picker_area = Rect {
+    app.geo.revision_picker_area = Rect {
         x: 10,
         y: 10,
         width: 40,
@@ -1549,7 +1549,7 @@ fn revision_picker_scroll_up_navigates() {
         },
     ]));
     app.revision_picker.as_mut().unwrap().selected = 1;
-    app.revision_picker_area = Rect {
+    app.geo.revision_picker_area = Rect {
         x: 10,
         y: 10,
         width: 40,
@@ -1576,7 +1576,7 @@ fn double_click_palette_file_route_opens_file_not_command() {
         &root, false, false, 0, None,
     ));
     app.command_palette = Some(p);
-    app.command_palette_area = Rect::new(0, 0, 40, 10);
+    app.geo.command_palette_area = Rect::new(0, 0, 40, 10);
     // Double-click the first (and only) file result.
     app.handle_mouse(left_down_at(5, 0));
     app.handle_mouse(left_down_at(5, 0));
@@ -1612,7 +1612,7 @@ fn double_click_palette_diagnostic_jumps_to_its_line() {
         },
     ]));
     app.command_palette = Some(palette);
-    app.command_palette_area = Rect::new(0, 0, 40, 10);
+    app.geo.command_palette_area = Rect::new(0, 0, 40, 10);
 
     app.handle_mouse(left_down_at(5, 0));
     app.handle_mouse(left_down_at(5, 0));
@@ -1645,8 +1645,8 @@ fn repo_log_click_inside_selects_row() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.repo_log = Some(repo_log_with_commits(root.clone(), 3));
-    app.repo_log_area = Rect::new(10, 10, 40, 20);
-    app.repo_log_offset = 0;
+    app.geo.repo_log_area = Rect::new(10, 10, 40, 20);
+    app.geo.repo_log_offset = 0;
     app.handle_repo_log_mouse(left_down_at(12, 11));
     assert_eq!(app.repo_log.as_ref().unwrap().selected, 1);
     fs::remove_dir_all(&root).ok();
@@ -1657,8 +1657,8 @@ fn repo_log_click_outside_closes_overlay() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.repo_log = Some(repo_log_with_commits(root.clone(), 3));
-    app.repo_log_area = Rect::new(10, 10, 40, 20);
-    app.repo_log_offset = 0;
+    app.geo.repo_log_area = Rect::new(10, 10, 40, 20);
+    app.geo.repo_log_offset = 0;
     app.handle_repo_log_mouse(left_down_at(0, 0));
     assert!(app.repo_log.is_none());
     fs::remove_dir_all(&root).ok();
@@ -1676,7 +1676,7 @@ fn bug_report_scroll_down_in_preview_advances_scroll() {
         state.insert_char(c);
     }
     app.bug_report = Some(state);
-    app.bug_report_preview_area = Rect::new(0, 0, 40, 2);
+    app.geo.bug_report_preview_area = Rect::new(0, 0, 40, 2);
 
     app.handle_bug_report_mouse(scroll_down_at(1, 1));
     assert!(app.bug_report.as_ref().unwrap().preview_scroll.scroll > 0);
@@ -1688,7 +1688,7 @@ fn bug_report_click_outside_closes_modal() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.bug_report = Some(crate::search::BugReportState::default());
-    app.bug_report_area = Rect::new(10, 10, 40, 20);
+    app.geo.bug_report_area = Rect::new(10, 10, 40, 20);
     app.handle_bug_report_mouse(left_down_at(0, 0));
     assert!(app.bug_report.is_none());
     fs::remove_dir_all(&root).ok();
@@ -1699,7 +1699,7 @@ fn worktree_picker_click_outside_closes() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.worktree_picker = Some(crate::search::WorktreePicker::for_test(Vec::new()));
-    app.worktree_picker_area = Rect::new(10, 10, 20, 5);
+    app.geo.worktree_picker_area = Rect::new(10, 10, 20, 5);
     app.handle_mouse(left_down_at(0, 0));
     assert!(app.worktree_picker.is_none());
     fs::remove_dir_all(&root).ok();
@@ -1722,7 +1722,7 @@ fn right_clicking_a_breadcrumb_opens_its_context_menu() {
     let root = temp_tree();
     let mut app = app_for(&root);
     let area = Rect::new(0, 1, 12, 1);
-    app.breadcrumb_areas.push((root.clone(), area));
+    app.geo.breadcrumb_areas.push((root.clone(), area));
     app.handle_mouse(MouseEvent {
         kind: MouseEventKind::Down(MouseButton::Right),
         column: 2,
@@ -1738,8 +1738,8 @@ fn right_clicking_a_breadcrumb_opens_its_context_menu() {
 fn right_clicking_the_statusbar_opens_status_actions() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.statusbar_area = Rect::new(0, 23, 80, 1);
-    assert!(crate::ui::statusbar::segment_at(&app, app.statusbar_area, 75, 23).is_some());
+    app.geo.statusbar_area = Rect::new(0, 23, 80, 1);
+    assert!(crate::ui::statusbar::segment_at(&app, app.geo.statusbar_area, 75, 23).is_some());
     app.handle_mouse(MouseEvent {
         kind: MouseEventKind::Down(MouseButton::Right),
         column: 75,
@@ -1764,7 +1764,7 @@ fn right_clicking_a_diff_header_opens_hunk_actions() {
         "-old".to_string(),
         "+new".to_string(),
     ];
-    app.content_area = Rect::new(40, 2, 40, 20);
+    app.geo.content_area = Rect::new(40, 2, 40, 20);
     app.handle_mouse(MouseEvent {
         kind: MouseEventKind::Down(MouseButton::Right),
         column: 45,
@@ -1791,7 +1791,7 @@ fn right_clicking_a_side_by_side_diff_row_targets_its_unified_hunk() {
         "+new".to_string(),
     ];
     app.diff_rows = crate::diff::parse_side_by_side(&app.content);
-    app.content_area = Rect::new(40, 2, 40, 20);
+    app.geo.content_area = Rect::new(40, 2, 40, 20);
     app.handle_mouse(MouseEvent {
         kind: MouseEventKind::Down(MouseButton::Right),
         column: 45,
@@ -1838,7 +1838,7 @@ fn right_clicking_a_blame_row_opens_blame_actions() {
     let mut app = app_for(&root);
     app.open_file(&path);
     app.show_blame = true;
-    app.blame_area = Rect::new(40, 2, 25, 10);
+    app.geo.blame_area = Rect::new(40, 2, 25, 10);
     app.handle_mouse(MouseEvent {
         kind: MouseEventKind::Down(MouseButton::Right),
         column: 42,
@@ -1858,8 +1858,8 @@ fn hovering_a_menu_label_does_not_open_its_dropdown() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.config.ui.menu_bar = true;
-    app.menu_bar_area = Rect::new(0, 0, 80, 1);
-    let (start, _) = crate::ui::menu_bar::menu_ranges(app.menu_bar_area)[1];
+    app.geo.menu_bar_area = Rect::new(0, 0, 80, 1);
+    let (start, _) = crate::ui::menu_bar::menu_ranges(app.geo.menu_bar_area)[1];
     app.handle_mouse(MouseEvent {
         kind: MouseEventKind::Moved,
         column: start,
@@ -1875,8 +1875,8 @@ fn hovering_another_label_switches_an_open_menu_and_leaving_keeps_it_open() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.config.ui.menu_bar = true;
-    app.menu_bar_area = Rect::new(0, 0, 80, 1);
-    let ranges = crate::ui::menu_bar::menu_ranges(app.menu_bar_area);
+    app.geo.menu_bar_area = Rect::new(0, 0, 80, 1);
+    let ranges = crate::ui::menu_bar::menu_ranges(app.geo.menu_bar_area);
     let at = |kind, column, row| MouseEvent {
         kind,
         column,
@@ -1906,7 +1906,7 @@ fn clicking_tree_top_border_toggles_git_mode() {
         staged: 0,
         untracked: 0,
     });
-    app.tree_area = Rect::new(0, 1, 30, 20);
+    app.geo.tree_area = Rect::new(0, 1, 30, 20);
     assert!(!app.git_mode);
 
     app.handle_mouse(left_down_at(5, 0));
@@ -1923,7 +1923,7 @@ fn clicking_diff_header_area_cycles_mode_and_toggles_side_by_side() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.is_diff = true;
-    app.diff_header_area = Rect::new(30, 1, 60, 1);
+    app.geo.diff_header_area = Rect::new(30, 1, 60, 1);
     app.diff_mode = crate::app::DiffMode::All;
     app.diff_side_by_side = false;
 
@@ -1945,7 +1945,7 @@ fn clicking_diff_header_area_cycles_mode_and_toggles_side_by_side() {
 fn clicking_statusbar_git_badges_toggles_git_mode_and_diff_modes() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.statusbar_area = Rect::new(0, 23, 100, 1);
+    app.geo.statusbar_area = Rect::new(0, 23, 100, 1);
     app.git_info = Some(crate::git::GitRepoInfo {
         head: crate::git::GitHead::Branch("main".into()),
         ahead: 0,
@@ -1958,7 +1958,8 @@ fn clicking_statusbar_git_badges_toggles_git_mode_and_diff_modes() {
 
     let mut git_mode_col = None;
     for col in 0..100 {
-        if let Some(text) = crate::ui::statusbar::segment_at(&app, app.statusbar_area, col, 23) {
+        if let Some(text) = crate::ui::statusbar::segment_at(&app, app.geo.statusbar_area, col, 23)
+        {
             if text.contains("git mode") {
                 git_mode_col = Some(col);
                 break;
@@ -1977,7 +1978,8 @@ fn clicking_statusbar_git_badges_toggles_git_mode_and_diff_modes() {
     let mut diff_mode_col = None;
     let mut sxs_col = None;
     for col in 0..100 {
-        if let Some(text) = crate::ui::statusbar::segment_at(&app, app.statusbar_area, col, 23) {
+        if let Some(text) = crate::ui::statusbar::segment_at(&app, app.geo.statusbar_area, col, 23)
+        {
             if text.contains("diff:") {
                 diff_mode_col = Some(col);
             }

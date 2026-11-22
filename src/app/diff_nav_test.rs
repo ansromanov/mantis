@@ -45,7 +45,7 @@ fn set_unified_diff(app: &mut App) {
         "-removed".to_string(),
         " kept".to_string(),
     ];
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -171,7 +171,7 @@ fn diff_next_hunk_uses_diff_rows_in_sbs_mode() {
     app.diff_side_by_side = true;
     app.current_file = None;
     app.virtual_file = None;
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 100,
@@ -233,7 +233,7 @@ fn diff_prev_hunk_uses_diff_rows_in_sbs_mode() {
     app.diff_side_by_side = true;
     app.current_file = None;
     app.virtual_file = None;
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 100,

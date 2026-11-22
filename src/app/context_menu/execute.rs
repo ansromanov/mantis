@@ -141,17 +141,18 @@ impl App {
                 let Some(menu) = self.context_menu.as_ref() else {
                     return;
                 };
-                if !rect_contains(self.context_menu_area, ev.column, ev.row) {
+                if !rect_contains(self.geo.context_menu_area, ev.column, ev.row) {
                     self.close_context_menu();
                     return;
                 }
                 // The popup includes its border; action rows start one row in.
-                let inner_left = self.context_menu_area.x + 1;
-                let inner_right = self.context_menu_area.x + self.context_menu_area.width - 1;
+                let inner_left = self.geo.context_menu_area.x + 1;
+                let inner_right =
+                    self.geo.context_menu_area.x + self.geo.context_menu_area.width - 1;
                 if ev.column < inner_left || ev.column >= inner_right {
                     return;
                 }
-                let inner_top = self.context_menu_area.y + 1;
+                let inner_top = self.geo.context_menu_area.y + 1;
                 if ev.row < inner_top {
                     return;
                 }

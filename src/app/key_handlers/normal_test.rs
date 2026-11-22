@@ -499,7 +499,7 @@ fn tree_end_then_home_keeps_selection_in_view() {
     let mut app = app_for(&root);
     app.focus = Focus::Tree;
     assert!(!app.tree_independent_scroll, "default mode under test");
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 0,
         y: 0,
         width: 40,
@@ -511,7 +511,7 @@ fn tree_end_then_home_keeps_selection_in_view() {
     app.handle_key(key(KeyCode::End));
     let last = app.nodes.len() - 1;
     assert_eq!(app.tree_selected, last);
-    let h = app.tree_area.height as usize;
+    let h = app.geo.tree_area.height as usize;
     assert!(
         app.tree_selected >= app.tree_scroll && app.tree_selected < app.tree_scroll + h,
         "End selection {} must be within viewport [{}, {})",
@@ -675,7 +675,7 @@ fn toggle_diff_side_by_side_preserves_content_scroll() {
     app.open_file(&root.join("long.txt"));
     app.focus = Focus::Content;
     app.is_diff = true;
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -722,7 +722,7 @@ fn toggle_wrap_preserves_content_scroll() {
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
     app.focus = Focus::Content;
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -766,7 +766,7 @@ fn toggle_pretty_json_off_clamps_scroll_when_content_shrinks() {
         "}".to_string(),
     ];
     app.show_pretty_json = true;
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -1167,7 +1167,7 @@ fn content_page_down_moves_active_line_by_page_rows() {
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
     app.focus = Focus::Content;
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -1190,7 +1190,7 @@ fn content_page_up_moves_active_line_by_page_rows() {
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
     app.focus = Focus::Content;
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -1213,7 +1213,7 @@ fn content_page_down_clamps_at_last_display_line() {
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
     app.focus = Focus::Content;
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -1235,7 +1235,7 @@ fn content_page_up_clamps_at_zero() {
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
     app.focus = Focus::Content;
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -1769,7 +1769,7 @@ fn toggle_word_wrap_method_flips_state_and_clamps_scroll() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("long.txt"));
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 40,
         y: 0,
         width: 40,

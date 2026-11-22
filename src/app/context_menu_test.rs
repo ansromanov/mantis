@@ -456,7 +456,7 @@ fn context_content_menu_copy_selection_copies_selected_text() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_file(&root.join("a.txt"));
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 40,
@@ -575,7 +575,7 @@ fn context_menu_mouse_click_on_item_activates() {
     app.open_file(&root.join("a.txt"));
     app.open_content_context_menu((20, 5));
     // Popup rows start one cell below the top border: row 10 (y=9+1) is entry 0.
-    app.context_menu_area = Rect {
+    app.geo.context_menu_area = Rect {
         x: 10,
         y: 9,
         width: 30,
@@ -602,7 +602,7 @@ fn context_menu_mouse_left_outside_closes() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.open_tree_context_menu(0, (10, 10));
-    app.context_menu_area = Rect {
+    app.geo.context_menu_area = Rect {
         x: 10,
         y: 10,
         width: 30,
@@ -739,8 +739,8 @@ fn keyboard_context_menu_uses_focused_tree_row() {
         .position(|n| n.path == root.join("a.txt"))
         .unwrap();
     app.tree_selected = file_idx;
-    app.tree_area = Rect::new(0, 2, 30, 10);
-    app.tree_offset = 0;
+    app.geo.tree_area = Rect::new(0, 2, 30, 10);
+    app.geo.tree_offset = 0;
     app.focus = Focus::Tree;
     app.handle_key(KeyEvent::new(
         KeyCode::F(10),

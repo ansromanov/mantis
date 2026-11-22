@@ -29,8 +29,8 @@ pub(crate) fn draw_recent(f: &mut Frame, app: &mut App, area: Rect) {
     let theme = app.theme.clone();
     let root = app.root.clone();
     let (list_area, offset) = draw_path_picker(f, &theme, &root, area, "Recent files", recent);
-    app.recent_area = list_area;
-    app.recent_offset = offset;
+    app.geo.recent_area = list_area;
+    app.geo.recent_offset = offset;
 }
 
 /// Draws the bookmarks picker using the same path-picker layout as recent files.
@@ -41,8 +41,8 @@ pub(crate) fn draw_bookmarks(f: &mut Frame, app: &mut App, area: Rect) {
     let theme = app.theme.clone();
     let root = app.root.clone();
     let (list_area, offset) = draw_path_picker(f, &theme, &root, area, "Bookmarks", bookmarks);
-    app.recent_area = list_area;
-    app.recent_offset = offset;
+    app.geo.recent_area = list_area;
+    app.geo.recent_offset = offset;
 }
 
 fn draw_path_picker(

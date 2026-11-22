@@ -368,7 +368,7 @@ fn scroll_percentage_shown() {
     app.show_scroll_percentage = true;
     app.current_file = Some(PathBuf::from("Cargo.toml"));
     app.content = vec!["x".to_string(); 50];
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -385,7 +385,7 @@ fn status_bar_labels_viewport_and_cursor_positions() {
     app.show_scroll_percentage = true;
     app.current_file = Some(PathBuf::from("Cargo.toml"));
     app.content = vec!["x".to_string(); 50];
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -415,7 +415,7 @@ fn scroll_percentage_labels_the_end_as_bottom() {
     app.show_scroll_percentage = true;
     app.current_file = Some(PathBuf::from("Cargo.toml"));
     app.content = vec!["x".to_string(); 50];
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,

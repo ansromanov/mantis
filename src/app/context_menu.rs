@@ -129,20 +129,21 @@ impl App {
     pub(super) fn open_focused_context_menu(&mut self) {
         match self.focus {
             Focus::Tree => {
-                let row = self.tree_selected.saturating_sub(self.tree_offset);
+                let row = self.tree_selected.saturating_sub(self.geo.tree_offset);
                 let anchor = (
-                    self.tree_area.x.saturating_add(2),
-                    self.tree_area.y.saturating_add(row as u16),
+                    self.geo.tree_area.x.saturating_add(2),
+                    self.geo.tree_area.y.saturating_add(row as u16),
                 );
                 self.open_tree_context_menu(self.tree_selected, anchor);
             }
             Focus::Content => {
                 let row = self.active_line.saturating_sub(self.content_scroll);
                 let anchor = (
-                    self.content_area
+                    self.geo
+                        .content_area
                         .x
                         .saturating_add(self.line_prefix_width() as u16),
-                    self.content_area.y.saturating_add(row as u16),
+                    self.geo.content_area.y.saturating_add(row as u16),
                 );
                 self.open_content_context_menu(anchor);
             }

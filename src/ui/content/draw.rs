@@ -74,7 +74,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
 
     // Cleared here; the image branch below is the only path that sets a real
     // rect, so any other view leaves the post-frame overlay with nothing to do.
-    app.image_area = Rect::default();
+    app.geo.image_area = Rect::default();
 
     // Side-by-side diff layout takes over the whole content pane when toggled
     // on and the pane is wide enough; otherwise we fall through to unified.
@@ -101,11 +101,11 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
             .direction(Direction::Vertical)
             .constraints([Constraint::Length(1), Constraint::Min(0)])
             .split(inner);
-        app.diff_header_area = chunks[0];
+        app.geo.diff_header_area = chunks[0];
         super::diff_header::draw_diff_info_bar(f, app, chunks[0]);
         inner = chunks[1];
     } else if !app.is_diff {
-        app.diff_header_area = Rect::default();
+        app.geo.diff_header_area = Rect::default();
     }
 
     // ── Line blame bar: reserve 2 rows at the bottom ───────────────
@@ -141,7 +141,7 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     // Record this frame's geometry *before* any scroll math reads it. It used to
     // be written at the end of the frame, so the math ran on last frame's size and
     // a resize painted one wrong frame (and could leave the view off-position).
-    app.content_area = inner;
+    app.geo.content_area = inner;
     app.remap_scroll_for_width(inner.width as usize);
 
     let view_height = inner.height as usize;
@@ -455,8 +455,8 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         },
     );
 
-    app.content_area = inner;
-    app.blame_area = blame_area;
+    app.geo.content_area = inner;
+    app.geo.blame_area = blame_area;
     app.fold_gutter_rows = new_fold_gutter_rows;
 
     // Scrollbar is computed from the full pane area (area minus border).
@@ -480,16 +480,16 @@ pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
 }
 
 /// Draws the frame for an inline image preview: the pane border, a blanked
-/// region the terminal will draw the bitmap into (recorded as `app.image_area`),
+/// region the terminal will draw the bitmap into (recorded as `app.geo.image_area`),
 /// and the text placeholder as a caption underneath. The bitmap is emitted
 /// post-frame by `crate::graphics::render_overlay`.
 fn draw_image_preview(f: &mut Frame, app: &mut App, area: Rect, block: Block) {
     let inner = block.inner(area);
     f.render_widget(block, area);
-    app.content_area = inner;
+    app.geo.content_area = inner;
 
     if inner.width == 0 || inner.height == 0 {
-        app.image_area = Rect::default();
+        app.geo.image_area = Rect::default();
         return;
     }
 
@@ -521,7 +521,7 @@ fn draw_image_preview(f: &mut Frame, app: &mut App, area: Rect, block: Block) {
         caption_area,
     );
 
-    app.image_area = img_area;
+    app.geo.image_area = img_area;
 }
 
 /// Renders lines from precomputed styled spans (pretty JSON or CSV/TSV table view).

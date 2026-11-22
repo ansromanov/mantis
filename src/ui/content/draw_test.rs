@@ -93,7 +93,7 @@ fn wrapped_draw_handles_a_long_single_line() {
     app.content = vec!["x".repeat(500), "tail".into()];
     app.virtual_file = None;
     app.word_wrap = true;
-    app.content_area = ratatui::layout::Rect::new(0, 0, 30, 8);
+    app.geo.content_area = ratatui::layout::Rect::new(0, 0, 30, 8);
     let backend = TestBackend::new(30, 8);
     let mut terminal = ratatui::Terminal::new(backend).unwrap();
     terminal
@@ -609,9 +609,9 @@ fn draw_content_reserves_a_blanked_region_and_shows_the_caption_for_an_inline_im
 
     let out = render_to_string(&mut app);
 
-    assert_ne!(app.image_area, ratatui::layout::Rect::default());
+    assert_ne!(app.geo.image_area, ratatui::layout::Rect::default());
     assert!(
-        app.image_area.height < app.content_area.height,
+        app.geo.image_area.height < app.geo.content_area.height,
         "the caption rows must be excluded from the reserved image region"
     );
     assert!(
@@ -681,7 +681,7 @@ fn draw_content_when_diff_renders_diff_header_bar() {
             draw_content(frame, &mut app, frame.area());
         })
         .unwrap();
-    assert_ne!(app.diff_header_area, ratatui::layout::Rect::default());
+    assert_ne!(app.geo.diff_header_area, ratatui::layout::Rect::default());
     fs::remove_dir_all(&root).ok();
 }
 

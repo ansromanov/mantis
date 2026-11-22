@@ -33,7 +33,7 @@ const WELCOME_ACTIONS: &[(&str, &str)] = &[
 pub(crate) fn draw_welcome(f: &mut Frame, app: &mut App, area: Rect) {
     let theme = &app.theme;
     let popup = centered_rect(60, 70, area);
-    app.welcome_area = popup;
+    app.geo.welcome_area = popup;
     f.render_widget(Clear, popup);
 
     let block = Block::default()

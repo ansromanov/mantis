@@ -665,13 +665,13 @@ fn render_frame_draws_workspace_list_above_the_tree_with_multiple_tabs() {
     let list = tabs.strip_area;
     assert_eq!(list.height, 4, "two workspace rows plus borders");
     assert_eq!((list.x, list.y), (0, 0));
-    let tree = tabs.active_app().tree_area;
+    let tree = tabs.active_app().geo.tree_area;
     assert!(
         tree.x >= list.x && tree.right() <= list.right(),
         "tree shares the list's column"
     );
     assert!(tree.y >= list.bottom(), "the tree must sit below the list");
-    assert!(tabs.active_app().content_area.y < list.bottom());
+    assert!(tabs.active_app().geo.content_area.y < list.bottom());
     fs::remove_dir_all(&a).ok();
     fs::remove_dir_all(&b).ok();
 }

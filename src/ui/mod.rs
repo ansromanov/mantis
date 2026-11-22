@@ -96,17 +96,17 @@ fn draw_area(
     let menu_area = if menu_visible {
         vert[0]
     } else {
-        app.menu_bar_area = Rect::default();
-        app.menu_dropdown_area = Rect::default();
+        app.geo.menu_bar_area = Rect::default();
+        app.geo.menu_dropdown_area = Rect::default();
         Rect::default()
     };
     let body_area = if menu_visible { vert[1] } else { vert[0] };
     let status_area = if menu_visible { vert[2] } else { vert[1] };
 
     if area.width < MIN_LAYOUT_WIDTH || area.height < min_height {
-        app.tree_area = Rect::default();
-        app.content_area = Rect::default();
-        app.splitter_area = Rect::default();
+        app.geo.tree_area = Rect::default();
+        app.geo.content_area = Rect::default();
+        app.geo.splitter_area = Rect::default();
         let resize_message = match (area.width < MIN_LAYOUT_WIDTH, area.height < min_height) {
             (true, true) => format!(
                 "Terminal too small: {MIN_LAYOUT_WIDTH} columns x {min_height} rows minimum."
@@ -125,7 +125,7 @@ fn draw_area(
                 .style(Style::default().fg(app.theme.text)),
             body_area,
         );
-        app.statusbar_area = status_area;
+        app.geo.statusbar_area = status_area;
         app.statusbar_segments = statusbar::draw_statusbar(f, app, status_area);
         if menu_visible {
             menu_bar::draw_menu_bar(f, app, menu_area);
@@ -145,7 +145,7 @@ fn draw_area(
         .split(body_area);
 
     // Record the 2-column splitter boundary for mouse hit-testing.
-    app.splitter_area = Rect {
+    app.geo.splitter_area = Rect {
         x: horiz[0].right().saturating_sub(1),
         y: body_area.y,
         width: 2,
@@ -169,7 +169,7 @@ fn draw_area(
 
     tree::draw_tree(f, app, tree_area);
     content::draw_content(f, app, horiz[1]);
-    app.statusbar_area = status_area;
+    app.geo.statusbar_area = status_area;
     app.statusbar_segments = statusbar::draw_statusbar(f, app, status_area);
 
     // Overlays are drawn bottom-to-top in the order defined by `Overlay::STACK`,

@@ -60,10 +60,10 @@ fn draw_bug_report_populates_areas() {
         .draw(|f| draw_bug_report(f, &mut app, Rect::new(0, 0, 80, 24)))
         .unwrap();
 
-    assert!(app.bug_report_area.width > 0);
-    assert!(app.bug_report_area.height > 0);
-    assert!(app.bug_report_preview_area.width > 0);
-    assert!(app.bug_report_preview_area.height > 0);
+    assert!(app.geo.bug_report_area.width > 0);
+    assert!(app.geo.bug_report_area.height > 0);
+    assert!(app.geo.bug_report_preview_area.width > 0);
+    assert!(app.geo.bug_report_preview_area.height > 0);
 }
 
 #[test]

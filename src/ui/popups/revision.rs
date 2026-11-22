@@ -113,8 +113,8 @@ pub(crate) fn draw_revision_picker(f: &mut Frame, app: &mut App, area: Rect) {
 
     f.render_stateful_widget(list, parts[3], &mut state);
 
-    app.revision_picker_area = parts[3];
-    app.revision_picker_offset = state.offset();
+    app.geo.revision_picker_area = parts[3];
+    app.geo.revision_picker_offset = state.offset();
 }
 
 #[cfg(test)]

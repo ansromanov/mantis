@@ -362,7 +362,7 @@ fn tree_filter_jump_scrolls_match_into_view() {
     fs::write(root.join("zzz_target.txt"), "").unwrap();
     let mut app = app_for(&root);
     assert!(!app.tree_independent_scroll, "default mode under test");
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 0,
         y: 0,
         width: 40,
@@ -380,7 +380,7 @@ fn tree_filter_jump_scrolls_match_into_view() {
         sel.ends_with("zzz_target.txt"),
         "filter must select the matching node, got {sel:?}"
     );
-    let h = app.tree_area.height as usize;
+    let h = app.geo.tree_area.height as usize;
     assert!(
         app.tree_selected >= app.tree_scroll && app.tree_selected < app.tree_scroll + h,
         "filtered match {} must be within viewport [{}, {})",
@@ -397,7 +397,7 @@ fn in_file_search_down_advances_current_match() {
     let root = temp_tree();
     fs::write(root.join("a.txt"), "foo bar\nfoo baz\nfoo qux\n").unwrap();
     let mut app = app_for(&root);
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 80,
@@ -429,13 +429,13 @@ fn tree_filter_down_moves_to_next_match_and_clamps() {
     app.tree_filter = Some(TreeFilter::new());
     let visible = vec![0usize, 2, 5];
     app.tree_visible_indices = Some(visible.clone());
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 0,
         y: 0,
         width: 40,
         height: 10,
     };
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 40,
@@ -465,13 +465,13 @@ fn tree_filter_up_moves_to_prev_match_and_clamps() {
     app.tree_filter = Some(TreeFilter::new());
     let visible = vec![0usize, 2, 5];
     app.tree_visible_indices = Some(visible.clone());
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 0,
         y: 0,
         width: 40,
         height: 10,
     };
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 40,
@@ -502,13 +502,13 @@ fn tree_filter_pagedown_advances_by_page_and_clamps() {
     // A large visible set so we can test page scrolling.
     let visible: Vec<usize> = (0..50).collect();
     app.tree_visible_indices = Some(visible.clone());
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 0,
         y: 0,
         width: 40,
         height: 10,
     };
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 40,
@@ -539,13 +539,13 @@ fn tree_filter_pageup_goes_back_by_page_and_clamps() {
     app.tree_filter = Some(TreeFilter::new());
     let visible: Vec<usize> = (0..50).collect();
     app.tree_visible_indices = Some(visible.clone());
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 0,
         y: 0,
         width: 40,
         height: 10,
     };
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 40,
@@ -579,13 +579,13 @@ fn tree_filter_typing_after_navigation_jumps_to_first_match() {
     }
     let visible = vec![0usize, 1];
     app.tree_visible_indices = Some(visible.clone());
-    app.tree_area = Rect {
+    app.geo.tree_area = Rect {
         x: 0,
         y: 0,
         width: 40,
         height: 10,
     };
-    app.content_area = Rect {
+    app.geo.content_area = Rect {
         x: 0,
         y: 0,
         width: 40,
