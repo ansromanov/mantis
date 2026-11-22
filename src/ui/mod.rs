@@ -17,7 +17,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::app::App;
+use crate::app::{App, Overlay};
 
 mod content;
 pub(crate) mod menu_bar;
@@ -172,82 +172,50 @@ fn draw_area(
     app.statusbar_area = status_area;
     app.statusbar_segments = statusbar::draw_statusbar(f, app, status_area);
 
-    if app.in_file_search_open || app.json_query.is_some() {
-        popups::draw_in_file_search(f, app, horiz[1]);
-    }
-
-    if app.filter_bar.is_some() {
-        popups::draw_filter_bar(f, app, horiz[1]);
-    }
-
-    if app.tree_filter.is_some() {
-        popups::draw_tree_filter(f, app, tree_area);
-    }
-
-    if app.revision_picker.is_some() {
-        popups::draw_revision_picker(f, app, area);
-    }
-
-    if app.worktree_picker.is_some() {
-        popups::draw_worktree_picker(f, app, area);
-    }
-
-    if app.goto_line.is_some() {
-        popups::draw_goto_line(f, app, horiz[1]);
-    }
-
-    if app.search.is_some() {
-        popups::draw_search(f, app, area);
-    }
-
-    if app.command_palette.is_some() {
-        popups::draw_command_palette(f, app, area);
-    }
-
-    if app.history.is_some() {
-        popups::draw_history(f, app, area);
-    }
-
-    if app.repo_log.is_some() {
-        popups::draw_repo_log(f, app, area);
-    }
-
-    if app.theme_picker.is_some() {
-        popups::draw_theme(f, app, area);
-    }
-
-    if app.recent_files.is_some() {
-        popups::draw_recent(f, app, area);
-    }
-
-    if app.bookmarks.is_some() {
-        popups::draw_bookmarks(f, app, area);
-    }
-
-    if app.bug_report.is_some() {
-        popups::draw_bug_report(f, app, area);
-    }
-
-    if app.show_about {
-        popups::draw_about(f, app, area);
-    }
-
-    if app.show_help {
-        popups::draw_help(f, app, area);
-    }
-
-    if app.context_menu.is_some() {
-        popups::draw_context_menu(f, app, area);
-    }
-
-    if app.show_welcome {
-        popups::draw_welcome(f, app, area);
+    // Overlays are drawn bottom-to-top in the order defined by `Overlay::STACK`,
+    // the same order that decides which one receives input.
+    for overlay in app.open_overlays() {
+        draw_overlay(f, app, overlay, area, tree_area, horiz[1]);
     }
 
     if menu_visible {
         menu_bar::draw_menu_bar(f, app, menu_area);
     }
     workspace_area
+}
+
+/// Draws one overlay. `area` is the whole frame, `tree_area` and `content_area`
+/// the two panes the smaller bars attach to.
+fn draw_overlay(
+    f: &mut Frame,
+    app: &mut App,
+    overlay: Overlay,
+    area: Rect,
+    tree_area: Rect,
+    content_area: Rect,
+) {
+    match overlay {
+        Overlay::InFileBar => popups::draw_in_file_search(f, app, content_area),
+        Overlay::FilterBar => popups::draw_filter_bar(f, app, content_area),
+        Overlay::TreeFilter => popups::draw_tree_filter(f, app, tree_area),
+        Overlay::RevisionPicker => popups::draw_revision_picker(f, app, area),
+        Overlay::WorktreePicker => popups::draw_worktree_picker(f, app, area),
+        Overlay::GotoLine => popups::draw_goto_line(f, app, content_area),
+        Overlay::Search => popups::draw_search(f, app, area),
+        Overlay::CommandPalette => popups::draw_command_palette(f, app, area),
+        Overlay::History => popups::draw_history(f, app, area),
+        Overlay::RepoLog => popups::draw_repo_log(f, app, area),
+        Overlay::ThemePicker => popups::draw_theme(f, app, area),
+        Overlay::RecentFiles => popups::draw_recent(f, app, area),
+        Overlay::Bookmarks => popups::draw_bookmarks(f, app, area),
+        Overlay::BugReport => popups::draw_bug_report(f, app, area),
+        Overlay::About => popups::draw_about(f, app, area),
+        Overlay::Help => popups::draw_help(f, app, area),
+        Overlay::ContextMenu => popups::draw_context_menu(f, app, area),
+        Overlay::Welcome => popups::draw_welcome(f, app, area),
+        // Painted by the menu bar itself, after the overlays.
+        Overlay::MenuBar => {}
+    }
 }
 
 #[cfg(test)]

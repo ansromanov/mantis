@@ -26,7 +26,7 @@ mod normal_tests;
 
 use crossterm::event::KeyCode;
 
-use super::App;
+use super::{App, Overlay};
 use crate::config::static_keys;
 
 /// Page size for help popup scrolling (matches `handle_list_picker_key`).
@@ -56,101 +56,86 @@ impl App {
             self.set_status("Full redraw requested");
             return;
         }
-        if self.show_welcome {
-            if static_keys::is_close(&key) {
-                self.show_welcome = false;
-                crate::session::mark_welcome_shown();
-            }
-            return;
+        match self.top_overlay() {
+            Some(overlay) => self.handle_overlay_key(overlay, key),
+            None => self.handle_normal_key(key),
         }
-        if self.show_about {
-            if static_keys::is_open_release(&key) {
-                self.open_release_url();
-            } else if static_keys::is_modal_close(&key) {
-                self.show_about = false;
-            }
-            return;
-        }
-        if self.show_help {
-            if static_keys::is_modal_close(&key) {
-                self.show_help = false;
-                self.help_scroll.scroll = 0;
-                self.help_tab = 0;
-            } else {
-                match key.code {
-                    KeyCode::Up | KeyCode::Char('k') => {
-                        self.help_scroll.scroll_up(1);
-                    }
-                    KeyCode::Down | KeyCode::Char('j') => {
-                        self.help_scroll.scroll_down(1, usize::MAX);
-                    }
-                    KeyCode::PageUp => {
-                        self.help_scroll.scroll_up(HELP_PAGE_SIZE);
-                    }
-                    KeyCode::PageDown => {
-                        self.help_scroll.scroll_down(HELP_PAGE_SIZE, usize::MAX);
-                    }
-                    KeyCode::Home | KeyCode::Char('g') => {
-                        self.help_scroll.scroll = 0;
-                    }
-                    KeyCode::End | KeyCode::Char('G') => {
-                        self.help_scroll.scroll = usize::MAX;
-                    }
-                    KeyCode::Right | KeyCode::Char('l') | KeyCode::Tab => {
-                        self.help_tab = (self.help_tab + 1) % crate::ui::popups::help_tabs().len();
-                        self.help_scroll.scroll = 0;
-                    }
-                    KeyCode::Left | KeyCode::Char('h') | KeyCode::BackTab => {
-                        self.help_tab = if self.help_tab == 0 {
-                            crate::ui::popups::help_tabs().len() - 1
-                        } else {
-                            self.help_tab - 1
-                        };
-                        self.help_scroll.scroll = 0;
-                    }
-                    _ => {}
+    }
+
+    /// Routes a key to the topmost open overlay (see `app::overlay` for the
+    /// stacking order, which is shared with drawing).
+    fn handle_overlay_key(&mut self, overlay: Overlay, key: crossterm::event::KeyEvent) {
+        match overlay {
+            Overlay::Welcome => self.handle_welcome_key(key),
+            Overlay::About => self.handle_about_key(key),
+            Overlay::Help => self.handle_help_key(key),
+            Overlay::ThemePicker => self.handle_theme_key(key),
+            Overlay::ContextMenu => self.handle_context_menu_key(key),
+            Overlay::MenuBar => self.handle_menu_bar_key(key),
+            Overlay::CommandPalette => self.handle_command_key(key),
+            Overlay::History => self.handle_history_key(key),
+            Overlay::RepoLog => self.handle_repo_log_key(key),
+            Overlay::RecentFiles => self.handle_recent_key(key),
+            Overlay::Bookmarks => self.handle_bookmarks_key(key),
+            Overlay::Search => self.handle_search_key(key),
+            Overlay::InFileBar => {
+                if self.json_query.is_some() {
+                    self.handle_json_query_key(key);
+                } else {
+                    self.handle_in_file_search_key(key);
                 }
             }
+            Overlay::FilterBar => self.handle_filter_bar_key(key),
+            Overlay::TreeFilter => self.handle_tree_filter_key(key),
+            Overlay::BugReport => self.handle_bug_report_key(key),
+            Overlay::RevisionPicker => self.handle_revision_key(key),
+            Overlay::WorktreePicker => self.handle_worktree_key(key),
+            Overlay::GotoLine => self.handle_goto_line_key(key),
+        }
+    }
+
+    fn handle_welcome_key(&mut self, key: crossterm::event::KeyEvent) {
+        if static_keys::is_close(&key) {
+            self.show_welcome = false;
+            crate::session::mark_welcome_shown();
+        }
+    }
+
+    fn handle_about_key(&mut self, key: crossterm::event::KeyEvent) {
+        if static_keys::is_open_release(&key) {
+            self.open_release_url();
+        } else if static_keys::is_modal_close(&key) {
+            self.show_about = false;
+        }
+    }
+
+    fn handle_help_key(&mut self, key: crossterm::event::KeyEvent) {
+        if static_keys::is_modal_close(&key) {
+            self.show_help = false;
+            self.help_scroll.scroll = 0;
+            self.help_tab = 0;
             return;
         }
-        if self.theme_picker.is_some() {
-            self.handle_theme_key(key);
-            return;
-        }
-        if self.context_menu.is_some() {
-            self.handle_context_menu_key(key);
-        } else if self.menu_bar_state.is_some() {
-            self.handle_menu_bar_key(key);
-        } else if self.command_palette.is_some() {
-            self.handle_command_key(key);
-        } else if self.history.is_some() {
-            self.handle_history_key(key);
-        } else if self.repo_log.is_some() {
-            self.handle_repo_log_key(key);
-        } else if self.recent_files.is_some() {
-            self.handle_recent_key(key);
-        } else if self.bookmarks.is_some() {
-            self.handle_bookmarks_key(key);
-        } else if self.search.is_some() {
-            self.handle_search_key(key);
-        } else if self.json_query.is_some() {
-            self.handle_json_query_key(key);
-        } else if self.in_file_search_open {
-            self.handle_in_file_search_key(key);
-        } else if self.filter_bar.is_some() {
-            self.handle_filter_bar_key(key);
-        } else if self.tree_filter.is_some() {
-            self.handle_tree_filter_key(key);
-        } else if self.bug_report.is_some() {
-            self.handle_bug_report_key(key);
-        } else if self.revision_picker.is_some() {
-            self.handle_revision_key(key);
-        } else if self.worktree_picker.is_some() {
-            self.handle_worktree_key(key);
-        } else if self.goto_line.is_some() {
-            self.handle_goto_line_key(key);
-        } else {
-            self.handle_normal_key(key);
+        match key.code {
+            KeyCode::Up | KeyCode::Char('k') => self.help_scroll.scroll_up(1),
+            KeyCode::Down | KeyCode::Char('j') => self.help_scroll.scroll_down(1, usize::MAX),
+            KeyCode::PageUp => self.help_scroll.scroll_up(HELP_PAGE_SIZE),
+            KeyCode::PageDown => self.help_scroll.scroll_down(HELP_PAGE_SIZE, usize::MAX),
+            KeyCode::Home | KeyCode::Char('g') => self.help_scroll.scroll = 0,
+            KeyCode::End | KeyCode::Char('G') => self.help_scroll.scroll = usize::MAX,
+            KeyCode::Right | KeyCode::Char('l') | KeyCode::Tab => {
+                self.help_tab = (self.help_tab + 1) % crate::ui::popups::help_tabs().len();
+                self.help_scroll.scroll = 0;
+            }
+            KeyCode::Left | KeyCode::Char('h') | KeyCode::BackTab => {
+                self.help_tab = if self.help_tab == 0 {
+                    crate::ui::popups::help_tabs().len() - 1
+                } else {
+                    self.help_tab - 1
+                };
+                self.help_scroll.scroll = 0;
+            }
+            _ => {}
         }
     }
 }

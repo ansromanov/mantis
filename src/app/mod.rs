@@ -63,6 +63,8 @@ mod key_handlers;
 mod lint;
 mod loader;
 mod markdown_view;
+mod overlay;
+pub(crate) use overlay::Overlay;
 pub(crate) mod menu_bar;
 mod mouse_handlers;
 mod navigation;

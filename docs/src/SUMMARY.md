@@ -7,6 +7,7 @@
 - [Why mantis?](why.md)
 - [Installation](installation.md)
 - [Quick Start](quickstart.md)
+- [Demo](demo.md)
 
 # User Guide
 
