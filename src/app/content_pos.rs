@@ -478,23 +478,10 @@ impl App {
     /// pane, so the inline image overlay must be withheld for this frame (it is
     /// written straight to the terminal and would otherwise cover the popup).
     pub(crate) fn image_overlay_suppressed(&self) -> bool {
-        self.show_help
-            || self.show_about
-            || self.show_welcome
-            || self.theme_picker.is_some()
-            || self.command_palette.is_some()
-            || self.history.is_some()
-            || self.repo_log.is_some()
-            || self.recent_files.is_some()
-            || self.bug_report.is_some()
-            || self.revision_picker.is_some()
-            || self.worktree_picker.is_some()
-            || self.goto_line.is_some()
-            || self.search.is_some()
-            || self.context_menu.is_some()
-            || self.in_file_search_open
-            || self.json_query.is_some()
-            || self.filter_bar.is_some()
+        // The tree filter bar sits over the tree, never over the image.
+        self.open_overlays()
+            .into_iter()
+            .any(|overlay| overlay != super::Overlay::TreeFilter)
     }
 
     /// Unified scroll-into-view helper: nudges `content_scroll` so the given

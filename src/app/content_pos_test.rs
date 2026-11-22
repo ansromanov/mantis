@@ -555,6 +555,15 @@ fn image_overlay_suppressed_while_search_popup_is_open() {
     fs::remove_dir_all(&root).ok();
 }
 
+#[test]
+fn image_overlay_suppressed_while_about_is_open() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.show_about = true;
+    assert!(app.image_overlay_suppressed());
+    fs::remove_dir_all(&root).ok();
+}
+
 fn wrapped_app(root: &std::path::Path) -> App {
     let mut app = app_for(root);
     app.virtual_file = None;
