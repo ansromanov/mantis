@@ -2,7 +2,7 @@
 //!
 //! Defines `ListPicker` trait and `OverlayKey` enum plus `handle_list_picker_key`
 //! function that provides uniform keyboard handling for all list-style overlays
-//! (search, history, theme, recent files, commands, plugin, goto-line, in-file
+//! (search, history, theme, recent files, commands, goto-line, in-file
 //! search, and tree filter). Each overlay's handler becomes a thin wrapper:
 //! handle extra keys first, fall through to the shared dispatcher, then map
 //! `Activate`/`Close` to the overlay-specific action.
@@ -25,7 +25,7 @@ pub enum OverlayKey {
 /// A list-style overlay with a text query and a selected row.
 ///
 /// Implementations wrap the concrete type's query/selection fields. Types
-/// without a query (e.g. `PluginPicker`) return `true` from `query_is_empty`
+/// without a query (e.g. a read-only list) return `true` from `query_is_empty`
 /// and no-op from `push`/`pop`.
 pub trait ListPicker {
     fn query_push(&mut self, c: char);

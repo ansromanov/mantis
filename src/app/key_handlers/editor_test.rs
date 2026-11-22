@@ -957,7 +957,7 @@ fn test_command_applicability_predicates() {
     app.rendered_content.insert(plugin_path, Vec::new());
     assert_eq!(
         app.check_applicability("blame_line"),
-        Err("not available (current file not plugin-rendered)")
+        Err("not available (current file not rendered)")
     );
 }
 

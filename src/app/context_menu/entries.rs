@@ -148,7 +148,7 @@ pub(super) fn tree_entries(
 
 /// Builds the menu rows for the content pane. Excludes actions that are not
 /// applicable right now: "Copy selection" needs a live selection, and the
-/// markdown raw/rendered toggle needs the markdown plugin on a markdown file.
+/// markdown raw/rendered toggle needs a markdown file.
 pub(super) fn content_entries(app: &App) -> Vec<ContextMenuEntry> {
     let mut entries = Vec::new();
     let has_selection = app.selection.as_ref().is_some_and(|s| !s.is_empty());

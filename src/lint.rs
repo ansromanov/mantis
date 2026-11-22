@@ -1,6 +1,6 @@
 //! Python diagnostics from the external `ruff` linter.
 //!
-//! Replaces the former bundled Python plugin. [`run_ruff`] shells out to
+//! [`run_ruff`] shells out to
 //! `ruff check --output-format=json` for one file and [`ruff_json_to_diagnostics`]
 //! maps its output to [`crate::code_intel::Diagnostic`] records. When `ruff` is
 //! not installed (or fails) the result is simply empty, so diagnostics are an

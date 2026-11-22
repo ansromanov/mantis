@@ -10,10 +10,9 @@
 //! status-bar context menu.
 //!
 //! On narrow terminals the bar elides low-priority segments so it never
-//! overflows `area.width`. Plugin and status messages (`P_META`) are dropped
+//! overflows `area.width`. Status messages (`P_META`) are dropped
 //! first, then fold stats, badges, and file info (`P_INFO`), then git info;
-//! error indicators — including a `plugin_error` action (protocol 3+, styled
-//! distinctly from routine `show_message` text) — and the version string are
+//! error indicators and the version string are
 //! always shown. When `[statusbar] height = 2`, the left-aligned segments fill
 //! the top row and right-aligned segments the bottom row instead of sharing a
 //! single row, so narrow terminals spread segments rather than dropping them;

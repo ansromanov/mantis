@@ -1,9 +1,9 @@
-//! Lightweight Rust declaration detection for language-provider plugins.
+//! Lightweight Rust declaration detection for the symbol outline.
 //!
 //! This detector recognizes common type, module, implementation, and function
 //! declarations with source ranges and parent names. It deliberately remains a
-//! heuristic: the provider protocol accepts symbols from parsers with richer
-//! language support, while bundled plugins can share this small implementation.
+//! heuristic: a real parser would be more precise, but this small implementation
+//! keeps the binary dependency-free.
 
 use crate::code_intel::Symbol;
 

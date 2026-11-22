@@ -1,9 +1,7 @@
 //! Chooses the built-in fold detector for a file from its extension or shebang.
 //!
-//! This replaces the per-language bundled plugins: each of them only called one
-//! detector from [`crate::fold_detectors`] on `on_file_open`. Folding now runs
-//! in the file loader, so fold markers are present on the first painted frame
-//! instead of popping in after an out-of-process round trip.
+//! Folding runs in the file loader, so fold markers are present on the first
+//! painted frame.
 //!
 //! YAML is intentionally absent: the loader already runs
 //! [`crate::yaml_fold`] for it and also needs anchor/alias counts.

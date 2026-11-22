@@ -19,7 +19,7 @@ use unicode_width::UnicodeWidthStr;
 
 impl App {
     /// Returns the total number of lines in the current content source
-    /// (plugin content, virtual file, raw content, or JSON pretty).
+    /// (rendered content, virtual file, raw content, or JSON pretty).
     pub fn line_count(&self) -> usize {
         if let Some(path) = &self.current_file {
             if let Some(lines) = self.rendered_content.get(path) {
@@ -64,7 +64,7 @@ impl App {
     }
 
     /// Returns the text of the 0-indexed line, consulting the active content
-    /// source: plugin content, pretty JSON, CSV table, virtual file, or raw content vec.
+    /// source: rendered content, pretty JSON, CSV table, virtual file, or raw content vec.
     pub fn line_text(&self, index: usize) -> Option<&str> {
         if let Some(path) = &self.current_file {
             if let Some(lines) = self.rendered_text.get(path) {

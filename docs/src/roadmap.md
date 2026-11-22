@@ -1,6 +1,6 @@
 # Roadmap
 
-> Last updated: 2026-07-03. Living document — the epics linked below are the
+> Last updated: 2026-11-22. Living document — the epics linked below are the
 > source of truth for status; this page explains the *why* and the sequencing.
 
 ## Positioning: the reading tool for the AI era
@@ -29,7 +29,7 @@ and the fastest repo-reading surface for the agents themselves.*
 
 Every feature below stays **read-only and zero-config by default**. mantis will
 not grow: editing, LSP/IntelliSense, an embedded terminal, a debugger, or a
-plugin-language runtime. When a feature needs to *write*, it hands off (to
+scripting or plugin runtime. When a feature needs to *write*, it hands off (to
 `$EDITOR`, to the clipboard, to stdout).
 
 ---
@@ -63,8 +63,6 @@ expose it without the TUI:
   tree tools to any MCP-capable client.
 - **Remote-control socket** — `mantis --listen <socket>` so an external agent
   can drive a running viewer ("show the user this diff").
-- **Protocol hygiene** — rename the plugin manifest's `tv_protocol` field to
-  `mantis_protocol` (with back-compat) before third-party plugins multiply.
 
 ### 3. DevOps reader
 *Epic: [#471](https://github.com/ansromanov/mantis/issues/471)*
@@ -98,33 +96,22 @@ Consistency & performance) rather than being copied a third time.
 ### 5. Language & format intelligence
 *Epic: [#602](https://github.com/ansromanov/mantis/issues/602) (absorbing #482 & #485)*
 
-Language smarts and format viewing are delivered via the v3 plugin architecture and shared core detectors (`fold_detectors`):
+Everything here is built into the binary (the former plugin system was removed
+in 0.24; there is no extension protocol to maintain). Language smarts live in
+shared core detectors (`fold_detectors`) that run on the loader thread, so
+results are present on the first painted frame:
 
 - **Code folding** across core languages (Rust, Go, Python, Shell, JSON, YAML, Terraform/HCL shipped; TypeScript/JS, INI/Systemd, SQL, PowerShell, Templates next).
-- **Symbol outline / go-to-symbol** fuzzy picker (regex-based heuristics in core, surfaced via provider capability).
+- **Symbol outline / go-to-symbol** fuzzy picker (regex-based heuristics in core).
 - **Scope context in the breadcrumb**, which also feeds sticky scroll
   ([#199](https://github.com/ansromanov/mantis/issues/199)).
-- **Per-language statusbar facts** (protocol shipped in 0.18.x with `plugins/k8s`; language fact summaries next).
+- **Per-language statusbar facts** (Kubernetes manifest facts shipped; other language fact summaries next).
 
-### 6. File-type coverage via plugins
+### 6. File-type coverage
 *Epic: [#602](https://github.com/ansromanov/mantis/issues/602)*
 
-Coverage expands through bundled and registry plugins in two tiers:
-- **Syntax packs** (`.sublime-syntax`): TOML, TypeScript/TSX, Dockerfile, Nginx, Justfile, Terraform bundled; PowerShell and Jinja2/Go-template next.
-- **Rich viewers** (process plugins): Markdown shipped; SQLite/DB and CSV/TSV table views ([#71](https://github.com/ansromanov/mantis/issues/71)) planned following the 64 KB plugin buffer enhancement ([#449](https://github.com/ansromanov/mantis/issues/449)).
-
-### Cross-cutting: plugin system hardening
-
-The plugin system is the extension surface for pillars 2, 3, and 5, and a
-July 2026 review filed its prerequisites: ship bundled plugins in releases
-([#477](https://github.com/ansromanov/mantis/issues/477)), remove the
-startup `cargo build` fallback
-([#478](https://github.com/ansromanov/mantis/issues/478) — security), plugin
-stderr diagnostics ([#479](https://github.com/ansromanov/mantis/issues/479)),
-a registry trust model before the install UI ships
-([#480](https://github.com/ansromanov/mantis/issues/480)), and protocol v3
-(request/response, key consumption, provider priorities —
-[#481](https://github.com/ansromanov/mantis/issues/481)).
+- **Syntax packs** (`.sublime-syntax`, embedded in the binary): TOML, TypeScript/TSX, Dockerfile, Nginx, Justfile, Terraform bundled; PowerShell and Jinja2/Go-template next.
+- **Rich viewers** (built in): Markdown, JSON/JSONL, CSV/TSV and images shipped; SQLite/DB views planned.
 
 ---
 
@@ -151,11 +138,11 @@ legible as the codebase (and this roadmap) grows.
 
 | Release | Theme | Contents |
 |---|---|---|
-| **0.13** | Trust & polish | Code-review correctness fixes + quick UX wins — tracking issue [#473](https://github.com/ansromanov/mantis/issues/473); plugin packaging/security fixes [#477](https://github.com/ansromanov/mantis/issues/477)/[#478](https://github.com/ansromanov/mantis/issues/478) |
+| **0.13** | Trust & polish | Code-review correctness fixes + quick UX wins — tracking issue [#473](https://github.com/ansromanov/mantis/issues/473); trust and security fixes |
 | **0.14** | DevOps reader | Log follow mode + JSONL, `--diff base` startup, secret masking, CSV tables; code folding for Rust/Go/Python ([#483](https://github.com/ansromanov/mantis/issues/483)) |
-| **0.15** | Agent cockpit | `--review` dashboard, remote-control socket, session summary, protocol v3 + rename ([#481](https://github.com/ansromanov/mantis/issues/481)); go-to-symbol picker |
-| **0.16** | Machine interface | Headless JSON CLI, then the MCP server on top of it; registry trust model + install UI ([#480](https://github.com/ansromanov/mantis/issues/480)) |
-| **1.0** | AI-native viewer | SSH remote ([#359](https://github.com/ansromanov/mantis/issues/359)), keymap refactor ([#298](https://github.com/ansromanov/mantis/issues/298)), comprehensive help ([#304](https://github.com/ansromanov/mantis/issues/304)), plugin registry maturity |
+| **0.15** | Agent cockpit | `--review` dashboard, remote-control socket, session summary; go-to-symbol picker |
+| **0.16** | Machine interface | Headless JSON CLI, then the MCP server on top of it |
+| **1.0** | AI-native viewer | SSH remote ([#359](https://github.com/ansromanov/mantis/issues/359)), keymap refactor ([#298](https://github.com/ansromanov/mantis/issues/298)), comprehensive help ([#304](https://github.com/ansromanov/mantis/issues/304)) |
 
 **First two bets:** *prompt-ready copy* (days of work, immediate daily-use hook
 for the AI crowd) and *log follow mode* (biggest persona expansion per unit of

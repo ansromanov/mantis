@@ -19,7 +19,7 @@ use super::{StatusSegment, StatusSide, StatusbarHit};
 type SegmentRange = (StatusSegment, u16, u16);
 
 /// Priority levels for status-bar segments (higher = kept when eliding).
-pub(super) const P_META: u8 = 1; // plugin/status messages
+pub(super) const P_META: u8 = 1; // status messages
 pub(super) const P_INFO: u8 = 2; // fold stats, badges, scroll %, file encoding
 pub(super) const P_GIT: u8 = 3; // git branch info
 pub(super) const P_ERR: u8 = 4; // error indicators

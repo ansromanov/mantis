@@ -54,7 +54,6 @@ Mark items as `[x] Pass`, `[ ] Fail`, or `[ ] N/A` in the `Status` column. If an
 | [ ] | **Toggle Hidden** | `.` | Tree | Toggles visibility of hidden files/directories. | |
 | [ ] | **Theme Picker** | `t` | Tree | Opens the theme picker overlay. | |
 | [ ] | **File History** | `H` | Tree | Opens git history overlay for selected file. | |
-| [ ] | **Plugin Picker** | `p` | Tree | Opens the plugin manager overlay. | |
 | [ ] | **Toggle Watcher** | `W` | Tree | Toggles file auto-reload on disk change. | |
 | [ ] | **Navigate Up** | `Up` or `k` | Tree/Content | Moves cursor up one line. | |
 | [ ] | **Navigate Down** | `Down` or `j` | Tree/Content | Moves cursor down one line. | |
@@ -102,8 +101,7 @@ Mark items as `[x] Pass`, `[ ] Fail`, or `[ ] N/A` in the `Status` column. If an
 | [ ] | **Blame Pane (full file)** | Open a tracked file in a git repo, focus content pane, press `Ctrl+B`. | A dedicated scrollable blame pane replaces the tree, showing hash/author/date/subject columns per line, synced to the content cursor. Navigate with `j`/`k`/`Up`/`Down`, `g`/`G`, `PgUp`/`PgDown`. | |
 | [ ] | **Blame Pane Close** | With the full blame pane open, press `Esc` (or `Ctrl+B` again). | Blame pane closes; tree pane returns. | |
 | [ ] | **Single-Line Blame Bar** | With content pane focused on a tracked file, press `B`. | A 2-line bottom bar appears under the tree: line 1 shows `hash  author  date`, line 2 shows the dimmed commit subject. | |
-| [ ] | **Bundled Language Plugins** | Press `p` in the tree to open the plugin manager, verify `rust`, `python`, and `go` are enabled (default), close with `Esc`. | Folding (`Space`) works on `.rs`/`.py`/`.go` files. | |
-| [ ] | **Icons Hide Tree Arrows** | In the plugin manager, enable `iconize`, close, then look at directory rows in the tree. | Folder rows show an open/closed folder icon glyph instead of a `▶`/`▼` arrow; disabling `iconize` restores the arrows. | |
+| [ ] | **Icons Hide Tree Arrows** | Set `tree.icons = true` in `mantis.toml` (needs a Nerd Font), then look at directory rows in the tree. | Folder rows show an open/closed folder icon glyph instead of a `▶`/`▼` arrow; setting it back to `false` restores the arrows. | |
 | [ ] | **Bug Report Modal** | Open `Ctrl+P`, run `Report a bug (save diagnostics locally)`. | A modal titled ` Submit Bug Report ` opens with a multiline `Description (What happened / steps)` text box and a read-only `Diagnostic Payload Preview (Read-Only)` pane below it. | |
 | [ ] | **Bug Report Scroll Preview** | With the bug report modal open, use `PgUp`/`PgDown` or the mouse wheel over the diagnostic preview pane. | The read-only diagnostic payload preview scrolls independently of the description box. | |
 | [ ] | **Bug Report Submit / Cancel** | Type a short description, press `Ctrl+S` (or `Ctrl+Enter`) to submit; reopen and press `Esc` to cancel instead. | Submit saves a markdown report to `<state dir>/bug-reports/report-<timestamp>.md` (path shown in status bar) and attempts to open a pre-filled GitHub issue in the browser; `Esc` closes the modal with no file written. | |

@@ -1,7 +1,7 @@
 //! Central application state: the `App` struct that ties the whole TUI together.
 //!
 //! `App` holds the file tree, content/diff buffers, every overlay's state
-//! (search, history, theme picker, plugin picker, symbol outline, command
+//! (search, history, theme picker, symbol outline, command
 //! palette, recent files, action menu, help, about, blame, goto line), provider
 //! symbols and the
 //! resolved theme and keymap, and the geometry captured during the last render
@@ -83,7 +83,7 @@ pub(crate) use types::{HighlightCacheKey, HighlightCacheValue};
 pub(crate) use util::{deleted_set, diff_line_style, rect_contains};
 
 /// Central state struct for the `mantis` application. Handles the main event
-/// loop, key/mouse dispatch, overlays, plugins, theme preset/color roles, git
+/// loop, key/mouse dispatch, overlays, theme preset/color roles, git
 /// status tracking, and file preview/diff rendering.
 pub struct App {
     pub root: PathBuf,
@@ -267,7 +267,7 @@ pub struct App {
     pub indent_guides: bool,
 
     /// Whether to show file-type icon glyphs in the tree. The glyphs come from
-    /// a plugin via the `set_icon_map` action; off by default because they
+    /// the static table in `crate::icons`; off by default because they
     /// require a Nerd Font in the terminal.
     pub icons_enabled: bool,
     keys: Keymap,
@@ -432,10 +432,10 @@ pub struct App {
     /// Responses with a lower seq are stale and discarded, which coalesces
     /// rapid root changes / toggles into one scan.
     git_seq: u64,
-    /// Plugin-rendered content keyed by file path. Populated by the `set_content`
-    /// action; the content pane checks this before markdown/virtual-file rendering.
+    /// Rendered content keyed by file path. Populated by the markdown
+    /// view; the content pane checks this before markdown/virtual-file rendering.
     pub rendered_content: HashMap<PathBuf, Vec<Vec<(ratatui::style::Style, String)>>>,
-    /// Plain text of plugin-provided content, keyed by file path (same keys as
+    /// Plain text of the rendered content, keyed by file path (same keys as
     /// `rendered_content`). Used for in-file search, selection, and blame display.
     /// Stored separately because `rendered_content` holds styled spans whose text
     /// would require joining on every access.
@@ -444,16 +444,15 @@ pub struct App {
     /// returning to a previously-viewed file restores where you left off. Session-
     /// scoped (in memory); restart restore of the last file is handled by session.
     pub cursor_positions: HashMap<PathBuf, (usize, usize)>,
-    /// Set to `true` when a plugin sends `set_content` for the current file and
-    /// reset to `false` when `current_file` changes, so the `[rendering…]`
-    /// placeholder only shows while the plugin is actively working on that file.
+    /// Set to `true` when rendered content is installed for the current file and
+    /// reset to `false` when `current_file` changes.
     pub rendered_active: bool,
     /// When `true`, rendered markdown files are instead displayed as raw plain text natively.
     pub show_raw_markdown: bool,
-    /// The last path for which a plugin sent `set_content` while it was the
+    /// The last path for which rendered content was installed while it was the
     /// current file. Used to detect re-renders of the same file vs. first-time
     /// renders of a newly opened file, so scroll position is preserved across
-    /// plugin re-render ticks.
+    /// re-renders.
     pub(super) rendered_active_path: Option<PathBuf>,
     /// Transient status message (e.g. "path copied"), shown until the next keypress
     /// or auto-expires after ~3 seconds.
@@ -641,7 +640,7 @@ impl App {
                     return Err("not available in a diff");
                 }
                 if !self.has_text_cursor() {
-                    return Err("not available (current file not plugin-rendered)");
+                    return Err("not available (current file not rendered)");
                 }
                 Ok(())
             }
@@ -674,7 +673,7 @@ impl App {
                     return Err("no file is open");
                 }
                 if !self.rendered_active {
-                    return Err("not available (current file not plugin-rendered)");
+                    return Err("not available (current file not rendered)");
                 }
                 Ok(())
             }
@@ -867,10 +866,10 @@ impl App {
     }
 
     /// Clears all content-pane state (file buffer, diff, highlights, rendered
-    /// JSON, scroll, selection, fold state, plugin content, etc.).
+    /// JSON, scroll, selection, fold state, rendered content, etc.).
     /// Called when the current file is no longer valid — git mode becomes clean
-    /// (no changed files) or the viewer root changes. Does NOT clear plugin
-    /// contributions or file watchers (those are managed at the call site).
+    /// (no changed files) or the viewer root changes. Does NOT clear
+    /// file watchers (those are managed at the call site).
     fn clear_content_state(&mut self) {
         self.current_file = None;
         self.current_syntax = None;
