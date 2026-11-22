@@ -10,13 +10,6 @@
             "command": "if command -v pre-commit >/dev/null 2>&1; then if ! pre-commit run --all-files; then echo '{\"continue\": false, \"stopReason\": \"pre-commit checks failed\"}'; exit 1; fi; fi",
             "statusMessage": "Running pre-commit checks...",
             "timeout": 120
-          },
-          {
-            "type": "command",
-            "if": "Bash(git push*)",
-            "command": "git fetch origin main 2>/dev/null || true; if git rebase origin/main --quiet 2>/dev/null; then true; else git rebase --abort 2>/dev/null || true; fi",
-            "statusMessage": "Fetching and rebasing onto origin/main...",
-            "timeout": 60
           }
         ]
       }

@@ -139,8 +139,10 @@ jobs:
         run: |
           set -euo pipefail
           git-cliff --offline --tag "v${{ steps.version.outputs.version }}" --output /tmp/CHANGELOG.md
-          git-cliff --offline --unreleased --strip header --output /tmp/release-notes.md
+          git-cliff --offline --unreleased --tag "v${{ steps.version.outputs.version }}" --strip header --output /tmp/release-notes.md
           cp /tmp/CHANGELOG.md CHANGELOG.md
+          # Drop the leading "## [version]" heading: the release page already has a title.
+          sed -i '1{/^## \[/d}' /tmp/release-notes.md
           cp /tmp/release-notes.md release-notes.md
           log=$(cat release-notes.md)
           log=$(echo "$log" | sed 's/"""/\\"\\"\\"/g')
