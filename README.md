@@ -52,8 +52,9 @@ Be clear about the trade-offs before you install:
 
 - **Not an editor.** No insert mode, no buffers, no saving — it reads, it doesn't
   write. Editing means handing the file to `$EDITOR`.
-- **No LSP / IntelliSense.** No autocomplete, go-to-definition, diagnostics, or
-  refactoring. It highlights syntax; it doesn't understand your code.
+- **No LSP / IntelliSense.** No autocomplete, go-to-definition, or refactoring. It
+  highlights syntax and shows a lightweight symbol outline (Rust) and `ruff`
+  diagnostics (Python); it doesn't understand your code beyond that.
 - **No integrated terminal, debugger, or task runner.** It's a viewer, not an IDE.
 - **Fewer batteries.** A deliberately small feature set — less out-of-the-box than VS Code.
 - **Terminal-bound.** A TUI in your terminal, not a GUI; icons need a Nerd Font.
@@ -67,24 +68,34 @@ fills.
 **Navigation**
 - Tree navigation by keyboard or mouse, respecting `.gitignore`
 - Breadcrumb path bar; change root, go up a directory, double-click to descend
-- Code folding (`Space`) — collapse/expand blocks, with language-aware fold regions
+- Project tabs / workspaces, bookmarks, recent files (`Ctrl+O`), right-click context menus
+- Code folding (`Space`) — language-aware regions, ready on the first frame
+  (Rust, Go, Python, JS/TS, CSS, shell, HCL, SQL, YAML, TOML/INI, JSON, templates)
 
 **Search**
 - Fuzzy file-name search (`Ctrl+T`) — fzf-style, as you type
 - Full-text content search (`Ctrl+F`) across the tree
-- In-file search (`/`) and go-to-line (`Ctrl+G`)
+- In-file search (`/`), go-to-line (`Ctrl+G`), symbol outline (`O`, Rust)
 
 **Viewing & rendering**
 - Syntax highlighting for a wide range of languages
-- JSON pretty-printing for minified files
+- **Built-in markdown rendering** — headings, lists, tables, code blocks; `M` toggles raw
+- JSON pretty-print and path queries, CSV/TSV tables, JSON Lines
+- Python diagnostics via [`ruff`](https://docs.astral.sh/ruff/) (if installed) and
+  Kubernetes manifest facts in the status bar
 - Word wrap, line numbers, and a status bar (line, language, scroll, encoding)
+
+**Git**
+- Status-colored tree, working-tree diffs (unified or side-by-side), file history,
+  per-line and full-file blame, worktree switcher, and a git mode that scopes
+  everything to changed files (`Ctrl+D`)
 
 **Productivity**
 - Command palette (`Ctrl+P`) — fuzzy-find every action with its keybinding
-- Recent files (`Ctrl+O`), copy path
 - Open in your `$EDITOR` (`Ctrl+e`) and drop back into `mantis` when you're done
 - Auto-reload on disk change; session persistence (expanded dirs, open file,
   scroll) restored on restart, cached outside the repo
+- Pager mode: `git diff | mantis --language diff`
 
 **Customization**
 - Live theme switching — built-in presets, fully recolorable
@@ -94,17 +105,21 @@ fills.
 ## Install
 
 The one-liners above (no Rust toolchain required) download the prebuilt binary for
-your platform, verify its checksum, and install it onto your `PATH`. On macOS or
-Linux you can also use Homebrew:
+your platform, verify its checksum, and install it onto your `PATH`. You can also
+download a binary by hand from the
+[releases page](https://github.com/ansromanov/mantis/releases) (check it against
+`SHA256SUMS`), or on macOS / Linux use Homebrew:
 
 ```sh
 brew tap ansromanov/mantis https://github.com/ansromanov/mantis
 brew install mantis
 ```
 
-From source:
+From source (Rust toolchain required; one crate, no build step beyond cargo):
 
 ```sh
+cargo install --git https://github.com/ansromanov/mantis
+# or
 git clone https://github.com/ansromanov/mantis.git
 cd mantis && cargo build --release   # binary at target/release/mantis
 ```
