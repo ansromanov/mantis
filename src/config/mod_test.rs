@@ -172,6 +172,56 @@ fn validate_keys_accepts_full_default_template() {
     assert!(validate_keys(DEFAULT_CONFIG_TEMPLATE).is_empty());
 }
 
+// The shipped template is the user-facing key reference, so it must list exactly
+// the keys the code binds. macOS adds `cmd+` variants, hence the cfg.
+#[test]
+#[cfg(not(target_os = "macos"))]
+fn default_template_keys_match_keymap_defaults() {
+    use crate::config::keymap::{parse_binding, Keymap};
+
+    let normalize = |specs: &toml::Value| -> Vec<String> {
+        specs
+            .as_array()
+            .expect("key list")
+            .iter()
+            .map(|spec| {
+                let binding = parse_binding(spec.as_str().expect("key spec")).expect("valid spec");
+                toml::Value::try_from(binding)
+                    .unwrap()
+                    .as_str()
+                    .unwrap()
+                    .to_string()
+            })
+            .collect()
+    };
+
+    let template: toml::Value = toml::from_str(DEFAULT_CONFIG_TEMPLATE).unwrap();
+    let template_keys = template["keys"].as_table().expect("[keys] table");
+    let defaults = toml::Value::try_from(Keymap::default()).unwrap();
+    let default_keys = defaults.as_table().unwrap();
+
+    let mut missing: Vec<_> = default_keys
+        .keys()
+        .filter(|k| !template_keys.contains_key(*k))
+        .collect();
+    missing.sort();
+    assert!(
+        missing.is_empty(),
+        "keys missing from mantis.toml: {missing:?}"
+    );
+
+    for (action, specs) in template_keys {
+        let want = default_keys
+            .get(action)
+            .unwrap_or_else(|| panic!("mantis.toml binds unknown action {action}"));
+        assert_eq!(
+            normalize(specs),
+            normalize(want),
+            "mantis.toml disagrees with the code for `{action}`"
+        );
+    }
+}
+
 #[test]
 fn validate_keys_flags_unknown_top_level_key_with_suggestion() {
     let warnings = validate_keys("tre = 30\n");

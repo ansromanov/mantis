@@ -230,10 +230,13 @@ When full-file blame is toggled on (`Ctrl+b`), the tree panel is replaced by a d
 | `/`            | In-file search               |
 | `n`/`N`        | Next / previous hunk (in a diff) |
 | `M`            | Toggle raw/rendered markdown |
+| `z` / `L`      | Toggle word wrap / line numbers |
+| `J` / `T`      | Toggle JSON pretty-print / CSV table view |
 
-Word wrap, line numbers, JSON pretty-print, CSV/TSV table view, side-by-side diff, and the
-staged/unstaged diff cycle have no default content-pane key — use the command
-palette (`Ctrl+P`) or bind one yourself in `mantis.toml`.
+Display toggles have content-pane keys too: `z` word wrap, `L` line numbers, `J` JSON
+pretty-print and `T` CSV/TSV table view. In a diff, `S` switches side-by-side/unified and
+`s` cycles staged/unstaged. Every action is also in the command palette (`Ctrl+P`) with its
+current binding, and any key can be changed in `mantis.toml`.
 
 ### CSV and TSV table view
 

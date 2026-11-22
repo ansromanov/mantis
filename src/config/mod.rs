@@ -372,8 +372,8 @@ close = \"Esc\"                           # close/cancel any overlay
 activate = \"Enter\"                      # activate selected item
 
 # List navigation (search, history, picker, etc.)
-list_up = [\"Up\", \"k\"]                 # move up
-list_down = [\"Down\", \"j\"]             # move down
+list_up = [\"Up\", \"k\"]                 # move up (k only while the query is empty)
+list_down = [\"Down\", \"j\"]             # move down (j only while the query is empty)
 page_up = \"PageUp\"                      # scroll up by page
 page_down = \"PageDown\"                  # scroll down by page
 
@@ -383,7 +383,7 @@ input_char = \"<any printable>\"          # type to filter
 
 # In-file search navigation
 search_next = [\"Down\", \"n\", \"Tab\"]  # next match
-search_prev = [\"Up\", \"N\", \"BackTab\", \"Ctrl+P\"]  # previous match
+search_prev = [\"Up\", \"N\", \"BackTab\"]  # previous match (Ctrl+P stays the command palette)
 
 # About/Help screens
 about_open_release = \"o\"                # open release URL (About screen)
