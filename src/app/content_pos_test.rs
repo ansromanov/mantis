@@ -554,3 +554,71 @@ fn image_overlay_suppressed_while_search_popup_is_open() {
     assert!(app.image_overlay_suppressed());
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn image_overlay_suppressed_while_about_is_open() {
+    let root = temp_root();
+    let mut app = app_for(&root);
+    app.show_about = true;
+    assert!(app.image_overlay_suppressed());
+    fs::remove_dir_all(&root).ok();
+}
+
+fn wrapped_app(root: &std::path::Path) -> App {
+    let mut app = app_for(root);
+    app.virtual_file = None;
+    app.word_wrap = true;
+    app.content = (0..30)
+        .map(|i| {
+            format!(
+                "line {i}: the quick brown fox jumps over the lazy dog and keeps running far away"
+            )
+        })
+        .collect();
+    app
+}
+
+#[test]
+fn resize_keeps_the_same_logical_line_at_the_top() {
+    let root = temp_root();
+    let mut app = wrapped_app(&root);
+    app.content_area = Rect::new(0, 0, 44, 10);
+    app.scroll_wrap_width = 44;
+    app.content_scroll = app.wrapped_line_start_at(44, 12);
+
+    app.remap_scroll_for_width(22);
+
+    let (line, row) = app.wrapped_display_position_at(22, app.content_scroll);
+    assert_eq!((line, row), (12, 0), "line 12 must still start the view");
+    assert_eq!(app.scroll_wrap_width, 22);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn remap_is_a_noop_when_width_is_unchanged_or_unknown() {
+    let root = temp_root();
+    let mut app = wrapped_app(&root);
+    app.content_area = Rect::new(0, 0, 44, 10);
+    app.content_scroll = 17;
+    app.remap_scroll_for_width(44); // first frame: width was unknown
+    assert_eq!(app.content_scroll, 17);
+    app.remap_scroll_for_width(44); // same width
+    assert_eq!(app.content_scroll, 17);
+    fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn toggling_wrap_keeps_the_same_logical_line_at_the_top() {
+    let root = temp_root();
+    let mut app = wrapped_app(&root);
+    app.word_wrap = false;
+    app.content_area = Rect::new(0, 0, 44, 10);
+    app.content_scroll = 7; // logical line 7
+
+    app.set_word_wrap(true);
+    assert_eq!(app.wrapped_display_position(app.content_scroll), (7, 0));
+
+    app.set_word_wrap(false);
+    assert_eq!(app.content_scroll, 7);
+    fs::remove_dir_all(&root).ok();
+}

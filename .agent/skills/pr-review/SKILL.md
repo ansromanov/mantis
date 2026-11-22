@@ -126,11 +126,11 @@ Output a structured report:
 ## Rules
 
 - Never skip `cargo fmt` / `cargo clippy` after editing code.
-- Never push without running `just test-pr` first.
+- Never push without running `just check` first.
 - Never resolve a thread you did not address in code.
 - File a PR comment for every `BUG`/`WARN` diff finding before fixing it — don't
   silently patch and move on; the fix needs a resolvable, auditable thread.
 - Cancel any in-flight auto-merge run in Phase 0 before starting the review; never
   re-enable it yourself afterward.
 - Use `isolation: "worktree"` when spawning any subagent during this flow.
-- If `just test-pr` fails, fix the failure before pushing — do not push a broken branch.
+- If `just check` fails, fix the failure before pushing — do not push a broken branch.

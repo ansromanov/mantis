@@ -47,6 +47,7 @@ pub mod secret_mask;
 pub mod selection;
 pub mod session;
 pub mod sys_info;
+pub mod text_width;
 pub mod theme;
 pub mod tree;
 pub mod ui;

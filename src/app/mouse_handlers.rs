@@ -23,7 +23,7 @@ use crate::list_picker::ListPicker;
 use crate::selection::TextSelection;
 
 use super::content_pos::WHEEL_STEP;
-use super::{rect_contains, App, Focus};
+use super::{rect_contains, App, Focus, Overlay};
 
 /// Outcome of a picker mouse event handled by [`handle_picker_mouse`].
 #[derive(Debug, PartialEq, Eq)]
@@ -102,195 +102,77 @@ impl App {
     /// scroll, and double-click for search/history/theme results.
     pub fn handle_mouse(&mut self, ev: MouseEvent) {
         self.pause_follow_for_input();
-        if self.show_welcome {
-            if let MouseEventKind::Down(MouseButton::Left) = ev.kind {
-                if !rect_contains(self.welcome_area, ev.column, ev.row) {
-                    self.show_welcome = false;
-                    crate::session::mark_welcome_shown();
-                }
-            }
-            return;
-        }
-        if self.show_help {
-            match ev.kind {
-                MouseEventKind::ScrollDown => {
-                    self.help_scroll.scroll_down(WHEEL_STEP, usize::MAX);
-                }
-                MouseEventKind::ScrollUp => {
-                    self.help_scroll.scroll_up(WHEEL_STEP);
-                }
-                MouseEventKind::Down(MouseButton::Left) => {
-                    if !rect_contains(self.help_area, ev.column, ev.row) {
-                        self.show_help = false;
-                        self.help_scroll.scroll = 0;
-                        self.help_tab = 0;
-                        return;
-                    }
-                    if ev.row == self.help_area.y + 1 && ev.column > self.help_area.x {
-                        let available_width = self.help_area.width.saturating_sub(2);
-                        let offset = crate::ui::popups::help_tab_scroll_offset(
-                            self.help_tab,
-                            available_width,
-                        );
-                        let content_col = (ev.column - (self.help_area.x + 1)) + offset;
-                        let ranges = crate::ui::popups::help_tab_ranges(0);
-                        for (i, (start, end)) in ranges.iter().enumerate() {
-                            if content_col >= *start && content_col < *end {
-                                if self.help_tab != i {
-                                    self.help_tab = i;
-                                    self.help_scroll.scroll = 0;
-                                }
-                                return;
-                            }
-                        }
-                    }
-                }
-                _ => {}
-            }
-            return;
-        }
-        if self.context_menu.is_some() {
-            self.handle_context_menu_mouse(ev);
-            return;
-        }
-        if self.menu_bar_state.is_some()
-            || (self.config.ui.menu_bar && rect_contains(self.menu_bar_area, ev.column, ev.row))
+        let top = self.top_overlay();
+        // Overlays that sit above the menu bar swallow its clicks; below them a
+        // click on the bar (or an open dropdown) goes to the bar.
+        let above_menu_bar = matches!(
+            top,
+            Some(Overlay::Welcome | Overlay::Help | Overlay::About | Overlay::ContextMenu)
+        );
+        if !above_menu_bar
+            && top != Some(Overlay::MenuBar)
+            && self.config.ui.menu_bar
+            && rect_contains(self.menu_bar_area, ev.column, ev.row)
         {
             self.handle_menu_bar_mouse(ev);
             return;
         }
-        if self.filter_bar.is_some() {
-            if let MouseEventKind::Down(MouseButton::Left) = ev.kind {
-                let ca = self.content_area;
-                let bar_y = ca.y + ca.height.saturating_sub(2);
-                let on_bar = ev.row == bar_y && ev.column >= ca.x && ev.column < ca.x + ca.width;
-                if !on_bar {
-                    if let Some(s) = &self.filter_bar {
-                        if s.query.is_empty() {
-                            self.filter_query = None;
-                        } else {
-                            self.filter_query = Some(s.query.clone());
-                        }
-                    }
-                    self.filter_bar = None;
-                    self.rebuild_filter_display_map();
-                    self.clamp_content_scroll();
+        match top {
+            Some(Overlay::Welcome) => return self.handle_welcome_mouse(ev),
+            // The about box has no mouse interaction; it still swallows input.
+            Some(Overlay::About) => return,
+            Some(Overlay::Help) => return self.handle_help_mouse(ev),
+            Some(Overlay::ContextMenu) => return self.handle_context_menu_mouse(ev),
+            Some(Overlay::MenuBar) => return self.handle_menu_bar_mouse(ev),
+            Some(Overlay::FilterBar) => return self.handle_filter_bar_mouse(ev),
+            Some(Overlay::BugReport) => return self.handle_bug_report_mouse(ev),
+            Some(Overlay::RevisionPicker) => return self.handle_revision_mouse(ev),
+            Some(Overlay::WorktreePicker) => return self.handle_worktree_mouse(ev),
+            Some(Overlay::ThemePicker) => return self.handle_theme_mouse(ev),
+            Some(Overlay::CommandPalette) => return self.handle_command_palette_mouse(ev),
+            Some(Overlay::History) => return self.handle_history_mouse(ev),
+            Some(Overlay::RepoLog) => return self.handle_repo_log_mouse(ev),
+            Some(Overlay::RecentFiles) => return self.handle_recent_mouse(ev),
+            Some(Overlay::Bookmarks) => return self.handle_bookmarks_mouse(ev),
+            Some(Overlay::Search) => return self.handle_search_mouse(ev),
+            // Inline prompts: keep wheel events inside the prompt. Without this
+            // guard a wheel over it falls through to the tree/content handlers
+            // and changes the underlying view/focus.
+            Some(Overlay::InFileBar) => {
+                match ev.kind {
+                    MouseEventKind::ScrollDown => self.in_file_search_next(),
+                    MouseEventKind::ScrollUp => self.in_file_search_prev(),
+                    _ => return,
                 }
+                return;
             }
-            return;
-        }
-        if self.bug_report.is_some() {
-            self.handle_bug_report_mouse(ev);
-            return;
-        }
-        if self.revision_picker.is_some() {
-            if handle_picker_mouse(
-                ev,
-                self.revision_picker_area,
-                self.revision_picker_offset,
-                &mut self.revision_picker,
-                &mut self.last_click,
-            ) == PickerMouseAction::Activate
+            Some(Overlay::TreeFilter)
+                if matches!(
+                    ev.kind,
+                    MouseEventKind::ScrollDown | MouseEventKind::ScrollUp
+                ) =>
             {
-                let rev = self.revision_picker.as_ref().and_then(|p| {
-                    if p.results_len() > 0 && p.selected < p.results_len() {
-                        p.selected_rev().map(|r| r.to_string())
-                    } else if !p.query.is_empty() {
-                        Some(p.query.clone())
-                    } else {
-                        None
-                    }
-                });
-                self.revision_picker = None;
-                if let Some(rev) = rev {
-                    self.enter_compare_mode(rev);
+                match ev.kind {
+                    MouseEventKind::ScrollDown => self.handle_tree_filter_key(KeyEvent::new(
+                        KeyCode::Down,
+                        KeyModifiers::empty(),
+                    )),
+                    MouseEventKind::ScrollUp => self
+                        .handle_tree_filter_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty())),
+                    _ => return,
                 }
+                return;
             }
-            return;
-        }
-        if self.worktree_picker.is_some() {
-            if handle_picker_mouse(
-                ev,
-                self.worktree_picker_area,
-                self.worktree_picker_offset,
-                &mut self.worktree_picker,
-                &mut self.last_click,
-            ) == PickerMouseAction::Activate
+            Some(Overlay::GotoLine)
+                if matches!(
+                    ev.kind,
+                    MouseEventKind::ScrollDown | MouseEventKind::ScrollUp
+                ) =>
             {
-                let path = self
-                    .worktree_picker
-                    .as_ref()
-                    .and_then(|p| p.selected_path());
-                self.worktree_picker = None;
-                if let Some(path) = path {
-                    self.set_root(&path);
-                }
+                return;
             }
-            return;
-        }
-        if self.theme_picker.is_some() {
-            self.handle_theme_mouse(ev);
-            return;
-        }
-        if self.command_palette.is_some() {
-            self.handle_command_palette_mouse(ev);
-            return;
-        }
-        if self.history.is_some() {
-            self.handle_history_mouse(ev);
-            return;
-        }
-        if self.repo_log.is_some() {
-            self.handle_repo_log_mouse(ev);
-            return;
-        }
-        if self.recent_files.is_some() {
-            self.handle_recent_mouse(ev);
-            return;
-        }
-        if self.bookmarks.is_some() {
-            self.handle_bookmarks_mouse(ev);
-            return;
-        }
-        if self.search.is_some() {
-            self.handle_search_mouse(ev);
-            return;
-        }
-        // Keep wheel events inside the same overlay precedence chain as keys.
-        // Without this guard, a wheel over an inline prompt falls through to
-        // the tree/content handlers and changes the underlying view/focus.
-        if self.in_file_search_open {
-            match ev.kind {
-                MouseEventKind::ScrollDown => self.in_file_search_next(),
-                MouseEventKind::ScrollUp => self.in_file_search_prev(),
-                _ => return,
-            }
-            return;
-        }
-        if self.tree_filter.is_some()
-            && matches!(
-                ev.kind,
-                MouseEventKind::ScrollDown | MouseEventKind::ScrollUp
-            )
-        {
-            match ev.kind {
-                MouseEventKind::ScrollDown => {
-                    self.handle_tree_filter_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()))
-                }
-                MouseEventKind::ScrollUp => {
-                    self.handle_tree_filter_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()))
-                }
-                _ => return,
-            }
-            return;
-        }
-        if self.goto_line.is_some()
-            && matches!(
-                ev.kind,
-                MouseEventKind::ScrollDown | MouseEventKind::ScrollUp
-            )
-        {
-            return;
+            // Clicks outside the tree filter / go-to-line prompt reach the panes.
+            _ => {}
         }
         if rect_contains(self.statusbar_area, ev.column, ev.row) {
             match ev.kind {
@@ -900,6 +782,116 @@ impl App {
                 self.bug_report = None;
             }
             _ => {}
+        }
+    }
+
+    fn handle_welcome_mouse(&mut self, ev: MouseEvent) {
+        if let MouseEventKind::Down(MouseButton::Left) = ev.kind {
+            if !rect_contains(self.welcome_area, ev.column, ev.row) {
+                self.show_welcome = false;
+                crate::session::mark_welcome_shown();
+            }
+        }
+    }
+
+    fn handle_help_mouse(&mut self, ev: MouseEvent) {
+        match ev.kind {
+            MouseEventKind::ScrollDown => {
+                self.help_scroll.scroll_down(WHEEL_STEP, usize::MAX);
+            }
+            MouseEventKind::ScrollUp => {
+                self.help_scroll.scroll_up(WHEEL_STEP);
+            }
+            MouseEventKind::Down(MouseButton::Left) => {
+                if !rect_contains(self.help_area, ev.column, ev.row) {
+                    self.show_help = false;
+                    self.help_scroll.scroll = 0;
+                    self.help_tab = 0;
+                    return;
+                }
+                if ev.row == self.help_area.y + 1 && ev.column > self.help_area.x {
+                    let available_width = self.help_area.width.saturating_sub(2);
+                    let offset =
+                        crate::ui::popups::help_tab_scroll_offset(self.help_tab, available_width);
+                    let content_col = (ev.column - (self.help_area.x + 1)) + offset;
+                    let ranges = crate::ui::popups::help_tab_ranges(0);
+                    for (i, (start, end)) in ranges.iter().enumerate() {
+                        if content_col >= *start && content_col < *end {
+                            if self.help_tab != i {
+                                self.help_tab = i;
+                                self.help_scroll.scroll = 0;
+                            }
+                            return;
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn handle_filter_bar_mouse(&mut self, ev: MouseEvent) {
+        if let MouseEventKind::Down(MouseButton::Left) = ev.kind {
+            let ca = self.content_area;
+            let bar_y = ca.y + ca.height.saturating_sub(2);
+            let on_bar = ev.row == bar_y && ev.column >= ca.x && ev.column < ca.x + ca.width;
+            if !on_bar {
+                if let Some(s) = &self.filter_bar {
+                    if s.query.is_empty() {
+                        self.filter_query = None;
+                    } else {
+                        self.filter_query = Some(s.query.clone());
+                    }
+                }
+                self.filter_bar = None;
+                self.rebuild_filter_display_map();
+                self.clamp_content_scroll();
+            }
+        }
+    }
+
+    fn handle_revision_mouse(&mut self, ev: MouseEvent) {
+        if handle_picker_mouse(
+            ev,
+            self.revision_picker_area,
+            self.revision_picker_offset,
+            &mut self.revision_picker,
+            &mut self.last_click,
+        ) == PickerMouseAction::Activate
+        {
+            let rev = self.revision_picker.as_ref().and_then(|p| {
+                if p.results_len() > 0 && p.selected < p.results_len() {
+                    p.selected_rev().map(|r| r.to_string())
+                } else if !p.query.is_empty() {
+                    Some(p.query.clone())
+                } else {
+                    None
+                }
+            });
+            self.revision_picker = None;
+            if let Some(rev) = rev {
+                self.enter_compare_mode(rev);
+            }
+        }
+    }
+
+    fn handle_worktree_mouse(&mut self, ev: MouseEvent) {
+        if handle_picker_mouse(
+            ev,
+            self.worktree_picker_area,
+            self.worktree_picker_offset,
+            &mut self.worktree_picker,
+            &mut self.last_click,
+        ) == PickerMouseAction::Activate
+        {
+            let path = self
+                .worktree_picker
+                .as_ref()
+                .and_then(|p| p.selected_path());
+            self.worktree_picker = None;
+            if let Some(path) = path {
+                self.set_root(&path);
+            }
         }
     }
 }

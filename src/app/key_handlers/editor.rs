@@ -190,11 +190,7 @@ impl App {
                 true
             }
             Some("toggle_wrap") => {
-                self.word_wrap = !self.word_wrap;
-                self.config.content.word_wrap = self.word_wrap;
-                self.content_hscroll = 0;
-                self.clamp_content_scroll();
-                self.save_config();
+                self.toggle_word_wrap();
                 true
             }
             Some("toggle_line_numbers") => {

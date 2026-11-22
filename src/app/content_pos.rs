@@ -104,6 +104,26 @@ impl App {
         total.saturating_sub(vh)
     }
 
+    /// Text width available for wrapped content in a pane `area_width` cells wide:
+    /// the pane minus the line-number/fold gutter.
+    fn wrap_text_width(&self, area_width: usize) -> usize {
+        area_width.saturating_sub(self.line_prefix_width())
+    }
+
+    /// Number of visual rows display line `display` occupies at `width` cells.
+    /// Uses the same wrap function as the renderer (`crate::text_width`), so the
+    /// scroll range and the painted rows cannot disagree.
+    fn line_rows(&self, display: usize, width: usize) -> usize {
+        let physical = self.display_to_physical(display);
+        match self.line_width(physical) {
+            Some(w) if w <= width => 1,
+            Some(_) => self
+                .line_text(physical)
+                .map_or(1, |text| crate::text_width::wrap_row_count(text, width)),
+            None => 1,
+        }
+    }
+
     /// Returns the number of visual rows occupied by the current content when
     /// wrapping is enabled. The calculation is shared by scrolling and
     /// rendering so a long logical line cannot make the viewport appear stuck.
@@ -111,34 +131,35 @@ impl App {
         if !self.word_wrap {
             return self.display_line_count();
         }
-        let width = (self.content_area.width as usize).saturating_sub(self.line_prefix_width());
+        let width = self.wrap_text_width(self.content_area.width as usize);
         if width == 0 {
             return self.display_line_count();
         }
         (0..self.display_line_count())
-            .map(|display| {
-                self.line_width(self.display_to_physical(display))
-                    .unwrap_or(0)
-                    .div_ceil(width)
-                    .max(1)
-            })
+            .map(|display| self.line_rows(display, width))
             .sum()
     }
 
     /// Maps a visual wrapped-row offset to its logical display line and the
     /// number of visual rows to skip within that line.
     pub(crate) fn wrapped_display_position(&self, visual_offset: usize) -> (usize, usize) {
-        let width = (self.content_area.width as usize).saturating_sub(self.line_prefix_width());
+        self.wrapped_display_position_at(self.content_area.width as usize, visual_offset)
+    }
+
+    /// Like [`wrapped_display_position`](Self::wrapped_display_position) for a
+    /// pane of an explicit width (used to remap scroll across a resize).
+    pub(crate) fn wrapped_display_position_at(
+        &self,
+        area_width: usize,
+        visual_offset: usize,
+    ) -> (usize, usize) {
+        let width = self.wrap_text_width(area_width);
         if width == 0 {
             return (visual_offset.min(self.display_line_count()), 0);
         }
         let mut remaining = visual_offset;
         for display in 0..self.display_line_count() {
-            let rows = self
-                .line_width(self.display_to_physical(display))
-                .unwrap_or(0)
-                .div_ceil(width)
-                .max(1);
+            let rows = self.line_rows(display, width);
             if remaining < rows {
                 return (display, remaining);
             }
@@ -149,18 +170,56 @@ impl App {
 
     /// Returns the visual row at which a logical display line begins.
     pub(crate) fn wrapped_line_start(&self, target: usize) -> usize {
-        let width = (self.content_area.width as usize).saturating_sub(self.line_prefix_width());
+        self.wrapped_line_start_at(self.content_area.width as usize, target)
+    }
+
+    /// Like [`wrapped_line_start`](Self::wrapped_line_start) for an explicit pane width.
+    pub(crate) fn wrapped_line_start_at(&self, area_width: usize, target: usize) -> usize {
+        let width = self.wrap_text_width(area_width);
         if width == 0 {
             return target;
         }
         (0..target.min(self.display_line_count()))
-            .map(|display| {
-                self.line_width(self.display_to_physical(display))
-                    .unwrap_or(0)
-                    .div_ceil(width)
-                    .max(1)
-            })
+            .map(|display| self.line_rows(display, width))
             .sum()
+    }
+
+    /// Turns word wrap on or off, keeping the same logical line at the top of the
+    /// view. `content_scroll` counts wrapped rows when wrap is on and logical
+    /// lines when it is off, so flipping the flag without converting it jumps the
+    /// view to an unrelated place.
+    pub(crate) fn set_word_wrap(&mut self, on: bool) {
+        if self.word_wrap == on {
+            return;
+        }
+        let top_line = if self.word_wrap {
+            self.wrapped_display_position(self.content_scroll).0
+        } else {
+            self.content_scroll
+        };
+        self.word_wrap = on;
+        self.content_scroll = if on {
+            self.wrapped_line_start(top_line)
+        } else {
+            top_line
+        };
+        self.scroll_wrap_width = self.content_area.width as usize;
+        self.content_hscroll = 0;
+        self.clamp_content_scroll();
+    }
+
+    /// Keeps the same logical line at the top of a wrapped view when the pane
+    /// width changes (terminal resize, tree toggled, blame strip shown). Scroll
+    /// is stored in wrapped rows, which are only meaningful for one width, so
+    /// without this a resize leaves the view at a different place in the file.
+    pub(crate) fn remap_scroll_for_width(&mut self, area_width: usize) {
+        let previous = self.scroll_wrap_width;
+        self.scroll_wrap_width = area_width;
+        if !self.word_wrap || previous == 0 || previous == area_width {
+            return;
+        }
+        let (display, _) = self.wrapped_display_position_at(previous, self.content_scroll);
+        self.content_scroll = self.wrapped_line_start_at(area_width, display);
     }
 
     /// Width of the line-number gutter (fold marker + digits + space), or 0.
@@ -419,23 +478,10 @@ impl App {
     /// pane, so the inline image overlay must be withheld for this frame (it is
     /// written straight to the terminal and would otherwise cover the popup).
     pub(crate) fn image_overlay_suppressed(&self) -> bool {
-        self.show_help
-            || self.show_about
-            || self.show_welcome
-            || self.theme_picker.is_some()
-            || self.command_palette.is_some()
-            || self.history.is_some()
-            || self.repo_log.is_some()
-            || self.recent_files.is_some()
-            || self.bug_report.is_some()
-            || self.revision_picker.is_some()
-            || self.worktree_picker.is_some()
-            || self.goto_line.is_some()
-            || self.search.is_some()
-            || self.context_menu.is_some()
-            || self.in_file_search_open
-            || self.json_query.is_some()
-            || self.filter_bar.is_some()
+        // The tree filter bar sits over the tree, never over the image.
+        self.open_overlays()
+            .into_iter()
+            .any(|overlay| overlay != super::Overlay::TreeFilter)
     }
 
     /// Unified scroll-into-view helper: nudges `content_scroll` so the given
