@@ -1,4 +1,6 @@
 use super::*;
+use crate::list_picker::ListPicker;
+use fuzzy_matcher::skim::SkimMatcherV2;
 
 #[test]
 fn symbol_picker_fuzzy_filters_and_keeps_nested_cursor_symbol_selected() {
