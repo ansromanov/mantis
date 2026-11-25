@@ -1,19 +1,15 @@
-//! Command-palette dispatch and external-editor integration for `App`.
+//! Command-palette dispatch for `App`.
 //!
 //! `dispatch_command` maps a selected command-palette entry's `action_id` to the
 //! shared `dispatch_action_id` path, which also serves the menu bar. The palette
 //! and menu therefore share one set of canonical ids from
 //! `crate::actions::ACTIONS`, avoiding `open_x`/`x_picker` aliasing between this
-//! match and `Keymap::bindings_for_action`. This module
-//! also owns suspending the TUI to launch the user's `$EDITOR` on the current
-//! file: it tears down raw mode and the alternate screen, runs the editor,
-//! then restores the terminal and flags `needs_clear` so the next frame
-//! repaints cleanly. Theme switching and the highlighter rebuild triggered
-//! from the palette live here too, alongside the related terminal-state
-//! bookkeeping. `open_release_url` delegates to the shared `open_in_browser`
-//! helper, which guards against spawning the browser when stdout is not a TTY
-//! (piped/headless/CI runs). `open_external` guards the same way and shares
-//! the OS-dispatch spawn logic with `open_in_browser` via `spawn_system_open`.
+//! match and `Keymap::bindings_for_action`.
+//!
+//! The pieces that used to live here are in sibling modules: the palette routes
+//! (file, content, go-to-line, symbol, diagnostic) and theme application are in
+//! `palette`, and launching external programs (`$EDITOR`, the browser, the OS
+//! opener, the file manager) is in `external`.
 
 use crate::search::{GotoLineState, SearchState, ThemePicker};
 
