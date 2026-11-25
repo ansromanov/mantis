@@ -479,7 +479,7 @@ fn with_clean_env<F: FnOnce()>(f: F) {
 
 #[test]
 fn resolve_editor_uses_config_when_set() {
-    let (cmd, is_fallback) = super::editor::resolve_editor(Some("code --wait"));
+    let (cmd, is_fallback) = super::external::resolve_editor(Some("code --wait"));
     assert_eq!(cmd, "code --wait");
     assert!(!is_fallback, "config override is not a fallback");
 }
@@ -488,7 +488,7 @@ fn resolve_editor_uses_config_when_set() {
 fn resolve_editor_empty_config_falls_through() {
     with_clean_env(|| {
         std::env::set_var("EDITOR", "vim");
-        let (cmd, is_fallback) = super::editor::resolve_editor(Some(""));
+        let (cmd, is_fallback) = super::external::resolve_editor(Some(""));
         assert_eq!(cmd, "vim");
         assert!(!is_fallback, "env var is not a fallback");
     });
@@ -498,7 +498,7 @@ fn resolve_editor_empty_config_falls_through() {
 fn resolve_editor_config_wins_over_env() {
     with_clean_env(|| {
         std::env::set_var("VISUAL", "nano");
-        let (cmd, is_fallback) = super::editor::resolve_editor(Some("code --wait"));
+        let (cmd, is_fallback) = super::external::resolve_editor(Some("code --wait"));
         assert_eq!(cmd, "code --wait");
         assert!(!is_fallback);
     });
@@ -509,7 +509,7 @@ fn resolve_editor_uses_visual_when_set() {
     with_clean_env(|| {
         std::env::set_var("VISUAL", "my-editor");
         std::env::remove_var("EDITOR");
-        let (result, is_fallback) = super::editor::resolve_editor(None);
+        let (result, is_fallback) = super::external::resolve_editor(None);
         assert_eq!(result, "my-editor");
         assert!(!is_fallback, "env var is not a fallback");
     });
@@ -520,7 +520,7 @@ fn resolve_editor_uses_editor_when_visual_unset() {
     with_clean_env(|| {
         std::env::remove_var("VISUAL");
         std::env::set_var("EDITOR", "nano");
-        let (result, is_fallback) = super::editor::resolve_editor(None);
+        let (result, is_fallback) = super::external::resolve_editor(None);
         assert_eq!(result, "nano");
         assert!(!is_fallback, "env var is not a fallback");
     });
@@ -532,7 +532,7 @@ fn resolve_editor_fallback_returns_is_fallback_true() {
         return; // fallback differs on Windows
     }
     with_clean_env(|| {
-        let (_cmd, is_fallback) = super::editor::resolve_editor(None);
+        let (_cmd, is_fallback) = super::external::resolve_editor(None);
         assert!(is_fallback, "fallback must set is_fallback flag");
     });
 }
@@ -543,7 +543,7 @@ fn resolve_editor_fallback_prefers_nano_over_vim() {
         return; // fallback differs on Windows
     }
     with_clean_env(|| {
-        let (cmd, _) = super::editor::resolve_editor(None);
+        let (cmd, _) = super::external::resolve_editor(None);
         let nano_available = std::process::Command::new("which")
             .arg("nano")
             .output()

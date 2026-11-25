@@ -10,9 +10,15 @@
 //! and `editor` (command dispatch and
 //! external-editor suspend/resume).
 
+mod bug_report;
+mod command;
 mod editor;
+mod external;
 mod normal;
 mod overlay;
+mod palette;
+mod pickers;
+mod tree_filter;
 
 #[cfg(test)]
 #[path = "editor_test.rs"]
