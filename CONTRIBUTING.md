@@ -22,7 +22,7 @@ just run .        # or: cargo run -- .
 ## Before you open a PR
 
 ```sh
-just check        # fmt --check, clippy -D warnings, lib tests (same gate as CI)
+just check        # fmt --check, 800-line file limit, clippy -D warnings, lib tests (same gate as CI)
 ```
 
 CI additionally runs the full test suite and an end-to-end smoke test

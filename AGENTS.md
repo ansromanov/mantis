@@ -51,8 +51,10 @@ Conventions worth knowing:
   build the shared primitive when a second consumer is foreseeable.
 - Index with `.get(i)` unless the bound is provable. Clamp selection after rebuilds.
 - Add a `benches/performance.rs` case for new per-frame or large-input hot paths.
-- Prefer files under ~700 lines; split into a module directory when one grows past it.
-  This is a guideline, not a CI gate.
+- **Production Rust files stay at or below 800 lines**, enforced by CI
+  (`scripts/check-file-size.py`, `just file-size`). Split into a module directory
+  (`src/app/`, `src/search/pickers/`) before a file reaches the limit. `*_test.rs`
+  companions have no hard limit, but split them alongside the code they test.
 
 ## Testing
 

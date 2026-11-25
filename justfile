@@ -52,7 +52,11 @@ test-e2e:
     python3 scripts/ci-e2e.py
 
 # Local gate; mirrors CI.
-check: fmt-check clippy fast-test
+check: fmt-check file-size clippy fast-test
+
+# enforce the 800-line limit on production Rust files
+file-size:
+    python3 scripts/check-file-size.py
 
 fmt-check:
     cargo fmt --all -- --check
