@@ -50,11 +50,16 @@ use crate::theme::Theme;
 use crate::tree::TreeNode;
 use crate::virtual_file::VirtualFile;
 
+mod applicability;
+mod bug_report;
+mod clipboard;
 mod content_pos;
 mod content_query;
 mod context_menu;
 mod diff_nav;
+mod file_lists;
 mod file_ops;
+mod file_watch;
 mod fold;
 mod geometry;
 mod init;
@@ -67,17 +72,22 @@ pub use geometry::Geometry;
 pub(crate) use overlay::Overlay;
 pub(crate) mod menu_bar;
 mod mouse_handlers;
+mod mouse_overlays;
 mod navigation;
 mod pager;
 mod refresh;
+mod terminal;
 mod types;
 mod util;
 
 use loader::Loader;
 
 // Only referenced from test code (entry/state assertions).
+#[cfg(test)]
+use bug_report::resolve_bug_report_title;
 #[cfg_attr(not(test), allow(unused_imports))]
 pub use context_menu::{ContextActionId, ContextMenuEntry, ContextMenuState, ContextMenuTarget};
+pub(crate) use terminal::{restore_terminal, set_alternate_scroll};
 pub use types::{DiffMode, Focus, StatusMessage, TabAction};
 pub(crate) use types::{HighlightCacheKey, HighlightCacheValue};
 pub(crate) use util::{deleted_set, diff_line_style, rect_contains};
@@ -524,256 +534,6 @@ impl App {
         self.status_message = Some(sm);
     }
 
-    /// Checks if a command is currently applicable based on the application state.
-    /// Returns `Ok(())` if applicable, or `Err(reason)` if inapplicable.
-    pub fn check_applicability(&self, action_id: &str) -> Result<(), &'static str> {
-        let action = crate::actions::ACTIONS.iter().find(|a| a.id == action_id);
-        let applicability = match action {
-            Some(a) => a.applicability(),
-            None => return Ok(()),
-        };
-        match applicability {
-            crate::actions::Applicability::Always => Ok(()),
-            crate::actions::Applicability::OpenFile => {
-                if self.current_file.is_none() {
-                    return Err("no file is open");
-                }
-                Ok(())
-            }
-            crate::actions::Applicability::JsonFile => {
-                if self.current_file.is_none() {
-                    return Err("no file is open");
-                }
-                if !self.is_json {
-                    return Err("requires JSON file");
-                }
-                if self.json_pretty_lines.is_empty() {
-                    return Err("JSON file failed to parse");
-                }
-                Ok(())
-            }
-            crate::actions::Applicability::CsvFile => {
-                if self.current_file.is_none() {
-                    return Err("no file is open");
-                }
-                if !self.is_csv {
-                    return Err("requires CSV/TSV file");
-                }
-                if self.csv_table_lines.is_empty() {
-                    return Err("CSV/TSV table failed to parse");
-                }
-                Ok(())
-            }
-            crate::actions::Applicability::GitRepo => {
-                if self.git_info.is_none() {
-                    return Err("not in a git repo");
-                }
-                Ok(())
-            }
-            crate::actions::Applicability::GitRepoAndFile => {
-                if self.current_file.is_none() {
-                    return Err("no file is open");
-                }
-                if self.git_info.is_none() {
-                    return Err("not in a git repo");
-                }
-                Ok(())
-            }
-            crate::actions::Applicability::GitRepoAndNoDiff => {
-                if self.current_file.is_none() {
-                    return Err("no file is open");
-                }
-                if self.git_info.is_none() {
-                    return Err("not in a git repo");
-                }
-                if self.is_diff {
-                    return Err("not available in a diff");
-                }
-                if !self.has_text_cursor() {
-                    return Err("not available (current file not rendered)");
-                }
-                Ok(())
-            }
-            crate::actions::Applicability::GitRepoAndDiffView => {
-                if self.git_info.is_none() {
-                    return Err("not in a git repo");
-                }
-                if !self.is_diff {
-                    return Err("requires diff view");
-                }
-                Ok(())
-            }
-            crate::actions::Applicability::DiffView => {
-                if !self.is_diff {
-                    return Err("requires diff view");
-                }
-                Ok(())
-            }
-            crate::actions::Applicability::FoldRegions => {
-                if self.current_file.is_none() {
-                    return Err("no file is open");
-                }
-                if self.fold_regions.is_empty() && !self.is_jsonl {
-                    return Err("no fold regions in file");
-                }
-                Ok(())
-            }
-            crate::actions::Applicability::RenderedMarkdownActive => {
-                if self.current_file.is_none() {
-                    return Err("no file is open");
-                }
-                if !self.rendered_active {
-                    return Err("not available (current file not rendered)");
-                }
-                Ok(())
-            }
-            crate::actions::Applicability::Symbols => {
-                if self.current_file.is_none() {
-                    return Err("no file is open");
-                }
-                if self
-                    .current_file
-                    .as_deref()
-                    .and_then(|path| self.symbols.get(path))
-                    .is_none_or(Vec::is_empty)
-                {
-                    return Err("no symbols in file");
-                }
-                Ok(())
-            }
-            crate::actions::Applicability::Diagnostics => {
-                if self.current_file.is_none() {
-                    return Err("no file is open");
-                }
-                if self
-                    .current_file
-                    .as_deref()
-                    .and_then(|path| self.file_diagnostics.get(path))
-                    .is_none_or(Vec::is_empty)
-                {
-                    return Err("no diagnostics in file");
-                }
-                Ok(())
-            }
-            crate::actions::Applicability::GitMode => {
-                if !self.git_mode {
-                    return Err("requires git mode");
-                }
-                Ok(())
-            }
-        }
-    }
-
-    /// Collects an anonymous diagnostic report, saves it under the state directory,
-    /// and opens the user's browser pre-filled with a GitHub new-issue URL.
-    /// If the report exceeds ~6KB, truncates the URL query and copies the full
-    /// report to the clipboard instead. If browser launch fails, falls back
-    /// to clipboard copying and status bar instructions.
-    pub(crate) fn save_bug_report(&mut self) {
-        let title_text =
-            resolve_bug_report_title(self.bug_report.as_ref().map(|br| br.title.as_str()));
-        let report = crate::diagnostics::DiagnosticReport::collect(self);
-        let md = report.to_markdown();
-        let body_text = report.body.clone();
-
-        // 1. Save locally first.
-        let local_path = match report.save() {
-            Ok(path) => Some(path),
-            Err(e) => {
-                self.set_status(format!("bug report local save failed: {e}"));
-                None
-            }
-        };
-
-        // 2. Prepare URL parameters.
-        let base = "https://github.com/ansromanov/mantis/issues/new?template=app-bugreport.yml";
-        let title_encoded = percent_encode(&title_text);
-
-        let mut truncated = false;
-        let (description_encoded, diagnostics_encoded) = {
-            let desc_enc = percent_encode(&body_text);
-            let diag_enc = percent_encode(&md);
-            let test_url = format!(
-                "{}&title={}&description={}&diagnostics={}",
-                base, title_encoded, desc_enc, diag_enc
-            );
-            if test_url.len() > 6000 {
-                truncated = true;
-                let fallback_msg = format!(
-                    "<!-- DIAGNOSTICS TOO LARGE FOR URL - COPIED TO CLIPBOARD. PLEASE PASTE OVER THIS LINE -->\n\
-                     [Report truncated due to URL length limit ({} bytes). The full report was copied to your clipboard. Please paste it here.]",
-                    md.len()
-                );
-                (percent_encode(&fallback_msg), percent_encode(""))
-            } else {
-                (desc_enc, diag_enc)
-            }
-        };
-
-        let url = format!(
-            "{}&title={}&description={}&diagnostics={}",
-            base, title_encoded, description_encoded, diagnostics_encoded
-        );
-
-        // 3. Try to open browser (unless in a test context).
-        let browser_res = if cfg!(test) {
-            Ok(())
-        } else {
-            self.open_in_browser(&url)
-        };
-
-        // 4. Update status and clipboard depending on truncation and browser success.
-        match (browser_res, truncated) {
-            (Ok(()), false) => {
-                if let Some(path) = local_path {
-                    self.set_status(format!("bug report saved: {}", path.display()));
-                } else {
-                    self.set_status("opened browser");
-                }
-            }
-            (Ok(()), true) => {
-                self.copy_to_clipboard(md, "full bug report");
-                self.set_status("opened browser; full report copied (paste into description)");
-            }
-            (Err(err), _) => {
-                self.copy_to_clipboard(md, "full bug report");
-                self.set_status(format!(
-                    "clipboard filled; browser failed (open github.com/ansromanov/mantis/issues/new): {err}"
-                ));
-            }
-        }
-
-        self.bug_report = None;
-    }
-
-    /// Copies `text` to the system clipboard, reporting success or failure in the
-    /// status bar. Single source of truth for clipboard writes.
-    pub(crate) fn copy_to_clipboard(&mut self, text: String, label: &str) {
-        if text.is_empty() {
-            return;
-        }
-        match self.clipboard_set(text) {
-            Ok(()) => self.set_status(format!("copied {label}")),
-            Err(e) => {
-                self.set_status(format!("clipboard error: {e}"));
-            }
-        }
-    }
-
-    /// Writes `text` to the system clipboard.
-    #[cfg(not(test))]
-    fn clipboard_set(&mut self, text: String) -> Result<(), arboard::Error> {
-        arboard::Clipboard::new().and_then(|mut cb| cb.set_text(text))
-    }
-
-    /// Test double: captures `text` in `clipboard_capture` so `cargo test`
-    /// never touches (or races on) the real system clipboard.
-    #[cfg(test)]
-    fn clipboard_set(&mut self, text: String) -> Result<(), arboard::Error> {
-        self.clipboard_capture.push(text);
-        Ok(())
-    }
-
     /// Returns the set of changed file paths (not directories) when in git mode,
     /// or `None` when git mode is inactive. Used to scope the search index to
     /// changed files only.
@@ -867,80 +627,6 @@ impl App {
         self.rendered_content.clear();
         self.rendered_text.clear();
     }
-}
-
-/// Toggles xterm alternate-scroll mode (DECSET 1007), which otherwise
-/// translates mouse-wheel events into arrow-key presses in the alternate
-/// screen. At a scroll bound (e.g. wheel-up at the first line) those
-/// synthetic key presses cause visible flashing/tearing even though mantis's
-/// own scroll state is a no-op. Best-effort: write errors are ignored.
-///
-/// mantis always restores this to *enabled* on exit rather than probing and
-/// restoring whatever the terminal's mode was before mantis started (that
-/// requires a synchronous DECRQM query/response round-trip). If the ambient
-/// terminal had it disabled, exiting mantis will leave it enabled.
-pub(crate) fn set_alternate_scroll(enabled: bool) {
-    use std::io::Write;
-    let sequence = if enabled {
-        "\x1b[?1007h"
-    } else {
-        "\x1b[?1007l"
-    };
-    let _ = write!(std::io::stdout(), "{sequence}");
-    let _ = std::io::stdout().flush();
-}
-
-/// Restores the terminal to a normal state: pops keyboard enhancement flags
-/// (Unix only), disables raw mode, leaves the alternate screen, disables mouse
-/// capture, restores alternate-scroll mode, and shows the cursor. Best-effort
-/// and idempotent — each operation is silently ignored on error so this can be
-/// called from a panic hook or from regular teardown.
-#[cfg_attr(not(unix), allow(unused_imports))]
-pub(crate) fn restore_terminal() {
-    use std::io;
-
-    use crossterm::cursor::Show;
-    use crossterm::event::DisableMouseCapture;
-    use crossterm::execute;
-    use crossterm::terminal::{disable_raw_mode, LeaveAlternateScreen};
-
-    let _ = crate::event_source::pop_keyboard_enhancement_flags();
-    // Remove any inline image before leaving the alternate screen so it does not
-    // linger on the primary buffer. No-op unless graphics were detected.
-    crate::graphics::clear_all(&mut io::stdout());
-    let _ = disable_raw_mode();
-    let _ = execute!(
-        io::stdout(),
-        LeaveAlternateScreen,
-        DisableMouseCapture,
-        Show
-    );
-    set_alternate_scroll(true);
-}
-
-/// Resolves the GitHub issue title for a bug report: the trimmed user-entered
-/// title, or the default when it is missing/blank.
-fn resolve_bug_report_title(title: Option<&str>) -> String {
-    title
-        .map(str::trim)
-        .filter(|t| !t.is_empty())
-        .unwrap_or("App Bug Report")
-        .to_string()
-}
-
-fn percent_encode(s: &str) -> String {
-    let mut encoded = String::new();
-    for b in s.bytes() {
-        match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                encoded.push(b as char);
-            }
-            _ => {
-                encoded.push_str(&format!("%{:02X}", b));
-            }
-        }
-    }
-    encoded
 }
 
 #[cfg(test)]
