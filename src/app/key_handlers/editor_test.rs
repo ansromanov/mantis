@@ -450,8 +450,16 @@ fn app_git_show_fields_default_matches_config() {
 
 // -- resolve_editor ----------------------------------------------------------
 
+/// `VISUAL`/`EDITOR` are process-wide, and `cargo test` runs tests in parallel
+/// threads (nextest uses one process per test, which hides the race), so every
+/// test that touches them takes this lock.
+static EDITOR_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 #[track_caller]
 fn with_clean_env<F: FnOnce()>(f: F) {
+    let _guard = EDITOR_ENV_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let prior_visual = std::env::var("VISUAL").ok();
     let prior_editor = std::env::var("EDITOR").ok();
     std::env::remove_var("VISUAL");

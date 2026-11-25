@@ -9,3 +9,10 @@ pub use types::*;
 
 mod core;
 pub use core::*;
+
+mod blame;
+mod diff;
+mod log;
+pub use blame::*;
+pub use diff::*;
+pub use log::*;
