@@ -33,6 +33,9 @@ jobs:
       - name: Format
         run: cargo fmt --all -- --check
 
+      - name: File size limit
+        run: python3 scripts/check-file-size.py
+
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
 
