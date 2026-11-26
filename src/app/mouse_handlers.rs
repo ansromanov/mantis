@@ -174,6 +174,30 @@ impl App {
             // Clicks outside the tree filter / go-to-line prompt reach the panes.
             _ => {}
         }
+        // A click on a hint replays its key, so it behaves exactly like
+        // pressing it (including in the focused pane and with remapped keys).
+        if let MouseEventKind::Down(MouseButton::Left) = ev.kind {
+            if let Some(action) = self
+                .geo
+                .hint_targets
+                .iter()
+                .find(|(rect, _)| rect_contains(*rect, ev.column, ev.row))
+                .map(|(_, action)| *action)
+            {
+                let scope = match self.focus {
+                    Focus::Tree => crate::config::BindingScope::Tree,
+                    Focus::Content => crate::config::BindingScope::Content,
+                };
+                if let Some(key) = self
+                    .keys()
+                    .binding_in(action, scope)
+                    .map(|binding| (*binding).to_key_event())
+                {
+                    self.handle_key(key);
+                }
+                return;
+            }
+        }
         if rect_contains(self.geo.statusbar_area, ev.column, ev.row) {
             match ev.kind {
                 MouseEventKind::Down(MouseButton::Left) => {

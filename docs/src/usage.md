@@ -18,6 +18,11 @@ Press `?` or `F1` for in-app help, `F10` for the action menu, and `q` to quit.
 The menu groups palette actions by area and shows each action's current keybinding.
 Set `[ui] menu_bar = true` in `mantis.toml` to keep its row visible for mouse use.
 
+The bottom row shows a few keys for what you are doing right now (the tree, an
+open file, a diff, rendered markdown...), plus `F1 help` and `Shift+F10 more…`,
+which opens the context menu. Every hint can be clicked, which works exactly
+like pressing its key. Turn the row off with `[ui] hints = false`.
+
 ## Pager mode
 
 When no `<path>` is given and stdin is piped rather than a terminal, `mantis`

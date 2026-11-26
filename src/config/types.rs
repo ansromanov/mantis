@@ -135,12 +135,24 @@ impl Default for SearchConfig {
     }
 }
 
-/// Menu-bar configuration, grouped under `[ui]` in the TOML.
-#[derive(Default, Serialize, Deserialize, Clone, PartialEq)]
+/// Menu-bar and hint-row configuration, grouped under `[ui]` in the TOML.
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 #[serde(default)]
 pub struct UiConfig {
     /// Keep the action menu row visible even when its dropdown is closed.
     pub menu_bar: bool,
+    /// Show one row of clickable key hints for the current context below the
+    /// status bar.
+    pub hints: bool,
+}
+
+impl Default for UiConfig {
+    fn default() -> Self {
+        Self {
+            menu_bar: false,
+            hints: true,
+        }
+    }
 }
 
 /// Git-related configuration, grouped under `[git]` in the TOML.
