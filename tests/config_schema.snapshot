@@ -155,6 +155,7 @@ tree.independent_scroll
 tree.show_hidden
 tree.width
 ui
+ui.hints
 ui.menu_bar
 updates
 updates.check

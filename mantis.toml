@@ -97,6 +97,7 @@ height = 1                    # 1 = single row, 2 = spread left/right groups ove
 # this is false; enabling it keeps the row visible for mouse users.
 [ui]
 menu_bar = false              # keep the action menu row visible
+hints = true                  # one row of clickable key hints for what you are doing now
 
 
 # --- updates ----------------------------------------------------------------

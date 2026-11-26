@@ -217,6 +217,38 @@ impl KeyBinding {
     }
 }
 
+impl KeyBinding {
+    /// The key as shown in hints, without the `" (tree)"` / `" (content)"`
+    /// panel suffix that [`display`](Self::display) adds.
+    pub fn key_label(&self) -> String {
+        let label = self.display();
+        label
+            .strip_suffix(" (tree)")
+            .or_else(|| label.strip_suffix(" (content)"))
+            .unwrap_or(&label)
+            .to_string()
+    }
+
+    /// A key event this binding matches, so a click on a hint can replay the
+    /// exact key the user would press (and so honours remapped keys).
+    pub fn to_key_event(self) -> KeyEvent {
+        let mut modifiers = KeyModifiers::empty();
+        if self.ctrl {
+            modifiers |= KeyModifiers::CONTROL;
+        }
+        if self.alt {
+            modifiers |= KeyModifiers::ALT;
+        }
+        if self.super_key {
+            modifiers |= KeyModifiers::SUPER;
+        }
+        if self.shift || matches!(self.code, KeyCode::Char(c) if c.is_ascii_uppercase()) {
+            modifiers |= KeyModifiers::SHIFT;
+        }
+        KeyEvent::new(self.code, modifiers)
+    }
+}
+
 /// Returns true if any binding in the list matches the key event, ignoring
 /// binding scopes. Use in modal/overlay contexts where panel focus is not
 /// meaningful; the main-view dispatch goes through `pressed_in`.
@@ -311,6 +343,19 @@ impl Keymap {
             "reopen_tab" => &self.reopen_tab,
             _ => &[],
         }
+    }
+
+    /// The first binding of `action_id` that is active in `scope` (a global
+    /// binding or one scoped to that panel).
+    /// Prefers a key every keyboard has: the dedicated `Menu` key is skipped
+    /// when another binding exists (many laptops have no such key).
+    pub fn binding_in(&self, action_id: &str, scope: BindingScope) -> Option<&KeyBinding> {
+        let mut active = self
+            .bindings_for_action(action_id)
+            .iter()
+            .filter(|b| b.scope == BindingScope::Global || b.scope == scope);
+        let first = active.clone().next();
+        active.find(|b| b.code != KeyCode::Menu).or(first)
     }
 
     /// Returns a display label for the first binding mapped to `action_id`,

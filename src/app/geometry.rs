@@ -9,6 +9,9 @@ use ratatui::layout::Rect;
 
 #[derive(Default)]
 pub struct Geometry {
+    /// Click targets of the hint row: each hint's area and the action whose
+    /// key a click replays.
+    pub hint_targets: Vec<(Rect, &'static str)>,
     /// Hit area of the recent-files list recorded during the last render.
     pub recent_area: Rect,
     /// Scroll offset of the recent-files list recorded during the last render.

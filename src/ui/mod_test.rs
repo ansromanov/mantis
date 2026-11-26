@@ -29,15 +29,43 @@ fn tab_picker_overlay_draws_with_the_workspace() {
     assert!(text.contains("Open tabs"));
 }
 
+/// Layout tests below pin the classic layout (status bar on the last row), so
+/// the hint row is off here; `hint_row_sits_below_the_status_bar` covers it.
 fn make_app() -> App {
     let cfg = Config {
         git: crate::config::GitConfig {
             status: false,
             ..Default::default()
         },
+        ui: crate::config::UiConfig {
+            hints: false,
+            ..Default::default()
+        },
         ..Config::default()
     };
     App::new(PathBuf::from("."), cfg, None, None).unwrap()
+}
+
+#[test]
+fn hint_row_sits_below_the_status_bar() {
+    let mut app = make_app();
+    app.config.ui.hints = true;
+    app.focus = crate::app::Focus::Tree;
+    let backend = TestBackend::new(100, 20);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|f| super::draw(f, &mut app)).unwrap();
+    let rows = buffer_rows(&terminal);
+    assert!(
+        rows[19].contains("Enter open"),
+        "last row holds the hints: {:?}",
+        rows[19]
+    );
+    assert!(
+        rows[18].contains(&format!("v{}", env!("CARGO_PKG_VERSION"))),
+        "status bar moves up one row"
+    );
+    assert_eq!(app.geo.statusbar_area.y, 18);
+    assert!(!app.geo.hint_targets.is_empty());
 }
 
 #[test]

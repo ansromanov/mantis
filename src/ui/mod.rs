@@ -20,6 +20,7 @@ use ratatui::{
 use crate::app::{App, Overlay};
 
 mod content;
+pub(crate) mod hints;
 pub(crate) mod menu_bar;
 pub(crate) mod popups;
 pub(crate) mod statusbar;
@@ -74,10 +75,12 @@ fn draw_area(
 
     let menu_visible = shell.map_or(app.config.ui.menu_bar, |shell| shell.menu_bar)
         || app.menu_bar_state.is_some();
-    let min_height = MIN_LAYOUT_HEIGHT + u16::from(menu_visible);
+    let hints_visible = app.config.ui.hints;
+    let min_height = MIN_LAYOUT_HEIGHT + u16::from(menu_visible) + u16::from(hints_visible);
     // Allocate the status bar its configured number of rows (1 or 2), so a
-    // two-row bar has room to spread segments instead of eliding them.
-    let sb_height = app.config.statusbar.height.clamp(1, 2) as u16;
+    // two-row bar has room to spread segments instead of eliding them. The
+    // optional hint row sits right below it.
+    let sb_height = app.config.statusbar.height.clamp(1, 2) as u16 + u16::from(hints_visible);
     let vert = if menu_visible {
         Layout::default()
             .direction(Direction::Vertical)
@@ -101,7 +104,22 @@ fn draw_area(
         Rect::default()
     };
     let body_area = if menu_visible { vert[1] } else { vert[0] };
-    let status_area = if menu_visible { vert[2] } else { vert[1] };
+    let bottom_area = if menu_visible { vert[2] } else { vert[1] };
+    let (status_area, hint_area) = if hints_visible && bottom_area.height > 1 {
+        (
+            Rect {
+                height: bottom_area.height - 1,
+                ..bottom_area
+            },
+            Some(Rect {
+                y: bottom_area.y + bottom_area.height - 1,
+                height: 1,
+                ..bottom_area
+            }),
+        )
+    } else {
+        (bottom_area, None)
+    };
 
     if area.width < MIN_LAYOUT_WIDTH || area.height < min_height {
         app.geo.tree_area = Rect::default();
@@ -127,6 +145,7 @@ fn draw_area(
         );
         app.geo.statusbar_area = status_area;
         app.statusbar_segments = statusbar::draw_statusbar(f, app, status_area);
+        app.geo.hint_targets.clear();
         if menu_visible {
             menu_bar::draw_menu_bar(f, app, menu_area);
         }
@@ -171,6 +190,10 @@ fn draw_area(
     content::draw_content(f, app, horiz[1]);
     app.geo.statusbar_area = status_area;
     app.statusbar_segments = statusbar::draw_statusbar(f, app, status_area);
+    app.geo.hint_targets = match hint_area {
+        Some(area) => hints::draw_hints(f, app, area),
+        None => Vec::new(),
+    };
 
     // Overlays are drawn bottom-to-top in the order defined by `Overlay::STACK`,
     // the same order that decides which one receives input.

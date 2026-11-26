@@ -560,6 +560,12 @@ impl App {
         &self.keys
     }
 
+    /// Mutable keymap access for tests outside the `app` module.
+    #[cfg(test)]
+    pub(crate) fn keys_mut_for_tests(&mut self) -> &mut Keymap {
+        &mut self.keys
+    }
+
     /// Human-readable label for the tree panel's current view mode, shown as the
     /// panel's border title. Extends as new tree modes are added (functions,
     /// file structure, …); today it reflects only Files vs Git.
