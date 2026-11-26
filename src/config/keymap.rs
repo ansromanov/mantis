@@ -506,7 +506,7 @@ impl Default for Keymap {
     fn default() -> Self {
         #[allow(unused_mut)]
         let mut map = Keymap {
-            quit: bind(&["ctrl+c", "tree:q"]),
+            quit: bind(&["ctrl+c", "q"]),
             help: bind(&["F1", "?"]),
             menu_bar: bind(&["F10"]),
             toggle_hidden: bind(&["tree:."]),

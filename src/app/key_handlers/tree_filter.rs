@@ -43,7 +43,7 @@ impl App {
             OverlayKey::Activate => {
                 self.restore_tree_filter_expansion();
                 self.tree_filter = None;
-                self.activate_selected();
+                self.activate_selected_and_focus();
             }
             OverlayKey::Close => {
                 self.restore_tree_filter_expansion();

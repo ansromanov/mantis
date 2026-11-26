@@ -215,15 +215,20 @@ fn page_down_navigates_by_10() {
 }
 
 #[test]
-fn vim_jk_navigate_when_query_empty() {
+fn j_and_k_type_into_an_empty_query_instead_of_navigating() {
+    // Every overlay with a text field treats printable keys as text, so a
+    // query can start with j or k. Navigation is arrows / PageUp / Home / End.
     let mut p = TestPicker::new(vec!["a".into(), "b".into(), "c".into()]);
     assert!(p.query_is_empty());
-    let result = handle_list_picker_key(&mut p, &key(KeyCode::Char('j')));
-    assert_eq!(result, OverlayKey::Handled);
-    assert_eq!(p.selected, 1);
-    let result = handle_list_picker_key(&mut p, &key(KeyCode::Char('k')));
-    assert_eq!(result, OverlayKey::Handled);
-    assert_eq!(p.selected, 0);
+    assert_eq!(
+        handle_list_picker_key(&mut p, &key(KeyCode::Char('j'))),
+        OverlayKey::Handled
+    );
+    assert_eq!(p.query, "j");
+    assert_eq!(p.selected, 0, "j must not move the selection");
+    handle_list_picker_key(&mut p, &key(KeyCode::Char('k')));
+    assert_eq!(p.query, "jk");
+    assert_eq!(p.selected, 0, "k must not move the selection");
 }
 
 #[test]
