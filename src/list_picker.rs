@@ -49,18 +49,7 @@ pub fn handle_list_picker_key<P: ListPicker>(p: &mut P, key: &KeyEvent) -> Overl
             p.set_selected(p.selected().saturating_sub(1));
             OverlayKey::Handled
         }
-        // j/k navigate only when no query is active (vim-style); otherwise fall through to Char(c).
-        KeyCode::Char('k') if p.query_is_empty() => {
-            p.set_selected(p.selected().saturating_sub(1));
-            OverlayKey::Handled
-        }
         KeyCode::Down => {
-            if p.selected() + 1 < p.results_len() {
-                p.set_selected(p.selected() + 1);
-            }
-            OverlayKey::Handled
-        }
-        KeyCode::Char('j') if p.query_is_empty() => {
             if p.selected() + 1 < p.results_len() {
                 p.set_selected(p.selected() + 1);
             }

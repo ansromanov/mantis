@@ -166,7 +166,7 @@ These work no matter which panel is focused.
 
 | Key                    | Action                  |
 | ---------------------- | ----------------------- |
-| `Ctrl+c`, `q` (tree)   | Quit                    |
+| `Ctrl+c`, `q`          | Quit (from the main screen; in a popup `q` closes it or types) |
 | `F1`, `?`              | Toggle help             |
 | `F10`                  | Open the action menu    |
 | `Ctrl+P`               | Command palette (fuzzy-find any action) |

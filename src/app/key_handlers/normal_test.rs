@@ -1838,3 +1838,70 @@ fn f10_opens_the_action_menu_from_normal_mode() {
     assert!(app.menu_bar_state.is_some());
     fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn enter_on_a_file_moves_focus_to_content_and_esc_returns_to_tree() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = crate::app::Focus::Tree;
+    let file = root.join("long.txt");
+    app.tree_selected = app.nodes.iter().position(|n| n.path == file).unwrap();
+    app.handle_key(key(KeyCode::Enter));
+    assert_eq!(
+        app.focus,
+        crate::app::Focus::Content,
+        "opening a file focuses it"
+    );
+    app.handle_key(key(KeyCode::Esc));
+    assert_eq!(
+        app.focus,
+        crate::app::Focus::Tree,
+        "Esc steps back to the tree"
+    );
+    fs::remove_dir_all(root).ok();
+}
+
+#[test]
+fn enter_on_a_directory_keeps_focus_in_the_tree() {
+    let root = temp_tree();
+    let sub = root.join("sub");
+    fs::create_dir_all(&sub).unwrap();
+    fs::write(sub.join("a.txt"), "a\n").unwrap();
+    let mut app = app_for(&root);
+    app.rebuild(true);
+    app.focus = crate::app::Focus::Tree;
+    app.tree_selected = app.nodes.iter().position(|n| n.path == sub).unwrap();
+    app.handle_key(key(KeyCode::Enter));
+    assert_eq!(app.focus, crate::app::Focus::Tree);
+    fs::remove_dir_all(root).ok();
+}
+
+#[test]
+fn left_at_the_left_edge_returns_to_tree_but_scrolls_otherwise() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = crate::app::Focus::Content;
+    app.word_wrap = false;
+    app.content_hscroll = 8;
+    app.handle_key(key(KeyCode::Left));
+    assert_eq!(app.content_hscroll, 4, "Left scrolls while there is room");
+    assert_eq!(app.focus, crate::app::Focus::Content);
+    app.content_hscroll = 0;
+    app.handle_key(key(KeyCode::Left));
+    assert_eq!(
+        app.focus,
+        crate::app::Focus::Tree,
+        "Left at column 0 goes back"
+    );
+    fs::remove_dir_all(root).ok();
+}
+
+#[test]
+fn q_quits_from_the_content_pane_too() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = crate::app::Focus::Content;
+    app.handle_key(key(KeyCode::Char('q')));
+    assert!(app.should_quit);
+    fs::remove_dir_all(root).ok();
+}
