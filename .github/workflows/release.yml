@@ -92,12 +92,12 @@ jobs:
       sha: ${{ steps.commit.outputs.sha }}
       changelog: ${{ steps.changelog.outputs.log }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
           ssh-key: ${{ secrets.DEPLOY_KEY }}
 
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@893d6ee8d714b6c7dfe2bcd94e5759e9a7958a7e # v2
         with:
           tool: git-cliff@2.14.0
 
@@ -230,7 +230,7 @@ jobs:
     env:
       RUSTFLAGS: "-C link-arg=-fuse-ld=lld"
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ needs.bump.outputs.sha }}
 
@@ -240,12 +240,14 @@ jobs:
         if: inputs.runner != 'self-hosted'
         run: sudo apt-get update && sudo apt-get install -y lld
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+        with:
+          toolchain: stable
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
 
       - name: Install nextest
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@893d6ee8d714b6c7dfe2bcd94e5759e9a7958a7e # v2
         with:
           tool: nextest
 
@@ -264,13 +266,15 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ needs.bump.outputs.sha }}
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+        with:
+          toolchain: stable
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
 
       - name: Test
         shell: bash
@@ -287,19 +291,20 @@ jobs:
     # release, since it can always be rebuilt and published in a later run.
     continue-on-error: ${{ matrix.os == 'windows-latest' }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ needs.bump.outputs.sha }}
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
         with:
+          toolchain: stable
           targets: ${{ matrix.target }}
 
       - name: Install musl tools
         if: runner.os == 'Linux'
         run: sudo apt-get install -y musl-tools
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           key: ${{ matrix.target }}
 
@@ -313,7 +318,7 @@ jobs:
           [[ "${{ runner.os }}" == "Windows" ]] && src="${src}.exe"
           cp "$src" "${{ matrix.artifact }}"
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.artifact }}
@@ -334,7 +339,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ needs.bump.outputs.sha }}
           ssh-key: ${{ secrets.DEPLOY_KEY }}
@@ -358,7 +363,7 @@ jobs:
           fi
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           path: artifacts
           merge-multiple: true
@@ -369,7 +374,7 @@ jobs:
           sha256sum * > SHA256SUMS
           cat SHA256SUMS
 
-      - uses: softprops/action-gh-release@v3
+      - uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: v${{ needs.bump.outputs.version }}
