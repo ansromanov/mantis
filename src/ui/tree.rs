@@ -28,7 +28,7 @@ use crate::git::GitStatus;
 /// mouse hit-testing.
 pub fn draw_tree(f: &mut Frame, app: &mut App, area: Rect) {
     let focused = matches!(app.focus, Focus::Tree)
-        && app.search.is_none()
+        && app.command_palette.is_none()
         && app.history.is_none()
         && app.theme_picker.is_none();
     let border_style = if focused {

@@ -348,8 +348,7 @@ impl App {
                         None,
                     );
                     search.toggle_mode();
-                    self.search = Some(search);
-                    self.focus = Focus::Tree;
+                    self.open_palette_search(search);
                 }
             }
             ContextActionId::CollapseSiblings => {
@@ -380,7 +379,7 @@ impl App {
                     self.show_line_blame = true;
                 }
             }
-            ContextActionId::GotoLine => self.goto_line = Some(crate::search::GotoLineState::new()),
+            ContextActionId::GotoLine => self.open_palette_goto_line(),
             ContextActionId::FoldAll => self.fold_all(),
             ContextActionId::UnfoldAll => self.unfold_all(),
             ContextActionId::OpenAtRevision => self.toggle_file_revision(),

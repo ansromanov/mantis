@@ -163,22 +163,6 @@ impl App {
         }
     }
 
-    /// Handles mouse events on the search overlay: click to select,
-    /// double-click to open the result, scroll to navigate.
-    /// Close on click outside the popup area.
-    pub(super) fn handle_search_mouse(&mut self, ev: MouseEvent) {
-        if handle_picker_mouse(
-            ev,
-            self.geo.search_area,
-            self.geo.search_offset,
-            &mut self.search,
-            &mut self.last_click,
-        ) == PickerMouseAction::Activate
-        {
-            self.activate_search_selection();
-        }
-    }
-
     /// Handles mouse events for the bug report modal.
     pub(super) fn handle_bug_report_mouse(&mut self, ev: MouseEvent) {
         match ev.kind {

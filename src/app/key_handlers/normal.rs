@@ -13,9 +13,7 @@
 use crossterm::event::KeyEvent;
 
 use crate::config::{pressed_in, static_keys, BindingScope};
-use crate::search::{
-    CommandPalette, GotoLineState, InFileSearch, SearchState, ThemePicker, TreeFilter,
-};
+use crate::search::{CommandPalette, InFileSearch, ThemePicker, TreeFilter};
 
 use super::super::{App, Focus, TabAction};
 
@@ -107,21 +105,7 @@ impl App {
             self.viewing_revision = None;
             self.reload();
         } else if pressed_in(&k.search_content, &key, scope) {
-            let root = self.root.clone();
-            let changed = self.git_changed_files_set();
-            let mut s = SearchState::new(
-                &root,
-                self.show_hidden,
-                self.ignore_gitignore,
-                self.config.search.context_lines,
-                changed.as_ref(),
-            );
-            s.toggle_mode();
-            if self.config.search.keep_query && !self.last_search_query.is_empty() {
-                s.query = self.last_search_query.clone();
-                s.refresh_now();
-            }
-            self.search = Some(s);
+            self.open_content_search();
         } else if pressed_in(&k.file_history, &key, scope) {
             self.open_file_history();
         } else if pressed_in(&k.repo_commit_log, &key, scope) {
@@ -162,11 +146,7 @@ impl App {
                 Focus::Content => Focus::Tree,
             };
         } else if pressed_in(&k.goto_line, &key, scope) {
-            if self.focus == Focus::Content {
-                self.goto_line = Some(GotoLineState::new());
-            } else {
-                self.set_status("go to line: switch to the content pane (Tab)");
-            }
+            self.open_palette_goto_line();
         } else if pressed_in(&k.git_mode_toggle, &key, scope) {
             self.toggle_git_mode();
         } else if pressed_in(&k.git_mode_flat_toggle, &key, scope) {

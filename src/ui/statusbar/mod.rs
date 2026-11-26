@@ -133,7 +133,9 @@ pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) -> Vec<Status
         Style::default().bg(theme.selection_bg).fg(theme.text)
     };
 
-    let (lines, segments) = if app.goto_line.is_some() {
+    let palette_route = app.command_palette.as_ref().map(|p| p.route);
+    let (lines, segments) = if palette_route == Some(crate::command_palette::PaletteRoute::GotoLine)
+    {
         (
             vec![overlay_line(
                 " type line number  Enter jump  Esc cancel  +N forward  -N back",
@@ -167,10 +169,16 @@ pub(super) fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) -> Vec<Status
             )],
             Vec::new(),
         )
-    } else if app.search.is_some() {
+    } else if matches!(
+        palette_route,
+        Some(
+            crate::command_palette::PaletteRoute::Files
+                | crate::command_palette::PaletteRoute::Content
+        )
+    ) {
         (
             vec![overlay_line(
-                " \u{2191}\u{2193} navigate  Enter select  Tab toggle mode  Esc cancel",
+                " \u{2191}\u{2193} navigate  Enter open  Tab files/content  Ctrl+R regex  Ctrl+A case  Ctrl+W word  Esc close",
                 base,
                 area.width,
             )],

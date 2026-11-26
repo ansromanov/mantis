@@ -75,9 +75,6 @@ impl App {
                 self.reload_content();
             }
         }
-        if let Some(ref mut s) = self.search {
-            s.maybe_refresh();
-        }
         if let Some(ref mut p) = self.command_palette {
             if let Some(ref mut s) = p.route_search {
                 s.maybe_refresh();

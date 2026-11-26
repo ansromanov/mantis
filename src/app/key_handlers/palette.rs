@@ -6,6 +6,77 @@ use crate::theme::{Theme, ThemeConfig};
 use super::super::{diff_line_style, App};
 
 impl App {
+    /// A fresh command palette with the usage-ranked command order and the
+    /// current applicability reasons. Every way of opening the palette goes
+    /// through here so the command list looks the same however it was reached.
+    pub(crate) fn new_palette(&self) -> crate::command_palette::CommandPalette {
+        let (base_order, base_pinned) = crate::command_palette::ranked_base_order(
+            &self.command_usage,
+            self.config.palette_pin_recent,
+            self.config.palette_frequent_count,
+        );
+        let reasons = crate::command_palette::COMMANDS
+            .iter()
+            .map(|command| self.check_applicability(&command.action_id).err())
+            .collect();
+        crate::command_palette::CommandPalette::new(&self.keys, base_order, base_pinned, reasons)
+    }
+
+    /// A project search state for the palette's file (`content == false`) or
+    /// content route, restoring the last query when `search.keep_query` is on.
+    pub(crate) fn new_search_state(&self, content: bool) -> crate::search::SearchState {
+        let changed = self.git_changed_files_set();
+        let mut search = crate::search::SearchState::new(
+            &self.root,
+            self.show_hidden,
+            self.ignore_gitignore,
+            self.config.search.context_lines,
+            changed.as_ref(),
+        );
+        if content {
+            search.toggle_mode();
+        }
+        if self.config.search.keep_query && !self.last_search_query.is_empty() {
+            search.query = self.last_search_query.clone();
+            search.refresh_now();
+        }
+        search
+    }
+
+    /// Opens the palette directly in the file or content route (picked from
+    /// `search.mode`). This is the single search window: `Ctrl+T`, `Ctrl+F`,
+    /// the menu, the context menu and `/` in the palette all end up here.
+    pub(crate) fn open_palette_search(&mut self, search: crate::search::SearchState) {
+        let mut palette = self.new_palette();
+        palette.route = match search.mode {
+            crate::search::SearchMode::Files => crate::command_palette::PaletteRoute::Files,
+            crate::search::SearchMode::Content => crate::command_palette::PaletteRoute::Content,
+        };
+        palette.route_search = Some(search);
+        palette.opened_in_route = true;
+        self.command_palette = Some(palette);
+    }
+
+    /// Opens project-wide content search in the palette.
+    pub(crate) fn open_content_search(&mut self) {
+        let search = self.new_search_state(true);
+        self.open_palette_search(search);
+    }
+
+    /// Opens go-to-line in the palette. Works from either pane: the line is
+    /// resolved against the open file, so there is no need to focus it first.
+    pub(crate) fn open_palette_goto_line(&mut self) {
+        if self.current_file.is_none() && self.content.is_empty() {
+            self.set_status("go to line: no file is open");
+            return;
+        }
+        let mut palette = self.new_palette();
+        palette.route = crate::command_palette::PaletteRoute::GotoLine;
+        palette.route_goto_line = Some(crate::search::GotoLineState::new());
+        palette.opened_in_route = true;
+        self.command_palette = Some(palette);
+    }
+
     /// Opens the file selected in the palette's file-search route and closes
     /// the palette. Mirrors `activate_search_selection` but reads from the
     /// palette's sub-picker rather than `self.search`.
@@ -63,21 +134,8 @@ impl App {
             self.set_status("symbol outline: no symbols in file");
             return;
         };
-        let (base_order, base_pinned) = crate::command_palette::ranked_base_order(
-            &self.command_usage,
-            self.config.palette_pin_recent,
-            self.config.palette_frequent_count,
-        );
-        let reasons = crate::command_palette::COMMANDS
-            .iter()
-            .map(|command| self.check_applicability(&command.action_id).err())
-            .collect();
-        let mut palette = crate::command_palette::CommandPalette::new(
-            &self.keys,
-            base_order,
-            base_pinned,
-            reasons,
-        );
+        let mut palette = self.new_palette();
+        palette.opened_in_route = true;
         palette.route = crate::command_palette::PaletteRoute::Symbols;
         palette.route_symbols = Some(crate::search::SymbolPicker::new(
             symbols,
@@ -120,21 +178,8 @@ impl App {
             self.set_status("diagnostics: no diagnostics in file");
             return;
         };
-        let (base_order, base_pinned) = crate::command_palette::ranked_base_order(
-            &self.command_usage,
-            self.config.palette_pin_recent,
-            self.config.palette_frequent_count,
-        );
-        let reasons = crate::command_palette::COMMANDS
-            .iter()
-            .map(|command| self.check_applicability(&command.action_id).err())
-            .collect();
-        let mut palette = crate::command_palette::CommandPalette::new(
-            &self.keys,
-            base_order,
-            base_pinned,
-            reasons,
-        );
+        let mut palette = self.new_palette();
+        palette.opened_in_route = true;
         palette.route = crate::command_palette::PaletteRoute::Diagnostics;
         palette.route_diagnostics = Some(crate::search::DiagnosticPicker::new(diagnostics));
         self.command_palette = Some(palette);
@@ -231,5 +276,49 @@ impl App {
         } else if let Some(path) = self.current_file.clone() {
             self.reopen_file(&path);
         }
+    }
+}
+
+#[cfg(test)]
+impl App {
+    /// The palette's file/content search, when the palette is open in a search route.
+    pub(crate) fn palette_search(&self) -> Option<&crate::search::SearchState> {
+        self.command_palette
+            .as_ref()
+            .and_then(|p| p.route_search.as_ref())
+    }
+
+    /// Mutable access to the palette's file/content search.
+    pub(crate) fn palette_search_mut(&mut self) -> Option<&mut crate::search::SearchState> {
+        self.command_palette
+            .as_mut()
+            .and_then(|p| p.route_search.as_mut())
+    }
+
+    /// The palette's go-to-line input, when the palette is open in that route.
+    pub(crate) fn palette_goto_line(&self) -> Option<&crate::search::GotoLineState> {
+        self.command_palette
+            .as_ref()
+            .and_then(|p| p.route_goto_line.as_ref())
+    }
+}
+
+#[cfg(test)]
+impl App {
+    /// Mutable access to the palette's go-to-line input.
+    pub(crate) fn palette_goto_line_mut(&mut self) -> Option<&mut crate::search::GotoLineState> {
+        self.command_palette
+            .as_mut()
+            .and_then(|p| p.route_goto_line.as_mut())
+    }
+
+    /// Opens the palette in the go-to-line route with a prepared input,
+    /// regardless of whether a file is open (tests drive the input directly).
+    pub(crate) fn install_palette_goto_line(&mut self, goto: crate::search::GotoLineState) {
+        let mut palette = self.new_palette();
+        palette.route = crate::command_palette::PaletteRoute::GotoLine;
+        palette.route_goto_line = Some(goto);
+        palette.opened_in_route = true;
+        self.command_palette = Some(palette);
     }
 }

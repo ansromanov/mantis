@@ -83,7 +83,6 @@ impl App {
             Overlay::RepoLog => self.handle_repo_log_key(key),
             Overlay::RecentFiles => self.handle_recent_key(key),
             Overlay::Bookmarks => self.handle_bookmarks_key(key),
-            Overlay::Search => self.handle_search_key(key),
             Overlay::InFileBar => {
                 if self.json_query.is_some() {
                     self.handle_json_query_key(key);
@@ -96,7 +95,6 @@ impl App {
             Overlay::BugReport => self.handle_bug_report_key(key),
             Overlay::RevisionPicker => self.handle_revision_key(key),
             Overlay::WorktreePicker => self.handle_worktree_key(key),
-            Overlay::GotoLine => self.handle_goto_line_key(key),
         }
     }
 

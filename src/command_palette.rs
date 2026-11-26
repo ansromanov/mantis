@@ -158,6 +158,10 @@ pub struct CommandPalette {
     pub route_symbols: Option<SymbolPicker>,
     /// Sub-picker for diagnostics returned for the current file.
     pub route_diagnostics: Option<DiagnosticPicker>,
+    /// True when a shortcut opened the palette straight into a route (file
+    /// search, content search, go-to-line, symbols, diagnostics). Esc then
+    /// closes the whole palette instead of falling back to the command list.
+    pub opened_in_route: bool,
     /// All commands. Indices in `filtered`
     /// and `base_order` reference this list.
     pub all_commands: Vec<CommandEntry>,
@@ -252,6 +256,7 @@ impl CommandPalette {
             route_goto_line: None,
             route_symbols: None,
             route_diagnostics: None,
+            opened_in_route: false,
             all_commands,
         }
     }

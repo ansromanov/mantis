@@ -83,31 +83,4 @@ impl App {
             _ => {}
         }
     }
-
-    /// Handles keyboard input while the go-to-line dialog is open.
-    /// Extra keys: filters out the open binding so it is not appended.
-    pub(super) fn handle_goto_line_key(&mut self, key: KeyEvent) {
-        // Filter out the open binding key before passing to the shared dispatcher.
-        if let KeyCode::Char(_) = &key.code {
-            if crate::config::pressed(&self.config.keys.goto_line, &key) {
-                return;
-            }
-        }
-        let Some(ref mut g) = self.goto_line else {
-            return;
-        };
-        match handle_list_picker_key(g, &key) {
-            OverlayKey::Activate => {
-                let query = self.goto_line.as_ref().map(|g| g.query.clone());
-                self.goto_line = None;
-                if let Some(q) = query {
-                    self.goto_line_from_query(&q);
-                }
-            }
-            OverlayKey::Close => {
-                self.goto_line = None;
-            }
-            _ => {}
-        }
-    }
 }

@@ -52,10 +52,10 @@ fn json_query_replaces_results_and_escape_restores_content() {
 fn ctrl_l_requests_a_full_redraw_even_while_an_overlay_is_open() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.search = Some(SearchState::new(&root, false, false, 0, None));
+    app.open_palette_search(SearchState::new(&root, false, false, 0, None));
     app.handle_key(KeyEvent::new(KeyCode::Char('l'), KeyModifiers::CONTROL));
     assert!(app.needs_clear);
-    assert!(app.search.is_some());
+    assert!(app.palette_search().is_some());
 }
 
 #[test]
@@ -73,11 +73,11 @@ fn handle_goto_line_key_open_binding_not_appended_to_query() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.focus = Focus::Content;
-    app.goto_line = Some(GotoLineState::new());
+    app.open_palette_goto_line();
     // pressing the open binding (ctrl+g) while the dialog is open should not
     // append to the query
-    app.handle_goto_line_key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL));
-    assert!(app.goto_line.as_ref().unwrap().query.is_empty());
+    app.handle_key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL));
+    assert!(app.palette_goto_line().unwrap().query.is_empty());
     fs::remove_dir_all(&root).ok();
 }
 
@@ -85,9 +85,9 @@ fn handle_goto_line_key_open_binding_not_appended_to_query() {
 fn handle_goto_line_key_digit_appends_to_query() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.goto_line = Some(GotoLineState::new());
-    app.handle_goto_line_key(KeyEvent::new(KeyCode::Char('5'), KeyModifiers::empty()));
-    assert_eq!(app.goto_line.as_ref().unwrap().query, "5");
+    app.open_palette_goto_line();
+    app.handle_key(KeyEvent::new(KeyCode::Char('5'), KeyModifiers::empty()));
+    assert_eq!(app.palette_goto_line().unwrap().query, "5");
     fs::remove_dir_all(&root).ok();
 }
 
@@ -95,9 +95,9 @@ fn handle_goto_line_key_digit_appends_to_query() {
 fn handle_goto_line_key_esc_closes_dialog() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.goto_line = Some(GotoLineState::new());
-    app.handle_goto_line_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
-    assert!(app.goto_line.is_none());
+    app.open_palette_goto_line();
+    app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
+    assert!(app.palette_goto_line().is_none());
     fs::remove_dir_all(&root).ok();
 }
 
@@ -110,9 +110,9 @@ fn handle_goto_line_key_activate_moves_active_line() {
     app.active_line = 0;
     let mut g = GotoLineState::new();
     g.query = "20".to_string();
-    app.goto_line = Some(g);
-    app.handle_goto_line_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
-    assert!(app.goto_line.is_none());
+    app.install_palette_goto_line(g);
+    app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    assert!(app.palette_goto_line().is_none());
     assert_eq!(
         app.active_line, 19,
         "1-indexed input lands on the 0-indexed line"
@@ -129,8 +129,8 @@ fn handle_goto_line_key_activate_relative_plus_is_cursor_relative() {
     app.active_line = 10;
     let mut g = GotoLineState::new();
     g.query = "+5".to_string();
-    app.goto_line = Some(g);
-    app.handle_goto_line_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    app.install_palette_goto_line(g);
+    app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
     assert_eq!(
         app.active_line, 15,
         "+n offsets from active_line, not content_scroll"
@@ -147,8 +147,8 @@ fn handle_goto_line_key_activate_relative_minus_is_cursor_relative() {
     app.active_line = 10;
     let mut g = GotoLineState::new();
     g.query = "-3".to_string();
-    app.goto_line = Some(g);
-    app.handle_goto_line_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    app.install_palette_goto_line(g);
+    app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
     assert_eq!(
         app.active_line, 7,
         "-n offsets from active_line, not content_scroll"
@@ -165,8 +165,8 @@ fn handle_goto_line_key_activate_clamps_to_last_line() {
     app.active_line = 0;
     let mut g = GotoLineState::new();
     g.query = "9999".to_string();
-    app.goto_line = Some(g);
-    app.handle_goto_line_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    app.install_palette_goto_line(g);
+    app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
     let last = app.display_line_count().saturating_sub(1);
     assert_eq!(app.active_line, last);
     fs::remove_dir_all(&root).ok();
@@ -183,8 +183,8 @@ fn handle_goto_line_key_activate_relative_uses_content_scroll_without_cursor() {
     app.content_scroll = 10;
     let mut g = GotoLineState::new();
     g.query = "+5".to_string();
-    app.goto_line = Some(g);
-    app.handle_goto_line_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
+    app.install_palette_goto_line(g);
+    app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
     assert_eq!(
         app.content_scroll, 15,
         "cursorless views offset from content_scroll, ignoring stale active_line"
@@ -1099,22 +1099,22 @@ fn handle_search_key_toggles() {
     // The toggles only affect Content-mode search (see refresh_content), so
     // switch out of the default Files mode before exercising them.
     s.toggle_mode();
-    app.search = Some(s);
+    app.open_palette_search(s);
 
     let regex_key = KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL);
-    assert!(!app.search.as_ref().unwrap().regex);
-    app.handle_search_key(regex_key);
-    assert!(app.search.as_ref().unwrap().regex);
+    assert!(!app.palette_search().unwrap().regex);
+    app.handle_key(regex_key);
+    assert!(app.palette_search().unwrap().regex);
 
     let case_key = KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL);
-    assert!(!app.search.as_ref().unwrap().case_sensitive);
-    app.handle_search_key(case_key);
-    assert!(app.search.as_ref().unwrap().case_sensitive);
+    assert!(!app.palette_search().unwrap().case_sensitive);
+    app.handle_key(case_key);
+    assert!(app.palette_search().unwrap().case_sensitive);
 
     let word_key = KeyEvent::new(KeyCode::Char('w'), KeyModifiers::CONTROL);
-    assert!(!app.search.as_ref().unwrap().whole_word);
-    app.handle_search_key(word_key);
-    assert!(app.search.as_ref().unwrap().whole_word);
+    assert!(!app.palette_search().unwrap().whole_word);
+    app.handle_key(word_key);
+    assert!(app.palette_search().unwrap().whole_word);
 
     fs::remove_dir_all(&root).ok();
 }
@@ -1123,10 +1123,10 @@ fn handle_search_key_toggles() {
 fn handle_search_key_unmodified_letters_type_into_query() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.search = Some(SearchState::new(&root, false, true, 0, None));
+    app.open_palette_search(SearchState::new(&root, false, true, 0, None));
 
-    app.handle_search_key(KeyEvent::new(KeyCode::Char('r'), KeyModifiers::empty()));
-    let s = app.search.as_ref().unwrap();
+    app.handle_key(KeyEvent::new(KeyCode::Char('r'), KeyModifiers::empty()));
+    let s = app.palette_search().unwrap();
     assert_eq!(s.query, "r");
     assert!(!s.regex);
 
@@ -1141,10 +1141,10 @@ fn handle_search_key_toggles_are_ignored_in_files_mode() {
     // pressing them here must be a no-op (state unchanged, selection intact).
     let mut s = SearchState::new(&root, false, true, 0, None);
     s.selected = 3;
-    app.search = Some(s);
+    app.open_palette_search(s);
 
-    app.handle_search_key(KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL));
-    let s = app.search.as_ref().unwrap();
+    app.handle_key(KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL));
+    let s = app.palette_search().unwrap();
     assert!(!s.regex);
     assert_eq!(
         s.selected, 3,

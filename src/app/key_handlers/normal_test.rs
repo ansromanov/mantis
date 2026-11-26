@@ -429,7 +429,7 @@ fn goto_line_keybinding_opens_dialog_with_content_focus() {
     let mut app = app_for(&root);
     app.focus = Focus::Content;
     app.handle_key(ctrl('g'));
-    assert!(app.goto_line.is_some());
+    assert!(app.palette_goto_line().is_some());
     fs::remove_dir_all(&root).ok();
 }
 
@@ -449,7 +449,7 @@ fn ctrl_g_opens_goto_line_not_git_mode() {
     });
     app.handle_key(ctrl('g'));
     assert!(
-        app.goto_line.is_some(),
+        app.palette_goto_line().is_some(),
         "goto_line dialog must open when ctrl+g is pressed"
     );
     assert!(!app.git_mode, "git_mode must NOT be toggled by ctrl+g");
@@ -459,15 +459,16 @@ fn ctrl_g_opens_goto_line_not_git_mode() {
 }
 
 #[test]
-fn goto_line_keybinding_is_noop_with_tree_focus() {
+fn goto_line_keybinding_without_an_open_file_explains_why() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.focus = Focus::Tree;
+    app.current_file = None;
     app.handle_key(ctrl('g'));
-    assert!(app.goto_line.is_none());
+    assert!(app.palette_goto_line().is_none());
     assert_eq!(
         app.status_message.as_ref().map(|sm| sm.text.as_str()),
-        Some("go to line: switch to the content pane (Tab)")
+        Some("go to line: no file is open")
     );
     fs::remove_dir_all(&root).ok();
 }
@@ -477,10 +478,11 @@ fn goto_line_status_clears_on_valid_keypress() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.focus = Focus::Tree;
+    app.current_file = None;
     app.handle_key(ctrl('g'));
     assert_eq!(
         app.status_message.as_ref().map(|sm| sm.text.as_str()),
-        Some("go to line: switch to the content pane (Tab)")
+        Some("go to line: no file is open")
     );
     app.handle_key(key(KeyCode::Char('j')));
     assert!(app.status_message.is_none());
@@ -1109,7 +1111,7 @@ fn content_search_key_scopes_search_in_git_mode() {
     // search_content = ctrl+f; uppercase event must match case-insensitively.
     app.handle_key(ctrl('F'));
     assert!(
-        app.search.as_ref().unwrap().scoped,
+        app.palette_search().unwrap().scoped,
         "content search must be scoped when git mode is active"
     );
     fs::remove_dir_all(&root).ok();
@@ -1122,7 +1124,7 @@ fn content_search_key_not_scoped_outside_git_mode() {
     app.focus = Focus::Content;
     app.handle_key(ctrl('F'));
     assert!(
-        !app.search.as_ref().unwrap().scoped,
+        !app.palette_search().unwrap().scoped,
         "content search must not be scoped outside git mode"
     );
     fs::remove_dir_all(&root).ok();
@@ -1134,12 +1136,15 @@ fn f_letter_opens_content_search_only_in_tree() {
     let mut app = app_for(&root);
     app.focus = Focus::Tree;
     app.handle_key(key(KeyCode::Char('f')));
-    assert!(app.search.is_some(), "tree:f opens content search");
-    app.search = None;
+    assert!(
+        app.palette_search().is_some(),
+        "tree:f opens content search"
+    );
+    app.command_palette = None;
     app.focus = Focus::Content;
     app.handle_key(key(KeyCode::Char('f')));
     assert!(
-        app.search.is_none(),
+        app.palette_search().is_none(),
         "bare f must not fire in the content pane (letter-free policy)"
     );
     fs::remove_dir_all(&root).ok();
@@ -1354,11 +1359,11 @@ fn ctrl_t_opens_file_picker_when_tree_focused() {
     app.focus = Focus::Tree;
     app.handle_key(ctrl('t'));
     assert!(
-        app.search.is_some(),
+        app.palette_search().is_some(),
         "ctrl+t must open the search picker from Tree focus"
     );
     assert_eq!(
-        app.search.as_ref().unwrap().mode,
+        app.palette_search().unwrap().mode,
         SearchMode::Files,
         "ctrl+t must open in Files mode"
     );
@@ -1373,11 +1378,11 @@ fn ctrl_t_opens_file_picker_when_content_focused_with_file() {
     app.focus = Focus::Content;
     app.handle_key(ctrl('t'));
     assert!(
-        app.search.is_some(),
+        app.palette_search().is_some(),
         "ctrl+t must open the search picker from Content focus with an open file"
     );
     assert_eq!(
-        app.search.as_ref().unwrap().mode,
+        app.palette_search().unwrap().mode,
         SearchMode::Files,
         "ctrl+t must open in Files mode (not in-file search)"
     );
@@ -1433,7 +1438,7 @@ fn slash_opens_file_picker_when_content_focused_no_file() {
     app.current_file = None;
     app.handle_key(key(KeyCode::Char('/')));
     assert!(
-        app.search.is_some(),
+        app.palette_search().is_some(),
         "/ must fall back to the search picker without a file"
     );
     fs::remove_dir_all(&root).ok();
@@ -1837,4 +1842,59 @@ fn f10_opens_the_action_menu_from_normal_mode() {
     app.handle_key(key(KeyCode::F(10)));
     assert!(app.menu_bar_state.is_some());
     fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn ctrl_f_opens_the_palette_in_content_search_and_esc_closes_it() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(ctrl('f'));
+    assert_eq!(
+        app.command_palette.as_ref().map(|p| p.route),
+        Some(crate::command_palette::PaletteRoute::Content)
+    );
+    // Opened by a shortcut: Esc closes the whole window, not just the route.
+    app.handle_key(key(KeyCode::Esc));
+    assert!(app.command_palette.is_none());
+    fs::remove_dir_all(root).ok();
+}
+
+#[test]
+fn search_toggles_work_in_the_palette_content_route() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.handle_key(ctrl('f'));
+    app.handle_key(ctrl('r'));
+    app.handle_key(ctrl('a'));
+    app.handle_key(ctrl('w'));
+    let search = app.palette_search().unwrap();
+    assert!(search.regex && search.case_sensitive && search.whole_word);
+    fs::remove_dir_all(root).ok();
+}
+
+#[test]
+fn closing_the_palette_search_remembers_the_query_for_keep_query() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.config.search.keep_query = true;
+    app.handle_key(ctrl('f'));
+    for c in "line".chars() {
+        app.handle_key(key(KeyCode::Char(c)));
+    }
+    app.handle_key(key(KeyCode::Esc));
+    assert_eq!(app.last_search_query, "line");
+    app.handle_key(ctrl('f'));
+    assert_eq!(app.palette_search().unwrap().query, "line");
+    fs::remove_dir_all(root).ok();
+}
+
+#[test]
+fn ctrl_g_works_from_the_tree_when_a_file_is_open() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = crate::app::Focus::Tree;
+    app.handle_key(ctrl('g'));
+    assert!(app.palette_goto_line().is_some());
+    fs::remove_dir_all(root).ok();
 }
