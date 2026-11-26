@@ -132,10 +132,13 @@ fn menu_bar_uses_an_extra_row_and_seven_row_minimum() {
 #[test]
 fn draw_search_overlay() {
     let mut app = make_app();
-    app.search = Some(SearchState::new(Path::new("."), false, true, 0, None));
+    app.open_palette_search(SearchState::new(Path::new("."), false, true, 0, None));
     let rows = render(&mut app);
     let joined = rows.join("\n");
-    assert!(joined.contains("Search: Files"));
+    assert!(
+        joined.contains("Files"),
+        "the palette shows its file-search route"
+    );
     assert!(joined.contains("Tab"));
 }
 

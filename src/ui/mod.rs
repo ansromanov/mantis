@@ -223,8 +223,6 @@ fn draw_overlay(
         Overlay::TreeFilter => popups::draw_tree_filter(f, app, tree_area),
         Overlay::RevisionPicker => popups::draw_revision_picker(f, app, area),
         Overlay::WorktreePicker => popups::draw_worktree_picker(f, app, area),
-        Overlay::GotoLine => popups::draw_goto_line(f, app, content_area),
-        Overlay::Search => popups::draw_search(f, app, area),
         Overlay::CommandPalette => popups::draw_command_palette(f, app, area),
         Overlay::History => popups::draw_history(f, app, area),
         Overlay::RepoLog => popups::draw_repo_log(f, app, area),

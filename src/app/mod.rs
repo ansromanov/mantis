@@ -42,8 +42,8 @@ use crate::fold::FoldRegion;
 use crate::git::GitStatus;
 use crate::highlight::Highlighter;
 use crate::search::{
-    BugReportState, CommandPalette, GotoLineState, HistoryState, InFileSearch, RecentFilesState,
-    RepoLogState, RevisionPicker, SearchState, ThemePicker, TreeFilter, WorktreePicker,
+    BugReportState, CommandPalette, HistoryState, InFileSearch, RecentFilesState, RepoLogState,
+    RevisionPicker, ThemePicker, TreeFilter, WorktreePicker,
 };
 use crate::selection::TextSelection;
 use crate::theme::Theme;
@@ -164,7 +164,6 @@ pub struct App {
     pub command_usage: crate::command_usage::UsageStats,
     pub content_title: Option<String>,
     pub focus: Focus,
-    pub search: Option<SearchState>,
     pub last_search_query: String,
     pub in_file_search: Option<InFileSearch>,
     /// Whether the in-file search bar currently owns keyboard input.
@@ -175,9 +174,6 @@ pub struct App {
     /// Inline tree name filter, open when the user presses `/` with the tree
     /// focused. `None` means no filter is active; the full node list is shown.
     pub tree_filter: Option<TreeFilter>,
-    /// Inline go-to-line dialog, open when the user presses the `goto_line`
-    /// keybinding (default `:`). `Some` while the dialog is open.
-    pub goto_line: Option<GotoLineState>,
     pub command_palette: Option<CommandPalette>,
     pub history: Option<HistoryState>,
     /// State for the repo-wide commit log overlay. `Some` while the picker
@@ -516,7 +512,11 @@ impl App {
         let show_hidden = self.show_hidden;
         let ignore_gitignore = self.ignore_gitignore;
         let changed = self.git_changed_files_set();
-        if let Some(s) = &mut self.search {
+        if let Some(s) = self
+            .command_palette
+            .as_mut()
+            .and_then(|p| p.route_search.as_mut())
+        {
             s.reload_files(&root, show_hidden, ignore_gitignore, changed.as_ref());
         }
         self.rebuild(false);

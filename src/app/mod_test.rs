@@ -4,7 +4,7 @@ use super::*;
 use crate::command_palette::COMMANDS;
 use crate::config::Config;
 use crate::fold::FoldRegion;
-use crate::search::{GotoLineState, InFileMatch, SearchMode, TreeFilter};
+use crate::search::{InFileMatch, SearchMode, TreeFilter};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::Rect;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -452,9 +452,9 @@ fn open_file_search(app: &mut App) {
     app.focus = Focus::Content;
     app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
-    assert!(app.search.is_some());
-    app.geo.search_area = full_rect();
-    app.geo.search_offset = 0;
+    assert!(app.palette_search().is_some());
+    app.geo.command_palette_area = full_rect();
+    app.geo.command_palette_offset = 0;
 }
 
 #[test]
@@ -464,8 +464,11 @@ fn search_single_click_selects_without_opening() {
     open_file_search(&mut app);
 
     app.handle_mouse(click(1, 1));
-    assert_eq!(app.search.as_ref().unwrap().selected, 1);
-    assert!(app.search.is_some(), "single click should not open");
+    assert_eq!(app.palette_search().unwrap().selected, 1);
+    assert!(
+        app.palette_search().is_some(),
+        "single click should not open"
+    );
     fs::remove_dir_all(&root).ok();
 }
 
@@ -475,12 +478,12 @@ fn search_double_click_opens_result() {
     let mut app = app_for(&root);
     open_file_search(&mut app);
 
-    let target = app.search.as_ref().unwrap().file_results[0].clone();
+    let target = app.palette_search().unwrap().file_results[0].clone();
     app.handle_mouse(click(1, 0));
     app.handle_mouse(click(1, 0)); // second click, same row, within window
 
     assert!(
-        app.search.is_none(),
+        app.palette_search().is_none(),
         "double click should open and close search"
     );
     assert_eq!(app.current_file.as_deref(), Some(target.as_path()));
@@ -493,14 +496,14 @@ fn search_click_on_different_row_does_not_open() {
     let mut app = app_for(&root);
     open_file_search(&mut app);
     // Need at least two results for this to be meaningful.
-    if app.search.as_ref().unwrap().results_len() >= 2 {
+    if app.palette_search().unwrap().results_len() >= 2 {
         app.handle_mouse(click(1, 0));
         app.handle_mouse(click(1, 1));
         assert!(
-            app.search.is_some(),
+            app.palette_search().is_some(),
             "clicks on different rows must not open"
         );
-        assert_eq!(app.search.as_ref().unwrap().selected, 1);
+        assert_eq!(app.palette_search().unwrap().selected, 1);
     }
     fs::remove_dir_all(&root).ok();
 }
@@ -792,7 +795,7 @@ fn git_mode_search_is_scoped_to_changed_files() {
     app.focus = Focus::Content;
     app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
-    let search = app.search.as_ref().unwrap();
+    let search = app.palette_search().unwrap();
     assert!(search.scoped, "search must be scoped in git mode");
 
     // Only changed files appear: committed.txt, new.txt, sub/nested.txt.
@@ -827,7 +830,7 @@ fn git_mode_search_is_not_scoped_outside_git_mode() {
     app.focus = Focus::Content;
     app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
-    let search = app.search.as_ref().unwrap();
+    let search = app.palette_search().unwrap();
     assert!(!search.scoped, "search must NOT be scoped outside git mode");
     // Unchanged file must appear.
     let names: Vec<&str> = search
@@ -878,7 +881,7 @@ fn git_mode_empty_changed_set_gives_empty_search() {
     app.focus = Focus::Content;
     app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
-    if let Some(search) = app.search.as_ref() {
+    if let Some(search) = app.palette_search() {
         assert!(search.scoped);
         assert!(
             search.file_results.is_empty(),
@@ -1248,9 +1251,10 @@ fn goto_line_key_opens_with_colon_and_content_focus() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.focus = Focus::Content;
+    app.open_file(&root.join("long.txt"));
     app.handle_key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL));
-    assert!(app.goto_line.is_some());
-    assert!(app.goto_line.as_ref().unwrap().query.is_empty());
+    assert!(app.palette_goto_line().is_some());
+    assert!(app.palette_goto_line().unwrap().query.is_empty());
     fs::remove_dir_all(&root).ok();
 }
 
@@ -1260,7 +1264,7 @@ fn goto_line_key_does_not_open_with_tree_focus() {
     let mut app = app_for(&root);
     app.focus = Focus::Tree;
     app.handle_key(KeyEvent::new(KeyCode::Char(':'), KeyModifiers::empty()));
-    assert!(app.goto_line.is_none());
+    assert!(app.palette_goto_line().is_none());
     fs::remove_dir_all(&root).ok();
 }
 
@@ -1269,10 +1273,11 @@ fn goto_line_key_esc_closes() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.focus = Focus::Content;
+    app.open_file(&root.join("long.txt"));
     app.handle_key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL));
-    assert!(app.goto_line.is_some());
+    assert!(app.palette_goto_line().is_some());
     app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
-    assert!(app.goto_line.is_none());
+    assert!(app.palette_goto_line().is_none());
     fs::remove_dir_all(&root).ok();
 }
 
@@ -1281,11 +1286,12 @@ fn goto_line_key_char_appends() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.focus = Focus::Content;
+    app.open_file(&root.join("long.txt"));
     app.handle_key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL));
     app.handle_key(KeyEvent::new(KeyCode::Char('4'), KeyModifiers::empty()));
-    assert_eq!(app.goto_line.as_ref().unwrap().query, "4");
+    assert_eq!(app.palette_goto_line().unwrap().query, "4");
     app.handle_key(KeyEvent::new(KeyCode::Char('2'), KeyModifiers::empty()));
-    assert_eq!(app.goto_line.as_ref().unwrap().query, "42");
+    assert_eq!(app.palette_goto_line().unwrap().query, "42");
     fs::remove_dir_all(&root).ok();
 }
 
@@ -1294,12 +1300,13 @@ fn goto_line_key_backspace_removes_char() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.focus = Focus::Content;
+    app.open_file(&root.join("long.txt"));
     app.handle_key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL));
-    app.goto_line.as_mut().unwrap().push('4');
-    app.goto_line.as_mut().unwrap().push('2');
-    assert_eq!(app.goto_line.as_ref().unwrap().query, "42");
+    app.palette_goto_line_mut().unwrap().push('4');
+    app.palette_goto_line_mut().unwrap().push('2');
+    assert_eq!(app.palette_goto_line().unwrap().query, "42");
     app.handle_key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::empty()));
-    assert_eq!(app.goto_line.as_ref().unwrap().query, "4");
+    assert_eq!(app.palette_goto_line().unwrap().query, "4");
     fs::remove_dir_all(&root).ok();
 }
 
@@ -1310,10 +1317,10 @@ fn goto_line_key_enter_jumps_to_absolute_line() {
     app.focus = Focus::Content;
     app.open_file(&root.join("long.txt"));
     app.content_scroll = 0;
-    app.goto_line = Some(GotoLineState::new());
+    app.open_palette_goto_line();
     app.handle_key(KeyEvent::new(KeyCode::Char('5'), KeyModifiers::empty()));
     app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
-    assert!(app.goto_line.is_none());
+    assert!(app.palette_goto_line().is_none());
     assert_eq!(app.active_line, 4, "cursor must land on the requested line");
     assert_eq!(app.content_scroll, 4);
     fs::remove_dir_all(&root).ok();
@@ -1326,11 +1333,11 @@ fn goto_line_key_enter_relative_plus_jump() {
     app.focus = Focus::Content;
     app.open_file(&root.join("long.txt"));
     app.active_line = 10;
-    app.goto_line = Some(GotoLineState::new());
+    app.open_palette_goto_line();
     app.handle_key(KeyEvent::new(KeyCode::Char('+'), KeyModifiers::empty()));
     app.handle_key(KeyEvent::new(KeyCode::Char('5'), KeyModifiers::empty()));
     app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
-    assert!(app.goto_line.is_none());
+    assert!(app.palette_goto_line().is_none());
     assert_eq!(
         app.active_line, 15,
         "+n offsets from the cursor, not the viewport top"
@@ -1345,11 +1352,11 @@ fn goto_line_key_enter_relative_minus_jump() {
     app.focus = Focus::Content;
     app.open_file(&root.join("long.txt"));
     app.active_line = 20;
-    app.goto_line = Some(GotoLineState::new());
+    app.open_palette_goto_line();
     app.handle_key(KeyEvent::new(KeyCode::Char('-'), KeyModifiers::empty()));
     app.handle_key(KeyEvent::new(KeyCode::Char('5'), KeyModifiers::empty()));
     app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
-    assert!(app.goto_line.is_none());
+    assert!(app.palette_goto_line().is_none());
     assert_eq!(
         app.active_line, 15,
         "-n offsets from the cursor, not the viewport top"
@@ -1365,11 +1372,11 @@ fn goto_line_key_enter_clamps_to_max() {
     app.open_file(&root.join("long.txt"));
     app.geo.content_area = Rect::new(0, 0, 80, 10);
     app.content_scroll = 0;
-    app.goto_line = Some(GotoLineState::new());
+    app.open_palette_goto_line();
     app.handle_key(KeyEvent::new(KeyCode::Char('9'), KeyModifiers::empty()));
     app.handle_key(KeyEvent::new(KeyCode::Char('9'), KeyModifiers::empty()));
     app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
-    assert!(app.goto_line.is_none());
+    assert!(app.palette_goto_line().is_none());
     let last = app.display_line_count().saturating_sub(1);
     assert_eq!(app.active_line, last);
     assert_eq!(app.content_scroll, 40);
@@ -1382,9 +1389,9 @@ fn goto_line_key_enter_empty_query_is_noop() {
     let mut app = app_for(&root);
     app.focus = Focus::Content;
     app.content_scroll = 5;
-    app.goto_line = Some(GotoLineState::new());
+    app.open_palette_goto_line();
     app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
-    assert!(app.goto_line.is_none());
+    assert!(app.palette_goto_line().is_none());
     assert_eq!(app.content_scroll, 5);
     fs::remove_dir_all(&root).ok();
 }
@@ -1394,11 +1401,12 @@ fn goto_line_key_unrecognized_key_is_noop() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.focus = Focus::Content;
+    app.open_file(&root.join("long.txt"));
     app.handle_key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL));
-    assert!(app.goto_line.is_some());
-    let query_before = app.goto_line.as_ref().unwrap().query.clone();
+    assert!(app.palette_goto_line().is_some());
+    let query_before = app.palette_goto_line().unwrap().query.clone();
     app.handle_key(KeyEvent::new(KeyCode::F(1), KeyModifiers::empty()));
-    assert_eq!(app.goto_line.as_ref().unwrap().query, query_before);
+    assert_eq!(app.palette_goto_line().unwrap().query, query_before);
     fs::remove_dir_all(&root).ok();
 }
 
@@ -1407,11 +1415,12 @@ fn goto_line_key_open_binding_not_appended_to_query() {
     let root = temp_tree();
     let mut app = app_for(&root);
     app.focus = Focus::Content;
+    app.open_file(&root.join("long.txt"));
     app.handle_key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL));
-    assert!(app.goto_line.is_some());
+    assert!(app.palette_goto_line().is_some());
     // pressing the open binding again should not append it to the query
     app.handle_key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL));
-    assert!(app.goto_line.as_ref().unwrap().query.is_empty());
+    assert!(app.palette_goto_line().unwrap().query.is_empty());
     fs::remove_dir_all(&root).ok();
 }
 
@@ -1424,9 +1433,9 @@ fn search_key_esc_closes() {
     app.focus = Focus::Content;
     app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
-    assert!(app.search.is_some());
+    assert!(app.palette_search().is_some());
     app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
-    assert!(app.search.is_none());
+    assert!(app.palette_search().is_none());
     fs::remove_dir_all(&root).ok();
 }
 
@@ -1438,9 +1447,9 @@ fn search_key_tab_toggles_mode() {
     app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
     app.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::empty()));
-    assert_eq!(app.search.as_ref().unwrap().mode, SearchMode::Content);
+    assert_eq!(app.palette_search().unwrap().mode, SearchMode::Content);
     app.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::empty()));
-    assert_eq!(app.search.as_ref().unwrap().mode, SearchMode::Files);
+    assert_eq!(app.palette_search().unwrap().mode, SearchMode::Files);
     fs::remove_dir_all(&root).ok();
 }
 
@@ -1583,19 +1592,19 @@ fn search_mouse_scroll_down_up() {
     app.focus = Focus::Content;
     app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
-    app.geo.search_area = Rect {
+    app.geo.command_palette_area = Rect {
         x: 0,
         y: 0,
         width: 40,
         height: 20,
     };
-    app.geo.search_offset = 0;
+    app.geo.command_palette_offset = 0;
 
-    if app.search.as_ref().unwrap().results_len() >= 2 {
+    if app.palette_search().unwrap().results_len() >= 2 {
         app.handle_mouse(mouse(MouseEventKind::ScrollDown, 1, 1));
-        assert_eq!(app.search.as_ref().unwrap().selected, 1);
+        assert_eq!(app.palette_search().unwrap().selected, 1);
         app.handle_mouse(mouse(MouseEventKind::ScrollUp, 1, 1));
-        assert_eq!(app.search.as_ref().unwrap().selected, 0);
+        assert_eq!(app.palette_search().unwrap().selected, 0);
     }
     fs::remove_dir_all(&root).ok();
 }
@@ -2115,7 +2124,7 @@ fn search_key_enter_activates_and_closes() {
     app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
     app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()));
-    assert!(app.search.is_none());
+    assert!(app.palette_search().is_none());
     fs::remove_dir_all(&root).ok();
 }
 
@@ -2126,11 +2135,15 @@ fn search_key_up_down_navigation() {
     app.focus = Focus::Content;
     app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
-    let max = app.search.as_ref().unwrap().results_len().saturating_sub(1);
+    let max = app
+        .palette_search()
+        .unwrap()
+        .results_len()
+        .saturating_sub(1);
     app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
-    assert_eq!(app.search.as_ref().unwrap().selected, 1.min(max));
+    assert_eq!(app.palette_search().unwrap().selected, 1.min(max));
     app.handle_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()));
-    assert_eq!(app.search.as_ref().unwrap().selected, 0);
+    assert_eq!(app.palette_search().unwrap().selected, 0);
     fs::remove_dir_all(&root).ok();
 }
 
@@ -2142,7 +2155,7 @@ fn search_key_up_stays_at_zero() {
     app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
     app.handle_key(KeyEvent::new(KeyCode::Up, KeyModifiers::empty()));
-    assert_eq!(app.search.as_ref().unwrap().selected, 0);
+    assert_eq!(app.palette_search().unwrap().selected, 0);
     fs::remove_dir_all(&root).ok();
 }
 
@@ -2153,7 +2166,7 @@ fn search_key_down_stays_at_boundary() {
     app.focus = Focus::Content;
     app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
-    let s = app.search.as_mut().unwrap();
+    let s = app.palette_search_mut().unwrap();
     let max = s.results_len().saturating_sub(1);
     if max == 0 {
         fs::remove_dir_all(&root).ok();
@@ -2162,7 +2175,7 @@ fn search_key_down_stays_at_boundary() {
     s.selected = max;
     let _ = s;
     app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
-    assert_eq!(app.search.as_ref().unwrap().selected, max);
+    assert_eq!(app.palette_search().unwrap().selected, max);
     fs::remove_dir_all(&root).ok();
 }
 
@@ -2174,9 +2187,9 @@ fn search_key_backspace_and_char() {
     app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
     app.handle_key(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::empty()));
-    assert_eq!(app.search.as_ref().unwrap().query, "a");
+    assert_eq!(app.palette_search().unwrap().query, "a");
     app.handle_key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::empty()));
-    assert_eq!(app.search.as_ref().unwrap().query, "");
+    assert_eq!(app.palette_search().unwrap().query, "");
     fs::remove_dir_all(&root).ok();
 }
 
@@ -2510,9 +2523,9 @@ fn normal_key_search_content_opens_search_in_content_mode() {
     let mut app = app_for(&root);
     // "f" opens content search
     app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::empty()));
-    assert!(app.search.is_some());
+    assert!(app.palette_search().is_some());
     assert_eq!(
-        app.search.as_ref().unwrap().mode,
+        app.palette_search().unwrap().mode,
         crate::search::SearchMode::Content
     );
     fs::remove_dir_all(&root).ok();
@@ -3508,14 +3521,14 @@ fn search_mouse_click_outside_area_closes() {
     app.focus = Focus::Content;
     app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
-    app.geo.search_area = Rect {
+    app.geo.command_palette_area = Rect {
         x: 5,
         y: 5,
         width: 30,
         height: 10,
     };
     app.handle_mouse(click(1, 1)); // outside area -> closes
-    assert!(app.search.is_none());
+    assert!(app.palette_search().is_none());
     fs::remove_dir_all(&root).ok();
 }
 
@@ -3526,16 +3539,16 @@ fn search_mouse_click_out_of_range_index_noop() {
     app.focus = Focus::Content;
     app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
-    app.geo.search_area = Rect {
+    app.geo.command_palette_area = Rect {
         x: 0,
         y: 0,
         width: 30,
         height: 20,
     };
-    app.geo.search_offset = 100; // offset past results -> index out of range
-    let selected_before = app.search.as_ref().unwrap().selected;
+    app.geo.command_palette_offset = 100; // offset past results -> index out of range
+    let selected_before = app.palette_search().unwrap().selected;
     app.handle_mouse(click(1, 5)); // within area, but index = 100 + 5 = 105
-    assert_eq!(app.search.as_ref().unwrap().selected, selected_before);
+    assert_eq!(app.palette_search().unwrap().selected, selected_before);
     fs::remove_dir_all(&root).ok();
 }
 
@@ -4083,11 +4096,11 @@ fn dispatch_command_open_file_search_creates_search() {
     let root = temp_tree();
     let mut app = app_for(&root);
     setup_command(&mut app, "search_files");
-    assert!(app.search.is_none());
+    assert!(app.palette_search().is_none());
     app.dispatch_command();
-    assert!(app.command_palette.is_none());
-    assert!(app.search.is_some());
-    assert_eq!(app.search.as_ref().unwrap().mode, SearchMode::Files);
+    // The palette re-opens straight into its file-search route.
+    assert!(app.command_palette.as_ref().unwrap().opened_in_route);
+    assert_eq!(app.palette_search().unwrap().mode, SearchMode::Files);
     fs::remove_dir_all(&root).ok();
 }
 
@@ -4099,8 +4112,8 @@ fn dispatch_command_open_file_search_with_keep_query() {
     app.last_search_query = "test".to_string();
     setup_command(&mut app, "search_files");
     app.dispatch_command();
-    assert!(app.search.is_some());
-    assert_eq!(app.search.as_ref().unwrap().query, "test");
+    assert!(app.palette_search().is_some());
+    assert_eq!(app.palette_search().unwrap().query, "test");
     fs::remove_dir_all(&root).ok();
 }
 
@@ -4110,9 +4123,8 @@ fn dispatch_command_open_content_search_creates_search() {
     let mut app = app_for(&root);
     setup_command(&mut app, "search_content");
     app.dispatch_command();
-    assert!(app.command_palette.is_none());
-    assert!(app.search.is_some());
-    assert_eq!(app.search.as_ref().unwrap().mode, SearchMode::Content);
+    assert!(app.command_palette.as_ref().unwrap().opened_in_route);
+    assert_eq!(app.palette_search().unwrap().mode, SearchMode::Content);
     fs::remove_dir_all(&root).ok();
 }
 
@@ -4429,12 +4441,12 @@ fn search_mouse_scroll_up_at_zero() {
     app.focus = Focus::Content;
     app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
-    app.geo.search_area = full_rect();
-    app.geo.search_offset = 0;
-    if app.search.as_ref().unwrap().results_len() > 0 {
-        app.search.as_mut().unwrap().selected = 0;
+    app.geo.command_palette_area = full_rect();
+    app.geo.command_palette_offset = 0;
+    if app.palette_search().unwrap().results_len() > 0 {
+        app.palette_search_mut().unwrap().selected = 0;
         app.handle_mouse(mouse(MouseEventKind::ScrollUp, 1, 1));
-        assert_eq!(app.search.as_ref().unwrap().selected, 0);
+        assert_eq!(app.palette_search().unwrap().selected, 0);
     }
     fs::remove_dir_all(&root).ok();
 }
@@ -4616,11 +4628,11 @@ fn search_key_unrecognized_key_is_noop() {
     app.focus = Focus::Content;
     app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
-    assert!(app.search.is_some());
-    let selected = app.search.as_ref().unwrap().selected;
+    assert!(app.palette_search().is_some());
+    let selected = app.palette_search().unwrap().selected;
     // F-key should hit the _ => {} catch-all
     app.handle_key(KeyEvent::new(KeyCode::F(1), KeyModifiers::empty()));
-    assert_eq!(app.search.as_ref().unwrap().selected, selected);
+    assert_eq!(app.palette_search().unwrap().selected, selected);
     fs::remove_dir_all(&root).ok();
 }
 

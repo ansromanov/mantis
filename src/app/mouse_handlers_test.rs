@@ -143,12 +143,13 @@ fn statusbar_segment_click_opens_revision_picker_and_blank_space_is_noop() {
 fn statusbar_overlay_hint_line_has_no_click_targets() {
     let root = temp_tree();
     let mut app = app_for(&root);
-    app.goto_line = Some(crate::search::GotoLineState::new());
+    app.install_palette_goto_line(crate::search::GotoLineState::new());
     app.geo.statusbar_area = Rect::new(0, 0, 30, 1);
     app.statusbar_segments.clear();
 
     app.handle_mouse(left_down_at(5, 0));
-    assert!(app.goto_line.is_some());
+    // The hint row has no targets: the click only dismisses the popup (like
+    // any click outside a popup) and never reaches a status-bar segment.
     assert!(app.revision_picker.is_none());
     fs::remove_dir_all(&root).ok();
 }

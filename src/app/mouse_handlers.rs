@@ -134,7 +134,6 @@ impl App {
             Some(Overlay::RepoLog) => return self.handle_repo_log_mouse(ev),
             Some(Overlay::RecentFiles) => return self.handle_recent_mouse(ev),
             Some(Overlay::Bookmarks) => return self.handle_bookmarks_mouse(ev),
-            Some(Overlay::Search) => return self.handle_search_mouse(ev),
             // Inline prompts: keep wheel events inside the prompt. Without this
             // guard a wheel over it falls through to the tree/content handlers
             // and changes the underlying view/focus.
@@ -163,15 +162,7 @@ impl App {
                 }
                 return;
             }
-            Some(Overlay::GotoLine)
-                if matches!(
-                    ev.kind,
-                    MouseEventKind::ScrollDown | MouseEventKind::ScrollUp
-                ) =>
-            {
-                return;
-            }
-            // Clicks outside the tree filter / go-to-line prompt reach the panes.
+            // Clicks outside the tree filter prompt reach the panes.
             _ => {}
         }
         // A click on a hint replays its key, so it behaves exactly like
@@ -541,10 +532,7 @@ impl App {
             "worktree_picker" => {
                 self.worktree_picker = Some(crate::search::WorktreePicker::new(&self.root));
             }
-            "goto_line" => {
-                self.focus = Focus::Content;
-                self.goto_line = Some(crate::search::GotoLineState::new());
-            }
+            "goto_line" => self.open_palette_goto_line(),
             "theme_picker" => {
                 self.context_menu = None;
                 self.theme_picker = Some(crate::search::ThemePicker::default());

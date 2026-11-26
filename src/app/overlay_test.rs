@@ -38,7 +38,7 @@ fn the_stack_lists_every_overlay_exactly_once() {
             "{overlay:?} listed twice"
         );
     }
-    assert_eq!(seen.len(), 19);
+    assert_eq!(seen.len(), 17);
 }
 
 #[test]

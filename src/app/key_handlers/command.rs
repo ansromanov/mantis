@@ -39,6 +39,27 @@ impl App {
             return;
         }
 
+        // Regex / case / whole-word toggles in the content route, the same
+        // Ctrl+R / Ctrl+A / Ctrl+W the standalone search window had.
+        if let Some(toggle) = static_keys::search_toggle(&key) {
+            if let Some(search) = self
+                .command_palette
+                .as_mut()
+                .filter(|p| p.route == crate::command_palette::PaletteRoute::Content)
+                .and_then(|p| p.route_search.as_mut())
+            {
+                match toggle {
+                    static_keys::SearchToggle::Regex => search.regex = !search.regex,
+                    static_keys::SearchToggle::CaseSensitive => {
+                        search.case_sensitive = !search.case_sensitive
+                    }
+                    static_keys::SearchToggle::WholeWord => search.whole_word = !search.whole_word,
+                }
+                search.refresh_now();
+                return;
+            }
+        }
+
         // Capture route before key handling so we can detect a prefix transition.
         let route_before = self
             .command_palette
@@ -55,6 +76,7 @@ impl App {
 
         match action {
             Some(OverlayKey::Activate) => {
+                self.remember_palette_search_query();
                 let route = self
                     .command_palette
                     .as_ref()
@@ -82,9 +104,14 @@ impl App {
                 }
             }
             Some(OverlayKey::Close) => {
+                self.remember_palette_search_query();
                 if let Some(ref mut p) = self.command_palette {
                     let in_routed_mode = p.route != crate::command_palette::PaletteRoute::Commands;
-                    if in_routed_mode {
+                    if in_routed_mode && p.opened_in_route {
+                        // Opened by a shortcut straight into this mode: Esc
+                        // closes the window, like every other popup.
+                        self.command_palette = None;
+                    } else if in_routed_mode {
                         p.route = crate::command_palette::PaletteRoute::Commands;
                         p.route_search = None;
                         p.route_goto_line = None;
@@ -107,6 +134,19 @@ impl App {
                 self.maybe_create_palette_sub_picker(current_route, route_before);
             }
             _ => {}
+        }
+    }
+
+    /// Stores the palette's search query for `search.keep_query`, whether the
+    /// search ends with Enter (or a double-click) or with Esc.
+    pub(crate) fn remember_palette_search_query(&mut self) {
+        if let Some(query) = self
+            .command_palette
+            .as_ref()
+            .and_then(|p| p.route_search.as_ref())
+            .map(|s| s.query.clone())
+        {
+            self.last_search_query = query;
         }
     }
 

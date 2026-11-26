@@ -2,7 +2,7 @@ use super::*;
 use crate::app::{App, Focus, StatusMessage};
 use crate::config::{Config, StatusBarConfig};
 use crate::git::{GitHead, GitRepoInfo};
-use crate::search::{GotoLineState, HistoryState, SearchState, ThemePicker};
+use crate::search::{HistoryState, SearchState, ThemePicker};
 use ratatui::backend::TestBackend;
 use ratatui::style::{Color, Modifier};
 use ratatui::Terminal;
@@ -246,15 +246,24 @@ fn hint_worktree_new_tab_mode_shows_enter_activation() {
 #[test]
 fn hint_search() {
     let mut app = make_app();
-    app.search = Some(SearchState::new(Path::new("."), false, true, 0, None));
+    app.open_palette_search(SearchState::new(Path::new("."), false, true, 0, None));
     let text = render_bar(&app);
-    assert!(text.contains("Enter select"));
+    assert!(text.contains("Enter open"));
+    assert!(
+        !text.contains("Ctrl+R"),
+        "the toggles only apply to content search, so the file route omits them"
+    );
+    let mut content = SearchState::new(Path::new("."), false, true, 0, None);
+    content.toggle_mode();
+    app.open_palette_search(content);
+    let text = render_bar(&app);
+    assert!(text.contains("Ctrl+R regex"));
 }
 
 #[test]
 fn hint_goto_line() {
     let mut app = make_app();
-    app.goto_line = Some(GotoLineState::new());
+    app.install_palette_goto_line(crate::search::GotoLineState::new());
     let text = render_bar(&app);
     assert!(text.contains("Enter jump"));
     assert!(text.contains("+N forward"));

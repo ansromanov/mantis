@@ -55,7 +55,13 @@ pub(crate) fn draw_command_palette(f: &mut Frame, app: &mut App, area: Rect) {
     };
 
     let theme = app.theme.clone();
-    let popup = centered_rect(56, 65, area);
+    // Search routes list `path:line: text` rows, so they get the larger box
+    // the standalone search window used; the command list stays compact.
+    let popup = match route {
+        crate::command_palette::PaletteRoute::Files
+        | crate::command_palette::PaletteRoute::Content => centered_rect(72, 75, area),
+        _ => centered_rect(56, 65, area),
+    };
     f.render_widget(Clear, popup);
 
     let route_label = route.label();
@@ -103,6 +109,40 @@ pub(crate) fn draw_command_palette(f: &mut Frame, app: &mut App, area: Rect) {
         ])),
         parts[0],
     );
+
+    // Search routes show what the standalone search window used to: the
+    // regex / case / whole-word toggles (content only) and a result counter,
+    // right-aligned on the query row.
+    if let Some(search) = app.command_palette.as_ref().and_then(|p| {
+        matches!(
+            p.route,
+            crate::command_palette::PaletteRoute::Files
+                | crate::command_palette::PaletteRoute::Content
+        )
+        .then_some(p.route_search.as_ref())
+        .flatten()
+    }) {
+        let mut spans = if search.mode == crate::search::SearchMode::Content {
+            super::util::search_toggle_spans(
+                search.case_sensitive,
+                search.whole_word,
+                search.regex,
+                &theme,
+            )
+        } else {
+            Vec::new()
+        };
+        let total = search.results_len();
+        let current = if total > 0 { search.selected + 1 } else { 0 };
+        spans.push(Span::styled(
+            format!("  {current}/{total}"),
+            Style::default().fg(theme.dim),
+        ));
+        f.render_widget(
+            Paragraph::new(Line::from(spans)).alignment(ratatui::layout::Alignment::Right),
+            parts[0],
+        );
+    }
 
     f.render_widget(
         Paragraph::new("-".repeat(inner.width as usize)).style(Style::default().fg(theme.dim)),

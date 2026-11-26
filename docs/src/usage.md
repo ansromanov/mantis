@@ -289,18 +289,25 @@ The status bar shows a git summary when inside a repository:
 Side-by-side diff and the staged/unstaged diff cycle have no default key —
 use the command palette (`Ctrl+P`) or bind one in `mantis.toml`.
 
-## Search popup
+## Search
 
-Three search entry points cover different needs:
+Every "find" opens the same window: the command palette (`Ctrl+P`) in the
+matching mode, so it looks and behaves the same however you open it.
 
-- **`Ctrl+T`** — global fuzzy file-name picker. Opens the same file-name search
-  from either panel, regardless of focus. Use this when you want to jump to any
-  file in the project by name.
-- **`/`** — context-sensitive: in the tree panel it filters file names inline;
-  in the content panel (with a file open) it opens the in-file search bar;
-  otherwise it falls back to the file-name picker.
-- **`Ctrl+F`** (or `f` in the tree panel) — fuzzy content search across
-  all files (or changed files in git mode).
+- **`Ctrl+T`** — find a file by name (palette `/` mode), from either panel.
+- **`Ctrl+F`** (or `f` in the tree) — search file contents (palette `#` mode)
+  across all files, or only changed files in git mode. `Tab` switches between
+  names and contents; `Ctrl+R`, `Ctrl+A` and `Ctrl+W` toggle regex,
+  case-sensitive and whole-word matching.
+- **`Ctrl+G`** — go to a line in the open file (palette `:` mode), from either
+  panel.
+- **`O`** / **`!`** — symbols / diagnostics of the open file (palette `@` / `!`).
+- **`/`** — stays local: in the tree it filters names inline; in the content
+  panel it opens the in-file search bar.
+
+When a shortcut opens the palette in a mode, `Esc` closes it; when you switch
+modes by typing a prefix in `Ctrl+P`, `Esc` (or Backspace on an empty query)
+returns to the command list.
 
 Open any search popup and just start typing to filter.
 In git mode (`Ctrl+D`), searches are automatically scoped to only the

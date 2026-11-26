@@ -550,7 +550,7 @@ fn image_overlay_suppressed_while_help_is_shown() {
 fn image_overlay_suppressed_while_search_popup_is_open() {
     let root = temp_root();
     let mut app = app_for(&root);
-    app.search = Some(crate::search::SearchState::new(&root, false, true, 0, None));
+    app.open_palette_search(crate::search::SearchState::new(&root, false, true, 0, None));
     assert!(app.image_overlay_suppressed());
     fs::remove_dir_all(&root).ok();
 }
