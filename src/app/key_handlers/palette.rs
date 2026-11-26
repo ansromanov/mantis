@@ -88,8 +88,7 @@ impl App {
         });
         self.command_palette = None;
         if let Some(path) = action {
-            self.open_file(&path);
-            self.reveal_in_tree(&path);
+            self.open_and_reveal(&path);
         }
     }
 
@@ -105,9 +104,8 @@ impl App {
         });
         self.command_palette = None;
         if let Some((path, line)) = action {
-            self.open_file(&path);
+            self.open_and_reveal(&path);
             self.set_content_scroll(line.saturating_sub(1));
-            self.reveal_in_tree(&path);
         }
     }
 
@@ -121,6 +119,7 @@ impl App {
         self.command_palette = None;
         if let Some(q) = query {
             self.goto_line_from_query(&q);
+            self.focus = crate::app::Focus::Content;
         }
     }
 
@@ -160,6 +159,7 @@ impl App {
             self.scroll_active_line_into_view();
             self.mark_content_scrolled();
             self.mark_session_dirty();
+            self.focus = crate::app::Focus::Content;
         }
     }
 
@@ -201,6 +201,7 @@ impl App {
             self.scroll_active_line_into_view();
             self.mark_content_scrolled();
             self.mark_session_dirty();
+            self.focus = crate::app::Focus::Content;
         }
     }
 
@@ -208,8 +209,7 @@ impl App {
     /// absolute (`42`, 1-indexed, clamped to the file), relative forward
     /// (`+5`), and relative backward (`-3`) jumps. Diff and rendered
     /// views have no active-line cursor, so relative jumps are based on
-    /// `content_scroll` there instead. Shared by the standalone goto-line
-    /// dialog and the palette's `:` route.
+    /// `content_scroll` there instead. Used by the palette's `:` route.
     pub(crate) fn goto_line_from_query(&mut self, q: &str) {
         let has_cursor = self.has_text_cursor();
         let base = if has_cursor {
