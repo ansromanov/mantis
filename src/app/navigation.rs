@@ -284,6 +284,20 @@ impl App {
 
     /// Acts on the currently selected node: toggles a directory's fold state,
     /// or opens a file. Shared by the Enter key and a mouse click.
+    /// Keyboard "open": activates the selected row and, when it is a file,
+    /// moves focus to the content pane so reading keys work straight away.
+    /// Directories only expand/collapse and keep focus in the tree.
+    pub(super) fn activate_selected_and_focus(&mut self) {
+        let is_file = self
+            .nodes
+            .get(self.tree_selected)
+            .is_some_and(|node| !node.is_dir);
+        self.activate_selected();
+        if is_file {
+            self.focus = crate::app::Focus::Content;
+        }
+    }
+
     pub(super) fn activate_selected(&mut self) {
         let Some(node) = self.nodes.get(self.tree_selected) else {
             return;
