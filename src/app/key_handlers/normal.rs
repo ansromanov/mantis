@@ -62,6 +62,12 @@ impl App {
                 self.toggle_git_mode();
                 return;
             }
+            // Nothing else to dismiss: Esc in the content pane steps back to
+            // the tree, the inverse of opening a file with Enter.
+            if self.focus == Focus::Content {
+                self.focus = Focus::Tree;
+                return;
+            }
         }
         let scope = match self.focus {
             Focus::Tree => BindingScope::Tree,
@@ -271,7 +277,7 @@ impl App {
                 self.try_open_selected();
             }
         } else if pressed_in(&k.tree_expand, &key, scope) {
-            self.activate_selected();
+            self.activate_selected_and_focus();
         } else if self.tree_independent_scroll && pressed_in(&k.content_page_up, &key, scope) {
             let page = self.tree_page_size();
             self.tree_scroll = self.tree_scroll.saturating_sub(page);
@@ -479,8 +485,14 @@ impl App {
             } else {
                 self.set_content_scroll(self.content_scroll.saturating_add(self.page_rows()));
             }
-        } else if !self.word_wrap && pressed_in(&k.content_left, &key, scope) {
-            self.content_hscroll = self.content_hscroll.saturating_sub(4);
+        } else if pressed_in(&k.content_left, &key, scope) {
+            // At the left edge (or with wrap on, where there is no horizontal
+            // scroll) Left steps back to the tree, mirroring Right/Enter there.
+            if self.word_wrap || self.content_hscroll == 0 {
+                self.focus = Focus::Tree;
+            } else {
+                self.content_hscroll = self.content_hscroll.saturating_sub(4);
+            }
         } else if !self.word_wrap && pressed_in(&k.content_right, &key, scope) {
             self.content_hscroll += 4;
         } else if !self.word_wrap && pressed_in(&k.content_reset_col, &key, scope) {

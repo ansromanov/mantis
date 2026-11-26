@@ -125,7 +125,7 @@ restore_on_launch = true     # reopen last session's tabs when launched with no 
 [keys]
 
 # global
-quit = ["ctrl+c", "tree:q"]
+quit = ["ctrl+c", "q"]                # q quits from the main screen; in a popup it closes or types
 help = ["F1", "?"]
 menu_bar = ["F10"]
 context_menu = ["Menu", "shift+F10"]

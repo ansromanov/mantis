@@ -34,7 +34,7 @@ You don't need to learn anything special — use the arrow keys, or your mouse.
 | Collapse a folder / go up | `←` |
 | Jump between the tree and the file view | `Tab` |
 | Scroll the file | `↑` / `↓`, `PageUp` / `PageDown` |
-| Quit | `Ctrl+c` (or `q` while the tree is focused) |
+| Quit | `Ctrl+c` or `q` |
 
 > 🖱️ Prefer the mouse? Click a row to select it, click a folder to fold/unfold,
 > and use the scroll wheel in whichever panel your cursor is over.

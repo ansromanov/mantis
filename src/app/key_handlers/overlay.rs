@@ -261,11 +261,8 @@ impl App {
     /// the list triggers paged loading.
     pub(super) fn handle_repo_log_key(&mut self, key: KeyEvent) {
         let should_load_more = if let Some(ref r) = self.repo_log {
-            // 'j' navigates only while the query is empty; otherwise it is a
-            // query character and must not trigger paging.
-            (matches!(key.code, KeyCode::Down)
-                || (matches!(key.code, KeyCode::Char('j')) && r.query.is_empty()))
-                && r.selected + 1 >= r.results_len()
+            // Every printable key is query text (j included); only Down pages.
+            matches!(key.code, KeyCode::Down) && r.selected + 1 >= r.results_len()
         } else {
             false
         };

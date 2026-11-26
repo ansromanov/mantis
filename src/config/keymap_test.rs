@@ -455,7 +455,7 @@ fn pressed_in_honours_scope() {
 fn default_content_reachable_letters_are_motions_only() {
     let motions = [
         'j', 'k', 'h', 'l', 'g', 'G', '0', 'n', 'N', 'M', 'o', 'O', 'y', 'Y', 'B', 'F', 's', 'S',
-        ' ', 'z', 'L', 'J', 'T',
+        ' ', 'z', 'L', 'J', 'T', 'q',
     ];
     let tree_structural = [
         "tree_expand",
