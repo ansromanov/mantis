@@ -1982,3 +1982,34 @@ fn q_quits_from_the_content_pane_too() {
     assert!(app.should_quit);
     fs::remove_dir_all(root).ok();
 }
+
+#[test]
+fn opening_a_file_from_search_focuses_the_content_pane() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.focus = crate::app::Focus::Tree;
+    app.handle_key(ctrl('t'));
+    for c in "long".chars() {
+        app.handle_key(key(KeyCode::Char(c)));
+    }
+    app.handle_key(key(KeyCode::Enter));
+    assert_eq!(
+        app.current_file.as_deref(),
+        Some(root.join("long.txt").as_path())
+    );
+    assert_eq!(app.focus, crate::app::Focus::Content);
+    fs::remove_dir_all(root).ok();
+}
+
+#[test]
+fn go_to_line_from_the_tree_focuses_the_content_pane() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.open_file(&root.join("long.txt"));
+    app.focus = crate::app::Focus::Tree;
+    app.handle_key(ctrl('g'));
+    app.handle_key(key(KeyCode::Char('3')));
+    app.handle_key(key(KeyCode::Enter));
+    assert_eq!(app.focus, crate::app::Focus::Content);
+    fs::remove_dir_all(root).ok();
+}
