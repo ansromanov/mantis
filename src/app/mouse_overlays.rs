@@ -143,6 +143,7 @@ impl App {
             &mut self.last_click,
         ) == PickerMouseAction::Activate
         {
+            self.remember_palette_search_query();
             let route = self
                 .command_palette
                 .as_ref()

@@ -76,6 +76,7 @@ impl App {
 
         match action {
             Some(OverlayKey::Activate) => {
+                self.remember_palette_search_query();
                 let route = self
                     .command_palette
                     .as_ref()
@@ -103,15 +104,7 @@ impl App {
                 }
             }
             Some(OverlayKey::Close) => {
-                // Remember the search query for `search.keep_query`.
-                if let Some(query) = self
-                    .command_palette
-                    .as_ref()
-                    .and_then(|p| p.route_search.as_ref())
-                    .map(|s| s.query.clone())
-                {
-                    self.last_search_query = query;
-                }
+                self.remember_palette_search_query();
                 if let Some(ref mut p) = self.command_palette {
                     let in_routed_mode = p.route != crate::command_palette::PaletteRoute::Commands;
                     if in_routed_mode && p.opened_in_route {
@@ -141,6 +134,19 @@ impl App {
                 self.maybe_create_palette_sub_picker(current_route, route_before);
             }
             _ => {}
+        }
+    }
+
+    /// Stores the palette's search query for `search.keep_query`, whether the
+    /// search ends with Enter (or a double-click) or with Esc.
+    pub(crate) fn remember_palette_search_query(&mut self) {
+        if let Some(query) = self
+            .command_palette
+            .as_ref()
+            .and_then(|p| p.route_search.as_ref())
+            .map(|s| s.query.clone())
+        {
+            self.last_search_query = query;
         }
     }
 

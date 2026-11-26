@@ -1898,3 +1898,20 @@ fn ctrl_g_works_from_the_tree_when_a_file_is_open() {
     assert!(app.palette_goto_line().is_some());
     fs::remove_dir_all(root).ok();
 }
+
+#[test]
+fn opening_a_search_result_also_remembers_the_query() {
+    let root = temp_tree();
+    let mut app = app_for(&root);
+    app.config.search.keep_query = true;
+    app.handle_key(ctrl('t'));
+    for c in "long".chars() {
+        app.handle_key(key(KeyCode::Char(c)));
+    }
+    app.handle_key(key(KeyCode::Enter));
+    assert_eq!(
+        app.last_search_query, "long",
+        "Enter keeps the query like Esc does"
+    );
+    fs::remove_dir_all(root).ok();
+}

@@ -249,6 +249,14 @@ fn hint_search() {
     app.open_palette_search(SearchState::new(Path::new("."), false, true, 0, None));
     let text = render_bar(&app);
     assert!(text.contains("Enter open"));
+    assert!(
+        !text.contains("Ctrl+R"),
+        "the toggles only apply to content search, so the file route omits them"
+    );
+    let mut content = SearchState::new(Path::new("."), false, true, 0, None);
+    content.toggle_mode();
+    app.open_palette_search(content);
+    let text = render_bar(&app);
     assert!(text.contains("Ctrl+R regex"));
 }
 
