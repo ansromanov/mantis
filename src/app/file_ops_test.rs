@@ -988,11 +988,11 @@ fn open_file_search_sets_search_state_in_files_mode() {
     let mut app = app_for(&root);
     app.open_file_search();
     assert!(
-        app.search.is_some(),
+        app.palette_search().is_some(),
         "open_file_search must populate app.search"
     );
     assert_eq!(
-        app.search.as_ref().unwrap().mode,
+        app.palette_search().unwrap().mode,
         SearchMode::Files,
         "open_file_search must open in Files mode"
     );
@@ -1006,7 +1006,7 @@ fn open_file_search_scoped_in_git_mode() {
     app.git_mode = true;
     app.open_file_search();
     assert!(
-        app.search.as_ref().unwrap().scoped,
+        app.palette_search().unwrap().scoped,
         "open_file_search must scope to changed files in git mode"
     );
     fs::remove_dir_all(&root).ok();
@@ -1018,7 +1018,7 @@ fn open_file_search_not_scoped_outside_git_mode() {
     let mut app = app_for(&root);
     app.open_file_search();
     assert!(
-        !app.search.as_ref().unwrap().scoped,
+        !app.palette_search().unwrap().scoped,
         "open_file_search must not scope outside git mode"
     );
     fs::remove_dir_all(&root).ok();
@@ -1032,7 +1032,7 @@ fn open_file_search_restores_last_query_when_keep_query_enabled() {
     app.last_search_query = "foo".to_string();
     app.open_file_search();
     assert_eq!(
-        app.search.as_ref().unwrap().query,
+        app.palette_search().unwrap().query,
         "foo",
         "open_file_search must restore last query when search.keep_query is true"
     );
@@ -1047,7 +1047,7 @@ fn open_file_search_does_not_restore_query_when_keep_query_disabled() {
     app.last_search_query = "foo".to_string();
     app.open_file_search();
     assert_eq!(
-        app.search.as_ref().unwrap().query,
+        app.palette_search().unwrap().query,
         "",
         "open_file_search must not restore query when search.keep_query is false"
     );

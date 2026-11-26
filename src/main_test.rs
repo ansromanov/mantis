@@ -547,14 +547,14 @@ fn event_loop_key_search_toggles_search() {
     let dir = temp_dir();
     fs::write(dir.join("a.txt"), "hello\n").unwrap();
     let mut app = app_for(&dir);
-    assert!(app.search.is_none());
+    assert!(app.palette_search().is_none());
     // ctrl+f opens the full-text content search overlay.
     app.focus = crate::app::Focus::Content;
     app.current_file = None;
     app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
-    assert!(app.search.is_some());
+    assert!(app.palette_search().is_some());
     app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()));
-    assert!(app.search.is_none());
+    assert!(app.palette_search().is_none());
     fs::remove_dir_all(&dir).ok();
 }
 
@@ -623,7 +623,7 @@ fn run_event_loop_processes_events_before_quit() {
     let mut events = ScriptedEvents::new(vec![key_event('/'), esc_event(), key_event('q')]);
     run_event_loop(&mut terminal, &mut tabs, &mut events).unwrap();
     assert!(tabs.active_app().should_quit);
-    assert!(tabs.active_app().search.is_none());
+    assert!(tabs.active_app().command_palette.is_none());
     fs::remove_dir_all(&dir).ok();
 }
 

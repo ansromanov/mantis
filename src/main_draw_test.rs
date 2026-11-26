@@ -102,7 +102,7 @@ fn app_draw_with_search_open() {
     app.current_file = None;
     // ctrl+f opens the full-text content search overlay.
     app.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
-    assert!(app.search.is_some());
+    assert!(app.palette_search().is_some());
     let backend = TestBackend::new(80, 30);
     let mut terminal = ratatui::Terminal::new(backend).unwrap();
     terminal.draw(|f| ui::draw(f, &mut app)).unwrap();

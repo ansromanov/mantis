@@ -35,7 +35,7 @@ use super::selection::apply_selection;
 /// - Inline fallback view (for errors, binaries, small files)
 pub(crate) fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     let focused = matches!(app.focus, Focus::Content)
-        && app.search.is_none()
+        && app.command_palette.is_none()
         && app.history.is_none()
         && app.theme_picker.is_none();
     let border_style = if focused {

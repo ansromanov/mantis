@@ -12,7 +12,6 @@
 use std::path::{Path, PathBuf};
 
 use crate::git::GitStatus;
-use crate::search::SearchMode;
 use crate::tree::{build_visible, TreeNode};
 
 use super::App;
@@ -542,26 +541,6 @@ impl App {
             .map(|n| n.path.clone());
         if let Some(p) = path {
             self.set_root(&p);
-        }
-    }
-
-    /// Opens the currently selected search result and closes the overlay.
-    /// Shared by the Enter key and a mouse click in the results list.
-    pub(super) fn activate_search_selection(&mut self) {
-        let action = self.search.as_ref().and_then(|s| match s.mode {
-            SearchMode::Files => s.file_results.get(s.selected).map(|p| (p.clone(), None)),
-            SearchMode::Content => s
-                .content_results
-                .get(s.selected)
-                .map(|m| (m.path.clone(), Some(m.line_num))),
-        });
-        self.search = None;
-        if let Some((path, line)) = action {
-            self.open_file(&path);
-            if let Some(ln) = line {
-                self.set_content_scroll(ln.saturating_sub(1));
-            }
-            self.reveal_in_tree(&path.clone());
         }
     }
 }

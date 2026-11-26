@@ -40,8 +40,6 @@ pub struct Geometry {
     pub blame_area: Rect,
     /// Hit area of the diff info and actions header bar at the top of the diff pane.
     pub diff_header_area: Rect,
-    pub search_area: Rect,
-    pub search_offset: usize,
     pub command_palette_area: Rect,
     pub command_palette_offset: usize,
     pub history_area: Rect,

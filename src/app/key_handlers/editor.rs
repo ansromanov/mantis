@@ -11,9 +11,9 @@
 //! `palette`, and launching external programs (`$EDITOR`, the browser, the OS
 //! opener, the file manager) is in `external`.
 
-use crate::search::{GotoLineState, SearchState, ThemePicker};
+use crate::search::ThemePicker;
 
-use super::super::{App, Focus};
+use super::super::App;
 
 impl App {
     /// Executes the selected command from the palette and closes it. Returns
@@ -98,21 +98,7 @@ impl App {
                 true
             }
             Some("search_content") => {
-                let root = self.root.clone();
-                let changed = self.git_changed_files_set();
-                let mut s = SearchState::new(
-                    &root,
-                    self.show_hidden,
-                    self.ignore_gitignore,
-                    self.config.search.context_lines,
-                    changed.as_ref(),
-                );
-                s.toggle_mode();
-                if self.config.search.keep_query && !self.last_search_query.is_empty() {
-                    s.query = self.last_search_query.clone();
-                    s.refresh_now();
-                }
-                self.search = Some(s);
+                self.open_content_search();
                 true
             }
             Some("reload") => {
@@ -412,9 +398,7 @@ impl App {
                 true
             }
             Some("goto_line") => {
-                if self.focus == Focus::Content {
-                    self.goto_line = Some(GotoLineState::new());
-                }
+                self.open_palette_goto_line();
                 true
             }
             Some("symbol_outline") => {

@@ -143,6 +143,7 @@ impl App {
             &mut self.last_click,
         ) == PickerMouseAction::Activate
         {
+            self.remember_palette_search_query();
             let route = self
                 .command_palette
                 .as_ref()
@@ -160,22 +161,6 @@ impl App {
                     self.dispatch_palette_diagnostic()
                 }
             }
-        }
-    }
-
-    /// Handles mouse events on the search overlay: click to select,
-    /// double-click to open the result, scroll to navigate.
-    /// Close on click outside the popup area.
-    pub(super) fn handle_search_mouse(&mut self, ev: MouseEvent) {
-        if handle_picker_mouse(
-            ev,
-            self.geo.search_area,
-            self.geo.search_offset,
-            &mut self.search,
-            &mut self.last_click,
-        ) == PickerMouseAction::Activate
-        {
-            self.activate_search_selection();
         }
     }
 

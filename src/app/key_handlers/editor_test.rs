@@ -288,19 +288,20 @@ fn go_to_line_command_opens_dialog_when_content_focused() {
     app.focus = Focus::Content;
     app.command_palette = Some(palette_with_query("Go to line"));
     app.dispatch_command();
-    assert!(app.goto_line.is_some());
+    assert!(app.palette_goto_line().is_some());
     fs::remove_dir_all(&root).ok();
 }
 
 #[test]
-fn go_to_line_command_no_op_when_tree_focused() {
+fn go_to_line_command_works_from_the_tree_too() {
+    // The line is resolved against the open file, so focus does not matter.
     let root = temp_tree();
     let mut app = app_for(&root);
     app.current_file = Some(root.join("a.txt"));
     app.focus = Focus::Tree;
     app.command_palette = Some(palette_with_query("Go to line"));
     app.dispatch_command();
-    assert!(app.goto_line.is_none());
+    assert!(app.palette_goto_line().is_some());
     fs::remove_dir_all(&root).ok();
 }
 
@@ -379,7 +380,7 @@ fn open_file_search_command_scoped_in_git_mode() {
     app.command_palette = Some(palette_with_query("Open file search"));
     app.dispatch_command();
     assert!(
-        app.search.as_ref().unwrap().scoped,
+        app.palette_search().unwrap().scoped,
         "file search must be scoped when git mode is active"
     );
     fs::remove_dir_all(&root).ok();
@@ -392,7 +393,7 @@ fn open_file_search_command_not_scoped_outside_git_mode() {
     app.command_palette = Some(palette_with_query("Open file search"));
     app.dispatch_command();
     assert!(
-        !app.search.as_ref().unwrap().scoped,
+        !app.palette_search().unwrap().scoped,
         "file search must not be scoped outside git mode"
     );
     fs::remove_dir_all(&root).ok();
@@ -406,7 +407,7 @@ fn open_content_search_command_scoped_in_git_mode() {
     app.command_palette = Some(palette_with_query("Open content search"));
     app.dispatch_command();
     assert!(
-        app.search.as_ref().unwrap().scoped,
+        app.palette_search().unwrap().scoped,
         "content search must be scoped when git mode is active"
     );
     fs::remove_dir_all(&root).ok();
@@ -753,7 +754,7 @@ fn dispatch_command_find_files_opens_file_picker() {
         "find_files must be a real dispatch arm"
     );
     assert!(
-        app.search.is_some(),
+        app.palette_search().is_some(),
         "find_files must open the search picker"
     );
     fs::remove_dir_all(&root).ok();

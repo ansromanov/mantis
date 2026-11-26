@@ -29,7 +29,7 @@ fn find_in_folder_opens_content_search_from_that_directory() {
 
     app.execute_context_action(ContextActionId::FindInFolder);
 
-    let search = app.search.as_ref().expect("scoped search opens");
+    let search = app.palette_search().expect("scoped search opens");
     assert_eq!(search.mode, SearchMode::Content);
     assert!(app.context_menu.is_none());
     fs::remove_dir_all(&root).ok();

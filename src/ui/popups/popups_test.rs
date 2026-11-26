@@ -3,7 +3,7 @@ use ratatui::layout::Rect;
 use crate::ui::popups::util::centered_rect;
 use crate::ui::popups::{
     draw_about, draw_command_palette, draw_help, draw_history, draw_in_file_search, draw_recent,
-    draw_search, draw_tab_picker, draw_theme, draw_tree_filter,
+    draw_tab_picker, draw_theme, draw_tree_filter,
 };
 
 #[test]
@@ -71,22 +71,7 @@ fn centered_rect_non_zero_origin() {
     assert_eq!(result.y, 5 + 10);
 }
 
-// ── draw_search_none ─────────────────────────────────────────────────────
-
-#[test]
-fn draw_search_none_does_not_panic() {
-    let dir = tempfile::tempdir().unwrap();
-    let mut app = make_app(dir.path());
-    app.search = None;
-
-    let backend = TestBackend::new(80, 30);
-    let mut terminal = Terminal::new(backend).unwrap();
-    terminal
-        .draw(|f| draw_search(f, &mut app, f.area()))
-        .unwrap();
-}
-
-// ── draw_search ─────────────────────────────────────────────────────────
+// ── shared helpers ──────────────────────────────────────────────────────
 
 use crate::app::App;
 use crate::config::Config;
@@ -115,147 +100,6 @@ fn buffer_rows(terminal: &Terminal<TestBackend>) -> Vec<String> {
                 .collect()
         })
         .collect()
-}
-
-#[test]
-fn draw_search_files_mode() {
-    let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("alpha.txt"), "").unwrap();
-    std::fs::write(dir.path().join("beta.txt"), "").unwrap();
-    let mut app = make_app(dir.path());
-    app.search = Some(crate::search::SearchState::new(
-        dir.path(),
-        false,
-        true,
-        0,
-        None,
-    ));
-
-    let backend = TestBackend::new(80, 30);
-    let mut terminal = Terminal::new(backend).unwrap();
-    terminal
-        .draw(|f| draw_search(f, &mut app, f.area()))
-        .unwrap();
-    let rows = buffer_rows(&terminal);
-    let joined = rows.join("\n");
-    assert!(joined.contains("Search: Files"));
-    assert!(joined.contains("alpha.txt"));
-    assert!(joined.contains("beta.txt"));
-}
-
-#[test]
-fn draw_search_files_filtered() {
-    let dir = tempfile::tempdir().unwrap();
-    let one = dir.path().join("111111_document_only.txt");
-    let two = dir.path().join("222222_document_only.txt");
-    std::fs::write(&one, "").unwrap();
-    std::fs::write(&two, "").unwrap();
-    let mut app = make_app(dir.path());
-    app.search = Some(crate::search::SearchState::new(
-        dir.path(),
-        false,
-        true,
-        0,
-        None,
-    ));
-    for c in "111111".chars() {
-        app.search.as_mut().unwrap().push(c);
-    }
-
-    let backend = TestBackend::new(80, 30);
-    let mut terminal = Terminal::new(backend).unwrap();
-    terminal
-        .draw(|f| draw_search(f, &mut app, f.area()))
-        .unwrap();
-    let rows = buffer_rows(&terminal);
-    let joined = rows.join("\n");
-    assert!(joined.contains("111111_document_only.txt"));
-    assert!(!joined.contains("222222_document_only.txt"));
-}
-
-#[test]
-fn draw_search_content_mode() {
-    let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("hello.txt"), "hello world\nfoo bar\n").unwrap();
-    std::fs::write(dir.path().join("other.txt"), "no match").unwrap();
-    let mut app = make_app(dir.path());
-    let mut search = crate::search::SearchState::new(dir.path(), false, true, 0, None);
-    search.toggle_mode();
-    search.push('h');
-    search.push('e');
-    search.refresh_now();
-    app.search = Some(search);
-
-    let backend = TestBackend::new(80, 30);
-    let mut terminal = Terminal::new(backend).unwrap();
-    terminal
-        .draw(|f| draw_search(f, &mut app, f.area()))
-        .unwrap();
-    let rows = buffer_rows(&terminal);
-    let joined = rows.join("\n");
-    assert!(joined.contains("Search: Content"));
-    assert!(joined.contains("hello.txt"));
-    assert!(joined.contains("hello world"));
-}
-
-#[test]
-fn draw_search_content_short_query_hint() {
-    let dir = tempfile::tempdir().unwrap();
-    let mut app = make_app(dir.path());
-    let mut search = crate::search::SearchState::new(dir.path(), false, true, 0, None);
-    search.toggle_mode();
-    search.push('x');
-    app.search = Some(search);
-
-    let backend = TestBackend::new(80, 30);
-    let mut terminal = Terminal::new(backend).unwrap();
-    terminal
-        .draw(|f| draw_search(f, &mut app, f.area()))
-        .unwrap();
-    let rows = buffer_rows(&terminal);
-    let joined = rows.join("\n");
-    assert!(joined.contains("2+ chars"));
-}
-
-#[test]
-fn draw_search_content_query_two_chars_hides_hint() {
-    let dir = tempfile::tempdir().unwrap();
-    let mut app = make_app(dir.path());
-    let mut search = crate::search::SearchState::new(dir.path(), false, true, 0, None);
-    search.toggle_mode();
-    search.push('x');
-    search.push('y');
-    app.search = Some(search);
-
-    let backend = TestBackend::new(80, 30);
-    let mut terminal = Terminal::new(backend).unwrap();
-    terminal
-        .draw(|f| draw_search(f, &mut app, f.area()))
-        .unwrap();
-    let rows = buffer_rows(&terminal);
-    let joined = rows.join("\n");
-    assert!(joined.contains("Search: Content"));
-    assert!(!joined.is_empty());
-}
-
-#[test]
-fn draw_search_select_highlight() {
-    let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("a.txt"), "").unwrap();
-    std::fs::write(dir.path().join("b.txt"), "").unwrap();
-    let mut app = make_app(dir.path());
-    let mut search = crate::search::SearchState::new(dir.path(), false, true, 0, None);
-    search.selected = 1;
-    app.search = Some(search);
-
-    let backend = TestBackend::new(80, 30);
-    let mut terminal = Terminal::new(backend).unwrap();
-    terminal
-        .draw(|f| draw_search(f, &mut app, f.area()))
-        .unwrap();
-    let rows = buffer_rows(&terminal);
-    let joined = rows.join("\n");
-    assert!(joined.contains("b.txt"));
 }
 
 // ── draw_history_none ────────────────────────────────────────────────────

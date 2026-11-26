@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::search::{HistoryState, RecentFilesState, SearchState};
+use crate::search::{HistoryState, RecentFilesState};
 
 use super::{diff_line_style, App, Focus};
 
@@ -89,20 +89,8 @@ impl App {
     /// Opens the global fuzzy file-name picker (SearchState in Files mode),
     /// scoped to git-changed files when in git mode. Focus-independent.
     pub fn open_file_search(&mut self) {
-        let root = self.root.clone();
-        let changed = self.git_changed_files_set();
-        let mut s = SearchState::new(
-            &root,
-            self.show_hidden,
-            self.ignore_gitignore,
-            self.config.search.context_lines,
-            changed.as_ref(),
-        );
-        if self.config.search.keep_query && !self.last_search_query.is_empty() {
-            s.query = self.last_search_query.clone();
-            s.refresh_now();
-        }
-        self.search = Some(s);
+        let search = self.new_search_state(false);
+        self.open_palette_search(search);
     }
 
     /// Opens the git history of the currently displayed file as a picker.
