@@ -32,6 +32,10 @@ fn tab_picker_overlay_draws_with_the_workspace() {
 /// Layout tests below pin the classic layout (status bar on the last row), so
 /// the hint row is off here; `hint_row_sits_below_the_status_bar` covers it.
 fn make_app() -> App {
+    make_app_in(PathBuf::from("."))
+}
+
+fn make_app_in(root: PathBuf) -> App {
     let cfg = Config {
         git: crate::config::GitConfig {
             status: false,
@@ -43,7 +47,7 @@ fn make_app() -> App {
         },
         ..Config::default()
     };
-    App::new(PathBuf::from("."), cfg, None, None).unwrap()
+    App::new(root, cfg, None, None).unwrap()
 }
 
 #[test]
@@ -98,7 +102,10 @@ fn render(app: &mut App) -> Vec<String> {
 
 #[test]
 fn draw_no_overlay() {
-    let mut app = make_app();
+    // A fixed directory, so the test does not depend on what the repository root holds.
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("mantis.toml"), "").unwrap();
+    let mut app = make_app_in(dir.path().to_path_buf());
     let rows = render(&mut app);
     assert_eq!(app.geo.menu_bar_area, ratatui::layout::Rect::default());
     let joined = rows.join("\n");
