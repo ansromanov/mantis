@@ -80,4 +80,6 @@ just run PATH  # run the viewer
 - Releases are cut manually from the `Release` workflow; the version lives in `Cargo.toml`
   and is bumped by the release workflow only — never in feature PRs.
 - A PR does not need a linked issue. Describe what changed and why.
+- Right after opening a pull request, turn on auto-merge: `gh pr merge --auto --squash`. GitHub merges it when the
+  required checks pass; do not merge by hand and do not use `--admin`. Dependabot's pull requests get this from a workflow.
 - User-visible changes update the matching page in `docs/src/`.
